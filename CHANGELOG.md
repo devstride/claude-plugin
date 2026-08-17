@@ -16,6 +16,12 @@ for what each version component means here and how a release is cut.
   the checklist for cutting a release, how to tag, and how updates reach installed users.
 - README section on versioning, updates and pinning.
 
+### Notes
+
+- **Updates are not automatic.** An installed plugin stays at its version until you run
+  `claude plugin marketplace update devstride` **and** `claude plugin update devstride@devstride`,
+  then restart. The first command alone refreshes the catalog without touching your install.
+
 ## [0.3.0] — 2026-08-17
 
 ### Added

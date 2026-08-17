@@ -135,12 +135,19 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 Current version: **0.3.1** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
-**When updates reach you.** Claude Code checks its marketplaces **once per session**, so a new
-release arrives at your **next session start**. To pull it immediately:
+**Getting a new release.** Updates are **not** applied automatically — an installed plugin stays at
+its version until you ask for the new one. Two steps, and both are needed:
 
+```bash
+claude plugin marketplace update devstride   # refresh the catalog
+claude plugin update devstride@devstride     # upgrade the installed plugin
 ```
-/plugin marketplace update devstride
-```
+
+Then restart Claude Code to apply it. Note the second command needs the **fully-qualified**
+`devstride@devstride`; the bare plugin name reports "not found".
+
+The first command on its own is a common mistake — it refreshes marketplace metadata and reports
+success while leaving your installed copy exactly where it was.
 
 **Compatibility.** Skill names (`/devstride:<name>`) and the `.claude/ds-config.json` key contract
 change only on a **MAJOR** version bump. New skills and changed skill behavior come in MINOR bumps;

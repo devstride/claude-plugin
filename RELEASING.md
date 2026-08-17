@@ -53,16 +53,28 @@ between minors.
 
 ## When your users actually get it
 
-Git-sourced marketplace installs resolve to a commit. Claude Code checks for marketplace updates
-**once per session**, so a release reaches an installed user at their **next session start** — not
-mid-session. To pull it immediately:
+**They do not get it automatically.** This is the part worth stating plainly when you announce a
+release, because the intuition is wrong: an installed plugin stays pinned to its installed version
+indefinitely. Verified on Claude Code 2.1.233 — starting a fresh session with a newer version
+available left the installed plugin untouched.
 
-```
-/plugin marketplace update devstride
+Getting the new version takes two commands, and **both** are required:
+
+```bash
+claude plugin marketplace update devstride   # refresh the catalog
+claude plugin update devstride@devstride     # upgrade the installed plugin
 ```
 
-That is the answer to "when does my team get the fix": next session, or right now if they run the
-update themselves.
+followed by a restart to apply. Two traps worth repeating to users:
+
+- **`marketplace update` alone does nothing to an installed plugin.** It refreshes catalog metadata
+  and prints success, while the installed copy stays exactly where it was. This looks like the fix
+  did not ship.
+- **`claude plugin update devstride` fails** with "Plugin not found" — the update command needs the
+  fully-qualified `devstride@devstride`.
+
+So the answer to "when does my team get the fix" is: when they run those two commands. Say so in the
+release announcement rather than assuming it propagates.
 
 ### Pinning
 
