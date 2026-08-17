@@ -132,7 +132,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 
 ## Versioning & updates
 
-Current version: **0.3.1** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **0.3.2** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not** applied automatically — an installed plugin stays at
@@ -158,7 +158,7 @@ always tracks the default branch. To pin, clone the repository at a release tag 
 directory* as the marketplace, which freezes you at that commit until you move the clone yourself:
 
 ```bash
-git clone --branch devstride--v0.3.1 --depth 1 \
+git clone --branch devstride--v0.3.2 --depth 1 \
   https://github.com/devstride/claude-plugin ~/devstride-plugin-pinned
 claude plugin marketplace remove devstride
 claude plugin marketplace add ~/devstride-plugin-pinned

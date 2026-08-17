@@ -83,7 +83,7 @@ always tracks the default branch. Pinning therefore works by pointing the market
 clone checked out at a release tag, which freezes the user at that commit until they move the clone:
 
 ```bash
-git clone --branch devstride--v0.3.1 --depth 1 \
+git clone --branch devstride--v0.3.2 --depth 1 \
   https://github.com/devstride/claude-plugin ~/devstride-plugin-pinned
 claude plugin marketplace remove devstride
 claude plugin marketplace add ~/devstride-plugin-pinned

@@ -8,6 +8,18 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-08-17
+
+### Fixed
+
+- **The documented update path did not work.** Updates are not automatic: a fresh session leaves an
+  installed plugin at its existing version, and refreshing the marketplace reports success without
+  touching the install. Upgrading needs `claude plugin marketplace update devstride` **and**
+  `claude plugin update devstride@devstride` (fully-qualified — the bare name reports "not found"),
+  then a restart.
+- **The documented pinning command did not exist.** `claude plugin marketplace add` has no ref or
+  version flag; pinning means cloning a release tag and adding that directory as the marketplace.
+
 ## [0.3.1] — 2026-08-17
 
 ### Added
@@ -15,12 +27,6 @@ for what each version component means here and how a release is cut.
 - `CHANGELOG.md` and `RELEASING.md`: a documented release process — how to choose a version number,
   the checklist for cutting a release, how to tag, and how updates reach installed users.
 - README section on versioning, updates and pinning.
-
-### Notes
-
-- **Updates are not automatic.** An installed plugin stays at its version until you run
-  `claude plugin marketplace update devstride` **and** `claude plugin update devstride@devstride`,
-  then restart. The first command alone refreshes the catalog without touching your install.
 
 ## [0.3.0] — 2026-08-17
 
@@ -58,7 +64,8 @@ for what each version component means here and how a release is cut.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.1...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.2...HEAD
+[0.3.2]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.1...devstride--v0.3.2
 [0.3.1]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.0...devstride--v0.3.1
 [0.3.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.2.0...devstride--v0.3.0
 [0.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.1.0...devstride--v0.2.0
