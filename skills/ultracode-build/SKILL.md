@@ -82,7 +82,7 @@ checks green → commit → repeat.
   optional; never invent or reuse attribution metadata. PR bodies get none.
 - **Keep checks green as you go**: every command in `verify.typecheck`, every entry in
   `preCommitWiringChecks` (when the repo configures any), and the touched test suite via
-  `verify.singleTestCommand`, **widened when the change is broad**. A red type-check, wiring
+  `verify.testSingle`, **widened when the change is broad**. A red type-check, wiring
   check, or test is stop-and-fix, never commit-anyway.
 - **Generated-file type errors are tolerated** only where config says so — a file matching
   `generated.paths` failing with a pattern in `generated.toleratedTypeErrors`. Everything else
