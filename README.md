@@ -132,7 +132,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 
 ## Versioning & updates
 
-Current version: **0.3.2** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **0.3.3** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not** applied automatically — an installed plugin stays at
@@ -143,28 +143,31 @@ claude plugin marketplace update devstride   # refresh the catalog
 claude plugin update devstride@devstride     # upgrade the installed plugin
 ```
 
-Then restart Claude Code to apply it. Note the second command needs the **fully-qualified**
-`devstride@devstride`; the bare plugin name reports "not found".
+Then restart Claude Code to apply it. Two things to watch:
 
-The first command on its own is a common mistake — it refreshes marketplace metadata and reports
+- The update command needs the **fully-qualified** `devstride@devstride`; the bare plugin name
+  reports "not found".
+- It acts on the **user** scope by default. If you installed with `--scope project`, `local` or
+  `managed`, pass the same `--scope` or it will report the plugin isn't installed and change nothing.
+
+Running only the first command is a common mistake — it refreshes marketplace metadata and reports
 success while leaving your installed copy exactly where it was.
 
-**Compatibility.** Skill names (`/devstride:<name>`) and the `.claude/ds-config.json` key contract
-change only on a **MAJOR** version bump. New skills and changed skill behavior come in MINOR bumps;
-wording fixes in PATCH.
+**Compatibility.** An existing skill name (`/devstride:<name>`) and an existing
+`.claude/ds-config.json` key keep working, and keep meaning the same thing, until a **MAJOR** bump.
+New skills, new config keys, and changed skill behavior arrive in MINOR bumps; wording fixes in
+PATCH.
 
-**Pinning.** `claude plugin marketplace add` has no version flag — a GitHub-sourced marketplace
-always tracks the default branch. To pin, clone the repository at a release tag and add *that
-directory* as the marketplace, which freezes you at that commit until you move the clone yourself:
+**Pinning.** Append `@<tag>` to the marketplace source to pin to a release. There is no `--ref`
+flag — the ref goes in the source itself:
 
 ```bash
-git clone --branch devstride--v0.3.2 --depth 1 \
-  https://github.com/devstride/claude-plugin ~/devstride-plugin-pinned
 claude plugin marketplace remove devstride
-claude plugin marketplace add ~/devstride-plugin-pinned
+claude plugin marketplace add devstride/claude-plugin@devstride--v<version>
 ```
 
-Unpin by removing it and re-adding `devstride/claude-plugin`.
+Every release is tagged, so any version in the [changelog](CHANGELOG.md) is pinnable. Unpin by
+removing it and re-adding the bare `devstride/claude-plugin`.
 
 ## License
 

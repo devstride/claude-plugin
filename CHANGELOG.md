@@ -8,6 +8,25 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.3.3] — 2026-08-17
+
+### Fixed
+
+- **Pinning is much simpler than previously documented.** Append `@<tag>` to the marketplace source
+  (`devstride/claude-plugin@devstride--v0.3.2`) — the earlier instructions had users cloning a tag
+  and adding the directory, which worked but was unnecessary.
+- Noted that `claude plugin update` acts on the **user** scope by default, so a project-, local- or
+  managed-scope install needs a matching `--scope` or the command reports the plugin isn't installed
+  and changes nothing.
+
+### Changed
+
+- The release checklist now covers updating the README's version line and validating both manifests
+  separately, so neither can be missed on a future release.
+- Clarified the compatibility promise: **new** config keys are a MINOR change; removing, renaming or
+  redefining an existing one is MAJOR. The previous wording implied any config-key change was MAJOR,
+  contradicting the table beside it.
+
 ## [0.3.2] — 2026-08-17
 
 ### Fixed
@@ -64,7 +83,8 @@ for what each version component means here and how a release is cut.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.2...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.3...HEAD
+[0.3.3]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.2...devstride--v0.3.3
 [0.3.2]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.1...devstride--v0.3.2
 [0.3.1]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.0...devstride--v0.3.1
 [0.3.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.2.0...devstride--v0.3.0
