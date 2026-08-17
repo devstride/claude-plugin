@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "devstride",
+  "description": "DevStride's agentic delivery loop for Claude Code — plan a roadmap, then walk it story by story through build, review, and release against your own repo and DevStride org.",
+  "owner": { "name": "DevStride", "url": "https://devstride.com" },
+  "plugins": [
+    {
+      "name": "devstride",
+      "source": "./",
+      "category": "workflow",
+      "homepage": "https://devstride.com",
+      "description": "Scaffold release — the DevStride agentic delivery loop. Skills and the bundled DevStride MCP server are being added; this version installs an empty plugin."
+    }
+  ]
+}
