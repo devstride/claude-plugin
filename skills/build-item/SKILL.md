@@ -114,7 +114,10 @@ the container role (this org's Epic type) whose completion cuts a release, mappe
    nothing, falls through to `baseBranch`, and ships a story straight to develop outside its epic
    branch. Use `hierarchy` to enumerate ancestors, `get_item` to type them. Inspecting only the
    direct parent misses a release-unit ancestor two levels up. Named per
-   `epicIntegrationBranches.pattern`. Resolve: (a) the branch recorded for this epic in handoff
+   `epicIntegrationBranches.pattern`, with the slug built per `epicIntegrationBranches.slugRule`
+   when set (it says how to derive the slug from the title — casing, allowed characters, whether
+   an execution-order prefix is stripped, how far to truncate — so two runs name the same epic the
+   same way instead of each inventing a slug). Resolve: (a) the branch recorded for this epic in handoff
    memory; (b) `git ls-remote --heads origin "*/<epicNumber>-*"` (one match → reuse, several →
    ask); (c) none → create off fresh `baseBranch` and push. The date in the name is the branch's
    CREATION date, never re-minted. Cache per epic within a session. **Announce which branch was
@@ -432,7 +435,10 @@ The release unit's whole batch of leaf merges lands on develop as ONE reviewed P
   NOT also run it locally, a double-run is waste. (With the list empty, local-only suites in
   `preShipChecks` are the callers' step-2b responsibility instead.) Fix failures in-loop before
   cutting the PR.
-- **Cut via `/devstride:pr`** in autonomous mode, head = epic branch, base = `baseBranch`, flagged as an
+- **Cut via `/devstride:pr`** in autonomous mode, head = epic branch, base =
+  `epicIntegrationBranches.releaseTarget` (a config key naming where completed release units land;
+  the shipped default is `baseBranch`, and a repo that stages releases elsewhere sets it there),
+  flagged as an
   **EPIC RELEASE PR** so the body leads with the epic and lists the constituent stories.
 - **Review-and-settle — and CHECK WHICH SCOPE APPLIES, because fast mode changes it.**
   - **Fast mode was used** (`fastStoryMerges.epicReleaseIsFirstCloudPass`, the default path):

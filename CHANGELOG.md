@@ -8,6 +8,31 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-17
+
+### Added
+
+Four config keys existed but nothing read them, so the behaviour they describe was hardcoded to one
+repository's conventions. They are now honoured:
+
+- **`itemTagFormat`** — the shape of the work-item tag in commit messages. It was fixed at
+  `[I#####]`; a repo whose tracker uses `PROJ-123` can now say so.
+- **`review.localReviewerName`** — the local review engine's display name. The skills called it
+  "Codex" in every roster announcement regardless of what was actually configured.
+- **`epicIntegrationBranches.slugRule`** — how to derive a branch slug from a title. Without it each
+  run invented its own slugging, so the same release unit could be named two ways.
+- **`epicIntegrationBranches.releaseTarget`** — where a completed release unit lands. It was
+  hardcoded to the base branch; a repo that stages releases elsewhere can now point it there.
+
+### Changed
+
+- `push` named `verify.typecheckCombined` in its config header while its step read
+  `verify.typecheck`. Both keys exist so nothing broke, but a skill should not name a key it does
+  not read. It now reads the array form, with the combined form as an explicit fallback.
+- `push` shipped one repository's toolchain as its defaults — a specific package-manager invocation
+  and a specific generated file path. Both are gone; the defaults are now the config keys
+  themselves, and no monorepo literal remains anywhere in `skills/`.
+
 ## [0.4.3] — 2026-08-17
 
 ### Changed
@@ -162,7 +187,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.3...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.5.0...HEAD
+[0.5.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.3...devstride--v0.5.0
 [0.4.3]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.2...devstride--v0.4.3
 [0.4.2]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.1...devstride--v0.4.2
 [0.4.1]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.0...devstride--v0.4.1
