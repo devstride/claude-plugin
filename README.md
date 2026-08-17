@@ -130,11 +130,34 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end |
 | `release` | Promotes the release branch to production, with a full gated review and a docs pass |
 
-## Versioning
+## Versioning & updates
 
-`version` in `.claude-plugin/plugin.json` is the install cache key. Installed copies are cached per
-version, so every user-visible change ships with a version bump — otherwise existing installs keep
-serving the old copy.
+Current version: **0.3.1** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+[RELEASING.md](RELEASING.md) for how releases are cut.
+
+**When updates reach you.** Claude Code checks its marketplaces **once per session**, so a new
+release arrives at your **next session start**. To pull it immediately:
+
+```
+/plugin marketplace update devstride
+```
+
+**Compatibility.** Skill names (`/devstride:<name>`) and the `.claude/ds-config.json` key contract
+change only on a **MAJOR** version bump. New skills and changed skill behavior come in MINOR bumps;
+wording fixes in PATCH.
+
+**Pinning.** `claude plugin marketplace add` has no version flag — a GitHub-sourced marketplace
+always tracks the default branch. To pin, clone the repository at a release tag and add *that
+directory* as the marketplace, which freezes you at that commit until you move the clone yourself:
+
+```bash
+git clone --branch devstride--v0.3.1 --depth 1 \
+  https://github.com/devstride/claude-plugin ~/devstride-plugin-pinned
+claude plugin marketplace remove devstride
+claude plugin marketplace add ~/devstride-plugin-pinned
+```
+
+Unpin by removing it and re-adding `devstride/claude-plugin`.
 
 ## License
 
