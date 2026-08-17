@@ -8,18 +8,18 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
-### Added (deliberately unreleased)
+### Added
 
-- **`/devstride:setup`, inspection phase only.** The skill reads the repository and reports what
-  `.claude/ds-config.json` should say — package manager, verify commands, CI provider and its draft
-  gating, branch roles, review engines, conventions doc — with the evidence behind each value and a
-  status of `detected`, `ambiguous` or `unknown`. It writes nothing.
+- **`/devstride:setup`** — a guided setup command, so a new repository does not start with a blank
+  `.claude/ds-config.json` and a reference page. It inspects the repository and works out what the
+  config should say — package manager, verify commands, CI provider and its draft gating, branch
+  roles, review engines, conventions doc — reporting every value with the evidence behind it and a
+  status of `detected`, `ambiguous` or `unknown`, then asks only about what it could not settle.
 
-  **No version bump accompanies this, on purpose.** `version` is the install cache key, so leaving it
-  alone is what keeps installed copies from receiving a half-built command: `setup` is not useful
-  until it can also ask the remaining questions and write the file, and a version that exposed the
-  inspection alone would ship a command that stops halfway. The bump comes with the phase that makes
-  it whole. Until then it is reachable only by working in this repository, not by installing.
+  Being built in phases: repository inspection and the prefill contract first, then the interview and
+  the config write, then a validation pass that proves the written config by executing it. **The
+  version bump ships when the last of those lands**, because `version` is the install cache key and
+  a bump partway through would put a command that stops halfway into everyone's install.
 
 ## [0.6.0] — 2026-08-17
 

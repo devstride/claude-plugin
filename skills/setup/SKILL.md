@@ -10,8 +10,10 @@ repository rather than asking. Run it after installing the plugin, before writin
 `.claude/ds-config.json` by hand.
 
 Optional argument — a detector name, to run just that one: `ecosystem` (A2–A3), `verify` (A4),
-`ci` (A5), `branches` (A6), `engines` (A7), `docs` (A8). A1 establishes the repository root and
-remote that every other detector reads from, so it always runs: $ARGUMENTS
+`ci` (A5), `branches` (A6), `engines` (A7), `docs` (A8). **Run each one's prerequisites too, silently
+— A1 always, and A2–A3 before A4**, which cannot compose a command without knowing the package
+manager or find workspace scripts without knowing the layout. A narrowed run reports fewer keys; it
+must never report worse ones: $ARGUMENTS
 
 > **This version inspects and reports. It does not write the config file.** The interview that turns
 > these findings into `.claude/ds-config.json` arrives in a later release. Until then this is a
@@ -86,7 +88,11 @@ Fingerprint the lockfile at the repository root:
   Two lockfiles usually mean a half-finished migration, and picking the loser produces commands that
   fail on every machine but the one that ran them. Two files naming the *same* manager
   (`bun.lock` beside `bun.lockb`) is not ambiguity — the answer is the same either way.
-- `package.json` with no lockfile → `unknown`; the interview asks.
+- `package.json` with no lockfile → **read its `packageManager` field before giving up.** Corepack's
+  `"packageManager": "pnpm@10.0.0"` is a declaration of exactly what this repository uses, and a
+  repository that gitignores its lockfile still has it. Present → `detected`, with the field as the
+  evidence. Present *and* contradicting a lockfile → `ambiguous`, showing both; that disagreement is
+  worth surfacing rather than resolving. Neither → `unknown`; the interview asks.
 - **No `package.json` at all → the non-Node path.** Fingerprint `Cargo.toml`, `go.mod`,
   `pyproject.toml`, `Gemfile`, `Makefile`; record the ecosystem as evidence and mark every `verify.*`
   key `unknown`. The ecosystem is still worth recording even though it prefills nothing — it lets the
@@ -113,6 +119,13 @@ Ranked exact-name matches:
 - **typecheck**: `typecheck`, `check:ts`, `check-types`, `type-check`, `tsc`
 - **test**: `test`
 - **lint**: `lint`
+
+**Then read what the matched script actually does.** A name match is not a working command:
+`npm init` writes `"test": "echo \"Error: no test specified\" && exit 1"`, which matches `test`
+exactly and fails by design. A script whose body is a bare `echo`, an `exit 1`, or otherwise runs no
+tool is a placeholder — record it `unknown` and say why. Reporting it `detected` would hand the user
+a value to copy that makes every merge gate fail on first use, which is precisely the class of wrong
+answer the status column exists to prevent.
 
 **Compose the command as `<pm> run <script>`, always.** The bare form — `pnpm lint` — works in pnpm,
 yarn and bun but **not in npm**, where only a handful of names (`test`, `start`) are built-in verbs
@@ -159,10 +172,21 @@ is the one repositories get wrong**:
    pull request ready creates **no workflow run at all** — the draft condition is never even
    evaluated — and the loop waits for a run that will never exist.
 
-So: both present → prefill all three `true`, `detected`. **Gating present but `ready_for_review`
-missing → `ambiguous`, not `true`.** Prefilling `true` there would configure the loop to rely on a
-hold this repository cannot deliver, which is exactly the failure the config was supposed to prevent.
-Say what is missing and point at `/devstride:doctor`, which diagnoses this specific gap.
+Four cases, and **all four produce all three rows** — a case that emits nothing leaves the loop on
+shipped defaults chosen for somebody else's repository:
+
+| What the pull-request workflows show | The three booleans |
+|---|---|
+| Draft-gated **and** `ready_for_review` in types | `true`, `detected` |
+| Draft-gated, `ready_for_review` missing | `ambiguous` — the hold cannot work as written |
+| Pull-request workflows exist, none draft-gated | `false`, `detected` — CI runs on open; the run-once design is simply not in use here |
+| GitHub Actions present, but no pull-request workflow at all | `false`, `detected` — nothing to hold |
+
+The second row is the one worth being stubborn about. Prefilling `true` there would configure the
+loop to rely on a hold this repository cannot deliver — the ready-flip creates no run, and the loop
+waits for it forever. Say what is missing and point at `/devstride:doctor`, which diagnoses this
+specific gap. The third row is a legitimate configuration, not a defect: say what it means for cost
+(CI on open and again after every fix push) and leave the choice with the user.
 
 Any other provider — `.gitlab-ci.yml`, `.circleci/`, `Jenkinsfile`, `azure-pipelines.yml` — or none
 at all: record the provider name and prefill the three booleans `false`, `detected`. That is not a
@@ -173,12 +197,19 @@ draft flip. **Setup attempts nothing provider-specific beyond GitHub Actions.**
 
 From git alone — no network unless a local answer is unavailable.
 
+- **Enumerate the branches that exist, then reason about them.** `git branch --format='%(refname:short)'`
+  and `git branch -r --format='%(refname:short)'` — read **both**, because a fresh clone commonly has
+  exactly one local branch and a local-only list reports a repository as single-branch when it is not.
+  Enumerating first matters: plenty of repositories name their long-lived branches `production`,
+  `trunk`, `release` or `staging`, and probing only for `develop`/`main`/`master` would not merely
+  miss them, it would report a four-branch repository as single-branch and hand every role to the one
+  name it recognized.
 - Default branch: `git symbolic-ref refs/remotes/origin/HEAD`. **This ref is set at clone time and is
   frequently absent**, so treat an error as ordinary, not exceptional; the fallback is
   `git remote show origin`, which is a network call (see the ground rules).
-- Existence probes with `git rev-parse --verify --quiet` for `develop`, `main`, `master` — and probe
-  **both** `refs/heads/<name>` and `refs/remotes/origin/<name>`. A fresh clone commonly has exactly
-  one local branch, so a local-only probe reports a repository as single-branch when it is not.
+- `develop` / `main` / `master` are **heuristics for assigning roles among the branches you found**,
+  never the set of branches to look for. Where the names are conventional the roles follow; where they
+  are not, present what exists and let the interview assign them.
 **Four branch keys hang off this, not two, and every one of them has a shipped default pointing at a
 branch this repository may not have.** Emit all four on every path, or the loop inherits
 `develop`/`master` defaults and aims flows at refs that do not exist:
@@ -192,6 +223,9 @@ branch this repository may not have.** Emit all four on every path, or the loop 
 
 - A development branch **and** a main/master branch → `baseBranch` and `release.releaseSource` = the
   development one; `release.productionBranch` and `hotfixBaseBranch` = main/master.
+- Branches exist but none carry a conventional name → `ambiguous` on all four, with every enumerated
+  branch offered as a candidate and the `origin/HEAD` default named as the likeliest production
+  branch. `protectedBranches` should offer the long-lived ones, not just the two you can name.
 - Only one branch → prefill **all four** to that branch, status `ambiguous` on each. A single-branch
   repository is a legitimate configuration — base, release source, production and hotfix base are
   genuinely the same ref, and hotfixes are then ordinary branches — but so is a repository whose
@@ -212,9 +246,13 @@ configuration in which the built-in adversarial pass is the local gate.
 - **A local review CLI** (`review.localCommand`) — probe with `command -v codex`, and with the name
   of any other review CLI the user names. Found → offer it as a candidate, `ambiguous`, because the
   exact invocation is a choice and the defaults are usually wrong for this: which model, which
-  reasoning effort, which flags. Not found → `null`, `detected`, with the "may be an alias" caveat
-  from the ground rules. Also carry `review.localReviewerName`, so the roster calls the engine what
-  it actually is rather than the shipped default's name.
+  reasoning effort, which flags. Also carry `review.localReviewerName`, so the roster calls the
+  engine what it actually is rather than the shipped default's name.
+  **Not found → `unknown`, not a detected `null`.** One probe that missed is not evidence of absence:
+  the tool may be a shell alias a non-interactive shell never loaded, or a perfectly good reviewer
+  with a name nobody thought to check. Since a `detected` row is advertised as copyable, a detected
+  `null` here would quietly switch off a review engine the user has installed — and they would never
+  see the moment it happened. Report what was probed, and let the question be asked.
 - **Cloud reviewers** (`review.automatedReviewers`) — a cloud reviewer is *possible* when the origin
   host is GitHub and `gh auth status` succeeds for that host. That is a precondition, **not proof
   that a review can be requested**: entitlement, repository settings and organization policy all sit
