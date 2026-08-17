@@ -8,6 +8,15 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.4.3] — 2026-08-17
+
+### Changed
+
+- `CONTRIBUTING.md` records four disciplines for editing skills without silently losing rules —
+  cut the why before the what; a rationale moved away from its mechanism becomes false; walk the
+  config keys both ways; presence is not correctness. Each names a failure this text has actually
+  suffered, and each fails without erroring.
+
 ## [0.4.2] — 2026-08-17
 
 ### Fixed
@@ -153,7 +162,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.2...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.3...HEAD
+[0.4.3]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.2...devstride--v0.4.3
 [0.4.2]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.1...devstride--v0.4.2
 [0.4.1]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.0...devstride--v0.4.1
 [0.4.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.4...devstride--v0.4.0

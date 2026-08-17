@@ -46,6 +46,32 @@ porting: whenever skill text moves between repos in any direction, move the *dif
 and re-run the sanitization grep before committing — a clobbered generalization is
 indistinguishable from an ordinary diff.
 
+## Editing skills without losing rules
+
+These four disciplines were learned the expensive way — each names a failure that has actually
+happened to this text, and each fails silently, which is why they are written down rather than
+assumed.
+
+**Cut the WHY before the WHAT.** Keeping a rationale while dropping the imperative it explained is
+*the* signature compression failure: the paragraph still reads sensibly, so nothing looks wrong,
+but the instruction is gone. When tightening a skill, never let a surviving justification stand in
+for the rule it was justifying.
+
+**A rationale that travels without its mechanism becomes false.** A sentence explaining *why* a step
+matters is usually true only in the sequence it was written for. Move the step somewhere else and
+the explanation can survive intact while quietly becoming wrong — technically fluent, factually
+untrue, and invisible to any grep.
+
+**Walk the config keys, one by one.** "The file wins over the defaults" is not self-executing.
+After any change that touches configuration, check that **every** key the skills cite actually
+exists in a real config, and that every key in a real config still has an instruction honouring it.
+An absent JSON key does not error — the agent simply reads nothing and improvises.
+
+**Presence is not fidelity, and fidelity is not correctness.** Grepping for a rule proves only that
+the words are there. It cannot tell you the rule is still *true* after the change around it. And
+when checking a refactor, derive what to look for from the **diff**, not from memory of what
+mattered — memory reproduces what you already thought about.
+
 ## Repo conventions
 
 See [AGENTS.md](AGENTS.md) for public-repo hygiene, the release/versioning rule, and layout.
