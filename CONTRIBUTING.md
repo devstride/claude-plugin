@@ -1,32 +1,26 @@
 # Contributing
 
-Thanks for looking. Please read the sync-direction note first — it decides where a change should
-land, and right now that is usually **not this repo**.
+Thanks for looking. Skill improvements are welcome here — this repo is where they live.
 
-## Sync direction during the transition
+## Where skill changes land
 
-The skills in `skills/` are **ported** from the repository where they are developed and used daily.
-That repository is currently the single source of truth: this repo **receives skill text, it does
-not originate it**.
+**This repo is canonical for the shared-loop skills.** Skill text is developed here and released
+from here; consumers — including DevStride's own monorepo, which installs the plugin like any other
+customer — receive it through a versioned release.
 
-Practically:
+- **Pull requests that improve the skills are welcome.** So are issues describing behaviour you hit
+  and which skill produced it.
+- Read [RELEASING.md](RELEASING.md) before proposing a change that alters what a skill *does*: skill
+  names and `.claude/ds-config.json` keys are a published contract, and breaking one costs a MAJOR
+  version.
+- Keep skills repo-agnostic. Everything repo-specific belongs in the consuming repo's
+  `.claude/ds-config.json`, which always wins over the defaults shipped here. A change that only
+  makes sense for one repository belongs in that repository, as a local skill — the split this
+  plugin exists to demonstrate.
 
-- **Pull requests that edit skill prose directly will be declined during the transition**, however
-  good the change. Not because it is unwelcome — because a fix applied only here is silently
-  overwritten by the next port, and the loop's own delivery skills keep running against the
-  upstream copy, which would still have the bug.
-- **Bug reports and design feedback are very welcome** — open an issue. Describe the behavior you
-  hit and which skill produced it. Fixes land upstream and arrive here in the next port, with a
-  version bump.
-- Changes to things this repo genuinely owns — the plugin manifest, the marketplace entry, README,
-  this file, packaging and validation — are normal PRs and are reviewed here.
+## Conventions the skills must keep
 
-This note will be replaced when the upstream repository switches to consuming the published plugin
-instead of its local copy. At that point this repo becomes canonical and skill PRs open up.
-
-## If you are porting
-
-A port is mechanical and should stay that way:
+These held the port together and still hold the plugin together:
 
 - Skill directories use the bare verb name (`plan`, `build-item`, …). The plugin namespace supplies
   the `devstride:` prefix, so skills surface as `/devstride:plan`.
@@ -38,18 +32,19 @@ A port is mechanical and should stay that way:
   forbidden** — they do not survive the plugin cache copy.
 - Skills read the *consuming* repo's `.claude/ds-config.json` and fall back to inline defaults.
   Never ship a particular repo's config, and never hardcode one repo's branch names, deploy
-  provider, or infrastructure as though it were universal.
+  provider, or infrastructure as though it were universal. This is the single easiest rule to
+  break by accident, and it breaks quietly — a sentence that reads as a plain statement of fact
+  ("CI is the sharded backend suite", "the list is empty today") is one repo's configuration
+  asserted as universal truth.
 - Nothing internal to the upstream project ships: no private tracker numbers, no internal branch
   names, no incident write-ups, no repo-local operational tooling.
 
-**Port a CHANGE as a patch, not a file copy.** The first port also *generalized* the text —
-replacing one project's branch names, deploy provider, CI job names and directory layout with the
-config keys that govern them. Those generalizations exist only here; upstream still carries the
-concrete values, because upstream is one specific repo. So copying a changed file wholesale
-silently reverts every generalization in it and re-publishes internal specifics. Instead, take the
-upstream diff for the change, rewrite skill names and paths in the *patch*, and apply it — hunks
-that fail because they landed in generalized context get applied by hand. Then re-run the
-sanitization grep before committing; a clobbered generalization looks exactly like a normal diff.
+**Historical note, kept because the failure mode recurs.** While skills were developed elsewhere
+and ported in, a re-port that copied changed files wholesale silently reverted every
+generalization in them and re-published one project's internals. The lesson generalizes past
+porting: whenever skill text moves between repos in any direction, move the *diff*, not the file,
+and re-run the sanitization grep before committing — a clobbered generalization is
+indistinguishable from an ordinary diff.
 
 ## Repo conventions
 

@@ -8,6 +8,14 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-08-17
+
+### Changed
+
+- **This repo is now canonical for the skills.** DevStride's own monorepo has cut over to
+  installing the plugin like any other customer, so skill text is developed and released here
+  rather than ported in. `CONTRIBUTING.md` updated accordingly — skill pull requests are welcome.
+
 ## [0.4.0] — 2026-08-17
 
 ### Fixed
@@ -135,7 +143,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.1...HEAD
+[0.4.1]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.0...devstride--v0.4.1
 [0.4.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.4...devstride--v0.4.0
 [0.3.4]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.3...devstride--v0.3.4
 [0.3.3]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.2...devstride--v0.3.3
