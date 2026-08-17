@@ -8,6 +8,18 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-17
+
+### Added
+
+- **`/devstride:doctor`** — a read-only setup check. Every prerequisite of this loop currently fails
+  silently: a missing or unauthenticated `gh`, a DevStride connection whose signed-out symptom is
+  *absent tools* rather than an error, a config typo that reads as an unset key, workflow jobs never
+  gated on draft (so the review-before-CI design simply never engages), and a test command left
+  unset while fast merges make the local suites the only gate. `doctor` reports each with what
+  breaks and the command that fixes it, walks every section rather than stopping at the first
+  failure, and never changes anything — which is what makes it safe as the first thing you run.
+
 ## [0.5.0] — 2026-08-17
 
 ### Added
@@ -187,7 +199,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.5.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.6.0...HEAD
+[0.6.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.5.0...devstride--v0.6.0
 [0.5.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.3...devstride--v0.5.0
 [0.4.3]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.2...devstride--v0.4.3
 [0.4.2]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.1...devstride--v0.4.2

@@ -4,7 +4,7 @@ DevStride's agentic delivery loop, packaged as a Claude Code plugin. Plan a road
 existence, then let the loop walk it one story at a time — branch, build, adversarially review,
 merge, and release — against your own repository and your own DevStride organization.
 
-> **Status: early.** The fifteen delivery-loop skills and the DevStride MCP connection are both
+> **Status: early.** The sixteen delivery-loop skills and the DevStride MCP connection are both
 > bundled — installing the plugin is all the *configuration* the connection needs, though you still
 > sign in once. The guided setup command that writes your repo config is still to come.
 
@@ -221,10 +221,11 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `branch-feature` / `branch-hotfix` | Cuts a working branch from the development or production branch |
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end |
 | `release` | Promotes the release branch to production, with a full gated review and a docs pass |
+| `doctor` | Checks your setup — git, `gh`, the plugin, the DevStride connection, config, CI gating — and reports what to fix. Read-only |
 
 ## Versioning & updates
 
-Current version: **0.5.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **0.6.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
