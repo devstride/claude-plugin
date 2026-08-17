@@ -9,8 +9,9 @@ Work out what the delivery loop's configuration should be **for this repository*
 repository rather than asking. Run it after installing the plugin, before writing
 `.claude/ds-config.json` by hand.
 
-Optional argument — a detector name (`ecosystem`, `verify`, `ci`, `branches`, `engines`, `docs`) to
-run just one: $ARGUMENTS
+Optional argument — a detector name, to run just that one: `ecosystem` (A2–A3), `verify` (A4),
+`ci` (A5), `branches` (A6), `engines` (A7), `docs` (A8). A1 establishes the repository root and
+remote that every other detector reads from, so it always runs: $ARGUMENTS
 
 > **This version inspects and reports. It does not write the config file.** The interview that turns
 > these findings into `.claude/ds-config.json` arrives in a later release. Until then this is a
@@ -81,9 +82,10 @@ Fingerprint the lockfile at the repository root:
 | `package-lock.json` | npm |
 | `bun.lock` / `bun.lockb` | bun |
 
-- **More than one lockfile → `ambiguous`, listing all of them.** Never silently pick. Multiple
-  lockfiles usually mean a half-finished migration, and picking the loser produces commands that fail
-  on every machine but the one that ran them.
+- **Lockfiles for more than one manager → `ambiguous`, listing all of them.** Never silently pick.
+  Two lockfiles usually mean a half-finished migration, and picking the loser produces commands that
+  fail on every machine but the one that ran them. Two files naming the *same* manager
+  (`bun.lock` beside `bun.lockb`) is not ambiguity — the answer is the same either way.
 - `package.json` with no lockfile → `unknown`; the interview asks.
 - **No `package.json` at all → the non-Node path.** Fingerprint `Cargo.toml`, `go.mod`,
   `pyproject.toml`, `Gemfile`, `Makefile`; record the ecosystem as evidence and mark every `verify.*`
@@ -144,7 +146,9 @@ Then compose, remembering the shapes differ:
 mechanics understand.
 
 When it is GitHub Actions, look at the workflows themselves before prefilling the three CI-ordering
-booleans (`review.openPullRequestsAsDraft`, `review.readyForReviewReleasesCi`,
+booleans — and look only at the ones this is about: **workflows with an `on: pull_request` trigger.**
+A workflow that fires on push, on a schedule, or on `pull_request_review` is not part of the draft
+hold, and judging it as ungated turns a correctly-configured repository into a false finding (`review.openPullRequestsAsDraft`, `review.readyForReviewReleasesCi`,
 `review.ciHeldUntilReviewSettled`). Two things have to be true for the hold to work, and **the second
 is the one repositories get wrong**:
 
@@ -175,11 +179,25 @@ From git alone — no network unless a local answer is unavailable.
 - Existence probes with `git rev-parse --verify --quiet` for `develop`, `main`, `master` — and probe
   **both** `refs/heads/<name>` and `refs/remotes/origin/<name>`. A fresh clone commonly has exactly
   one local branch, so a local-only probe reports a repository as single-branch when it is not.
-- A development branch **and** a main/master branch → `baseBranch` = the development one,
-  `release.productionBranch` = main/master, `hotfixBaseBranch` = the production branch.
-- Only one branch → prefill both keys to it, status `ambiguous`: a single-branch repository is a
-  legitimate configuration, but so is a repository whose second branch simply has not been created
-  yet, and those two want different answers.
+**Four branch keys hang off this, not two, and every one of them has a shipped default pointing at a
+branch this repository may not have.** Emit all four on every path, or the loop inherits
+`develop`/`master` defaults and aims flows at refs that do not exist:
+
+| Key | What it is |
+|---|---|
+| `baseBranch` | Where work branches from and merges back to |
+| `release.releaseSource` | What gets promoted to production — normally the same branch as `baseBranch` |
+| `release.productionBranch` | What production deploys from |
+| `hotfixBaseBranch` | What an urgent fix branches from, so it carries no unreleased work — normally the production branch |
+
+- A development branch **and** a main/master branch → `baseBranch` and `release.releaseSource` = the
+  development one; `release.productionBranch` and `hotfixBaseBranch` = main/master.
+- Only one branch → prefill **all four** to that branch, status `ambiguous` on each. A single-branch
+  repository is a legitimate configuration — base, release source, production and hotfix base are
+  genuinely the same ref, and hotfixes are then ordinary branches — but so is a repository whose
+  second branch simply has not been created yet, and those two want different answers. What is not
+  acceptable is leaving two of the four unstated: the defaults would fill them with branch names this
+  repository does not have, and the failure surfaces much later, at the first release or hotfix.
 - Always compute `protectedBranches` containing the detected base and production branches. It is
   what keeps the loop from force-pushing or deleting them, so it should never be left empty by
   accident.
@@ -191,10 +209,12 @@ From git alone — no network unless a local answer is unavailable.
 Report what is here. **Absent is a finding, not a failure** — an empty roster is a legal
 configuration in which the built-in adversarial pass is the local gate.
 
-- **A local review CLI** (`review.localCommand`) — probe with `command -v <name>` for the CLIs the
-  user might have. Found → offer it as a candidate, `ambiguous`, because the exact invocation is a
-  choice: which model, which effort, which flags. Not found → `null`, `detected`, with the
-  "may be an alias" caveat from the ground rules.
+- **A local review CLI** (`review.localCommand`) — probe with `command -v codex`, and with the name
+  of any other review CLI the user names. Found → offer it as a candidate, `ambiguous`, because the
+  exact invocation is a choice and the defaults are usually wrong for this: which model, which
+  reasoning effort, which flags. Not found → `null`, `detected`, with the "may be an alias" caveat
+  from the ground rules. Also carry `review.localReviewerName`, so the roster calls the engine what
+  it actually is rather than the shipped default's name.
 - **Cloud reviewers** (`review.automatedReviewers`) — a cloud reviewer is *possible* when the origin
   host is GitHub and `gh auth status` succeeds for that host. That is a precondition, **not proof
   that a review can be requested**: entitlement, repository settings and organization policy all sit
