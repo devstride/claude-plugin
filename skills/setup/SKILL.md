@@ -1,13 +1,16 @@
 ---
 name: setup
-description: Inspect this repository and work out what its .claude/ds-config.json should say — package manager, verify commands, CI provider and draft gating, branches, review engines, conventions doc — then present the findings with the evidence behind each one. Read-only; writes nothing.
+description: Set the delivery loop up for this repository — inspect it for everything answerable without asking (package manager, verify commands, CI provider and draft gating, branches, review engines), map your DevStride work types onto the loop's roles, ask only what is left, then write .claude/ds-config.json. Re-running merges rather than overwrites.
 user-invocable: true
 disable-model-invocation: true
 ---
 
-Work out what the delivery loop's configuration should be **for this repository**, by looking at the
-repository rather than asking. Run it after installing the plugin, before writing
-`.claude/ds-config.json` by hand.
+Set the delivery loop up for **this** repository and **this** DevStride organization, in one guided
+session. Run it after installing the plugin, and again whenever the repository changes shape.
+
+Six phases: inspect what the repository can answer (A), report it (B), map the organization's work
+types onto the loop's roles (C), ask only about what is left (D), write the config (E) — or, on a
+repository that already has one, merge into it without destroying anything (F).
 
 Optional argument — a detector name, to run just that one: `ecosystem` (A2–A3), `verify` (A4),
 `ci` (A5), `branches` (A6), `engines` (A7), `docs` (A8). **Run each one's prerequisites too, silently
@@ -15,16 +18,16 @@ Optional argument — a detector name, to run just that one: `ecosystem` (A2–A
 manager or find workspace scripts without knowing the layout. A narrowed run reports fewer keys; it
 must never report worse ones: $ARGUMENTS
 
-> **This version inspects and reports. It does not write the config file.** The interview that turns
-> these findings into `.claude/ds-config.json` arrives in a later release. Until then this is a
-> filled-in worksheet: everything it marks `detected` is a value you can copy straight into the file,
-> and everything it marks `ambiguous` or `unknown` is a decision only you can make. Phase B says
-> exactly this to the user; do not imply a file was written.
+**The write boundary — the whole of it.** This skill writes exactly two paths, both under
+`.claude/`: `ds-config.json`, and the lessons store at `lessonsDoc` if the user accepts an empty one.
+Nothing else, ever. Not application code, not `CLAUDE.md`, not permission settings, not a CI
+workflow, not a `.gitignore`. It never mutates git state — no commit, checkout, branch, fetch, push
+or `git config` write — never installs anything, and never calls a DevStride **write** tool; the only
+organization calls it makes are reads.
 
-**This skill is READ-ONLY.** It reads files and runs inspection commands. It never writes, moves or
-deletes a file — `.claude/ds-config.json` included — never mutates git state (no commit, checkout,
-branch, fetch, push or `git config` write), never installs anything, and never calls a DevStride
-write tool. A run must leave `git status --porcelain` byte-identical to how it found it.
+**Phases A through D are strictly read-only**, and nothing is written until every question has been
+answered and the result confirmed. Up to that point a run must leave `git status --porcelain`
+byte-identical to how it found it. If a detector seems to need a write, it is the wrong detector.
 
 ## Why detection comes before questions
 
@@ -290,31 +293,159 @@ Phase A's output is a list of rows, one per configuration key, each with:
 or `unknown` row becomes a question. Rows are the unit — a key that produced no row is not a key
 with no answer, it is a key nobody looked at, and the two must stay distinguishable.
 
-## Phase B — report, then stop
+## Phase B — report what was found
 
 Present the summary grouped the way someone reads it, not the way it was gathered: what was detected,
 what needs a decision, and what could not be determined. Lead with the count of each, so a user with
 two open questions sees "two" rather than scanning forty rows for them.
 
-Then say plainly:
+Say what happens next — the open questions are coming, and nothing has been written yet — and then
+go to Phase C. Do not stop here for approval of the findings themselves; Phase D asks about every row
+that needs a human, and the bulk confirmation there is where detected values get their sign-off.
 
-- Nothing was written. This run inspected only, and the repository is byte-for-byte as it was found.
-- The `detected` values can be copied into `.claude/ds-config.json` as they stand. Point at the
-  [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference)
-  for the full key contract — shapes, defaults and the keys no inspection can reach.
-- The guided interview that asks the open questions and writes the file is not in this release yet.
-- `/devstride:doctor` checks a config once it exists, and diagnoses the setup problems inspection can
-  only observe.
+## Phase C — map the organization's work types onto the loop's roles
 
-Do not offer to write the file, and do not write it if asked — that path does not exist yet, and a
-hand-rolled substitute would produce a file the real interview later has to reconcile against.
+The loop reasons in two abstract roles, and `hierarchyRoles` is where a repository says which of its
+organization's real work types fill them:
+
+- **`releaseUnit`** (a string) — the container level whose completion cuts a release. The loop gives
+  each one an integration branch, batches its work onto it, and ships it as one reviewed increment.
+- **`leaf`** (an array of strings) — the executable one-day item types the loop actually builds.
+
+Read them from the organization, do not assume them. `get_workspace_context` establishes which
+organization is connected; `get_work_type_hierarchy` returns the tree and a per-name lookup with each
+type's parent and ancestor chain. **Never assume canonical spellings** — organizations rename these,
+and they have typos; one real organization's capability level is spelled `Capabilty`. Whatever the
+call returns is the truth, including its misspellings, because that string is what the loop will
+compare against.
+
+Propose from the structure: the childless types at the bottom of the deepest chain are the `leaf`
+candidates, and the level directly above them is the `releaseUnit`. Confirm with `AskUserQuestion`,
+showing the proposal against the actual hierarchy so the choice is legible — and confirm even when
+the structure looks obvious, because this single answer decides where the loop branches, what it
+counts down to, and what "a release" means for this repository. Getting it wrong plans work at one
+size and releases it at another.
+
+Two shapes need care:
+
+- **More or fewer levels than the proposal assumes.** The model is two roles, not a level count. An
+  organization with five container levels still has exactly one release boundary; ask which, rather
+  than counting.
+- **A single work type doing everything.** Map it to both roles and say explicitly what that means:
+  every item is its own release unit, so the loop runs without integration batching.
+
+### When the DevStride connection is not available
+
+The bundled server contributes **no tools at all** until it is signed in — that is the signed-out
+symptom, not an error, so the failure mode to avoid is a wall of tool errors that reads like a bug.
+Say it once, plainly: the server ships with the plugin, it needs one browser sign-in, and `/mcp` is
+where that happens. Then offer two paths and take the user's answer:
+
+1. **Continue without it** — everything else is detectable, so the config gets written with
+   `hierarchyRoles` omitted and reported as required follow-up. Say what stays broken meanwhile:
+   the loop cannot resolve release units, so it cannot batch or release by them.
+2. **Stop and resume** — connect first, then re-run. Nothing is lost; setup is re-runnable by design.
+
+Never guess the roles from the plugin's own defaults to paper over a missing connection. A plausible
+`hierarchyRoles` naming work types the organization does not have is worse than an absent one: absent
+is visible, and wrong silently matches nothing.
+
+## Phase D — ask only what is left
+
+Walk the prefill summary and turn it into as few questions as the repository allows.
+
+- **Every `ambiguous` or `unknown` row is a question**, asked with `AskUserQuestion`. An `ambiguous`
+  row already carries its candidates — offer them as the options, with the likeliest first. An
+  `unknown` row has no prefill, so ask plainly and say what the value is for.
+- **`detected` rows are confirmed in bulk, not asked one at a time.** Show them as a list with their
+  evidence and take a single yes. Interview length is the product's first impression, and asking
+  someone to re-approve forty facts their own repository just proved is how a good setup feels bad.
+- **An explicit answer always beats a detection.** If the user overrides a `detected` value, the
+  override is what gets written — do not re-apply the detected one at write time, and do not argue.
+- Ask about the two things no inspection can reach: whether this repository has a **sibling docs
+  repository** the release skill should update (`release.docsRepo`, omitted entirely if not), and
+  whether to **initialize an empty lessons store**.
+
+## Phase E — write the config
+
+One write, after every confirmation, of the whole document. There is no state in which a half-written
+config exists.
+
+Write these keys. Values come from detection, from Phase C, or from the answers in Phase D; where
+none of those apply, write the shipped default, because a key present with a default is inspectable
+and a key absent is invisible:
+
+| Key | Value |
+|---|---|
+| `baseBranch`, `hotfixBaseBranch`, `protectedBranches` | From A6. `protectedBranches` **always** contains the detected base and production branches |
+| `integrationBranch` | `null` — the per-release-unit derivation is the default; an explicit value overrides it |
+| `epicIntegrationBranches` | `enabled`, `pattern`, `slugRule`, `releaseTarget`, `fastStoryMerges`, `autoRelease: false`, `deleteBranchAfterRelease` |
+| `branchNaming` | `pattern`, `prefixSource`, `dateFormat` |
+| `verify` | `typecheck` (array), `test`, `lint`, `testSingle`, `testDir`, `skipDuringStoryBuilds: []` |
+| `generated` | Only when detected — omit rather than write an empty shape |
+| `review` | The roster and the three CI-ordering booleans, per the rules below |
+| `prBodyTemplate`, `commitConventions`, `ci` | The shipped defaults, unless the repository said otherwise |
+| `preShipChecks` | `[]` — a repository's slow pre-ship suites are added later, deliberately |
+| `preCommitWiringChecks` | `[]` — the wiring checks a repository wants before each commit are its own to name |
+| `hierarchyRoles` | Phase C's confirmed mapping |
+| `release` | `productionBranch`, `releaseSource`; `docsRepo` only if the user opted in |
+| `conventionsDoc`, `itemTagFormat`, `lessonsDoc` | From A8, the answers, and the shipped default path |
+
+**`autoRelease` is written `false`.** A repository whose release unit merges to its base branch
+without a human saying so is a decision its owner should make deliberately, on a loop they have
+watched run — not one they inherit from a setup command on day one.
+
+**The roster must describe what actually exists.** This is the one place where writing an aspirational
+config does real damage, because every later run reads these keys as fact:
+
+- No local review CLI detected → **omit `localCommand`** (or write `null`). The built-in adversarial
+  pass is then the local gate, which is a legal configuration, not a degraded one.
+- No cloud reviewer → **`automatedReviewers: []`**. Nothing is requested, polled or waited on, and an
+  absent review is correct rather than pending.
+- **`fastStoryMerges.enabled: true` only when at least one local engine is present.** Under fast
+  merges an item gets no pull request and no CI of its own, so the local suites are the only gate it
+  receives; enabling it with nothing local behind it merges code that nothing checked.
+- Equally, **`fastStoryMerges` needs `verify.test` and `verify.typecheck` set** for the same reason.
+  If the interview could not establish them, write `fastStoryMerges.enabled: false` and say why.
+
+Then report what was written, where, and what to do next: `/devstride:doctor` to check the result,
+and the [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference)
+for the keys setup does not ask about.
+
+## Phase F — re-running on a repository that already has a config
+
+Setup is re-runnable, and a re-run must never cost someone their hand edits. This path is the
+difference between a command people run again and one they run once.
+
+1. **Re-detect everything** — Phases A and C, unchanged.
+2. **Diff against the existing file** and propose **only the keys whose detected value differs** from
+   what is there. A key that already matches is not a question.
+3. **On acceptance, deep-merge** the accepted keys into the existing document.
+
+What survives a merge, verbatim and unconditionally:
+
+- **Keys setup does not recognize.** They may be newer than this version of the skill, or something
+  the repository added on purpose. Either way they are not yours to remove.
+- **Every `_`-prefixed key.** Real configs carry `_readme` annotations documenting hard-won reasons
+  beside the values they explain. They are documentation, they are load-bearing to whoever wrote
+  them, and a rewrite that drops them destroys the reasoning while leaving the config working.
+- **Any value setup did not propose changing.** Silence is not consent to revert.
+
+Never delete a key, never rewrite the file wholesale to normalize its shape, and never treat a
+missing key as a deliberate choice — a config written by hand, or by an older version, is simply
+incomplete, so propose the addition. **Setup authors this file; it is not a precedence layer.** The
+existing contract is unchanged: the file wins over the skills' shipped defaults, including over
+anything setup itself wrote.
 
 IMPORTANT:
-- **Read-only, absolutely.** See the contract at the top. If a detector seems to need a write, it is
-  the wrong detector.
+- **The write boundary is two paths under `.claude/`.** See the top. Everything else on disk is
+  read-only to this skill, in every phase.
 - **Never report a guess as `detected`.** The status column is the only thing standing between a
   detected value and a fabricated one, and a user who finds one wrong value stops trusting all of
   them.
 - **Absence is information.** No local review CLI, no cloud reviewer, no CI provider — each is a real
-  finding with a real prefill. Reporting them as gaps to fix misrepresents a legal configuration as a
-  broken one.
+  finding with a real value to write. Reporting them as gaps to fix misrepresents a legal
+  configuration as a broken one.
+- **Never write a config that claims an engine the repository does not have.** Every later run treats
+  these keys as fact, so an aspirational roster does not fail loudly — it quietly changes what gets
+  reviewed.
