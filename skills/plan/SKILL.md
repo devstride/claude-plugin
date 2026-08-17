@@ -147,6 +147,8 @@ That's the depth bar: container (Capability) = one paragraph; release unit (Epic
 ## 6. Rationalize dates
 
 - Do not hand-compute cascade dates in this skill. Once the graph is fully wired (step 5 verified with zero orphans), invoke `rationalize-gantt` on the plan root to backfill the synthetic one-story-per-day dates, cascade them through the dependency graph, and catch/resolve any invalid-dependency (red-line) edges or graph issues (cycles, redundant edges, inconsistent fan-out) introduced by the new items. Let that skill own the auto-scheduler-toggle check, the compression math, and the violation review — don't duplicate its logic here. Fix any graph issue it flags that traces back to a step 5 wiring decision with `add_relationship`/`remove_relationship` rather than re-running the whole plan.
+  **If it STOPS on a dependency cycle, it wrote no dates at all** — the plan is left entirely undated, which is this step's whole purpose unmet. Fix the offending edges it names, then **re-invoke it**; do not treat the stop as a completed pass or move on to step 7 without dates.
+
 - **On the EXTEND path** (step 1 classified the plan as partial-extend), tell `rationalize-gantt` to re-date **not-done items only** (it asks this in its §0) so it does NOT overwrite the real completion dates that `build-item`'s ritual already stamped on shipped items. A from-scratch plan can re-date everything.
 
 ## 6.5 Stamp execution-order numbers into leaf titles

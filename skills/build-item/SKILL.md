@@ -296,7 +296,13 @@ No PR to merge — integrate locally, then push the epic branch:
 - Base moved while you were building → merge the refreshed epic branch INTO the story branch
   first, re-run the local suites, and only then merge back. An unresolvable conflict is a
   genuine fork.
-- Push the epic branch. Delete the story branch locally; there is no remote branch to delete.
+- Push the epic branch. **Only once that push SUCCEEDS**, delete the story branch **both locally
+  and on the remote** (`git branch -d <story>` and `git push origin --delete <story>`). Order
+  matters: if the epic push is rejected (the base moved between merge and push), the merge exists
+  only locally, and deleting the remote story branch would destroy the sole remote copy of the
+  work. `branch-feature` always
+  finishes with `git push -u origin`, so the remote branch DOES exist — deleting only the local
+  one leaves a stale remote branch behind for every fast-mode story.
 - **Skip the rest of step 5 entirely** — the CI, draft-state and `skipping`-check rules below
   describe a PR that does not exist here. Go to step 6.
 
@@ -354,13 +360,20 @@ No PR to merge — integrate locally, then push the epic branch:
   1. Re-fetch the description with `view: 'full'`, then `add_comment` it verbatim under
      "📋 Original spec (as planned) — superseded by the description below". Both fields are HTML:
      pass `{ html }`, never Markdown.
-  2. `update_item` the description to the as-built spec: an italic "As-built — reflects what
-     shipped in PR #<n>" note, a **Deviations from the original spec** list with one-line
+  2. `update_item` the description to the as-built spec: an italic as-built note naming **what
+     the work actually shipped in**, a **Deviations from the original spec** list with one-line
      rationales, then a concise **As shipped** summary.
+     **Cite the artifact that EXISTS for this story's path** — the two paths differ and getting it
+     wrong invents a reference: a **4b story has a PR**, so "reflects what shipped in PR #<n>";
+     a **4a fast-mode story has none**, so cite its merge SHA and integration branch — "reflects
+     what shipped in `<merge-sha>` on `<integration-branch>`" — and let step 8 add the release PR
+     link later. Never write a PR number on the fast path: there is nothing to write, and a
+     plausible-looking number is a dangling pointer at somebody else's work.
   - Matched the spec with no material deviations → skip; note "shipped as specified".
 - The deviations recorded here MUST be the same ones from steps 3 and 4. Never let one ship
   undocumented on the item.
-- **Report** the item (with its `[N]` prefix), lane, dates, PR link, and whether the spec was
+- **Report** the item (with its `[N]` prefix), lane, dates, **the PR link (4b) or the merge SHA +
+  integration branch (4a — a fast-mode story has no PR to link)**, and whether the spec was
   reconciled — otherwise nothing confirms the Done move, the date window, the link and the
   as-built reconciliation actually happened.
 
@@ -444,6 +457,10 @@ The release unit's whole batch of leaf merges lands on develop as ONE reviewed P
 - **Close out**: `add_comment` on the RELEASE-UNIT item (release PR link, list of shipped leaves,
   date), move it to Done if the org tracks lanes at that level, update handoff memory, sync local
   develop.
+- **Link the release PR onto each constituent leaf whose as-built note deferred it.** Step 6 tells
+  a fast-mode story to cite its merge SHA and say the release PR follows at step 8 — this is where
+  that promise is kept. `link_pull_request` (or `add_comment`) the release PR on every leaf in the
+  batch. Skip it and every fast-mode story ends pointing at a link that never arrives.
 - Surface — never perform — the follow-on owner-cut `develop → master` promotion (`/devstride:release`).
 - Out-of-scope findings from this review go through step 6.5 like any other.
 

@@ -26,7 +26,15 @@ IMPORTANT:
 
 ## 3. Compute the compressed cascade (deterministic — do it in a script, not by hand)
 - CONTAINERS = items that are a `parentNumber` of another item (any container level — this org: Epics/Capabilities). LEAF stories = the rest.
-- `depth(leaf)` = 0 if no leaf depends on it (a final deliverable → sits on TODAY), else `1 + max(depth(c) for every leaf c that is blocked_by this leaf)`. Use only LEAF→LEAF `blocked_by` edges for depth (ignore edges to containers / out-of-tree items here — they are handled as violations in step 5).
+- **DETECT CYCLES FIRST, before computing any depth.** Topologically sort the LEAF→LEAF `blocked_by` graph (repeatedly remove nodes with no unprocessed dependents). If every node is removed the graph is acyclic — proceed. If any remain, **STOP: do not compute depths and do not write a single date.** But do NOT report the whole remainder as "the cycle": the leftover set also contains innocent ancestors that merely feed a cycle (given `A ↔ B` and `A blocked_by C`, `C` never clears either, yet `C → A` is a perfectly valid edge). Reporting it would invite deleting a correct dependency. **Isolate the true members first** — compute strongly connected components over the remaining subgraph and report only components of size > 1 (plus any self-edge), naming the actual cycle path. Everything outside those components is fine and must be left alone.
+  **Then say how to get moving again**, because a stopped pass wrote NO dates and the plan is
+  therefore entirely undated — a worse state than the one it was called to fix, if the operator is
+  left there. Report the cycle path, propose which edge to drop or repoint (the members are usually
+  a mutual `blocked_by` pair, one direction of which is simply wrong), and once the edges are
+  corrected **re-run this step from the top**. Step 6's REMOVE/REPOINT machinery is unreachable
+  while the stop stands — steps 4-7 never execute — so the correction happens before the re-run,
+  not inside this pass. This is not optional defensive coding: the depth definition below is recursive with a base case of "nothing depends on it", so no member of a cycle ever reaches that base case and a script implementing it either never terminates or blows its stack. `plan` relies on THIS pass to catch cycles, so a hang here reads as a hung tool rather than the graph error it is.
+- `depth(leaf)` = 0 if no leaf depends on it (a final deliverable → sits on TODAY), else `1 + max(depth(c) for every leaf c that is blocked_by this leaf)`. Use only LEAF→LEAF `blocked_by` edges for depth (ignore edges to containers / out-of-tree items here — they are handled as violations in step 5). Safe to evaluate only because the cycle check above already passed.
 - `date(leaf) = TODAY − depth days`; `startDate == dueDate` (1-day stories).
 - CONTAINER span = `[min(child start), max(child due)]` over its descendants (container spans nest — this org: epics span their stories, capabilities their epics).
 - Result: leaves land on TODAY, every dependency is exactly one day before its dependent, and every day from the deepest root to today is populated (no dead zones).

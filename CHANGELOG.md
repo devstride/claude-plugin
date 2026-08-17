@@ -8,6 +8,37 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-17
+
+### Fixed
+
+Six logic defects in the skills, all pre-existing rather than introduced by packaging, plus the
+holes found while fixing them.
+
+- **Pre-ship checks ran after the pull request had already been marked ready and CI had settled**,
+  so a failing one forced a fix onto reviewed, tested code and CI re-ran on a patch no engine had
+  seen. `review` now supports a caller-declared pre-ship hold (7.1b) with a named `PRE-SHIP RESUME`
+  re-entry mode; `pr` and `release` declare it and discharge it at a new step 2c.
+- **`push` staged only tracked files**, so a change introducing a new file committed and pushed
+  without it while reporting success.
+- **`insert-story` / `insert-defect` created an edge-less orphan** when a plan had no selectable
+  next item — which `build-item` then classified as unplanned work and shipped straight to the base
+  branch. Now distinguishes a finished plan (attach after the last completed item, numbered as a
+  dotted splice) from a blocked one (stop and surface it).
+- **`rationalize-gantt` could not terminate on a dependency cycle**, the very thing `plan` relies
+  on it to catch. It now isolates strongly connected components first and stops before writing any
+  date, naming the real cycle members rather than the innocent nodes feeding them.
+- **`build-item` demanded a pull-request reference for fast-merge stories that have none**,
+  inviting a fabricated one; it now cites the merge commit and integration branch, and the release
+  step actually links the release pull request it promises.
+- **`build-item` left a stale remote branch** after every fast merge, and now deletes it — only
+  once the integration push has succeeded.
+
+### Changed
+
+- `CONTRIBUTING.md`: port a change as a patch, never a file copy. A wholesale copy silently reverts
+  the generalizations that make the text repo-agnostic.
+
 ## [0.3.4] — 2026-08-17
 
 ### Fixed
@@ -104,7 +135,8 @@ for what each version component means here and how a release is cut.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.4...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.0...HEAD
+[0.4.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.4...devstride--v0.4.0
 [0.3.4]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.3...devstride--v0.3.4
 [0.3.3]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.2...devstride--v0.3.3
 [0.3.2]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.1...devstride--v0.3.2

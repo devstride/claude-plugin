@@ -42,6 +42,15 @@ A port is mechanical and should stay that way:
 - Nothing internal to the upstream project ships: no private tracker numbers, no internal branch
   names, no incident write-ups, no repo-local operational tooling.
 
+**Port a CHANGE as a patch, not a file copy.** The first port also *generalized* the text —
+replacing one project's branch names, deploy provider, CI job names and directory layout with the
+config keys that govern them. Those generalizations exist only here; upstream still carries the
+concrete values, because upstream is one specific repo. So copying a changed file wholesale
+silently reverts every generalization in it and re-publishes internal specifics. Instead, take the
+upstream diff for the change, rewrite skill names and paths in the *patch*, and apply it — hunks
+that fail because they landed in generalized context get applied by hand. Then re-run the
+sanitization grep before committing; a clobbered generalization looks exactly like a normal diff.
+
 ## Repo conventions
 
 See [AGENTS.md](AGENTS.md) for public-repo hygiene, the release/versioning rule, and layout.

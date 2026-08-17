@@ -9,7 +9,12 @@ Execute the following git workflow:
 
 1. Run `git add -u` to stage changes to already-tracked files only (do NOT sweep
    in untracked files with `git add .`)
-2. Run `git status` to see what's being committed
+2. Run `git status` to see what's being committed — and **stage any NEW file the change
+   requires, BY NAME** (`git add path/to/new-file.ts`). `git add -u` covers only tracked
+   files, so a new source or test file is invisible to it: without this step the commit
+   pushes without it and the skill reports success, leaving a silently incomplete change on
+   the branch. Never resolve this with a blanket `git add .` — name the paths, and leave
+   genuinely unrelated untracked files alone
 3. Run `git diff --cached --stat` to show a summary of staged changes
 4. Create a commit with a meaningful message per `commitConventions` (fallback: Conventional
    Commits with the item tag). The item tag applies only when the work HAS an associated item —

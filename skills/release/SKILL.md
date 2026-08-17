@@ -41,6 +41,16 @@ IMPORTANT — the DevStride MCP targets PRODUCTION; git/gh act on the real repos
   interactive ask-gates and notifies — pausing a release that steps 0–3 are supposed to run
   autonomously. Consume the findings summary and untracked-deferral list it returns before the
   owner merge gate.
+- **Declare a PRE-SHIP HOLD in that same invocation whenever step 2b has at least one entry to
+  run** (`when` ∈ {`releaseOnly`, `always`}) — tell `review` to settle the review but STOP at its
+  **7.1b** and hand back, rather than flipping. Run step 2b, then discharge the hold at **step 2c**.
+  The release's local gates must test the same diff the reviewers settled and CI is about to run;
+  flipping first means a red pre-ship check is fixed on an already-reviewed, already-CI'd release
+  PR, and that fix reaches production having passed no reviewer. Nothing selected, or
+  `preShipChecks` absent/empty → no hold, and skip 2c.
+- **A release PR's head is protected**, so `review`'s 7.1 never rebases it — the hold still
+  fires, deliberately: 7.1b sits on the no-refresh-needed path too, precisely because this is the
+  caller whose release-only suites nothing else gates.
 - **Any configured `preShipChecks` suites run LOCALLY, in step 2b below — never in CI.**
   These are suites the repo deliberately keeps out of the pipeline (see the config's
   `_preShipChecks_readme`); nothing in CI covers them, so:
@@ -88,6 +98,18 @@ before production. **Absent key or empty array → this step is an explicit no-o
 - The owner may waive a check explicitly (e.g. "skip <check name>"). Record the waiver in
   the step-4 summary so the release's evidence is honest about what was and was not
   verified.
+
+## 2c. Release CI — discharge the pre-ship hold
+
+**Run this whenever step 2 declared a hold; skip it when it did not.** Re-invoke **`review` in
+PRE-SHIP RESUME mode, naming that mode** — it re-enters at 7.1, re-checks the unresolved threads,
+flips the release PR ready and settles CI. Naming the mode matters: a plain re-invocation restarts
+the whole review cycle, re-requesting cloud reviewers and re-running the lessons write.
+
+**Never leave a declared hold undischarged.** The release PR would sit permanently draft with CI
+never released, and step 4's non-draft check would then block the merge with no explanation. If a
+release-gating suite cannot be brought green, that is an owner decision (step 2b's waiver), not a
+reason to return silently.
 
 ## 3. Documentation pass — the sibling docs repo (DEFAULT ON; skip on "no docs")
 
