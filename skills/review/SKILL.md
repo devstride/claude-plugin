@@ -31,7 +31,9 @@ comes from config plus probes, never from assumption:
 
 - **Claude adversarial** — intrinsic; always on the roster (it is this agent, via
   `ultracode-build` phase 3 or step 1 here).
-- **Local CLI engine (Codex, by default)** — on the roster iff `review.localCommand` is non-null AND its
+- **Local CLI engine** — **call it by `review.localReviewerName`** (the shipped default names Codex;
+  a repo running a different CLI must not be told its reviewer is Codex). On the roster iff
+  `review.localCommand` is non-null AND its
   binary resolves (probe the command's first token with `command -v` before launching).
   `localCommand: null` is a legal, documented value meaning "no second local engine".
 - **Cloud reviewers** — exactly the `review.automatedReviewers` entries; `[]` is legal and means
@@ -41,7 +43,8 @@ comes from config plus probes, never from assumption:
   flip/gate-job/close-reopen machinery, and CI settles concurrently with review. Mixed values are
   unsupported-but-safe: fall back to the strictest configured behavior and say so.
 
-Announce the resolved roster ("engines this run: Claude + Codex + Copilot" / "Claude only —
+Announce the resolved roster, naming the local engine by `review.localReviewerName`
+("engines this run: Claude + Codex + Copilot" / "Claude only —
 localCommand null, no cloud reviewers"). **Configured-but-failing is NOT not-configured**: a probe
 failure or an unresponsive configured reviewer is a degradation THIS RUN and must be reported as
 such; an unconfigured engine is silent-by-design. A missing engine narrows the roster — it never

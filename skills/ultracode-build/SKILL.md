@@ -77,7 +77,8 @@ checks green → commit → repeat.
   error handling, module boundaries and logging policy — do not substitute conventions you
   remember from elsewhere.
 - **Commit OFTEN** — one per coherent step, not one at the end. Message per
-  `commitConventions.messageFormat` (fallback: Conventional Commits with scope and the item tag,
+  `commitConventions.messageFormat`, with the tag shaped per `itemTagFormat` (fallback:
+  Conventional Commits with scope and the item tag,
   e.g. `fix(subscription): enforce seat-count invariant [I20130]`). AI attribution is
   optional; never invent or reuse attribution metadata. PR bodies get none.
 - **Keep checks green as you go**: every command in `verify.typecheck`, every entry in

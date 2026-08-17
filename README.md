@@ -15,6 +15,34 @@ merge, and release — against your own repository and your own DevStride organi
 /plugin install devstride@devstride
 ```
 
+<details>
+<summary>Rolling it out to a team</summary>
+
+You can declare the marketplace and enable the plugin for a whole repository by committing
+`.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "devstride": { "source": { "source": "github", "repo": "devstride/claude-plugin" } }
+  },
+  "enabledPlugins": { "devstride@devstride": true }
+}
+```
+
+**This registers and enables the plugin — it does not install it.** Each person still runs
+`claude plugin install devstride@devstride` once on their machine. Worth saying out loud in your
+onboarding docs, because the failure is silent: the skills simply are not there, with nothing
+explaining why.
+
+Two more things to know before a team relies on this. If your repository's `.gitignore` excludes
+`.claude/`, the settings file needs an explicit exception or it will never be committed. And an
+installed plugin stays on its version until someone updates it, so teammates who install at
+different times can be running different versions — see
+[Versioning & updates](#versioning--updates).
+
+</details>
+
 ## Connect to DevStride
 
 The plugin bundles the DevStride MCP server, so there is nothing to configure — but there **is** one
@@ -95,14 +123,78 @@ own server if you want the smaller catalog.
 
 </details>
 
-## Setup
+## Configure it for your repo
 
-The skills read a per-repo config file, `.claude/ds-config.json`, for everything repo-specific:
-branch names, verify/test/lint commands, review engines, and release settings. Every key has a
-shipped default, so the skills degrade sensibly before you write one — but the file is where you
-adapt the loop to your repository, and where it disagrees with a default, the file wins.
+The skills read one file in **your** repository — `.claude/ds-config.json` — for everything
+repo-specific: branch names, how to type-check and test, which review engines exist, release
+settings. Every key has a shipped default, so the skills work before you write one; the file is how
+you adapt the loop to your repository, and **where it disagrees with a default, the file wins**. The
+plugin never ships anyone's config.
 
-A guided setup command that inspects your repo and writes that file for you is in progress.
+Start with this and grow it — every key below is optional, and these are the ones worth setting
+first:
+
+```json
+{
+  "baseBranch": "develop",
+  "protectedBranches": ["develop", "master"],
+  "conventionsDoc": "AGENTS.md",
+
+  "verify": {
+    "typecheck": ["pnpm check:ts"],
+    "test": "pnpm test",
+    "testSingle": "pnpm test -- <path/to/test.spec.ts>",
+    "lint": "pnpm lint"
+  },
+
+  "review": {
+    "localCommand": null,
+    "automatedReviewers": [],
+    "openPullRequestsAsDraft": true
+  }
+}
+```
+
+| Key | What it controls |
+|---|---|
+| `baseBranch` | The branch work merges into and branches are cut from. |
+| `protectedBranches` | Branches never rebased, force-pushed, or deleted. |
+| `conventionsDoc` | Your coding-standards file. The build skill reads it and obeys it — this is how the loop writes code that looks like yours. |
+| `verify.typecheck` | Commands run before every commit and merge. |
+| `verify.test` | Your test suite. Green is a gate, not a suggestion. |
+| `verify.testSingle` | How to run one test file, for the tight build loop. |
+| `verify.lint` | Linter, run when the diff touches the paths it covers. |
+| `review.localCommand` | A local review CLI to run on every change. `null` means none — the built-in adversarial pass is then your local gate. |
+| `review.automatedReviewers` | Cloud reviewers to request on each pull request. `[]` means none; nothing is requested or waited on. |
+| `review.openPullRequestsAsDraft` | Open pull requests as drafts so CI is held until review settles, then runs once on the final diff. Set `false` if your CI should run immediately. |
+
+The full contract — every key, its shape and default — is in the
+[configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference).
+
+> A guided `setup` command that inspects your repo and writes this file for you is planned but not
+> shipped. Until it lands, write the file by hand — the defaults above are a working starting point.
+
+## Your first plan
+
+With the plugin installed, DevStride connected, and a config file in place:
+
+```
+/devstride:plan I1234
+```
+
+Pass the item you want to plan under — a Module, Capability, or Epic in your DevStride
+organization. This is an interactive discovery loop, not a document generator: it asks about scope,
+sequencing and trade-offs, and creates nothing until you have signed off on the shape.
+
+Then execute what you planned, one item at a time:
+
+```
+/loop /devstride:build-item
+```
+
+Each pass selects the next unblocked item, marks it in progress, branches, builds, reviews, merges,
+and updates the item — then picks up the next one. Run `/devstride:build-item` without `/loop` to do
+exactly one.
 
 ## Skills
 
@@ -132,7 +224,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 
 ## Versioning & updates
 
-Current version: **0.4.3** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **0.5.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
