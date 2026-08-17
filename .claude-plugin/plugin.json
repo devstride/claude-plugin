@@ -1,7 +1,7 @@
 {
   "name": "devstride",
   "description": "Plan → Track → Deliver: DevStride's agentic delivery loop for Claude Code. Fifteen skills that plan a roadmap in DevStride, then walk it story by story through branch, build, adversarial review, PR and release against your own repo.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "mcpServers": {
     "devstride": {
       "type": "http",

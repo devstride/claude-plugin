@@ -8,6 +8,16 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-08-17
+
+### Fixed
+
+- **`ultracode-build` cited a config key that does not exist.** It asked for
+  `verify.singleTestCommand` when the key is `verify.testSingle`, so the build phase would look up
+  a missing key and guess how to run the touched test suite — silently, since an absent key does
+  not error. Found by auditing every one of the 50 config keys the skills cite against a real
+  config; it was the only mismatch.
+
 ## [0.4.1] — 2026-08-17
 
 ### Changed
@@ -143,7 +153,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.1...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.2...HEAD
+[0.4.2]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.1...devstride--v0.4.2
 [0.4.1]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.0...devstride--v0.4.1
 [0.4.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.4...devstride--v0.4.0
 [0.3.4]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.3...devstride--v0.3.4
