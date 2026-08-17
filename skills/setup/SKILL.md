@@ -1,0 +1,262 @@
+---
+name: setup
+description: Inspect this repository and work out what its .claude/ds-config.json should say — package manager, verify commands, CI provider and draft gating, branches, review engines, conventions doc — then present the findings with the evidence behind each one. Read-only; writes nothing.
+user-invocable: true
+disable-model-invocation: true
+---
+
+Work out what the delivery loop's configuration should be **for this repository**, by looking at the
+repository rather than asking. Run it after installing the plugin, before writing
+`.claude/ds-config.json` by hand.
+
+Optional argument — a detector name (`ecosystem`, `verify`, `ci`, `branches`, `engines`, `docs`) to
+run just one: $ARGUMENTS
+
+> **This version inspects and reports. It does not write the config file.** The interview that turns
+> these findings into `.claude/ds-config.json` arrives in a later release. Until then this is a
+> filled-in worksheet: everything it marks `detected` is a value you can copy straight into the file,
+> and everything it marks `ambiguous` or `unknown` is a decision only you can make. Phase B says
+> exactly this to the user; do not imply a file was written.
+
+**This skill is READ-ONLY.** It reads files and runs inspection commands. It never writes, moves or
+deletes a file — `.claude/ds-config.json` included — never mutates git state (no commit, checkout,
+branch, fetch, push or `git config` write), never installs anything, and never calls a DevStride
+write tool. A run must leave `git status --porcelain` byte-identical to how it found it.
+
+## Why detection comes before questions
+
+Every question the user answers by hand is friction at the worst possible moment — the first ten
+minutes with a new tool, before it has done anything for them. Nearly every value in this config is
+already sitting in the repository: the lockfile knows the package manager, `package.json` knows the
+test command, git knows the branches, `PATH` knows which review engines exist.
+
+So the rule is **detect before you ask**, and its corollary matters just as much: **never guess.**
+A wrong detected value is worse than an honest question, because it arrives wearing the authority of
+evidence and the user accepts it without reading. Three outcomes, and the third is not a failure:
+
+| Status | Meaning | What happens to it later |
+|---|---|---|
+| `detected` | One unambiguous answer, with evidence | Becomes a prefilled default |
+| `ambiguous` | Several plausible answers, or one that needs confirming | Becomes a question with the candidates offered |
+| `unknown` | The repository does not answer this | Becomes a question with no prefill |
+
+Every row carries the evidence that produced it — the file read or the command run. A row without
+evidence is a guess with a status attached.
+
+## Ground rules for every detector
+
+- **Anchor to the repository root**, `git rev-parse --show-toplevel`, not the working directory.
+  Run from a subdirectory and root-relative detection silently reads the wrong tree — the commonest
+  way this produces a confidently wrong answer.
+- **Match names exactly; never substring.** A script called `test:watch` is not the test command, and
+  `pretest` is not either. Compare full script names against a ranked list of known ones. An
+  unanchored match here is invisible: it produces a plausible command that runs the wrong thing.
+- **Prefer local, offline evidence.** Some git commands reach the network (`git remote show origin`);
+  those are still read-only but they are slow and can block on credentials. Use them only as a
+  fallback, and if one stalls, record the key as `ambiguous` with that as its reason rather than
+  waiting.
+- **A command that is not on `PATH` may still be a shell alias or function**, which a non-interactive
+  shell does not load. Report "not on `PATH`" and say so, rather than declaring the tool absent.
+- **Say when a check could not be run.** An unrun check is never a pass and never an absence.
+
+## Phase A — inspect
+
+### A1. Repository and remote
+
+- Confirm you are in a git work tree (`git rev-parse --is-inside-work-tree`). If not, stop: there is
+  nothing to detect and the delivery half of the loop needs a repository.
+- `git remote get-url origin` — check for `origin` **by name**, because the delivery skills hardcode
+  it. If other remotes exist but `origin` does not, say which, and mark every branch key `ambiguous`.
+- Record the forge host from that URL. **The delivery half assumes GitHub and GitHub Actions**; any
+  other host is worth saying plainly here rather than discovering later.
+
+### A2. Ecosystem and package manager
+
+Fingerprint the lockfile at the repository root:
+
+| File | Package manager |
+|---|---|
+| `pnpm-lock.yaml` | pnpm |
+| `yarn.lock` | yarn |
+| `package-lock.json` | npm |
+| `bun.lock` / `bun.lockb` | bun |
+
+- **More than one lockfile → `ambiguous`, listing all of them.** Never silently pick. Multiple
+  lockfiles usually mean a half-finished migration, and picking the loser produces commands that fail
+  on every machine but the one that ran them.
+- `package.json` with no lockfile → `unknown`; the interview asks.
+- **No `package.json` at all → the non-Node path.** Fingerprint `Cargo.toml`, `go.mod`,
+  `pyproject.toml`, `Gemfile`, `Makefile`; record the ecosystem as evidence and mark every `verify.*`
+  key `unknown`. The ecosystem is still worth recording even though it prefills nothing — it lets the
+  interview ask an ecosystem-shaped question instead of a blank one.
+
+### A3. Workspace layout
+
+A monorepo changes the *shape* of the verify commands, so establish it before A4.
+
+- pnpm: the `packages:` globs in `pnpm-workspace.yaml`.
+- npm / yarn / bun: the `workspaces` field in the root `package.json` — it is **either** an array of
+  globs **or** an object with a `packages` array. Handle both; assuming the array shape reads a real
+  monorepo as a single package.
+- Expand the globs and note which workspaces actually define scripts you care about. **Present only
+  those.** A repository with forty packages and three that run tests should produce three rows, not
+  forty.
+
+### A4. Verify commands
+
+Scan `scripts` in the root `package.json` and — in a monorepo — in each workspace's.
+
+Ranked exact-name matches:
+
+- **typecheck**: `typecheck`, `check:ts`, `check-types`, `type-check`, `tsc`
+- **test**: `test`
+- **lint**: `lint`
+
+**Compose the command as `<pm> run <script>`, always.** The bare form — `pnpm lint` — works in pnpm,
+yarn and bun but **not in npm**, where only a handful of names (`test`, `start`) are built-in verbs
+and everything else needs `run`. So `npm lint` and `npm check-types` are not commands, and a
+detector that drops `run` emits a config that fails on the first npm repository it meets while
+looking perfectly correct in review. `run` is valid in all four, so there is no reason to omit it.
+An existing config using the bare form is equivalent, not wrong — do not report it as a difference.
+
+Then compose, remembering the shapes differ:
+
+- **`verify.typecheck` is an array**, so a monorepo naturally produces one entry per workspace —
+  `cd <workspace> && <pm> run <script>`. A single-package repo produces a one-element array, not a
+  string. Propose **every** workspace that has one; a repository deliberately checking only some of
+  them is a choice for the interview, and silently dropping workspaces would hide type errors the
+  user believes are covered.
+- **`verify.test` and `verify.lint` are single strings.** Several workspaces with test scripts is
+  therefore `ambiguous`, not a list: the loop runs one test command and the user has to say whether
+  that is a root script that fans out, or one particular workspace. Offer the candidates; do not
+  invent a `&&` chain that has never been run.
+- **`verify.testDir`** — the directory holding the suites, from the test runner's config
+  (`include` / `roots` / `testMatch`) when there is one, otherwise a conventional `tests/`, `test/`
+  or `__tests__/` that actually exists.
+- **`verify.testSingle`** — only when the runner is recognizable from `devDependencies` or the test
+  script. For vitest and jest, `<detected test command> -- <path/to/test.spec.ts>`. An unrecognized runner is
+  `unknown`; its single-file syntax is not guessable and a wrong one wastes the loop's tightest inner
+  cycle.
+
+### A5. CI provider, and the draft gate
+
+`.github/workflows/*.yml` or `*.yaml` present → **GitHub Actions**, the only provider the draft-hold
+mechanics understand.
+
+When it is GitHub Actions, look at the workflows themselves before prefilling the three CI-ordering
+booleans (`review.openPullRequestsAsDraft`, `review.readyForReviewReleasesCi`,
+`review.ciHeldUntilReviewSettled`). Two things have to be true for the hold to work, and **the second
+is the one repositories get wrong**:
+
+1. Jobs are gated on the draft condition — `github.event.pull_request.draft == false`, or the
+   equivalent `if: ${{ !github.event.pull_request.draft }}`.
+2. **`ready_for_review` is in `on.pull_request.types`.** GitHub's default types are
+   `[opened, synchronize, reopened]` and `ready_for_review` is *not* among them. Without it, marking a
+   pull request ready creates **no workflow run at all** — the draft condition is never even
+   evaluated — and the loop waits for a run that will never exist.
+
+So: both present → prefill all three `true`, `detected`. **Gating present but `ready_for_review`
+missing → `ambiguous`, not `true`.** Prefilling `true` there would configure the loop to rely on a
+hold this repository cannot deliver, which is exactly the failure the config was supposed to prevent.
+Say what is missing and point at `/devstride:doctor`, which diagnoses this specific gap.
+
+Any other provider — `.gitlab-ci.yml`, `.circleci/`, `Jenkinsfile`, `azure-pipelines.yml` — or none
+at all: record the provider name and prefill the three booleans `false`, `detected`. That is not a
+degraded setup, just a different one; the loop opens ordinary pull requests and never waits on a
+draft flip. **Setup attempts nothing provider-specific beyond GitHub Actions.**
+
+### A6. Branches
+
+From git alone — no network unless a local answer is unavailable.
+
+- Default branch: `git symbolic-ref refs/remotes/origin/HEAD`. **This ref is set at clone time and is
+  frequently absent**, so treat an error as ordinary, not exceptional; the fallback is
+  `git remote show origin`, which is a network call (see the ground rules).
+- Existence probes with `git rev-parse --verify --quiet` for `develop`, `main`, `master` — and probe
+  **both** `refs/heads/<name>` and `refs/remotes/origin/<name>`. A fresh clone commonly has exactly
+  one local branch, so a local-only probe reports a repository as single-branch when it is not.
+- A development branch **and** a main/master branch → `baseBranch` = the development one,
+  `release.productionBranch` = main/master, `hotfixBaseBranch` = the production branch.
+- Only one branch → prefill both keys to it, status `ambiguous`: a single-branch repository is a
+  legitimate configuration, but so is a repository whose second branch simply has not been created
+  yet, and those two want different answers.
+- Always compute `protectedBranches` containing the detected base and production branches. It is
+  what keeps the loop from force-pushing or deleting them, so it should never be left empty by
+  accident.
+- **Detached HEAD** does not block any of this — every probe above is by ref name. **No `origin`**
+  does: mark the branch keys `ambiguous` and give that as the reason.
+
+### A7. Review engines
+
+Report what is here. **Absent is a finding, not a failure** — an empty roster is a legal
+configuration in which the built-in adversarial pass is the local gate.
+
+- **A local review CLI** (`review.localCommand`) — probe with `command -v <name>` for the CLIs the
+  user might have. Found → offer it as a candidate, `ambiguous`, because the exact invocation is a
+  choice: which model, which effort, which flags. Not found → `null`, `detected`, with the
+  "may be an alias" caveat from the ground rules.
+- **Cloud reviewers** (`review.automatedReviewers`) — a cloud reviewer is *possible* when the origin
+  host is GitHub and `gh auth status` succeeds for that host. That is a precondition, **not proof
+  that a review can be requested**: entitlement, repository settings and organization policy all sit
+  behind it, and none of them are visible from here. So a positive result is `ambiguous` — a
+  candidate to confirm — and never `detected`. Whether a request actually lands is settled by
+  actually requesting one, which is the validation phase's job, not this one.
+- **`gh` itself** — `gh --version` and `gh auth status`. The whole delivery half depends on it: no
+  `gh` means no pull requests, no review threads, no ready-flip. Read the **active** account's line;
+  `gh auth status` can list several with different scopes. If authentication comes from `GH_TOKEN` or
+  `GITHUB_TOKEN`, say so, because that changes how it gets fixed.
+
+### A8. Conventions doc, and any existing config
+
+- `conventionsDoc` — `AGENTS.md`, `CLAUDE.md` or `CONTRIBUTING.md` at the repository root, in that
+  order of preference. More than one → `ambiguous`, listing them; the build engine reads exactly one
+  and obeys it, so this choice has teeth. None → `unknown`.
+- **Read `.claude/ds-config.json` if it exists** and record each key's current value alongside the
+  detected one. This is the only way a later re-run can tell a hand-edit apart from a stale value,
+  and a re-run that cannot tell them apart is a re-run that overwrites deliberate work.
+
+## The prefill summary — the contract
+
+Phase A's output is a list of rows, one per configuration key, each with:
+
+| Field | Meaning |
+|---|---|
+| `key` | Dotted path into `.claude/ds-config.json` — e.g. `verify.typecheck`, `review.openPullRequestsAsDraft` |
+| `value` | The detected value, in the shape the key takes (array, string, boolean, object). `null` when nothing was detected |
+| `evidence` | What produced it: the file read or the command run. Never empty |
+| `status` | `detected`, `ambiguous`, or `unknown` |
+| `candidates` | Present only when `ambiguous` — every plausible answer, so the question can offer them |
+| `existing` | Present only when `.claude/ds-config.json` already sets this key — its current value |
+
+**This shape is the contract.** Every `detected` row becomes a prefilled default; every `ambiguous`
+or `unknown` row becomes a question. Rows are the unit — a key that produced no row is not a key
+with no answer, it is a key nobody looked at, and the two must stay distinguishable.
+
+## Phase B — report, then stop
+
+Present the summary grouped the way someone reads it, not the way it was gathered: what was detected,
+what needs a decision, and what could not be determined. Lead with the count of each, so a user with
+two open questions sees "two" rather than scanning forty rows for them.
+
+Then say plainly:
+
+- Nothing was written. This run inspected only, and the repository is byte-for-byte as it was found.
+- The `detected` values can be copied into `.claude/ds-config.json` as they stand. Point at the
+  [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference)
+  for the full key contract — shapes, defaults and the keys no inspection can reach.
+- The guided interview that asks the open questions and writes the file is not in this release yet.
+- `/devstride:doctor` checks a config once it exists, and diagnoses the setup problems inspection can
+  only observe.
+
+Do not offer to write the file, and do not write it if asked — that path does not exist yet, and a
+hand-rolled substitute would produce a file the real interview later has to reconcile against.
+
+IMPORTANT:
+- **Read-only, absolutely.** See the contract at the top. If a detector seems to need a write, it is
+  the wrong detector.
+- **Never report a guess as `detected`.** The status column is the only thing standing between a
+  detected value and a fabricated one, and a user who finds one wrong value stops trusting all of
+  them.
+- **Absence is information.** No local review CLI, no cloud reviewer, no CI provider — each is a real
+  finding with a real prefill. Reporting them as gaps to fix misrepresents a legal configuration as a
+  broken one.
