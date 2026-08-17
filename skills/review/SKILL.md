@@ -72,6 +72,18 @@ here `github.event.pull_request.draft == false`), so during
 review **nothing is running** — nothing to poll, nothing to triage. The step-7 ready-flip is
 what releases CI, so it runs once, on the final reviewed diff.
 
+**PRE-SHIP RESUME mode** (the caller says so by name — `pr` step 2c, `release` step 2c):
+this is how a caller that took the **7.1b pre-ship hold** comes back to finish. **Skip steps 0
+through 6.5 entirely** and start at **7.1**. Re-resolve the PR, re-run 7.1's base/patch check and
+the paginated zero-unresolved check, then continue through the flip and settle. Do NOT re-enter the
+earlier steps: a fresh invocation would relaunch every review stream, **re-request every cloud
+reviewer**, and re-run step 6.5, whose at-most-once-per-cycle rule exists precisely to stop a
+re-matched finding inflating `recurrences` and corrupting eviction order. The one exception is the
+one 7.1b names: if the pre-ship fix changed the patch SUBSTANTIVELY, re-run the local streams and
+re-request the cloud reviewers for that delta before flipping — a targeted re-review of the new
+diff, not a restart of the cycle. The lessons tally from the held invocation carries into this
+one's report rather than being recomputed.
+
 **LOCAL-ONLY mode** (fast develop mode — `build-item` step 4a invokes it by name; the caller
 passes a base REF instead of a PR number): there is no PR, so run the **Codex stream only** and
 STOP after triage. Skip steps 0, 2, 6, 7 and 8 entirely — no PR resolution, no cloud reviewer, no
@@ -359,7 +371,10 @@ released CI, so treating it as a precondition would be circular.
      `protectedBranches` FIRST: on a `develop → master` release the head **is** `develop`, and
      rebasing it would rewrite the shared production-bound branch, which `release` forbids.
      Protected + base advanced → STOP and surface it as an owner synchronization decision (a
-     merge, and `release`'s business). Otherwise proceed to the flip as-is.
+     merge, and `release`'s business). Otherwise the head needs no refresh — **continue to 7.1b,
+     NOT straight to the flip.** A release PR always takes this branch, and `release` is the very
+     caller whose pre-ship suites are the only thing gating its release-only checks; jumping to the
+     flip here would skip that hold silently, on the one path where it matters most.
    - **Disposable head:** fetch the base, rebase onto it, push via `/devstride:push` (a rebase rewrites
      SHAs, so a bare push is rejected; `push` uses `--force-with-lease`). An unresolvable
      conflict is a genuine fork — STOP.
@@ -369,6 +384,30 @@ released CI, so treating it as a precondition would be circular.
      configured) if the delta is substantive** — otherwise its review stays attached to the old
      diff and the configured-engine contract is satisfied only on paper. With no cloud roster,
      the re-run local streams are the whole re-review.
+7.1b. **PRE-SHIP HOLD — when the caller declared one, STOP HERE and hand control back.**
+   **Applies only when `review.ciHeldUntilReviewSettled` is true.** In a CI-runs-on-draft repo
+   there is no flip to hold and CI has been running since the PR opened, so the run-once ordering
+   guarantee does not exist to protect — do not hold; the caller runs its pre-ship checks before
+   its own merge gate instead, and this step continues to 7.2 and settles normally.
+   A caller with non-empty `preShipChecks` (`pr` step 2b, `release` step 2b) runs local
+   suites that nothing in CI covers. **This hold sits AFTER 7.1 deliberately**: the pre-ship
+   suites must run against the FINAL, base-refreshed, mergeable head — the same SHA CI is about to
+   test. Holding before the base refresh would gate a SHA that 7.1 then rewrites, leaving the
+   merged code covered by no local gate at all.
+   - Hand back reporting: the review has settled, the head is current with its base, the PR is
+     still a draft, and the pre-ship checks are outstanding. The caller runs them, fixes and
+     pushes anything red, then re-invokes this step to finish.
+   - **The caller MUST re-invoke.** A declared-but-never-resumed hold strands the PR as a
+     permanent draft with CI never released — if the caller cannot complete its checks, it must
+     say so and either resume or explicitly abandon the PR, never silently stop.
+   - **Re-entry is not free of the rules above.** A pre-ship fix is a new push, so re-run **7.1**
+     (base/patch check — NOT the skill's top-level step 1, which would relaunch every review
+     stream) and the paginated zero-unresolved check before flipping. **If the fix changed the
+     patch substantively, no engine has seen the final diff**: re-run the local review streams AND
+     **re-request every configured cloud reviewer**, exactly as 7.1 requires after a rebase.
+     Settling on the strength of the pre-fix cloud review would leave the shipped patch without
+     the configured cloud pass. If the fix rewrites the head again, repeat this hold.
+
 2. **Slow-suite applicability — read `verify.skipDuringStoryBuilds` and branch on it.**
    **Empty (the default): THERE IS NOTHING TO COMPUTE.** Require no extra check names, add no
    trigger label, and never wait on or rerun a slow-suite check — its absence from CI is correct,

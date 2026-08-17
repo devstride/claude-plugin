@@ -97,6 +97,20 @@ engine: every configured review pass, triage, fixes, reply-then-resolve, and —
 drafts — the ready-flip and CI settlement.
 In driven mode carry its untracked-deferral list back to `build-item`.
 
+**DECIDE THE PRE-SHIP HOLD BEFORE INVOKING** — it is declared in the same invocation, so work it
+out first. Compute step 2b's selection now (the `when` filter plus the `pathGlobs` match): **if at
+least one `preShipChecks` entry both selects AND matches this PR, declare a PRE-SHIP HOLD** — tell
+`review` to settle the review but STOP at its **7.1b** and hand back, rather than flipping.
+Then run step 2b, and finish at step 2c. **Order is the whole point:** the pre-ship suites must
+test the same diff the reviewers settled and CI is about to run. Let the flip happen first and a
+red pre-ship check forces a fix onto an already-reviewed, already-CI'd PR — the fix reaches CI
+having passed no reviewer.
+**Do not hold on a non-empty config alone.** A repo can have several entries while this PR matches
+none — a frontend-only diff against path-scoped suites, or entries that are all `releaseOnly` — and
+2b is then a documented no-op. Holding for a step that will do nothing buys a pointless round trip.
+Nothing selected, or `preShipChecks` absent/empty → no hold; let `review` run straight through
+and skip 2c.
+
 ## 2b. Pre-ship checks — run the repo's configured local suites against the final diff
 
 Some suites deliberately run LOCALLY, at the ship boundary, instead of in cloud CI. The repo
@@ -121,6 +135,20 @@ covers them, which is why this step exists.
 4. **A red check blocks the PR — fix it; do not ship over it.** Report per check: name,
    command, pass/fail, counts. (Waivers exist only at the release boundary, in `release`
    step 2b — there is no per-PR waiver.)
+
+## 2c. Release CI — discharge the pre-ship hold
+
+**Run this whenever step 2 declared a hold; skip it when it did not.** Re-invoke **`review` in
+PRE-SHIP RESUME mode, naming that mode** — it re-enters at 7.1, re-checks the base and the
+unresolved threads, flips the PR ready and settles CI. Naming the mode matters: a plain
+re-invocation restarts at step 0 and re-runs the whole review cycle, re-requesting cloud reviewers
+and corrupting the lessons store.
+
+**A declared hold that is never discharged is a stranded PR** — permanently draft, CI never
+released — and the caller above (`build-item`) will then refuse to merge it, correctly but with
+no explanation of why. So this step is not optional once the hold is taken: if the pre-ship checks
+cannot be brought green, say so explicitly and surface the PR's held state rather than returning
+silently.
 
 ## 3. Optionally link the PR (standalone only)
 
