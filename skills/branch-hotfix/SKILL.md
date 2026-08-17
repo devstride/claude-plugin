@@ -16,7 +16,12 @@ Branch name argument: $ARGUMENTS
 1. **Working tree must be clean** — run `git status --porcelain`. If there are
    uncommitted changes, STOP and ask whether to stash or commit first. Do NOT
    carry changes onto the production branch.
-2. If no branch name argument is provided, ask the user for one.
+2. **Recommend stopping any running dev server BEFORE the branch switch.** Moving the checkout
+   from the development branch back to production code underneath a running server, or a
+   database migrated to the development branch's schema, is a common source of confusing
+   failures. You cannot stop it for the user — it runs in their terminal — so remind them now,
+   while there is still time to act on it.
+3. If no branch name argument is provided, ask the user for one.
 
 ## Steps
 
@@ -32,11 +37,11 @@ Branch name argument: $ARGUMENTS
    - Example: "Jane Doe" → `jane/hotfix/01-23-26/fix-login-crash`
 4. Push the new branch and set upstream: `git push -u origin <new-branch-name>`
 
-**Local environment.** A hotfix moves the checkout from the development branch back to production
-code, which can leave a running dev server or a locally-migrated database out of step with the
-tree. If this repo has a local-environment reset or reseed procedure, run it now — that procedure
-is repo-specific and lives with the repo, not in this skill. At minimum, stop any running dev
-server before switching branches and restart it afterwards.
+**Local environment.** Now that the branch exists, bring the local environment back into step with
+production code: if this repo has a database reset/reseed or migration procedure, run it, then
+restart the dev server pre-flight step 2 asked the user to stop. That procedure is repo-specific
+and lives with the repo, not in this skill — if you do not know it, say so and ask rather than
+guessing.
 
 A PR is NOT opened here — a freshly-created branch has no commits ahead of the
 production branch, so there is nothing to compare. A hotfix merges back to the
@@ -45,7 +50,7 @@ when the fix is ready, so it gets the standard draft-first, review-before-CI tre
 review-fix push on a non-draft PR would restart CI, which is exactly what the
 draft hold exists to prevent.
 If you open it by hand, use `gh pr create --base master` with `--draft` iff the repo holds CI
-on drafts (`review.openPullRequestsAsDraft`, true here) — never `--fill`.
+on drafts (`review.openPullRequestsAsDraft`, true by default) — never `--fill`.
 
 ## After
 
@@ -55,7 +60,8 @@ on drafts (`review.openPullRequestsAsDraft`, true here) — never `--fill`.
 
 ## On failure
 
-- If any step fails after you've left the production branch, do NOT strand the user. Report
-  exactly which step failed and its output, and ask how to proceed before making
-  further changes.
+- If any step fails, do NOT strand the user — and note that steps 1-2 leave the checkout ON the
+  production branch, so a failure there is especially easy to overlook. Report exactly which step
+  failed and its output, say which branch the checkout is on now, and ask how to proceed before
+  making further changes.
 - The previous branch is NOT deleted — keep it until the hotfix is merged.

@@ -72,18 +72,21 @@ STOP and surface it — do not build a half-thing around a missing dependency.
 Implement against the plan in the main agent (not a Workflow). Tight loop: small increment →
 checks green → commit → repeat.
 
-- Follow the contract per file; reuse what UNDERSTAND found; obey every `conventionsDoc` rule (no
-  `any` in `frontend/src/`, semantic Tailwind colors, focus rings, Result pattern, exceptions from
-  `libs/exceptions`, cross-module access only via CommandBus/QueryBus, no `console.log`).
+- Follow the contract per file; reuse what UNDERSTAND found; **read the repo's `conventionsDoc`
+  and obey every rule in it**. It is the authority on this repo's typing rules, styling tokens,
+  error handling, module boundaries and logging policy — do not substitute conventions you
+  remember from elsewhere.
 - **Commit OFTEN** — one per coherent step, not one at the end. Message per
   `commitConventions.messageFormat` (fallback: Conventional Commits with scope and the item tag,
   e.g. `fix(subscription): enforce seat-count invariant [I20130]`). AI attribution is
   optional; never invent or reuse attribution metadata. PR bodies get none.
-- **Keep checks green as you go**: backend and frontend `check:ts`, the four pre-commit wiring
-  checks (init / correlation-id / events-registration / events-in-stack), and the touched test
-  suite — `pnpm test -- tests/suits/path/to/test.spec.ts`, **widened when the change is broad**. A red non-SDK type-check, wiring check, or test is stop-and-fix, never commit-anyway.
-- **SDK-only type errors are tolerated** — errors confined to `frontend/src/api/sdk.gen.ts` of the
-  form `error TS2339: Property 'client' does not exist`. Everything else stops.
+- **Keep checks green as you go**: every command in `verify.typecheck`, every entry in
+  `preCommitWiringChecks` (when the repo configures any), and the touched test suite via
+  `verify.singleTestCommand`, **widened when the change is broad**. A red type-check, wiring
+  check, or test is stop-and-fix, never commit-anyway.
+- **Generated-file type errors are tolerated** only where config says so — a file matching
+  `generated.paths` failing with a pattern in `generated.toleratedTypeErrors`. Everything else
+  stops. Fix those by re-running `generated.regenCommand`, never by hand-editing the file.
 - **Skip `verify.skipDuringStoryBuilds` suites** when that config list is non-empty — those suites
   are gated elsewhere (at the PR/release boundary their config entries define), so don't run them
   locally during a story build and don't expect their checks here. An empty list means there is

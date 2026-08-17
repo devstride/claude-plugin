@@ -19,8 +19,8 @@ The lessons file opens with exactly this header shape:
 ```markdown
 # Lessons — distilled review findings
 
-<!-- Written ONLY by review at settle time. Read-only everywhere else.
-     Format + curation rules: references/lessons-format.md in the devstride plugin's review skill -->
+<!-- Written ONLY by devstride:review at settle time. Read-only everywhere else.
+     Format + curation rules: the devstride:review skill's references/lessons-format.md -->
 
 Next-ID: 4
 ```
@@ -112,8 +112,7 @@ above, distilled from CONFIRMED/PLAUSIBLE findings at settle time.
 **What NEVER enters**:
 
 - One-off nitpicks and finding instances with no recurrence potential.
-- Item-, PR-, or incident-specific facts (those belong in commit bodies, item comments, or the
-  repo's internal overlay doc).
+- Item-, PR-, or incident-specific facts (those belong in commit bodies or item comments).
 - Style opinions.
 - Anything already stated in the repo's `conventionsDoc` — **the writer checks conventionsDoc
   before minting a lesson**; a rule that belongs there is a human-owned doc change, never a
@@ -139,6 +138,5 @@ borderline entry costs more than it saves.
 
 - `.claude/ds-config.json` `_lessonsDoc_readme` — the addressing key.
 - `review/SKILL.md` — the writer (classification, merge-by-ID, cap enforcement) and the
-  dedup guard — *wired by the "review auto-writes classified lessons" story*.
-- `ultracode-build/SKILL.md` — phase-1 build context and phase-3 finder checks — *wired by
-  the "Lessons consumption in build & review + dedup guard" story*.
+  dedup guard.
+- `ultracode-build/SKILL.md` — phase-1 build context and phase-3 finder checks.

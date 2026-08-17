@@ -43,14 +43,14 @@ doing it here too double-owns it. Still pause only at a genuine fork.
 
 ## 1. Open the PR — as a DRAFT (when the repo holds CI on drafts)
 
-**`gh pr create --draft` — conditional on `review.openPullRequestsAsDraft`** (true here; a repo
+**`gh pr create --draft` — conditional on `review.openPullRequestsAsDraft`** (true by default; a repo
 with it false opens non-draft and lets CI run concurrently with review, with no flip step).
 The draft is what holds CI: every PR job in the repo's workflow files
 (config `ci.workflowGlobs`) is gated on the draft condition (config `ci.draftGateCondition` —
 here `github.event.pull_request.draft == false`), so opening as a draft gives the configured
 review engines the whole review phase and **no workflow burns a runner on a diff that is about to
 change**. `review` step 7 flips it ready once findings are settled, and that flip releases CI —
-one run, on the final reviewed diff. In a draft-hold repo (this one), never open non-draft and
+one run, on the final reviewed diff. In a draft-hold repo, never open non-draft and
 never flip it ready here; when `openPullRequestsAsDraft` is false, the non-draft open IS the
 configured behavior and there is no flip to protect.
 
@@ -58,7 +58,7 @@ configured behavior and there is no flip to protect.
 --body-file <file>` — with `--draft` iff the repo holds CI on drafts (`openPullRequestsAsDraft`;
 mixed/partial boolean configs take the strictest reading, i.e. draft) — and a request for **each
 entry in `review.automatedReviewers`, per its
-`how`** (this repo has one, Copilot, via GraphQL `requestReviews` — see `review`). Do not
+`how`** (the shipped default names one, Copilot, via GraphQL `requestReviews` — see `review`). Do not
 hardcode a single reviewer: a repo with several, or a different bot, is expressed in config, and
 a hardcoded request leaves the others never run while the poll waits them out. An EMPTY
 `automatedReviewers` is legal — request nothing and note that no cloud wave is configured. Mark as
@@ -72,7 +72,7 @@ never defer it to a later turn. An explicitly requested Copilot review runs fine
 a clear, conventional TITLE. Render the sections from config **`prBodyTemplate.sections`**, in
 order, each filled per its `guidance` — the list is ordered and CLOSED (no invented extra
 headings). Caller-declared flavors (epic release, hotfix, release) change how the sections are
-FILLED, never the section set. Inline fallback when the key is absent — this repo's four sections:
+FILLED, never the section set. Inline fallback when the key is absent — these four sections:
 
 1. **`## Simple Description`** — plain-language, non-technical: what this does and why,
    understandable without knowing the codebase. (Deliberately not titled with an
@@ -86,7 +86,7 @@ FILLED, never the section set. Inline fallback when the key is absent — this r
 4. **`## Testing Steps`** — concrete steps to exercise it, plus which automated tests cover it.
 
 If the config file disagrees with this fallback, the file wins. When
-`prBodyTemplate.noAiAttribution` is true (this repo's setting, and the fallback default), no
+`prBodyTemplate.noAiAttribution` is true (the fallback default), no
 `Co-Authored-By` or AI-attribution text goes in the body; a repo that sets it false may include
 attribution. Report the PR number and URL.
 

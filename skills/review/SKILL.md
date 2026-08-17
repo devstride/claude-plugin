@@ -1,6 +1,6 @@
 ---
 name: review
-description: Run a PR through every configured review engine (in this repo, Claude, local Codex, and cloud Copilot), address every verified finding, resolve the addressed threads, release CI and settle it green, then report or notify
+description: Run a PR through every configured review engine (as configured in `review.*`), address every verified finding, resolve the addressed threads, release CI and settle it green, then report or notify
 ---
 
 Take an open pull request through the **full review-and-settle loop**: run every review
@@ -31,7 +31,7 @@ comes from config plus probes, never from assumption:
 
 - **Claude adversarial** — intrinsic; always on the roster (it is this agent, via
   `ultracode-build` phase 3 or step 1 here).
-- **Local CLI engine (Codex here)** — on the roster iff `review.localCommand` is non-null AND its
+- **Local CLI engine (Codex, by default)** — on the roster iff `review.localCommand` is non-null AND its
   binary resolves (probe the command's first token with `command -v` before launching).
   `localCommand: null` is a legal, documented value meaning "no second local engine".
 - **Cloud reviewers** — exactly the `review.automatedReviewers` entries; `[]` is legal and means
@@ -48,7 +48,11 @@ such; an unconfigured engine is silent-by-design. A missing engine narrows the r
 hard-stops the loop — with ONE floor: fast story merges require ≥ 1 local engine (see
 `build-item` step 4).
 
-This repo's configured roster (the inline fallback):
+The roster comes from `review.*` in the consuming repo's config. **With no config file present,
+the fallback roster is CLAUDE-ONLY** — there is no `localCommand` to run and no cloud reviewer to
+request, so proceed on the Claude pass and say so. Do NOT treat that as the degraded
+"configured engine failed" stop; nothing was configured to fail. A fully-configured roster looks
+like this:
 
 | engine | where | effort |
 | --- | --- | --- |
@@ -408,13 +412,14 @@ released CI, so treating it as a precondition would be circular.
    non-applicable suites may be absent.
    **If the poll hits its bounded timeout while a required check is still pending, LAUNCH ANOTHER
    INSTANCE of the same shape** — never a foreground or manual loop. `review.pollTimeoutMinutes`
-   (20) bounds the REVIEWER poll, and the sharded backend suite can outlast it. Without
+   (20) bounds the REVIEWER poll, and a long-running CI job can outlast it. Without
    re-launching, an autonomous release can never settle.
    **No check for a `preShipChecks` suite will EVER appear on this board** — those suites
    run LOCALLY, in `pr` step 2b and `release` step 2b, by design. So never wait on,
-   request, or rerun one, and never treat its absence as pending. With
-   `verify.skipDuringStoryBuilds` empty (the state today) there is no slow-suite
-   applicability left to compute here either.
+   request, or rerun one, and never treat its absence as pending. Separately, if
+   `verify.skipDuringStoryBuilds` is EMPTY there is no slow-suite applicability to compute here
+   either — but if it is NON-EMPTY, the checks step 7 case 2 resolved for it are mandatory, and
+   an absent one is a gate that never ran.
 5. **Red CI:** *flaky/infra* (known-intermittent full-shard classes, a `paths-filter`
    token glitch, concurrent-worker-DB resets) → `gh run rerun <id> --failed`, bounded to ~2. A
    run that failed to TRIGGER is kicked by close+reopen. *Real* → reproduce, fix, push, re-poll;

@@ -5,7 +5,7 @@ description: "Orchestrate one DevStride work item end-to-end: select, branch, bu
 
 Orchestrate ONE DevStride one-day leaf item (this org's Story or Defect types) end-to-end: select → In Progress → branch → build →
 review → PR → merge → completion ritual → sync → next. This is the ORCHESTRATOR. It composes
-the other `ds-*` skills and owns ONLY the DevStride glue (selection, lane transitions, the
+the other delivery skills and owns ONLY the DevStride glue (selection, lane transitions, the
 completion ritual). **Invoke them by name; do not re-spell what they do.**
 
 Argument — an item number, or `next`/empty for the next unblocked item. It may also SCOPE selection
@@ -46,7 +46,7 @@ to re-derive where it is. Render this at each step transition, updating rows in 
 | 1 · In Progress | ✅ |
 | 2 · Branch | ✅ jane/03-14-26/I20110-… |
 | 3 · Build + Claude pass | ✅ 1 finding fixed |
-| 4b · PR + review + CI | #42 — draft, CI held (release is review step 7) |
+| 4b · PR + review + CI | #42 — draft, CI held (release is `review` step 7) |
 | — Codex (local, xhigh) | ✅ 3 findings → fixed |
 | — Copilot (cloud) | ⏳ request registered in timeline |
 | 5b · Merge | — |
@@ -232,10 +232,10 @@ no local CLI engine AND no build-time Claude pass ran for this story (a caller b
 with zero engines behind it is the one outcome this mode must make impossible.
 
 - **Claude adversarial** — already ran as `ultracode-build` phase 3 in step 3. Do not re-run it.
-- **Local CLI engine (Codex here)** — when on the roster, invoke **`review` in local-only mode**
+- **Local CLI engine (Codex, by default)** — when on the roster, invoke **`review` in local-only mode**
   (say so explicitly; pass the epic branch as
   the base ref). It runs `review.localCommand` and returns triaged findings. Use the skill rather
-  than calling Codex here: the load-bearing flags live there (notably
+  than invoking the CLI engine directly: the load-bearing flags live there (notably
   `-c mcp_servers.devstride.enabled=false`, without which the review wedges and returns nothing —
   a silent roster narrowing). Unconfigured (`localCommand: null`) → the Claude pass is the local
   gate, per `review`'s degradation ladder; a configured engine whose probe fails is reported
@@ -263,7 +263,7 @@ working base as the pre-answered base, and note that this loop owns PR-to-item l
 not `pr`.
 
 It opens the PR — as a draft when the repo holds CI on drafts (`review.openPullRequestsAsDraft`,
-true here) — with every configured cloud reviewer requested in the same call (none, if the
+true by default) — with every configured cloud reviewer requested in the same call (none, if the
 configured set is empty), then runs the
 review-and-settle loop via `review`. **Review first, CI last**: every CONFIGURED engine
 runs at max effort with no trivial-diff skip; in a draft-hold repo CI is held while the PR is a
@@ -312,7 +312,7 @@ No PR to merge — integrate locally, then push the epic branch:
   before accepting the new CI run. A conflict resolution or interacting base change that no engine
   saw must not reach develop on the strength of a green re-run alone.
   **Also, when `verify.skipDuringStoryBuilds` is non-empty, RECOMPUTE its applicability from the
-  new SHA before judging CI** (an empty list — the state today — means there is nothing to
+  new SHA before judging CI** (an empty list means there is nothing to
   recompute). A rebase or conflict resolution
   can change the final path set, so the pre-rebase decision is stale — and a check that just
   became mandatory would sit absent while the merge step treated the old gate set as
@@ -328,8 +328,9 @@ No PR to merge — integrate locally, then push the epic branch:
   tries. Real → reproduce, fix, push, re-poll. Never merge red; never give up after one failure.
 - Per-story PRs into an epic branch do not wait on `verify.skipDuringStoryBuilds` checks. On a
   develop-base story PR, any suite in that config list is evaluated per its configured
-  applicability; with the list empty (the state today) there is nothing to evaluate, and an
-  absent check is settled, not pending.
+  applicability; with the list empty there is nothing to evaluate, and an
+  absent check is settled, not pending. **Read the config before concluding either** — an
+  absent check for a suite the config DOES list is a gate that never ran, not a settled one.
 - **Re-check zero unresolved review threads immediately before merging** (the paginated query
   from `review`'s references). `review` verified it at settle time, but a comment posted
   in the gap between settle and merge — a late reviewer, a second Copilot pass — would otherwise
@@ -412,11 +413,12 @@ The release unit's whole batch of leaf merges lands on develop as ONE reviewed P
 - **Refresh from develop**: pull the epic branch, fetch `baseBranch`, capture the fetched tip as
   `<baseOid>`, and **merge that exact OID** — merge, NOT rebase; story SHAs on a shared branch must
   not be rewritten. Resolve conflicts in-loop if safe and mechanical; otherwise STOP. Push.
-- **Verify locally**: type-checks and `verify.test` (the complete NON-GOLDEN suite). Compute the
+- **Verify locally**: type-checks and `verify.test` (the repo's full test suite). Compute the
   release diff against the same merged tip. If `verify.skipDuringStoryBuilds` is non-empty and a
   listed suite's configured applicability fires, its CI check is mandatory on the PR below — do
-  NOT also run it locally, a double-run is waste. (The list is empty today; local-only suites are
-  the callers' step-2b responsibility instead.) Fix failures in-loop before cutting the PR.
+  NOT also run it locally, a double-run is waste. (With the list empty, local-only suites in
+  `preShipChecks` are the callers' step-2b responsibility instead.) Fix failures in-loop before
+  cutting the PR.
 - **Cut via `/devstride:pr`** in autonomous mode, head = epic branch, base = `baseBranch`, flagged as an
   **EPIC RELEASE PR** so the body leads with the epic and lists the constituent stories.
 - **Review-and-settle — and CHECK WHICH SCOPE APPLIES, because fast mode changes it.**
@@ -433,8 +435,8 @@ The release unit's whole batch of leaf merges lands on develop as ONE reviewed P
     per-story review COULDN'T see — the cross-story integration surface and the develop-merge
     conflict resolutions — rather than re-reviewing approved diffs.
   - Either way: any suite in `verify.skipDuringStoryBuilds` is decided by its configured
-    applicability — a suite that fires is mandatory, with no story-level exemption. The list is
-    empty today, so no slow cloud suite gates the release; local pre-ship suites remain the
+    applicability — a suite that fires is mandatory, with no story-level exemption. With the list
+    empty, no slow cloud suite gates the release; local pre-ship suites remain the
     callers' own step-2b responsibility.
 - **Merge** `gh pr merge <n> --merge` once green and settled, then delete the epic branch —
   **only if `epicIntegrationBranches.deleteBranchAfterRelease`**. It is a destructive remote
