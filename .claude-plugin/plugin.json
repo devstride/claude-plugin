@@ -1,7 +1,7 @@
 {
   "name": "devstride",
-  "description": "Plan → Track → Deliver: DevStride's agentic delivery loop for Claude Code. Scaffold — skills and the bundled MCP server are being added.",
-  "version": "0.1.0",
+  "description": "Plan → Track → Deliver: DevStride's agentic delivery loop for Claude Code. Fifteen skills that plan a roadmap in DevStride, then walk it story by story through branch, build, adversarial review, PR and release against your own repo.",
+  "version": "0.2.0",
   "keywords": [
     "devstride",
     "project-management",
@@ -11,7 +11,10 @@
     "delivery",
     "mcp"
   ],
-  "author": { "name": "DevStride", "url": "https://devstride.com" },
+  "author": {
+    "name": "DevStride",
+    "url": "https://devstride.com"
+  },
   "homepage": "https://devstride.com",
   "repository": "https://github.com/devstride/claude-plugin",
   "license": "MIT"
