@@ -16,7 +16,12 @@ Optional argument — a detector name, to run just that one: `ecosystem` (A2–A
 `ci` (A5), `branches` (A6), `engines` (A7), `docs` (A8). **Run each one's prerequisites too, silently
 — A1 always, and A2–A3 before A4**, which cannot compose a command without knowing the package
 manager or find workspace scripts without knowing the layout. A narrowed run reports fewer keys; it
-must never report worse ones: $ARGUMENTS
+must never report worse ones.
+
+**A narrowed run stops after Phase B and writes nothing.** It has only looked at part of the
+repository, so it has nothing to say about the rest — and a write would fill every key the skipped
+detectors would have answered with a default, silently replacing real settings with guesses. Say
+that a full `/devstride:setup` is what writes the file: $ARGUMENTS
 
 **The write boundary — the whole of it.** This skill writes exactly two paths, both under
 `.claude/`: `ds-config.json`, and the lessons store at `lessonsDoc` if the user accepts an empty one.
@@ -169,7 +174,11 @@ hold, and judging it as ungated turns a correctly-configured repository into a f
 is the one repositories get wrong**:
 
 1. Jobs are gated on the draft condition — `github.event.pull_request.draft == false`, or the
-   equivalent `if: ${{ !github.event.pull_request.draft }}`.
+   equivalent `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated when every job in
+   its `needs` closure is**, because a skipped dependency skips its dependents. Real workflows gate
+   one cheap job and fan the result out to the expensive ones, so checking only for an explicit `if`
+   reads a correctly-gated repository as ungated — and then writes all three hold booleans `false`,
+   turning a working setup off.
 2. **`ready_for_review` is in `on.pull_request.types`.** GitHub's default types are
    `[opened, synchronize, reopened]` and `ready_for_review` is *not* among them. Without it, marking a
    pull request ready creates **no workflow run at all** — the draft condition is never even
@@ -203,6 +212,10 @@ From git alone — no network unless a local answer is unavailable.
 - **Enumerate the branches that exist, then reason about them.** `git branch --format='%(refname:short)'`
   and `git branch -r --format='%(refname:short)'` — read **both**, because a fresh clone commonly has
   exactly one local branch and a local-only list reports a repository as single-branch when it is not.
+  **Normalize the remote list before using it**: strip the `origin/` prefix, drop the symbolic
+  `origin/HEAD` entry, and deduplicate against the local names. Skipping this writes `origin/develop`
+  as `baseBranch` — which reads plausibly and then fails at the loop's first checkout, because git
+  and every GitHub call want the branch name, not the remote-tracking ref.
   Enumerating first matters: plenty of repositories name their long-lived branches `production`,
   `trunk`, `release` or `staging`, and probing only for `develop`/`main`/`master` would not merely
   miss them, it would report a four-branch repository as single-branch and hand every role to the one
@@ -364,7 +377,10 @@ Walk the prefill summary and turn it into as few questions as the repository all
   override is what gets written — do not re-apply the detected one at write time, and do not argue.
 - Ask about the two things no inspection can reach: whether this repository has a **sibling docs
   repository** the release skill should update (`release.docsRepo`, omitted entirely if not), and
-  whether to **initialize an empty lessons store**.
+  whether to **initialize the lessons store**. If they accept, write the canonical template from the
+  defaults reference — header and `Next-ID: 1`. **A zero-byte file is not an empty store**: `Next-ID`
+  is the counter that makes lesson IDs unreusable, and a file with no header has none. Declined, the
+  key is still written and the review skill creates the file when it has something to record.
 
 ## Phase E — write the config
 
@@ -373,27 +389,28 @@ config exists.
 
 Write these keys. Values come from detection, from Phase C, or from the answers in Phase D; where
 none of those apply, write the shipped default, because a key present with a default is inspectable
-and a key absent is invisible:
+and a key absent is invisible.
+
+**The defaults are literal values, not a description of one.**
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md` holds every one of them —
+branch naming, integration branches, commit conventions, the pull-request body template, the CI
+block, the empty lists, and the lessons-store template. **Read it before writing**, and copy the
+values verbatim. The delivery skills compare against these strings literally, so a default
+paraphrased into something that means the same thing is a default that no longer matches.
 
 | Key | Value |
 |---|---|
 | `baseBranch`, `hotfixBaseBranch`, `protectedBranches` | From A6. `protectedBranches` **always** contains the detected base and production branches |
 | `integrationBranch` | `null` — the per-release-unit derivation is the default; an explicit value overrides it |
-| `epicIntegrationBranches` | `enabled`, `pattern`, `slugRule`, `releaseTarget`, `fastStoryMerges`, `autoRelease: false`, `deleteBranchAfterRelease` |
-| `branchNaming` | `pattern`, `prefixSource`, `dateFormat` |
+| `epicIntegrationBranches` | Verbatim from the defaults reference, with `fastStoryMerges.enabled` decided by the rules below |
 | `verify` | `typecheck` (array), `test`, `lint`, `testSingle`, `testDir`, `skipDuringStoryBuilds: []` |
 | `generated` | Only when detected — omit rather than write an empty shape |
 | `review` | The roster and the three CI-ordering booleans, per the rules below |
-| `prBodyTemplate`, `commitConventions`, `ci` | The shipped defaults, unless the repository said otherwise |
-| `preShipChecks` | `[]` — a repository's slow pre-ship suites are added later, deliberately |
-| `preCommitWiringChecks` | `[]` — the wiring checks a repository wants before each commit are its own to name |
+| `prBodyTemplate`, `commitConventions`, `ci`, `branchNaming` | Verbatim from the defaults reference, unless the repository said otherwise |
+| `preShipChecks`, `preCommitWiringChecks` | `[]` — a repository names these for itself, deliberately; see the defaults reference for why empty is a real answer |
 | `hierarchyRoles` | Phase C's confirmed mapping |
 | `release` | `productionBranch`, `releaseSource`; `docsRepo` only if the user opted in |
 | `conventionsDoc`, `itemTagFormat`, `lessonsDoc` | From A8, the answers, and the shipped default path |
-
-**`autoRelease` is written `false`.** A repository whose release unit merges to its base branch
-without a human saying so is a decision its owner should make deliberately, on a loop they have
-watched run — not one they inherit from a setup command on day one.
 
 **The roster must describe what actually exists.** This is the one place where writing an aspirational
 config does real damage, because every later run reads these keys as fact:
