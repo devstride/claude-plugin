@@ -36,76 +36,109 @@ depend on, it does not freeze the surface.
 
 ## The checklist
 
-1. **Move the `Unreleased` entries** in `CHANGELOG.md` under a new `## [x.y.z] — YYYY-MM-DD`
-   heading, and add the comparison link at the bottom of the file. If `Unreleased` is empty, there
-   is nothing to release — stop here rather than cutting an empty version.
-2. **Bump `version`** in `.claude-plugin/plugin.json` to match. It lives there and nowhere else —
-   the marketplace entry deliberately carries no version, so there is nothing to keep in sync.
-3. **Update the README's `Current version:` line.** It is the one other place a version literal
-   lives, and it is the first thing a visitor reads. (Deliberately the *only* other place: examples
-   elsewhere use a `<version>` placeholder precisely so they cannot go stale.)
-4. **Validate both manifests — separately.** A root-level run silently checks only the marketplace
-   manifest when one is present, so it must be done in two passes:
+0. **Validate what you are about to ship.** Three passes, because one run does not cover it:
 
    ```bash
-   claude plugin validate .                    # marketplace manifest
-   # then validate the plugin manifest against a copy with marketplace.json absent
+   claude plugin validate .          # marketplace manifest ONLY — see the caveat in AGENTS.md
+   claude plugin validate ./skills   # skill frontmatter; a malformed SKILL.md ships silently otherwise
    ```
 
-   Do not rely on step 5's agreement check alone: if the marketplace manifest is invalid, the tag
-   command can treat it as absent and tag the otherwise-valid plugin anyway.
-5. **Commit** as `release: v<version>`.
-6. **Tag and push.** Use the official tooling rather than tagging by hand:
+   Then validate the **plugin** manifest, which the root-level run skips whenever a marketplace
+   manifest is present: copy the repo to a scratch directory, delete `.claude-plugin/marketplace.json`
+   from the copy, and run `claude plugin validate` against it.
+
+1. **Move the `Unreleased` entries** in `CHANGELOG.md` under a new `## [x.y.z] — YYYY-MM-DD`
+   heading, add the comparison link at the bottom, and **re-point `[unreleased]`** at the tag you are
+   about to create — otherwise it spans the release you just cut.
+
+   *If `Unreleased` is empty*, one of two things is true. Either nothing user-visible changed, in
+   which case do not cut a release at all; or the entries were never written, in which case write
+   them now from the commit range (`git log <last tag>..HEAD`). Do not cut an empty version.
+
+2. **Bump `version`** in `.claude-plugin/plugin.json`. This is the authority — the marketplace entry
+   deliberately carries no version, so there is nothing to keep in sync there.
+
+3. **Update the README's `Current version:` line** to match. It is the only *other* place a version
+   literal lives, and it is the first thing a visitor reads. Every other example deliberately uses a
+   `<version>` placeholder so it cannot go stale.
+
+4. **Commit** as `release: v<version>`.
+
+5. **Push `main` FIRST.** Before tagging, not after: `claude plugin tag --push` pushes only the tag.
+   Tag first and a rejected or forgotten branch push leaves an immutable public release tag for a
+   commit that is not on `main`.
+
+6. **Tag.** Use the official tooling rather than tagging by hand. Preview it first:
 
    ```bash
-   claude plugin tag --push -m "devstride %s"
+   claude plugin tag --dry-run
+   claude plugin tag --push
    ```
 
    This creates `devstride--v<version>` — note the plugin-name prefix, which is the convention the
-   tool expects, not a bare `v<version>`. It also refuses to run on a dirty tree and validates that
-   `plugin.json` and the marketplace entry agree, which is the check that catches a half-finished
-   step 2. Preview with `--dry-run` first.
-7. **Push `main`.**
+   tool expects, not a bare `v<version>`. It refuses to run on a dirty tree, and **refuses to
+   re-create a tag that already exists** — which is what actually catches a forgotten step 2, and it
+   only works because the previous release was tagged. (Its manifest-agreement check cannot catch an
+   un-bumped version: the marketplace entry has no version to disagree with.)
+
+7. **Verify the release is real**, in a scratch project — this whole document exists because these
+   failures are silent:
+
+   ```bash
+   claude plugin marketplace update devstride
+   claude plugin update devstride@devstride
+   claude plugin list          # confirm the reported version is the one you just cut
+   ```
+
+8. **Announce it**, including the two update commands from the section below. Users who have not
+   enabled auto-update will not receive the release until they run them.
 
 ## When your users actually get it
 
-**They do not get it automatically.** This is the part worth stating plainly when you announce a
-release, because the intuition is wrong: an installed plugin stays pinned to its installed version
-indefinitely. Verified on Claude Code 2.1.233 — starting a fresh session with a newer version
-available left the installed plugin untouched.
+**Not automatically, unless they opted in.** Auto-update is a per-marketplace setting and it is
+**off by default** for a manually added marketplace. A user who enables it (in `/plugin` → the
+devstride marketplace → **Enable auto-update**) gets releases without doing anything. Everyone else
+stays on their installed version indefinitely — verified on Claude Code 2.1.233, where starting a
+fresh session with a newer version available left the installed plugin untouched.
 
-Getting the new version takes two commands, and **both** are required:
+For everyone else, two commands, and **both** are required:
 
 ```bash
 claude plugin marketplace update devstride   # refresh the catalog
 claude plugin update devstride@devstride     # upgrade the installed plugin
 ```
 
-followed by a restart to apply. Two traps worth repeating to users:
+followed by a restart to apply. Three traps worth repeating in the announcement:
 
 - **`marketplace update` alone does nothing to an installed plugin.** It refreshes catalog metadata
   and prints success, while the installed copy stays exactly where it was. This looks like the fix
   did not ship.
 - **`claude plugin update devstride` fails** with "Plugin not found" — the update command needs the
   fully-qualified `devstride@devstride`.
+- **It defaults to the `user` scope.** A project-, local- or managed-scope install needs a matching
+  `--scope`, or the command reports the plugin is not installed and changes nothing.
 
-So the answer to "when does my team get the fix" is: when they run those two commands. Say so in the
-release announcement rather than assuming it propagates.
+So the answer to "when does my team get the fix" is: immediately if they enabled auto-update,
+otherwise when they run those two commands. Say which in the announcement rather than assuming it
+propagates.
 
 ### Pinning
 
 Users pin by appending `@<tag>` to the marketplace source. There is no `--ref` flag; the ref belongs
-in the source argument:
+in the source argument. **`marketplace remove` uninstalls every plugin that came from that
+marketplace, and re-adding it does not bring them back** — so the reinstall is a required third step:
 
 ```bash
 claude plugin marketplace remove devstride
 claude plugin marketplace add devstride/claude-plugin@devstride--v<version>
+claude plugin install devstride@devstride
 ```
 
-Unpin by removing it and re-adding the bare `devstride/claude-plugin`.
+Unpinning is the same three commands with the bare `devstride/claude-plugin` as the source.
 
-This is why tagging every release matters even without GitHub Releases: **the tag is the pin.** An
-untagged release is one nobody can hold still on.
+This is one reason to tag every release: **the tag is the pin**, and an untagged release is one
+nobody can hold still on. Treat tagging as part of publishing rather than a bookkeeping extra —
+the update machinery resolves `<name>--v*` tags, so an untagged release is not merely unpinnable.
 
 ## A release packages a port — it does not license direct edits
 

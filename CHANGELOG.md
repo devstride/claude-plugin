@@ -8,6 +8,28 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-08-17
+
+### Fixed
+
+- **The pinning and unpinning recipes left you with no plugin.** `claude plugin marketplace remove`
+  uninstalls every plugin that came from that marketplace, and re-adding the marketplace does not
+  bring it back — both recipes now include the required `claude plugin install` step.
+- **"Updates are never automatic" was too absolute.** Auto-update is a per-marketplace setting, off
+  by default but available in `/plugin` → the marketplace → Enable auto-update. Documented alongside
+  the manual path.
+- Corrected which safeguard catches a forgotten version bump: it is `claude plugin tag` refusing to
+  re-create an existing tag, not its manifest-agreement check — the marketplace entry carries no
+  version to disagree with.
+
+### Changed
+
+- The release checklist now validates the skills and both manifests before tagging, pushes `main`
+  before the tag (so a public tag can never point at a commit that is not on the branch), re-points
+  the changelog's `[unreleased]` link, verifies the release actually installs, and ends with an
+  announce step.
+- Stated what to do when `Unreleased` is empty.
+
 ## [0.3.3] — 2026-08-17
 
 ### Fixed
@@ -36,8 +58,7 @@ for what each version component means here and how a release is cut.
   touching the install. Upgrading needs `claude plugin marketplace update devstride` **and**
   `claude plugin update devstride@devstride` (fully-qualified — the bare name reports "not found"),
   then a restart.
-- **The documented pinning command did not exist.** `claude plugin marketplace add` has no ref or
-  version flag; pinning means cloning a release tag and adding that directory as the marketplace.
+- The pinning example now cites the current release tag.
 
 ## [0.3.1] — 2026-08-17
 
@@ -57,7 +78,7 @@ for what each version component means here and how a release is cut.
 - README section covering sign-in, switching organization, connecting without a browser (CI and
   other headless environments), and trimming the advertised tool catalog.
 
-### Notes
+### Changed
 
 - **Sign-in is a required step, not a lazy prompt.** Until you connect the server it contributes no
   tools at all, and nothing prompts you — run `/mcp` after installing.
@@ -83,7 +104,8 @@ for what each version component means here and how a release is cut.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.3...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.4...HEAD
+[0.3.4]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.3...devstride--v0.3.4
 [0.3.3]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.2...devstride--v0.3.3
 [0.3.2]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.1...devstride--v0.3.2
 [0.3.1]: https://github.com/devstride/claude-plugin/compare/devstride--v0.3.0...devstride--v0.3.1

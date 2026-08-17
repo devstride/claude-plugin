@@ -132,18 +132,23 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 
 ## Versioning & updates
 
-Current version: **0.3.3** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **0.3.4** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
-**Getting a new release.** Updates are **not** applied automatically — an installed plugin stays at
-its version until you ask for the new one. Two steps, and both are needed:
+**Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
+its version until you either turn auto-update on or ask for the new one explicitly.
+
+*Once, to stop thinking about it:* open `/plugin`, select the devstride marketplace, and choose
+**Enable auto-update**. Claude Code then refreshes the marketplace and its installed plugins for you.
+
+*Otherwise, per release:* two commands, and **both** are needed —
 
 ```bash
 claude plugin marketplace update devstride   # refresh the catalog
 claude plugin update devstride@devstride     # upgrade the installed plugin
 ```
 
-Then restart Claude Code to apply it. Two things to watch:
+then restart Claude Code to apply it. Two things to watch:
 
 - The update command needs the **fully-qualified** `devstride@devstride`; the bare plugin name
   reports "not found".
@@ -159,15 +164,21 @@ New skills, new config keys, and changed skill behavior arrive in MINOR bumps; w
 PATCH.
 
 **Pinning.** Append `@<tag>` to the marketplace source to pin to a release. There is no `--ref`
-flag — the ref goes in the source itself:
+flag — the ref goes in the source itself.
+
+> **`marketplace remove` also uninstalls every plugin that came from it.** Re-adding the marketplace
+> does *not* bring the plugin back, so the reinstall line below is required, not optional. Skip it
+> and you are left with a registered marketplace and no skills, and nothing says why.
 
 ```bash
 claude plugin marketplace remove devstride
 claude plugin marketplace add devstride/claude-plugin@devstride--v<version>
+claude plugin install devstride@devstride
 ```
 
-Every release is tagged, so any version in the [changelog](CHANGELOG.md) is pinnable. Unpin by
-removing it and re-adding the bare `devstride/claude-plugin`.
+Every release is tagged, so any version in the [changelog](CHANGELOG.md) is pinnable. To unpin, run
+the same three commands with the bare `devstride/claude-plugin` as the source. Restart Claude Code
+afterwards either way.
 
 ## License
 
