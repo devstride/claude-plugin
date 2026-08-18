@@ -97,13 +97,21 @@ If a check could not be run, say so — never report an unrun check as a pass.
   as behind. Behind → **updating is two commands, and one alone silently does nothing**:
   ```bash
   claude plugin marketplace update devstride
-  claude plugin update devstride@devstride
+  claude plugin update <installed-id>
   ```
-  then restart. The update command needs the fully-qualified `devstride@devstride` and acts on the
-  `user` scope unless given a matching `--scope`.
+  then restart. **Take `<installed-id>` from `claude plugin list`, do not assume it.** The marketplace
+  publishes the same plugin under two entry names — `devstride` and the shorter `ds` alias — and the
+  id is whichever one that machine installed through. Naming the other reports the plugin as *not
+  installed*, which reads as a broken setup rather than a wrong argument, and the user stays on their
+  old version believing they updated. The command needs the fully-qualified `<name>@devstride` form
+  and acts on the `user` scope unless given a matching `--scope`.
 - **Repo-level declaration** — if `.claude/settings.json` declares the marketplace and plugin, say
   what that does and does **not** do: it registers and enables, it does **not install**. Every
-  teammate still runs `claude plugin install devstride@devstride` once.
+  teammate still runs `claude plugin install <id>` once — and **build that id from the
+  `enabledPlugins` key you just read**, rather than printing a literal. A repository may enable
+  either marketplace entry, and telling someone to install `devstride@devstride` when their
+  repository declares `ds@devstride` leaves them with a plugin that does not match what the project
+  enabled.
   **Then check the file actually reaches them — two different questions, two commands.**
   `git ls-files --error-unmatch .claude/settings.json` proves it is TRACKED; `git check-ignore -v
   .claude/settings.json` shows whether an ignore rule matches. Run the trackedness check
@@ -163,16 +171,30 @@ exempt it, and do not advise gating it.
 
 Two separate checks, and **the first is the one everyone misses**:
 
-- **`ready_for_review` must be in `on.pull_request.types`.** GitHub's default types are
-  `[opened, synchronize, reopened]` — **`ready_for_review` is not among them.** So a workflow with a
-  perfect draft `if:` and default types creates **no workflow run at all** when the loop marks a
-  pull request ready: the condition is never even evaluated. The loop then waits for a run that will
-  never exist. FAIL with: add `ready_for_review` to `on.pull_request.types`.
+- **`on.pull_request.types` must carry all four events the loop depends on** — `opened`,
+  `synchronize`, `reopened`, `ready_for_review` — and each covers a different way a run gets
+  created. GitHub's defaults are the first three, so **`ready_for_review` is not among them**: a
+  workflow with a perfect draft `if:` and no `types` list creates **no workflow run at all** when
+  the loop marks a pull request ready. The condition is never even evaluated, and the loop waits for
+  a run that will never exist.
+  **Declaring `types` explicitly REPLACES the defaults rather than adding to them**, which is the
+  second half of the trap: a list naming only `ready_for_review` fixes the flip and breaks
+  everything after it — a fix push starts nothing, and close-and-reopen has no `reopened` to fire on.
+  **`opened` looks droppable and is not.** Under the hold the loop's own pull requests open as
+  drafts, so that event only ever produces a skipped run *for them* — which is exactly why someone
+  eventually deletes it. But `review` also runs standalone on a pull request somebody else opened,
+  and on a **non-draft** one it skips the ready-flip entirely and settles against the CI it assumes
+  is already running. Without `opened` there is no such run and never will be, so it waits forever.
+  FAIL with: declare all four.
 - **Jobs gated on the draft condition** — match against `ci.draftGateCondition` (the config names
   the expression; default `github.event.pull_request.draft == false`) and accept equivalent forms
-  such as `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated if every job in its
-  `needs` closure is** — real workflows gate one cheap job and fan the result out, and a skipped
-  dependency skips its dependents, so flagging those is a false FAIL on a correctly-gated repo.
+  such as `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated if ANY job it
+  `needs` is gated** — real workflows gate one cheap job and fan the result out, and GitHub's default
+  job condition requires every dependency to *succeed*, so one skipped dependency skips the
+  dependent. Requiring the whole closure to be gated is the wrong test and false-FAILs exactly the
+  layout this rule exists for: a gated job beside an ungated utility job, both feeding the expensive
+  one. The exception is a job that opts out of that default with `if: always()` or similar — it runs
+  regardless, so it is genuinely ungated.
   Ungated → CI fires on open and again on every review-fix push; nothing errors, you simply pay
   repeatedly and lose the run-once guarantee.
 - **`ci.gateJobName`** — if set, confirm a job with that **display name** (`name:`) or key exists;

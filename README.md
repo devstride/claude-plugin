@@ -17,6 +17,42 @@ merge, and release — against your own repository and your own DevStride organi
 ```
 
 <details>
+<summary>The shorter <code>ds</code> spelling</summary>
+
+The marketplace carries a second entry, `ds`, pointing at the same plugin:
+
+```
+/plugin install ds@devstride
+```
+
+**It is the same plugin** — same skills, same version, one manifest. `devstride` is the canonical
+entry; `ds` exists only so the install line is shorter to type.
+
+**It does not shorten the commands.** Measured on an actual alias install: the skill namespace comes
+from the plugin manifest's name, not from the marketplace entry you installed through, so skills
+still invoke as `/devstride:plan`, `/devstride:build-item` and so on either way. If you were hoping
+for `/ds:plan`, this is not that — and giving you that would mean a second plugin manifest, which
+this project does not do.
+
+**Install one or the other, never both.** Nothing stops you, but the two entries install as separate
+plugins from the same source: you get two copies of the tree on disk and every skill twice in the
+picker.
+
+**And remember which one you installed.** Every command that names a plugin needs the id you
+actually installed under, so a `ds` install updates with:
+
+```bash
+claude plugin marketplace update devstride
+claude plugin update ds@devstride
+```
+
+Running the `devstride@devstride` form against an alias install reports the plugin as not installed —
+which reads like something broke, when in fact you are simply on the other id. `claude plugin list`
+tells you which you have.
+
+</details>
+
+<details>
 <summary>Rolling it out to a team</summary>
 
 You can declare the marketplace and enable the plugin for a whole repository by committing
@@ -233,7 +269,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 
 ## Versioning & updates
 
-Current version: **0.7.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **0.8.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
@@ -251,7 +287,9 @@ claude plugin update devstride@devstride     # upgrade the installed plugin
 
 then restart Claude Code to apply it. Two things to watch:
 
-- The update command needs the **fully-qualified** `devstride@devstride`; the bare plugin name
+- The update command needs a **fully-qualified** id — `devstride@devstride`, or `ds@devstride` if you
+  installed through the [short alias](#install). `claude plugin list` shows which you have, and using
+  the wrong one reports the plugin as not installed rather than doing nothing visible; the bare plugin name
   reports "not found".
 - It acts on the **user** scope by default. If you installed with `--scope project`, `local` or
   `managed`, pass the same `--scope` or it will report the plugin isn't installed and change nothing.

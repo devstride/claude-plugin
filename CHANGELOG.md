@@ -8,6 +8,35 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-08-18
+
+### Fixed
+
+- **The draft-gate check failed repositories whose CI hold works.** It counted a job as gated only
+  when *every* job in its `needs` closure was gated. GitHub's default job condition requires all
+  dependencies to succeed, so one skipped dependency skips the dependent — meaning **any** gated
+  dependency is enough. The wrong test rejected exactly the layout it was written for: a cheap gate
+  job carrying the draft condition, an ungated utility job beside it, and the expensive job
+  depending on both. It also called a job gated when `if: always()` opts it out of that default and
+  it genuinely does run on drafts.
+- **The trigger-event check had the matching gap.** It required `ready_for_review`, correctly, but
+  declaring `types` explicitly *replaces* GitHub's defaults rather than adding to them — so a list
+  naming only that event fixes the ready-flip and breaks everything after it. All four events are
+  required now, including `opened`, which looks droppable under the draft hold and is not: a
+  standalone review on a non-draft pull request skips the flip and settles against CI that, without
+  it, was never created.
+
+### Added
+
+- **A `ds` marketplace entry**, pointing at the same plugin, so the install line can be typed as
+  `ds@devstride`. Same skills, same version, one manifest — the entry is a name, not a fork.
+  **It shortens the install spelling only:** measured on a real alias install, the skill namespace
+  comes from the plugin manifest's name, so commands remain `/devstride:<skill>` either way. Install
+  one entry or the other, never both — they install as separate plugins from one source, so both
+  means two copies on disk and every skill twice.
+  Update commands take the id you installed under (`claude plugin list` shows it); the diagnostic no
+  longer assumes either name.
+
 ## [0.7.0] — 2026-08-18
 
 ### Added
@@ -220,7 +249,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.7.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.0...HEAD
+[0.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.7.0...devstride--v0.8.0
 [0.7.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.6.0...devstride--v0.7.0
 [0.6.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.5.0...devstride--v0.6.0
 [0.5.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.3...devstride--v0.5.0

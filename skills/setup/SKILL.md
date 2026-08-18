@@ -202,8 +202,11 @@ is the one repositories get wrong**:
    wrong. **And declaring `types` explicitly replaces the defaults rather than adding to them**, so a list
    naming `ready_for_review` and nothing else is its own trap: a fix push after a red run then
    starts no run either, and the close-and-reopen fallback has no `reopened` to fire on. An explicit
-   list needs `opened`, `synchronize`, `reopened` **and** `ready_for_review`; anything short of that
-   is `ambiguous`, naming which events are missing.
+   list needs all four; anything short of that is `ambiguous`, naming which events are missing.
+   **`opened` is the one that looks droppable and is not.** The loop's own pull requests open as
+   drafts, so it only ever produces a skipped run for them — but a standalone review on a
+   *non-draft* pull request skips the ready-flip and settles against CI it assumes is already
+   running, which without `opened` was never created.
 
 Five cases, and **every one of them produces all three rows** — a case that emits nothing leaves the loop on
 shipped defaults chosen for somebody else's repository:
