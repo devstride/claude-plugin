@@ -16,7 +16,10 @@ Optional argument: $ARGUMENTS
 
 - **`validate`** — skip straight to Phase G and check the config that is already there. Nothing is
   inspected for a rewrite, nothing is asked, nothing is written. Use it after hand-editing the file,
-  or to find out why the loop is behaving oddly.
+  or to find out why the loop is behaving oddly. **Run A1 first even so**: Phase G reads the config
+  at a repository-relative path and runs commands that assume the repository root, so a validate
+  invoked from a subdirectory would otherwise read a file that is not there and run commands in the
+  wrong directory.
 - **A detector name** — `ecosystem` (A2–A3), `verify` (A4), `ci` (A5), `branches` (A6),
   `engines` (A7), `docs` (A8) — to inspect and report just that part.
 - **Nothing** — the full run: inspect, ask, write, validate.
@@ -193,7 +196,9 @@ is the one repositories get wrong**:
    `[opened, synchronize, reopened]` and `ready_for_review` is *not* among them. Without it, marking
    a pull request ready creates **no workflow run at all** — the draft condition is never even
    evaluated — and the loop waits for a run that will never exist.
-   **But declaring `types` explicitly replaces the defaults rather than adding to them**, so a list
+   **So the default is never enough here** — a draft-gated workflow with no `types` list at all fails
+   in exactly this way, and it is the commonest shape of the bug precisely because nothing looks
+   wrong. **And declaring `types` explicitly replaces the defaults rather than adding to them**, so a list
    naming `ready_for_review` and nothing else is its own trap: a fix push after a red run then
    starts no run either, and the close-and-reopen fallback has no `reopened` to fire on. An explicit
    list needs `opened`, `synchronize`, `reopened` **and** `ready_for_review`; anything short of that
@@ -204,8 +209,8 @@ shipped defaults chosen for somebody else's repository:
 
 | What the pull-request workflows show | The three booleans |
 |---|---|
-| Draft-gated, **and** the trigger fires on all four of `opened`, `synchronize`, `reopened`, `ready_for_review` (whether by default or by an explicit list) | `true`, `detected` |
-| Draft-gated, but any of those four events missing from an explicit `types` list | `ambiguous` — the hold cannot work as written |
+| Draft-gated, **and** an explicit `types` list naming all four of `opened`, `synchronize`, `reopened`, `ready_for_review` | `true`, `detected` |
+| Draft-gated, but `types` is absent, or an explicit list is missing any of the four | `ambiguous` — the hold cannot work as written |
 | Pull-request workflows exist, none draft-gated | `false`, `detected` — CI runs on open; the run-once design is simply not in use here |
 | Some pull-request jobs gated, others not | `ambiguous` — name the ungated jobs |
 | GitHub Actions present, but no pull-request workflow at all | `false`, `detected` — nothing to hold |
@@ -577,13 +582,22 @@ one is how a setup gets called broken because a laptop was on a train.
    outcome here that would be genuinely hard to forgive.
 2. **The branch refs exist.** `git rev-parse --verify` for `baseBranch`, `release.releaseSource`,
    `release.productionBranch` and `hotfixBaseBranch` — all four, preferring the remote-tracking ref
-   and falling back to local. Leaving the release source out is easy and expensive: the release skill
-   fetches it first thing, so a stale value passes validation and fails at the release. Then assert
+   and falling back to local. **Then confirm them against the remote itself** with
+   `git ls-remote --heads origin`: remote-tracking refs are a local cache and outlive the branches
+   they name, so a deleted branch still passes a `rev-parse` and the loop fails on its first fetch.
+   Where that network call cannot run, the ref checks are `UNVERIFIABLE` rather than `PASS` — say the
+   evidence was a possibly-stale cache. Leaving the release source out is easy and expensive: the
+   release skill fetches it first thing, so a stale value passes validation and fails at the release. Then assert
    `protectedBranches` still contains base, production and release source — a config that lost one is
    a config with the safety off.
 2b. **The GitHub toolchain the delivery half requires.** Unconditional, whatever the review roster
    says: an `origin` remote exists **by name**, its host is GitHub, and `gh` is installed and
-   authenticated for that host. These are not reviewer conveniences — without them the loop cannot
+   authenticated for that host **with write access to this repository**. Authentication alone is not
+   the check: a read-only token passes `gh auth status` and passes a repository read, and then cannot
+   push a branch, open a pull request or merge one. Read the active account's scopes (`repo`, plus
+   `read:org` for an organization-owned repository) and the repository's own permissions — 
+   `gh api repos/{owner}/{repo} --jq .permissions` — and report a read-only result as a `FAIL` for
+   delivery readiness, naming `gh auth refresh -s repo,read:org` as the fix. These are not reviewer conveniences — without them the loop cannot
    push, open a pull request, or merge anything. Checking them only when a cloud reviewer happens to
    be configured is how a repository with no `origin` gets certified loop-ready and then fails at the
    loop's first push. On a non-GitHub host, say plainly that the delivery half has no adapter and that
@@ -606,9 +620,16 @@ one is how a setup gets called broken because a laptop was on a train.
    writable. That is the whole check: **setup never creates this file** — the review skill does, on
    its first lesson — so a missing file is the normal state and not a finding. What matters is that
    the directory will accept it when the time comes.
-6. **The CI ordering is self-consistent** — warn only, never a failure. If the config says pull
-   requests open as drafts but no workflow carries a draft gate, the hold cannot work, and the loop
-   would wait on CI that already ran. Say so and point at `/devstride:doctor`. **Never edit a
+6. **The CI ordering is self-consistent.** Mostly a warning — but one case is a `FAIL`, and the
+   distinction is whether CI can still *settle*.
+   - **Warning:** the config opens pull requests as drafts and no workflow carries a draft gate. The
+     hold does not engage, so CI runs more often than intended. Wasteful, not broken.
+   - **`FAIL`:** a draft-gated workflow whose trigger cannot rerun it — `types` absent, or an
+     explicit list missing any of `opened`, `synchronize`, `reopened`, `ready_for_review`. Here the
+     loop cannot finish at all: after a red run, a fix push starts nothing and the close-and-reopen
+     fallback has no event to fire on, so it waits forever on a run that cannot exist. A repository
+     in that state is not loop-ready, whatever else passes.
+   Point at `/devstride:doctor` either way. **Never edit a
    workflow to fix it**: outside `.claude/` this skill does not write, and that boundary does not
    bend for a helpful one-line change.
 

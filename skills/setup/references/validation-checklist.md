@@ -37,7 +37,8 @@ names them — a verdict that hides a skipped test suite is claiming more than i
 4. **Work-type roles** — every name in `hierarchyRoles` still resolves in the organization.
 5. **Lessons store** — the `lessonsDoc` parent directory exists and is writable. **A missing file is
    the normal state**; the review skill creates it on the first lesson.
-6. **CI ordering** — warn only. Draft-opening configured with no draft gate in any workflow.
+6. **CI ordering** — a warning when the draft hold simply does not engage; a **`FAIL`** when a
+   draft-gated workflow's trigger cannot rerun it, because then CI can never settle.
 
 ## Failure modes
 
@@ -61,6 +62,8 @@ names them — a verdict that hides a skipped test suite is claiming more than i
 | `protectedBranches` no longer contains base, production or release source | Hand-edited, or a branch role changed without it | Add them back. This list is what stops the loop force-pushing or deleting those branches — and the release source is the one that gets left out, because it is usually the base branch and looks already covered |
 | No `origin` remote, or it is not GitHub | A fork checkout naming its remotes `upstream`/`fork`, or a non-GitHub forge | The delivery skills address `origin` literally and assume GitHub; rename the remote, or accept that only the planning half runs here |
 | `gh` missing or unauthenticated | Never installed, or signed out | Install GitHub CLI and `gh auth login`. Without it there are no pull requests, no review threads and no merges |
+| `gh` authenticated but read-only | A default or narrowly-scoped token, or an account with read access only | `gh auth refresh -s repo,read:org`. Authentication is not authorization — a read-only token passes every probe and then cannot push a branch or merge anything |
+| A branch resolves locally but the loop fails on its first fetch | A stale remote-tracking ref for a branch deleted upstream, or a local-only branch | `git fetch --prune origin`, then correct the key to a branch that exists on the remote |
 
 ### Review engines
 
