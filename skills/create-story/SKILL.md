@@ -17,7 +17,12 @@ This skill has two phases: **(A)** CREATE + PLACE the item interactively (steps 
 
 Once you have a real description, pin these down (inbound work has no natural home in the graph, so ask — don't guess):
 
-- **Where in the map?** Ask which parent to file under — a container at any level of your org's hierarchy (this org: Module / Capability / Epic; `I#####`) or a workstream/folder (`F####`). If `$ARGUMENTS` already carries one, confirm it rather than re-asking; otherwise ask. Resolve with `resolve_item` / `find_parent_candidates` (the org's story-flavored leaf type via `get_work_type_hierarchy`; this org: `Story`) and NEVER guess a parent — the backend rejects illegal parent/type pairings anyway.
+- **Where in the map?** Ask which parent item to file under — an item at any grouping level of your
+  org's hierarchy (this org: Module / Capability / Epic; `I#####`) or a workstream/folder (`F####`).
+  If `$ARGUMENTS` already carries one, confirm it rather than re-asking; otherwise ask. Resolve with
+  `resolve_item` / `find_parent_candidates` (the org's story-flavored leaf type via
+  `get_work_type_hierarchy`; this org: `Story`) and NEVER guess a parent — the backend rejects
+  illegal parent/type pairings anyway.
 - **Which board?** Ask which DevStride board it should live on (a triage/kanban board, or a current cycle/sprint). List the candidates with `list_boards`; resolve the chosen board's id and its default not-started lane with `get_board`. A one-off ticket should be VISIBLE on a board — unlike sequenced-plan items, which live on the Gantt.
 - **Assignee = the current user by default.** Resolve the caller via `whoami` (identity → username) and assign the item to that user (`assigneeUsername`). State who that resolved to and allow the user to name a different assignee before creating.
 - Resolve the org's priority order (`get_workspace_context`, same non-canonical-config caveat as `plan` step 0) so you can set a sensible `priorityId` — default the org's normal/medium priority unless the user flags it urgent.

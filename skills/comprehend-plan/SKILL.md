@@ -3,9 +3,16 @@ name: comprehend-plan
 description: Recursively read a DevStride plan (descriptions and comments, every level) to build full grounded context before editing it
 ---
 
-Recursively read a DevStride plan — descriptions AND comments, at every level — to build a full, grounded understanding of what a plan-root container (any container level of your org's hierarchy — e.g. this org's Module/Capability/Epic) actually contains, where it stands, and what its real (not just titled) intent is. This is a READ-ONLY research skill: it never creates or edits DevStride items, and never touches the repo.
+Recursively read a DevStride plan — descriptions AND comments, at every level — to build a full,
+grounded understanding of what a parent item at any grouping level of your org's hierarchy (e.g.
+this org's Module/Capability/Epic) actually contains, where it stands, and what its real (not just
+titled) intent is. This is a READ-ONLY research skill: it never creates or edits DevStride items,
+and never touches the repo.
 
-Plan-root argument — the item number to comprehend (a plan-root container — any container level of your org's hierarchy, e.g. this org's Module/Capability/Epic — such as `I20100`), optionally followed by a focus question (e.g. `I20100 what's left before webhook intake is done?`); empty → ask which item to comprehend: $ARGUMENTS
+Plan-root argument — the parent item number to comprehend (any grouping level of your org's
+hierarchy, e.g. this org's Module/Capability/Epic — such as `I20100`), optionally followed by a
+focus question (e.g. `I20100 what's left before webhook intake is done?`); empty → ask which item to
+comprehend: $ARGUMENTS
 
 Use this BEFORE `/devstride:insert-story`, `/devstride:insert-defect`, `/devstride:rationalize-gantt`, or any surgical edit to a plan you don't already carry full context on — and any time the user asks "what's the state of X" / "what does X actually cover" / "where are we on X".
 
@@ -32,11 +39,14 @@ Use this BEFORE `/devstride:insert-story`, `/devstride:insert-defect`, `/devstri
 
 ## 3. Synthesize
 
-- Build a single coherent picture, organized by the tree's own hierarchy (root → containers → leaves), not a flat list:
+- Build a single coherent picture, organized by the tree's own hierarchy (root → grouping items →
+  leaves), not a flat list:
   - **What this plan is actually for** — the real intent, drawn from descriptions AND reconciled against comment history (flag any place a comment contradicts or supersedes its item's description — that's a live discrepancy worth surfacing, not silently picking one).
   - **Where it stands** — lane distribution (Done / In Progress / open), and the critical path: what's done, what's in flight, what `/devstride:build-item` would pick up next (the **next-unblocked story** per the canonical rule in `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`).
   - **Deferrals and known gaps** — anything a description or comment explicitly flagged as deferred, blocked-on-a-human, or a known compromise.
-  - **Sub-plan shape** — the container breakdown (which containers/release-units exist — this org: Capabilities/Epics — and roughly what each owns) so a reader can navigate without re-reading everything themselves.
+  - **Sub-plan shape** — the grouping breakdown (which grouping items and release units exist — this
+    org: Capabilities/Epics — and roughly what each owns) so a reader can navigate without re-reading
+    everything themselves.
 - If a focus question was supplied in `$ARGUMENTS`, answer it directly and explicitly, backed by what you found — don't bury the answer in the general synthesis.
 
 ## 4. Report

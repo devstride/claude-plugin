@@ -5,7 +5,9 @@ description: Backfill synthetic dates and rationalize the dependency graph of a 
 
 Backfill synthetic dates and rationalize the dependency graph of a DevStride plan so its Gantt renders as a maximally-compressed, gapless, fully-valid dependency cascade. Use it after building out (or partway through) a plan whose item dates have drifted, gone stale, sit in the future, or never reflected the real `blocked_by` graph — and to surface/clean up wrong or coarse dependencies (the red "invalid dependency" lines are a free lint of your plan graph). Assumes every story takes exactly ONE day — the Claude Code build pace — so the timeline is a synthetic critical-path view, not a forecast.
 
-Plan-root argument — the item number whose descendant tree IS the plan (a plan-root container at any level of your org's hierarchy — e.g. this org's Solution or Epic — or a workstream; e.g. `I20100`), or a roadmap/Gantt name; empty → ask which plan to rationalize: $ARGUMENTS
+Plan-root argument — the item number whose descendant tree IS the plan (a parent item at any
+grouping level of your org's hierarchy — e.g. this org's Solution or Epic — or a workstream; e.g.
+`I20100`), or a roadmap/Gantt name; empty → ask which plan to rationalize: $ARGUMENTS
 
 IMPORTANT:
 - The DevStride MCP targets PRODUCTION. Every date and relationship change here is a real, user-visible edit to live items. The cascade OVERWRITES existing start/due dates across the whole tree — including the real completion-ritual dates set by `build-item`. Confirm the scope root (and whether completed items are in scope) before mutating.

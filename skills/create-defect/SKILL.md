@@ -17,7 +17,13 @@ This skill has two phases: **(A)** CREATE + PLACE the item interactively (steps 
 
 Once you have a real repro/root-cause, pin these down (inbound work has no natural home in the graph, so ask — don't guess):
 
-- **Where in the map?** Ask which parent to file under — a container at any level of your org's hierarchy (this org: Module / Capability / Epic; `I#####`) or a workstream/folder (`F####`). A defect often belongs under whichever container owns the broken behavior. If `$ARGUMENTS` already carries a parent, confirm it rather than re-asking; otherwise ask. Resolve with `resolve_item` / `find_parent_candidates` (the org's defect-flavored leaf type via `get_work_type_hierarchy`; this org: `Defect`) and NEVER guess a parent — the backend rejects illegal parent/type pairings anyway.
+- **Where in the map?** Ask which parent item to file under — an item at any grouping level of your
+  org's hierarchy (this org: Module / Capability / Epic; `I#####`) or a workstream/folder (`F####`).
+  A defect often belongs under whichever parent item owns the broken behavior. If `$ARGUMENTS`
+  already carries a parent, confirm it rather than re-asking; otherwise ask. Resolve with
+  `resolve_item` / `find_parent_candidates` (the org's defect-flavored leaf type via
+  `get_work_type_hierarchy`; this org: `Defect`) and NEVER guess a parent — the backend rejects
+  illegal parent/type pairings anyway.
 - **Which board?** Ask which DevStride board it should live on (a triage/kanban board, or a current cycle/sprint). List the candidates with `list_boards`; resolve the chosen board's id and its default not-started lane with `get_board`. A one-off defect should be VISIBLE on a board — unlike sequenced-plan items, which live on the Gantt.
 - **Assignee = the current user by default.** Resolve the caller via `whoami` (identity → username) and assign the item to that user (`assigneeUsername`). State who that resolved to and allow the user to name a different assignee before creating.
 - Resolve the org's priority order (`get_workspace_context`, same non-canonical-config caveat as `plan` step 0) so you can set a sensible `priorityId` — a defect blocking real usage usually warrants an above-normal priority; ask if unclear.

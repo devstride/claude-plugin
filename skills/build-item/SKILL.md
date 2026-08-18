@@ -9,7 +9,7 @@ the other delivery skills and owns ONLY the DevStride glue (selection, lane tran
 completion ritual). **Invoke them by name; do not re-spell what they do.**
 
 Argument — an item number, or `next`/empty for the next unblocked item. It may also SCOPE selection
-to one plan by naming its ROOT (a plan-root container — any container level of the org's hierarchy,
+to one plan by naming its ROOT (a parent item at any grouping level of the org's hierarchy,
 e.g. this org's Module/Capability/Epic): `next under I20100`, or **`I20100`
 alone, meaning "the next unblocked item under this root"** — a bare root is a SCOPE, never a story
 to build, so resolve it as the plan root and then select within it. A specific item that is not
@@ -161,7 +161,7 @@ Deltas — **steps 1–6 run VERBATIM**, because the point is that the inner bui
 - **Step 0** — the item is given: skip plan-root resolution, ready-set and selection. **SKIP THE
   EPIC-BRANCH DERIVATION TOO — the working base is `baseBranch`, unconditionally.** Do not reason
   from "a one-off has no release-unit ancestor": `/devstride:create-story` and `/devstride:create-defect` both
-  offer a release-unit container (this org's Epic) as a parent, so a one-off filed under one DOES
+  offer a release-unit item (this org's Epic) as a parent, so a one-off filed under one DOES
   have a release-unit ancestor. Without this explicit bypass the
   general rule would route it onto that epic's integration branch and strand it there until an
   unrelated epic releases. A one-off ships straight to develop, never an integration branch. Still

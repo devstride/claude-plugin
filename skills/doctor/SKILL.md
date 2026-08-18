@@ -140,7 +140,52 @@ If a check could not be run, say so — never report an unrun check as a pass.
 ## 4. Config file (`config`)
 
 - **Present and parses** — read `.claude/ds-config.json`. Absent is legal, not an error: every key
-  has a shipped default. Say which defaults are therefore in force.
+  has a shipped default. Say which defaults are therefore in force — but do not call the repository
+  ready until those effective branch names have been checked against `origin` below.
+- **Branch roles resolve on the connected repository.** Run the minimal read-only repository-root
+  and `origin` probes even when the user invoked `/devstride:doctor config` by itself; do not require
+  them to run the whole environment section first. Enumerate the actual remote heads with
+  `git ls-remote --heads origin` (read-only; never `fetch`). If the network check cannot run, fall
+  back to normalized local and
+  `refs/remotes/origin/*` names, label that evidence possibly stale, and do not turn an unconfirmed
+  branch into a PASS.
+
+  Resolve all four effective values, including inline fallbacks when their keys are absent:
+
+  | Role | Config key | Inline fallback |
+  |---|---|---|
+  | normal work base | `baseBranch` | `develop` |
+  | release source | `release.releaseSource` | `develop` |
+  | production | `release.productionBranch` | `master` |
+  | hotfix base | `hotfixBaseBranch` | `master` |
+
+  Check that each effective value exists on `origin`, and that `protectedBranches` contains the
+  effective base, release source and production branches. Explicit configured names win even when
+  they are unconventional; naming heuristics must never overwrite or warn against a valid explicit
+  choice.
+
+  When an absent key falls back to a branch that does not exist, apply setup's exact-name candidate
+  vocabulary to the enumerated remote heads: production-role candidates are `main`, `master`,
+  `production`, `prod`; pre-production development-role candidates are `develop`, `development`,
+  `staging`, `stage`, `canary`, `test`, `testing`, `qa`; `trunk` is a possible single-trunk branch.
+  Match whole names only — `production-fix` is not `production`, and `contest` is not `test`.
+
+  - Exactly one development candidate and one production candidate → print the concrete suggested
+    four-key mapping, with base/release source on the former and production/hotfix on the latter.
+  - More than one candidate for either role → list the matches and say the role is ambiguous. Never
+    pick the first list entry.
+  - One production candidate or `trunk` plus only topic branches → suggest the single-trunk mapping
+    for all four roles, but say it needs confirmation.
+  - One development candidate with no production candidate → suggest only the base and release
+    source; never promote staging, canary, test or QA to production by name alone.
+
+  Any nonexistent effective branch is a FAIL: feature checkout, hotfix creation or release will
+  target a ref that is not there. For an absent-key fallback, include the candidate mapping above.
+  For an explicit configured name, identify the invalid key but do not silently replace the user's
+  choice with a heuristic. Fix: run `/devstride:setup` to confirm and write detected roles, or edit
+  the four keys explicitly and re-run `/devstride:doctor config`. Doctor remains read-only — it
+  prints suggested JSON but never writes it. If the shipped fallback refs do exist, PASS and report
+  them; a user can still run setup to make the roles explicit.
 - **Unrecognized keys — report as a WARNING, not a typo accusation.** List keys you do not
   recognize and let the user judge. **Exclude by convention**: any key whose leaf name starts with
   `_` (the `_*_readme` documentation convention, used pervasively in real configs) and `$schema`.

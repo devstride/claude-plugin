@@ -262,9 +262,24 @@ From git alone — no network unless a local answer is unavailable.
 - Default branch: `git symbolic-ref refs/remotes/origin/HEAD`. **This ref is set at clone time and is
   frequently absent**, so treat an error as ordinary, not exceptional; the fallback is
   `git remote show origin`, which is a network call (see the ground rules).
-- `develop` / `main` / `master` are **heuristics for assigning roles among the branches you found**,
-  never the set of branches to look for. Where the names are conventional the roles follow; where they
-  are not, present what exists and let the interview assign them.
+- **Classify only exact, whole branch names** after enumeration; never use substring or prefix
+  matches. The common production-role candidates are `main`, `master`, `production`, and `prod`.
+  The common pre-production development-role candidates are `develop`, `development`, `staging`,
+  `stage`, `canary`, `test`, `testing`, and `qa`. `trunk` is a common single-trunk name, not proof
+  of a separate production role. Preserve the repository's actual spelling in the value you propose.
+  These lists assign likely roles among branches already proved to exist on `origin`; they are never
+  the set of refs to probe for, and a name alone is not proof of what deploys.
+- **One exact development candidate plus one exact production candidate is an unambiguous pair.**
+  Mark all four role values `detected`: `baseBranch` and `release.releaseSource` use the development
+  candidate; `release.productionBranch` and `hotfixBaseBranch` use the production candidate. The
+  candidate-list order is NOT a ranking. If two names from either role set exist — for example both
+  `main` and `production`, or both `staging` and `canary` — mark the affected roles `ambiguous`, show
+  the matches, and ask which branch actually fills each role.
+- Treat `origin/HEAD` as supporting evidence for the repository's ordinary pull-request base, not as
+  proof of production. GitHub lets any branch be the default, and repositories commonly make either
+  their development branch or their production branch the default. Use it to suggest, never to
+  override a conflicting exact-name pair or an explicit answer.
+
 **Four branch keys hang off this, not two, and every one of them has a shipped default pointing at a
 branch this repository may not have.** Emit all four on every path, or the loop inherits
 `develop`/`master` defaults and aims flows at refs that do not exist:
@@ -276,17 +291,23 @@ branch this repository may not have.** Emit all four on every path, or the loop 
 | `release.productionBranch` | What production deploys from |
 | `hotfixBaseBranch` | What an urgent fix branches from, so it carries no unreleased work — normally the production branch |
 
-- A development branch **and** a main/master branch → `baseBranch` and `release.releaseSource` = the
-  development one; `release.productionBranch` and `hotfixBaseBranch` = main/master.
-- One conventional branch plus topic branches (the ordinary trunk-based repository: `main`, and
-  whatever feature or dependency-bot branches happen to be open) → treat it as the single-branch case
-  and prefill **all four roles to the trunk**, `ambiguous`, saying so. Topic branches are work in
-  flight, never candidates for a role. What must not happen is falling through to "several branches,
-  no answer": the roles all have shipped defaults, so an unstated role is not neutral — it silently
-  becomes `develop` or `master`.
+- One unambiguous development/production pair → use the pair exactly as described above.
+- One production-role candidate or `trunk` plus topic branches (the ordinary trunk-based repository,
+  where feature or dependency-bot branches happen to be open) → treat it as the single-branch case
+  and prefill **all four roles to that long-lived branch**, `ambiguous`, saying so. Topic branches
+  are work in flight, never candidates for a role. What must not happen is falling through to
+  "several branches, no answer": the roles all have shipped defaults, so an unstated role is not
+  neutral — it silently becomes `develop` or `master`.
+- One development-role candidate with no production-role candidate → suggest it for `baseBranch`
+  and `release.releaseSource`, but keep the production and hotfix roles `ambiguous`. Do not silently
+  promote a staging, canary, test, or QA branch to production.
+- Multiple candidates in either role set → keep the affected roles `ambiguous`, even if one appears
+  earlier in the list. Show the exact matches and ask; the branch name cannot tell you which one
+  deploys.
 - Branches exist but none carry a conventional name → `ambiguous` on all four, with every enumerated
-  branch offered as a candidate and the `origin/HEAD` default named as the likeliest production
-  branch. `protectedBranches` should offer the long-lived ones, not just the two you can name.
+  branch offered as a candidate and the `origin/HEAD` default named as the likeliest ordinary
+  pull-request base. `protectedBranches` should offer the long-lived ones, not just the two you can
+  name.
 - Only one branch → prefill **all four** to that branch, status `ambiguous` on each. A single-branch
   repository is a legitimate configuration — base, release source, production and hotfix base are
   genuinely the same ref, and hotfixes are then ordinary branches — but so is a repository whose
@@ -394,9 +415,14 @@ that needs a human, and the bulk confirmation there is where detected values get
 The loop reasons in two abstract roles, and `hierarchyRoles` is where a repository says which of its
 organization's real work types fill them:
 
-- **`releaseUnit`** (a string) — the container level whose completion cuts a release. The loop gives
-  each one an integration branch, batches its work onto it, and ships it as one reviewed increment.
+- **`releaseUnit`** (a string) — the parent-item level whose completion cuts a release. The loop
+  gives each one an integration branch, batches its work onto it, and ships it as one reviewed
+  increment.
 - **`leaf`** (an array of strings) — the executable one-day item types the loop actually builds.
+
+`Container` is internal hierarchy shorthand, not user-facing DevStride vocabulary. In questions and
+reports say **parent item**, **grouping item**, or the actual work type name returned by DevStride.
+Developers reasonably interpret an unexplained “container” as Docker.
 
 Read them from the organization, do not assume them. `get_workspace_context` establishes which
 organization is connected; `get_work_type_hierarchy` returns the tree and a per-name lookup with each
@@ -415,8 +441,8 @@ size and releases it at another.
 Two shapes need care:
 
 - **More or fewer levels than the proposal assumes.** The model is two roles, not a level count. An
-  organization with five container levels still has exactly one release boundary; ask which, rather
-  than counting.
+  organization with five parent-item levels still has exactly one release boundary; ask which,
+  rather than counting.
 - **A single work type doing everything.** Map it to both roles and say explicitly what that means:
   every item is its own release unit, so the loop runs without integration batching.
 

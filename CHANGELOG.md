@@ -8,6 +8,26 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-08-18
+
+### Added
+
+- **Repository-aware branch-role suggestions in setup and doctor.** Setup now recognizes exact
+  common production branch names (`main`, `master`, `production`, `prod`) and pre-production
+  development names (`develop`, `development`, `staging`, `stage`, `canary`, `test`, `testing`,
+  `qa`) among branches that actually exist on `origin`. One unambiguous pair is proposed for all
+  four delivery roles; multiple matches remain a user decision. Doctor now checks the effective
+  configured-or-fallback roles against the remote and prints the concrete mapping setup would use
+  when a static `develop` or `master` fallback does not exist. Neither skill guesses from a
+  substring, and doctor remains read-only.
+
+### Changed
+
+- **User-facing hierarchy language says “parent item,” not “container.”** Planning and setup retain
+  container/leaf as an internal classification, but their prompts and reports now use parent item,
+  grouping item, or the organization's actual work type so developers do not mistake a DevStride
+  hierarchy node for a Docker container.
+
 ## [0.8.1] — 2026-08-18
 
 ### Added
@@ -265,7 +285,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.1...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.9.0...HEAD
+[0.9.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.1...devstride--v0.9.0
 [0.8.1]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.0...devstride--v0.8.1
 [0.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.7.0...devstride--v0.8.0
 [0.7.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.6.0...devstride--v0.7.0

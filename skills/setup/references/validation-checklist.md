@@ -58,6 +58,8 @@ names them — a verdict that hides a skipped test suite is claiming more than i
 |---|---|---|
 | A branch ref does not resolve | The remote has not been fetched in this clone | `git fetch origin`, then re-run validation |
 | It still does not resolve after a fetch | The branch was renamed or deleted upstream | Correct the key to the branch that exists — `baseBranch`, `release.productionBranch`, `hotfixBaseBranch` or `release.releaseSource` |
+| A shipped `develop` or `master` fallback does not exist, but common alternatives do | No explicit branch roles were written for this repository | Run `/devstride:setup`; its branch detector proposes exact existing development and production candidates, or asks when several match |
+| Both `main` and `production`, or both `staging` and `canary`, exist | A branch name alone cannot prove which ref fills the role | Choose the actual base and production branches during setup; candidate-list order is never a tie-breaker |
 | It resolves but the loop later fails on checkout | The value carries a remote prefix (`origin/develop`) | Strip it; git and every forge call want the branch name |
 | `protectedBranches` no longer contains base, production or release source | Hand-edited, or a branch role changed without it | Add them back. This list is what stops the loop force-pushing or deleting those branches — and the release source is the one that gets left out, because it is usually the base branch and looks already covered |
 | No `origin` remote, or it is not GitHub | A fork checkout naming its remotes `upstream`/`fork`, or a non-GitHub forge | The delivery skills address `origin` literally and assume GitHub; rename the remote, or accept that only the planning half runs here |

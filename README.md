@@ -164,17 +164,28 @@ own server if you want the smaller catalog.
 
 The skills read one file in **your** repository — `.claude/ds-config.json` — for everything
 repo-specific: branch names, how to type-check and test, which review engines exist, release
-settings. Every key has a shipped default, so the skills work before you write one; the file is how
-you adapt the loop to your repository, and **where it disagrees with a default, the file wins**. The
-plugin never ships anyone's config.
+settings. Every key has a deterministic shipped fallback, but delivery can use it only when the
+named branch or command actually exists. The file is how you adapt the loop to your repository, and
+**where it disagrees with a fallback, the file wins**. The plugin never ships anyone's config.
 
-Start with this and grow it — every key below is optional, and these are the ones worth setting
-first:
+Prefer `/devstride:setup`: it enumerates branches that actually exist on `origin`, recognizes common
+development names such as `develop`, `staging`, `canary` and `test`, recognizes production names
+such as `main`, `master`, `production` and `prod`, and asks instead of guessing when several match.
+It writes explicit branch roles, so the static no-config fallbacks are not silently aimed at refs
+this repository does not have.
+
+The example below illustrates a repository that promotes `staging` to `production`. Use your
+repository's real branch names rather than copying those two values:
 
 ```json
 {
-  "baseBranch": "develop",
-  "protectedBranches": ["develop", "master"],
+  "baseBranch": "staging",
+  "hotfixBaseBranch": "production",
+  "protectedBranches": ["staging", "production"],
+  "release": {
+    "releaseSource": "staging",
+    "productionBranch": "production"
+  },
   "conventionsDoc": "AGENTS.md",
 
   "verify": {
@@ -195,7 +206,10 @@ first:
 | Key | What it controls |
 |---|---|
 | `baseBranch` | The branch work merges into and branches are cut from. |
+| `hotfixBaseBranch` | The production-safe branch an urgent fix starts from. |
 | `protectedBranches` | Branches never rebased, force-pushed, or deleted. |
+| `release.releaseSource` | The branch promoted during a production release, normally the same as `baseBranch`. |
+| `release.productionBranch` | The production release target. |
 | `conventionsDoc` | Your coding-standards file. The build skill reads it and obeys it — this is how the loop writes code that looks like yours. |
 | `verify.typecheck` | Commands run before every commit and merge. |
 | `verify.test` | Your test suite. Green is a gate, not a suggestion. |
@@ -269,7 +283,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 
 ## Versioning & updates
 
-Current version: **0.8.1** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **0.9.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
