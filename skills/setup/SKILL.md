@@ -23,8 +23,7 @@ repository, so it has nothing to say about the rest — and a write would fill e
 detectors would have answered with a default, silently replacing real settings with guesses. Say
 that a full `/devstride:setup` is what writes the file: $ARGUMENTS
 
-**The write boundary — the whole of it.** This skill writes exactly two paths, both under
-`.claude/`: `ds-config.json`, and the lessons store at `lessonsDoc` if the user accepts an empty one.
+**The write boundary — the whole of it.** This skill writes exactly one path: `.claude/ds-config.json`.
 Nothing else, ever. Not application code, not `CLAUDE.md`, not permission settings, not a CI
 workflow, not a `.gitignore`. It never mutates git state — no commit, checkout, branch, fetch, push
 or `git config` write — never installs anything, and never calls a DevStride **write** tool; the only
@@ -182,10 +181,15 @@ is the one repositories get wrong**:
    gated is the wrong test and fails those workflows; so is checking only for an explicit `if`.
    Either mistake reads a correctly-gated repository as ungated and then writes all three hold
    booleans `false`, turning a working setup off.
-2. **`ready_for_review` is in `on.pull_request.types`.** GitHub's default types are
-   `[opened, synchronize, reopened]` and `ready_for_review` is *not* among them. Without it, marking a
-   pull request ready creates **no workflow run at all** — the draft condition is never even
+2. **`on.pull_request.types` carries every event the loop depends on.** GitHub's default types are
+   `[opened, synchronize, reopened]` and `ready_for_review` is *not* among them. Without it, marking
+   a pull request ready creates **no workflow run at all** — the draft condition is never even
    evaluated — and the loop waits for a run that will never exist.
+   **But declaring `types` explicitly replaces the defaults rather than adding to them**, so a list
+   naming `ready_for_review` and nothing else is its own trap: a fix push after a red run then
+   starts no run either, and the close-and-reopen fallback has no `reopened` to fire on. An explicit
+   list needs `opened`, `synchronize`, `reopened` **and** `ready_for_review`; anything short of that
+   is `ambiguous`, naming which events are missing.
 
 Four cases, and **all four produce all three rows** — a case that emits nothing leaves the loop on
 shipped defaults chosen for somebody else's repository:
@@ -227,6 +231,13 @@ From git alone — no network unless a local answer is unavailable.
   plausibly and then fails at the loop's first checkout, because git and every GitHub call want the
   branch name. And every delivery operation targets `origin` by name, so a fork checkout's
   `upstream/develop` is not a candidate for any role here — it is somebody else's branch.
+- **Remote-tracking refs are a local cache, not the remote.** They go stale: `origin/develop` can
+  outlive the branch it names, and a local-only branch has no remote at all. Since the loop's very
+  first act is to fetch and pull against `origin`, a role assigned from a stale ref fails
+  immediately. Where a role turns on evidence that is only local or only cached, confirm it with
+  `git ls-remote --heads origin` — read-only, but a network call, so treat a stall as the ground
+  rules say — and if you cannot confirm, mark the key `ambiguous` and say the evidence was a
+  possibly-stale cache.
   Enumerating first matters: plenty of repositories name their long-lived branches `production`,
   `trunk`, `release` or `staging`, and probing only for `develop`/`main`/`master` would not merely
   miss them, it would report a four-branch repository as single-branch and hand every role to the one
@@ -397,15 +408,11 @@ Walk the prefill summary and turn it into as few questions as the repository all
   note is warranted (`releaseNotesWhen`). A bare yes writes an incomplete `docsRepo` that stops the
   release skill at its first read. No docs sibling → omit `release.docsRepo` entirely, which is how
   the release skill knows to skip that phase. Then ask
-  whether to **initialize the lessons store** — **and only ask when the file does not already
-  exist.** Resolve the configured path first. An existing store holds accumulated lessons and the
-  `Next-ID` counter; initializing over it destroys the lessons and resets the counter, which then
-  re-issues IDs that are supposed to be retired forever. On a re-run, or after the review skill has
-  already created it, there is no question to ask — say it is already there and move on.
-  When it is genuinely absent and the user accepts, write the canonical template from the defaults
-  reference — header and `Next-ID: 1`. **A zero-byte file is not an empty store**: a file with no
-  header has no counter to read. Declined, the key is still written and the review skill creates the
-  file when it has something to record.
+  where the **lessons store** should live, if not the default path.
+  **Do not offer to create the file** — the store has a single writer, and it is not this skill. Its
+  absence is a valid starting state that the review skill resolves the first time it has a lesson
+  worth keeping; a file created here would be a second writer producing a store with no lessons in
+  it. Write the key, nothing else.
 
 ## Phase E — write the config
 
@@ -434,7 +441,7 @@ paraphrased into something that means the same thing is a default that no longer
 | `prBodyTemplate`, `commitConventions`, `ci`, `branchNaming` | Verbatim from the defaults reference, unless the repository said otherwise |
 | `preShipChecks`, `preCommitWiringChecks` | `[]` — a repository names these for itself, deliberately; see the defaults reference for why empty is a real answer |
 | `hierarchyRoles` | Phase C's confirmed mapping |
-| `release` | `productionBranch`, `releaseSource`; `docsRepo` only if the user opted in |
+| `release` | `productionBranch`, `releaseSource`, `autoDeployOnMerge`; `docsRepo` only if the user opted in, and then complete |
 | `conventionsDoc`, `itemTagFormat`, `lessonsDoc` | From A8, the answers, and the shipped default path |
 
 **The roster must describe what actually exists.** This is the one place where writing an aspirational
@@ -473,14 +480,19 @@ What survives a merge, verbatim and unconditionally:
   them, and a rewrite that drops them destroys the reasoning while leaving the config working.
 - **Any value setup did not propose changing.** Silence is not consent to revert.
 
-Never delete a key, never rewrite the file wholesale to normalize its shape, and never treat a
-missing key as a deliberate choice — a config written by hand, or by an older version, is simply
+**One deletion is allowed, and only one shape of it:** a key setup itself recognizes, which the
+user has explicitly said no longer applies — the sibling docs repository being the case that
+actually happens. Leaving a stale `release.docsRepo` in place is not conservative, because the
+release skill reads a present one as opt-in and would commit and push to a checkout that is gone.
+So remove it, after an explicit answer, and say you did. Everything else stands: never remove an
+unrecognized key, never remove one the user did not speak to, never rewrite the file wholesale to
+normalize its shape, and never treat a missing key as a deliberate choice — a config written by hand, or by an older version, is simply
 incomplete, so propose the addition. **Setup authors this file; it is not a precedence layer.** The
 existing contract is unchanged: the file wins over the skills' shipped defaults, including over
 anything setup itself wrote.
 
 IMPORTANT:
-- **The write boundary is two paths under `.claude/`.** See the top. Everything else on disk is
+- **The write boundary is one path: `.claude/ds-config.json`.** See the top. Everything else on disk is
   read-only to this skill, in every phase.
 - **Never report a guess as `detected`.** The status column is the only thing standing between a
   detected value and a fabricated one, and a user who finds one wrong value stops trusting all of

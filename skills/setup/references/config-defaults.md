@@ -178,27 +178,8 @@ is not in this catalog, ask for those fields rather than inventing them.
 { "lessonsDoc": ".claude/ds-lessons.md" }
 ```
 
-The key is always written, whether or not the file is created — the review skill creates the file
-when it has its first lesson to record.
-
-**Only create it when the file is absent.** An existing store carries accumulated lessons and the
-`Next-ID` counter; writing the template over it destroys the lessons and resets the counter, which
-then re-issues IDs that eviction retired. Check first, and if it is there, leave it alone.
-
-When it is genuinely absent and the user accepts, write **exactly** this, and nothing more:
-
-```markdown
-# Lessons — distilled review findings
-
-<!-- Written ONLY by devstride:review at settle time. Read-only everywhere else.
-     Format + curation rules: the devstride:review skill's references/lessons-format.md -->
-
-Next-ID: 1
-```
-
-**A zero-byte file is not an empty store.** `Next-ID` is the ID authority — it only ever increments,
-so that IDs cannot be reused after an eviction — and a file with no header has no counter to read.
-The review skill knows how to create the file from nothing; what it does not expect is a file that
-exists and is malformed. So: write the template above, or **create no file at all** — the
-`lessonsDoc` key is written either way, and an absent file is the normal starting state. Never touch
-it again after this; everything downstream of setup treats the store as review's to write.
+**Write the key and stop.** The store has a single writer — the review skill, at settle time — and
+its absence is a valid state for every reader and for that writer, which creates it when it has a
+first lesson worth keeping. There is no setup prerequisite, so a file created here would be a second
+writer producing a store with nothing in it. The format is review's to own and document; setup only
+says where the file goes.
