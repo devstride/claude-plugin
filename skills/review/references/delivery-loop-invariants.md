@@ -126,11 +126,10 @@ I10. A rule that survives only in this checklist is effectively DELETED from the
      runtime path unless a SKILL.md step tells the agent to read this file.
 
 ## J. Recovered by a systematic omission audit
-##    (I1–I7 were the original seven; I8–I10 came from later rounds.)
-##    Four review rounds had been trickling these out one at a time. A diff of the text
-##    before and after the compression found 23 candidates; adversarial verification
-##    confirmed 13 and refuted 10 — the refuted ones had survived in the consuming repo's
-##    config and conventions doc rather than in the skills.
+##    Ordinary review had been surfacing these one at a time, slowly. Diffing the text before
+##    and after the compression and verifying each candidate adversarially found the rest in a
+##    single pass — and cleared a similar number of false alarms that had merely moved into
+##    config or the conventions doc. Derive candidates from the DIFF, not from memory.
 J1.  Dedup across engines is on the CLAIM, not the location — different defects share lines.
      For genuine duplicates, keep the CLOUD entry; it carries the thread step 6 must resolve.
 J2.  The step-2 poll bans Monitor and re-armed wakeups, not just --watch and foreground sleep.
@@ -183,25 +182,51 @@ small lesson. The procedure:
 # include those; without it, expect misses for exactly those facts and read before concluding
 # anything from them.
 CONSUMER=${CONSUMER:-}
+# A consuming repo names its own conventions doc; do not assume AGENTS.md.
+CONV=$( [ -n "$CONSUMER" ] && python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('conventionsDoc','AGENTS.md'))" \
+         "$CONSUMER/.claude/ds-config.json" 2>/dev/null || true )
 # EXCLUDE THIS FILE from the corpus. It contains every needle by construction, so reading it
 # makes the check pass unconditionally — it would report zero misses with every rule deleted.
 # This is limit 2 below, and the check fell into it on the first attempt.
 SELF="delivery-loop-invariants.md"
 ALL=$(cat skills/*/SKILL.md $(ls skills/*/references/*.md | grep -v "$SELF") \
           AGENTS.md CONTRIBUTING.md \
-          ${CONSUMER:+"$CONSUMER"/.claude/ds-config.json "$CONSUMER"/AGENTS.md} \
+          ${CONSUMER:+"$CONSUMER"/.claude/ds-config.json ${CONV:+"$CONSUMER/$CONV"}} \
           2>/dev/null | tr '\n' ' ')
+# Corpus-wide needles: the rule must survive SOMEWHERE an agent reads.
 for needle in "pull_request_review_id" "suppressed due to low confidence" "graphqlBotId" \
               "review_requested" "paginate" "blanket-resolve" "for MINUTES" "xhigh" \
               "materializ" "100-file cap" "gh pr checks --watch" "protectedBranches" \
               "CHANGED the patch" "untrusted tool data" "compose an item number" "EXPIRED" \
-              "untracked-deferral" "KEEP THE CLOUD" "LAUNCH ANOTHER" "deleteBranchAfterRelease" \
-              "autoRelease" "requested_reviewer.node_id" "release-unit ancestor step 0 resolved" \
-              "copilot-swe-agent" "databaseId" "three-dot" "close+reopen" "force-with-lease" \
-              "source and destination" "high-water" "no thread" "localReviewerName" "hierarchyRoles" \
-              "always()" "single writer"; do
-  printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING: $needle"
+              "untracked-deferral" "KEEP THE CLOUD" "copilot-swe-agent" "databaseId" \
+              "three-dot" "close+reopen" "force-with-lease" "source and destination" \
+              "high-water" "no thread" "localReviewerName" "always()" "single writer"; do
+  printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
+
+# SCOPED needles: the rule must survive in the file that ACTS on it. A corpus-wide search
+# hides the regression that matters here — delete build-item's autoRelease guard and the
+# word still appears in plan and in the config's own documentation, so nothing reports.
+#
+# These have their own failure mode, met immediately: a pair can name the WRONG file. Two of
+# the pairs below did — one rule lives in a reference rather than its skill body, and one
+# needle spanned a line break. Both read as losses and were neither. A scoped miss means
+# "go and look", exactly like a corpus-wide one.
+while IFS='|' read -r file needle; do
+  [ -z "$file" ] && continue
+  grep -qiF "$needle" "$file" 2>/dev/null || echo "MISSING in $file: $needle"
+done <<'PAIRS'
+skills/build-item/SKILL.md|autoRelease
+skills/build-item/SKILL.md|deleteBranchAfterRelease
+skills/build-item/SKILL.md|release-unit ancestor step 0 resolved
+skills/build-item/SKILL.md|EPIC-BRANCH DERIVATION
+skills/build-item/SKILL.md|hierarchyRoles
+skills/review/SKILL.md|LAUNCH ANOTHER
+skills/review/references/github-review-api.md|requested_reviewer.node_id
+skills/review/SKILL.md|automatedReviewers
+skills/pr/SKILL.md|source and destination
+skills/release/SKILL.md|DRIVEN
+PAIRS
 ```
 
 **A needle is a phrase, and phrases legitimately change.** Two of the needles above were re-pointed
