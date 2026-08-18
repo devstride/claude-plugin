@@ -311,11 +311,21 @@ configuration in which the built-in adversarial pass is the local gate.
 - `conventionsDoc` — `AGENTS.md`, `CLAUDE.md` or `CONTRIBUTING.md` at the repository root, in that
   order of preference. More than one → `ambiguous`, listing them; the build engine reads exactly one
   and obeys it, so this choice has teeth. None → `unknown`.
-- **A pull-request template** at `.github/pull_request_template.md` (or `.github/PULL_REQUEST_TEMPLATE/`)
-  → a `prBodyTemplate.sections` row, `ambiguous`, with its headings as the candidate. This repository
-  already has an agreed pull-request format, and once setup writes the generic sections the pull-request
-  skill treats them as authoritative and quietly stops using the one the team actually agreed on.
-  Detecting it is what turns "should be replaced" into a question that gets asked.
+- **A pull-request template** → a `prBodyTemplate.sections` row, `ambiguous`, carrying the template
+  as the candidate. This repository already has an agreed pull-request format, and once setup writes
+  the generic sections the pull-request skill treats them as authoritative and quietly stops using
+  the one the team actually agreed on. Detecting it is what turns "should be replaced" into a
+  question that gets asked.
+  - **Look in every place GitHub honours, case-insensitively**: `pull_request_template.md` at the
+    repository root, in `.github/`, or in `docs/`, and a `PULL_REQUEST_TEMPLATE/` directory in any of
+    those three. Checking one spelling in one directory reports "no template" for most repositories
+    that have one, which is worse than not looking — it produces a confident default.
+  - **Capture each section as `{heading, guidance}`, not as a heading alone.** The pull-request skill
+    fills each section from its `guidance`, so a heading with an empty guidance yields a section the
+    skill does not know how to write, and the instructions or checklist the team wrote underneath are
+    dropped from every pull request thereafter. Carry the text beneath each heading across as the
+    guidance; where a heading has nothing under it, ask what belongs there rather than leaving it
+    blank.
 - **Read `.claude/ds-config.json` if it exists** and record each key's current value alongside the
   detected one. This is the only way a later re-run can tell a hand-edit apart from a stale value,
   and a re-run that cannot tell them apart is a re-run that overwrites deliberate work.
