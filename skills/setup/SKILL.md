@@ -174,11 +174,14 @@ hold, and judging it as ungated turns a correctly-configured repository into a f
 is the one repositories get wrong**:
 
 1. Jobs are gated on the draft condition — `github.event.pull_request.draft == false`, or the
-   equivalent `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated when every job in
-   its `needs` closure is**, because a skipped dependency skips its dependents. Real workflows gate
-   one cheap job and fan the result out to the expensive ones, so checking only for an explicit `if`
-   reads a correctly-gated repository as ungated — and then writes all three hold booleans `false`,
-   turning a working setup off.
+   equivalent `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated when ANY job it
+   `needs` is gated** (unless it overrides the default with `if: always()` or similar). GitHub's
+   default job condition requires every dependency to *succeed*, so one skipped dependency skips the
+   dependent — which is exactly how real workflows are built: one cheap job carries the draft
+   condition and the expensive ones hang off it by `needs`. Requiring the *whole* closure to be
+   gated is the wrong test and fails those workflows; so is checking only for an explicit `if`.
+   Either mistake reads a correctly-gated repository as ungated and then writes all three hold
+   booleans `false`, turning a working setup off.
 2. **`ready_for_review` is in `on.pull_request.types`.** GitHub's default types are
    `[opened, synchronize, reopened]` and `ready_for_review` is *not* among them. Without it, marking a
    pull request ready creates **no workflow run at all** — the draft condition is never even
@@ -192,7 +195,13 @@ shipped defaults chosen for somebody else's repository:
 | Draft-gated **and** `ready_for_review` in types | `true`, `detected` |
 | Draft-gated, `ready_for_review` missing | `ambiguous` — the hold cannot work as written |
 | Pull-request workflows exist, none draft-gated | `false`, `detected` — CI runs on open; the run-once design is simply not in use here |
+| Some pull-request jobs gated, others not | `ambiguous` — name the ungated jobs |
 | GitHub Actions present, but no pull-request workflow at all | `false`, `detected` — nothing to hold |
+
+The mixed row is real and common — a repository part-way through adopting the hold, or one that
+deliberately runs a cheap check on drafts. Neither `true` nor `false` is honest there: `true` would
+claim a hold that part of CI ignores, `false` would discard the part that works. Name the ungated
+jobs and let the user say which they meant.
 
 The second row is the one worth being stubborn about. Prefilling `true` there would configure the
 loop to rely on a hold this repository cannot deliver — the ready-flip creates no run, and the loop
@@ -212,10 +221,12 @@ From git alone — no network unless a local answer is unavailable.
 - **Enumerate the branches that exist, then reason about them.** `git branch --format='%(refname:short)'`
   and `git branch -r --format='%(refname:short)'` — read **both**, because a fresh clone commonly has
   exactly one local branch and a local-only list reports a repository as single-branch when it is not.
-  **Normalize the remote list before using it**: strip the `origin/` prefix, drop the symbolic
-  `origin/HEAD` entry, and deduplicate against the local names. Skipping this writes `origin/develop`
-  as `baseBranch` — which reads plausibly and then fails at the loop's first checkout, because git
-  and every GitHub call want the branch name, not the remote-tracking ref.
+  **Take only `origin`'s refs, and normalize them**: enumerate `refs/remotes/origin/*`, strip the
+  `origin/` prefix, drop the symbolic `origin/HEAD` entry, and deduplicate against the local names.
+  Both halves matter. Keeping the prefix writes `origin/develop` as `baseBranch`, which reads
+  plausibly and then fails at the loop's first checkout, because git and every GitHub call want the
+  branch name. And every delivery operation targets `origin` by name, so a fork checkout's
+  `upstream/develop` is not a candidate for any role here — it is somebody else's branch.
   Enumerating first matters: plenty of repositories name their long-lived branches `production`,
   `trunk`, `release` or `staging`, and probing only for `develop`/`main`/`master` would not merely
   miss them, it would report a four-branch repository as single-branch and hand every role to the one
@@ -270,7 +281,11 @@ configuration in which the built-in adversarial pass is the local gate.
   `null` here would quietly switch off a review engine the user has installed — and they would never
   see the moment it happened. Report what was probed, and let the question be asked.
 - **Cloud reviewers** (`review.automatedReviewers`) — a cloud reviewer is *possible* when the origin
-  host is GitHub and `gh auth status` succeeds for that host. That is a precondition, **not proof
+  host is GitHub and `gh auth status` succeeds for that host. **An entry is more than a name** — the
+  review flow requests each reviewer per its `how`, and a `requested_reviewer` bot is requested by
+  its `graphqlBotId`, so an entry missing those fields is malformed and silently requests nothing.
+  Take the complete entry from the known-reviewer catalog in the defaults reference, or ask for
+  every field; never write a half-populated one. That is a precondition, **not proof
   that a review can be requested**: entitlement, repository settings and organization policy all sit
   behind it, and none of them are visible from here. So a positive result is `ambiguous` — a
   candidate to confirm — and never `detected`. Whether a request actually lands is settled by
@@ -376,11 +391,21 @@ Walk the prefill summary and turn it into as few questions as the repository all
 - **An explicit answer always beats a detection.** If the user overrides a `detected` value, the
   override is what gets written — do not re-apply the detected one at write time, and do not argue.
 - Ask about the two things no inspection can reach: whether this repository has a **sibling docs
-  repository** the release skill should update (`release.docsRepo`, omitted entirely if not), and
-  whether to **initialize the lessons store**. If they accept, write the canonical template from the
-  defaults reference — header and `Next-ID: 1`. **A zero-byte file is not an empty store**: `Next-ID`
-  is the counter that makes lesson IDs unreusable, and a file with no header has none. Declined, the
-  key is still written and the review skill creates the file when it has something to record.
+  repository** the release skill should update — and if so, ask for the **whole object** in that same
+  exchange: its `path`, the `branch` to push, whether pushing deploys the site
+  (`autoDeployOnPush`), whether releases update it by default (`updateByDefault`), and when a release
+  note is warranted (`releaseNotesWhen`). A bare yes writes an incomplete `docsRepo` that stops the
+  release skill at its first read. No docs sibling → omit `release.docsRepo` entirely, which is how
+  the release skill knows to skip that phase. Then ask
+  whether to **initialize the lessons store** — **and only ask when the file does not already
+  exist.** Resolve the configured path first. An existing store holds accumulated lessons and the
+  `Next-ID` counter; initializing over it destroys the lessons and resets the counter, which then
+  re-issues IDs that are supposed to be retired forever. On a re-run, or after the review skill has
+  already created it, there is no question to ask — say it is already there and move on.
+  When it is genuinely absent and the user accepts, write the canonical template from the defaults
+  reference — header and `Next-ID: 1`. **A zero-byte file is not an empty store**: a file with no
+  header has no counter to read. Declined, the key is still written and the review skill creates the
+  file when it has something to record.
 
 ## Phase E — write the config
 

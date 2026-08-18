@@ -140,6 +140,38 @@ All three start empty, and empty is a real answer rather than a placeholder:
   the loop wait for a check that will never run, so this stays empty until someone adds both halves
   together.
 
+## Known cloud reviewers
+
+An `automatedReviewers` entry is requested by the review flow **per its `how`**, and a
+`requested_reviewer` bot is requested by node id — so an entry carrying only a display name is
+malformed, and the failure is silent: the request creates nothing and the flow waits for a review
+that was never asked for. Write complete entries or none.
+
+GitHub's Copilot code reviewer:
+
+```json
+{
+  "name": "Copilot",
+  "how": "requested_reviewer",
+  "bot": "copilot-pull-request-reviewer[bot]",
+  "value": "copilot-pull-request-reviewer[bot]",
+  "graphqlBotId": "BOT_kgDOCnlnWA"
+}
+```
+
+Two traps worth carrying into the config rather than rediscovering:
+
+- **One reviewer, several spellings.** The login that requests the review and the one the reviews
+  endpoint reports is `copilot-pull-request-reviewer[bot]`; the inline-comments endpoint says
+  `Copilot`; review threads say `copilot-pull-request-reviewer` with no suffix. Anything filtering
+  comments by login therefore drops real findings and looks exactly like "the reviewer left none".
+- **The review bot is not the coding agent.** They are different bots with different node ids, and
+  requesting the coding agent is accepted while creating no review request at all.
+
+Any other cloud reviewer must be described the same way — a name the user recognizes, a `how` the
+review flow understands, and whatever identifier that `how` needs. If the user names a reviewer that
+is not in this catalog, ask for those fields rather than inventing them.
+
 ## Lessons store
 
 ```json
@@ -149,7 +181,11 @@ All three start empty, and empty is a real answer rather than a placeholder:
 The key is always written, whether or not the file is created — the review skill creates the file
 when it has its first lesson to record.
 
-If the user accepts an initialized store, write **exactly** this, and nothing more:
+**Only create it when the file is absent.** An existing store carries accumulated lessons and the
+`Next-ID` counter; writing the template over it destroys the lessons and resets the counter, which
+then re-issues IDs that eviction retired. Check first, and if it is there, leave it alone.
+
+When it is genuinely absent and the user accepts, write **exactly** this, and nothing more:
 
 ```markdown
 # Lessons — distilled review findings
