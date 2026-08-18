@@ -8,6 +8,22 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-08-18
+
+### Added
+
+- **A check that proves a skill edit dropped no rule** —
+  `skills/review/references/delivery-loop-invariants.md`, referenced from `CONTRIBUTING.md`. It
+  catalogues 83 hard-won facts these skills encode and carries a runnable grep for whether any has
+  gone missing. Run it whenever you edit skill text: compressing or re-wording is exactly when a
+  rule disappears along with the paragraph carrying it, and it disappears quietly — the prose still
+  reads well, so nothing looks wrong.
+
+  It is candid about its limits, including two it demonstrated on itself while being written: it
+  originally read its own catalogue, which made it pass unconditionally, and several needles missed
+  on rules that were plainly present under rewritten wording. A miss means *go and look*, never
+  *a rule was lost*.
+
 ## [0.8.0] — 2026-08-18
 
 ### Fixed
@@ -249,7 +265,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.1...HEAD
+[0.8.1]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.0...devstride--v0.8.1
 [0.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.7.0...devstride--v0.8.0
 [0.7.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.6.0...devstride--v0.7.0
 [0.6.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.5.0...devstride--v0.6.0
