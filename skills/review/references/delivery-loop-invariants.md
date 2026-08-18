@@ -57,7 +57,9 @@ D5. Findings have no GitHub thread — fixed pre-settle.
 E1. [Applies only where `verify.skipDuringStoryBuilds` is non-empty — see slow-suite-gating.md]
     A deferred slow suite runs in exactly three cases: paths matched / base is the production
     branch / a manual label.
-E2. [Same condition] The base case is unconditional on paths and short-circuits.
+E2. [Same condition] The base case is unconditional on paths and short-circuits — and it is the
+    entry's configured `alwaysRunWhenBase` list, not one branch name. Production is the typical
+    value, never the definition.
 E3. [Same condition] An explicit user request has to be materialized as the label, or the
     check never runs.
 E4. Never use `gh pr view --json files` (100 cap) or REST pull-files (3000 cap) for
@@ -115,7 +117,8 @@ I5. [Applies only where the repo maps slow suites per base branch] An applicable
 I6. If the roster drops to Claude-only on a PR path because CONFIGURED engines
     FAILED, STOP for a human GitHub review — do not proceed on the Claude pass
     alone. (A configured-EMPTY roster — localCommand null, automatedReviewers
-    [] — is the repo's own choice: proceed, announced. See review._roster_readme.)
+    [] — is the repo's own choice: proceed, announced. See the roster-resolution and degradation
+    policy at the top of `skills/review/SKILL.md`.)
 I7. `epicIntegrationBranches.deleteBranchAfterRelease` false must retain the branch.
 I8.  review's OWN cloud-request path must iterate review.automatedReviewers per
      `how` — fixing this in pr alone leaves the standalone path broken.
@@ -182,18 +185,25 @@ small lesson. The procedure:
 # documentation, or the coding-conventions doc. Set CONSUMER to a real consuming checkout to
 # include those; without it, expect misses for exactly those facts and read before concluding
 # anything from them.
+# Run this with BASH. Under zsh, `${VAR:+a b}` expands to a single word, so the consumer paths
+# below would reach `cat` as one impossible filename — and the redirected stderr would hide it,
+# leaving you to conclude those facts were missing. Build an array instead of relying on that.
 CONSUMER=${CONSUMER:-}
-# A consuming repo names its own conventions doc; do not assume AGENTS.md.
-CONV=$( [ -n "$CONSUMER" ] && python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('conventionsDoc','AGENTS.md'))" \
-         "$CONSUMER/.claude/ds-config.json" 2>/dev/null || true )
+EXTRA=()
+if [ -n "$CONSUMER" ]; then
+  # A consuming repo names its own conventions doc; do not assume AGENTS.md.
+  CONV=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('conventionsDoc','AGENTS.md'))" \
+           "$CONSUMER/.claude/ds-config.json" 2>/dev/null || echo AGENTS.md)
+  for f in "$CONSUMER/.claude/ds-config.json" "$CONSUMER/$CONV"; do
+    [ -f "$f" ] && EXTRA+=("$f") || echo "NOTE: consumer file not found, skipping: $f"
+  done
+fi
 # EXCLUDE THIS FILE from the corpus. It contains every needle by construction, so reading it
 # makes the check pass unconditionally — it would report zero misses with every rule deleted.
 # This is limit 2 below, and the check fell into it on the first attempt.
 SELF="delivery-loop-invariants.md"
 ALL=$(cat skills/*/SKILL.md $(ls skills/*/references/*.md | grep -v "$SELF") \
-          AGENTS.md CONTRIBUTING.md \
-          ${CONSUMER:+"$CONSUMER"/.claude/ds-config.json ${CONV:+"$CONSUMER/$CONV"}} \
-          2>/dev/null | tr '\n' ' ')
+          AGENTS.md CONTRIBUTING.md "${EXTRA[@]}" | tr '\n' ' ')
 # Corpus-wide needles: the rule must survive SOMEWHERE an agent reads.
 for needle in "pull_request_review_id" "suppressed due to low confidence" "graphqlBotId" \
               "review_requested" "paginate" "blanket-resolve" "for MINUTES" "xhigh" \
