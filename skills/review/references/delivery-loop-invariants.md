@@ -255,7 +255,7 @@ before you run it.
 **Run this whenever you edit skill text** — a compression pass, a re-word, a refactor that moves a
 step. That is the moment a rule goes missing, and it is the only moment this file earns its keep.
 
-**Three limits this check does NOT overcome, all learned here:**
+**Four limits this check does NOT overcome, every one learned here:**
 
 1. **It proves only what it contains.** The first diet passed a 53-fact check while seven rules
    were broken — they were facts nobody had catalogued. For a refactor, derive candidates from
@@ -270,7 +270,12 @@ step. That is the moment a rule goes missing, and it is the only moment this fil
    uncited artifact — taking I10 with it, orphaned by exactly the condition it describes. It is
    referenced from `CONTRIBUTING.md` now so that cannot repeat quietly. If you ever find the
    inbound reference gone, this file is already deleted in every sense that matters.
-3. **A surviving rule can still be WRONG.** This check asks "is it present?", never "is it
+3. **A needle matches substrings.** Rename `autoRelease` to `autoReleaseLater` and the check still
+   passes, because the old token is inside the new one. Found while testing this very check: the
+   first negative test reported nothing and looked like a broken check, when it was a broken test.
+   Grep `-F` is deliberately dumb; treat a pass as "the phrase is present", not "the rule is
+   unchanged".
+4. **A surviving rule can still be WRONG.** This check asks "is it present?", never "is it
    true?". L1 is the proof: a claim that `hierarchy` names each ancestor's work type was
    catalogued, restored verbatim, and grep-verified — while being false to the code the whole
    time. J1 is the softer version: restored, present, and missing one of its two conditions.
