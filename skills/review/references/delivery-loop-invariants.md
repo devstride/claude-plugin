@@ -70,15 +70,19 @@ E8. Above GitHub's 3000-file cap the workflow paths-filter can miss a match the 
 ## F. CI settling
 F1. Never `gh pr checks --watch` (blocks for full CI duration; can be killed).
 F2. Use ONE self-terminating background poll; re-launch rather than foreground-loop.
-F3. Draft holds CI; the ready-flip is what releases it.
+F3. [Draft-hold repos only — all three `review.*` CI-ordering flags false means PRs open
+    non-draft and none of this applies] Draft holds CI; the ready-flip is what releases it.
 F4. Distinguish flaky/infra from real; bound reruns to ~2.
-F5. A run that failed to TRIGGER is fixed by close+reopen of the PR.
+F5. [Same condition] A run that failed to TRIGGER is fixed by close+reopen of the PR.
 F6. Require the FINAL head SHA to be observed SUCCESS; absent/stale is not green.
 
 ## G. Git safety
-G1. NEVER rebase or force-push a protected head — a develop→master PR's head IS develop.
+G1. NEVER rebase or force-push a protected head — and a production release PR's head IS the
+    release source branch, which is one of them.
 G2. If the rebase changed the patch, re-review before releasing CI.
-G3. `--delete-branch` never on a PR whose head is develop/master.
+G3. `--delete-branch` never on a PR whose head is in `protectedBranches` — the configured
+    list, not two literal branch names. A repo's protected heads may be `main`, `production`,
+    or anything else it named.
 G4. A rebase rewrites SHAs, so a bare `git push` is rejected — use --force-with-lease.
 G5. Rebase BEFORE the ready-flip so the single CI run lands on the final SHA.
 
@@ -179,7 +183,12 @@ small lesson. The procedure:
 # include those; without it, expect misses for exactly those facts and read before concluding
 # anything from them.
 CONSUMER=${CONSUMER:-}
-ALL=$(cat skills/*/SKILL.md skills/*/references/*.md AGENTS.md CONTRIBUTING.md \
+# EXCLUDE THIS FILE from the corpus. It contains every needle by construction, so reading it
+# makes the check pass unconditionally — it would report zero misses with every rule deleted.
+# This is limit 2 below, and the check fell into it on the first attempt.
+SELF="delivery-loop-invariants.md"
+ALL=$(cat skills/*/SKILL.md $(ls skills/*/references/*.md | grep -v "$SELF") \
+          AGENTS.md CONTRIBUTING.md \
           ${CONSUMER:+"$CONSUMER"/.claude/ds-config.json "$CONSUMER"/AGENTS.md} \
           2>/dev/null | tr '\n' ' ')
 for needle in "pull_request_review_id" "suppressed due to low confidence" "graphqlBotId" \
@@ -187,10 +196,25 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "materializ" "100-file cap" "gh pr checks --watch" "protectedBranches" \
               "CHANGED the patch" "untrusted tool data" "compose an item number" "EXPIRED" \
               "untracked-deferral" "KEEP THE CLOUD" "LAUNCH ANOTHER" "deleteBranchAfterRelease" \
-              "autoRelease" "requested_reviewer.node_id" "release-unit ancestor step 0 resolved"; do
+              "autoRelease" "requested_reviewer.node_id" "release-unit ancestor step 0 resolved" \
+              "copilot-swe-agent" "databaseId" "three-dot" "close+reopen" "force-with-lease" \
+              "source and destination" "high-water" "no thread" "localReviewerName" "hierarchyRoles" \
+              "always()" "single writer"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING: $needle"
 done
 ```
+
+**A needle is a phrase, and phrases legitimately change.** Two of the needles above were re-pointed
+the first time this ran: the wording they were cut from had been rewritten, so they missed while the
+rules were plainly present in two and three files respectively. That is the check working — it sent
+someone to read — and the fix is to re-point the needle at the surviving wording, never to assume a
+loss and never to "restore" a rule that never left.
+
+**The needle list is a SAMPLE, not one per fact.** It covers the highest-cost facts and at least
+one from every section; it does not enumerate all 83, and pretending otherwise would be the same
+species of unverified claim as the miscount above. A clean run means *these* rules survived — it is
+evidence, not a proof of completeness. When you have compressed something specific, add its needle
+before you run it.
 
 **Run this whenever you edit skill text** — a compression pass, a re-word, a refactor that moves a
 step. That is the moment a rule goes missing, and it is the only moment this file earns its keep.
