@@ -26,8 +26,12 @@ names them — a verdict that hides a skipped test suite is claiming more than i
 1. **Verify commands** — every `verify.typecheck` entry, and `verify.lint`. Exit 0 is the pass.
    `generated.toleratedTypeErrors` matches are not failures where `generated.paths` matches the file.
    `verify.test` is offered, never forced.
-2. **Branch refs** — `baseBranch`, `release.productionBranch`, `hotfixBaseBranch` resolve, and
-   `protectedBranches` still contains the base and production branches.
+2. **Branch refs** — `baseBranch`, `release.releaseSource`, `release.productionBranch` and
+   `hotfixBaseBranch` all resolve, and `protectedBranches` still contains base, production and
+   release source.
+2b. **GitHub toolchain** — an `origin` remote by name, on GitHub, with `gh` installed and
+   authenticated for that host. Checked unconditionally: the delivery half cannot push, open a pull
+   request or merge without them.
 3. **Declared review engines** — the local CLI is invocable; the cloud reviewer's host is
    authenticated and the repository readable. Only what the config declares is checked.
 4. **Work-type roles** — every name in `hierarchyRoles` still resolves in the organization.
@@ -54,7 +58,9 @@ names them — a verdict that hides a skipped test suite is claiming more than i
 | A branch ref does not resolve | The remote has not been fetched in this clone | `git fetch origin`, then re-run validation |
 | It still does not resolve after a fetch | The branch was renamed or deleted upstream | Correct the key to the branch that exists — `baseBranch`, `release.productionBranch`, `hotfixBaseBranch` or `release.releaseSource` |
 | It resolves but the loop later fails on checkout | The value carries a remote prefix (`origin/develop`) | Strip it; git and every forge call want the branch name |
-| `protectedBranches` no longer contains base or production | Hand-edited, or a branch role changed without it | Add them back. This list is what stops the loop force-pushing or deleting those branches |
+| `protectedBranches` no longer contains base, production or release source | Hand-edited, or a branch role changed without it | Add them back. This list is what stops the loop force-pushing or deleting those branches — and the release source is the one that gets left out, because it is usually the base branch and looks already covered |
+| No `origin` remote, or it is not GitHub | A fork checkout naming its remotes `upstream`/`fork`, or a non-GitHub forge | The delivery skills address `origin` literally and assume GitHub; rename the remote, or accept that only the planning half runs here |
+| `gh` missing or unauthenticated | Never installed, or signed out | Install GitHub CLI and `gh auth login`. Without it there are no pull requests, no review threads and no merges |
 
 ### Review engines
 

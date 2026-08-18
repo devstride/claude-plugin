@@ -263,6 +263,12 @@ branch this repository may not have.** Emit all four on every path, or the loop 
 
 - A development branch **and** a main/master branch → `baseBranch` and `release.releaseSource` = the
   development one; `release.productionBranch` and `hotfixBaseBranch` = main/master.
+- One conventional branch plus topic branches (the ordinary trunk-based repository: `main`, and
+  whatever feature or dependency-bot branches happen to be open) → treat it as the single-branch case
+  and prefill **all four roles to the trunk**, `ambiguous`, saying so. Topic branches are work in
+  flight, never candidates for a role. What must not happen is falling through to "several branches,
+  no answer": the roles all have shipped defaults, so an unstated role is not neutral — it silently
+  becomes `develop` or `master`.
 - Branches exist but none carry a conventional name → `ambiguous` on all four, with every enumerated
   branch offered as a candidate and the `origin/HEAD` default named as the likeliest production
   branch. `protectedBranches` should offer the long-lived ones, not just the two you can name.
@@ -272,9 +278,12 @@ branch this repository may not have.** Emit all four on every path, or the loop 
   second branch simply has not been created yet, and those two want different answers. What is not
   acceptable is leaving two of the four unstated: the defaults would fill them with branch names this
   repository does not have, and the failure surfaces much later, at the first release or hotfix.
-- Always compute `protectedBranches` containing the detected base and production branches. It is
-  what keeps the loop from force-pushing or deleting them, so it should never be left empty by
-  accident.
+- Always compute `protectedBranches` containing the detected base, production **and release-source**
+  branches. All three, even when two of them are the same ref. It is what keeps the loop from
+  force-pushing or deleting them — and the release source is the one people leave out, because it is
+  usually the base branch and so looks already covered. Where it is not, it is the *head* of the
+  production pull request, and an unlisted branch is one the loop treats as disposable: fair game to
+  rebase and force-push.
 - **Detached HEAD** does not block any of this — every probe above is by ref name. **No `origin`**
   does: mark the branch keys `ambiguous` and give that as the reason.
 
@@ -455,7 +464,7 @@ paraphrased into something that means the same thing is a default that no longer
 
 | Key | Value |
 |---|---|
-| `baseBranch`, `hotfixBaseBranch`, `protectedBranches` | From A6. `protectedBranches` **always** contains the detected base and production branches |
+| `baseBranch`, `hotfixBaseBranch`, `protectedBranches` | From A6. `protectedBranches` **always** contains the base, production and release-source branches |
 | `integrationBranch` | `null` — the per-release-unit derivation is the default; an explicit value overrides it |
 | `epicIntegrationBranches` | Verbatim from the defaults reference, with `fastStoryMerges.enabled` decided by the rules below |
 | `verify` | `typecheck` (array), `test`, `lint`, `testSingle`, `testDir`, `skipDuringStoryBuilds: []` |
@@ -547,10 +556,26 @@ one is how a setup gets called broken because a laptop was on a train.
    **Echo any command the user typed during the interview before running it the first time.** A
    detected command came from the repository's own scripts; a hand-entered one has never been seen
    by anything, and executing it unannounced is not a good first impression.
-2. **The branch refs exist.** `git rev-parse --verify` for `baseBranch`, `release.productionBranch`
-   and `hotfixBaseBranch` — prefer the remote-tracking ref, fall back to local. Then assert
-   `protectedBranches` still contains the base and production branches: it is what stops the loop
-   force-pushing or deleting them, and a config that lost one is a config with the safety off.
+   **And be honest that these commands are not yours.** The write boundary says *this skill* writes
+   one file — it does not, and cannot, promise the repository's own scripts leave the tree alone. A
+   lint script may carry `--fix`, a typecheck may drop an incremental cache, a script may invoke a
+   generator. So **ask before running anything whose name or flags suggest it writes** (`--fix`,
+   `--write`, `format`, `fmt`, a regen), and note in the verdict when the tree changed during
+   validation. Reporting `PASS` while quietly having reformatted somebody's source is the one
+   outcome here that would be genuinely hard to forgive.
+2. **The branch refs exist.** `git rev-parse --verify` for `baseBranch`, `release.releaseSource`,
+   `release.productionBranch` and `hotfixBaseBranch` — all four, preferring the remote-tracking ref
+   and falling back to local. Leaving the release source out is easy and expensive: the release skill
+   fetches it first thing, so a stale value passes validation and fails at the release. Then assert
+   `protectedBranches` still contains base, production and release source — a config that lost one is
+   a config with the safety off.
+2b. **The GitHub toolchain the delivery half requires.** Unconditional, whatever the review roster
+   says: an `origin` remote exists **by name**, its host is GitHub, and `gh` is installed and
+   authenticated for that host. These are not reviewer conveniences — without them the loop cannot
+   push, open a pull request, or merge anything. Checking them only when a cloud reviewer happens to
+   be configured is how a repository with no `origin` gets certified loop-ready and then fails at the
+   loop's first push. On a non-GitHub host, say plainly that the delivery half has no adapter and that
+   the planning half still works — that is a `FAIL` for delivery readiness, not a warning.
 3. **The declared review engines respond.** Only what the config declares — an engine nobody
    declared is not a gap, so do not check for it and do not mention it.
    A local CLI must actually be invocable: probe the binary from `review.localCommand` and get a
@@ -588,7 +613,9 @@ Two things the verdict must say when they are true, so a failure is not misread:
 
 IMPORTANT:
 - **The write boundary is one path: `.claude/ds-config.json`.** See the top. Everything else on disk is
-  read-only to this skill, in every phase.
+  read-only to *this skill*, in every phase. The one thing that is not this skill is the repository's
+  own verify commands, which Phase G runs — they belong to the repository and may touch the tree;
+  Phase G asks first where that looks likely and reports it when it happens.
 - **Never report a guess as `detected`.** The status column is the only thing standing between a
   detected value and a fabricated one, and a user who finds one wrong value stops trusting all of
   them.
