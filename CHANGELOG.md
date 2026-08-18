@@ -8,6 +8,8 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-08-18
+
 ### Added
 
 - **`/devstride:setup`** — a guided setup command, so a new repository does not start with a blank

@@ -4,9 +4,10 @@ DevStride's agentic delivery loop, packaged as a Claude Code plugin. Plan a road
 existence, then let the loop walk it one story at a time — branch, build, adversarially review,
 merge, and release — against your own repository and your own DevStride organization.
 
-> **Status: early.** The sixteen delivery-loop skills and the DevStride MCP connection are both
+> **Status: early.** The seventeen delivery-loop skills and the DevStride MCP connection are both
 > bundled — installing the plugin is all the *configuration* the connection needs, though you still
-> sign in once. The guided setup command that writes your repo config is still to come.
+> sign in once. `/devstride:setup` then configures the plugin for your repository and proves the
+> config by running it.
 
 ## Install
 
@@ -171,8 +172,14 @@ first:
 The full contract — every key, its shape and default — is in the
 [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference).
 
-> A guided `setup` command that inspects your repo and writes this file for you is planned but not
-> shipped. Until it lands, write the file by hand — the defaults above are a working starting point.
+> **Or run `/devstride:setup` and let it write this for you.** It inspects your repository, maps your
+> DevStride work types onto the loop's roles, asks only about what it could not work out, writes the
+> file, and then executes it — running your verify commands, resolving your branches, probing your
+> declared review engines — so you find out it is right while you are still here to fix it. Re-run it
+> whenever the repository changes shape: it proposes only what changed and merges, preserving hand
+> edits and anything it does not recognize.
+>
+> The block above stays useful either way, as a minimal working file to start from.
 
 ## Your first plan
 
@@ -221,11 +228,12 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `branch-feature` / `branch-hotfix` | Cuts a working branch from the development or production branch |
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end |
 | `release` | Promotes the release branch to production, with a full gated review and a docs pass |
+| `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it |
 | `doctor` | Checks your setup — git, `gh`, the plugin, the DevStride connection, config, CI gating — and reports what to fix. Read-only |
 
 ## Versioning & updates
 
-Current version: **0.6.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **0.7.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
