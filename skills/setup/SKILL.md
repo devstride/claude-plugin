@@ -8,9 +8,10 @@ disable-model-invocation: true
 Set the delivery loop up for **this** repository and **this** DevStride organization, in one guided
 session. Run it after installing the plugin, and again whenever the repository changes shape.
 
-Six phases: inspect what the repository can answer (A), report it (B), map the organization's work
+Seven phases: inspect what the repository can answer (A), report it (B), map the organization's work
 types onto the loop's roles (C), ask only about what is left (D), write the config (E) — or, on a
-repository that already has one, merge into it without destroying anything (F).
+repository that already has one, merge into it without destroying anything (F) — and then prove the
+result by running it (G).
 
 Optional argument: $ARGUMENTS
 

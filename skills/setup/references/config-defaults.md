@@ -5,6 +5,10 @@ verbatim.** They are not illustrations, and they are not to be paraphrased, re-w
 "improved" at write time: the delivery skills read these keys as literal strings, and a value
 reworded into something equivalent-looking is a value that no longer matches.
 
+**This is not one blob to paste, though.** A few values marked below are *decisions*, computed per
+repository from what the run actually found — they appear here for their shape and their reasoning,
+not as a value to copy. Each one says so where it appears.
+
 Where a key's value comes from somewhere else — detection, an interview answer, the work-type
 mapping — that source wins and nothing here applies. This file covers the remainder.
 
@@ -34,7 +38,7 @@ must be copied rather than summarized.
     "slugRule": "epic title kebab-cased, lowercased, [a-z0-9-] only, execution-order bracket prefix stripped, truncated to ~6 words",
     "releaseTarget": "baseBranch",
     "fastStoryMerges": {
-      "enabled": true,
+      "enabled": "DECIDED PER REPOSITORY — see below; never copied from here",
       "requireLocalVerifyGreen": true,
       "epicReleaseIsFirstCloudPass": true
     },
@@ -44,7 +48,9 @@ must be copied rather than summarized.
 }
 ```
 
-Two of these are decisions, not defaults, and both are deliberately set to the cautious side:
+One of these is a literal and one is a decision. **`fastStoryMerges.enabled` above is deliberately
+not a copyable value** — writing `true` from this file would enable fast merges on a repository that
+cannot safely use them:
 
 - **`autoRelease: false`** — a release unit merging to the base branch without a human saying so is
   something an owner should switch on after watching the loop run, not inherit on day one.
