@@ -107,8 +107,11 @@ If a check could not be run, say so — never report an unrun check as a pass.
   and acts on the `user` scope unless given a matching `--scope`.
 - **Repo-level declaration** — if `.claude/settings.json` declares the marketplace and plugin, say
   what that does and does **not** do: it registers and enables, it does **not install**. Every
-  teammate still runs `claude plugin install devstride@devstride` once — matching whichever entry the
-  settings file enables.
+  teammate still runs `claude plugin install <id>` once — and **build that id from the
+  `enabledPlugins` key you just read**, rather than printing a literal. A repository may enable
+  either marketplace entry, and telling someone to install `devstride@devstride` when their
+  repository declares `ds@devstride` leaves them with a plugin that does not match what the project
+  enabled.
   **Then check the file actually reaches them — two different questions, two commands.**
   `git ls-files --error-unmatch .claude/settings.json` proves it is TRACKED; `git check-ignore -v
   .claude/settings.json` shows whether an ignore rule matches. Run the trackedness check
