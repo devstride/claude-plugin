@@ -97,6 +97,7 @@ timeline. A `PASS` here means *nothing is obviously in the way*.
 |---|---|---|
 | Drafts are configured but no workflow is draft-gated | The repository never adopted the review-then-CI ordering | Gate the jobs on the draft condition, or set the three `review` CI-ordering keys `false`. `/devstride:doctor` diagnoses this in detail |
 | Workflows are gated but marking ready starts no run | `ready_for_review` is missing from `on.pull_request.types` — the defaults do not include it | Add it. Note that declaring `types` **replaces** the defaults, so the list also needs `opened`, `synchronize` and `reopened` |
+| CI never re-runs after a review-fix push | An explicit `types` list has `ready_for_review` but dropped `synchronize` | Add the missing events. All four are needed: the flip starts the run, the push updates it, and reopen is the fallback |
 
 **Never edit a workflow to fix any of these.** This skill writes one file,
 `.claude/ds-config.json`, and that boundary does not bend for a helpful one-line change to

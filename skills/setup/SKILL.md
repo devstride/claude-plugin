@@ -12,8 +12,14 @@ Six phases: inspect what the repository can answer (A), report it (B), map the o
 types onto the loop's roles (C), ask only about what is left (D), write the config (E) — or, on a
 repository that already has one, merge into it without destroying anything (F).
 
-Optional argument — a detector name, to run just that one: `ecosystem` (A2–A3), `verify` (A4),
-`ci` (A5), `branches` (A6), `engines` (A7), `docs` (A8): $ARGUMENTS
+Optional argument: $ARGUMENTS
+
+- **`validate`** — skip straight to Phase G and check the config that is already there. Nothing is
+  inspected for a rewrite, nothing is asked, nothing is written. Use it after hand-editing the file,
+  or to find out why the loop is behaving oddly.
+- **A detector name** — `ecosystem` (A2–A3), `verify` (A4), `ci` (A5), `branches` (A6),
+  `engines` (A7), `docs` (A8) — to inspect and report just that part.
+- **Nothing** — the full run: inspect, ask, write, validate.
 
 **Run each one's prerequisites too, silently
 — A1 always, and A2–A3 before A4**, which cannot compose a command without knowing the package
@@ -198,8 +204,8 @@ shipped defaults chosen for somebody else's repository:
 
 | What the pull-request workflows show | The three booleans |
 |---|---|
-| Draft-gated **and** `ready_for_review` in types | `true`, `detected` |
-| Draft-gated, `ready_for_review` missing | `ambiguous` — the hold cannot work as written |
+| Draft-gated, **and** the trigger fires on all four of `opened`, `synchronize`, `reopened`, `ready_for_review` (whether by default or by an explicit list) | `true`, `detected` |
+| Draft-gated, but any of those four events missing from an explicit `types` list | `ambiguous` — the hold cannot work as written |
 | Pull-request workflows exist, none draft-gated | `false`, `detected` — CI runs on open; the run-once design is simply not in use here |
 | Some pull-request jobs gated, others not | `ambiguous` — name the ungated jobs |
 | GitHub Actions present, but no pull-request workflow at all | `false`, `detected` — nothing to hold |
@@ -310,8 +316,10 @@ configuration in which the built-in adversarial pass is the local gate.
   every field; never write a half-populated one. That is a precondition, **not proof
   that a review can be requested**: entitlement, repository settings and organization policy all sit
   behind it, and none of them are visible from here. So a positive result is `ambiguous` — a
-  candidate to confirm — and never `detected`. Whether a request actually lands is settled by
-  actually requesting one, which is the validation phase's job, not this one.
+  candidate to confirm — and never `detected`. Whether a request actually lands is only ever settled
+  on a real pull request, by the review flow that requests one and then checks the timeline for the
+  event. **Setup never settles it** — not here and not in Phase G, which has no pull request to
+  request against and would have to mutate an unrelated one to try.
 - **`gh` itself** — `gh --version` and `gh auth status`. The whole delivery half depends on it: no
   `gh` means no pull requests, no review threads, no ready-flip. Read the **active** account's line;
   `gh auth status` can list several with different scopes. If authentication comes from `GH_TOKEN` or
@@ -364,8 +372,12 @@ Present the summary grouped the way someone reads it, not the way it was gathere
 what needs a decision, and what could not be determined. Lead with the count of each, so a user with
 two open questions sees "two" rather than scanning forty rows for them.
 
-Say what happens next — the open questions are coming, and nothing has been written yet — and then
-go to Phase C. Do not stop here for approval of the findings themselves; Phase D asks about every row
+**On a narrowed run, this is the end.** Report what that detector found and stop — see the argument
+note at the top for why: the other detectors never ran, so the phases that write have nothing to go
+on for most of the file.
+
+On a full run, say what happens next — the open questions are coming, and nothing has been written
+yet — and go to Phase C. Do not stop here for approval of the findings themselves; Phase D asks about every row
 that needs a human, and the bulk confirmation there is where detected values get their sign-off.
 
 ## Phase C — map the organization's work types onto the loop's roles

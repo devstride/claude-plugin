@@ -220,7 +220,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.6.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.7.0...HEAD
+[0.7.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.6.0...devstride--v0.7.0
 [0.6.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.5.0...devstride--v0.6.0
 [0.5.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.3...devstride--v0.5.0
 [0.4.3]: https://github.com/devstride/claude-plugin/compare/devstride--v0.4.2...devstride--v0.4.3
