@@ -163,16 +163,24 @@ exempt it, and do not advise gating it.
 
 Two separate checks, and **the first is the one everyone misses**:
 
-- **`ready_for_review` must be in `on.pull_request.types`.** GitHub's default types are
-  `[opened, synchronize, reopened]` — **`ready_for_review` is not among them.** So a workflow with a
-  perfect draft `if:` and default types creates **no workflow run at all** when the loop marks a
-  pull request ready: the condition is never even evaluated. The loop then waits for a run that will
-  never exist. FAIL with: add `ready_for_review` to `on.pull_request.types`.
+- **`on.pull_request.types` must carry every event the loop depends on**, and there are four:
+  `opened`, `synchronize`, `reopened`, `ready_for_review`. GitHub's defaults are the first three —
+  **`ready_for_review` is not among them.** So a workflow with a perfect draft `if:` and no `types`
+  list creates **no workflow run at all** when the loop marks a pull request ready: the condition is
+  never even evaluated, and the loop waits for a run that will never exist.
+  **Declaring `types` explicitly REPLACES the defaults rather than adding to them**, which is the
+  second half of this trap: a list naming only `ready_for_review` fixes the flip and breaks
+  everything after it — a fix push starts no run, and the close-and-reopen fallback has no
+  `reopened` to fire on. FAIL with: declare all four events.
 - **Jobs gated on the draft condition** — match against `ci.draftGateCondition` (the config names
   the expression; default `github.event.pull_request.draft == false`) and accept equivalent forms
-  such as `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated if every job in its
-  `needs` closure is** — real workflows gate one cheap job and fan the result out, and a skipped
-  dependency skips its dependents, so flagging those is a false FAIL on a correctly-gated repo.
+  such as `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated if ANY job it
+  `needs` is gated** — real workflows gate one cheap job and fan the result out, and GitHub's default
+  job condition requires every dependency to *succeed*, so one skipped dependency skips the
+  dependent. Requiring the whole closure to be gated is the wrong test and false-FAILs exactly the
+  layout this rule exists for: a gated job beside an ungated utility job, both feeding the expensive
+  one. The exception is a job that opts out of that default with `if: always()` or similar — it runs
+  regardless, so it is genuinely ungated.
   Ungated → CI fires on open and again on every review-fix push; nothing errors, you simply pay
   repeatedly and lose the run-once guarantee.
 - **`ci.gateJobName`** — if set, confirm a job with that **display name** (`name:`) or key exists;
