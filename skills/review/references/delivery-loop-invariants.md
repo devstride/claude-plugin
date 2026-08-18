@@ -1,7 +1,7 @@
 # Landmine inventory — every hard-won fact the delivery skills encode
 
-**A maintenance instrument for people editing these skills.** Each line below is a fact that cost a
-real incident. When you compress, refactor or re-word a skill, this is how you check that a rule did
+**A maintenance instrument for people editing these skills.** Each line below is a fact that was
+learned the expensive way — a rule that exists because its absence caused a failure. When you compress, refactor or re-word a skill, this is how you check that a rule did
 not quietly vanish along with the paragraph that carried it.
 
 **Run it whenever you edit skill text.** The runnable check and the three things it cannot prove are
@@ -20,7 +20,8 @@ A2. Therefore: scope collection by `pull_request_review_id`, never by author log
 A3. jq `test("copilot")` is case-sensitive; needs `"i"` flag if matching at all.
 A4. Findings live in TWO places: inline threads AND the review body.
 A5. The body may hold `<details>Comments suppressed due to low confidence</details>`
-    — treat as real findings; one caught a genuine race that shipped as a defect.
+    — treat as real findings. The confidence label is the reviewer's, not a verdict; a
+    suppressed comment can be a real concurrency defect.
 A6. A review can carry findings with ZERO inline comments.
 A7. Scope to the CURRENT cycle via a review-id high-water mark, else stale findings
     are re-triaged and a stale review can settle the loop.
