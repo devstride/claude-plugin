@@ -12,7 +12,7 @@
       "source": "./",
       "category": "workflow",
       "homepage": "https://devstride.com",
-      "description": "The DevStride agentic delivery loop — sixteen skills covering roadmap planning, dependency-ordered execution, adversarial review before CI, and owner-cut releases. Configured per repo via .claude/ds-config.json."
+      "description": "The DevStride agentic delivery loop — seventeen skills covering guided repo setup, roadmap planning, dependency-ordered execution, adversarial review before CI, and owner-cut releases. Configured per repo via .claude/ds-config.json."
     }
   ]
 }
