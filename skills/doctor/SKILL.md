@@ -97,13 +97,18 @@ If a check could not be run, say so — never report an unrun check as a pass.
   as behind. Behind → **updating is two commands, and one alone silently does nothing**:
   ```bash
   claude plugin marketplace update devstride
-  claude plugin update devstride@devstride
+  claude plugin update <installed-id>
   ```
-  then restart. The update command needs the fully-qualified `devstride@devstride` and acts on the
-  `user` scope unless given a matching `--scope`.
+  then restart. **Take `<installed-id>` from `claude plugin list`, do not assume it.** The marketplace
+  publishes the same plugin under two entry names — `devstride` and the shorter `ds` alias — and the
+  id is whichever one that machine installed through. Naming the other reports the plugin as *not
+  installed*, which reads as a broken setup rather than a wrong argument, and the user stays on their
+  old version believing they updated. The command needs the fully-qualified `<name>@devstride` form
+  and acts on the `user` scope unless given a matching `--scope`.
 - **Repo-level declaration** — if `.claude/settings.json` declares the marketplace and plugin, say
   what that does and does **not** do: it registers and enables, it does **not install**. Every
-  teammate still runs `claude plugin install devstride@devstride` once.
+  teammate still runs `claude plugin install devstride@devstride` once — matching whichever entry the
+  settings file enables.
   **Then check the file actually reaches them — two different questions, two commands.**
   `git ls-files --error-unmatch .claude/settings.json` proves it is TRACKED; `git check-ignore -v
   .claude/settings.json` shows whether an ignore rule matches. Run the trackedness check

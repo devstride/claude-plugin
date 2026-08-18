@@ -38,6 +38,18 @@ this project does not do.
 plugins from the same source: you get two copies of the tree on disk and every skill twice in the
 picker.
 
+**And remember which one you installed.** Every command that names a plugin needs the id you
+actually installed under, so an `ds` install updates with:
+
+```bash
+claude plugin marketplace update devstride
+claude plugin update ds@devstride
+```
+
+Running the `devstride@devstride` form against an alias install reports the plugin as not installed —
+which reads like something broke, when in fact you are simply on the other id. `claude plugin list`
+tells you which you have.
+
 </details>
 
 <details>
@@ -275,7 +287,9 @@ claude plugin update devstride@devstride     # upgrade the installed plugin
 
 then restart Claude Code to apply it. Two things to watch:
 
-- The update command needs the **fully-qualified** `devstride@devstride`; the bare plugin name
+- The update command needs a **fully-qualified** id — `devstride@devstride`, or `ds@devstride` if you
+  installed through the [short alias](#install). `claude plugin list` shows which you have, and using
+  the wrong one reports the plugin as not installed rather than doing nothing visible; the bare plugin name
   reports "not found".
 - It acts on the **user** scope by default. If you installed with `--scope project`, `local` or
   `managed`, pass the same `--scope` or it will report the plugin isn't installed and change nothing.
