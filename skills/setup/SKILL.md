@@ -202,16 +202,19 @@ is the one repositories get wrong**:
    wrong. **And declaring `types` explicitly replaces the defaults rather than adding to them**, so a list
    naming `ready_for_review` and nothing else is its own trap: a fix push after a red run then
    starts no run either, and the close-and-reopen fallback has no `reopened` to fire on. An explicit
-   list needs `opened`, `synchronize`, `reopened` **and** `ready_for_review`; anything short of that
+   list needs `synchronize`, `reopened` **and** `ready_for_review`; anything short of those three
    is `ambiguous`, naming which events are missing.
+   **`opened` is not one of the three.** Under the hold a pull request opens as a draft, so that
+   event only ever produces a skipped run — worth a mention for pull requests opened outside the
+   loop, never a reason to call a working setup broken.
 
 Five cases, and **every one of them produces all three rows** — a case that emits nothing leaves the loop on
 shipped defaults chosen for somebody else's repository:
 
 | What the pull-request workflows show | The three booleans |
 |---|---|
-| Draft-gated, **and** an explicit `types` list naming all four of `opened`, `synchronize`, `reopened`, `ready_for_review` | `true`, `detected` |
-| Draft-gated, but `types` is absent, or an explicit list is missing any of the four | `ambiguous` — the hold cannot work as written |
+| Draft-gated, **and** an explicit `types` list naming `synchronize`, `reopened`, `ready_for_review` | `true`, `detected` |
+| Draft-gated, but `types` is absent, or an explicit list is missing any of those three | `ambiguous` — the hold cannot work as written |
 | Pull-request workflows exist, none draft-gated | `false`, `detected` — CI runs on open; the run-once design is simply not in use here |
 | Some pull-request jobs gated, others not | `ambiguous` — name the ungated jobs |
 | GitHub Actions present, but no pull-request workflow at all | `false`, `detected` — nothing to hold |
@@ -626,7 +629,7 @@ one is how a setup gets called broken because a laptop was on a train.
    - **Warning:** the config opens pull requests as drafts and no workflow carries a draft gate. The
      hold does not engage, so CI runs more often than intended. Wasteful, not broken.
    - **`FAIL`:** a draft-gated workflow whose trigger cannot rerun it — `types` absent, or an
-     explicit list missing any of `opened`, `synchronize`, `reopened`, `ready_for_review`. Here the
+     explicit list missing any of `synchronize`, `reopened`, `ready_for_review`. Here the
      loop cannot finish at all: after a red run, a fix push starts nothing and the close-and-reopen
      fallback has no event to fire on, so it waits forever on a run that cannot exist. A repository
      in that state is not loop-ready, whatever else passes.

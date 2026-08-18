@@ -163,15 +163,20 @@ exempt it, and do not advise gating it.
 
 Two separate checks, and **the first is the one everyone misses**:
 
-- **`on.pull_request.types` must carry every event the loop depends on**, and there are four:
-  `opened`, `synchronize`, `reopened`, `ready_for_review`. GitHub's defaults are the first three —
-  **`ready_for_review` is not among them.** So a workflow with a perfect draft `if:` and no `types`
-  list creates **no workflow run at all** when the loop marks a pull request ready: the condition is
-  never even evaluated, and the loop waits for a run that will never exist.
+- **`on.pull_request.types` must carry every event the loop depends on**, and there are three:
+  `ready_for_review` for the flip that releases CI, `synchronize` so a fix push after a red run
+  starts another, and `reopened` for the close-and-reopen fallback. GitHub's defaults are
+  `[opened, synchronize, reopened]` — **`ready_for_review` is not among them**, so a workflow with a
+  perfect draft `if:` and no `types` list creates **no workflow run at all** when the loop marks a
+  pull request ready. The condition is never even evaluated, and the loop waits for a run that will
+  never exist.
   **Declaring `types` explicitly REPLACES the defaults rather than adding to them**, which is the
-  second half of this trap: a list naming only `ready_for_review` fixes the flip and breaks
-  everything after it — a fix push starts no run, and the close-and-reopen fallback has no
-  `reopened` to fire on. FAIL with: declare all four events.
+  second half of the trap: a list naming only `ready_for_review` fixes the flip and breaks
+  everything after it. FAIL with: declare the three the loop uses.
+  **`opened` is not one of them** — under the draft hold a pull request opens as a draft, so that
+  event only ever produces a skipped run. Mention it as worth having for pull requests opened
+  outside the loop, but do not FAIL a workflow that omits it; prescribing an unnecessary change to a
+  working setup is the same failure as missing a real one.
 - **Jobs gated on the draft condition** — match against `ci.draftGateCondition` (the config names
   the expression; default `github.event.pull_request.draft == false`) and accept equivalent forms
   such as `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated if ANY job it
