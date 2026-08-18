@@ -311,6 +311,11 @@ configuration in which the built-in adversarial pass is the local gate.
 - `conventionsDoc` — `AGENTS.md`, `CLAUDE.md` or `CONTRIBUTING.md` at the repository root, in that
   order of preference. More than one → `ambiguous`, listing them; the build engine reads exactly one
   and obeys it, so this choice has teeth. None → `unknown`.
+- **A pull-request template** at `.github/pull_request_template.md` (or `.github/PULL_REQUEST_TEMPLATE/`)
+  → a `prBodyTemplate.sections` row, `ambiguous`, with its headings as the candidate. This repository
+  already has an agreed pull-request format, and once setup writes the generic sections the pull-request
+  skill treats them as authoritative and quietly stops using the one the team actually agreed on.
+  Detecting it is what turns "should be replaced" into a question that gets asked.
 - **Read `.claude/ds-config.json` if it exists** and record each key's current value alongside the
   detected one. This is the only way a later re-run can tell a hand-edit apart from a stale value,
   and a re-run that cannot tell them apart is a re-run that overwrites deliberate work.
@@ -401,14 +406,20 @@ Walk the prefill summary and turn it into as few questions as the repository all
   someone to re-approve forty facts their own repository just proved is how a good setup feels bad.
 - **An explicit answer always beats a detection.** If the user overrides a `detected` value, the
   override is what gets written — do not re-apply the detected one at write time, and do not argue.
-- Ask about the two things no inspection can reach: whether this repository has a **sibling docs
-  repository** the release skill should update — and if so, ask for the **whole object** in that same
-  exchange: its `path`, the `branch` to push, whether pushing deploys the site
+Three things no inspection can reach, asked every run:
+
+- **What does merging to the production branch actually do?** (`release.autoDeployOnMerge`) — one
+  plain-English sentence: whether it deploys production automatically, and through what. Nothing can
+  detect this and there is no sensible default, yet it is the sentence the release skill quotes back
+  to an owner at the production gate so they know exactly what they are approving. Left unasked, it
+  gets improvised at the one moment in the whole loop where improvising is least acceptable.
+- **Is there a sibling docs repository the release skill should update?** If yes, take the **whole
+  object** in that same exchange: `path`, the `branch` to push, whether pushing deploys the site
   (`autoDeployOnPush`), whether releases update it by default (`updateByDefault`), and when a release
   note is warranted (`releaseNotesWhen`). A bare yes writes an incomplete `docsRepo` that stops the
   release skill at its first read. No docs sibling → omit `release.docsRepo` entirely, which is how
-  the release skill knows to skip that phase. Then ask
-  where the **lessons store** should live, if not the default path.
+  the release skill knows to skip that phase.
+- **Where should the lessons store live**, if not the default path.
   **Do not offer to create the file** — the store has a single writer, and it is not this skill. Its
   absence is a valid starting state that the review skill resolves the first time it has a lesson
   worth keeping; a file created here would be a second writer producing a store with no lessons in
@@ -467,8 +478,12 @@ Setup is re-runnable, and a re-run must never cost someone their hand edits. Thi
 difference between a command people run again and one they run once.
 
 1. **Re-detect everything** — Phases A and C, unchanged.
-2. **Diff against the existing file** and propose **only the keys whose detected value differs** from
-   what is there. A key that already matches is not a question.
+2. **Diff against the existing file** and propose **only what would change** — a key that already
+   matches is not a question. "What would change" is wider than detection: it is every accepted
+   detector value that differs, every interview answer that differs (including a docs repository the
+   user has just said is gone), and every key missing entirely because it was written by hand or by
+   an older version. Restricting the proposal to detected values alone silently drops the other two,
+   which is how a stale setting survives a re-run the user thought had removed it.
 3. **On acceptance, deep-merge** the accepted keys into the existing document.
 
 What survives a merge, verbatim and unconditionally:
