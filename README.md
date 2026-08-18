@@ -39,7 +39,7 @@ plugins from the same source: you get two copies of the tree on disk and every s
 picker.
 
 **And remember which one you installed.** Every command that names a plugin needs the id you
-actually installed under, so an `ds` install updates with:
+actually installed under, so a `ds` install updates with:
 
 ```bash
 claude plugin marketplace update devstride
