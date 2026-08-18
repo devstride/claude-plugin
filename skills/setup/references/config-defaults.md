@@ -199,5 +199,6 @@ Next-ID: 1
 **A zero-byte file is not an empty store.** `Next-ID` is the ID authority — it only ever increments,
 so that IDs cannot be reused after an eviction — and a file with no header has no counter to read.
 The review skill knows how to create the file from nothing; what it does not expect is a file that
-exists and is malformed. So: write the template above, or leave the path absent. Never touch it
-again after this — everything downstream of setup treats the store as review's to write.
+exists and is malformed. So: write the template above, or **create no file at all** — the
+`lessonsDoc` key is written either way, and an absent file is the normal starting state. Never touch
+it again after this; everything downstream of setup treats the store as review's to write.

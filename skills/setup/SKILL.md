@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Set the delivery loop up for this repository — inspect it for everything answerable without asking (package manager, verify commands, CI provider and draft gating, branches, review engines), map your DevStride work types onto the loop's roles, ask only what is left, then write .claude/ds-config.json. Re-running merges rather than overwrites.
+description: Set the delivery loop up for this repository — inspecting it for everything answerable without asking (package manager, verify commands, CI provider and draft gating, branches, review engines), mapping your DevStride work types onto the loop's roles, asking only about what is left, and writing .claude/ds-config.json, which a re-run merges into rather than overwrites.
 user-invocable: true
 disable-model-invocation: true
 ---
