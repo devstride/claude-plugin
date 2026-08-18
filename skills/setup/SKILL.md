@@ -13,7 +13,9 @@ types onto the loop's roles (C), ask only about what is left (D), write the conf
 repository that already has one, merge into it without destroying anything (F).
 
 Optional argument — a detector name, to run just that one: `ecosystem` (A2–A3), `verify` (A4),
-`ci` (A5), `branches` (A6), `engines` (A7), `docs` (A8). **Run each one's prerequisites too, silently
+`ci` (A5), `branches` (A6), `engines` (A7), `docs` (A8): $ARGUMENTS
+
+**Run each one's prerequisites too, silently
 — A1 always, and A2–A3 before A4**, which cannot compose a command without knowing the package
 manager or find workspace scripts without knowing the layout. A narrowed run reports fewer keys; it
 must never report worse ones.
@@ -21,7 +23,7 @@ must never report worse ones.
 **A narrowed run stops after Phase B and writes nothing.** It has only looked at part of the
 repository, so it has nothing to say about the rest — and a write would fill every key the skipped
 detectors would have answered with a default, silently replacing real settings with guesses. Say
-that a full `/devstride:setup` is what writes the file: $ARGUMENTS
+that a full `/devstride:setup` is what writes the file.
 
 **The write boundary — the whole of it.** This skill writes exactly one path: `.claude/ds-config.json`.
 Nothing else, ever. Not application code, not `CLAUDE.md`, not permission settings, not a CI
@@ -191,7 +193,7 @@ is the one repositories get wrong**:
    list needs `opened`, `synchronize`, `reopened` **and** `ready_for_review`; anything short of that
    is `ambiguous`, naming which events are missing.
 
-Four cases, and **all four produce all three rows** — a case that emits nothing leaves the loop on
+Five cases, and **every one of them produces all three rows** — a case that emits nothing leaves the loop on
 shipped defaults chosen for somebody else's repository:
 
 | What the pull-request workflows show | The three booleans |

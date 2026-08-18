@@ -98,9 +98,10 @@ numbers visibly do not match this shape.
 }
 ```
 
-The sections are rendered in array order. A repository with its own pull-request template should
-have these replaced by its headings — worth asking about if one exists at
-`.github/pull_request_template.md`.
+The sections are rendered in array order, and each is filled from its `guidance` — so an entry needs
+both fields to be usable. **A repository with its own pull-request template should have these
+replaced by that template's sections**, carried across complete with the text under each heading;
+A8 covers where those templates live and how to capture them.
 
 ## CI
 
