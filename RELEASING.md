@@ -55,8 +55,19 @@ depend on, it does not freeze the surface.
    which case do not cut a release at all; or the entries were never written, in which case write
    them now from the commit range (`git log <last tag>..HEAD`). Do not cut an empty version.
 
-2. **Bump `version`** in `.claude-plugin/plugin.json`. This is the authority — the marketplace entry
-   deliberately carries no version, so there is nothing to keep in sync there.
+2. **Bump `version`** in `.claude-plugin/plugin.json`. This is the authority — the marketplace
+   entries deliberately carry no version, so there is nothing to keep in sync there.
+
+   **Keep it that way.** There are two entries now, `devstride` and its `ds` alias, and they must
+   stay identical in `source` so both always serve the same plugin at the same version. Adding a
+   `version` field to either one would manufacture exactly the drift this arrangement makes
+   impossible — two entries that can disagree about what they publish. The invariant is worth
+   asserting if you touch that file:
+
+   ```bash
+   python3 -c "import json; p=json.load(open('.claude-plugin/marketplace.json'))['plugins']; \
+     assert len({e['source'] for e in p})==1 and not [e for e in p if 'version' in e]; print('ok')"
+   ```
 
 3. **Update the README's `Current version:` line** to match. It is the only *other* place a version
    literal lives, and it is the first thing a visitor reads. Every other example deliberately uses a

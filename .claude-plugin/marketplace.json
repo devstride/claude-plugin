@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "devstride",
-  "description": "DevStride's agentic delivery loop for Claude Code — plan a roadmap, then walk it story by story through build, review, and release against your own repo and DevStride org.",
+  "description": "DevStride's agentic delivery loop for Claude Code \u2014 plan a roadmap, then walk it story by story through build, review, and release against your own repo and DevStride org.",
   "owner": {
     "name": "DevStride",
     "url": "https://devstride.com"
@@ -12,7 +12,14 @@
       "source": "./",
       "category": "workflow",
       "homepage": "https://devstride.com",
-      "description": "The DevStride agentic delivery loop — seventeen skills covering guided repo setup, roadmap planning, dependency-ordered execution, adversarial review before CI, and owner-cut releases. Configured per repo via .claude/ds-config.json."
+      "description": "The DevStride agentic delivery loop \u2014 seventeen skills covering guided repo setup, roadmap planning, dependency-ordered execution, adversarial review before CI, and owner-cut releases. Configured per repo via .claude/ds-config.json."
+    },
+    {
+      "name": "ds",
+      "source": "./",
+      "category": "workflow",
+      "homepage": "https://devstride.com",
+      "description": "Short-spelling alias of the devstride plugin \u2014 the same plugin, the same skills, the same version, installed under a shorter name. Canonical entry: devstride. Install one or the other, not both."
     }
   ]
 }

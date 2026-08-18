@@ -17,6 +17,30 @@ merge, and release — against your own repository and your own DevStride organi
 ```
 
 <details>
+<summary>The shorter <code>ds</code> spelling</summary>
+
+The marketplace carries a second entry, `ds`, pointing at the same plugin:
+
+```
+/plugin install ds@devstride
+```
+
+**It is the same plugin** — same skills, same version, one manifest. `devstride` is the canonical
+entry; `ds` exists only so the install line is shorter to type.
+
+**It does not shorten the commands.** Measured on an actual alias install: the skill namespace comes
+from the plugin manifest's name, not from the marketplace entry you installed through, so skills
+still invoke as `/devstride:plan`, `/devstride:build-item` and so on either way. If you were hoping
+for `/ds:plan`, this is not that — and giving you that would mean a second plugin manifest, which
+this project does not do.
+
+**Install one or the other, never both.** Nothing stops you, but the two entries install as separate
+plugins from the same source: you get two copies of the tree on disk and every skill twice in the
+picker.
+
+</details>
+
+<details>
 <summary>Rolling it out to a team</summary>
 
 You can declare the marketplace and enable the plugin for a whole repository by committing
