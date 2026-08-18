@@ -72,6 +72,22 @@ the words are there. It cannot tell you the rule is still *true* after the chang
 when checking a refactor, derive what to look for from the **diff**, not from memory of what
 mattered — memory reproduces what you already thought about.
 
+## Check that an edit did not drop a rule
+
+`skills/review/references/delivery-loop-invariants.md` catalogues every hard-won fact these skills
+encode — each one a rule that cost a real incident — and carries a runnable check for whether any of
+them has gone missing.
+
+**Run it whenever you edit skill text.** Compressing, re-wording, or moving a step is exactly when a
+rule disappears along with the paragraph that carried it, and it disappears quietly: the prose still
+reads well, so nothing looks wrong. That has happened to this text more than once, which is why the
+file exists and why the four disciplines above are phrased as warnings rather than advice.
+
+It is a maintenance instrument, not an operating rule — nothing at runtime reads it. Treat a missing
+needle as a prompt to go and look, never as proof of loss: wording legitimately changes, and the
+check cannot tell a rewrite from a deletion. The file is candid about the two further things it
+cannot prove.
+
 ## Repo conventions
 
 See [AGENTS.md](AGENTS.md) for public-repo hygiene, the release/versioning rule, and layout.
