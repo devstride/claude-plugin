@@ -449,7 +449,7 @@ and a key absent is invisible.
 **The defaults are literal values, not a description of one.**
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md` holds every one of them —
 branch naming, integration branches, commit conventions, the pull-request body template, the CI
-block, the empty lists, and the lessons-store template. **Read it before writing**, and copy the
+block, the empty lists, and the known-cloud-reviewer catalog. **Read it before writing**, and copy the
 values verbatim. The delivery skills compare against these strings literally, so a default
 paraphrased into something that means the same thing is a default that no longer matches.
 
@@ -480,9 +480,9 @@ config does real damage, because every later run reads these keys as fact:
 - Equally, **`fastStoryMerges` needs `verify.test` and `verify.typecheck` set** for the same reason.
   If the interview could not establish them, write `fastStoryMerges.enabled: false` and say why.
 
-Then report what was written, where, and what to do next: `/devstride:doctor` to check the result,
-and the [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference)
-for the keys setup does not ask about.
+Then say what was written and where — and go straight to Phase G. **The run is not finished at the
+write.** A config that has never been executed is a plausible-looking file, and the whole point of
+Phase G is that plausible is not the bar.
 
 ## Phase F — re-running on a repository that already has a config
 
@@ -518,6 +518,74 @@ incomplete, so propose the addition. **Setup authors this file; it is not a prec
 existing contract is unchanged: the file wins over the skills' shipped defaults, including over
 anything setup itself wrote.
 
+## Phase G — prove the config by running it
+
+**A config is not done until it has run.** Everything up to here produced a file that *looks* right;
+this phase finds out whether it *is* right, while the person who can fix it is still sitting there.
+The alternative is discovering it later, from inside the delivery loop, as a confusing failure three
+steps removed from its cause.
+
+Phase G runs automatically after every write — fresh or merge — and is also available on its own
+against a config setup did not write. **Validation reads the file, not any memory of writing it**;
+keys it does not recognize are ignored, not errors.
+
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/validation-checklist.md` holds the checks and the
+failure-mode table — symptom, likely cause, exact fix. Read it when you run this phase, and map
+every failure to its row rather than improvising an explanation.
+
+**Run every check, even after one fails.** Someone with three problems should learn all three now,
+not one restart at a time. Each check ends `PASS`, `FAIL`, `SKIPPED` (by the user) or `UNVERIFIABLE`
+(offline, or a prerequisite absent) — and those last two are **not** failures. Collapsing them into
+one is how a setup gets called broken because a laptop was on a train.
+
+1. **The verify commands actually run.** Execute every `verify.typecheck` entry and `verify.lint`;
+   exit 0 is the pass. Where `generated.toleratedTypeErrors` is configured, errors matching it in
+   files matching `generated.paths` do not fail the check — that is what the key is for.
+   **`verify.test` is offered, never forced**: suites can run for half an hour, and nobody wants that
+   sprung on them mid-setup. Declining is `SKIPPED`, and it is reported in the verdict rather than
+   quietly folded into a pass.
+   **Echo any command the user typed during the interview before running it the first time.** A
+   detected command came from the repository's own scripts; a hand-entered one has never been seen
+   by anything, and executing it unannounced is not a good first impression.
+2. **The branch refs exist.** `git rev-parse --verify` for `baseBranch`, `release.productionBranch`
+   and `hotfixBaseBranch` — prefer the remote-tracking ref, fall back to local. Then assert
+   `protectedBranches` still contains the base and production branches: it is what stops the loop
+   force-pushing or deleting them, and a config that lost one is a config with the safety off.
+3. **The declared review engines respond.** Only what the config declares — an engine nobody
+   declared is not a gap, so do not check for it and do not mention it.
+   A local CLI must actually be invocable: probe the binary from `review.localCommand` and get a
+   version out of it. For a cloud reviewer, confirm `gh auth status` for the repository's host and
+   read access via `gh api repos/{owner}/{repo}`.
+   **Say plainly what that last one does not prove.** Access is a precondition; whether a review
+   request actually registers is only ever settled on a real pull request, because the request
+   mutation reports success even when it creates nothing. `PASS` here means "nothing is obviously
+   in the way", and the checklist says so in those words.
+4. **The work-type roles still resolve.** Re-read the hierarchy and confirm every name in
+   `hierarchyRoles` is still there. Work types get renamed and archived between setup runs, and the
+   failure is silent: the loop simply matches nothing, finds no release unit, and quietly treats
+   every item as a one-off. If the DevStride connection is unavailable, reuse Phase C's message and
+   record `UNVERIFIABLE` — a validation run must not stack-trace either.
+5. **The lessons store has somewhere to live.** Check the `lessonsDoc` parent directory exists and is
+   writable. That is the whole check: **setup never creates this file** — the review skill does, on
+   its first lesson — so a missing file is the normal state and not a finding. What matters is that
+   the directory will accept it when the time comes.
+6. **The CI ordering is self-consistent** — warn only, never a failure. If the config says pull
+   requests open as drafts but no workflow carries a draft gate, the hold cannot work, and the loop
+   would wait on CI that already ran. Say so and point at `/devstride:doctor`. **Never edit a
+   workflow to fix it**: outside `.claude/` this skill does not write, and that boundary does not
+   bend for a helpful one-line change.
+
+**The verdict is the output.** List every check with its outcome, then one line: **loop-ready** only
+with zero failures — skips and unverifiables are fine, provided they are named. Anything else says
+what failed and the fix from the checklist.
+
+Two things the verdict must say when they are true, so a failure is not misread:
+
+- **The working tree was dirty.** Validation runs against the tree as it is, which is correct, but an
+  uncommitted change is a far likelier cause of a failing typecheck than the config is.
+- **The run was offline.** The git and command checks are unaffected; the connection and cloud-access
+  checks are `UNVERIFIABLE` and worth re-running when there is a network.
+
 IMPORTANT:
 - **The write boundary is one path: `.claude/ds-config.json`.** See the top. Everything else on disk is
   read-only to this skill, in every phase.
@@ -530,3 +598,6 @@ IMPORTANT:
 - **Never write a config that claims an engine the repository does not have.** Every later run treats
   these keys as fact, so an aspirational roster does not fail loudly — it quietly changes what gets
   reviewed.
+- **A written config is not a finished one.** Phase G is not an optional flourish at the end; it is
+  the difference between a file that looks right and one that has been shown to work. Never end a
+  run at the write and call the repository set up.

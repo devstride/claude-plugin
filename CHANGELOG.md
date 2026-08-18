@@ -16,10 +16,16 @@ for what each version component means here and how a release is cut.
   roles, review engines, conventions doc — reporting every value with the evidence behind it and a
   status of `detected`, `ambiguous` or `unknown`, then asks only about what it could not settle.
 
-  Being built in phases: repository inspection and the prefill contract first, then the interview and
-  the config write, then a validation pass that proves the written config by executing it. **The
-  version bump ships when the last of those lands**, because `version` is the install cache key and
-  a bump partway through would put a command that stops halfway into everyone's install.
+  **It ends by running what it wrote.** Verify commands are invoked for real, branch refs resolved,
+  declared review engines probed, work-type roles re-checked against the organization. Every check
+  runs even after one fails, and the repository is called loop-ready only with zero failures —
+  skipped and unverifiable are reported as themselves, never folded into a pass. Each failure maps to
+  a shipped failure-mode table with the exact fix.
+
+  Built in three phases — inspection, then the interview and write, then this validation pass — with
+  **no version bump until the last of them landed**, because `version` is the install cache key and a
+  bump partway through would have put a command that stops halfway into everyone's install. That
+  constraint is now satisfied: the bump ships with this release.
 
 ## [0.6.0] — 2026-08-17
 
