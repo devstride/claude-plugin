@@ -474,8 +474,23 @@ Walk the prefill summary and turn it into as few questions as the repository all
   someone to re-approve forty facts their own repository just proved is how a good setup feels bad.
 - **An explicit answer always beats a detection.** If the user overrides a `detected` value, the
   override is what gets written — do not re-apply the detected one at write time, and do not argue.
-Three things no inspection can reach, asked every run:
+Four things no inspection can reach, asked every run — the first one first, because its answer
+moves other keys:
 
+- **Which delivery profile?** (`profile`) — one question, three options, each captioned with the
+  contract's one-line "who it is for": `prototype`, `standard` (the default — offered first, and
+  the answer when the user takes the default), `enterprise`. The contract is
+  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`; read it before asking, and
+  take the captions from its table rather than paraphrasing them. Say in the question what the
+  answer moves — `epicIntegrationBranches.autoRelease`, `fastStoryMerges.enabled` and
+  `review.pollTimeoutMinutes` are written to match it, at the values in the defaults reference —
+  so the user is choosing a shape, not a label. On a re-run the file's current `profile` is the
+  prefill. **If the answer is `prototype`, say the consequence before moving on**: `autoRelease`
+  becomes `true`, so a release unit merges to `baseBranch` the moment its last item lands, with no
+  human saying so. Name the branch; where it is also the production branch, or is promoted to it
+  without a gate, that is production with nobody's hand on it, and the owner must hear it here,
+  from setup, not from a deploy. The profile is never `detected`: nothing in a repository says how
+  much rigor its owners want.
 - **What does merging to the production branch actually do?** (`release.autoDeployOnMerge`) — one
   plain-English sentence: whether it deploys production automatically, and through what. Nothing can
   detect this and there is no sensible default, yet it is the sentence the release skill quotes back
@@ -504,8 +519,9 @@ and a key absent is invisible.
 
 **The defaults are literal values, not a description of one.**
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md` holds every one of them —
-branch naming, integration branches, commit conventions, the pull-request body template, the CI
-block, the empty lists, and the known-cloud-reviewer catalog. **Read it before writing**, and copy the
+the delivery-profile values, branch naming, integration branches, commit conventions, the
+pull-request body template, the CI block, the empty lists, and the known-cloud-reviewer catalog.
+**Read it before writing**, and copy the
 values verbatim. The delivery skills compare against these strings literally, so a default
 paraphrased into something that means the same thing is a default that no longer matches.
 
@@ -513,10 +529,11 @@ paraphrased into something that means the same thing is a default that no longer
 |---|---|
 | `baseBranch`, `hotfixBaseBranch`, `protectedBranches` | From A6. `protectedBranches` **always** contains the base, production and release-source branches |
 | `integrationBranch` | `null` — the per-release-unit derivation is the default; an explicit value overrides it |
-| `epicIntegrationBranches` | Verbatim from the defaults reference, with `fastStoryMerges.enabled` decided by the rules below |
+| `profile` | The Phase D answer, as the word itself — always written, `standard` included; the defaults reference says why |
+| `epicIntegrationBranches` | Verbatim from the defaults reference, with `autoRelease` at the profile's value and `fastStoryMerges.enabled` decided by the rules below |
 | `verify` | `typecheck` (array), `test`, `lint`, `testSingle`, `testDir`, `skipDuringStoryBuilds: []` |
 | `generated` | Only when detected — omit rather than write an empty shape |
-| `review` | The roster and the three CI-ordering booleans, per the rules below |
+| `review` | The roster and the three CI-ordering booleans, per the rules below; `pollTimeoutMinutes` at the profile's value |
 | `prBodyTemplate`, `commitConventions`, `ci`, `branchNaming` | Verbatim from the defaults reference, unless the repository said otherwise |
 | `preShipChecks`, `preCommitWiringChecks` | `[]` — a repository names these for itself, deliberately; see the defaults reference for why empty is a real answer |
 | `hierarchyRoles` | Phase C's confirmed mapping |
@@ -530,11 +547,21 @@ config does real damage, because every later run reads these keys as fact:
   pass is then the local gate, which is a legal configuration, not a degraded one.
 - No cloud reviewer → **`automatedReviewers: []`**. Nothing is requested, polled or waited on, and an
   absent review is correct rather than pending.
-- **`fastStoryMerges.enabled: true` only when at least one local engine is present.** Under fast
-  merges an item gets no pull request and no CI of its own, so the local suites are the only gate it
-  receives; enabling it with nothing local behind it merges code that nothing checked.
-- Equally, **`fastStoryMerges` needs `verify.test` and `verify.typecheck` set** for the same reason.
-  If the interview could not establish them, write `fastStoryMerges.enabled: false` and say why.
+- **`fastStoryMerges.enabled: true` only when something reviews the story before it merges.** Under
+  fast merges an item gets no pull request and no CI of its own, so the local engines and the local
+  suites are the only gate it receives; enabling it with nothing behind it merges code that nothing
+  checked. Claude's build-time adversarial pass is a local engine under the contract's floors and
+  runs on every story, so this precondition holds by construction — a configured local CLI is a
+  second engine, not the first — and `prototype`, which forbids a per-story pull request while an
+  integration branch exists, relies on exactly that.
+- So the precondition that can actually be missing is the other one: **`fastStoryMerges` needs
+  `verify.test` and `verify.typecheck` set.** If the interview could not establish them, write
+  `fastStoryMerges.enabled: false` and say why — under every profile, `prototype` included, saying
+  there that the file now contradicts its profile, which `/devstride:doctor` will also report.
+- **`autoRelease` and `review.pollTimeoutMinutes` take the profile's values** from the defaults
+  reference. When that means writing `autoRelease: true` for `prototype`, repeat the consequence at
+  the write, naming `baseBranch`: the release unit will merge there with no human saying so. That
+  warning is the operator's to hear, and the write is the last moment setup can give it.
 
 Then say what was written and where — and go straight to Phase G. **The run is not finished at the
 write.** A config that has never been executed is a plausible-looking file, and the whole point of
@@ -552,6 +579,13 @@ difference between a command people run again and one they run once.
    user has just said is gone), and every key missing entirely because it was written by hand or by
    an older version. Restricting the proposal to detected values alone silently drops the other two,
    which is how a stale setting survives a re-run the user thought had removed it.
+   `profile` is a recognized key like any other: the file's value prefills the Phase D question, an
+   unchanged answer is not a proposal, and a changed one proposes the profile **together with** the
+   three keys it moves, as one change. A user who accepts the new profile but keeps a hand-set
+   `autoRelease` or `pollTimeoutMinutes` has made an explicit choice — the key stands, by the
+   contract — so say at the write that the file now disagrees with its profile, and that
+   `/devstride:doctor` will report the same. A config with no `profile` at all was written by hand
+   or by an older version: ask the question and propose the addition.
 3. **On acceptance, deep-merge** the accepted keys into the existing document.
 
 What survives a merge, verbatim and unconditionally:
