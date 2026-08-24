@@ -28,7 +28,8 @@ word**, and the knobs move together. Individual knobs can still be overridden (s
 | `localCliEngine` — does the local CLI reviewer (Codex, by default) run on stories | **No** — Claude's build-time pass is the local gate | Yes, when configured | Yes, when configured |
 | `maxLocalReviewRounds` — total runs of the local CLI engine per story, re-reviews included | 0 | **1** — one review; its findings are fixed; **no re-review of the fixes** | **2** — one review, one re-review of the fixes, then stop |
 | `storyVerify` — the local gate before a story merges | Type-checks + the touched test suites (`verify.testSingle`, widened when the change is broad). The full `verify.test` runs once, at the release PR | Type-checks + full `verify.test` | Type-checks + full `verify.test` + `verify.lint` where applicable |
-| `perStoryPullRequest` | **Never** while an integration branch exists — fast mode, with Claude as the ≥ 1 local engine | Per `fastStoryMerges.enabled` | Per `fastStoryMerges.enabled` |
+| `perStoryPullRequest` | Fast mode — no per-story PR — whenever `fastStoryMerges.enabled` is absent or `true`; Claude's build-time pass is the ≥ 1 local engine the floor needs. A present `false` wins and is reported | Per `fastStoryMerges.enabled` | Per `fastStoryMerges.enabled` |
+| `fastStoryMerges.enabled` (default written by `setup`) | **true** whenever `verify.typecheck` is set — Claude's pass is the local engine, and the story gate is type-checks + touched suites | `true` only when a local CLI engine is configured AND `verify.test` and `verify.typecheck` are set (the existing rule); else `false`, saying which precondition was missing | Same rule as `standard` |
 | `releaseCiOrdering` | CI runs **concurrently** with review on the release PR (the draft hold is treated as off) | Per the three `review.*` CI-ordering booleans | Per the three `review.*` CI-ordering booleans |
 | `autoRelease` (default written by `setup`) | **true** — the release unit merges to the base branch when its last leaf lands. `setup` says this out loud when it writes it: on a repo whose base branch is effectively production, the owner must know | false | false |
 | `reviewerRegistrationWindowMinutes` — how long to wait for proof that a cloud reviewer was actually asked | 2 | 2 | 2 |
@@ -68,21 +69,29 @@ touch the boundary; the login-callback story does.
 Every delivery skill resolves the profile the same way, first match wins, and **announces the
 result and its source** ("profile: prototype — from the plan root I20100"):
 
-1. An explicit profile passed in `$ARGUMENTS` of the invoking skill (`rebalance` takes one;
-   `plan` accepts one).
+1. An explicit profile passed in `$ARGUMENTS` of the invoking skill — the bare word
+   `prototype`, `standard` or `enterprise` anywhere in the arguments (`/devstride:plan I20100
+   prototype`, `/devstride:rebalance I20100 standard`). `rebalance` requires one; `plan` and
+   `build-item` accept one.
 2. The **root marker** on the resolved plan root — see below. A one-off item (no plan root) has
    none.
 3. `profile` in the consuming repo's `.claude/ds-config.json`.
 4. `standard`.
 
-**Explicit config values win over profile defaults.** Where a knob above also exists as its own
-config key — `epicIntegrationBranches.autoRelease`, `epicIntegrationBranches.fastStoryMerges.enabled`,
-`review.pollTimeoutMinutes`, `review.localCommand`, the three `review.*` CI-ordering booleans —
-a key PRESENT in the file is the operator's decision and stands, whatever the profile says. The
-profile supplies the value only when the key is absent. `setup` writes those keys consistent with
-the profile it was told, so a fresh config and its profile agree; a hand-edited key that
-disagrees is honoured and reported ("profile prototype, but `autoRelease` is false in config —
-stopping at release-ready as configured").
+**Explicit config values win over profile defaults.** Four knobs above also exist as their own
+config keys — `epicIntegrationBranches.autoRelease`, `epicIntegrationBranches.fastStoryMerges.enabled`,
+`review.pollTimeoutMinutes`, and the three `review.*` CI-ordering booleans (which back
+`releaseCiOrdering`). For those, a key PRESENT in the file is the operator's decision and stands,
+whatever the profile says; the profile supplies the value only when the key is absent. `setup`
+writes those keys consistent with the profile it was told, so a fresh config and its profile
+agree; a hand-edited key that disagrees is honoured and reported ("profile prototype, but
+`autoRelease` is false in config — stopping at release-ready as configured").
+
+**`review.localCommand` is different: it names the engine, it does not schedule it.** A present
+`localCommand` puts the local CLI engine on the roster; `localCliEngine` and
+`maxLocalReviewRounds` then decide WHERE and HOW OFTEN it runs. So under `prototype` a configured
+Codex still reviews every release PR and every PR-path item at full effort — it simply gets zero
+rounds on fast-mode stories. A `null` `localCommand` removes the engine everywhere, as today.
 
 ## The root marker
 
