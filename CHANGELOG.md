@@ -8,6 +8,56 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Delivery profiles.** One user-facing choice — `prototype`, `standard`, or `enterprise` — now
+  sets how much rigor the loop spends per unit of work: how finely `plan` slices stories and how
+  deep each spec goes, how many readers `ultracode-build` fans out and how wide its adversarial
+  review may go, which verified findings are fixed in-story, how many local review rounds `review`
+  runs, which local gate a story must hold before it merges, and how long the loop waits for a
+  cloud reviewer. The canonical contract is `skills/plan/references/delivery-profiles.md`; every
+  skill cites it. Resolution order: an explicit profile word in the invoking skill's arguments →
+  a `Delivery profile:` marker line in the plan root's description → `profile` in
+  `.claude/ds-config.json` → `standard`. Four config keys that already exist on their own
+  (`epicIntegrationBranches.autoRelease`, `fastStoryMerges.enabled`, `review.pollTimeoutMinutes`,
+  the three `review.*` CI-ordering booleans) win over a profile default when present. Floors no
+  profile removes: one Claude adversarial pass at NARROW or wider on every story; the security
+  lens on any diff touching the auth boundary; at least one engine behind a fast merge; a green
+  local gate before merge; the full configured roster and CI on the release PR.
+- **`profile` and `profileOverrides` config keys.** `setup` asks which profile and writes it, plus
+  the profile-consistent values of the derived keys — saying out loud when `prototype` sets
+  `autoRelease: true`. `doctor` reports the effective profile, its source, and any key that
+  contradicts it.
+- **`/devstride:rebalance <root> <profile>`** — the eighteenth skill. Re-slices a live plan's
+  NOT-STARTED leaves to a new profile: merges fine stories into vertical slices (or splits coarse
+  ones), embeds the absorbed specs in the successor so no detail is lost, archives the absorbed
+  originals with a pointer (never deletes), rewires dependency edges, numbers successors with the
+  splice convention, rewrites the root marker, and re-dates the not-done items. Shows a
+  before/after table and requires sign-off before writing; refuses to run while a build loop is
+  active on the same plan.
+- **A bounded review loop.** `maxLocalReviewRounds` caps total runs of the local CLI reviewer per
+  story (0 / 1 / 2 by profile); after the cap, the last round's findings are fixed without a
+  re-review and anything further that is not P1 or security is deferred with a rationale. A
+  `fixFloor` (`p1-security` / `likely-important` / `all-confirmed`) decides which verified
+  findings are fixed in-story. Verification defaults to REFUTED unless reproducible.
+- **Fail-fast cloud-reviewer registration.** A `requestReviews` call must be proven registered
+  (the per-reviewer `review_requested` timeline event) within two minutes or that reviewer is
+  dropped for the run and reported — never waited out. `review.pollTimeoutMinutes` now bounds
+  only the wait for a REGISTERED reviewer's review.
+
+### Changed
+
+- **The default rigor is now `standard`, not what is now called `enterprise`.** Every skill
+  previously ran at a single, maximum rigor: up to six readers per story, HIGH-RISK review breadth
+  whenever in doubt, every confirmed finding fixed, unbounded re-review rounds, a 20-minute
+  reviewer poll. Measured on a real greenfield project that shape cost hours and dozens of review
+  agents per story. A repository that wants the previous behaviour sets `"profile": "enterprise"`
+  in `.claude/ds-config.json`; a repository with no `profile` key now runs `standard`.
+- `review.pollTimeoutMinutes` takes the profile's default (5 / 10 / 20) when absent from config.
+- A public consuming repository can keep tracker numbers out of commits and branch names with
+  `itemTagFormat: ""` and an integration-branch pattern without `<epic-number>`; the keys already
+  tolerated this and the documentation now says so.
+
 ## [0.9.0] — 2026-08-18
 
 ### Added
