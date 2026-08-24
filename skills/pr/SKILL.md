@@ -12,6 +12,14 @@ Optional argument (DevStride item number): $ARGUMENTS
 **Config**: `.claude/ds-config.json` (`baseBranch`, `integrationBranch`, `hotfixBaseBranch`,
 `review.*`), authoritative over any literal here.
 
+**Delivery profile.** Driven by `build-item`, take the profile the caller resolved. Standalone,
+resolve it by the resolution order in
+`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` (the canonical contract — cite
+it, never restate it) and announce it with its source. Two of its knobs act here: `releaseCiOrdering`
+decides whether the open is a draft (step 1), and `reviewerRegistrationWindowMinutes` bounds how
+long a reviewer request has to prove itself (step 1). The rest belong to `review`, which this
+skill passes the resolved profile to (step 2).
+
 **Working base.** For a feature PR: the branch the CALLER passed (`build-item` derives the
 story's epic integration branch), else `integrationBranch` if non-null, else `baseBranch`.
 Hotfix PRs target `hotfixBaseBranch` regardless. Read "the working base" wherever a step says
@@ -52,7 +60,10 @@ review engines the whole review phase and **no workflow burns a runner on a diff
 change**. `review` step 7 flips it ready once findings are settled, and that flip releases CI —
 one run, on the final reviewed diff. In a draft-hold repo, never open non-draft and
 never flip it ready here; when `openPullRequestsAsDraft` is false, the non-draft open IS the
-configured behavior and there is no flip to protect.
+configured behavior and there is no flip to protect. **Under a profile whose `releaseCiOrdering`
+runs CI concurrently with review (`prototype`), open NON-DRAFT as if all three CI-ordering
+booleans were false** — unless the repo's keys are present and true, in which case the explicit
+config wins: open as a draft and report the contradiction.
 
 **Batch the whole open into ONE call**: push the branch, `gh pr create --base <base>
 --body-file <file>` — with `--draft` iff the repo holds CI on drafts (`openPullRequestsAsDraft`;
@@ -62,11 +73,16 @@ entry in `review.automatedReviewers`, per its
 hardcode a single reviewer: a repo with several, or a different bot, is expressed in config, and
 a hardcoded request leaves the others never run while the poll waits them out. An EMPTY
 `automatedReviewers` is legal — request nothing and note that no cloud wave is configured. Mark as
-already-requested ONLY the reviewers whose request actually registered.
+already-requested ONLY the reviewers whose request actually registered — a NEW `review_requested`
+timeline event for THAT reviewer, proven within **`reviewerRegistrationWindowMinutes`** (2 under
+every profile). A request still unproven when the window closes is a failed request: report
+that reviewer as NOT registered and dropped for this run, so `review` never polls for it. The
+mutation's own success return proves nothing.
 Requesting Copilot **in the same call that opens the PR** is what makes the cloud review overlap
 the local engines rather than follow them — the single biggest wall-clock saving in the loop, so
 never defer it to a later turn. An explicitly requested Copilot review runs fine on a draft. Tell
-`review` the reviewer is already requested so they skip their own request.
+`review` which reviewers are already REGISTERED (and which were dropped) so it skips its own
+request for the former and waits on neither.
 
 **Body format** — author it (never `--fill`), write to a scratch file, pass `--body-file`, and keep
 a clear, conventional TITLE. Render the sections from config **`prBodyTemplate.sections`**, in
@@ -92,7 +108,8 @@ attribution. Report the PR number and URL.
 
 ## 2. Review and CI gating
 
-Invoke **`review`** on the PR, telling it whether it is driven or standalone. It owns the whole
+Invoke **`review`** on the PR, telling it whether it is driven or standalone and **passing the
+resolved delivery profile** (with its source) so it does not re-resolve. It owns the whole
 engine: every configured review pass, triage, fixes, reply-then-resolve, and — when CI is held on
 drafts — the ready-flip and CI settlement.
 In driven mode carry its untracked-deferral list back to `build-item`.
