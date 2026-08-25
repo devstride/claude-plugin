@@ -12,13 +12,14 @@ Optional argument (DevStride item number): $ARGUMENTS
 **Config**: `.claude/ds-config.json` (`baseBranch`, `integrationBranch`, `hotfixBaseBranch`,
 `review.*`), authoritative over any literal here.
 
-**Delivery profile.** Driven by `build-item`, take the profile the caller resolved. Standalone,
-resolve it by the resolution order in
+**Delivery profile.** Driven by `build-item`, take the profile the caller resolved. Standalone —
+or whenever no caller supplied one — resolve it by the resolution order in
 `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` (the canonical contract — cite
-it, never restate it) and announce it with its source. Two of its knobs act here: `releaseCiOrdering`
-decides whether the open is a draft (step 1), and `reviewerRegistrationWindowMinutes` bounds how
-long a reviewer request has to prove itself (step 1). The rest belong to `review`, which this
-skill passes the resolved profile to (step 2).
+it, never restate it), apply the repo's `profileOverrides` as it specifies, and announce it with
+its source. Two of its knobs act here: `releaseCiOrdering` decides whether an EPIC RELEASE PR
+opens as a draft (step 1), and `reviewerRegistrationWindowMinutes` bounds how long a reviewer
+request has to prove itself (step 1). The rest belong to `review`, which this skill passes the
+resolved profile to (step 2).
 
 **Working base.** For a feature PR: the branch the CALLER passed (`build-item` derives the
 story's epic integration branch), else `integrationBranch` if non-null, else `baseBranch`.
@@ -60,10 +61,12 @@ review engines the whole review phase and **no workflow burns a runner on a diff
 change**. `review` step 7 flips it ready once findings are settled, and that flip releases CI —
 one run, on the final reviewed diff. In a draft-hold repo, never open non-draft and
 never flip it ready here; when `openPullRequestsAsDraft` is false, the non-draft open IS the
-configured behavior and there is no flip to protect. **Under a profile whose `releaseCiOrdering`
-runs CI concurrently with review (`prototype`), open NON-DRAFT as if all three CI-ordering
-booleans were false** — unless the repo's keys are present and true, in which case the explicit
-config wins: open as a draft and report the contradiction.
+configured behavior and there is no flip to protect. **An EPIC RELEASE PR under a profile whose
+`releaseCiOrdering` runs CI concurrently with review (`prototype`) opens NON-DRAFT, as if all
+three CI-ordering booleans were false** — unless the repo's keys are present and true, in which
+case the explicit config wins: open as a draft and report the contradiction. The contract scopes
+that knob to the release PR: a one-off, hotfix or per-story PR under `prototype` still opens per
+the configured draft hold.
 
 **Batch the whole open into ONE call**: push the branch, `gh pr create --base <base>
 --body-file <file>` — with `--draft` iff the repo holds CI on drafts (`openPullRequestsAsDraft`;

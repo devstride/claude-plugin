@@ -29,18 +29,23 @@ passes every configured engine before it reaches develop. See LOCAL-ONLY mode be
 **The delivery profile — resolve it BEFORE the roster, and announce it with its source.** The
 profile is the one user-facing choice that sets how much rigor this engine spends per cycle; its
 canonical definition is `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` — read
-that file, do not restate it. This skill honours six of its knobs: `localCliEngine` (whether the
-local CLI engine is on a STORY roster), `maxLocalReviewRounds` (the round cap), `fixFloor` (which
+that file, do not restate it. This skill honours six of its knobs: `localCliEngine` and
+`maxLocalReviewRounds` (whether, and how many times, the local CLI engine runs on a fast-mode
+STORY review — never whether it is on the roster), `fixFloor` (which
 verified findings get fixed in-cycle), `reviewerRegistrationWindowMinutes`, `pollTimeoutMinutes`,
 and `releaseCiOrdering`. A caller that already resolved the profile (`build-item`, `pr`,
-`release`) passes it in — take it as given. Standalone, resolve it yourself by the contract's
-resolution order (explicit argument → the plan root's marker, read with `get_item(view: 'full')`
-→ config `profile` → `standard`). Either way announce it next to the roster ("profile: standard —
-from `.claude/ds-config.json`"). **An explicit config key wins over the profile** for any knob
-that also exists as its own key (`review.pollTimeoutMinutes`, `review.localCommand`, the three
-CI-ordering booleans): a key PRESENT in the file is the operator's decision — honour it and
-report the contradiction when it disagrees with the profile. The profile fills in only where the
-key is absent.
+`release`) passes it in — take it as given. **Whenever none was passed** — standalone, or a
+driven caller that did not supply one — resolve it yourself by the contract's resolution order
+(explicit argument → the plan root's marker, read with `get_item(view: 'full')` → config
+`profile` → `standard`); never run with the knobs undefined. Then apply the repo's
+`profileOverrides` exactly as the contract specifies (valid knob names pin their value for every
+profile; unknown names are reported and ignored). Either way announce it next to the roster
+("profile: standard — from `.claude/ds-config.json`"). **An explicit config key wins over the
+profile** for the knobs that also exist as their own key (`review.pollTimeoutMinutes` and the
+three CI-ordering booleans, here): a key PRESENT in the file is the operator's decision — honour
+it and report the contradiction when it disagrees with the profile; the profile (then the
+override) fills in only where the key is absent. **`review.localCommand` is not one of those
+keys: it NAMES the engine, it does not schedule it** — see the roster bullet below.
 
 **Roster resolution — do this at the start of EVERY run, and announce the result.** The roster
 comes from config plus probes, never from assumption:
@@ -52,10 +57,12 @@ comes from config plus probes, never from assumption:
   `review.localCommand` is non-null AND its
   binary resolves (probe the command's first token with `command -v` before launching).
   `localCommand: null` is a legal, documented value meaning "no second local engine".
-  **Profile gate, story path only:** when the profile's `localCliEngine` is off (`prototype`), the
-  engine is NOT on the roster for a STORY review (LOCAL-ONLY mode) — Claude's build-time pass is
-  the story's local gate, and that is a profile choice, not a degradation. It IS on the roster,
-  when configured, at the epic release PR and on every other PR path.
+  **A present `localCommand` puts the engine on the roster for EVERY PR-path review under EVERY
+  profile** — the release PR, a one-off, a hotfix. The profile's `localCliEngine` and
+  `maxLocalReviewRounds` decide only how many rounds it gets on a fast-mode STORY review
+  (LOCAL-ONLY mode): zero under `prototype`, where Claude's build-time pass is the story's local
+  gate. Zero rounds on a story is a profile choice, not a degradation, and it does not take the
+  engine off the roster anywhere else.
 - **Cloud reviewers** — exactly the `review.automatedReviewers` entries; `[]` is legal and means
   "no cloud wave" (nothing to request, poll, or resolve — absent reviews are correct, not pending).
 - **Draft-hold mechanics** — per `review.openPullRequestsAsDraft` / `readyForReviewReleasesCi` /
@@ -63,9 +70,13 @@ comes from config plus probes, never from assumption:
   flip/gate-job/close-reopen machinery, and CI settles concurrently with review. Mixed values are
   unsupported-but-safe: fall back to the strictest configured behavior and say so.
   **Profile:** when the profile's `releaseCiOrdering` runs CI concurrently with review
-  (`prototype`), treat all three booleans as false FOR THIS RUN — the all-false regime above —
-  and announce it. Explicit keys still win: if the repo's booleans are present and true, honour
-  them, hold CI as configured, and report the contradiction.
+  (`prototype`) AND the PR under review is a RELEASE PR — the epic release PR `build-item` step
+  8 cuts, or the production cut — treat all three booleans as false FOR THIS RUN, the all-false
+  regime above, and announce it. The knob is scoped to the release PR by the contract: a
+  one-off, hotfix or per-story PR keeps the configured draft hold. Explicit keys still win: if
+  the repo's booleans are present and true, honour them, hold CI as configured, and report the
+  contradiction. In this concurrent regime a PR that is STILL A DRAFT on entry has CI held for
+  no reason — step 0 flips it ready immediately so CI starts now, alongside the reviewers.
 
 Announce the resolved roster, naming the local engine by `review.localReviewerName`
 ("engines this run: Claude + Codex + Copilot" / "Claude only —
@@ -113,10 +124,11 @@ one's report rather than being recomputed.
 
 **LOCAL-ONLY mode** (fast develop mode — `build-item` step 4a invokes it by name; the caller
 passes a base REF instead of a PR number): there is no PR, so run the **Codex stream only** and
-STOP after triage. Under a profile whose `localCliEngine` is off (`prototype`) there is no Codex
-stream either: the local CLI engine is off the story roster by profile, so this mode runs steps
-3–5 over the caller's build-time Claude findings, then step 6.5 — the same path as the
-"engine unavailable" case below, reported as "off-roster by profile", not as degradation.
+STOP after triage. Under a profile that gives the local CLI engine zero story rounds
+(`prototype`: `localCliEngine` off, `maxLocalReviewRounds` 0) there is no Codex stream either —
+the engine stays on the roster, it simply does not run on this story — so this mode runs steps
+3–5 over the caller's build-time Claude findings, then step 6.5: the same path as the
+"engine unavailable" case below, reported as "zero rounds by profile", not as degradation.
 Skip steps 0, 2, 6, 7 and 8 entirely — no PR resolution, no cloud reviewer, no
 poll, no threads to reply to or resolve, no ready-flip, no CI. Run step 1's Codex bullet with
 `--base <the passed ref>`, then steps 3–5 over its findings (de-duplication is trivial: one engine
@@ -151,7 +163,11 @@ ambiguous/risky/unverifiable finding, or a destructive/outward-facing action.
   or merged PR, unlike current-branch resolution; without this guard the loop would launch
   reviewers and attempt mutations against it.
 - **A DRAFT is the NORMAL state — never skip it, never ask whether to review it.** It means
-  "ready to review, CI held". You flip it ready yourself in step 7.
+  "ready to review, CI held". You flip it ready yourself in step 7. **One exception:** when the
+  roster resolved the CI-concurrent regime for this run (profile `releaseCiOrdering` on a
+  release PR, no explicit true keys) a draft is holding CI that should already be running —
+  `gh pr ready` it NOW, before any push, and confirm a workflow run appears for the head SHA
+  (close+reopen if none does). Step 7 then has no flip left to make.
 - Resolve `{owner}/{repo}` once.
 
 ## 1. Launch every stream, concurrently
@@ -170,10 +186,9 @@ engines run; serializing wastes minutes.
   (`localCommand: null`) → skip silently, it is not on the roster.
   **This launch is round 1 of the profile's `maxLocalReviewRounds`** — the TOTAL number of runs of
   this engine in this review cycle, re-reviews included; step 5 spends any remaining rounds and
-  7.1/7.1b are bounded by the same cap. Count every launch. A cap of 0 describes the `prototype`
-  story path, where `localCliEngine` already keeps the engine off the roster; on a PR path where
-  the engine IS on the roster it runs its first round regardless — read 0 as "one review, no
-  re-review" there.
+  7.1/7.1b are bounded by the same cap. Count every launch. The cap of 0 is the `prototype`
+  STORY value (fast-mode stories, LOCAL-ONLY mode); on a PR path a configured engine reviews
+  under every profile, so read `prototype` there as "one review, no re-review".
 - **Cloud reviewers** — skip this bullet's REQUESTING and step 2's poll entirely when
   `review.automatedReviewers` is `[]` (no cloud wave is configured — absent reviews are correct,
   not pending). Step 6 is skipped only when no review threads EXIST: a human reviewer may leave
@@ -289,7 +304,10 @@ opinion. REFUTED findings never bump a lesson — a false positive is not a recu
 - **CONFIRMED/PLAUSIBLE, in scope, at or above the profile's `fixFloor`** → fix now. The floor
   is the contract's, exactly as it defines it: `p1-security` (P1 correctness and any security
   finding), `likely-important` (both likely to occur and material if it does), or
-  `all-confirmed` (every CONFIRMED and PLAUSIBLE finding).
+  `all-confirmed` (every CONFIRMED and PLAUSIBLE finding). Read it from the same two facts every
+  verified verdict carries in `ultracode-build` phase 3 — **likelihood** and **impact**, with
+  **P1** as that skill defines it — so the two engines triage one finding the same way; a
+  security finding is material by definition, so for it only likelihood is in question.
 - **CONFIRMED/PLAUSIBLE, in scope, BELOW the floor** → not fixed in this cycle. Defer it with a
   one-line rationale — to the item that owns it, else the untracked-deferral list (driven) or a
   named offer of `/devstride:insert-defect` (standalone) — or dismiss it with a rationale where
@@ -424,8 +442,8 @@ it an automated merge would be stuck or would silently drop a lesson.
 ## 7. Release CI (ready-flip) and settle green
 
 **When the draft-hold booleans are all false (CI-runs-on-draft repo) — or the profile's
-`releaseCiOrdering` treats them as false for this run (`prototype`, absent explicit true keys in
-config) — ONLY step 7.3's flip
+`releaseCiOrdering` treats them as false for this run (`prototype`, on a release PR, absent
+explicit true keys in config; step 0 already flipped any draft) — ONLY step 7.3's flip
 mechanics do not apply**: no ready-flip, no gate-job assertion, no close+reopen. Everything else
 is unchanged — the entry gate below, the pre-flip paginated zero-unresolved check, step 7.1's
 base refresh (a stale patch must not settle), and step 7.2's slow-suite applicability all still
