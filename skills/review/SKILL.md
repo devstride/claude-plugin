@@ -335,8 +335,9 @@ remaining → run the engine once more over the fixed diff (same command, same `
 background launch) and take its findings back through steps 3–4; each run counts. **At the cap:
 the last round's verified findings are fixed WITHOUT another engine round.** Any further finding
 after that — from Claude's own re-read of the delta, a cloud re-review, or a CI loop-back — is
-fixed only if it is P1 or security; everything else is deferred with a rationale to the owning
-item or the untracked-deferral list. Claude's intrinsic pass has no cap: re-read the delta of
+triaged at the profile's `fixFloor` exactly as in step 4 (the cap bounds ENGINE ROUNDS, not the
+floor: fixing a finding never spends a round, so the floor does not need to drop), and whatever
+the floor defers goes with a rationale to the owning item or the untracked-deferral list. Claude's intrinsic pass has no cap: re-read the delta of
 every fix yourself. This cap is what turns the fix / re-review / fix spiral — four to eight
 rounds on a large diff, each drawing a fresh handful of findings — into a bounded cycle; do not
 "just run it once more" past it.
