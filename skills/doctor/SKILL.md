@@ -32,6 +32,7 @@ produces a confusing downstream symptom instead of an error, usually much later:
 | Workflows missing `ready_for_review` | The ready-flip creates **no run at all**; the loop waits forever |
 | Workflow jobs not gated on draft | CI runs on open and again after every fix — the run-once design never engages |
 | `verify.test` unset with fast merges on | Items merge with no LOCAL gate — and under fast mode the local suites are the only gate the item itself gets |
+| `profile: prototype` beside a hand-set `autoRelease: false` | The loop stops at release-ready and the profile looks ignored. It is not — the explicit key wins, and nothing says so |
 
 The value is not the checks. It is turning silence into a sentence.
 
@@ -186,6 +187,31 @@ If a check could not be run, say so — never report an unrun check as a pass.
   the four keys explicitly and re-run `/devstride:doctor config`. Doctor remains read-only — it
   prints suggested JSON but never writes it. If the shipped fallback refs do exist, PASS and report
   them; a user can still run setup to make the roles explicit.
+- **Delivery profile — the effective one, and its source.** Read `profile` and report it as one
+  line: `profile: <name> — from .claude/ds-config.json`, or `profile: standard — key absent, shipped
+  default`. The contract behind the word is
+  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`; read its resolution order,
+  and say that a plan root's own marker or an explicit skill argument outranks the file at run time
+  — this reports the repository's default, not what a particular plan will run under, and it never
+  calls a DevStride tool to find out. A value that is not one of the three names is a FAIL: the
+  skills read it as absent and fall through to `standard` without a word. Fix: set it to
+  `prototype`, `standard` or `enterprise`, or run `/devstride:setup`.
+  **Then the contradictions.** Compare `epicIntegrationBranches.autoRelease` and
+  `review.pollTimeoutMinutes` with the profile's values in
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md`, and
+  `epicIntegrationBranches.fastStoryMerges.enabled` against `prototype` only, and only when
+  `verify.typecheck` is set — the other two profiles decide that key per repository, so `false`
+  under them is a decision, not a contradiction. A present key that differs is **informational, not a FAIL**: the explicit key
+  wins, by contract. But say which key, which value, and what the profile would have written —
+  `profile prototype, but autoRelease is false in config — the loop stops at release-ready as
+  configured` — because someone who chose `prototype` for its speed and meets a release-ready stop
+  otherwise debugs the wrong thing. A present `review.localCommand` under `prototype` is **not** a
+  contradiction and must not be reported as one: the contract says it names the engine without
+  scheduling it — that engine still reviews release and pull-request paths, and simply gets no
+  rounds on fast-mode stories. `profileOverrides`, when present, is the operator pinning
+  knobs on purpose: report as a WARNING any name in it that is not a knob in the contract's table
+  (the skills ignore unknown names rather than honouring them as something else), and nothing
+  else about it.
 - **Unrecognized keys — report as a WARNING, not a typo accusation.** List keys you do not
   recognize and let the user judge. **Exclude by convention**: any key whose leaf name starts with
   `_` (the `_*_readme` documentation convention, used pervasively in real configs) and `$schema`.
@@ -193,6 +219,8 @@ If a check could not be run, say so — never report an unrun check as a pass.
   **not** by grepping skill prose — several real keys are descriptive and appear in no skill, so a
   prose grep flags valid configuration as misspelled and buries the one genuine typo in the noise.
   Where a key is one edit away from a real one, offer that as a possibility, not a verdict.
+  `profile` and `profileOverrides` are recognized keys — they belong to the delivery-profile
+  contract — whether or not the published reference lists them yet.
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
   **array**, so iterate it — `review.localCommand`, `generated.regenCommand`,
   `preShipChecks[].command`): split on `&&` and `;`, take the first token of **each** segment, and
