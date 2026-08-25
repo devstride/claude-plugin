@@ -34,6 +34,50 @@ part of a sequenced plan is auto-detected as a one-off: $ARGUMENTS
   item's description rather than faithfully building the wrong thing, and keep it current *as the
   work firms up*, not only at the end. The item is the durable source of truth; the PR is not.
 
+## Delivery profile — resolve it ONCE per iteration, and say where it came from
+
+The delivery profile is the one user-facing choice that sets how much rigor the loop spends per
+story. Its knobs, its floors, its resolution order and its root marker are defined ONLY in
+`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` — read that file; never
+restate its table. This skill resolves the profile for the run and honours four of its knobs:
+`perStoryPullRequest` (step 4), `storyVerify` (step 4a), `autoRelease` and `releaseCiOrdering`
+(step 8). The composed skills honour their own knobs, but they must not each re-resolve the
+profile — a story built under one profile and reviewed under another is worse than either — so
+**pass the resolved profile EXPLICITLY, by name, in the invocation text** of `ultracode-build`
+(step 3), `review` (steps 4a and 4b) and `pr` (steps 4b and 8).
+
+Resolve it in step 0, once the plan root is known, in the contract's order — first match wins:
+
+1. An explicit profile in `$ARGUMENTS` — the bare word `prototype`, `standard` or `enterprise`
+   anywhere in the arguments (`I20100 prototype`, `next under I20100 enterprise`).
+2. The root marker in the plan root's description, read with **`get_item(view: 'full')`** — the
+   summary projection omits `description`, so a summary read finds no marker and silently falls
+   through to the config default. This is the same class of trap as the `relationships` omission
+   the one-off classification below guards against: absence of data read as data.
+3. `profile` in `.claude/ds-config.json`.
+4. `standard`.
+
+A one-off has no plan root, so only (2) is skipped — never (1): `I20110 enterprise` is an
+explicit profile and wins; otherwise it resolves from (3), else (4). **Announce the result WITH ITS
+SOURCE** — `profile: prototype — from the plan root I20100` — and carry it in the progress
+table's `Profile` row. A bare name cannot be checked against the marker or the config by anyone
+reading the transcript, and the next session inherits it from handoff memory (step 7).
+
+**A config key that is PRESENT wins over the profile's default.** `epicIntegrationBranches.autoRelease`,
+`epicIntegrationBranches.fastStoryMerges.enabled` and the three `review.*` CI-ordering booleans
+are the operator's decision whenever they are in the file; the profile supplies a value only for
+a key that is ABSENT. A present key that contradicts the profile is honoured AND reported
+("profile prototype, but `autoRelease` is false in config — stopping at release-ready as
+configured") — following either side silently hides a disagreement the operator needs to see.
+
+**`profileOverrides` in config pins individual knobs** (the contract's Overrides section). Apply
+it to the four knobs this skill owns after resolving the profile and BEFORE any decision reads
+them: an entry naming `perStoryPullRequest`, `storyVerify`, `autoRelease` or `releaseCiOrdering`
+replaces the profile's default for that knob. It is still a profile-level value, so a PRESENT
+dedicated key above still wins over it. Unknown knob names are reported and ignored, never
+honoured as something else, and no override lowers a floor. Skipping this step is how a
+`prototype` plan with `profileOverrides.autoRelease: false` auto-releases anyway.
+
 ## Progress reporting — emit the table at every step transition
 
 The loop's position is otherwise recoverable only from prose, so a compacted or resumed session has
@@ -43,6 +87,7 @@ to re-derive where it is. Render this at each step transition, updating rows in 
 | Step | Status |
 |---|---|
 | 0 · Select | I20110 — one-off → base develop, no epic branch |
+| Profile | standard — from `.claude/ds-config.json` (one-off: no root marker) |
 | 1 · In Progress | ✅ |
 | 2 · Branch | ✅ jane/03-14-26/I20110-… |
 | 3 · Build + Claude pass | ✅ 1 finding fixed |
@@ -61,10 +106,11 @@ rather than going missing — otherwise "no Copilot row" is indistinguishable fr
 forgotten":
 
 ```
+| Profile | standard — from the plan root I20100 (marker read with view: 'full') |
 | 4a · Fast review (no PR) | epic branch — cloud gate deferred to step 8 |
 | — Claude (build, max) | ✅ step 3, 2 findings fixed |
 | — Codex (local, xhigh) | ✅ 4 findings → 3 fixed, 1 captured |
-| — Local suites | ✅ green — file/test pass counts recorded in the commit body |
+| — Local suites | ✅ green (storyVerify: standard) — file/test pass counts recorded in the commit body |
 | — Copilot + CI | ⏸ deferred to the epic release PR (step 8) |
 | 5a · Fast merge | ✅ merged --no-ff → jane/03-14-26/I20104-attachment-storage |
 ```
@@ -73,7 +119,9 @@ forgotten":
 the loop is, so a row labelled for something the step does not do resumes at the wrong operation.
 CI release and settling belong to step 4's delegated review (`review` step 7), NOT to a step of
 their own — step 5 is Merge and step 6 is the Completion ritual. Mark step 8 `n/a` on a one-off
-rather than dropping the row, so "absent" never has to be told apart from "not reached".
+rather than dropping the row, so "absent" never has to be told apart from "not reached". The
+`Profile` row is the one non-step row besides the engine rows: it names the profile AND its
+source, because a resumed session re-derives the review path and the verify width from it.
 
 Rules that make it worth rendering rather than decorative:
 
@@ -133,8 +181,10 @@ stage is untouched until the epic completes, and story-level runs SKIP `verify.s
 suites. When the release unit's last leaf merges, **step 8 runs automatically**. The working base is
 per-RELEASE-UNIT, not per-session — re-derive when the loop walks into the next release unit.
 
-**The working base also selects the review path** (step 4). Epic integration branch → **fast
-develop mode**: no per-story PR, the local roster (≥ 1 engine — see step 4a's floor) + green
+**The working base also selects the review path** (step 4), together with the delivery profile's
+`perStoryPullRequest`. Epic integration branch → **fast
+develop mode** (always under `prototype`; per `fastStoryMerges.enabled` otherwise — step 4 has
+the rule): no per-story PR, the local roster (≥ 1 engine — see step 4a's floor) + green
 local suites, local merge, with
 the cloud roster and CI deferred to the epic release PR. `baseBranch` → the full per-story PR ritual,
 because a one-off gets no later epic release and its own PR is the only cloud gate it will ever
@@ -165,8 +215,11 @@ Deltas — **steps 1–6 run VERBATIM**, because the point is that the inner bui
   have a release-unit ancestor. Without this explicit bypass the
   general rule would route it onto that epic's integration branch and strand it there until an
   unrelated epic releases. A one-off ships straight to develop, never an integration branch. Still
-  run the gating/scope check and spec validation. Because the working base is `baseBranch`, a
-  one-off always takes step **4b** — the full PR ritual. Fast mode is never available here, and
+  run the gating/scope check and spec validation. **There is no plan root, so the root-marker step is
+  skipped: an explicit profile in `$ARGUMENTS` wins, else `profile` in config, else `standard`**
+  — announce it with that source. Because the working
+  base is `baseBranch`, a one-off always takes step **4b** — the full PR ritual — **under every
+  profile**. Fast mode is never available here, and
   the reason is the whole basis of the mode: there is no epic release PR behind a one-off, so its
   own PR is the only place Copilot and CI will ever see the code before it reaches develop.
 - **Step 6.5** — no plan chain to splice into. Capture follow-ups as their own one-off items
@@ -194,7 +247,17 @@ Deltas — **steps 1–6 run VERBATIM**, because the point is that the inner bui
   next candidate. **SCOPE CHECK** — what is buildable now vs deferred; record deferrals.
   **VALIDATE THE SPEC** — re-fetch with `view: 'full'` (the default omits `description`) and
   confirm its paths/symbols/assumptions against the codebase.
-- Report the item, title, ready-set, and the buildable-now-vs-deferred line.
+- **Resolve the delivery profile once the story is SELECTED**, not when the root is — the order
+  and the marker are in the Delivery profile section above. The marker step walks the story's
+  ancestor chain: the same walk the epic-branch derivation performs (`hierarchy` for the chain,
+  `get_item` per ancestor) — fetch those ancestors with `view: 'full'` and take the NEAREST
+  container's marker, else the root's, because a descendant with its own marker wins for its
+  subtree (the contract's inheritance rule); a summary read finds nothing and falls through to
+  config. Resolving from the root before selection cannot see that subtree marker. Announce
+  `profile: <name> — from <source>` and fill the table's `Profile` row. Once per iteration —
+  never carried over from the previous story, which may sit under a different container.
+- Report the item, title, ready-set, the profile with its source, and the
+  buildable-now-vs-deferred line.
 
 ## 1. Mark In Progress
 
@@ -208,17 +271,30 @@ explicitly so it overrides its own config resolution.
 
 ## 3. Build
 
-Invoke **`ultracode-build`** with `I<number> <one-line goal/scope>`. It returns: the item
+Invoke **`ultracode-build`** as `I<number> <one-line goal/scope> profile: <name>` — the trailing
+`profile: <name>` clause is the form the engine parses (it announces the profile "from the
+invocation"); it honours its own knobs from the contract and must not re-resolve the profile
+behind you. It returns: the item
 number, a one-line summary, green-checks confirmation, the **deferral line**, the **deviations
-list** (every material divergence from the written spec, not just deferrals), and the
-**untracked-deferral list**. Carry all three forward — deferrals + deviations into the PR body
-(step 4) and the as-built reconciliation (step 6); untracked deferrals into step 6.5.
+list** (every material divergence from the written spec, not just deferrals), the
+**untracked-deferral list**, and the **dismissed-findings list** (each review finding it chose
+not to fix, with its rationale). Carry all four forward — deferrals + deviations into the PR body
+(step 4) and the as-built reconciliation (step 6); untracked deferrals into step 6.5; dismissed
+findings into the PR body (4b) or the merge-commit body (5a) so every dismissal is visible where
+the code lands. Step 6 does not reconcile dismissals — a dismissal is a review disposition, not
+a divergence from the spec.
 
 ## 4. Review — fast mode on an epic branch, full PR ritual on develop
 
-**Which path you are on is decided by the WORKING BASE step 0 resolved, not by the diff, the item,
-or how the run feels.** Epic integration branch + `epicIntegrationBranches.fastStoryMerges.enabled`
-→ **4a**. Working base is `baseBranch` → **4b**. Never mix them: the paths differ in where the
+**Which path you are on is decided by the WORKING BASE step 0 resolved and the profile's
+`perStoryPullRequest`, not by the diff, the item, or how the run feels.** Epic integration branch:
+under **`prototype`** → **4a** whenever `fastStoryMerges.enabled` is ABSENT or `true` — fast mode
+is the profile's default, and Claude's build-time pass is the ≥ 1 local engine the floor asks
+for; a PRESENT `false` wins, routes the story to 4b, and is reported as a contradiction. Under
+**`standard` / `enterprise`** →
+**4a** iff `epicIntegrationBranches.fastStoryMerges.enabled`, exactly as before; the profile
+supplies no value while that key is present. Working base is `baseBranch` → **4b**, under every
+profile. Never mix them: the paths differ in where the
 CLOUD gate sits, and a story that takes 4a while heading for develop reaches production having
 never been cloud-reviewed.
 
@@ -232,12 +308,17 @@ and the story is settled entirely locally. Every LOCAL engine on the resolved ro
 **THE FLOOR: fast mode requires ≥ 1 local engine behind the story.** If the resolved roster has
 no local CLI engine AND no build-time Claude pass ran for this story (a caller bypassed
 `ultracode-build`), route the story through **4b** instead and say why — a fast-merged story
-with zero engines behind it is the one outcome this mode must make impossible.
+with zero engines behind it is the one outcome this mode must make impossible. **The floor itself
+does not move with the profile.** Under `prototype` the local CLI engine does not run on stories
+(`localCliEngine` — `review`'s knob), so Claude's build-time pass is the engine behind the story:
+the floor is satisfied, not lowered.
 
 - **Claude adversarial** — already ran as `ultracode-build` phase 3 in step 3. Do not re-run it.
 - **Local CLI engine (Codex, by default)** — when on the roster, invoke **`review` in local-only mode**
   (say so explicitly; pass the epic branch as
-  the base ref). It runs `review.localCommand` and returns triaged findings. Use the skill rather
+  the base ref **and the resolved profile by name** — `review` owns `localCliEngine` and
+  `maxLocalReviewRounds`, so under `prototype` it launches no CLI engine and still runs its
+  settle-time steps). It runs `review.localCommand` and returns triaged findings. Use the skill rather
   than invoking the CLI engine directly: the load-bearing flags live there (notably
   `-c mcp_servers.devstride.enabled=false`, without which the review wedges and returns nothing —
   a silent roster narrowing). Unconfigured (`localCommand: null`) → the Claude pass is the local
@@ -245,11 +326,17 @@ with zero engines behind it is the one outcome this mode must make impossible.
   as this-run degradation. **Invoke `review` in local-only mode EITHER WAY** — even with no
   CLI engine to run, it owns the settle-time steps that must happen once findings are settled;
   skipping the invocation because there is nothing for it to launch drops those steps silently.
-- **Fix every confirmed finding before merging**, committed per
+- **Fix every finding `review` hands back as fix-in-story before merging** — its `fixFloor`
+  triage decides which confirmed findings those are under the profile, and a finding it deferred
+  with a rationale is not re-imposed here — committed per
   `commitConventions.reviewFixFormat` (fallback: `fix(<scope>): <summary> [<itemNumber> review]`).
-  Out-of-scope findings go on the untracked-deferral list for step 6.5, exactly as on 4b.
-- **Local suites are the gate** (`fastStoryMerges.requireLocalVerifyGreen`). Type-checks +
-  `verify.test`, plus `verify.lint` when the diff touches frontend. **Record the pass counts in the
+  Out-of-scope and deferred-below-floor findings with no tracked home go on the
+  untracked-deferral list for step 6.5, exactly as on 4b.
+- **Local suites are the gate** (`fastStoryMerges.requireLocalVerifyGreen`). The gate's WIDTH is
+  the profile's `storyVerify` — take it from
+  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`, not from memory of a fixed
+  suite list — and say which width ran; that it must be GREEN is a floor no profile moves.
+  **Record the pass counts in the
   commit body** — with no CI run behind the story, that line is the only durable evidence the gate
   ran. Red suites are a STOP, never a "the epic release will catch it": at the epic release the
   failure arrives with N stories of diff to bisect.
@@ -262,11 +349,14 @@ Then go to **step 5 (fast merge)**.
 ### 4b. FULL PR RITUAL — develop-base stories and one-offs
 
 Invoke **`pr`** in autonomous (driven-by-`build-item`) mode — say so explicitly, pass the
-working base as the pre-answered base, and note that this loop owns PR-to-item linking (step 6),
-not `pr`.
+working base as the pre-answered base **and the resolved profile by name** (it hands the profile
+on to `review`, which owns the round cap and fix floor), and note that this loop owns PR-to-item
+linking (step 6), not `pr`.
 
 It opens the PR — as a draft when the repo holds CI on drafts (`review.openPullRequestsAsDraft`,
-true by default) — with every configured cloud reviewer requested in the same call (none, if the
+true by default; the profile does not touch a per-story PR's draft hold — `releaseCiOrdering` is
+a release-PR knob, step 8 — and a CI-ordering boolean present in config stands as
+configured) — with every configured cloud reviewer requested in the same call (none, if the
 configured set is empty), then runs the
 review-and-settle loop via `review`. **Review first, CI last**: every CONFIGURED engine
 runs at max effort with no trivial-diff skip; in a draft-hold repo CI is held while the PR is a
@@ -274,7 +364,8 @@ draft and the ready-flip
 releases it — one run, on the final reviewed diff. Never flip a PR ready yourself to start CI early;
 that is the waste this ordering removes. This is ADDITIONAL to the build-time pass in step 3.
 
-Ensure every deferral and deviation is in the PR body. `review` returns its triage; out-of-scope
+Ensure every deferral, deviation and dismissed finding (with its rationale) is in the PR body.
+`review` returns its triage; out-of-scope
 findings with no tracked home come back on the untracked-deferral list for step 6.5.
 
 **The push/ready-flip race is `review` step 7's to prevent** — that is the skill that actually
@@ -295,7 +386,9 @@ No PR to merge — integrate locally, then push the epic branch:
   `--no-ff` so the story stays a legible unit in the epic's first-parent history — the epic
   release PR body and the close-out counts are both read off those merges. Message:
   `commitConventions.epicMergeFormat` (fallback:
-  `merge: <itemNumber> [<N>] <short scope> into <epic-slug> integration`).
+  `merge: <itemNumber> [<N>] <short scope> into <epic-slug> integration`). Its BODY carries the
+  dismissed-findings list from step 3 plus any 4a dismissals, each with its rationale — with no
+  PR behind the story, that body is the only place a reader can see what was judged and let go.
 - Base moved while you were building → merge the refreshed epic branch INTO the story branch
   first, re-run the local suites, and only then merge back. An unresolvable conflict is a
   genuine fork.
@@ -376,9 +469,10 @@ No PR to merge — integrate locally, then push the epic branch:
 - The deviations recorded here MUST be the same ones from steps 3 and 4. Never let one ship
   undocumented on the item.
 - **Report** the item (with its `[N]` prefix), lane, dates, **the PR link (4b) or the merge SHA +
-  integration branch (4a — a fast-mode story has no PR to link)**, and whether the spec was
-  reconciled — otherwise nothing confirms the Done move, the date window, the link and the
-  as-built reconciliation actually happened.
+  integration branch (4a — a fast-mode story has no PR to link)**, **the profile it was built
+  under with its source**, and whether the spec was
+  reconciled — otherwise nothing confirms the Done move, the date window, the link, the rigor
+  the story actually got and the as-built reconciliation actually happened.
 
 ## 6.5 Capture untracked findings as tracked items
 
@@ -394,11 +488,15 @@ goes on that item instead — capture-as-new is only for work with no home. Repo
 - **Assert a clean tree** (`git status --porcelain`) — `branch-feature` aborts on a dirty tree,
   so stray files silently wedge the loop. Dirty → surface exactly what drifted and STOP. Never
   auto-reset or `git add .`.
-- Update handoff memory: story shipped, remaining work, **the resolved plan root**, and **the
-  epic's integration branch keyed to its epic number** (or "develop — no epic").
+- Update handoff memory: story shipped, remaining work, **the resolved plan root together with
+  the delivery profile and its source**, and **the
+  epic's integration branch keyed to its epic number** (or "develop — no epic"). The profile
+  is recorded WITH the root, never alone: it is a property of the plan, and a resumed session
+  must re-resolve it from the same root rather than trust a remembered name.
 - **Close-out summary**, computed AFTER 6.5 so spliced items are counted:
   ```
   ✅ Completed [23] I20130 — Enforce seat invariant
+  🎚 Profile: standard — from the plan root I20100
   📦 3 stories remaining in Epic "V1 Seat Management" until release-ready
      (12 remaining in the full plan)
   ```
@@ -420,7 +518,11 @@ goes on that item instead — capture-as-new is only for work with no home. Repo
 
 Runs when step 7 finds the release unit (this org's Epic) at zero remaining leaves, the working
 base is its integration branch,
-**and `epicIntegrationBranches.autoRelease` is true**. With `autoRelease` false, do NOT cut or
+**and auto-release is on** — which is `epicIntegrationBranches.autoRelease` whenever that key is
+PRESENT in config, and the profile's `autoRelease` default (from the contract) ONLY when the key
+is ABSENT. A present key wins whatever the profile says, and the contradiction is reported:
+"profile prototype, but `autoRelease` is false in config — stopping at release-ready as
+configured". With auto-release off, do NOT cut or
 merge the release: report the epic as release-ready and stop for an explicit manual release. A
 config flag the loop ignores is worse than no flag — the operator believes they disabled
 auto-release while the loop merges to develop anyway.
@@ -429,7 +531,9 @@ The release unit's whole batch of leaf merges lands on develop as ONE reviewed P
 - **Refresh from develop**: pull the epic branch, fetch `baseBranch`, capture the fetched tip as
   `<baseOid>`, and **merge that exact OID** — merge, NOT rebase; story SHAs on a shared branch must
   not be rewritten. Resolve conflicts in-loop if safe and mechanical; otherwise STOP. Push.
-- **Verify locally**: type-checks and `verify.test` (the repo's full test suite). Compute the
+- **Verify locally**: type-checks and `verify.test` (the repo's full test suite — where the
+  profile's `storyVerify` ran less than that per story, this is the batch's first full run, so
+  do not skip it on the strength of green stories). Compute the
   release diff against the same merged tip. If `verify.skipDuringStoryBuilds` is non-empty and a
   listed suite's configured applicability fires, its CI check is mandatory on the PR below — do
   NOT also run it locally, a double-run is waste. (With the list empty, local-only suites in
@@ -439,7 +543,15 @@ The release unit's whole batch of leaf merges lands on develop as ONE reviewed P
   `epicIntegrationBranches.releaseTarget` (a config key naming where completed release units land;
   the shipped default is `baseBranch`, and a repo that stages releases elsewhere sets it there),
   flagged as an
-  **EPIC RELEASE PR** so the body leads with the epic and lists the constituent stories.
+  **EPIC RELEASE PR** so the body leads with the epic and lists the constituent stories, **with
+  the resolved profile named in the invocation** (it reaches `review` through `pr`).
+  **`releaseCiOrdering`:** under `prototype`, tell `pr` and `review` that the draft hold is OFF
+  for this PR — CI runs concurrently with the review — for each of the three `review.*`
+  CI-ordering booleans that is ABSENT from config; a boolean that is PRESENT stands as
+  configured, key by key, and a present one that contradicts the profile is reported. Treating
+  one present key as "the config decided all three" leaves a partial config that the PR and
+  review skills read strictly. Under `standard` / `enterprise` the booleans govern as configured
+  (the review-first, CI-once ordering step 4b describes).
 - **Review-and-settle — and CHECK WHICH SCOPE APPLIES, because fast mode changes it.**
   - **Fast mode was used** (`fastStoryMerges.epicReleaseIsFirstCloudPass`, the default path):
     **this PR is the FIRST pass by the cloud-side roster (when one is configured) or CI over ANY
