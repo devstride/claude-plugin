@@ -281,8 +281,15 @@ The point: **find out whether anything actually checks the code before it merges
   branch** and `epicIntegrationBranches.fastStoryMerges.enabled` is on (the default). Such an item
   gets no pull request and no CI of its own, so its local suites are the only gate *it* receives —
   the cloud engines and CI are deferred to the release pull request, not removed.
-- **So in that mode, `verify.test` and `verify.typecheck` must be set.** If either is missing, say
-  plainly: *code merges to the integration branch with nothing locally checking it.*
+- **So in that mode, the profile's story gate must be runnable.** WHICH commands that needs is the
+  effective profile's `storyVerify` (§4 resolved the profile; the contract is
+  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`): under `prototype`,
+  `verify.typecheck` plus `verify.testSingle` — `verify.test` is not required, because that gate is
+  type-checks and the touched suites, and `setup` deliberately enables fast merges on exactly that
+  shape; under `standard` and `enterprise`, `verify.test` and `verify.typecheck` both. Requiring
+  the wider pair under `prototype` would FAIL the very config `setup` just wrote. If a required
+  command is missing, say plainly: *code merges to the integration branch with nothing locally
+  checking it* — and name the commands THAT profile needs.
 - **Give the fix that matches their config.** Setting `epicIntegrationBranches.enabled: false` only
   works when the working base is being derived per-epic. **An explicit `integrationBranch` value
   takes precedence over that flag entirely**, so with one set, flipping the flag changes nothing.

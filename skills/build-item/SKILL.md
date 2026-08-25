@@ -83,6 +83,14 @@ dedicated key above still wins over it. Unknown knob names are reported and igno
 honoured as something else, and no override lowers a floor. Skipping this step is how a
 `prototype` plan with `profileOverrides.autoRelease: false` auto-releases anyway.
 
+**Every decision below branches on the EFFECTIVE value of a knob, never on the profile's NAME.**
+Resolve the four knobs once, here — profile default, then override, then a present dedicated
+config key — and read only those resolved values in steps 4, 4a, 5a and 8. Wherever a step says
+"under `prototype`", it means "when the effective knob says so": a `prototype` plan with
+`profileOverrides.perStoryPullRequest` set to standard's value takes 4b, and one with
+`releaseCiOrdering` overridden keeps the configured draft hold at step 8. Branching on the name
+would make both overrides inert while the text advertises them.
+
 ## Progress reporting — emit the table at every step transition
 
 The loop's position is otherwise recoverable only from prose, so a compacted or resumed session has

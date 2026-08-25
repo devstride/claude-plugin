@@ -298,8 +298,14 @@ probe date was overwritten, stop here: propagation is on and nothing below is sa
 
 ### 3f. Re-date
 
-- Invoke **rationalize-gantt** on the root in its **not-done-only** mode (it asks in its §0) so
+- Invoke **rationalize-gantt** in its **not-done-only** mode (it asks in its §0) so
   shipped items keep the real completion dates `/devstride:build-item`'s ritual stamped on them.
+  **Point it at the ENCLOSING PLAN ROOT, not at a scoped release unit.** When this run was scoped
+  to one unit, re-dating only that unit leaves every downstream leaf in a SIBLING unit dated
+  against a predecessor that has just moved — the cascade cannot reach outside the tree it is
+  given, so the run would finish reporting success while the plan renders red invalid-dependency
+  lines. Walk `hierarchy` up from the scoped unit to the outermost item still under one plan and
+  pass that; a run already scoped to the plan root passes it unchanged.
   Not-done includes any In Progress leaf: its date moves with the cascade like every other open
   item (step 1), and only its date — this skill has not touched its spec, edges, number or parent.
   Let it own the cascade math, its own probe and the red-line review; do not approximate its logic
