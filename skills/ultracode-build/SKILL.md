@@ -29,7 +29,9 @@ and announce it with its source:
 
 - **Passed in the invocation** (`profile: <name>` — the `build-item` path): use it as given, do
   not re-resolve, and announce it as such ("profile: standard — from the invocation"); the
-  caller already walked the order and reported the underlying source.
+  caller already walked the order and reported the underlying source. The name must be one of
+  the three the contract defines; anything else (`profile: standart`) is a stop-and-ask, never
+  a guess or a silent fall-through — with an unknown name no column supplies the knobs below.
 - **Standalone** (no profile in `$ARGUMENTS`): walk the contract's resolution order — its root
   marker needs `get_item(view: 'full')`, since the default projection omits the description
   and a summary read silently falls through to the config default. Announce the result and
@@ -218,9 +220,13 @@ do NOT blind-apply finder suggestions — a finding is not actionable until CONF
 from REFUTED and the finding earns its way up — CONFIRMED by reproducing it from the diff,
 PLAUSIBLE only by pointing at the concrete mechanism in THIS diff and showing why it is likely
 reached. A finder's confidence moves nothing on its own, and "could not rule it out" is
-REFUTED.
+REFUTED. Every CONFIRMED or PLAUSIBLE verdict also carries the two facts the fix floor reads
+next: **likelihood** (how readily the defect is reached in real use) and **impact** (what it
+costs when it is). **P1** means the impact is a broken acceptance criterion of this story,
+corrupted or lost data, or a security hole; a security finding is P1 whatever its likelihood.
 
-Then act by the profile's `fixFloor` — which verified findings get fixed IN THIS STORY:
+Then act by the profile's `fixFloor` — which verified findings get fixed IN THIS STORY, read
+from those verdicts:
 
 - **`p1-security`** (`prototype`): P1 correctness and any security finding. Everything else is
   deferred with a one-line rationale, tagged as below.
@@ -254,12 +260,15 @@ type-checks / wiring checks green, and the test gate green at the profile's `sto
 
 Report to `build-item`: the item number, a one-line summary, **the profile and its source**,
 green-checks confirmation **naming the gate that was run** (the commands, so the caller can see
-the width without re-deriving it), the phase-3 review report, and three lists —
+the width without re-deriving it), the phase-3 review report, and four lists —
 
 - **buildable-now-vs-deferred scope line** (build + review deferrals, each tagged has-a-home vs
   untracked);
 - **untracked-deferral list** — load-bearing; step 6.5 turns each into a spliced-in item. Empty is
   fine and normal, but say so explicitly rather than omitting it;
+- **dismissed-findings list** — every verified finding the `fixFloor` left unfixed and undeferred,
+  each with its one-line rationale, so the PR body can show what was seen and judged rather than
+  what was missed. Empty is the normal case under `all-confirmed`; say so rather than omit it;
 - **deviations list** — every material divergence from the written spec, not just deferrals: a
   different approach, a false spec assumption (a dependency already shipped, a DTO lacked a field,
   a component already existed), scope cut or added, each with a one-line rationale. This feeds the
