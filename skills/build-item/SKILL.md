@@ -63,12 +63,16 @@ SOURCE** — `profile: prototype — from the plan root I20100` — and carry it
 table's `Profile` row. A bare name cannot be checked against the marker or the config by anyone
 reading the transcript, and the next session inherits it from handoff memory (step 7).
 
-**A config key that is PRESENT wins over the profile's default.** `epicIntegrationBranches.autoRelease`,
-`epicIntegrationBranches.fastStoryMerges.enabled` and the three `review.*` CI-ordering booleans
-are the operator's decision whenever they are in the file; the profile supplies a value only for
-a key that is ABSENT. A present key that contradicts the profile is honoured AND reported
-("profile prototype, but `autoRelease` is false in config — stopping at release-ready as
-configured") — following either side silently hides a disagreement the operator needs to see.
+**A config key that is PRESENT wins over the profile's default** for `epicIntegrationBranches.autoRelease`
+and `epicIntegrationBranches.fastStoryMerges.enabled`: they are the operator's decision whenever
+they are in the file; the profile supplies a value only for a key that is ABSENT. A present key
+that contradicts the profile is honoured AND reported ("profile prototype, but `autoRelease` is
+false in config — stopping at release-ready as configured") — following either side silently
+hides a disagreement the operator needs to see. **The three `review.*` CI-ordering booleans are
+different**: they describe what the repo's workflows SUPPORT (a draft hold, a ready-flip that
+releases CI), not a per-run decision. They govern the hold as configured under `standard` and
+`enterprise`; under `prototype` the hold is not used at runtime whatever they say —
+`releaseCiOrdering` is unconditional (steps 4b and 8, per the contract).
 
 **`profileOverrides` in config pins individual knobs** (the contract's Overrides section). Apply
 it to the four knobs this skill owns after resolving the profile and BEFORE any decision reads
@@ -354,9 +358,11 @@ on to `review`, which owns the round cap and fix floor), and note that this loop
 linking (step 6), not `pr`.
 
 It opens the PR — as a draft when the repo holds CI on drafts (`review.openPullRequestsAsDraft`,
-true by default; the profile does not touch a per-story PR's draft hold — `releaseCiOrdering` is
-a release-PR knob, step 8 — and a CI-ordering boolean present in config stands as
-configured) — with every configured cloud reviewer requested in the same call (none, if the
+true by default) under `standard` / `enterprise`; **under `prototype`, tell `pr` and `review`
+the draft hold is OFF for this PR, unconditionally** — the PR opens non-draft and CI runs
+concurrently with the review, whatever the three `review.*` CI-ordering booleans say (they
+describe workflow support, not a per-run decision) — with every configured cloud reviewer
+requested in the same call (none, if the
 configured set is empty), then runs the
 review-and-settle loop via `review`. **Review first, CI last**: every CONFIGURED engine
 runs at max effort with no trivial-diff skip; in a draft-hold repo CI is held while the PR is a
@@ -546,12 +552,11 @@ The release unit's whole batch of leaf merges lands on develop as ONE reviewed P
   **EPIC RELEASE PR** so the body leads with the epic and lists the constituent stories, **with
   the resolved profile named in the invocation** (it reaches `review` through `pr`).
   **`releaseCiOrdering`:** under `prototype`, tell `pr` and `review` that the draft hold is OFF
-  for this PR — CI runs concurrently with the review — for each of the three `review.*`
-  CI-ordering booleans that is ABSENT from config; a boolean that is PRESENT stands as
-  configured, key by key, and a present one that contradicts the profile is reported. Treating
-  one present key as "the config decided all three" leaves a partial config that the PR and
-  review skills read strictly. Under `standard` / `enterprise` the booleans govern as configured
-  (the review-first, CI-once ordering step 4b describes).
+  for this PR — it opens non-draft and CI runs concurrently with the review —
+  **unconditionally**, whatever the three `review.*` CI-ordering booleans say: they describe
+  what the workflows support, and a prototype run does not use the hold. Under `standard` /
+  `enterprise` the booleans govern the hold as configured (the review-first, CI-once ordering
+  step 4b describes).
 - **Review-and-settle — and CHECK WHICH SCOPE APPLIES, because fast mode changes it.**
   - **Fast mode was used** (`fastStoryMerges.epicReleaseIsFirstCloudPass`, the default path):
     **this PR is the FIRST pass by the cloud-side roster (when one is configured) or CI over ANY
