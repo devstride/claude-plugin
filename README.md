@@ -4,7 +4,7 @@ DevStride's agentic delivery loop, packaged as a Claude Code plugin. Plan a road
 existence, then let the loop walk it one story at a time — branch, build, adversarially review,
 merge, and release — against your own repository and your own DevStride organization.
 
-> **Status: early.** The seventeen delivery-loop skills and the DevStride MCP connection are both
+> **Status: early.** The eighteen delivery-loop skills and the DevStride MCP connection are both
 > bundled — installing the plugin is all the *configuration* the connection needs, though you still
 > sign in once. `/devstride:setup` then configures the plugin for your repository and proves the
 > config by running it.
@@ -231,6 +231,28 @@ The full contract — every key, its shape and default — is in the
 >
 > The block above stays useful either way, as a minimal working file to start from.
 
+## Choose a delivery profile
+
+One word sets how much rigor the loop spends per unit of work — how finely a plan is sliced, how
+deep each spec goes, how wide the adversarial review fans out, how many local review rounds run,
+and which gates a story passes before it merges:
+
+| Profile | For | Shape |
+|---|---|---|
+| `prototype` | A small team validating an idea; no production users yet | One story per user-visible slice; light specs; Claude's review pass only, at narrow breadth; touched tests as the story gate; no per-story PR; release units auto-release |
+| `standard` (default) | A working product | Stories of an hour or two; capped specs; contained review breadth; one local CLI review round; full local suite per story |
+| `enterprise` | Regulated, revenue-bearing, or shared-platform code | Fine stories; full specs; the widest review breadth available; every confirmed finding fixed; two local review rounds |
+
+`/devstride:setup` asks which one and writes `"profile"` into `.claude/ds-config.json`; a plan can
+carry its own choice as a `Delivery profile:` line in its root item's description; an explicit
+profile word in a skill's arguments wins over both. Floors hold under every profile: one
+adversarial pass always runs, the security lens is mandatory on any auth-boundary diff, and the
+release pull request still gets every configured engine and CI over the full diff. The full
+contract, knob by knob, is `skills/plan/references/delivery-profiles.md`.
+
+Picked too heavy a profile and watching the loop take far too long? `/devstride:rebalance <root>
+<profile>` re-slices the not-started part of a live plan in place.
+
 ## Your first plan
 
 With the plugin installed, DevStride connected, and a config file in place:
@@ -265,7 +287,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `comprehend-plan` | Recursively reads a plan — descriptions and comment threads, every level — before any edit |
 | `insert-story` / `insert-defect` | Splices new work into a live plan's dependency chain, dated and ordered |
 | `rationalize-gantt` | Backfills dates and rationalizes the dependency graph so the timeline reads as a clean cascade |
-| `rebalance` | Re-slices a live plan's not-started leaves to a different delivery profile in place, preserving every absorbed spec |
+| `rebalance` | Re-slices a live plan's not-started leaves to a different delivery profile — merging or splitting stories, preserving every absorbed spec, archiving originals with a pointer |
 
 **Delivery** — walk the plan one item at a time:
 
