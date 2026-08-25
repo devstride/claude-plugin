@@ -205,7 +205,10 @@ If a check could not be run, say so — never report an unrun check as a pass.
   wins, by contract. But say which key, which value, and what the profile would have written —
   `profile prototype, but autoRelease is false in config — the loop stops at release-ready as
   configured` — because someone who chose `prototype` for its speed and meets a release-ready stop
-  otherwise debugs the wrong thing. `profileOverrides`, when present, is the operator pinning
+  otherwise debugs the wrong thing. A present `review.localCommand` under `prototype` is **not** a
+  contradiction and must not be reported as one: the contract says it names the engine without
+  scheduling it — that engine still reviews release and pull-request paths, and simply gets no
+  rounds on fast-mode stories. `profileOverrides`, when present, is the operator pinning
   knobs on purpose: report as a WARNING any name in it that is not a knob in the contract's table
   (the skills ignore unknown names rather than honouring them as something else), and nothing
   else about it.
