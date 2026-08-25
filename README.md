@@ -265,6 +265,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `comprehend-plan` | Recursively reads a plan — descriptions and comment threads, every level — before any edit |
 | `insert-story` / `insert-defect` | Splices new work into a live plan's dependency chain, dated and ordered |
 | `rationalize-gantt` | Backfills dates and rationalizes the dependency graph so the timeline reads as a clean cascade |
+| `rebalance` | Re-slices a live plan's not-started leaves to a different delivery profile in place, preserving every absorbed spec |
 
 **Delivery** — walk the plan one item at a time:
 
