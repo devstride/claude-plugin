@@ -23,18 +23,18 @@ sets, the floors no profile removes, and the rule that a key present in the file
 default all live in the contract,
 `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` — read it before asking the
 question, and cite it rather than restating it. This file records only what setup writes: the word
-itself, and the profile's values for the three knobs that also exist as their own config keys. The
-two rows the contract fixes are copied from it; the fast-merge row is the rule in the next section,
-which the contract defers to for `standard` and `enterprise`:
+itself, and the profile's values for the three knobs that also exist as their own config keys. All
+three rows are copied from the contract's table; the fast-merge row's rule is spelled out in the
+next section:
 
 | Key | `prototype` | `standard` | `enterprise` |
 |---|---|---|---|
 | `epicIntegrationBranches.autoRelease` | `true` | `false` | `false` |
-| `epicIntegrationBranches.fastStoryMerges.enabled` | `true` — the profile forbids a per-story pull request while an integration branch exists | decided per repository, below | decided per repository, below |
+| `epicIntegrationBranches.fastStoryMerges.enabled` | `true` whenever `verify.typecheck` is set — Claude's build-time pass is the local engine | the existing rule, below | the existing rule, below |
 | `review.pollTimeoutMinutes` | `5` | `10` | `20` |
 
-`fastStoryMerges.enabled` stays subject to the precondition in the next section under every profile:
-the profile decides the shape, the repository's verify commands decide whether it can be honoured.
+Under every profile `fastStoryMerges.enabled` still turns on the repository's own commands and
+roster — the profile decides which precondition applies, never whether one does.
 `profile` is written on every run, `standard` included — an absent key reads as `standard` too, but a
 re-run cannot tell a chosen default from a question never asked, and the doctor cannot report a
 source for a value that is not there.
@@ -89,15 +89,15 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   write, naming the base branch: where that branch is production, or is promoted to it without a
   gate, this is a release with nobody's hand on it, and the owner must hear that from setup rather
   than discover it from a deploy.
-- **`fastStoryMerges.enabled`** — write `true` **only** when something reviews the story before it
-  merges *and* `verify.test` and `verify.typecheck` are both set. Under fast merges an item gets no
-  pull request and no CI of its own, so the local engines and those local suites are the only gate
-  it receives. The first precondition holds by construction: Claude's build-time adversarial pass
-  is a local engine under the contract's floors and runs on every story the build engine produces,
-  so a configured local CLI is a second engine, never the first. The precondition that can actually
-  be missing is the verify pair. Otherwise write `false` and say which precondition was missing —
-  under `prototype` too, where a `false` here contradicts the profile and the doctor will report it
-  as such: a green local gate is a floor, and no profile removes one.
+- **`fastStoryMerges.enabled`** — the precondition depends on the profile. Under `standard` and
+  `enterprise`, write `true` **only** when a local CLI review engine is configured
+  (`review.localCommand` non-null) *and* `verify.test` and `verify.typecheck` are both set. Under
+  `prototype`, write `true` whenever `verify.typecheck` is set: Claude's build-time adversarial pass
+  is the local engine there — it meets the contract's floor on its own — and the profile's story
+  gate is type-checks plus the touched suites, so `verify.test` is not required. Under fast merges
+  an item gets no pull request and no CI of its own, so the local engines and those local suites
+  are the only gate it receives. Otherwise write `false` and say which precondition was missing —
+  a `false` under `prototype` contradicts the profile, and the doctor will report it as such.
 
 ## Commit conventions
 

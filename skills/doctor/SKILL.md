@@ -199,9 +199,9 @@ If a check could not be run, say so — never report an unrun check as a pass.
   **Then the contradictions.** Compare `epicIntegrationBranches.autoRelease` and
   `review.pollTimeoutMinutes` with the profile's values in
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md`, and
-  `epicIntegrationBranches.fastStoryMerges.enabled` against `prototype` only — the other two
-  profiles leave that key to the repository, so `false` under them is a decision, not a
-  contradiction. A present key that differs is **informational, not a FAIL**: the explicit key
+  `epicIntegrationBranches.fastStoryMerges.enabled` against `prototype` only, and only when
+  `verify.typecheck` is set — the other two profiles decide that key per repository, so `false`
+  under them is a decision, not a contradiction. A present key that differs is **informational, not a FAIL**: the explicit key
   wins, by contract. But say which key, which value, and what the profile would have written —
   `profile prototype, but autoRelease is false in config — the loop stops at release-ready as
   configured` — because someone who chose `prototype` for its speed and meets a release-ready stop

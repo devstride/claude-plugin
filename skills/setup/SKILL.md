@@ -547,17 +547,17 @@ config does real damage, because every later run reads these keys as fact:
   pass is then the local gate, which is a legal configuration, not a degraded one.
 - No cloud reviewer → **`automatedReviewers: []`**. Nothing is requested, polled or waited on, and an
   absent review is correct rather than pending.
-- **`fastStoryMerges.enabled: true` only when something reviews the story before it merges.** Under
-  fast merges an item gets no pull request and no CI of its own, so the local engines and the local
-  suites are the only gate it receives; enabling it with nothing behind it merges code that nothing
-  checked. Claude's build-time adversarial pass is a local engine under the contract's floors and
-  runs on every story, so this precondition holds by construction — a configured local CLI is a
-  second engine, not the first — and `prototype`, which forbids a per-story pull request while an
-  integration branch exists, relies on exactly that.
-- So the precondition that can actually be missing is the other one: **`fastStoryMerges` needs
-  `verify.test` and `verify.typecheck` set.** If the interview could not establish them, write
-  `fastStoryMerges.enabled: false` and say why — under every profile, `prototype` included, saying
-  there that the file now contradicts its profile, which `/devstride:doctor` will also report.
+- **`fastStoryMerges.enabled` is decided per repository, and the precondition depends on the
+  profile.** Under fast merges an item gets no pull request and no CI of its own, so the local
+  engines and the local suites are the only gate it receives; enabling it with nothing behind it
+  merges code that nothing checked. Under `standard` and `enterprise`, write `true` only when a
+  local CLI engine is on the roster *and* `verify.test` and `verify.typecheck` are set. Under
+  `prototype`, write `true` whenever `verify.typecheck` is set — Claude's build-time pass is the
+  local engine the contract's floor needs, and the profile's story gate is type-checks plus the
+  touched suites. The exact rule is in the defaults reference; apply it, do not re-derive it.
+- If the applicable precondition is not met, write `fastStoryMerges.enabled: false` and say which
+  part was missing — under `prototype` too, saying there that the file now contradicts its
+  profile, which `/devstride:doctor` will also report.
 - **`autoRelease` and `review.pollTimeoutMinutes` take the profile's values** from the defaults
   reference. When that means writing `autoRelease: true` for `prototype`, repeat the consequence at
   the write, naming `baseBranch`: the release unit will merge there with no human saying so. That
