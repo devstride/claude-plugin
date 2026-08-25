@@ -41,11 +41,14 @@ driven caller that did not supply one — resolve it yourself by the contract's 
 `profileOverrides` exactly as the contract specifies (valid knob names pin their value for every
 profile; unknown names are reported and ignored). Either way announce it next to the roster
 ("profile: standard — from `.claude/ds-config.json`"). **An explicit config key wins over the
-profile** for the knobs that also exist as their own key (`review.pollTimeoutMinutes` and the
-three CI-ordering booleans, here): a key PRESENT in the file is the operator's decision — honour
-it and report the contradiction when it disagrees with the profile; the profile (then the
-override) fills in only where the key is absent. **`review.localCommand` is not one of those
-keys: it NAMES the engine, it does not schedule it** — see the roster bullet below.
+profile** for a knob that also exists as its own key (`review.pollTimeoutMinutes`, here): a key
+PRESENT in the file is the operator's decision — honour it and report the contradiction when it
+disagrees with the profile; the profile (then the override) fills in only where the key is
+absent. Two `review.*` keys are NOT that kind of override: **`review.localCommand` NAMES the
+engine, it does not schedule it** (see the roster bullet below), and **the three CI-ordering
+booleans describe what the repo's workflows SUPPORT** — `setup` writes them as detected facts
+under every profile — so under `standard` and `enterprise` they govern the hold exactly as
+before, and under `prototype` the hold is simply not used at runtime, whatever they say.
 
 **Roster resolution — do this at the start of EVERY run, and announce the result.** The roster
 comes from config plus probes, never from assumption:
@@ -72,11 +75,13 @@ comes from config plus probes, never from assumption:
   **Profile:** when the profile's `releaseCiOrdering` runs CI concurrently with review
   (`prototype`) AND the PR under review is a RELEASE PR — the epic release PR `build-item` step
   8 cuts, or the production cut — treat all three booleans as false FOR THIS RUN, the all-false
-  regime above, and announce it. The knob is scoped to the release PR by the contract: a
-  one-off, hotfix or per-story PR keeps the configured draft hold. Explicit keys still win: if
-  the repo's booleans are present and true, honour them, hold CI as configured, and report the
-  contradiction. In this concurrent regime a PR that is STILL A DRAFT on entry has CI held for
-  no reason — step 0 flips it ready immediately so CI starts now, alongside the reviewers.
+  regime above, and say so in the roster announcement ("CI concurrent with review — prototype;
+  the draft hold is not used this run"). The booleans are NOT consulted for this: they record
+  what the workflows support, and `prototype` does not use the hold whatever they say. The knob
+  is scoped to the release PR by the contract: a one-off, hotfix or per-story PR keeps the
+  configured draft hold. In this concurrent regime a PR that is STILL A DRAFT on entry has CI
+  held for no reason — step 0 flips it ready immediately so CI starts now, alongside the
+  reviewers.
 
 Announce the resolved roster, naming the local engine by `review.localReviewerName`
 ("engines this run: Claude + Codex + Copilot" / "Claude only —
@@ -164,8 +169,8 @@ ambiguous/risky/unverifiable finding, or a destructive/outward-facing action.
   reviewers and attempt mutations against it.
 - **A DRAFT is the NORMAL state — never skip it, never ask whether to review it.** It means
   "ready to review, CI held". You flip it ready yourself in step 7. **One exception:** when the
-  roster resolved the CI-concurrent regime for this run (profile `releaseCiOrdering` on a
-  release PR, no explicit true keys) a draft is holding CI that should already be running —
+  roster resolved the CI-concurrent regime for this run (`prototype`'s `releaseCiOrdering` on a
+  release PR) a draft is holding CI that should already be running —
   `gh pr ready` it NOW, before any push, and confirm a workflow run appears for the head SHA
   (close+reopen if none does). Step 7 then has no flip left to make.
 - Resolve `{owner}/{repo}` once.
@@ -442,8 +447,8 @@ it an automated merge would be stuck or would silently drop a lesson.
 ## 7. Release CI (ready-flip) and settle green
 
 **When the draft-hold booleans are all false (CI-runs-on-draft repo) — or the profile's
-`releaseCiOrdering` treats them as false for this run (`prototype`, on a release PR, absent
-explicit true keys in config; step 0 already flipped any draft) — ONLY step 7.3's flip
+`releaseCiOrdering` treats them as false for this run (`prototype`, on a release PR, whatever
+the booleans say; step 0 already flipped any draft) — ONLY step 7.3's flip
 mechanics do not apply**: no ready-flip, no gate-job assertion, no close+reopen. Everything else
 is unchanged — the entry gate below, the pre-flip paginated zero-unresolved check, step 7.1's
 base refresh (a stale patch must not settle), and step 7.2's slow-suite applicability all still

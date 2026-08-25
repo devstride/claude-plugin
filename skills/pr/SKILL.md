@@ -63,10 +63,10 @@ one run, on the final reviewed diff. In a draft-hold repo, never open non-draft 
 never flip it ready here; when `openPullRequestsAsDraft` is false, the non-draft open IS the
 configured behavior and there is no flip to protect. **An EPIC RELEASE PR under a profile whose
 `releaseCiOrdering` runs CI concurrently with review (`prototype`) opens NON-DRAFT, as if all
-three CI-ordering booleans were false** — unless the repo's keys are present and true, in which
-case the explicit config wins: open as a draft and report the contradiction. The contract scopes
-that knob to the release PR: a one-off, hotfix or per-story PR under `prototype` still opens per
-the configured draft hold.
+three CI-ordering booleans were false** — whatever the booleans say: they record what the repo's
+workflows SUPPORT, and `prototype` does not use the hold at runtime. Say so when reporting the
+open. The contract scopes that knob to the release PR: a one-off, hotfix or per-story PR under
+`prototype` still opens per the configured draft hold.
 
 **Batch the whole open into ONE call**: push the branch, `gh pr create --base <base>
 --body-file <file>` — with `--draft` iff the repo holds CI on drafts (`openPullRequestsAsDraft`;
