@@ -30,7 +30,7 @@ word**, and the knobs move together. Individual knobs can still be overridden (s
 | `storyVerify` — the local gate before a story merges | Type-checks + the touched test suites (`verify.testSingle`, widened when the change is broad). The full `verify.test` runs once, at the release PR | Type-checks + full `verify.test` | Type-checks + full `verify.test` + `verify.lint` where applicable |
 | `perStoryPullRequest` | Fast mode — no per-story PR — whenever `fastStoryMerges.enabled` is absent or `true`; Claude's build-time pass is the ≥ 1 local engine the floor needs. A present `false` wins and is reported | Per `fastStoryMerges.enabled` | Per `fastStoryMerges.enabled` |
 | `fastStoryMerges.enabled` (default written by `setup`) | **true** whenever `verify.typecheck` is set — Claude's pass is the local engine, and the story gate is type-checks + touched suites | `true` only when a local CLI engine is configured AND `verify.test` and `verify.typecheck` are set (the existing rule); else `false`, saying which precondition was missing | Same rule as `standard` |
-| `releaseCiOrdering` | CI runs **concurrently** with review on the release PR (the draft hold is treated as off) | Per the three `review.*` CI-ordering booleans | Per the three `review.*` CI-ordering booleans |
+| `releaseCiOrdering` | CI runs **concurrently** with review on the release PR — the draft hold is not used at runtime, whatever the three `review.*` CI-ordering booleans say | Per the three `review.*` CI-ordering booleans | Per the three `review.*` CI-ordering booleans |
 | `autoRelease` (default written by `setup`) | **true** — the release unit merges to the base branch when its last leaf lands. `setup` says this out loud when it writes it: on a repo whose base branch is effectively production, the owner must know | false | false |
 | `reviewerRegistrationWindowMinutes` — how long to wait for proof that a cloud reviewer was actually asked | 2 | 2 | 2 |
 | `pollTimeoutMinutes` — bound on waiting for a REGISTERED cloud reviewer's review (default written by `setup`) | 5 | 10 | 20 |
@@ -78,14 +78,20 @@ result and its source** ("profile: prototype — from the plan root I20100"):
 3. `profile` in the consuming repo's `.claude/ds-config.json`.
 4. `standard`.
 
-**Explicit config values win over profile defaults.** Four knobs above also exist as their own
-config keys — `epicIntegrationBranches.autoRelease`, `epicIntegrationBranches.fastStoryMerges.enabled`,
-`review.pollTimeoutMinutes`, and the three `review.*` CI-ordering booleans (which back
-`releaseCiOrdering`). For those, a key PRESENT in the file is the operator's decision and stands,
-whatever the profile says; the profile supplies the value only when the key is absent. `setup`
+**Explicit config values win over profile defaults.** Three knobs above also exist as their own
+config keys — `epicIntegrationBranches.autoRelease`, `epicIntegrationBranches.fastStoryMerges.enabled`
+and `review.pollTimeoutMinutes`. For those, a key PRESENT in the file is the operator's decision
+and stands, whatever the profile says; the profile supplies the value only when the key is absent. `setup`
 writes those keys consistent with the profile it was told, so a fresh config and its profile
 agree; a hand-edited key that disagrees is honoured and reported ("profile prototype, but
 `autoRelease` is false in config — stopping at release-ready as configured").
+
+**The three `review.*` CI-ordering booleans are different again: they describe what the repo's
+workflows SUPPORT, not what the profile does with it.** `setup` writes them as detected facts under
+every profile. Under `standard` and `enterprise` they govern the draft hold exactly as today. Under
+`prototype` the hold is not used at runtime whatever they say — `pr` opens the release PR non-draft
+and `review` settles CI concurrently with review, with no flip, gate assertion or close+reopen —
+so `doctor` never reports them as contradicting the profile.
 
 **`review.localCommand` is different: it names the engine, it does not schedule it.** A present
 `localCommand` puts the local CLI engine on the roster; `localCliEngine` and
