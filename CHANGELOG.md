@@ -8,6 +8,8 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-08-25
+
 ### Added
 
 - **Delivery profiles.** One user-facing choice — `prototype`, `standard`, or `enterprise` — now
@@ -335,7 +337,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.9.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.10.0...HEAD
+[0.10.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.9.0...devstride--v0.10.0
 [0.9.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.1...devstride--v0.9.0
 [0.8.1]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.0...devstride--v0.8.1
 [0.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.7.0...devstride--v0.8.0

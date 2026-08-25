@@ -306,7 +306,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 
 ## Versioning & updates
 
-Current version: **0.9.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **0.10.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
