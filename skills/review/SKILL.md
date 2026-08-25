@@ -108,7 +108,7 @@ Standalone `/devstride:review`, human-driven `/devstride:pr`, hotfixes and `/dev
 never assume it "already ran".
 
 **REVIEW FIRST, CI LAST**, held mechanically (`review.ciHeldUntilReviewSettled`) — this
-paragraph describes the draft-hold regime (this repo's); in a CI-runs-on-draft repo (all draft
+paragraph describes the draft-hold regime (the shipped default); in a CI-runs-on-draft repo (all draft
 booleans false) CI runs concurrently and only the settle-at-final-SHA rule applies. PRs open as
 drafts and every workflow job is gated on the draft condition (config `ci.draftGateCondition`,
 here `github.event.pull_request.draft == false`), so during

@@ -71,8 +71,9 @@ false in config — stopping at release-ready as configured") — following eith
 hides a disagreement the operator needs to see. **The three `review.*` CI-ordering booleans are
 different**: they describe what the repo's workflows SUPPORT (a draft hold, a ready-flip that
 releases CI), not a per-run decision. They govern the hold as configured under `standard` and
-`enterprise`; under `prototype` the hold is not used at runtime whatever they say —
-`releaseCiOrdering` is unconditional (steps 4b and 8, per the contract).
+`enterprise`; under `prototype` the RELEASE PR (step 8) does not use the hold at runtime whatever
+they say — `releaseCiOrdering` is unconditional there, per the contract. A base-branch story's
+own PR (4b) keeps the configured hold under every profile: it is that story's only cloud gate.
 
 **`profileOverrides` in config pins individual knobs** (the contract's Overrides section). Apply
 it to the four knobs this skill owns after resolving the profile and BEFORE any decision reads
@@ -358,10 +359,9 @@ on to `review`, which owns the round cap and fix floor), and note that this loop
 linking (step 6), not `pr`.
 
 It opens the PR — as a draft when the repo holds CI on drafts (`review.openPullRequestsAsDraft`,
-true by default) under `standard` / `enterprise`; **under `prototype`, tell `pr` and `review`
-the draft hold is OFF for this PR, unconditionally** — the PR opens non-draft and CI runs
-concurrently with the review, whatever the three `review.*` CI-ordering booleans say (they
-describe workflow support, not a per-run decision) — with every configured cloud reviewer
+true by default) **under every profile, `prototype` included**: the contract's
+`releaseCiOrdering` applies to the RELEASE PR (step 8) only, and this PR is the story's sole
+cloud gate, so the configured hold stands here — with every configured cloud reviewer
 requested in the same call (none, if the
 configured set is empty), then runs the
 review-and-settle loop via `review`. **Review first, CI last**: every CONFIGURED engine
