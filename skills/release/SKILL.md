@@ -36,6 +36,13 @@ IMPORTANT — the DevStride MCP targets PRODUCTION; git/gh act on the real repos
 
 ## 2. Full gated review-and-settle (`review`)
 
+- **Resolve the delivery profile first and pass it by name to `pr` and `review`** — a production
+  release has no plan root, so per the contract
+  (`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`) it resolves from a bare
+  profile word in `$ARGUMENTS`, else `profile` in `.claude/ds-config.json`, else `standard`;
+  announce it with its source. The profile sets the review's round cap and fix floor; it never
+  loosens this step's gates — a production release is a PR-path review under every profile, so
+  the configured CLI engine and every cloud reviewer still run.
 - Invoke **`review`** on the release PR, **telling it explicitly that it is DRIVEN**. It keys
   its behavior off what the caller declares: undeclared, it takes the standalone path, keeps its
   interactive ask-gates and notifies — pausing a release that steps 0–3 are supposed to run

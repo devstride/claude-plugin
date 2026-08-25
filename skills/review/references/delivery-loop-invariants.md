@@ -211,7 +211,10 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "CHANGED the patch" "untrusted tool data" "compose an item number" "EXPIRED" \
               "untracked-deferral" "KEEP THE CLOUD" "copilot-swe-agent" "databaseId" \
               "three-dot" "close+reopen" "force-with-lease" "source and destination" \
-              "high-water" "no thread" "localReviewerName" "always()" "single writer"; do
+              "high-water" "no thread" "localReviewerName" "always()" "single writer" \
+              "delivery-profiles.md" "Delivery profile:" "maxLocalReviewRounds" \
+              "reviewerRegistrationWindowMinutes" "fixFloor" "reviewBreadthCeiling" \
+              "names the engine"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
 
@@ -237,6 +240,17 @@ skills/review/references/github-review-api.md|requested_reviewer.node_id
 skills/review/SKILL.md|automatedReviewers
 skills/pr/SKILL.md|source and destination
 skills/release/SKILL.md|DRIVEN
+skills/build-item/SKILL.md|profile: <name>
+skills/build-item/SKILL.md|view: 'full'
+skills/ultracode-build/SKILL.md|reviewBreadthCeiling
+skills/review/SKILL.md|maxLocalReviewRounds
+skills/review/SKILL.md|reviewerRegistrationWindowMinutes
+skills/pr/SKILL.md|reviewerRegistrationWindowMinutes
+skills/plan/SKILL.md|Delivery profile:
+skills/rebalance/SKILL.md|archive
+skills/setup/SKILL.md|profile
+skills/doctor/SKILL.md|profile
+skills/release/SKILL.md|delivery-profiles.md
 PAIRS
 ```
 
@@ -315,9 +329,36 @@ N2. A config flag's behaviour is asserted in MORE PLACES than the skill that rea
     the config authoritative-by-policy and contradicted-in-practice. Grep every file for a
     flag's claims when you change how it is honoured.
 
+## O. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
+O1. ONE profile word — `prototype` / `standard` / `enterprise` — moves every rigor knob together;
+    the knobs are coupled (coarse stories + enterprise review is the worst combination), so no
+    skill exposes them as independent primary settings.
+O2. Resolution order, every skill, first match wins, ANNOUNCED with its source: bare word in the
+    arguments → the plan root's `Delivery profile:` marker → `profile` in config → `standard`.
+O3. The marker is read with `get_item(view: 'full')` — the summary projection omits `description`,
+    so a summary read finds no marker and silently falls through to the config default.
+O4. Floors no profile removes: one Claude adversarial pass at NARROW or wider on every story; the
+    security lens on any diff touching the auth boundary (decided from the DIFF, not the plan's
+    theme); ≥ 1 engine behind a fast merge; a green local gate before merge; the full configured
+    roster + CI on the release PR.
+O5. A present `autoRelease`, `fastStoryMerges.enabled` or `pollTimeoutMinutes` key wins over the
+    profile default and the contradiction is reported; `review.localCommand` NAMES the engine and
+    never schedules it; the three CI-ordering booleans describe workflow SUPPORT and are bypassed
+    at runtime only by `prototype`, only on the RELEASE PR.
+O6. `maxLocalReviewRounds` counts TOTAL CLI-engine runs per cycle, re-reviews included; past the cap
+    no engine round runs — Claude re-reads the delta — and findings keep the profile's `fixFloor`
+    (the cap bounds rounds, not the floor).
+O7. A cloud reviewer not PROVEN registered within `reviewerRegistrationWindowMinutes` is dropped for
+    the run and reported, never waited out; `pollTimeoutMinutes` bounds only a REGISTERED reviewer.
+O8. `rebalance` never deletes: absorbed originals are ARCHIVED with a comment naming the successor,
+    after the successor exists with the absorbed specs embedded and its edges re-wired; Done and
+    In Progress leaves are untouchable; it refuses to run while a build loop is active on the plan.
+O9. `plan` never rewrites a live marker — a changed profile on an existing plan is `rebalance`'s job,
+    because re-gating existing leaves without re-slicing them is a silent rigor change.
+
 ---
 
-**Revised total: 53 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) = 83.**
+**Revised total: 53 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) = 92.**
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.
