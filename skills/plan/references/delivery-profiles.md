@@ -130,7 +130,12 @@ no marker and silently falls through to the config default.
 }
 ```
 
-Keys are the knob names in the table above; values are the table's vocabulary. An override
+Keys are the knob names in the table above; values are the table's vocabulary — and for the two
+prose-valued knobs, `grain` and `specDepth`, the value is another profile's NAME (`"specDepth":
+"enterprise"` means "slice at standard but spec at enterprise depth"). When a knob also has a
+dedicated config key (`autoRelease`, `fastStoryMerges.enabled`, `pollTimeoutMinutes`) and both are
+present, the dedicated key wins — an override adjusts the profile's default, it does not outrank
+an operator's explicit setting. An override
 cannot go below a floor (`reviewBreadthCeiling` cannot be lower than NARROW, and setting it does
 not remove the auth-boundary security lens). Unknown knob names are reported and ignored, never
 silently honoured as something else.
