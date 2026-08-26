@@ -40,14 +40,15 @@ bites when a push lands while a run is in flight.
 
 ```yaml
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 ```
 
-Put it at the top level of every pull-request workflow. **Cancel only pull-request runs.** A
-post-merge push run on the base branch is path-filtered on its own diff, so a backend push
-followed by a frontend-only push would cancel the only backend validation of the final tree and
-replace it with a run that sees no backend change — the expression above lets push runs finish.
+Put it at the top level of every pull-request workflow. **Group pull-request runs only; give
+every push run a unique group** (`github.run_id`). GitHub keeps at most one PENDING run per
+group even with cancellation off, so a shared per-branch group would let a burst of pushes
+replace a pending run whose path filter covered a change the later pushes do not — a backend push
+followed by two frontend-only pushes would lose the only backend validation of the final tree.
 Do **not** put it on a workflow whose runs must all complete (a publish, a deploy, a data job);
 those get `cancel-in-progress: false` with a group of their own.
 
@@ -61,21 +62,28 @@ filter, compare trees and skip when they match:
       - name: Skip when this push's tree was already tested on the base branch
         id: tree
         if: github.event_name == 'push' && github.ref == 'refs/heads/<production>'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git fetch --no-tags --depth=2 origin <production> <base>
+          git fetch --no-tags --depth=2 origin '+refs/heads/<production>:refs/remotes/origin/<production>' '+refs/heads/<base>:refs/remotes/origin/<base>'
           T="$(git rev-parse 'HEAD^{tree}')"
-          if git rev-parse -q --verify 'HEAD^2' >/dev/null && [ "$T" = "$(git rev-parse 'HEAD^2^{tree}')" ]; then
-            echo "identical=true" >> "$GITHUB_OUTPUT"   # the promoted commit itself
-          elif [ "$T" = "$(git rev-parse 'origin/<base>^{tree}')" ]; then
-            echo "identical=true" >> "$GITHUB_OUTPUT"   # a fast-forward promotion
-          else
-            echo "identical=false" >> "$GITHUB_OUTPUT"
+          identical=false
+          if P2="$(git rev-parse -q --verify 'HEAD^2')" && [ "$T" = "$(git rev-parse "${P2}^{tree}")" ]; then
+            REL="$(gh api "repos/${GITHUB_REPOSITORY}/compare/<base>...${P2}" --jq .status 2>/dev/null || echo unknown)"
+            case "$REL" in identical|behind) identical=true ;; esac   # the parent IS a <base> commit
           fi
+          if [ "$identical" != true ] && [ "$T" = "$(git rev-parse 'origin/<base>^{tree}')" ]; then
+            identical=true   # a fast-forward promotion
+          fi
+          echo "identical=${identical}" >> "$GITHUB_OUTPUT"
 ```
 
-Compare against the **promoted commit** — the merge's second parent — first, and the base tip
-only as a fallback: the base branch may already have moved by the time the runner starts, and a
-comparison against its tip would then re-run everything on exactly the busy days the skip is for.
+Two conditions, both required. Compare against the **promoted commit** — the merge's second
+parent — and prove that parent is reachable from the base branch (the compare API's `identical`
+or `behind`): a hotfix merged straight to production is ALSO a two-parent merge whose tree equals
+its second parent, and that one must run. Compare against the base tip only as the fallback for a
+fast-forward promotion, and fetch the base into an explicit remote-tracking ref — a bare
+`git fetch origin <base>` writes only `FETCH_HEAD`, and `origin/<base>` would not exist.
 
 The step needs a checkout before it: place it after `actions/checkout` (or add one with
 `fetch-depth: 2`) — a gate job that filters paths through the API alone has no repository on
