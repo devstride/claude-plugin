@@ -219,6 +219,31 @@ Any other cloud reviewer must be described the same way — a name the user reco
 review flow understands, and whatever identifier that `how` needs. If the user names a reviewer that
 is not in this catalog, ask for those fields rather than inventing them.
 
+## Documentation hooks
+
+```json
+{
+  "docs": {
+    "updateSkill": null,
+    "releaseNotesSkill": null,
+    "updateOnEpicRelease": false
+  },
+  "release": {
+    "deployVerification": null
+  }
+}
+```
+
+The plugin never updates documentation or writes release notes itself. `docs.updateSkill` and
+`docs.releaseNotesSkill` name LOCAL skills in the consuming repository — scaffolded by `setup` from
+its templates and owned by the repository from then on — and `null` means "no documentation system
+here", which every docs phase reports as skipped. Core documentation is updated by default when a
+skill is registered; **release notes are written only when the owner passes `--release-notes` to
+the release skill**, and only after `release.deployVerification` (or the owner) confirms the deploy
+is live. There is deliberately no "when a note is warranted" key: the loop does not interpret one.
+`release.docsRepo` is the pre-1.0 shape and is migrated, not written. The contract is
+`${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`.
+
 ## Lessons store
 
 ```json

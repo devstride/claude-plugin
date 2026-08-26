@@ -39,6 +39,10 @@ names them — a verdict that hides a skipped test suite is claiming more than i
    the normal state**; the review skill creates it on the first lesson.
 6. **CI ordering** — a warning when the draft hold simply does not engage; a **`FAIL`** when a
    draft-gated workflow's trigger cannot rerun it, because then CI can never settle.
+7. **Documentation hooks** — only when `docs.updateSkill` / `docs.releaseNotesSkill` is set; `null`
+   or absent is `N/A`. Each named `.claude/skills/<name>/SKILL.md` exists, and its `check` mode
+   passes (read-only by contract). A legacy `release.docsRepo` block is a `FAIL` whenever present, with or without a `docs`
+   block beside it. `release.deployVerification`, if set, resolves but is not run.
 
 ## Failure modes
 
@@ -104,6 +108,17 @@ timeline. A `PASS` here means *nothing is obviously in the way*.
 | Workflows are gated but marking ready starts no run | `ready_for_review` is missing from `on.pull_request.types` — the defaults do not include it | Add it. Note that declaring `types` **replaces** the defaults, so the list also needs `opened`, `synchronize` and `reopened` |
 | CI never re-runs after a review-fix push | An explicit `types` list has `ready_for_review` but dropped `synchronize` | Add the missing events. All four are needed: the flip starts the run, `synchronize` covers the fix push, `reopened` is the fallback, and `opened` covers a standalone review on a non-draft pull request — which skips the flip and settles against CI that, without it, was never created |
 
-**Never edit a workflow to fix any of these.** This skill writes one file,
-`.claude/ds-config.json`, and that boundary does not bend for a helpful one-line change to
-somebody's CI.
+**Never edit a workflow to fix any of these.** This skill's write boundary is
+`.claude/ds-config.json` plus the local documentation skills it scaffolds in Phase E2
+(`.claude/skills/<name>/SKILL.md`, never overwriting a file that exists) — and that boundary does not
+bend for a helpful one-line change to somebody's CI. Validation itself writes nothing.
+
+### Documentation hooks
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| A hook names a skill whose `SKILL.md` is missing | The skill was never scaffolded here, or lives in a gitignored path and never reached this clone | `/devstride:setup docs` re-scaffolds it; then `git check-ignore` the path — `.claude/skills/` must be committed |
+| The skill's `check` mode fails | The documentation checkout is missing, dirty, on the wrong branch, or its remote is unreachable; a directory moved; a service is down | The skill prints the specific fact and its fix — follow it. The skill is the repository's own file; edit its "where documentation lives" section if the location genuinely changed |
+| The skill has no `check` mode | Hand-written before the contract, or the mode was removed | Rebuild it from `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/docs-skill-templates/`, keeping the repository's own sections |
+| `release.docsRepo` is present (with or without a `docs` block) | The config predates 1.0 | Run `/devstride:setup docs`: it scaffolds the local skills from the block's values, writes `docs.*`, and removes `docsRepo` |
+| Release notes were requested and nothing happened | `docs.releaseNotesSkill` is `null` — the owner said this repository does not publish notes | Nothing to do, or run `/devstride:setup docs` to register one |

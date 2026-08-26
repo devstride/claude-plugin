@@ -22,22 +22,32 @@ Optional argument: $ARGUMENTS
   invoked from a subdirectory would otherwise read a file that is not there and run commands in the
   wrong directory.
 - **A detector name** — `ecosystem` (A2–A3), `verify` (A4), `ci` (A5), `branches` (A6),
-  `engines` (A7), `docs` (A8) — to inspect and report just that part.
-- **Nothing** — the full run: inspect, ask, write, validate.
+  `engines` (A7) — to inspect and report just that part.
+- **`docs`** — the documentation-hooks mode, and the one narrowed run that WRITES: run A1 and A8,
+  ask Phase D's three documentation questions (plus `release.deployVerification`), then write
+  **only** the `docs` block and `release.deployVerification` into the config (creating the file
+  with just those keys if none exists; merging per Phase F otherwise, including the legacy
+  `release.docsRepo` migration), scaffold the local skills (Phase E2), and run Phase G's
+  documentation check (7) alone. Every other key is untouched. This is how a repository
+  registers its documentation system after the fact, and how a pre-1.0 config migrates.
+- **Nothing** — the full run: inspect, ask, write, scaffold, validate.
 
 **Run each one's prerequisites too, silently
 — A1 always, and A2–A3 before A4**, which cannot compose a command without knowing the package
 manager or find workspace scripts without knowing the layout. A narrowed run reports fewer keys; it
 must never report worse ones.
 
-**A narrowed run stops after Phase B and writes nothing.** It has only looked at part of the
-repository, so it has nothing to say about the rest — and a write would fill every key the skipped
-detectors would have answered with a default, silently replacing real settings with guesses. Say
-that a full `/devstride:setup` is what writes the file.
+**A narrowed detector run stops after Phase B and writes nothing.** It has only looked at part of
+the repository, so it has nothing to say about the rest — and a write would fill every key the
+skipped detectors would have answered with a default, silently replacing real settings with
+guesses. Say that a full `/devstride:setup` is what writes the file. **`docs` is the exception by
+design**: it writes exactly the keys its own questions answer and nothing else, so it cannot
+replace a setting it never asked about.
 
-**The write boundary — the whole of it.** This skill writes exactly one path: `.claude/ds-config.json`.
-Nothing else, ever. Not application code, not `CLAUDE.md`, not permission settings, not a CI
-workflow, not a `.gitignore`. It never mutates git state — no commit, checkout, branch, fetch, push
+**The write boundary — the whole of it.** This skill writes `.claude/ds-config.json`, and — in
+Phase E2 only — the local documentation skills it scaffolds at `.claude/skills/<name>/SKILL.md`,
+never overwriting a file that exists. Nothing else, ever. Not application code, not `CLAUDE.md`,
+not permission settings, not a CI workflow, not a `.gitignore`. It never mutates git state — no commit, checkout, branch, fetch, push
 or `git config` write — never installs anything, and never calls a DevStride **write** tool; the only
 organization calls it makes are reads.
 
@@ -378,6 +388,17 @@ configuration in which the built-in adversarial pass is the local gate.
 - **Read `.claude/ds-config.json` if it exists** and record each key's current value alongside the
   detected one. This is the only way a later re-run can tell a hand-edit apart from a stale value,
   and a re-run that cannot tell them apart is a re-run that overwrites deliberate work.
+- **Documentation hooks** — two rows, `docs.updateSkill` and `docs.releaseNotesSkill`. Detection is
+  limited here and the row must say so. From the existing config's `docs` block: a name whose
+  `.claude/skills/<name>/SKILL.md` exists is `detected`; one whose directory is missing is
+  `ambiguous`, carrying the dangling name. A legacy `release.docsRepo` block is `ambiguous`: its
+  values are the candidate answers for the Phase D interview, and Phase F migrates it. Then look
+  for signs of a documentation system to offer as **candidates, never as answers** — a `docs/`
+  directory, a static-site config (`mkdocs.yml`, `docusaurus.config.*`, a `nuxt.config.*` beside a
+  `content/` directory, `_config.yml`), a `CHANGELOG.md`, a `release-notes/` directory. Where
+  nothing is found the rows are `unknown`, not `null`: a repository with no documentation is a
+  legitimate answer, and only the owner can give it. The contract these hooks meet is
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`.
 
 ## The prefill summary — the contract
 
@@ -496,12 +517,34 @@ moves other keys:
   detect this and there is no sensible default, yet it is the sentence the release skill quotes back
   to an owner at the production gate so they know exactly what they are approving. Left unasked, it
   gets improvised at the one moment in the whole loop where improvising is least acceptable.
-- **Is there a sibling docs repository the release skill should update?** If yes, take the **whole
-  object** in that same exchange: `path`, the `branch` to push, whether pushing deploys the site
-  (`autoDeployOnPush`), whether releases update it by default (`updateByDefault`), and when a release
-  note is warranted (`releaseNotesWhen`). A bare yes writes an incomplete `docsRepo` that stops the
-  release skill at its first read. No docs sibling → omit `release.docsRepo` entirely, which is how
-  the release skill knows to skip that phase.
+- **Documentation — three questions, asked together** (`docs.*`). Nothing here is detectable beyond
+  the candidates A8 surfaced, and the answers become two LOCAL skills rather than config values, so
+  ask precisely:
+  1. **Where does documentation live?** A directory in this repository, a sibling checkout (path and
+     branch), a hosted service (URL), or "nowhere" — in which case write `docs.updateSkill: null`,
+     skip question 2, say that the release skill's docs pass will report itself skipped, and
+     **still ask question 3**: the two hooks are independent, and a repository with no reference
+     docs may well publish release notes (a changelog, a mailing).
+  2. **How is documentation updated?** Edited and pushed straight to a branch that publishes on
+     push; edited on a branch and merged through a pull request; through a tool or service; by
+     someone else entirely (then the skill's job is to hand that person the delta). Capture whatever
+     makes "publish" concrete for this repository — the branch, the pull-request base, the command,
+     the person.
+  3. **How are release notes pushed?** Where a note lives (a `release-notes/` directory, a
+     `CHANGELOG.md`, a page in a service, a mailing) and how it becomes visible. "We do not publish
+     release notes" is a real answer: write `docs.releaseNotesSkill: null` and say that
+     `--release-notes` on the release skill will report itself unavailable.
+
+  Then take the skill **names** (defaults `update-documentation` and `update-release-notes`; the
+  owner may prefer a repository prefix), and — separately, because it is optional —
+  **`release.deployVerification`**: a command that exits 0 only when production is serving the
+  commit in `RELEASE_COMMIT`. Say what it buys: with it, release notes can be written the moment
+  the deploy is proven live; without it, the release skill asks the owner to confirm the deploy by
+  hand first. Never invent one. The answers are written into the scaffolded skills in Phase E2, not
+  into the config — the config holds only the two names. The contract those skills must meet is
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`. **Release notes are opt-in per
+  release, by design**: setup never writes a policy for when a note is "warranted", because the
+  release skill never interprets one — the owner passes `--release-notes` when they want a note.
 - **Where should the lessons store live**, if not the default path.
   **Do not offer to create the file** — the store has a single writer, and it is not this skill. Its
   absence is a valid starting state that the review skill resolves the first time it has a lesson
@@ -537,7 +580,8 @@ paraphrased into something that means the same thing is a default that no longer
 | `prBodyTemplate`, `commitConventions`, `ci`, `branchNaming` | Verbatim from the defaults reference, unless the repository said otherwise |
 | `preShipChecks`, `preCommitWiringChecks` | `[]` — a repository names these for itself, deliberately; see the defaults reference for why empty is a real answer |
 | `hierarchyRoles` | Phase C's confirmed mapping |
-| `release` | `productionBranch`, `releaseSource`, `autoDeployOnMerge`; `docsRepo` only if the user opted in, and then complete |
+| `release` | `productionBranch`, `releaseSource`, `autoDeployOnMerge`, and `deployVerification` (`null` unless the owner gave one). Never `docsRepo` — that shape is retired; Phase F migrates one it finds |
+| `docs` | `updateSkill` and `releaseNotesSkill` — the local skill names Phase E2 scaffolds, or `null` where the owner said there is nothing to update; `updateOnEpicRelease: false` |
 | `conventionsDoc`, `itemTagFormat`, `lessonsDoc` | From A8, the answers, and the shipped default path |
 
 **The roster must describe what actually exists.** This is the one place where writing an aspirational
@@ -563,9 +607,33 @@ config does real damage, because every later run reads these keys as fact:
   the write, naming `baseBranch`: the release unit will merge there with no human saying so. That
   warning is the operator's to hear, and the write is the last moment setup can give it.
 
-Then say what was written and where — and go straight to Phase G. **The run is not finished at the
-write.** A config that has never been executed is a plausible-looking file, and the whole point of
+Then say what was written and where — and go to Phase E2 (scaffold the documentation skills the
+`docs` block names), then Phase G. **The run is not finished at the write.** A config that has never been executed is a plausible-looking file, and the whole point of
 Phase G is that plausible is not the bar.
+
+## Phase E2 — scaffold the local documentation skills
+
+The plugin holds only the two skill names; the owner's answers about where documentation lives, how
+it is updated and how release notes are pushed belong in the repository, as skills it owns. Write
+them now, from the templates in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/docs-skill-templates/`:
+
+- `.claude/skills/<docs.updateSkill>/SKILL.md` from `update-documentation.md`, and
+  `.claude/skills/<docs.releaseNotesSkill>/SKILL.md` from `update-release-notes.md` — only for the
+  hooks the owner did not answer "nowhere" / "we do not publish" to.
+- Fill every `{{PLACEHOLDER}}` from the Phase D answers, in the owner's own terms, and set the
+  frontmatter `name` to the directory name. Where the answers came from a legacy `release.docsRepo`
+  block (Phase F), its `path`, `branch` and `autoDeployOnPush` are the answers to the first two
+  questions. Leave no placeholder unfilled: a skill that still reads `{{DOCS_LOCATION}}` is a skill
+  that will confidently edit nothing.
+- **Never overwrite a skill that already exists.** A present `SKILL.md` is the repository's,
+  hand-edited or not; leave it and say so. The scaffold is a starting point, not a managed file —
+  the owner edits it from here, and re-running setup must cost them nothing.
+- Confirm the skill files are not gitignored (`git check-ignore <path>` must exit 1). A scaffolded
+  skill that never enters a commit exists on one machine only, and every other clone's release
+  skill will report a dangling hook.
+- Tell the owner what was written, that each skill's `check` mode is what Phase G and
+  `/devstride:doctor` run, and that the skills are theirs to refine — the templates are generic on
+  purpose.
 
 ## Phase F — re-running on a repository that already has a config
 
@@ -575,8 +643,8 @@ difference between a command people run again and one they run once.
 1. **Re-detect everything** — Phases A and C, unchanged.
 2. **Diff against the existing file** and propose **only what would change** — a key that already
    matches is not a question. "What would change" is wider than detection: it is every accepted
-   detector value that differs, every interview answer that differs (including a docs repository the
-   user has just said is gone), and every key missing entirely because it was written by hand or by
+   detector value that differs, every interview answer that differs (including a documentation hook the
+   user has just said no longer applies), and every key missing entirely because it was written by hand or by
    an older version. Restricting the proposal to detected values alone silently drops the other two,
    which is how a stale setting survives a re-run the user thought had removed it.
    `profile` is a recognized key like any other: the file's value prefills the Phase D question, an
@@ -586,7 +654,8 @@ difference between a command people run again and one they run once.
    contract — so say at the write that the file now disagrees with its profile, and that
    `/devstride:doctor` will report the same. A config with no `profile` at all was written by hand
    or by an older version: ask the question and propose the addition.
-3. **On acceptance, deep-merge** the accepted keys into the existing document.
+3. **On acceptance, deep-merge** the accepted keys into the existing document — then run Phase E2
+   for any `docs` hook the merge introduced or migrated, and Phase G as usual.
 
 What survives a merge, verbatim and unconditionally:
 
@@ -598,10 +667,19 @@ What survives a merge, verbatim and unconditionally:
 - **Any value setup did not propose changing.** Silence is not consent to revert.
 
 **One deletion is allowed, and only one shape of it:** a key setup itself recognizes, which the
-user has explicitly said no longer applies — the sibling docs repository being the case that
-actually happens. Leaving a stale `release.docsRepo` in place is not conservative, because the
-release skill reads a present one as opt-in and would commit and push to a checkout that is gone.
-So remove it, after an explicit answer, and say you did. Everything else stands: never remove an
+user has explicitly said no longer applies — a documentation hook (`docs.updateSkill` or
+`docs.releaseNotesSkill`) naming a skill for a documentation system that is gone being the case that
+actually happens. Leaving it in place is not conservative: the release skill reads a present name as
+a registered hook and would invoke a skill with nothing left to update. So set it to `null`, after
+an explicit answer, and say you did.
+
+**The legacy `release.docsRepo` block is the one migration.** A config written before 1.0 carries
+docs settings the plugin itself used to act on. Propose, as one change: scaffold the local skills
+from its values (Phase E2), write the `docs` block naming them, and remove `release.docsRepo`. On
+acceptance do all three; on refusal leave the block untouched and say that the release skill will
+report it as deprecated and run without docs until it is migrated.
+
+Everything else stands: never remove an
 unrecognized key, never remove one the user did not speak to, never rewrite the file wholesale to
 normalize its shape, and never treat a missing key as a deliberate choice — a config written by hand, or by an older version, is simply
 incomplete, so propose the addition. **Setup authors this file; it is not a precedence layer.** The
@@ -709,7 +787,7 @@ Two things the verdict must say when they are true, so a failure is not misread:
   checks are `UNVERIFIABLE` and worth re-running when there is a network.
 
 IMPORTANT:
-- **The write boundary is one path: `.claude/ds-config.json`.** See the top. Everything else on disk is
+- **The write boundary is `.claude/ds-config.json` plus the Phase E2 scaffolds.** See the top. Everything else on disk is
   read-only to *this skill*, in every phase. The one thing that is not this skill is the repository's
   own verify commands, which Phase G runs — they belong to the repository and may touch the tree;
   Phase G asks first where that looks likely and reports it when it happens.
@@ -725,3 +803,12 @@ IMPORTANT:
 - **A written config is not a finished one.** Phase G is not an optional flourish at the end; it is
   the difference between a file that looks right and one that has been shown to work. Never end a
   run at the write and call the repository set up.
+7. **The documentation hooks respond.** Only when `docs.updateSkill` or `docs.releaseNotesSkill` is
+   set — an absent or `null` hook is a repository with no documentation system, which is `N/A` and
+   said so, not a gap. For each name: `.claude/skills/<name>/SKILL.md` exists (missing → `FAIL`,
+   fix `/devstride:setup docs`), then invoke the skill in its `check` mode and take its verdict —
+   read-only by contract, so it is safe to run here. A skill with no `check` mode is a `FAIL` naming
+   the template it should be rebuilt from. A `release.docsRepo` block is a `FAIL` naming the Phase F migration whenever it is present,
+   with or without a `docs` block beside it. Where `release.deployVerification` is set, confirm its first
+   token resolves (same segment-splitting as the verify commands) but do not run it — it is
+   meaningful only against a real merge commit.

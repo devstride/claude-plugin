@@ -8,6 +8,52 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-08-26
+
+**Why a major version.** `release.docsRepo` changes meaning — the plugin no longer acts on it —
+and `releaseNotesWhen` is retired. Per [RELEASING.md](RELEASING.md), changing what an existing
+`.claude/ds-config.json` key means is a MAJOR bump, however small the edit. Migration is one
+command: `/devstride:setup docs`.
+
+### Changed
+
+- **`release` no longer writes release notes on its own judgement, and no longer edits
+  documentation itself.** The documentation phase now invokes a LOCAL skill in the consuming
+  repository (`docs.updateSkill`) with a structured delta payload — what shipped, per item, in plain
+  English — and that skill owns where docs live and how they are published. Core documentation is
+  still updated by default when a skill is registered (`no docs` suppresses it) — but now only
+  after the production merge is confirmed and the deploy verified, so public documentation never
+  describes functionality still waiting on the owner's approval. **Release notes are
+  opt-in**: `--release-notes true|draft`, default `false`, written in a new post-merge step only
+  after the production merge is confirmed and the deploy verified live (`release.deployVerification`
+  when configured, otherwise owner confirmation). The `releaseNotesWhen` policy is gone on purpose:
+  no skill in the plugin decides that a delta "warrants" a note. `docs only` and a new
+  `release-notes only` run either phase alone against an already-shipped release.
+- **`setup`** asks three documentation questions — where docs live, how they are updated, how
+  release notes are pushed — plus an optional deploy-verification command, and **scaffolds the two
+  local skills** from shipped templates (never overwriting one that exists). Its validation phase
+  runs each registered skill's read-only `check` mode. A legacy `release.docsRepo` block is offered
+  as a one-step migration: scaffold from its values, write `docs.*`, remove the block.
+- **`doctor`** gains a `docs` section: each hook's skill exists and is not gitignored, its `check`
+  mode passes, a legacy `docsRepo` block is reported, and an unregistered documentation system is
+  N/A rather than a failure.
+
+### Added
+
+- Config keys `docs.updateSkill`, `docs.releaseNotesSkill`, `docs.updateOnEpicRelease` and
+  `release.deployVerification`. The contract — keys, payload shape, the `update` / `publish` /
+  `draft` / `check` modes a local skill must accept — is
+  `skills/release/references/docs-hooks.md`; the scaffold templates are
+  `skills/setup/references/docs-skill-templates/`.
+- `build-item` step 8 can update documentation when a release unit's release pull request merges,
+  behind `docs.updateOnEpicRelease` (default `false`). Never release notes.
+
+### Deprecated
+
+- `release.docsRepo`. `release` no longer acts on it: it reports the shape as deprecated, names
+  `/devstride:setup docs` as the migration, and runs without docs. `setup` migrates it; `doctor`
+  flags it.
+
 ## [0.10.0] — 2026-08-25
 
 ### Added
@@ -337,7 +383,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v0.10.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v1.0.0...HEAD
+[1.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.10.0...devstride--v1.0.0
 [0.10.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.9.0...devstride--v0.10.0
 [0.9.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.1...devstride--v0.9.0
 [0.8.1]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.0...devstride--v0.8.1

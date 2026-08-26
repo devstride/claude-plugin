@@ -218,9 +218,20 @@ repository's real branch names rather than copying those two values:
 | `review.localCommand` | A local review CLI to run on every change. `null` means none — the built-in adversarial pass is then your local gate. |
 | `review.automatedReviewers` | Cloud reviewers to request on each pull request. `[]` means none; nothing is requested or waited on. |
 | `review.openPullRequestsAsDraft` | Open pull requests as drafts so CI is held until review settles, then runs once on the final diff. Set `false` if your CI should run immediately. |
+| `docs.updateSkill` | Name of a local skill in your repo (`.claude/skills/<name>/`) that updates your documentation for a shipped delta. `null` means no documentation system; the release skill's docs pass reports itself skipped. |
+| `docs.releaseNotesSkill` | Name of a local skill that writes and publishes a release note. Used only when you pass `--release-notes` to the release skill — notes are never written unasked. |
 
 The full contract — every key, its shape and default — is in the
 [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference).
+
+**Documentation and release notes.** The plugin never edits your documentation itself. `setup` asks
+where your docs live, how they are updated, and how release notes are pushed, then scaffolds two
+local skills in your repository that hold those answers; the config only names them. A production
+release updates core documentation by default — after the merge is confirmed and the deploy verified,
+never before (suppress with `no docs`) — and writes a release note **only** when you pass
+`--release-notes` (`true`, or `draft` to review it first) — and only after the
+production merge is confirmed and the deploy verified live. Nothing in the loop decides on its own
+that a release "deserves" a note.
 
 > **Or run `/devstride:setup` and let it write this for you.** It inspects your repository, maps your
 > DevStride work types onto the loop's roles, asks only about what it could not work out, writes the
@@ -300,13 +311,13 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `push` | Stages, commits, type-checks, and pushes following the repo's commit conventions |
 | `branch-feature` / `branch-hotfix` | Cuts a working branch from the development or production branch |
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end |
-| `release` | Promotes the release branch to production, with a full gated review and a docs pass |
+| `release` | Promotes the release branch to production with a full gated review; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
 | `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it |
-| `doctor` | Checks your setup — git, `gh`, the plugin, the DevStride connection, config, CI gating — and reports what to fix. Read-only |
+| `doctor` | Checks your setup — git, `gh`, the plugin, the DevStride connection, config, CI gating, documentation hooks — and reports what to fix. Read-only |
 
 ## Versioning & updates
 
-Current version: **0.10.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **1.0.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
