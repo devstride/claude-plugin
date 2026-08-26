@@ -104,6 +104,11 @@ FILLED, never the section set. Inline fallback when the key is absent — these 
    contracts, migrations, permissions, user-visible behavior. "None" explicitly if none.
 4. **`## Testing Steps`** — concrete steps to exercise it, plus which automated tests cover it.
 
+**End every body with the loop marker `<!-- devstride:loop -->`** (an HTML comment — invisible
+when rendered): the draft-convention workflow from the CI cost patterns exempts pull requests
+carrying it, since `gh` opens them as the operator and `github.actor` cannot tell the loop from a
+person. It is not a template section; it goes after the last one.
+
 If the config file disagrees with this fallback, the file wins. When
 `prBodyTemplate.noAiAttribution` is true (the fallback default), no
 `Co-Authored-By` or AI-attribution text goes in the body; a repo that sets it false may include

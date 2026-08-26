@@ -77,7 +77,10 @@ Compare against the **promoted commit** — the merge's second parent — first,
 only as a fallback: the base branch may already have moved by the time the runner starts, and a
 comparison against its tip would then re-run everything on exactly the busy days the skip is for.
 
-and fold it into the gate's outputs: `backend: ${{ steps.tree.outputs.identical == 'true' && 'false' || steps.filter.outputs.backend }}`
+The step needs a checkout before it: place it after `actions/checkout` (or add one with
+`fetch-depth: 2`) — a gate job that filters paths through the API alone has no repository on
+disk, and `git rev-parse` would fail on every production push. Then fold it into the gate's
+outputs: `backend: ${{ steps.tree.outputs.identical == 'true' && 'false' || steps.filter.outputs.backend }}`
 (or into each step's `if:` where a workflow gates per step). A hotfix landing directly on the
 production branch has a different tree and still runs — that is the case the push trigger exists
 for.
@@ -95,9 +98,14 @@ on:
     types: [opened]
 jobs:
   draft-convention:
+    # The loop's own pull requests are opened by `gh` under a PERSON's account, so
+    # `github.actor` cannot tell them from a human's. Every pull request the loop
+    # opens carries the marker `<!-- devstride:loop -->` in its body; that is the
+    # exemption. Bots are exempt too.
     if: >-
       github.event.pull_request.draft == false &&
-      !endsWith(github.actor, '[bot]')
+      !endsWith(github.actor, '[bot]') &&
+      !contains(github.event.pull_request.body, 'devstride:loop')
     runs-on: ubuntu-latest
     steps:
       - run: |
@@ -105,9 +113,10 @@ jobs:
           exit 1
 ```
 
-Under a delivery profile whose release pull requests open non-draft (`prototype`), scope the
-condition to `!endsWith(github.actor, '[bot]')` only, as above, so the loop's own pull requests
-are never failed by it. `setup` and `doctor` recognise this workflow by its shape — `opened`
+Under a delivery profile whose release pull requests open non-draft (`prototype`, or
+`review.openPullRequestsAsDraft: false`), the loop's pull requests are opened by `gh` as the
+operator, not a bot — the body marker is what exempts them, and `pr` and `release` write it into
+every body they author. The check is informational by design: never make it a required status. `setup` and `doctor` recognise this workflow by its shape — `opened`
 only, one job that fails with a message — and exempt it from the four-events and concurrency
 checks. When the person follows the message and converts the pull request to a draft, the
 `converted_to_draft` event (pattern A) plus concurrency (pattern B) cancel the runs the mistaken

@@ -36,8 +36,12 @@ Optional argument: $ARGUMENTS
   already carries (the draft gate, per-pull-request `concurrency`, the tree-identical skip on
   production-branch pushes, the human draft-convention check), show the **exact diff** for each
   missing one, and apply only the diffs the user accepts — nothing else in the file is rewritten.
-  Then write `ci.freezeBaseWhileReleasePrReady` and `ci.expectedRunsPerPullRequest` if absent,
-  and run Phase G's CI checks. Offer `/devstride:ci-audit` first when the user wants numbers
+  Then write `ci.freezeBaseWhileReleasePrReady` and `ci.expectedRunsPerPullRequest` if absent.
+  **When the draft-gate diffs were accepted and the three `review.*` CI-ordering booleans are
+  `false`, propose flipping them `true` as part of the same change** — a gate the workflows now
+  carry does nothing while `pr` still opens non-draft and `review` never flips; installing the
+  mechanism without enabling the ordering is a run-once setup that runs every time. Then run
+  Phase G's CI checks. Offer `/devstride:ci-audit` first when the user wants numbers
   before changing anything.
 - **Nothing** — the full run: inspect, ask, write, scaffold, validate.
 

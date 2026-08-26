@@ -452,7 +452,8 @@ No PR to merge — integrate locally, then push the epic branch:
   in the gap between settle and merge — a late reviewer, a second Copilot pass — would otherwise
   merge silently unaddressed, and a merged PR showing open review comments reads as an
   unreviewed merge. Non-zero → loop back through `review` steps 3–6 (reply + resolve) first.
-- **Merge guard (`ci.freezeBaseWhileReleasePrReady`, default `true`):** before ANY merge into
+- **Merge guard — only when `ci.freezeBaseWhileReleasePrReady` is `true` (the default; an explicit
+  `false` disables it, and the merge proceeds with one line saying so):** before ANY merge into
   `baseBranch` — here, and the epic release at step 8 — look for an open, NON-DRAFT pull request
   with head `release.releaseSource` and base `release.productionBranch`. One exists → a release is
   in its CI window; merging beneath it re-runs its merge preview and stales its reviewed diff. Do
