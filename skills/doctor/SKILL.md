@@ -1,6 +1,6 @@
 ---
 name: doctor
-description: Check that this repo and machine are set up correctly for the delivery loop — git, gh, the plugin, the DevStride connection, the config file, the CI draft gate and the merge gates — and report exactly what is missing and the command that fixes it. Read-only.
+description: Check that this repo and machine are set up correctly for the delivery loop — git, gh, the plugin, the DevStride connection, the config file, the CI draft gate, the merge gates and the documentation hooks — and report exactly what is missing and the command that fixes it. Read-only.
 ---
 
 Diagnose whether the delivery loop will actually work here, and say precisely what to fix if it will
@@ -16,8 +16,8 @@ updates anything, never edits a workflow, and never calls a DevStride write tool
 > wrong; running the repair is what makes this skill unsafe to recommend as the first thing anyone
 > tries.
 
-Optional argument — a section name (`env`, `plugin`, `devstride`, `config`, `ci`, `gates`) to check
-just one: $ARGUMENTS
+Optional argument — a section name (`env`, `plugin`, `devstride`, `config`, `ci`, `gates`, `docs`) to
+check just one: $ARGUMENTS
 
 ## Why this skill exists
 
@@ -300,6 +300,34 @@ The point: **find out whether anything actually checks the code before it merges
   the only review; say so rather than implying breakage.
 - **`preShipChecks`** — if any entry exists, confirm its command resolves (same segment-splitting as
   §4); these run at the ship boundary and nothing in CI covers them.
+
+## 7. Documentation hooks (`docs`)
+
+The plugin never edits documentation itself; it invokes local skills named in `docs.updateSkill` and
+`docs.releaseNotesSkill` (contract: `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`).
+A repository with neither set has no documentation system registered — report that as **N/A**, not
+as a failure, and say what it means: the release skill's docs pass reports itself skipped, and
+`--release-notes` reports itself unavailable.
+
+- **Each named skill exists** — `.claude/skills/<name>/SKILL.md`. Missing → FAIL: the release skill
+  will report a dangling hook and run without docs. Fix: `/devstride:setup docs`. Also check the
+  path is not gitignored (`git check-ignore`); a skill that exists only on one machine is the
+  commonest way this fails on a fresh clone.
+- **Each skill's `check` mode passes** — invoke it by name with `check`. It is read-only by contract
+  (a checkout present, clean and on its branch; a directory present; a service reachable), so it is
+  safe to run from a read-only skill. Relay its verdict and fix verbatim. A skill with no `check`
+  mode is a FAIL naming the template to rebuild it from.
+- **A legacy `release.docsRepo` block, whether or not a `docs` block exists beside it** → FAIL: the
+  release skill never acts on it, so whatever it described is not being updated unless a `docs`
+  hook covers the same thing. Fix: `/devstride:setup docs` (it migrates the block into a local
+  skill and removes it).
+- **`release.deployVerification`** — if set, its first token resolves (same rule as §4). Do not run
+  it: it only means something against a real merge commit. If unset, say the release skill will ask
+  the owner to confirm the deploy before writing release notes — that is a legitimate configuration,
+  not a gap.
+- **Say what the release-notes default is**, because it is the part people expect to be the other
+  way round: notes are written only when the owner passes `--release-notes`; nothing in the loop
+  decides a release "deserves" one.
 
 ## Closing
 

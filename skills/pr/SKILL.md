@@ -29,8 +29,8 @@ develop.
 ## Two shapes that are NOT this flow
 
 - **PRODUCTION RELEASE.** Base == `release.productionBranch` and head == `release.releaseSource`
-  (`release.releaseSource` → `release.productionBranch`) is the production cut that triggers the repo's configured deploy, and it carries a docs pass
-  and an owner-gated merge. Detect it and **invoke `/devstride:release` instead**. A `hotfix → master` PR
+  (`release.releaseSource` → `release.productionBranch`) is the production cut that triggers the repo's configured deploy, and it carries the documentation
+  hooks and an owner-gated merge. Detect it and **invoke `/devstride:release` instead**. A `hotfix → master` PR
   is different — a single fix, not a promotion — and stays in this flow.
 - **EPIC RELEASE PR** (caller says so; `build-item` step 8). Head = the epic integration branch,
   base = `baseBranch`. The body's FIRST configured section (fallback `## Simple Description`)

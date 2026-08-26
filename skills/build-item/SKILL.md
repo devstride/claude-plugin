@@ -585,6 +585,19 @@ The release unit's whole batch of leaf merges lands on develop as ONE reviewed P
 - **Merge** `gh pr merge <n> --merge` once green and settled, then delete the epic branch —
   **only if `epicIntegrationBranches.deleteBranchAfterRelease`**. It is a destructive remote
   cleanup, so a false value must actually retain the branch.
+- **Documentation — opt-in, and it STAGES, never publishes.** With `docs.updateOnEpicRelease`
+  absent or `false` → nothing, silently. With it `true`: `docs.updateSkill` `null` → say docs
+  were skipped because no docs skill is registered; a name whose `.claude/skills/<name>/SKILL.md`
+  is MISSING → report a dangling hook with the fix (`/devstride:setup docs`) and continue — the
+  same rule the production release applies; a name that resolves → build the delta payload for
+  this epic (`kind: "epic-release"`, the release PR, the merge commit, every constituent leaf with
+  a plain-English `summary` and a `userFacing` judgement, and **`live: false`** — shape in
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`) and invoke that skill in mode
+  `update`; relay what it reports. `live: false` is not optional here: the epic has reached the
+  base branch, not production, so the skill stages the documentation and the production release
+  (`release` step 5b, `live: true`) is what publishes it. An epic hook that published would put
+  public docs ahead of the product. **Never release notes here**, under any setting — those are
+  the production release's step 5c, and only on the owner's `--release-notes`.
 - **Close out**: `add_comment` on the RELEASE-UNIT item (release PR link, list of shipped leaves,
   date), move it to Done if the org tracks lanes at that level, update handoff memory, sync local
   develop.
