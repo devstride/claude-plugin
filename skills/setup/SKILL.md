@@ -30,6 +30,15 @@ Optional argument: $ARGUMENTS
   `release.docsRepo` migration), scaffold the local skills (Phase E2), and run Phase G's
   documentation check (7) alone. Every other key is untouched. This is how a repository
   registers its documentation system after the fact, and how a pre-1.0 config migrates.
+- **`ci`** — the CI-cost mode, the second narrowed run that WRITES, and the only mode that touches
+  a workflow file: run A1 and A5, detect which of the four mechanics in
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md` each pull-request workflow
+  already carries (the draft gate, per-pull-request `concurrency`, the tree-identical skip on
+  production-branch pushes, the human draft-convention check), show the **exact diff** for each
+  missing one, and apply only the diffs the user accepts — nothing else in the file is rewritten.
+  Then write `ci.freezeBaseWhileReleasePrReady` and `ci.expectedRunsPerPullRequest` if absent,
+  and run Phase G's CI checks. Offer `/devstride:ci-audit` first when the user wants numbers
+  before changing anything.
 - **Nothing** — the full run: inspect, ask, write, scaffold, validate.
 
 **Run each one's prerequisites too, silently
@@ -40,14 +49,16 @@ must never report worse ones.
 **A narrowed detector run stops after Phase B and writes nothing.** It has only looked at part of
 the repository, so it has nothing to say about the rest — and a write would fill every key the
 skipped detectors would have answered with a default, silently replacing real settings with
-guesses. Say that a full `/devstride:setup` is what writes the file. **`docs` is the exception by
-design**: it writes exactly the keys its own questions answer and nothing else, so it cannot
-replace a setting it never asked about.
+guesses. Say that a full `/devstride:setup` is what writes the file. **`docs` and `ci` are the exceptions by
+design**: each writes exactly the keys its own questions answer (and, for `ci`, the accepted
+workflow diffs) and nothing else, so neither can replace a setting it never asked about.
 
-**The write boundary — the whole of it.** This skill writes `.claude/ds-config.json`, and — in
-Phase E2 only — the local documentation skills it scaffolds at `.claude/skills/<name>/SKILL.md`,
-never overwriting a file that exists. Nothing else, ever. Not application code, not `CLAUDE.md`,
-not permission settings, not a CI workflow, not a `.gitignore`. It never mutates git state — no commit, checkout, branch, fetch, push
+**The write boundary — the whole of it.** This skill writes `.claude/ds-config.json`; in
+Phase E2 only, the local documentation skills it scaffolds at `.claude/skills/<name>/SKILL.md`,
+never overwriting a file that exists; and in the `ci` mode only, the pull-request workflow files
+under `ci.workflowGlobs` — each change shown as a diff and applied only on an explicit yes.
+Nothing else, ever. Not application code, not `CLAUDE.md`, not permission settings, not a
+`.gitignore`, and no workflow edit outside `setup ci`. It never mutates git state — no commit, checkout, branch, fetch, push
 or `git config` write — never installs anything, and never calls a DevStride **write** tool; the only
 organization calls it makes are reads.
 
@@ -239,6 +250,15 @@ loop to rely on a hold this repository cannot deliver — the ready-flip creates
 waits for it forever. Say what is missing and point at `/devstride:doctor`, which diagnoses this
 specific gap. The third row is a legitimate configuration, not a defect: say what it means for cost
 (CI on open and again after every fix push) and leave the choice with the user.
+
+**Also record, per pull-request workflow, which of the CI-cost mechanics it carries** (rows
+`ci.concurrency`, `ci.productionTreeSkip`, `ci.policyCheck` — informational, they are not config
+keys): a top-level `concurrency:` block with `cancel-in-progress: true`; a step comparing
+`HEAD^{tree}` against the base branch on a production-branch push; a workflow that fails a
+non-draft pull request opened by a person. The patterns and the measurements behind them are in
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`; `setup ci` is what applies
+them. In a full run just report which are missing and say `setup ci` applies them — the full run
+never edits a workflow.
 
 Any other provider — `.gitlab-ci.yml`, `.circleci/`, `Jenkinsfile`, `azure-pipelines.yml` — or none
 at all: record the provider name and prefill the three booleans `false`, `detected`. That is not a
@@ -577,7 +597,7 @@ paraphrased into something that means the same thing is a default that no longer
 | `verify` | `typecheck` (array), `test`, `lint`, `testSingle`, `testDir`, `skipDuringStoryBuilds: []` |
 | `generated` | Only when detected — omit rather than write an empty shape |
 | `review` | The roster and the three CI-ordering booleans, per the rules below; `pollTimeoutMinutes` at the profile's value |
-| `prBodyTemplate`, `commitConventions`, `ci`, `branchNaming` | Verbatim from the defaults reference, unless the repository said otherwise |
+| `prBodyTemplate`, `commitConventions`, `ci`, `branchNaming` | Verbatim from the defaults reference, unless the repository said otherwise — `ci` includes `freezeBaseWhileReleasePrReady: true` and `expectedRunsPerPullRequest: 1` |
 | `preShipChecks`, `preCommitWiringChecks` | `[]` — a repository names these for itself, deliberately; see the defaults reference for why empty is a real answer |
 | `hierarchyRoles` | Phase C's confirmed mapping |
 | `release` | `productionBranch`, `releaseSource`, `autoDeployOnMerge`, and `deployVerification` (`null` unless the owner gave one). Never `docsRepo` — that shape is retired; Phase F migrates one it finds |
@@ -766,6 +786,9 @@ one is how a setup gets called broken because a laptop was on a train.
    distinction is whether CI can still *settle*.
    - **Warning:** the config opens pull requests as drafts and no workflow carries a draft gate. The
      hold does not engage, so CI runs more often than intended. Wasteful, not broken.
+   - **Warning:** a pull-request workflow has no `concurrency` block, or the production-branch push
+     runs with no tree-identical skip — CI is correct but pays for superseded and duplicate runs.
+     Say `/devstride:setup ci` applies both, and `/devstride:ci-audit` shows what they cost.
    - **`FAIL`:** a draft-gated workflow whose trigger cannot rerun it — `types` absent, or an
      explicit list missing any of `opened`, `synchronize`, `reopened`, `ready_for_review`. Here the
      loop cannot finish at all: after a red run, a fix push starts nothing and the close-and-reopen
@@ -787,7 +810,7 @@ Two things the verdict must say when they are true, so a failure is not misread:
   checks are `UNVERIFIABLE` and worth re-running when there is a network.
 
 IMPORTANT:
-- **The write boundary is `.claude/ds-config.json` plus the Phase E2 scaffolds.** See the top. Everything else on disk is
+- **The write boundary is `.claude/ds-config.json`, the Phase E2 scaffolds, and — in `setup ci` only, on acceptance — the pull-request workflows.** See the top. Everything else on disk is
   read-only to *this skill*, in every phase. The one thing that is not this skill is the repository's
   own verify commands, which Phase G runs — they belong to the repository and may touch the tree;
   Phase G asks first where that looks likely and reports it when it happens.

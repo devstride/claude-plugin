@@ -4,7 +4,7 @@ DevStride's agentic delivery loop, packaged as a Claude Code plugin. Plan a road
 existence, then let the loop walk it one story at a time — branch, build, adversarially review,
 merge, and release — against your own repository and your own DevStride organization.
 
-> **Status: early.** The eighteen delivery-loop skills and the DevStride MCP connection are both
+> **Status: early.** The nineteen delivery-loop skills and the DevStride MCP connection are both
 > bundled — installing the plugin is all the *configuration* the connection needs, though you still
 > sign in once. `/devstride:setup` then configures the plugin for your repository and proves the
 > config by running it.
@@ -224,6 +224,14 @@ repository's real branch names rather than copying those two values:
 The full contract — every key, its shape and default — is in the
 [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference).
 
+**CI cost.** The loop runs CI once per pull request, on the final reviewed diff — the draft hold
+guarantees it. What the hold does not cover is the rest of the bill: superseded runs, a
+production-branch push re-testing the tree the base branch just tested, a release pull request
+re-run every time something merges beneath it. `/devstride:ci-audit` measures all of it;
+`/devstride:setup ci` applies the workflow mechanics that remove it (as reviewed diffs); the loop
+rules — freeze the release source while a release is ready, report executed runs per pull request
+— are on by default (`ci.freezeBaseWhileReleasePrReady`, `ci.expectedRunsPerPullRequest`).
+
 **Documentation and release notes.** The plugin never edits your documentation itself. `setup` asks
 where your docs live, how they are updated, and how release notes are pushed, then scaffolds two
 local skills in your repository that hold those answers; the config only names them. A production
@@ -313,11 +321,12 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end |
 | `release` | Promotes the release branch to production with a full gated review; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
 | `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it |
-| `doctor` | Checks your setup — git, `gh`, the plugin, the DevStride connection, config, CI gating, documentation hooks — and reports what to fix. Read-only |
+| `doctor` | Checks your setup — git, `gh`, the plugin, the DevStride connection, config, CI gating and cost mechanics, documentation hooks — and reports what to fix. Read-only |
+| `ci-audit` | Measures what CI actually costs: executed runs per pull request (the design is one), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
 
 ## Versioning & updates
 
-Current version: **1.0.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **1.1.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
