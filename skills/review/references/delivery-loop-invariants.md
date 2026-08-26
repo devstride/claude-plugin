@@ -214,7 +214,7 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "high-water" "no thread" "localReviewerName" "always()" "single writer" \
               "delivery-profiles.md" "Delivery profile:" "maxLocalReviewRounds" \
               "reviewerRegistrationWindowMinutes" "fixFloor" "reviewBreadthCeiling" \
-              "names the engine"; do
+              "names the engine" "instanceBoundTo"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
 
@@ -251,6 +251,10 @@ skills/rebalance/SKILL.md|archive
 skills/setup/SKILL.md|profile
 skills/doctor/SKILL.md|profile
 skills/release/SKILL.md|delivery-profiles.md
+skills/build-item/SKILL.md|never makes the loop concurrent
+skills/branch-hotfix/SKILL.md|localEnvironment
+skills/setup/SKILL.md|instanceBoundTo
+skills/doctor/SKILL.md|localEnvironment
 PAIRS
 ```
 
@@ -356,9 +360,21 @@ O8. `rebalance` never deletes: absorbed originals are ARCHIVED with a comment na
 O9. `plan` never rewrites a live marker — a changed profile on an existing plan is `rebalance`'s job,
     because re-gating existing leaves without re-slicing them is a silent rigor change.
 
+## P. Local environment (config: `localEnvironment`)
+P1. The loop is serial because of SHARED test infrastructure and production writes — never
+    because "every repository has one working tree and one database". A per-checkout instance
+    (`instanceBoundTo: directory`) isolates dev servers and app data, not the test containers;
+    restating the rule as "one working tree" reads worktrees as a licence for parallel builds.
+P2. `branch-hotfix` reads `localEnvironment.migrate` then `seed` (that order — a seed against a
+    stale schema fails or lies) and falls back to ASKING when the block is absent or both are
+    `null`. It never invents a reset command.
+P3. `instanceBoundTo` is never `detected` by setup: no file says whether a second checkout gets
+    its own database. Candidates for the commands come from compose/devcontainer/nix/scripts and
+    are `ambiguous`, never `detected`; nothing found is `unknown`, not `null`.
+
 ---
 
-**Revised total: 53 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) = 92.**
+**Revised total: 53 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) = 95.**
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.

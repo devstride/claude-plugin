@@ -433,6 +433,26 @@ configuration in which the built-in adversarial pass is the local gate.
   legitimate answer, and only the owner can give it. The contract these hooks meet is
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`.
 
+### A9. Local environment
+
+How this repository stands up an isolated local instance, if it can. Five rows:
+`localEnvironment.create`, `.seed`, `.migrate`, `.teardown`, `.instanceBoundTo`.
+
+- Look for the shapes that usually mean one exists: `docker-compose*.yml` / `compose.yaml`, a
+  `.devcontainer/`, a `flake.nix` or `shell.nix`, a `Tiltfile` or `skaffold.yaml`, and root scripts
+  named `dev`, `sandbox`, `env:*`, `db:seed`, `db:reset`, `migrate`. Each is a **candidate** for the
+  row it suggests — a compose file suggests `create`, a `db:seed` script suggests `seed` — never a
+  `detected` value: a compose file proves a stack exists, not that `docker compose up` is how this
+  team starts it. Report such rows `ambiguous`, carrying the candidate.
+- **`instanceBoundTo` is never `detected`.** Whether a second checkout gets its own database, tables
+  and ports is a property of the tooling's design, and nothing in a file says it. Ask, with
+  `directory` (a second worktree gets its own instance; checking out another branch inside it keeps
+  that instance's data), `branch`, and `none` as the options, saying what each means for the loop.
+- Existing config: record the current block, per A8.
+- Nothing found → the rows are `unknown`, not `null`. A repository with no isolated environment is
+  a legitimate answer, and only the owner can give it; `null` is what the owner writes for a
+  command that does not exist.
+
 ## The prefill summary — the contract
 
 Phase A's output is a list of rows, one per configuration key, each with:
@@ -616,6 +636,7 @@ paraphrased into something that means the same thing is a default that no longer
 | `release` | `productionBranch`, `releaseSource`, `autoDeployOnMerge`, and `deployVerification` (`null` unless the owner gave one). Never `docsRepo` — that shape is retired; Phase F migrates one it finds |
 | `docs` | `updateSkill` and `releaseNotesSkill` — the local skill names Phase E2 scaffolds, or `null` where the owner said there is nothing to update; `updateOnEpicRelease: false` |
 | `conventionsDoc`, `itemTagFormat`, `lessonsDoc` | From A8, the answers, and the shipped default path |
+| `localEnvironment` | `create`, `seed`, `migrate`, `teardown` (each a command string or `null`) and `instanceBoundTo`, from A9 and the answers. Write the block even when every command is `null` — `branch-hotfix` and `build-item` read it, and an absent block reads as "nobody asked", not "there is none" |
 
 **The roster must describe what actually exists.** This is the one place where writing an aspirational
 config does real damage, because every later run reads these keys as fact:

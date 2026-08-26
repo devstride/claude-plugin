@@ -8,6 +8,23 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **`localEnvironment` config block** — `create`, `seed`, `migrate`, `teardown` (a command or
+  `null` each) and `instanceBoundTo` (`directory` / `branch` / `none`): how a repository stands up
+  an isolated local instance, if it can. `setup` gathers candidates and asks (detector A9);
+  `doctor` reports the block and probes its commands; `branch-hotfix` reads `migrate` then `seed`
+  instead of asking every time. `build-item`'s serial-execution rule is restated against what
+  actually constrains it — shared test infrastructure and production writes — rather than against
+  the assumption that every repository has exactly one working tree and one database, an
+  assumption a per-checkout instance quietly breaks.
+
+### Fixed
+
+- `RELEASING.md` described this repository as a port target whose skill text is overwritten from
+  an upstream copy. That predates the dogfood cutover; this repository is the source of truth and
+  is edited directly.
+
 ## [1.1.0] — 2026-08-26
 
 ### Added

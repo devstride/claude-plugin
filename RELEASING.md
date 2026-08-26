@@ -151,10 +151,14 @@ This is one reason to tag every release: **the tag is the pin**, and an untagged
 nobody can hold still on. Treat tagging as part of publishing rather than a bookkeeping extra —
 the update machinery resolves `<name>--v*` tags, so an untagged release is not merely unpinnable.
 
-## A release packages a port — it does not license direct edits
+## This repository is the source of truth
 
-Until the upstream repository switches to consuming this published plugin, **skill text is developed
-upstream and ported here** (see [CONTRIBUTING.md](CONTRIBUTING.md)). Cutting a release does not
-change that: a release packages whatever the latest port brought in. If a skill needs a fix, it is
-fixed upstream and re-ported, then released. Editing skill prose directly here would be silently
-overwritten by the next port.
+Skill text is developed **here** and released from here. An earlier arrangement developed the skills
+in a private upstream repository and ported them in, and this file used to warn that direct edits
+would be overwritten by the next port. That ended with the dogfood cutover: the upstream repository
+now installs this plugin and keeps no local copies of these skills. Edit skills directly, open a
+pull request, and cut a release — there is nothing upstream to re-port from.
+
+What survives from that era is the discipline, not the direction: keep skills repo-agnostic (see
+[CONTRIBUTING.md](CONTRIBUTING.md)), move a *diff* rather than a file when text travels between
+repositories, and run the invariants check whenever you edit skill text.

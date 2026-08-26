@@ -623,9 +623,14 @@ The release unit's whole batch of leaf merges lands on develop as ONE reviewed P
 IMPORTANT:
 - Empty `$ARGUMENTS` means `next`.
 - **Serial by design.** The plan's "parallel waves" describe SHAPE, not an instruction to run
-  concurrent builds: `branch-feature` aborts on a dirty tree, builds share ONE working tree and
-  ONE local DB (concurrent vitest runs corrupt each other's worker databases), and the MCP writes
-  to production. Surface the ready-set for a human to fan out manually; keep the loop serial.
+  concurrent builds. Three constraints hold whatever the repository's local tooling looks like:
+  `branch-feature` aborts on a dirty tree; test execution is serial against SHARED test
+  infrastructure (test runners that share containers or databases corrupt each other's state,
+  and a per-checkout instance — `localEnvironment.instanceBoundTo: directory` in config —
+  isolates dev servers and app data, NOT the test infrastructure); and the MCP writes to
+  production. The `localEnvironment` block tells the loop whether an isolated instance exists
+  at all; it never makes the loop concurrent. Surface the ready-set for a human to fan out
+  manually; keep the loop serial.
 - **Injection is part of the loop.** Never let a real out-of-scope finding ship as PR prose only.
 - **The release-unit container (this org's Epic) is exactly that — the release unit.** Develop
   only receives a COMPLETE, refreshed, fully-reviewed release unit with every applicable gate

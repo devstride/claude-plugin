@@ -221,9 +221,15 @@ If a check could not be run, say so — never report an unrun check as a pass.
   Where a key is one edit away from a real one, offer that as a possibility, not a verdict.
   `profile` and `profileOverrides` are recognized keys — they belong to the delivery-profile
   contract — whether or not the published reference lists them yet.
+- **`localEnvironment`** — report the block. Absent means the shipped default is in force: every
+  command `null`, `instanceBoundTo: none` — so `branch-hotfix` will ask before touching a database
+  and `build-item` treats the current checkout as the only environment. Present: report
+  `instanceBoundTo` and each command's resolution per the rule below. `instanceBoundTo: directory`
+  with a `null` `create` is a WARNING — it claims isolated instances exist and gives the loop no
+  way to make one.
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
   **array**, so iterate it — `review.localCommand`, `generated.regenCommand`,
-  `preShipChecks[].command`): split on `&&` and `;`, take the first token of **each** segment, and
+  `preShipChecks[].command`, and each non-null `localEnvironment.*` command): split on `&&` and `;`, take the first token of **each** segment, and
   skip shell builtins. Checking only the very first token is vacuous for the commonest shape:
   `cd backend && pnpm test` starts with `cd`, which always resolves, so the check would pass on a
   machine with no `pnpm` at all. A single-word command that does not resolve may be a shell alias or

@@ -198,6 +198,30 @@ All three start empty, and empty is a real answer rather than a placeholder:
   the loop wait for a check that will never run, so this stays empty until someone adds both halves
   together.
 
+## Local environment
+
+```json
+{
+  "localEnvironment": {
+    "create": null,
+    "seed": null,
+    "migrate": null,
+    "teardown": null,
+    "instanceBoundTo": "none"
+  }
+}
+```
+
+The shipped default says: this repository has not described an isolated local environment.
+`branch-hotfix` then asks before touching a database, and `build-item` treats the current checkout
+as the only environment there is. A repository whose tooling gives each checkout its own instance
+fills the commands in and sets `instanceBoundTo` to what that tooling actually keys on —
+`directory` (a second worktree gets its own database, tables and ports, and checking out another
+branch inside it keeps them) or `branch`. Commands may carry `<name>` and `<base>` placeholders
+where the tooling needs them. This block tells the loop what exists; it never makes the loop
+concurrent — the serial-execution rule in `build-item` stands, because a per-checkout instance
+isolates dev servers and app data, not shared test infrastructure.
+
 ## Known cloud reviewers
 
 An `automatedReviewers` entry is requested by the review flow **per its `how`**, and a

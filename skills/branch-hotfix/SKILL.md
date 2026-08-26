@@ -38,10 +38,11 @@ Branch name argument: $ARGUMENTS
 4. Push the new branch and set upstream: `git push -u origin <new-branch-name>`
 
 **Local environment.** Now that the branch exists, bring the local environment back into step with
-production code: if this repo has a database reset/reseed or migration procedure, run it, then
-restart the dev server pre-flight step 2 asked the user to stop. That procedure is repo-specific
-and lives with the repo, not in this skill — if you do not know it, say so and ask rather than
-guessing.
+production code. Read `localEnvironment` from `.claude/ds-config.json`: run `migrate` if it is set,
+then `seed` if it is set — in that order, because a seed against a stale schema fails or lies —
+then restart the dev server pre-flight step 2 asked the user to stop. When the block is absent, or
+both commands are `null`, the procedure is repo-specific and lives with the repo, not in this
+skill: say so and ask rather than guessing, and never invent a reset command.
 
 A PR is NOT opened here — a freshly-created branch has no commits ahead of the
 production branch, so there is nothing to compare. A hotfix merges back to the
