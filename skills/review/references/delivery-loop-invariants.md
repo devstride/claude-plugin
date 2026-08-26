@@ -255,6 +255,8 @@ skills/build-item/SKILL.md|never makes the loop concurrent
 skills/branch-hotfix/SKILL.md|localEnvironment
 skills/setup/SKILL.md|instanceBoundTo
 skills/doctor/SKILL.md|localEnvironment
+skills/ultracode-build/SKILL.md|via path Y
+skills/review/SKILL.md|via path Y
 PAIRS
 ```
 
@@ -372,9 +374,19 @@ P3. `instanceBoundTo` is never `detected` by setup: no file says whether a secon
     its own database. Candidates for the commands come from compose/devcontainer/nix/scripts and
     are `ambiguous`, never `detected`; nothing found is `unknown`, not `null`.
 
+## Q. Verification honesty
+Q1. A verdict that rests on having LOOKED names the path it exercised — "verified X via path
+    Y", never a bare "verified" — and lists the routes to the same state that were NOT tried.
+    A fix confirmed on one path proves nothing about the others; a UI fix that passed every
+    automated gate shipped with a hole on an untried route.
+Q2. Assert what you are measuring: scope DOM/API queries to the live container and check its
+    count (a stale mounted panel answers with equal confidence — it has made a broken state
+    read as a pass AND as a different bug); one clean load per case; a stale session or a
+    service that is not up looks identical to a broken feature.
+
 ---
 
-**Revised total: 53 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) = 95.**
+**Revised total: 53 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) = 97.**
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.

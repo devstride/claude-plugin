@@ -209,7 +209,9 @@ cluster, never a verdict. No lessons file → the finders' base checklists are t
   over-broad ACLs.
 - **Contract-match** — does the code actually satisfy UNDERSTAND's downstream contract?
 - **Tests / false-green** — assertions that can't fail, mocked-away behavior under test, missing
-  negative/permission cases, a green suite not covering the new path.
+  negative/permission cases, a green suite not covering the new path, and a behavioural fix
+  verified on ONE path to a state that other paths also reach (a second navigation route, a
+  fresh tab, a keyboard shortcut, a retry) — name the unexercised paths as findings.
 - **Cleanup / conventions** — `conventionsDoc` violations, dead code, leftover debug, KISS/YAGNI/DRY.
 
 **Stage B — verification** (per-finding at HIGH-RISK, batched per-finder at CONTAINED):
@@ -224,6 +226,18 @@ REFUTED. Every CONFIRMED or PLAUSIBLE verdict also carries the two facts the fix
 next: **likelihood** (how readily the defect is reached in real use) and **impact** (what it
 costs when it is). **P1** means the impact is a broken acceptance criterion of this story,
 corrupted or lost data, or a security hole; a security finding is P1 whatever its likelihood.
+
+**A verdict that rests on having LOOKED — a browser, a running service, a manual run — names
+the path it exercised.** The report vocabulary is **"verified X via path Y"**, never a bare
+"verified". Behavioural states are usually reachable by more than one route, and a fix confirmed
+on one of them has proven nothing about the others: before calling a behavioural fix verified,
+enumerate the ways the state can be reached and say which were exercised and which were not — a
+reviewer later finding an untried path is the process working, not a surprise. Assert what you
+are measuring: scope DOM or API queries to the live container and check its count, because a
+stale mounted panel or a cached response answers with equal confidence and makes a broken state
+read as a pass, or as a different bug; and use one clean load per case, since in-place navigation
+lets cases bleed into each other. A stale session, an expired login or a service that is not up
+looks identical to a broken feature — rule those out before reading code.
 
 Then act by the profile's `fixFloor` — which verified findings get fixed IN THIS STORY, read
 from those verdicts:

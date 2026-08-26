@@ -289,8 +289,13 @@ prevent. Standalone, you may instead ask whether to keep waiting.
 
 ## 4. Verify and triage
 
-Read the actual code before changing anything — never blind-apply a suggestion. Sort each into
-exactly one bucket:
+Read the actual code before changing anything — never blind-apply a suggestion. And when a
+finding is behavioural and the fix is confirmed by looking rather than by a test, the verdict
+names the path it exercised — **"verified X via path Y"**, never a bare "verified" — and says
+which other routes to the same state were NOT tried. That is the rule `ultracode-build` phase 3
+Stage B states in full; it applies unchanged here, because a fix that passed every automated gate
+and was looked at on one path can still ship with a hole on the paths nobody named. Sort each
+finding into exactly one bucket:
 
 **Dedup guard** — load `lessonsDoc` ONCE at this step's entry (absent or empty → skip the guard
 entirely; it is a valid state). As each finding lands in CONFIRMED/PLAUSIBLE, test it against

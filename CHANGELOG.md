@@ -19,6 +19,16 @@ for what each version component means here and how a release is cut.
   the assumption that every repository has exactly one working tree and one database, an
   assumption a per-checkout instance quietly breaks.
 
+### Changed
+
+- **Verification names its path.** A verdict that rests on having looked — a browser, a running
+  service, a manual run — now reports "verified X via path Y" and lists the routes to the same
+  state that were not tried; a bare "verified" is under-specified. `ultracode-build` phase 3
+  states the rule in full (and its tests/false-green lens now flags a fix verified on one path
+  to a state other paths reach); `review` step 4 applies it at triage. Written after a UI fix
+  passed every automated gate, was confirmed by opening the link, and shipped with a hole on two
+  routes nobody had named.
+
 ### Fixed
 
 - `RELEASING.md` described this repository as a port target whose skill text is overwritten from
