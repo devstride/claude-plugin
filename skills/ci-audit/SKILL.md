@@ -41,19 +41,22 @@ request's first run as a re-run of the earlier one.
 Paginate to the window start; if the API stops short of it, say so — the totals are then a
 floor, not the whole window.
 
-`ci.workflowGlobs` names workflow FILES, and `gh run list` reports display names — resolve one
-to the other first: `gh api repos/{owner}/{repo}/actions/workflows --jq '.workflows[]|{id,name,path}'`,
-keep the entries whose `path` matches a glob, and filter runs by those names (or by `workflow_id`
-via `gh run list --workflow <id>`). A workflow renamed in its `name:` line still matches by path.
-Then, for each run in that set, fetch its jobs:
+`ci.workflowGlobs` names workflow FILES, and runs carry a `workflow_id` — resolve one to the
+other first: `gh api "repos/{owner}/{repo}/actions/workflows?per_page=100" --paginate --jq '.workflows[]|{id,name,path}'`
+(paginate: a repository can have more workflows than one page), keep the entries whose `path`
+matches a glob, and filter the collected runs by those **ids** — never by display name, which two
+files can share and a rename leaves behind on old runs. Then, for each run in that set, fetch its
+jobs:
 
 ```bash
-gh api "repos/{owner}/{repo}/actions/runs/<id>/jobs?per_page=100" \
-  --jq '[.jobs[]|select(.completed_at!=null and .started_at!=null)|{name,conclusion,minutes:(((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601))/60)}]'
+gh api "repos/{owner}/{repo}/actions/runs/<id>/jobs?filter=all&per_page=100" --paginate \
+  --jq '[.jobs[]|select(.completed_at!=null and .started_at!=null)|{name,conclusion,attempt:.run_attempt,minutes:(((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601))/60)}]'
 ```
 
-Guard both timestamps: a job that never started, or is still running, has nulls that make
-`fromdateiso8601` abort the whole query.
+`filter=all` includes every attempt — a run retried with `gh run rerun` bills its failed attempt
+too, and the default returns only the latest — and `--paginate` covers matrices with more than
+one page of jobs. Guard both timestamps: a job that never started, or is still running, has nulls
+that make `fromdateiso8601` abort the whole query.
 
 A run **executed** when any job other than the gate/detect job finished with a conclusion other
 than `skipped`. Sum minutes over non-skipped jobs. Runs on `hosted-larger` runners cost more per

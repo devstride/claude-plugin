@@ -595,9 +595,12 @@ write.
   whether a re-run was replaced by a Claude-only re-read), **every reviewer dropped at the
   registration window**, the PR, finding tally (fixed / dismissed / captured / deferred), **the lessons tally** (`N written / M recurrences marked` — or `0`, the common case; call out any recurrence by its `L-NNN` in a driven-mode hand-back, since a lesson that keeps recurring despite being in the store is a signal its Avoid rule is not landing — curation feedback a human should see), resolved-thread
   count, CI state, every captured deferral explicitly, and **any reviewer that never responded**.
-- **CI runs on this PR — the run-once number.** Count the executed workflow runs on the PR's head
-  branch across the loop's workflows — those whose file paths match `ci.workflowGlobs`, resolved to
-  run names via `gh api repos/{owner}/{repo}/actions/workflows`: a run counts when any job beyond the
+- **CI runs on this PR — the run-once number.** Count the executed workflow runs attributed to THIS
+  pull request — by `pull_requests[].number` on the runs API, falling back to head repository plus
+  branch bounded to the PR's lifetime (a reused branch name, or the same name on a fork, must not
+  count) — across the loop's workflows: those whose file paths match `ci.workflowGlobs`, resolved
+  to `workflow_id` via `gh api repos/{owner}/{repo}/actions/workflows` (method in `ci-audit`). A
+  run counts when any job beyond the
   gate/detect job finished other than `skipped` (method in the `ci-audit` skill). Report
   `N executed run(s); expected ci.expectedRunsPerPullRequest` (default `1`). N above expected →
   name each extra run's cause: a push after the ready-flip (a commit dated after the
