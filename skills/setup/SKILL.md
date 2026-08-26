@@ -21,8 +21,9 @@ Optional argument: $ARGUMENTS
   at a repository-relative path and runs commands that assume the repository root, so a validate
   invoked from a subdirectory would otherwise read a file that is not there and run commands in the
   wrong directory.
-- **A detector name** — `ecosystem` (A2–A3), `verify` (A4), `ci` (A5), `branches` (A6),
-  `engines` (A7) — to inspect and report just that part.
+- **A detector name** — `ecosystem` (A2–A3), `verify` (A4), `ci-inspect` (A5), `branches` (A6),
+  `engines` (A7) — to inspect and report just that part. (`ci-inspect`, not `ci`: the bare word
+  is the write mode below, and one token must mean one thing.)
 - **`docs`** — the documentation-hooks mode, and the one narrowed run that WRITES: run A1 and A8,
   ask Phase D's three documentation questions (plus `release.deployVerification`), then write
   **only** the `docs` block and `release.deployVerification` into the config (creating the file
