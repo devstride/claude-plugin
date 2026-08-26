@@ -452,6 +452,17 @@ No PR to merge — integrate locally, then push the epic branch:
   in the gap between settle and merge — a late reviewer, a second Copilot pass — would otherwise
   merge silently unaddressed, and a merged PR showing open review comments reads as an
   unreviewed merge. Non-zero → loop back through `review` steps 3–6 (reply + resolve) first.
+- **Merge guard — only when `ci.freezeBaseWhileReleasePrReady` is `true` (the default; an explicit
+  `false` disables it, and the merge proceeds with one line saying so):** before ANY merge whose
+  TARGET is `release.releaseSource` — normally the same branch as `baseBranch`, but the guard keys
+  on the release source, since a merge elsewhere cannot stale the release and a merge INTO the
+  release source must be held whatever it is called — here, and the epic release at step 8, look
+  for an open, NON-DRAFT pull request with head `release.releaseSource` and base
+  `release.productionBranch`. One exists → a release is
+  in its CI window; merging beneath it re-runs its merge preview and stales its reviewed diff. Do
+  not merge: say which release PR is holding the base, wait for it to merge (poll on a sensible
+  interval, bounded by `review.pollTimeoutMinutes`), then merge. A still-draft release PR holds
+  nothing — its review has not settled and its CI has not started.
 - Merge: `gh pr merge <n> --merge --delete-branch`. **NEVER `--delete-branch` on a PR whose head
   is `develop` or `master`.** The epic release PR is step 8's business.
 
@@ -582,7 +593,8 @@ The release unit's whole batch of leaf merges lands on develop as ONE reviewed P
     applicability — a suite that fires is mandatory, with no story-level exemption. With the list
     empty, no slow cloud suite gates the release; local pre-ship suites remain the
     callers' own step-2b responsibility.
-- **Merge** `gh pr merge <n> --merge` once green and settled, then delete the epic branch —
+- **Merge** `gh pr merge <n> --merge` once green and settled — after the step-4b merge guard
+  (no ready release PR is holding the base) — then delete the epic branch —
   **only if `epicIntegrationBranches.deleteBranchAfterRelease`**. It is a destructive remote
   cleanup, so a false value must actually retain the branch.
 - **Documentation — opt-in, and it STAGES, never publishes.** With `docs.updateOnEpicRelease`

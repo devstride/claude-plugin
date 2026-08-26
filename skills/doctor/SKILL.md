@@ -1,6 +1,6 @@
 ---
 name: doctor
-description: Check that this repo and machine are set up correctly for the delivery loop — git, gh, the plugin, the DevStride connection, the config file, the CI draft gate, the merge gates and the documentation hooks — and report exactly what is missing and the command that fixes it. Read-only.
+description: Check that this repo and machine are set up correctly for the delivery loop — git, gh, the plugin, the DevStride connection, the config file, the CI draft gate and CI cost mechanics, the merge gates and the documentation hooks — and report exactly what is missing and the command that fixes it. Read-only.
 ---
 
 Diagnose whether the delivery loop will actually work here, and say precisely what to fix if it will
@@ -240,7 +240,10 @@ a pull request may still open as a draft; audit the gate and report the mixed co
 
 Scope the audit to workflows with an `on: pull_request` trigger. A workflow triggered only by
 `pull_request_review` or `pull_request_review_comment` is PR-related but must run on drafts —
-exempt it, and do not advise gating it.
+exempt it, and do not advise gating it. Likewise a **convention-only workflow** — subscribed to
+`opened` alone, no `synchronize`, one job that fails with a message (the draft-convention check
+from the CI cost patterns) — is a policy notice, not a CI gate: exempt it from the four-events and
+concurrency checks; it is supposed to run exactly on a non-draft open.
 
 Two separate checks, and **the first is the one everyone misses**:
 
@@ -258,7 +261,9 @@ Two separate checks, and **the first is the one everyone misses**:
   eventually deletes it. But `review` also runs standalone on a pull request somebody else opened,
   and on a **non-draft** one it skips the ready-flip entirely and settles against the CI it assumes
   is already running. Without `opened` there is no such run and never will be, so it waits forever.
-  FAIL with: declare all four.
+  FAIL with: declare all four. A fifth, `converted_to_draft`, is optional — with per-pull-request
+  `concurrency` on, the run it creates cancels the one a mistaken non-draft open started; suggest it
+  when concurrency is present and it is missing.
 - **Jobs gated on the draft condition** — match against `ci.draftGateCondition` (the config names
   the expression; default `github.event.pull_request.draft == false`) and accept equivalent forms
   such as `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated if ANY job it
@@ -272,6 +277,21 @@ Two separate checks, and **the first is the one everyone misses**:
   repeatedly and lose the run-once guarantee.
 - **`ci.gateJobName`** — if set, confirm a job with that **display name** (`name:`) or key exists;
   the loop uses it to prove the flip released CI. Unset → note the fallback to detecting a new run.
+- **The CI-cost mechanics** (`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`),
+  each a WARNING when missing, never a FAIL — CI is correct without them, just more expensive:
+  - a top-level `concurrency:` block with `cancel-in-progress: true` on every pull-request
+    workflow (a superseded run is cancelled instead of finished);
+  - on workflows that also run on `push` to the production branch, a tree-identical skip against
+    the base branch (a promotion merge has the same tree the base just tested — re-testing it is
+    pure cost; one repository measured this at half its test minutes);
+  - a draft-convention check that fails a non-draft pull request opened by a person (INFO, not a
+    warning — it is a courtesy to humans, not a gate).
+  Fix for all three: `/devstride:setup ci`, which shows each change as a diff.
+- **Run-once in practice.** Run the last seven days through the `ci-audit` skill's method (executed
+  runs per pull request, post-merge push minutes, release pull requests re-run by a moving base)
+  and report the ratio `executed PR runs / pull requests` — `1.0` is the design; above it, name the
+  pull requests and the causes. This is the number the whole draft-hold arrangement exists to
+  produce, and the only way to know it is to measure it.
 
 ## 6. Merge gates (`gates`)
 

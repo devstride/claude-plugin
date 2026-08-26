@@ -8,6 +8,40 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-08-26
+
+### Added
+
+- **`ci-audit` skill.** Measures what CI actually costs, from `gh` alone: executed workflow runs
+  per pull request (the design is one), post-merge push minutes by branch, release pull requests
+  re-run by a moving base, and the named offenders with their likely cause. Runs, not minutes,
+  are what the Actions usage page counts — and a draft-gated run whose jobs all skip is the gate
+  working, not a cost — so the skill counts executed jobs and their minutes.
+- **`setup ci`** — an opt-in write mode (like `setup docs`) and the only path by which setup
+  touches a workflow: it detects which of four CI-cost mechanics each pull-request workflow
+  carries, shows the exact diff for each missing one, and applies only the accepted diffs. The
+  mechanics and the measurements behind them are in
+  `skills/setup/references/ci-cost-patterns.md`: the draft gate; per-pull-request `concurrency`
+  with cancel-in-progress; a tree-identical skip on production-branch pushes (a promotion merge
+  has the same tree the base branch just tested); a check that fails a non-draft pull request
+  opened by a person, with the convention in the message.
+- Config keys `ci.freezeBaseWhileReleasePrReady` (default `true`) and
+  `ci.expectedRunsPerPullRequest` (default `1`).
+
+### Changed
+
+- **`release`** settles the release source before cutting (merge or park every ready pull request
+  into it), refuses to proceed past the flip while the base moves, and re-checks at the owner
+  gate that nothing merged beneath the release pull request. **`build-item`** will not merge into
+  the base branch while a ready release pull request exists — it waits for that release to merge.
+  Every merge beneath a ready release pull request re-runs its merge preview and stales the
+  reviewed diff; on one repository that was 18% of test minutes.
+- **`review`** step 8 reports executed CI runs on the pull request it settled against
+  `ci.expectedRunsPerPullRequest`, naming the cause of each extra run; a repeat is a lesson.
+- **`doctor`** warns (never fails) when a pull-request workflow lacks `concurrency` or a
+  production-branch push lacks the tree-identical skip, and reports the last seven days'
+  executed-runs-per-pull-request ratio.
+
 ## [1.0.0] — 2026-08-26
 
 **Why a major version.** `release.docsRepo` changes meaning — the plugin no longer acts on it —
@@ -383,7 +417,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v1.0.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v1.1.0...HEAD
+[1.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.0.0...devstride--v1.1.0
 [1.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.10.0...devstride--v1.0.0
 [0.10.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.9.0...devstride--v0.10.0
 [0.9.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.8.1...devstride--v0.9.0

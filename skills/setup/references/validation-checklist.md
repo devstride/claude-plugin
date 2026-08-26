@@ -105,10 +105,13 @@ timeline. A `PASS` here means *nothing is obviously in the way*.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Drafts are configured but no workflow is draft-gated | The repository never adopted the review-then-CI ordering | Gate the jobs on the draft condition, or set the three `review` CI-ordering keys `false`. `/devstride:doctor` diagnoses this in detail |
+| A pull-request workflow has no `concurrency` block, or a production-branch push re-tests a tree the base just tested | The repository never adopted the CI-cost mechanics | `/devstride:setup ci` applies them as reviewed diffs; `/devstride:ci-audit` shows the minutes involved |
 | Workflows are gated but marking ready starts no run | `ready_for_review` is missing from `on.pull_request.types` — the defaults do not include it | Add it. Note that declaring `types` **replaces** the defaults, so the list also needs `opened`, `synchronize` and `reopened` |
 | CI never re-runs after a review-fix push | An explicit `types` list has `ready_for_review` but dropped `synchronize` | Add the missing events. All four are needed: the flip starts the run, `synchronize` covers the fix push, `reopened` is the fallback, and `opened` covers a standalone review on a non-draft pull request — which skips the flip and settles against CI that, without it, was never created |
 
-**Never edit a workflow to fix any of these.** This skill's write boundary is
+**Never edit a workflow to fix any of these — outside `setup ci`,** which edits only the
+pull-request workflows, only the four CI-cost mechanics, only on an explicit yes per diff. This
+skill's write boundary is otherwise
 `.claude/ds-config.json` plus the local documentation skills it scaffolds in Phase E2
 (`.claude/skills/<name>/SKILL.md`, never overwriting a file that exists) — and that boundary does not
 bend for a helpful one-line change to somebody's CI. Validation itself writes nothing.

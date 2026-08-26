@@ -156,10 +156,21 @@ A8 covers where those templates live and how to capture them.
   "ci": {
     "workflowGlobs": [".github/workflows/*.yaml", ".github/workflows/*.yml"],
     "draftGateCondition": "github.event.pull_request.draft == false",
-    "gateJobName": null
+    "gateJobName": null,
+    "freezeBaseWhileReleasePrReady": true,
+    "expectedRunsPerPullRequest": 1
   }
 }
 ```
+
+`freezeBaseWhileReleasePrReady` is the loop rule behind run-once at the release: while a release
+pull request is ready, `build-item` does not merge anything into the base branch and `release`
+refuses to flip while another pull request into the release source is mergeable — every merge
+beneath a ready release pull request re-runs its merge preview and stales the reviewed diff.
+`expectedRunsPerPullRequest` is the number `review` step 8 reports against: executed CI runs on
+the pull request it settled; anything above it is named with its cause. The workflow mechanics
+these pair with (concurrency, the tree-identical production skip, the draft gate, the
+draft-convention check) are in `ci-cost-patterns.md`, applied by `setup ci`.
 
 `gateJobName` names the job the loop watches to confirm the ready-flip released CI. It is left
 `null` because nothing can guess it; the loop falls back to detecting a new run, which works and is
