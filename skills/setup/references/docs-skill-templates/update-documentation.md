@@ -46,7 +46,9 @@ safe. End with a single verdict line: `docs: PASS` or `docs: FAIL — <what to f
    internal-only changes, and do not write a release note here — that is the release-notes skill's
    job, and only when the owner asked for one.
 4. **Publish exactly as described above — only when `live` is `true`** — a direct push, a pull
-   request, a hand-off. A conventional commit message (`docs: <what> — <why>`) if a commit is
+   request, a hand-off. **A clean checkout after step 3 means this delta changed no
+   documentation: say so and stop** — never an empty commit, and never a failure; an
+   internal-only release is the common case, not an error. A conventional commit message (`docs: <what> — <why>`) if a commit is
    involved. With `live: false`, stage instead (for a checkout: commit on a local
    `docs/pending-<pr-number>` branch and return to the publishing branch, unpushed) and report
    where it waits; a later `live: true` payload for the same delta promotes that staged change
