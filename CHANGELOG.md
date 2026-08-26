@@ -19,6 +19,19 @@ for what each version component means here and how a release is cut.
   the assumption that every repository has exactly one working tree and one database, an
   assumption a per-checkout instance quietly breaks.
 
+- **The plugin tells you when it is behind.** A `SessionStart` hook (`hooks/version-check.sh`)
+  compares the version *this session is running* — read from the loaded copy, not from disk —
+  against the newest release tag, and prints the two exact update commands (with the installed id
+  and scope it read, never assumed) when a newer one exists. Silent when current or offline: it
+  speaks only when there is something to do. Never blocks a session, never exits non-zero; the
+  network call is capped at five seconds and cached for six hours. `doctor` reports when it last
+  ran and what it found. New config block `plugin` — `updateCheck` (default `true`), `autoUpdate`
+  (default `false`: apply at session start and ask for a restart — the only safe moment, since a
+  mid-loop update would change skill behaviour between build steps), `pin` (hold a version
+  deliberately; reported once, never nagged). `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` disables it.
+- `doctor`'s version-currency recipe moved to `skills/doctor/references/version-currency.md`, the
+  one place the hook and the skill both cite.
+
 ### Changed
 
 - **Verification names its path.** A verdict that rests on having looked — a browser, a running

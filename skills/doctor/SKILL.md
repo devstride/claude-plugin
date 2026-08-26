@@ -85,27 +85,18 @@ If a check could not be run, say so — never report an unrun check as a pass.
   loop is visibly working that the plugin "is not installed" without that caveat.
 - **Marketplace registered** — `claude plugin marketplace list`. Absent → the plugin cannot update.
   Fix: `claude plugin marketplace add devstride/claude-plugin`.
-- **Version currency** — read the newest published release from the repo's **tags**, not its
-  releases: this project tags every release but does not create GitHub Release objects, so a
-  `releases` query returns empty and would read as "up to date".
-  ```bash
-  git ls-remote --tags https://github.com/devstride/claude-plugin \
-    | awk '{print $2}' | sed 's|refs/tags/||' | grep -v '\^{}' | sed 's/.*--v//' \
-    | sort -V | tail -1
-  ```
-  **Strip the `devstride--v` prefix before comparing** — the tag is `devstride--v0.6.0` while
-  `claude plugin list` prints `0.6.0`, and comparing the two shapes reports every up-to-date install
-  as behind. Behind → **updating is two commands, and one alone silently does nothing**:
-  ```bash
-  claude plugin marketplace update devstride
-  claude plugin update <installed-id>
-  ```
-  then restart. **Take `<installed-id>` from `claude plugin list`, do not assume it.** The marketplace
-  publishes the same plugin under two entry names — `devstride` and the shorter `ds` alias — and the
-  id is whichever one that machine installed through. Naming the other reports the plugin as *not
-  installed*, which reads as a broken setup rather than a wrong argument, and the user stays on their
-  old version believing they updated. The command needs the fully-qualified `<name>@devstride` form
-  and acts on the `user` scope unless given a matching `--scope`.
+- **Version currency** — the recipe is `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/version-currency.md`
+  (tags not Releases; strip the `devstride--v` prefix; `sort -V`; the installed id and scope from
+  `claude plugin list --json`, never assumed; both update commands, then restart). Run it and
+  report installed vs newest. Behind → print the two commands with the id and scope you read.
+- **Session-start check** — read `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/version-check.json`
+  (schema in the same reference) and report `checkedAt`, `running`, `newest`, `mode` and
+  `result` as one line. Absent → the check has never run here: say so, and say why it might be
+  (plugin older than 1.2.0, hooks disabled, or `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). `mode` comes
+  from the repository's `plugin` config block — `notify` is the default; `auto-update` applies
+  releases at session start and asks for a restart; `pinned` reports and never nags. A
+  `result` of `unreachable` on the last run is informational, not a FAIL: the check stays
+  silent offline by design and records it here instead.
 - **Repo-level declaration** — if `.claude/settings.json` declares the marketplace and plugin, say
   what that does and does **not** do: it registers and enables, it does **not install**. Every
   teammate still runs `claude plugin install <id>` once — and **build that id from the

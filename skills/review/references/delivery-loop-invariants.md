@@ -203,7 +203,7 @@ fi
 # This is limit 2 below, and the check fell into it on the first attempt.
 SELF="delivery-loop-invariants.md"
 ALL=$(cat skills/*/SKILL.md $(ls skills/*/references/*.md | grep -v "$SELF") \
-          AGENTS.md CONTRIBUTING.md "${EXTRA[@]}" | tr '\n' ' ')
+          hooks/*.sh AGENTS.md CONTRIBUTING.md "${EXTRA[@]}" | tr '\n' ' ')
 # Corpus-wide needles: the rule must survive SOMEWHERE an agent reads.
 for needle in "pull_request_review_id" "suppressed due to low confidence" "graphqlBotId" \
               "review_requested" "paginate" "blanket-resolve" "for MINUTES" "xhigh" \
@@ -257,6 +257,9 @@ skills/setup/SKILL.md|instanceBoundTo
 skills/doctor/SKILL.md|localEnvironment
 skills/ultracode-build/SKILL.md|via path Y
 skills/review/SKILL.md|via path Y
+skills/doctor/references/version-currency.md|devstride--v
+hooks/version-check.sh|NEVER exits non-zero
+hooks/version-check.sh|alarm
 PAIRS
 ```
 
@@ -384,9 +387,22 @@ Q2. Assert what you are measuring: scope DOM/API queries to the live container a
     read as a pass AND as a different bug); one clean load per case; a stale session or a
     service that is not up looks identical to a broken feature.
 
+## R. Plugin version check (`hooks/version-check.sh`, recipe: `skills/doctor/references/version-currency.md`)
+R1. Newest release = TAGS not GitHub Releases (the project creates none, so a releases query
+    reads "up to date" forever); strip the `devstride--v` prefix before comparing; `sort -V`.
+    The installed id AND scope come from `claude plugin list --json` — the `ds@` alias exists,
+    and naming the wrong id reports "not installed" while the user stays on the old version.
+R2. The hook NEVER blocks and NEVER exits non-zero; every failure records itself and stays
+    quiet. Silent when current or unreachable; it speaks only when there is something to do.
+    Session start is the ONLY moment an update may be applied (opt-in): mid-loop would change
+    skill behaviour between build steps. macOS has no `timeout` — the network cap is perl's alarm.
+R3. It reads the RUNNING version from the loaded copy (`$CLAUDE_PLUGIN_ROOT/.claude-plugin/
+    plugin.json`), not from disk — a session serves what it loaded at startup, and
+    `claude plugin list` cannot see that.
+
 ---
 
-**Revised total: 53 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) = 97.**
+**Revised total: 53 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 3 (R) = 100.**
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.

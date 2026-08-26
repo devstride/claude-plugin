@@ -198,6 +198,29 @@ All three start empty, and empty is a real answer rather than a placeholder:
   the loop wait for a check that will never run, so this stays empty until someone adds both halves
   together.
 
+## Plugin updates
+
+```json
+{
+  "plugin": {
+    "updateCheck": true,
+    "autoUpdate": false,
+    "pin": null
+  }
+}
+```
+
+The session-start version check (`hooks/version-check.sh`) reads this block from the repository
+it starts in. `updateCheck: true` — it runs, silent when current or offline, and speaks only when
+a newer release exists: one line with the exact update commands. `autoUpdate: true` — it applies
+the update on disk at session start (the only safe moment; applying mid-loop would change skill
+behaviour between the steps of a build) and asks for a restart; the running session is unchanged.
+`pin` — a version this repository is deliberately holding at (an incident, a known-good
+baseline): the check reports "pinned at X, newest is Y" once and never nags. Setting the
+environment variable `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` disables the check regardless, for CI and
+headless runs. The recipe and the record it writes are in
+`skills/doctor/references/version-currency.md`.
+
 ## Local environment
 
 ```json

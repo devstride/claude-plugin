@@ -1,0 +1,13 @@
+{
+  "description": "Session-start version check: says when a newer plugin release exists, and how to get it. Silent when current. Never blocks a session.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/version-check.sh\"" }
+        ]
+      }
+    ]
+  }
+}

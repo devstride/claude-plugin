@@ -636,6 +636,7 @@ paraphrased into something that means the same thing is a default that no longer
 | `release` | `productionBranch`, `releaseSource`, `autoDeployOnMerge`, and `deployVerification` (`null` unless the owner gave one). Never `docsRepo` — that shape is retired; Phase F migrates one it finds |
 | `docs` | `updateSkill` and `releaseNotesSkill` — the local skill names Phase E2 scaffolds, or `null` where the owner said there is nothing to update; `updateOnEpicRelease: false` |
 | `conventionsDoc`, `itemTagFormat`, `lessonsDoc` | From A8, the answers, and the shipped default path |
+| `plugin` | Verbatim from the defaults reference — `updateCheck: true`, `autoUpdate: false`, `pin: null`. Not asked: the default is right for nearly every repository, and the block is documented where the owner will find it |
 | `localEnvironment` | `create`, `seed`, `migrate`, `teardown` (each a command string or `null`) and `instanceBoundTo`, from A9 and the answers. Write the block even when every command is `null` — `branch-hotfix` and `build-item` read it, and an absent block reads as "nobody asked", not "there is none" |
 
 **The roster must describe what actually exists.** This is the one place where writing an aspirational

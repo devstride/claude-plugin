@@ -376,6 +376,16 @@ Every release is tagged, so any version in the [changelog](CHANGELOG.md) is pinn
 the same three commands with the bare `devstride/claude-plugin` as the source. Restart Claude Code
 afterwards either way.
 
+### The plugin tells you when it is behind
+
+From 1.2.0 the plugin checks for a newer release at every session start — silently when you are
+current or offline, and with one line naming the exact two commands when you are not. It reads the
+version *this session* is running, not the one on disk, and it never blocks a session. Per
+repository, `.claude/ds-config.json` can turn it off (`plugin.updateCheck: false`), have it apply
+updates at session start (`plugin.autoUpdate: true` — you are asked to restart), or hold a version
+deliberately (`plugin.pin`). `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` disables it for a CI or headless run.
+`/devstride:doctor` reports when it last ran and what it found.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).

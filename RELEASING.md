@@ -106,8 +106,13 @@ depend on, it does not freeze the surface.
 
 ## When your users actually get it
 
-**Not automatically, unless they opted in.** Auto-update is a per-marketplace setting and it is
-**off by default** for a manually added marketplace. A user who enables it (in `/plugin` → the
+**Not automatically, unless they opted in — but from 1.2.0 they are told.** The plugin's own
+session-start check (`hooks/version-check.sh`) compares the version a session is running against
+the newest tag and prints the two update commands when it is behind; a repository can opt in to
+having it apply the update at session start (`plugin.autoUpdate`). That is why tagging is part of
+publishing, not bookkeeping: an untagged release is invisible to the check. Claude Code's own
+auto-update is a separate, per-marketplace setting and it is **off by default** for a manually
+added marketplace. A user who enables it (in `/plugin` → the
 devstride marketplace → **Enable auto-update**) gets releases without doing anything. Everyone else
 stays on their installed version indefinitely — verified on Claude Code 2.1.233, where starting a
 fresh session with a newer version available left the installed plugin untouched.
