@@ -113,7 +113,7 @@ jobs:
     if: >-
       github.event.pull_request.draft == false &&
       !endsWith(github.actor, '[bot]') &&
-      !contains(github.event.pull_request.body, 'devstride:loop')
+      !contains(github.event.pull_request.body, '<!-- devstride:loop -->')
     runs-on: ubuntu-latest
     steps:
       - run: |

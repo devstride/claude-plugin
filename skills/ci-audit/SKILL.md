@@ -28,7 +28,7 @@ minutes**, never runs: a run whose expensive jobs were skipped is the gate worki
 
 ```bash
 gh api "repos/{owner}/{repo}/actions/runs?per_page=100&created=>=$(date -u -v-${DAYS}d +%Y-%m-%d 2>/dev/null || date -u -d "-${DAYS} days" +%Y-%m-%d)&status=completed" --paginate \
-  --jq '.workflow_runs[]|{id,event,head_branch,head_repository:.head_repository.full_name,workflow_id,name,created_at,conclusion,pull_requests:[.pull_requests[].number]}'
+  --jq '.workflow_runs[]|{id,event,head_branch,head_repository:.head_repository.full_name,workflow_id,name,created_at,conclusion,pull_requests:[(.pull_requests // [])[].number]}'
 ```
 
 Use the REST list, not `gh run list`: it carries `pull_requests[].number` and the head
