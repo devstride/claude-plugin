@@ -240,7 +240,10 @@ a pull request may still open as a draft; audit the gate and report the mixed co
 
 Scope the audit to workflows with an `on: pull_request` trigger. A workflow triggered only by
 `pull_request_review` or `pull_request_review_comment` is PR-related but must run on drafts —
-exempt it, and do not advise gating it.
+exempt it, and do not advise gating it. Likewise a **convention-only workflow** — subscribed to
+`opened` alone, no `synchronize`, one job that fails with a message (the draft-convention check
+from the CI cost patterns) — is a policy notice, not a CI gate: exempt it from the four-events and
+concurrency checks; it is supposed to run exactly on a non-draft open.
 
 Two separate checks, and **the first is the one everyone misses**:
 
@@ -258,7 +261,9 @@ Two separate checks, and **the first is the one everyone misses**:
   eventually deletes it. But `review` also runs standalone on a pull request somebody else opened,
   and on a **non-draft** one it skips the ready-flip entirely and settles against the CI it assumes
   is already running. Without `opened` there is no such run and never will be, so it waits forever.
-  FAIL with: declare all four.
+  FAIL with: declare all four. A fifth, `converted_to_draft`, is optional — with per-pull-request
+  `concurrency` on, the run it creates cancels the one a mistaken non-draft open started; suggest it
+  when concurrency is present and it is missing.
 - **Jobs gated on the draft condition** — match against `ci.draftGateCondition` (the config names
   the expression; default `github.event.pull_request.draft == false`) and accept equivalent forms
   such as `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated if ANY job it

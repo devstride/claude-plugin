@@ -20,7 +20,9 @@ Every job in a pull-request workflow is gated on the draft condition, directly o
 ```yaml
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # converted_to_draft is optional: with pattern B on, the (all-skipped) run it
+    # creates cancels the run a mistaken non-draft open started.
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
 jobs:
   changes:
     if: >-
@@ -39,12 +41,15 @@ bites when a push lands while a run is in flight.
 ```yaml
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 ```
 
-Put it at the top level of every pull-request workflow. Do **not** put it on a workflow whose
-runs must all complete (a publish, a deploy, a data job); those get `cancel-in-progress: false`
-with a group of their own.
+Put it at the top level of every pull-request workflow. **Cancel only pull-request runs.** A
+post-merge push run on the base branch is path-filtered on its own diff, so a backend push
+followed by a frontend-only push would cancel the only backend validation of the final tree and
+replace it with a run that sees no backend change — the expression above lets push runs finish.
+Do **not** put it on a workflow whose runs must all complete (a publish, a deploy, a data job);
+those get `cancel-in-progress: false` with a group of their own.
 
 ## C. Tree-identical skip on the production branch
 
@@ -57,14 +62,20 @@ filter, compare trees and skip when they match:
         id: tree
         if: github.event_name == 'push' && github.ref == 'refs/heads/<production>'
         run: |
-          git fetch --no-tags --depth=1 origin <base>
-          if [ "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse 'origin/<base>^{tree}')" ]; then
-            echo "identical=true" >> "$GITHUB_OUTPUT"
-            echo "Tree identical to <base> tip — already tested there; skipping."
+          git fetch --no-tags --depth=2 origin <production> <base>
+          T="$(git rev-parse 'HEAD^{tree}')"
+          if git rev-parse -q --verify 'HEAD^2' >/dev/null && [ "$T" = "$(git rev-parse 'HEAD^2^{tree}')" ]; then
+            echo "identical=true" >> "$GITHUB_OUTPUT"   # the promoted commit itself
+          elif [ "$T" = "$(git rev-parse 'origin/<base>^{tree}')" ]; then
+            echo "identical=true" >> "$GITHUB_OUTPUT"   # a fast-forward promotion
           else
             echo "identical=false" >> "$GITHUB_OUTPUT"
           fi
 ```
+
+Compare against the **promoted commit** — the merge's second parent — first, and the base tip
+only as a fallback: the base branch may already have moved by the time the runner starts, and a
+comparison against its tip would then re-run everything on exactly the busy days the skip is for.
 
 and fold it into the gate's outputs: `backend: ${{ steps.tree.outputs.identical == 'true' && 'false' || steps.filter.outputs.backend }}`
 (or into each step's `if:` where a workflow gates per step). A hotfix landing directly on the
@@ -96,7 +107,11 @@ jobs:
 
 Under a delivery profile whose release pull requests open non-draft (`prototype`), scope the
 condition to `!endsWith(github.actor, '[bot]')` only, as above, so the loop's own pull requests
-are never failed by it.
+are never failed by it. `setup` and `doctor` recognise this workflow by its shape — `opened`
+only, one job that fails with a message — and exempt it from the four-events and concurrency
+checks. When the person follows the message and converts the pull request to a draft, the
+`converted_to_draft` event (pattern A) plus concurrency (pattern B) cancel the runs the mistaken
+open started.
 
 ## The loop rules these mechanics pair with
 

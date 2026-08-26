@@ -198,6 +198,12 @@ Then compose, remembering the shapes differ:
 `.github/workflows/*.yml` or `*.yaml` present → **GitHub Actions**, the only provider the draft-hold
 mechanics understand.
 
+**A convention-only workflow is exempt.** A pull-request workflow subscribed to `opened` alone
+(no `synchronize`), whose single job exists to fail with a message — the draft-convention check in
+the CI cost patterns — is a policy notice, not a CI gate: it must run on a non-draft open and must
+not be judged against the four-events or concurrency rules. Recognise it by that shape and leave
+it out of both checks.
+
 When it is GitHub Actions, look at the workflows themselves before prefilling the three CI-ordering
 booleans — and look only at the ones this is about: **workflows with an `on: pull_request` trigger.**
 A workflow that fires on push, on a schedule, or on `pull_request_review` is not part of the draft
@@ -224,6 +230,8 @@ is the one repositories get wrong**:
    naming `ready_for_review` and nothing else is its own trap: a fix push after a red run then
    starts no run either, and the close-and-reopen fallback has no `reopened` to fire on. An explicit
    list needs all four; anything short of that is `ambiguous`, naming which events are missing.
+   A fifth, `converted_to_draft`, is optional and worth having once per-pull-request `concurrency`
+   is on: the run it creates (every job skips) cancels the run a mistaken non-draft open started.
    **`opened` is the one that looks droppable and is not.** The loop's own pull requests open as
    drafts, so it only ever produces a skipped run for them — but a standalone review on a
    *non-draft* pull request skips the ready-flip and settles against CI it assumes is already
