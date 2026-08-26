@@ -260,6 +260,8 @@ skills/review/SKILL.md|via path Y
 skills/doctor/references/version-currency.md|devstride--v
 hooks/version-check.sh|NEVER exits non-zero
 hooks/version-check.sh|alarm
+hooks/version-check.sh|installPath
+hooks/version-check.sh|show-toplevel
 PAIRS
 ```
 
@@ -395,14 +397,21 @@ R1. Newest release = TAGS not GitHub Releases (the project creates none, so a re
 R2. The hook NEVER blocks and NEVER exits non-zero; every failure records itself and stays
     quiet. Silent when current or unreachable; it speaks only when there is something to do.
     Session start is the ONLY moment an update may be applied (opt-in): mid-loop would change
-    skill behaviour between build steps. macOS has no `timeout` — the network cap is perl's alarm.
+    skill behaviour between build steps. macOS has no `timeout` — EVERY network command (the tag
+    lookup AND both update commands) runs under perl's alarm; an uncapped update offline blocks
+    every session start.
 R3. It reads the RUNNING version from the loaded copy (`$CLAUDE_PLUGIN_ROOT/.claude-plugin/
     plugin.json`), not from disk — a session serves what it loaded at startup, and
     `claude plugin list` cannot see that.
+R4. It updates ONLY the install the loaded copy belongs to, for THIS repository: the enabled
+    `claude plugin list --json` row whose installPath is $CLAUDE_PLUGIN_ROOT, a project-scope row
+    for this repo preferred — never every matching scope, and never a fabricated fallback id
+    (that violates R1 for the `ds@` alias and every project-scope install). Config is read from
+    the REPOSITORY ROOT, not the launch directory; the diagnostic record is per repository.
 
 ---
 
-**Revised total: 53 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 3 (R) = 100.**
+**Revised total: 53 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) = 101.**
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.

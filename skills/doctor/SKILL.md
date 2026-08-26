@@ -89,8 +89,9 @@ If a check could not be run, say so — never report an unrun check as a pass.
   (tags not Releases; strip the `devstride--v` prefix; `sort -V`; the installed id and scope from
   `claude plugin list --json`, never assumed; both update commands, then restart). Run it and
   report installed vs newest. Behind → print the two commands with the id and scope you read.
-- **Session-start check** — read `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/version-check.json`
-  (schema in the same reference) and report `checkedAt`, `running`, `newest`, `mode` and
+- **Session-start check** — read the per-repository record
+  `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/repo-<sha1 of the repo root, first 12 hex>.json`
+  (schema in the same reference; compute the key from `git rev-parse --show-toplevel`) and report `checkedAt`, `running`, `newest`, `mode` and
   `result` as one line. Absent → the check has never run here: say so, and say why it might be
   (plugin older than 1.2.0, hooks disabled, or `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). `mode` comes
   from the repository's `plugin` config block — `notify` is the default; `auto-update` applies

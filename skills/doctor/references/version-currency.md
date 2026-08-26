@@ -44,16 +44,23 @@ needs `--scope project`.
 
 ## What the session-start check records
 
-`${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/version-check.json`, written on every run:
+Two files under `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/`. `newest.json` is shared — the
+newest tag is not per-repository — and holds `newest` + `fetchedAt` for the six-hour TTL.
+`repo-<sha1-of-repo-root>.json` is per repository, because `mode` comes from that repository's
+config and two repositories with different pins would otherwise overwrite each other's status.
+Written on every run:
 
 | Field | Meaning |
 |---|---|
 | `checkedAt` | Unix time of this run |
+| `repo` | The repository root the config was read from (a session launched from a subdirectory still resolves to it) |
 | `running` | The version the session that ran the check was serving |
 | `newest` | Newest tag seen, or `null` when unreachable |
 | `source` | `network` (fetched this run) or `cache` (within the 6-hour TTL) |
 | `mode` | `notify` (default), `auto-update`, or `pinned` — from the repo's `plugin` config block |
-| `result` | `current`, `behind`, `behind-pinned`, `updated`, `update-failed`, or `unreachable` |
+| `result` | `current`, `behind`, `behind-pinned`, `pin-drift` (running a version other than the pin), `updated`, `update-failed`, `lookup-failed` (the loaded copy matched no row of `claude plugin list --json`, so no id was named), or `unreachable` |
+| `install` | The `id scope` the check identified as THIS install — the enabled row whose `installPath` is the loaded copy, a project-scope row for this repository preferred — or `null` |
+| `notifiedFor` | What the pinned/drift line was last printed for; the same situation is said once, not every start |
 
-Absent file → the check has never run on this machine: the plugin predates it, hooks are disabled,
+Absent per-repo file → the check has never run for this repository on this machine: the plugin predates it, hooks are disabled,
 or `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` is set. That is what `doctor` reports.

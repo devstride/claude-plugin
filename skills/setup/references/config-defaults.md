@@ -240,8 +240,10 @@ The shipped default says: this repository has not described an isolated local en
 as the only environment there is. A repository whose tooling gives each checkout its own instance
 fills the commands in and sets `instanceBoundTo` to what that tooling actually keys on —
 `directory` (a second worktree gets its own database, tables and ports, and checking out another
-branch inside it keeps them) or `branch`. Commands may carry `<name>` and `<base>` placeholders
-where the tooling needs them. This block tells the loop what exists; it never makes the loop
+branch inside it keeps them) or `branch`. Commands may carry `<name>` (the instance), `<base>` (the ref to
+branch from) and `<branch>` (the new branch, in the repository's own naming convention — a
+tool that defaults the branch to the instance name mints a nonconforming one) where the
+tooling needs them. This block tells the loop what exists; it never makes the loop
 concurrent — the serial-execution rule in `build-item` stands, because a per-checkout instance
 isolates dev servers and app data, not shared test infrastructure.
 

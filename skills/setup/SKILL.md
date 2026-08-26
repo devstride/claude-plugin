@@ -438,8 +438,8 @@ configuration in which the built-in adversarial pass is the local gate.
 How this repository stands up an isolated local instance, if it can. Five rows:
 `localEnvironment.create`, `.seed`, `.migrate`, `.teardown`, `.instanceBoundTo`.
 
-- Look for the shapes that usually mean one exists: `docker-compose*.yml` / `compose.yaml`, a
-  `.devcontainer/`, a `flake.nix` or `shell.nix`, a `Tiltfile` or `skaffold.yaml`, and root scripts
+- Look for the shapes that usually mean one exists: `docker-compose*.yml`, `docker-compose*.yaml`, `compose.yml` or
+  `compose.yaml`, a `.devcontainer/`, a `flake.nix` or `shell.nix`, a `Tiltfile` or `skaffold.yaml`, and root scripts
   named `dev`, `sandbox`, `env:*`, `db:seed`, `db:reset`, `migrate`. Each is a **candidate** for the
   row it suggests — a compose file suggests `create`, a `db:seed` script suggests `seed` — never a
   `detected` value: a compose file proves a stack exists, not that `docker compose up` is how this
