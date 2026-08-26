@@ -49,8 +49,8 @@ must never report worse ones.
 **A narrowed detector run stops after Phase B and writes nothing.** It has only looked at part of
 the repository, so it has nothing to say about the rest — and a write would fill every key the
 skipped detectors would have answered with a default, silently replacing real settings with
-guesses. Say that a full `/devstride:setup` is what writes the file. **`docs` and `ci` are the exceptions by
-design**: each writes exactly the keys its own questions answer (and, for `ci`, the accepted
+guesses. Say that a full `/devstride:setup` is what writes the file.
+**`docs` and `ci` are the exceptions by design**: each writes exactly the keys its own questions answer (and, for `ci`, the accepted
 workflow diffs) and nothing else, so neither can replace a setting it never asked about.
 
 **The write boundary — the whole of it.** This skill writes `.claude/ds-config.json`; in

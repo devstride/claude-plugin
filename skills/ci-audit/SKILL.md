@@ -34,8 +34,11 @@ gh run list --limit 1000 --created ">=$(date -u -v-${DAYS}d +%Y-%m-%d 2>/dev/nul
 `--limit 1000` is the API ceiling; if the earliest run returned is later than the window start,
 say so — the window is shorter than asked and the totals are a floor, not the month.
 
-For each run in the loop's workflows (match `workflowName` against the workflows under
-`ci.workflowGlobs`), fetch its jobs:
+`ci.workflowGlobs` names workflow FILES, and `gh run list` reports display names — resolve one
+to the other first: `gh api repos/{owner}/{repo}/actions/workflows --jq '.workflows[]|{id,name,path}'`,
+keep the entries whose `path` matches a glob, and filter runs by those names (or by `workflow_id`
+via `gh run list --workflow <id>`). A workflow renamed in its `name:` line still matches by path.
+Then, for each run in that set, fetch its jobs:
 
 ```bash
 gh api "repos/{owner}/{repo}/actions/runs/<id>/jobs?per_page=100" \
