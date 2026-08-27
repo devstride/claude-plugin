@@ -55,7 +55,8 @@ still wins; else config `profile`, else `standard`). **Announce the result WITH 
 `Profile` row; the next session inherits it from handoff memory (step 7).
 
 **A config key that is PRESENT wins over the profile's default** for
-`epicIntegrationBranches.autoRelease` and `fastStoryMerges.enabled` — the profile fills only an
+`epicIntegrationBranches.autoRelease` and `epicIntegrationBranches.fastStoryMerges.enabled` —
+the profile fills only an
 ABSENT key, and a present key that contradicts the profile is honoured AND reported ("profile
 prototype, but `autoRelease` is false in config — stopping at release-ready as configured").
 **The three `review.*` CI-ordering booleans are different**: they describe what the workflows
@@ -177,8 +178,8 @@ Deltas — **steps 1–6 run VERBATIM**, because the point is that the inner bui
   runs them serially, but the ready-set shows where the parallel waves are.
 - **DRY-CHAIN / TERMINAL:** zero not-Done, non-gated, unblocked candidates → DONE. Exit
   cleanly; never loop back to re-ask. Report which: plan complete / N blocked by X, Y / N gated
-  on human-infra decisions. Suggest `/devstride:plan <root>` to extend; never invoke it
-  automatically.
+  on human-infra decisions. Suggest `/devstride:plan <root>` to extend when the chain simply ran
+  out (not when work is merely blocked or gated); never invoke it automatically.
 - **GATING CHECK** — depends on a human/infra decision that is the user's? Flag it and move to the
   next candidate. **SCOPE CHECK** — what is buildable now vs deferred; record deferrals.
   **VALIDATE THE SPEC** — re-fetch with `view: 'full'` (the default omits `description`) and
@@ -302,8 +303,8 @@ No PR to merge — integrate locally, then push the epic branch:
   legible first-parent unit — the release PR body and close-out counts read off these merges).
   Message: `commitConventions.epicMergeFormat` (fallback:
   `merge: <itemNumber> [<N>] <short scope> into <epic-slug> integration`); its BODY carries the
-  dismissed-findings list with rationales — the only place a reader sees what was judged and
-  let go.
+  dismissed-findings list from step 3 PLUS any 4a dismissals, each with its rationale — the
+  only place a reader sees what was judged and let go.
 - Base moved while building → merge the refreshed epic branch INTO the story branch first,
   re-run the local suites, then merge back; unresolvable conflict → genuine fork.
 - Push the epic branch. **Only once that push SUCCEEDS**, delete the story branch **locally AND
@@ -340,8 +341,9 @@ No PR to merge — integrate locally, then push the epic branch:
 - **Re-check zero unresolved review threads immediately before merging** (the paginated query
   from `review`'s references) — a comment in the settle-to-merge gap would otherwise merge
   silently unaddressed. Non-zero → back through `review` steps 3–6 first.
-- **Merge guard — only when `ci.freezeBaseWhileReleasePrReady` is `true`** (an explicit `false`
-  disables it, merge proceeds with one line saying so): before ANY merge whose TARGET is
+- **Merge guard — only when `ci.freezeBaseWhileReleasePrReady` is `true`, THE DEFAULT when the
+  key is absent** (only an explicit `false` disables it; the merge then proceeds with one line
+  saying so): before ANY merge whose TARGET is
   `release.releaseSource` — here, and the epic release at step 8 — look for an open, NON-DRAFT
   PR with head `release.releaseSource` and base `release.productionBranch`. One exists → a
   release is in its CI window; do not merge beneath it — say which PR holds the base, wait
