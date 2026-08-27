@@ -253,10 +253,15 @@ isolates dev servers and app data, not shared test infrastructure.
 un-apply and a seed rewrites rows, not schema — so an instance living on development-branch schema
 cannot be brought back to a production-branch base by running them. It stays schema-AHEAD of the
 code it is now running, and a hotfix can then validate against a schema production does not have.
-`recreate` is the tooling's "a fresh instance built from `<base>`" — whatever that costs. Prefer
-a form that stands up a NEW instance rather than destroying the one the session is working in:
-the safe shape is `create` from the hotfix base under a different `<name>`, then `migrate`, then
-`seed`. A repository whose environment genuinely has no schema (a stateless dev server) leaves it
+`recreate` is the tooling's way back: whatever genuinely returns an instance to `<base>`'s schema.
+Two shapes qualify, and a repository should pick whichever its tooling actually supports. An
+**in-place rebuild** — drop the schema and re-run the checked-out code's migrations, then seed —
+is usually simplest, and it keeps the session in a working directory. A **second instance** stood
+up from `<base>` also works, but check it can be built at all: a tool that reuses an existing
+branch cannot take one that is already checked out somewhere, which is exactly the state
+`branch-hotfix` leaves behind. Whichever shape, the rule is that the session must still be in a
+working instance afterwards — never a torn-down directory or a detached HEAD, because no config
+command can move the caller. A repository whose environment genuinely has no schema (a stateless dev server) leaves it
 `null`, and nothing is lost.
 
 ## Known cloud reviewers

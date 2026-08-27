@@ -53,14 +53,22 @@ entirely, which is the commonest shape you will meet, not a rare one. Read a mis
 
 Three cases, and the third is the one that matters:
 
-1. **`recreate` set** → use it: a fresh instance built from the hotfix base. **Substitute the
-   placeholders the contract allows before running it, and never pass one through to a shell** —
-   `<base>` reaching `sh` unexpanded is parsed as input redirection, and the command fails in a
-   way that reads like a broken environment rather than a broken invocation. Bind `<base>` to the
-   hotfix base ref (`hotfixBaseBranch`, fetched — a stale tracking ref rebuilds from an old
-   production commit), `<branch>` to the hotfix branch just created, and `<name>` to a NEW
-   instance name distinct from the one in use (the hotfix item number makes an obvious one).
-   Prefer that new instance over destroying the instance the session is working in.
+1. **`recreate` set** → run it. **Substitute the placeholders the contract allows before running
+   it, and never pass one through to a shell** — `<base>` reaching `sh` unexpanded is parsed as
+   input redirection, and the command fails in a way that reads like a broken environment rather
+   than a broken invocation. Bind `<base>` to the hotfix base ref (`hotfixBaseBranch`, fetched —
+   a stale tracking ref rebuilds from an old production commit), `<branch>` to the hotfix branch
+   just created, and **`<name>` to the instance the command is meant to act on — which the
+   COMMAND's shape decides, not this skill.** A command that resets in place needs the instance
+   the session is already in; one that stands up a second instance needs a new name (the hotfix
+   item number makes an obvious one). Read the command before binding it.
+
+   **What matters is not how many instances exist afterwards, but that the session is still in a
+   working one.** Do not leave the session in a directory whose instance was torn down, or on a
+   detached HEAD in a checkout the rebuilt instance no longer belongs to: a config command cannot
+   move the caller, so the skill would then check its own postcondition from the wrong place. An
+   in-place rebuild of the current instance's database satisfies this and is usually the simplest
+   thing a repository can offer.
 2. **`recreate` absent or `null`, and you can say WHY the schema has not diverged** (the instance
    has been on the production line all along, or the environment has no schema) → `migrate` then
    `seed`, in that order, since a seed against a stale schema fails or lies.
