@@ -8,6 +8,19 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **A cost harness, so "how much does a skill cost to load" is a number, not an estimate.**
+  `scripts/measure-cost.sh` measures every skill body, every reference, every shipped script and
+  the always-on session cost with one fixed method (`ceil(bytes / 3)` — simple on purpose, so
+  anyone can cross-check it with `wc -c`, and its bias cancels across a before/after table).
+  `scripts/cost-budgets.json` commits a budget per body, a ratchet: lower freely, raise only in the
+  same commit as the text that needs it. `scripts/measure-cost.sh --check` fails on a breach, a
+  missing budget or a stale one; `--table --since <tag>` prints the before/after table each
+  release's CHANGELOG now carries. `scripts/validate.sh` runs every pre-release check in one
+  command and is what RELEASING.md step 0 now names; `scripts/tests/run.sh` is where script tests
+  live from here on.
+
 ## [2.3.0] — 2026-08-27
 
 ### Fixed

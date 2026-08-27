@@ -36,3 +36,6 @@ paths individually) rather than trusting a single root-level run.
   declaring in `plugin.json`.
 - Shared reference docs belong to the skill that owns them (`skills/<name>/references/`), not to
   a repo-level directory.
+- `scripts/` holds repo-level maintenance scripts (`validate.sh`, `measure-cost.sh`, their tests).
+  Nothing at runtime reads them and the plugin loader ignores the directory — it is not a
+  component directory, and it must not move under `.claude-plugin/`.
