@@ -91,7 +91,7 @@ If a check could not be run, say so — never report an unrun check as a pass.
   report installed vs newest. Behind → print the two commands with the id and scope you read.
 - **Learned reviewer latency** — read `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/reviewer-latency.json` and report
   per reviewer id: samples, p50, p95, and the bound `review` derives under this repository's
-  `pollTimeoutMinutes` — or "cold — the wait uses `pollTimeoutMinutes`" under five samples.
+  `pollTimeoutMinutes` — or "cold — the wait uses `pollTimeoutMinutes`" below the script's sample minimum.
   Informational, never a FAIL; the schema and the doctor line's format are in
   `${CLAUDE_PLUGIN_ROOT}/skills/review/references/reviewer-latency.md`.
 - **Session-start check** — read the per-repository record
