@@ -549,15 +549,21 @@ released CI, so treating it as a precondition would be circular.
    escalate in order, bounded: (a) **close+reopen** the PR — `reopened` is in the trigger list
    and re-evaluates the draft condition; (b) if ~60 s after the reopen `mergeable_state` is
    still `unknown` / `merge_commit_sha` null and there is still no run, push ONE **EMPTY COMMIT**
-   (`git commit --allow-empty -m "ci: re-trigger — GitHub did not build this pull request's merge ref"`,
-   then a plain push — a fast-forward, allowed even on a PROTECTED head (7.1 forbids only
-   rewriting) at the cost of a no-op commit production inherits; name it in the step-8 report);
+   onto the PR's OWN head — three preconditions, each with a failure behind it
+   (`github-review-api.md`): index CLEAN (`git diff --cached --quiet`), local `HEAD` IS that PR's
+   head (`gh pr view <n> --json headRefName,headRefOid`), and after
+   `git commit --allow-empty -m "ci: re-trigger — GitHub did not build this pull request's merge ref"`
+   the new `HEAD^{tree}` EQUALS `HEAD~1^{tree}` — else reset and STOP. Then
+   `git push origin HEAD:<headRefName>` — a fast-forward, which 7.1 permits on a PROTECTED head
+   (it forbids only rewriting) though branch protection may still refuse any direct push: then
+   STOP and surface — at the cost of a no-op commit production inherits; name it in the step-8
+   report);
    (c) at most one empty commit per settle — still nothing is a GitHub-side incident: STOP and
    surface it, never loop. A new head forces a per-PR mergeability recompute; the stall is
    repo-wide for existing heads (why: `github-review-api.md`, "The mergeability
    stall"). An empty commit does not CHANGE the patch, so 7.1's re-review rule does
-   not fire. Keyed on "no run + `mergeable_state: unknown`", not on the flip — step 0's
-   close+reopen escalates the same way.
+   not fire. Keyed on "no run + `mergeable_state: unknown`", not the flip; step 0
+   escalates the same way.
 
    Report the verified outcome to the caller — `build-item` step 5 and `release` both treat
    "CI settled green" as a precondition for merging, and neither can distinguish a skipped board
@@ -621,13 +627,10 @@ write.
   run counts when any job beyond the
   gate/detect job finished other than `skipped` (method in the `ci-audit` skill). Count
   **per workflow**, one line each — `backend-tests 1 · lint 1 · ci-policy 1 — expected 1 per
-  workflow (ci.expectedRunsPerPullRequest); 0 excess`: several workflows once
-  each is the design; the excess is a SECOND executed run of the SAME workflow, named with its
-  cause: a push after the ready-flip (a commit dated after the `ready_for_review` timeline
+  workflow (ci.expectedRunsPerPullRequest); 0 excess`. Several workflows once each is the design;
+  the excess is a SECOND executed run of the SAME workflow, named with its cause: a push after the ready-flip (a commit dated after the `ready_for_review` timeline
   event), a base that moved (a new run with no new head commit), a PR opened non-draft, or 7.3's
-  empty re-trigger commit (an excess only if that workflow had ALREADY executed; else it IS the
-  intended run). A workflow with every non-gate job skipped executed 0 times — neither excess
-  nor miss. This is the number the draft hold exists to produce; the same cause on a later
+  empty re-trigger commit (an excess only if that workflow ALREADY executed). A workflow whose non-gate jobs all skipped executed 0 times: neither. This is the number the draft hold exists to produce; the same cause on a later
   cycle is a recurrence for that cycle's 6.5.
 - **Standalone** + `review.notifyWhenSettled` → `PushNotification` that the PR is ready. Skip if
   the user is clearly still here.

@@ -8,6 +8,16 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-08-26
+
+**Why a major version.** `ci.expectedRunsPerPullRequest` changes meaning: it now counts executed
+runs **per workflow** on a pull request, not as one aggregate across every workflow. Under the
+repository's own rule, changing what an existing `.claude/ds-config.json` key means is a MAJOR bump,
+however small the edit. Migration is one number: if your config keeps the default `1`, nothing to
+do — a full-stack pull request that runs several workflows once each is now reported correctly
+instead of as an excess. If you had raised it to tolerate the old aggregate count, set it back to
+the number of executed runs you actually expect from each workflow (almost always `1`).
+
 ### Fixed
 
 - **Review step 7.3 has a remedy for the GitHub mergeability stall that actually works.** When a
@@ -17,7 +27,10 @@ for what each version component means here and how a release is cut.
   repo-wide. What clears it is a NEW head. The skill now escalates in order — close+reopen, then
   ONE empty commit (`git commit --allow-empty`) when the stall persists ~60 s later — bounded to
   one per settle, then stops and surfaces a GitHub-side incident instead of looping. An empty
-  commit does not change the patch, so no re-review fires. Invariant F7 and needles pin it;
+  commit does not change the patch, so no re-review fires — but only a commit whose tree equals
+  its parent's, which `--allow-empty` alone does not guarantee, so the rule requires a clean
+  index, verifies the tree afterwards, and pushes to the pull request's own head ref rather than
+  whatever is checked out. Invariant F7 and needles pin it;
   `build-item` and step 7.5 point at the escalation instead of restating close+reopen
   (invariants total 101 → 104: F7 plus the new section S).
 - **`doctor` no longer reports a finding on a correctly configured draft-convention check** —
@@ -37,14 +50,15 @@ for what each version component means here and how a release is cut.
 
 ### Changed
 
-- **`ci.expectedRunsPerPullRequest` is read per workflow, not as an aggregate.** A full-stack
+- **`ci.expectedRunsPerPullRequest` is read per workflow, not as an aggregate** (the change behind
+  the major version — see above). A full-stack
   pull request legitimately executes several workflows once each; 1.2.0 reported that as
   "5 executed runs; expected 1". `review` step 8 now reports one line per workflow that executed
   and names a SECOND run of the SAME workflow as the excess, with a fourth cause — the empty
   re-trigger commit above, an excess only when that workflow had already executed. `ci-audit`
   classifies per (pull request, workflow) and its headline ratio is executed runs over the
   distinct workflows that executed per pull request; `doctor`'s run-once line uses the same
-  ratio. No config change is needed: the key's name, type and default are unchanged.
+  ratio. The key's name, type and default are unchanged; only its meaning is.
 - Pattern D (the draft-convention check) is now the three-event shape shown in
   `ci-cost-patterns.md`; repositories on
   the older `opened`-only shape can re-copy it to get the pass-on-conversion behaviour.
@@ -500,7 +514,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v1.2.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.0.0...HEAD
+[2.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.2.0...devstride--v2.0.0
 [1.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.1.0...devstride--v1.2.0
 [1.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.0.0...devstride--v1.1.0
 [1.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v0.10.0...devstride--v1.0.0

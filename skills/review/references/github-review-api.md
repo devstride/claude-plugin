@@ -233,9 +233,18 @@ nothing), then one empty commit when `mergeable_state` is still `unknown` ~60 s 
 stop — a second empty commit has never been needed, and looping on one would only stack no-op
 commits on the branch.
 
+**Why 7.3(b) has three preconditions rather than one command.** `git commit --allow-empty` does
+NOT force an empty tree — it commits whatever is in the index, and an empty *diff* is only the
+result when nothing is staged. A session that had staged an unrelated edit would therefore push
+real content under the "does not change the patch, so no re-review" rule: substantive code
+settled as a no-op. Hence a clean index BEFORE, and a tree comparison against the parent AFTER —
+the check that actually proves what the rule assumes. And the commit must land on the PR's own
+head: `review` runs standalone against any PR number, and `release` operates on two named
+branches, so in neither case is local `HEAD` necessarily that PR's head — an unqualified push
+would leave the stalled PR untouched while advancing some other branch.
+
 Two consequences step 7.3 states as rules: the empty commit does not change the patch, so the
 "CHANGED the patch" re-review rule does not fire; and on a protected release head it is a
 fast-forward push, which the protected-head rule permits (it forbids rewriting), at the cost of
 a no-op commit that production inherits at promotion — the tree-identical skip still fires
 there, because the tree is unchanged.
-

@@ -80,7 +80,9 @@ F5. [Same condition] A run that failed to TRIGGER is first kicked by close+reope
 F6. Require the FINAL head SHA to be observed SUCCESS; absent/stale is not green.
 F7. Close+reopen does not clear a GitHub mergeability stall (`mergeable_state: unknown`, no
     runs at all — not even skipped ones); a NEW HEAD does: one empty commit, bounded to one per
-    settle, then STOP and surface. An empty commit does not change the patch (no re-review).
+    settle, then STOP and surface. Only a commit whose tree EQUALS its parent's skips re-review,
+    and `--allow-empty` does not guarantee that — require a clean index and verify the tree.
+    Push to the PR's own head ref; local HEAD is not always it.
 
 ## G. Git safety
 G1. NEVER rebase or force-push a protected head — and a production release PR's head IS the
@@ -264,6 +266,7 @@ skills/doctor/references/version-currency.md|devstride--v
 hooks/version-check.sh|NEVER exits non-zero
 hooks/version-check.sh|alarm
 skills/review/SKILL.md|EMPTY COMMIT
+skills/review/SKILL.md|diff --cached --quiet
 skills/release/SKILL.md|empty re-trigger commit
 skills/review/SKILL.md|mergeable_state
 skills/review/SKILL.md|per workflow

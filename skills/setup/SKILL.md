@@ -203,13 +203,12 @@ Then compose, remembering the shapes differ:
 `.github/workflows/*.yml` or `*.yaml` present → **GitHub Actions**, the only provider the draft-hold
 mechanics understand.
 
-**A convention-only workflow is exempt.** The shape is defined once, under pattern D of
-`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`: `on.pull_request.types` of
-`opened` plus optionally `converted_to_draft` / `ready_for_review` and nothing else (never
-`synchronize`), one `run:`-only job with no checkout, failing on a non-draft `opened` and
-passing otherwise; the `opened`-only shape is a subset. **Remove it from the population BEFORE the five-case table below is
-evaluated** — left in, its draft-condition `if` and short `types` list read as an `ambiguous`
-row, and Phase G calls it a FAIL.
+**A convention-only workflow is exempt.** Its shape is defined once, under pattern D of
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md` (`opened` plus optionally
+`converted_to_draft` / `ready_for_review`, one run-only job, fails on a non-draft open); the
+`opened`-only shape is a subset. **Remove it from the population BEFORE the five-case table
+below is evaluated** — left in, its draft-condition `if` and short `types` list read as an
+`ambiguous` row and Phase G calls it a FAIL.
 
 When it is GitHub Actions, look at the workflows themselves before prefilling the three CI-ordering
 booleans — and look only at the ones this is about: **workflows with an `on: pull_request` trigger.**
