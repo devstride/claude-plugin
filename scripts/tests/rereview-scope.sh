@@ -61,6 +61,19 @@ J="$(scope --base main --round1 "$R1B")"
 if [ "$(printf '%s' "$J" | field 'd["scope"]')" = full ] && printf '%s' "$J" | grep -q '"reason":"new-file deep/moved.txt'; then ok "(5d) fix recreates a path round 1 renamed away → full: new-file"; else bad "(5d) $J"; fi
 g checkout -q story
 
+# (5e) round 1 was a PURE rename (zero changed lines); a fix that rewrites the file → full (any delta > 50% of 0)
+g checkout -q main && g checkout -qb story3 && g mv README.md README-moved.md && g commit -qm "story3: pure rename" && R1C="$(g rev-parse HEAD)"
+echo rewritten > "$TMP/r/README-moved.md" && g commit -qam "fix rewrites the renamed file"
+J="$(scope --base main --round1 "$R1C")"
+if [ "$(printf '%s' "$J" | field 'd["scope"]')" = full ] && printf '%s' "$J" | grep -q '"reason":"delta [0-9]* of 0 lines'; then ok "(5e) zero-line round 1, any rewrite → full"; else bad "(5e) $J"; fi
+g checkout -q story
+
+# (5f) a filename containing a TAB is kept whole, so a new tabbed file is still new → full
+printf 'x\n' > "$TMP/r/tab	new.txt" && g add -A && g commit -qm "fix adds a file with a tab in its name"
+J="$(scope --base main --round1 "$R1")"
+if [ "$(printf '%s' "$J" | field 'd["scope"]')" = full ] && [ "$(printf '%s' "$J" | field 'd["newFiles"][0]')" = "tab	new.txt" ]; then ok "(5f) tab in a filename survives numstat parsing → full: new-file"; else bad "(5f) $J"; fi
+g reset -q --hard "$R1"
+
 # (9) a fix touching a non-UTF-8 text file still decides, exit 0, one JSON line
 printf 'line 5-a caf\351\nline 5-b\nline 5-c\nline 5-d\n' > "$TMP/r/f5.txt" && g commit -qam "latin-1 byte in a fix"
 J="$(scope --base main --round1 "$R1" 2>&1)"; RC=$?

@@ -48,7 +48,7 @@ def numstat(a, b):
     tokens = git("diff", "--numstat", "-M", "-z", "%s...%s" % (a, b)).decode("utf-8", "surrogateescape").split("\0")
     i = 0
     while i < len(tokens):
-        parts = tokens[i].split("\t"); i += 1
+        parts = tokens[i].split("\t", 2); i += 1   # a path may itself contain a tab
         if len(parts) < 3: continue
         add, dele, path = parts[0], parts[1], parts[2]
         if path == "" and i + 1 < len(tokens):   # rename: the next two tokens are source, destination
@@ -76,7 +76,7 @@ else:
     new = sorted(dst for (src, dst) in d_entries if src not in r1_files and dst not in r1_files)
     out["newFiles"] = new
     if new: out.update(scope="full", reason="new-file %s" % new[0] + (" (+%d more)" % (len(new) - 1) if len(new) > 1 else ""))
-    elif r1_lines > 0 and d_lines > T * r1_lines: out.update(scope="full", reason="delta %d of %d lines (> %d%%)" % (d_lines, r1_lines, int(T * 100)))
+    elif d_lines > T * r1_lines: out.update(scope="full", reason="delta %d of %d lines (> %d%%)" % (d_lines, r1_lines, int(T * 100)))
     else: out.update(scope="delta", reason="the fixes stay inside round 1's files and under %d%% of its lines" % int(T * 100))
 print(json.dumps(out, separators=(",", ":")))
 PY
