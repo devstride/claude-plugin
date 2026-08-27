@@ -113,8 +113,9 @@ not the floor. Fixing a finding never spends a round.
 - **A template with no `<base>` at all is the pre-placeholder shape** (the contract used to say
   "the command with `--base origin/<baseRefName>`", which some templates met by carrying no
   placeholder): every launch APPENDS ` --base <value>` to it, with the same values a `<base>`
-  template gets, so round 2 still scopes to the delta. `doctor` §2 names the shape; `setup`
-  writes `<base>` from this release on.
+  template gets, so round 2 still scopes to the delta. `doctor` §6 names the shape; `setup`
+  writes `<base>` from this release on. A `<context>` token WITHOUT `<base>` is a config error —
+  `<context>` only ever replaces the `--base` pair.
 - `review.localCommand` placeholders: `<base>` (required — the ref the engine diffs against:
   `origin/<baseRefName>`, the PR's ACTUAL base — an epic branch, develop, or master for a
   release — never `baseBranch` by name) and `<context>` (optional — see above; removed on round

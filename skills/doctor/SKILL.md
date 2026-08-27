@@ -342,7 +342,8 @@ The point: **find out whether anything actually checks the code before it merges
   `integrationBranch` **and** disable epic branches.
 - **Review roster** — report which engines are configured (`review.localCommand`,
   `review.automatedReviewers`). An empty roster is legal and means the built-in adversarial pass is
-  the only review; say so rather than implying breakage.
+  the only review; say so rather than implying breakage. A `localCommand` with no `<base>` is the
+  pre-placeholder shape — say so (` --base <value>` is appended).
 - **`preShipChecks`** — if any entry exists, confirm its command resolves (same segment-splitting as
   §4); these run at the ship boundary and nothing in CI covers them.
 
