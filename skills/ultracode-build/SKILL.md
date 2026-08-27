@@ -162,21 +162,17 @@ expensive, serialized part of the pipeline.
 widest size this rule may pick; size the diff as below, then clamp to the ceiling. Say which
 size you picked and, when the ceiling clamped it, say that too:
 
-- **NARROW** (one-liner, copy tweak, rename, config flip): 1–2 finder lenses — **correctness, plus
-  conventions when the diff touches styled or typed frontend code** — with batched verification.
-  Cheap; skipping is what costs. The security lens joins these when the diff touches the auth
-  boundary (the floor below); that is an addition to NARROW, not a step up in size.
-- **CONTAINED** (one subsystem, no deployed-runtime contract change, no new permission surface —
-  a CLI verb, a test harness, a self-contained few-hundred-line refactor): 2–3 lenses chosen for the
-  diff's real risk, batched verification (one verifier per finder's list, not per finding). Half a
-  dozen agents, not twenty-five.
-- **HIGH-RISK** (cross-module contracts, deployed handlers/routes, migrations, permission/security
-  surface, event reshapes, anything the deploy-safety contract flags): all five lenses,
-  per-finding verification.
+- **NARROW**: 1–2 finder lenses — **correctness, plus conventions when the diff touches styled
+  or typed frontend code** — with batched verification. The security lens joins these when the
+  diff touches the auth boundary (the floor below): an addition to NARROW, not a step up.
+- **CONTAINED**: 2–3 lenses chosen for the diff's real risk, batched verification (one verifier
+  per finder's list, not per finding).
+- **HIGH-RISK**: all five lenses, verification grouped by file.
 
-Unsure → go one size up, **never past the ceiling**. Where the contract lets a ceiling rise for
-one story (a diff that itself touches an auth boundary or a migration), that is the contract's
-exception to read there, not a judgment call to make here.
+Unsure → go one size up, **never past the ceiling**; a ceiling the contract lets rise for one
+story is the contract's exception, not a judgment call here. **Read when** the size is unclear:
+`${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/review-fanout.md` — what each breadth
+looks like, why verification is grouped, the lesson-routing and verification reasoning.
 
 **FLOORS — no profile or override removes these.** The Claude pass itself always runs, at NARROW
 or wider. And **the security lens is added whenever the DIFF touches the auth boundary** — as
@@ -189,19 +185,15 @@ PR will target) and **excluding generated files**; reviewing generated code wast
 and produces noise.
 
 **Stage A — finders** (parallel, one per angle). Each returns findings with a `file:line` anchor
-and a one-sentence claim.
+and a one-sentence claim. Assign each finding an id (`F1…Fn`) when merging the finders' lists —
+Stage B's verdicts are keyed by it.
 
-**Hand each finder the lessons that match ITS angle** as ADDITIONAL named checks. Routing is a
-JUDGMENT read from each lesson's Pattern text — the schema records a curation `class`
-(`repeat`/`general`/`common`), never an angle, so there is nothing to look up. A lesson whose
-Pattern matches no lens you provisioned for this story is simply dropped for this build, by
-design: at NARROW or CONTAINED breadth most angles have no finder at all, and the lesson has
-already done its main job as a phase-1 constraint. Two
-guardrails, both load-bearing: lessons **EXTEND** a finder's checklist and never narrow it — a
-finder that tunnels onto lesson patterns and misses a novel defect has done the opposite of its
-job; and a lesson-derived finding goes through Stage B verification like any other, with a
-concrete `file:line` claim about THIS diff. A lesson is a hypothesis about where defects
-cluster, never a verdict. No lessons file → the finders' base checklists are the whole story.
+**Hand each finder the lessons that match ITS angle** as ADDITIONAL named checks — a judgment
+read from each lesson's Pattern text (the schema records no angle); a lesson matching no lens
+provisioned for this story is dropped for this build. Two imperatives: lessons **EXTEND** a
+finder's checklist and never narrow it; and a lesson-derived finding goes through Stage B
+verification like any other, with a concrete `file:line` claim about THIS diff. No lessons
+file → the finders' base checklists are the whole story.
 
 - **Correctness** — logic bugs, edge cases, off-by-one, null/undefined, swallowed `Result` errors,
   races, wrong state transitions.
@@ -214,7 +206,17 @@ cluster, never a verdict. No lessons file → the finders' base checklists are t
   fresh tab, a keyboard shortcut, a retry) — name the unexercised paths as findings.
 - **Cleanup / conventions** — `conventionsDoc` violations, dead code, leftover debug, KISS/YAGNI/DRY.
 
-**Stage B — verification** (per-finding at HIGH-RISK, batched per-finder at CONTAINED):
+**Stage B — verification.** Fan out by the profile's `verificationGrouping` (contract): at
+HIGH-RISK **one verifier per file-group** — the findings anchored in one file, or in a small set
+of files one verifier can hold together (at most 5 findings and 3 files per group; split larger
+ones) — grouped by `${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/scripts/group-findings.py`; at
+CONTAINED one verifier per finder's list; at NARROW batched. **An auth-boundary finding is never
+grouped: it gets its own verifier at every breadth** (Floor 2) — auth-boundary meaning the
+security lens raised it, or its anchor file is one the diff's auth-boundary decision named. Every
+verifier returns **one verdict per finding id** — CONFIRMED / PLAUSIBLE / REFUTED, each with
+likelihood and impact, as a JSON list keyed by id; a return missing any id, or carrying one
+verdict for the group, is defective: re-run that group per finding and say so in the report.
+`profileOverrides.verificationGrouping: "per-finding"` restores one verifier per finding.
 **CONFIRMED** (real and reproducible) / **PLAUSIBLE** (likely real, not fully verifiable from the
 diff) / **REFUTED** (the verifier shows why the code is fine). This stage exists precisely so you
 do NOT blind-apply finder suggestions — a finding is not actionable until CONFIRMED or PLAUSIBLE.
@@ -229,15 +231,9 @@ corrupted or lost data, or a security hole; a security finding is P1 whatever it
 
 **A verdict that rests on having LOOKED — a browser, a running service, a manual run — names
 the path it exercised.** The report vocabulary is **"verified X via path Y"**, never a bare
-"verified". Behavioural states are usually reachable by more than one route, and a fix confirmed
-on one of them has proven nothing about the others: before calling a behavioural fix verified,
-enumerate the ways the state can be reached and say which were exercised and which were not — a
-reviewer later finding an untried path is the process working, not a surprise. Assert what you
-are measuring: scope DOM or API queries to the live container and check its count, because a
-stale mounted panel or a cached response answers with equal confidence and makes a broken state
-read as a pass, or as a different bug; and use one clean load per case, since in-place navigation
-lets cases bleed into each other. A stale session, an expired login or a service that is not up
-looks identical to a broken feature — rule those out before reading code.
+"verified". Before calling a behavioural fix verified, enumerate the ways the state can be
+reached and name which routes were NOT tried. **Read when** verifying by looking: the reference
+above — scoping what you measure, one clean load per case, stale sessions that mimic defects.
 
 Then act by the profile's `fixFloor` — which verified findings get fixed IN THIS STORY, read
 from those verdicts:
@@ -264,7 +260,7 @@ ambiguous or risky finding is a fork — ask, with your recommendation.
 
 Close the phase with a one-line **review report**: the profile, the breadth picked (and whether
 the ceiling clamped it), the lens count (naming the security lens when the auth-boundary floor
-added it), the agent count across both stages, and the tally — raised / fixed / deferred /
+added it), the agent count across both stages (**verifiers: G file-groups + A per-finding**), and the tally — raised / fixed / deferred /
 dismissed.
 
 ## 4. Hand back
