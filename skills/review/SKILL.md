@@ -34,8 +34,10 @@ and how often the local CLI engine runs on a fast-mode STORY review — never wh
 roster), `fixFloor`, `reviewerRegistrationWindowMinutes`, `pollTimeoutMinutes`,
 `releaseCiOrdering`. A caller that resolved it (`build-item`, `pr`, `release`) passes it in;
 otherwise resolve it by the contract's order (explicit argument → the plan root's marker, read
-with `get_item(view: 'full')` → config `profile` → `standard`) and apply `profileOverrides` as
-the contract specifies. Announce next to the roster ("profile: standard — from
+with `get_item(view: 'full')` → config `profile` → `standard`). **Either way apply
+`profileOverrides` to THIS skill's knobs** — a caller passes the profile NAME, not the
+overrides, so skipping this on a driven path silently drops a pinned `fixFloor` or
+`maxLocalReviewRounds`. Announce next to the roster ("profile: standard — from
 `.claude/ds-config.json`").
 **An explicit config key wins over the profile** where a knob has its own key
 (`review.pollTimeoutMinutes`): a PRESENT key is the operator's decision — honour it, report the
@@ -394,7 +396,7 @@ circular.
    escalate in order, bounded: (a) **close+reopen**; (b) ~60 s later still `unknown`/null →
    ONE **EMPTY COMMIT** on the PR's OWN head, three preconditions each with a failure behind
    it (`github-review-api.md`): index CLEAN (`git diff --cached --quiet`), local `HEAD` IS
-   that PR's head, and after
+   that PR's head (`gh pr view <n> --json headRefName,headRefOid`), and after
    `git commit --allow-empty -m "ci: re-trigger — GitHub did not build this pull request's merge ref"`
    the new `HEAD^{tree}` EQUALS `HEAD~1^{tree}` — else reset and STOP; then
    `git push origin HEAD:<headRefName>` (a fast-forward — permitted on a protected head; branch
