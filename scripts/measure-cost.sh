@@ -1,0 +1,233 @@
+#!/bin/bash
+# scripts/measure-cost.sh — what a skill costs to load, against committed budgets.
+#
+# Runs under macOS /bin/bash 3.2: bash does argument parsing only; the logic is
+# python3, the toolchain hooks/version-check.sh already assumes.
+#
+# THE METHOD (fixed here; recorded in scripts/cost-budgets.json as _method):
+#   tokens(file) = ceil(utf8_bytes(file) / 3), bytes exactly as `wc -c` prints.
+# It is a pure function of the file, needs no dependency, and anyone can
+# cross-check it with a one-liner. It over-estimates plain prose and
+# under-estimates dense identifier lists; that bias is the same on both sides
+# of every before/after table, which is what the tables are for. Changing the
+# formula means running --write-budgets in the same commit so every budget is
+# re-baselined against the new method and the diff shows both.
+#
+# What is measured:
+#   bodies       every skills/*/SKILL.md, the WHOLE file. The loader strips the
+#                YAML frontmatter before the body enters context, so this
+#                over-counts by that much (~1% of a body) — kept deliberately so
+#                the number equals `wc -c`, which anyone can cross-check, and the
+#                bias is identical on both sides of every table. Budgeted.
+#   references   every skills/*/references/*.md — informational, never
+#                budgeted, listed so moved text can be seen to have MOVED.
+#   scripts      hooks/*.sh, scripts/*.sh, skills/*/scripts/* — bytes only,
+#                "executed, not loaded".
+#   alwaysOn.context   what enters every session's context: the skill listing,
+#                the sum over SKILL.md files of "- devstride:<name>: <description>\n"
+#                from each frontmatter. Budgeted (alwaysOnContext).
+#   alwaysOn.executed  hooks/hooks.json + hooks/version-check.sh +
+#                .claude-plugin/plugin.json in bytes — parsed or executed by the
+#                harness, never read as context.
+#
+# Flags:
+#   (none)                 human table
+#   --check                exit 1 on any OVER / MISSING-BUDGET / STALE-BUDGET /
+#                          always-on breach / unparsable budgets; else one ok
+#                          line per body
+#   --json                 the same data as one JSON document
+#   --table --since <ref>  markdown before/after table for CHANGELOG; @ref
+#                          columns come from `git show <ref>:<path>`
+#   --write-budgets        rewrite the budgets file from the current measurement
+#   --budgets <path>       use another budgets file (tests)
+#
+# Exit codes: --check and the plain table exit 1 on any problem (a breach, a
+# missing/stale budget, a missing always-on input, a body without frontmatter,
+# a broken budgets file). --json is pure data: it always exits 0 and lists the
+# same problems under "problems". --write-budgets and --table exit 0 on success.
+set -u
+command -v python3 >/dev/null 2>&1 || { echo "measure-cost: python3 is required" >&2; exit 2; }
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MODE=""; SINCE=""; BUDGETS="$ROOT/scripts/cost-budgets.json"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --check|--json|--table|--write-budgets) MODE="${1#--}"; shift ;;
+    --since|--budgets)
+      [ $# -ge 2 ] || { echo "measure-cost: $1 needs a value" >&2; exit 2; }
+      if [ "$1" = "--since" ]; then SINCE="$2"; else BUDGETS="$2"; fi; shift 2 ;;
+    -h|--help) awk 'NR>1 && !/^#/{exit} NR>1{print}' "$0"; exit 0 ;;
+    *) echo "measure-cost: unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+if [ "$MODE" = "table" ] && [ -z "$SINCE" ]; then echo "measure-cost: --table needs --since <git-ref>" >&2; exit 2; fi
+export MC_ROOT="$ROOT" MC_MODE="$MODE" MC_SINCE="$SINCE" MC_BUDGETS="$BUDGETS"
+exec python3 - <<'PY'
+import glob, json, math, os, re, subprocess, sys, datetime
+
+ROOT, MODE, SINCE, BUDGETS_PATH = (os.environ[k] for k in ("MC_ROOT", "MC_MODE", "MC_SINCE", "MC_BUDGETS"))
+METHOD = "tokens = ceil(utf8_bytes / 3); bytes as `wc -c`"
+
+def tokens(nbytes): return math.ceil(nbytes / 3)
+def nbytes(path): return os.path.getsize(path)
+def rel(p): return os.path.relpath(p, ROOT)
+
+def frontmatter(text):
+    """Minimal YAML front matter: `key: value`, quoted values, and `>`/`|` block scalars whose
+    indented continuation lines are joined with spaces. Returns {} when there is none — callers
+    treat that as a problem, never as an empty description."""
+    text = text.lstrip("\ufeff")
+    m = re.match(r"^---\r?\n(.*?)\r?\n---\r?\n", text, re.S)
+    fm, last = {}, None
+    if m:
+        for line in m.group(1).splitlines():
+            if last and line[:1] in (" ", "\t"):
+                fm[last] = (fm[last] + " " + line.strip()).strip(); continue
+            k, sep, v = line.partition(":")
+            if sep and k.strip() and not k[:1].isspace():
+                v = v.strip()
+                if v in (">", "|", ">-", "|-"): v = ""
+                elif len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'": v = v[1:-1]
+                fm[k.strip()] = v; last = k.strip()
+    return fm
+
+def listing_line(fm, dirname):
+    return "- devstride:%s: %s\n" % (fm.get("name") or dirname, fm.get("description", ""))
+
+# --- current tree -------------------------------------------------------------------------
+bodies = {}
+for p in sorted(glob.glob(os.path.join(ROOT, "skills", "*", "SKILL.md"))):
+    name = os.path.basename(os.path.dirname(p))
+    b = nbytes(p)
+    bodies[name] = {"path": rel(p), "bytes": b, "tokens": tokens(b)}
+refs = {}
+for p in sorted(glob.glob(os.path.join(ROOT, "skills", "*", "references", "**", "*.md"), recursive=True)):
+    b = nbytes(p); refs[rel(p)] = {"bytes": b, "tokens": tokens(b)}
+scripts = {}
+for pat in ("hooks/*.sh", "scripts/**/*.sh", "skills/*/scripts/**/*"):
+    for p in sorted(glob.glob(os.path.join(ROOT, pat), recursive=True)):
+        if os.path.isfile(p): scripts[rel(p)] = {"bytes": nbytes(p)}
+def listed(fm):
+    # A skill with `disable-model-invocation: true` is user-invoked only and is left out of the
+    # listing the model sees, so it costs nothing per session; its body still costs on invocation.
+    return str(fm.get("disable-model-invocation", "")).strip().lower() != "true"
+ctx_bytes, early_problems = 0, []
+for name, b in bodies.items():
+    with open(os.path.join(ROOT, b["path"]), encoding="utf-8") as f:
+        fm = frontmatter(f.read())
+    if not fm: early_problems.append("NO-FRONTMATTER %s" % b["path"])
+    if listed(fm): ctx_bytes += len(listing_line(fm, name).encode("utf-8"))
+EXECUTED = ("hooks/hooks.json", "hooks/version-check.sh", ".claude-plugin/plugin.json")
+executed_bytes = 0
+for p in EXECUTED:
+    if os.path.exists(os.path.join(ROOT, p)): executed_bytes += nbytes(os.path.join(ROOT, p))
+    else: early_problems.append("MISSING %s (alwaysOn.executed is defined as exactly three files)" % p)
+always = {"context": {"bytes": ctx_bytes, "tokens": tokens(ctx_bytes)}, "executed": {"bytes": executed_bytes}}
+
+# --- budgets --------------------------------------------------------------------------------
+def round_up_100(n): return n if n % 100 == 0 else (n // 100 + 1) * 100
+
+if MODE == "write-budgets":
+    with open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8") as f:
+        version = json.load(f).get("version", "?")
+    out = {
+        "_method": METHOD,
+        "_generatedBy": "scripts/measure-cost.sh --write-budgets at %s on %s" % (version, datetime.date.today().isoformat()),
+        "_rounding": "measured tokens rounded UP to the next multiple of 100",
+        "_readme": "A RATCHET. --check fails any skills/<name>/SKILL.md whose tokens exceed its budget. Lower freely. Raise only in the same commit as the text that needs it, and say so in the commit message — or move rationale to a references/ file instead. Changing _method re-baselines every entry in the same commit (--write-budgets).",
+        "alwaysOnContext": round_up_100(always["context"]["tokens"]),
+        "bodies": {n: round_up_100(b["tokens"]) for n, b in sorted(bodies.items())},
+    }
+    with open(BUDGETS_PATH, "w", encoding="utf-8") as f:
+        json.dump(out, f, indent=2, ensure_ascii=False); f.write("\n")
+    print("wrote %s: %d bodies, alwaysOnContext %d" % (rel(BUDGETS_PATH), len(out["bodies"]), out["alwaysOnContext"]))
+    sys.exit(0)
+
+budgets, budget_error = None, None
+try:
+    with open(BUDGETS_PATH, encoding="utf-8") as f: budgets = json.load(f)
+    if not isinstance(budgets.get("bodies"), dict) or not isinstance(budgets.get("alwaysOnContext"), int) or isinstance(budgets.get("alwaysOnContext"), bool): raise ValueError("missing bodies/alwaysOnContext")
+    for k, v in budgets["bodies"].items():
+        if not isinstance(v, int) or isinstance(v, bool) or v < 0: raise ValueError("bodies.%s must be a non-negative integer, got %r" % (k, v))
+except Exception as e:  # noqa: BLE001 — a broken budgets file is a failure, not silence
+    budget_error = "%s: %s" % (rel(BUDGETS_PATH), e)
+
+problems = list(early_problems)
+if budget_error:
+    problems.append("BAD-BUDGETS %s" % budget_error)
+else:
+    for n, b in bodies.items():
+        b["budget"] = budgets["bodies"].get(n)
+        if b["budget"] is None: problems.append("MISSING-BUDGET %s" % n)
+        elif b["tokens"] > b["budget"]: problems.append("OVER %s %s > %s (+%s)" % (b["path"], format(b["tokens"], ","), format(b["budget"], ","), format(b["tokens"] - b["budget"], ",")))
+    for n in budgets["bodies"]:
+        if n not in bodies: problems.append("STALE-BUDGET %s" % n)
+    always["context"]["budget"] = budgets["alwaysOnContext"]
+    if always["context"]["tokens"] > always["context"]["budget"]:
+        problems.append("OVER alwaysOn.context %s > %s" % (format(always["context"]["tokens"], ","), format(always["context"]["budget"], ",")))
+    budgets_method = budgets.get("_method")
+    if budgets_method != METHOD: problems.append("METHOD-MISMATCH budgets say %r, script uses %r — re-baseline with --write-budgets" % (budgets_method, METHOD))
+
+# --- output ---------------------------------------------------------------------------------
+def fmt(n): return format(n, ",")
+
+if MODE == "check":
+    for p in problems: print(p)
+    if problems: sys.exit(1)
+    for n, b in sorted(bodies.items(), key=lambda kv: -kv[1]["tokens"]):
+        print("ok %s %s <= %s" % (b["path"], fmt(b["tokens"]), fmt(b["budget"])))
+    print("alwaysOn.context %s <= %s (budget alwaysOnContext)" % (fmt(always["context"]["tokens"]), fmt(always["context"]["budget"])))
+    sys.exit(0)
+
+if MODE == "json":
+    print(json.dumps({"method": METHOD, "bodies": {n: {k: v for k, v in b.items()} for n, b in bodies.items()},
+                      "references": refs, "scripts": scripts, "alwaysOn": always,
+                      "problems": list(problems)}, indent=2, ensure_ascii=False))
+    sys.exit(0)
+
+if MODE == "table":
+    def git(*args):
+        r = subprocess.run(["git", "-C", ROOT] + list(args), capture_output=True)
+        return r.stdout if r.returncode == 0 else None
+    head = (git("rev-parse", "--short", "HEAD") or b"?").decode().strip()
+    if git("rev-parse", "--verify", SINCE + "^{commit}") is None:
+        print("measure-cost: unknown git ref %r" % SINCE, file=sys.stderr); sys.exit(2)
+    ref_bodies = {}
+    ls = git("ls-tree", "-r", "--name-only", SINCE, "--", "skills") or b""
+    ref_ctx = 0
+    for path in ls.decode().splitlines():
+        parts = path.split("/")
+        if len(parts) == 3 and parts[2] == "SKILL.md":
+            blob = git("show", "%s:%s" % (SINCE, path)) or b""
+            ref_bodies[parts[1]] = {"bytes": len(blob), "tokens": tokens(len(blob)), "path": path}
+            fm = frontmatter(blob.decode("utf-8", "replace"))
+            if listed(fm): ref_ctx += len(listing_line(fm, parts[1]).encode("utf-8"))
+    print("<!-- scripts/measure-cost.sh --table --since %s @ %s, method: %s -->" % (SINCE, head, METHOD))
+    print("| File | bytes@%s | tokens@%s | bytes now | tokens now | Δ tokens | budget |" % (SINCE, SINCE))
+    print("|---|---:|---:|---:|---:|---:|---:|")
+    tb = tt = nb = nt = 0
+    names = sorted(set(bodies) | set(ref_bodies), key=lambda n: -(bodies.get(n) or ref_bodies[n])["tokens"])
+    for n in names:
+        b, r = bodies.get(n), ref_bodies.get(n)
+        if r: tb += r["bytes"]; tt += r["tokens"]
+        if b: nb += b["bytes"]; nt += b["tokens"]
+        delta = "%+d" % ((b["tokens"] if b else 0) - (r["tokens"] if r else 0))
+        print("| %s | %s | %s | %s | %s | %s | %s |" % ((b or r)["path"] + (" (added)" if not r else "") + ("" if b else " (removed)"), fmt(r["bytes"]) if r else "—", fmt(r["tokens"]) if r else "—", fmt(b["bytes"]) if b else "—", fmt(b["tokens"]) if b else "—", delta, fmt(b["budget"]) if b and b.get("budget") is not None else "—"))
+    print("| alwaysOn.context (skill listing) | %s | %s | %s | %s | %+d | %s |" % (fmt(ref_ctx), fmt(tokens(ref_ctx)), fmt(ctx_bytes), fmt(always["context"]["tokens"]), always["context"]["tokens"] - tokens(ref_ctx), fmt(always["context"].get("budget", 0)) if not budget_error else "—"))
+    print("| **total (bodies)** | %s | %s | %s | %s | %+d | |" % (fmt(tb), fmt(tt), fmt(nb), fmt(nt), nt - tt))
+    sys.exit(0)
+
+# human table
+print("%-40s %9s %8s %8s %9s  %s" % ("body", "bytes", "tokens", "budget", "headroom", "status"))
+for n, b in sorted(bodies.items(), key=lambda kv: -kv[1]["tokens"]):
+    bud = b.get("budget"); status = "ok" if bud is not None and b["tokens"] <= bud else ("OVER" if bud is not None else "no budget")
+    print("%-40s %9s %8s %8s %9s  %s" % (b["path"], fmt(b["bytes"]), fmt(b["tokens"]), fmt(bud) if bud is not None else "—", fmt(bud - b["tokens"]) if bud is not None else "—", status))
+print("\n%-40s %9s %8s   (informational — never budgeted)" % ("reference", "bytes", "tokens"))
+for p, r in sorted(refs.items(), key=lambda kv: -kv[1]["tokens"]): print("%-40s %9s %8s" % (p, fmt(r["bytes"]), fmt(r["tokens"])))
+print("\n%-40s %9s   (executed, not loaded)" % ("script", "bytes"))
+for p, s in sorted(scripts.items()): print("%-40s %9s" % (p, fmt(s["bytes"])))
+print("\nalwaysOn.context   %s bytes / %s tokens  budget %s — the skill listing every session loads; the session-start hook adds at most two lines of stdout, and only when it speaks" % (fmt(ctx_bytes), fmt(always["context"]["tokens"]), fmt(always["context"].get("budget", 0)) if not budget_error else "—"))
+print("alwaysOn.executed  %s bytes — hooks/hooks.json + hooks/version-check.sh + .claude-plugin/plugin.json: parsed or executed by the harness, never read as context" % fmt(executed_bytes))
+print("\ntotals: %d bodies %s bytes / %s tokens; %d references %s tokens" % (len(bodies), fmt(sum(b["bytes"] for b in bodies.values())), fmt(sum(b["tokens"] for b in bodies.values())), len(refs), fmt(sum(r["tokens"] for r in refs.values()))))
+for p in problems: print(p)
+sys.exit(1 if problems else 0)
+PY
