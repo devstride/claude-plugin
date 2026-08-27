@@ -145,7 +145,9 @@ if MODE == "write-budgets":
 budgets, budget_error = None, None
 try:
     with open(BUDGETS_PATH, encoding="utf-8") as f: budgets = json.load(f)
-    if not isinstance(budgets.get("bodies"), dict) or not isinstance(budgets.get("alwaysOnContext"), int): raise ValueError("missing bodies/alwaysOnContext")
+    if not isinstance(budgets.get("bodies"), dict) or not isinstance(budgets.get("alwaysOnContext"), int) or isinstance(budgets.get("alwaysOnContext"), bool): raise ValueError("missing bodies/alwaysOnContext")
+    for k, v in budgets["bodies"].items():
+        if not isinstance(v, int) or isinstance(v, bool) or v < 0: raise ValueError("bodies.%s must be a non-negative integer, got %r" % (k, v))
 except Exception as e:  # noqa: BLE001 — a broken budgets file is a failure, not silence
     budget_error = "%s: %s" % (rel(BUDGETS_PATH), e)
 
@@ -208,8 +210,8 @@ if MODE == "table":
         b, r = bodies.get(n), ref_bodies.get(n)
         if r: tb += r["bytes"]; tt += r["tokens"]
         if b: nb += b["bytes"]; nt += b["tokens"]
-        delta = ("%+d" % ((b["tokens"] if b else 0) - (r["tokens"] if r else 0))) if (b and r) else ("%+d" % -r["tokens"] if r else "—")
-        print("| %s | %s | %s | %s | %s | %s | %s |" % ((b or r)["path"] + ("" if b else " (removed)"), fmt(r["bytes"]) if r else "—", fmt(r["tokens"]) if r else "—", fmt(b["bytes"]) if b else "—", fmt(b["tokens"]) if b else "—", delta, fmt(b["budget"]) if b and b.get("budget") is not None else "—"))
+        delta = "%+d" % ((b["tokens"] if b else 0) - (r["tokens"] if r else 0))
+        print("| %s | %s | %s | %s | %s | %s | %s |" % ((b or r)["path"] + (" (added)" if not r else "") + ("" if b else " (removed)"), fmt(r["bytes"]) if r else "—", fmt(r["tokens"]) if r else "—", fmt(b["bytes"]) if b else "—", fmt(b["tokens"]) if b else "—", delta, fmt(b["budget"]) if b and b.get("budget") is not None else "—"))
     print("| alwaysOn.context (skill listing) | %s | %s | %s | %s | %+d | %s |" % (fmt(ref_ctx), fmt(tokens(ref_ctx)), fmt(ctx_bytes), fmt(always["context"]["tokens"]), always["context"]["tokens"] - tokens(ref_ctx), fmt(always["context"].get("budget", 0)) if not budget_error else "—"))
     print("| **total (bodies)** | %s | %s | %s | %s | %+d | |" % (fmt(tb), fmt(tt), fmt(nb), fmt(nt), nt - tt))
     sys.exit(0)

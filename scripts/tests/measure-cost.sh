@@ -10,13 +10,13 @@ OUT="$(/bin/bash "$MC" --check 2>&1)"; RC=$?
 if [ "$RC" -eq 0 ]; then ok "(a) --check exits 0 on committed budgets"; else bad "(a) --check should exit 0, got $RC:"; printf '%s\n' "$OUT" | sed 's/^/       /'; fi
 
 # (b) a lowered budget for pr is reported OVER, exit 1
-python3 -c "import json,sys; d=json.load(open('$BUD')); d['bodies']['pr']=100; json.dump(d,open('$TMP/low.json','w'))"
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["bodies"]["pr"]=100; json.dump(d,open(sys.argv[2],"w"))' "$BUD" "$TMP/low.json"
 OUT="$(/bin/bash "$MC" --check --budgets "$TMP/low.json")"; RC=$?
 if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q "^OVER skills/pr/SKILL.md"; then ok "(b) lowered budget → exit 1 with OVER skills/pr/SKILL.md"; else bad "(b) expected exit 1 + OVER line, got rc=$RC: $OUT"; fi
 
 # (c) growing pr's body past its rounding headroom fails --check in a temp copy of the repo
 mkdir "$TMP/repo" && tar --exclude=.git -cf - -C "$ROOT" . | tar -xf - -C "$TMP/repo" || { bad "(c) could not copy the repo"; exit 1; }
-python3 -c "open('$TMP/repo/skills/pr/SKILL.md','a').write('x'*1200)"
+python3 -c 'import sys; open(sys.argv[1],"a").write("x"*1200)' "$TMP/repo/skills/pr/SKILL.md"
 OUT="$(/bin/bash "$TMP/repo/scripts/measure-cost.sh" --check 2>&1)"; RC=$?
 if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q "^OVER skills/pr/SKILL.md"; then ok "(c) +400 tokens on pr → exit 1 with OVER skills/pr/SKILL.md"; else bad "(c) expected exit 1 + OVER line, got rc=$RC: $OUT"; fi
 
@@ -26,7 +26,7 @@ OUT="$(/bin/bash "$TMP/repo/scripts/measure-cost.sh" --check --budgets "$BUD" 2>
 if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q "^MISSING-BUDGET zz-test"; then ok "(d) unbudgeted body → MISSING-BUDGET zz-test, exit 1"; else bad "(d) expected MISSING-BUDGET zz-test rc=1, got rc=$RC: $OUT"; fi
 
 # (d2) a budget with no body → STALE-BUDGET
-python3 -c "import json; d=json.load(open('$BUD')); d['bodies']['ghost']=100; json.dump(d,open('$TMP/stale.json','w'))"
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["bodies"]["ghost"]=100; json.dump(d,open(sys.argv[2],"w"))' "$BUD" "$TMP/stale.json"
 OUT="$(/bin/bash "$MC" --check --budgets "$TMP/stale.json")"; RC=$?
 if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q "^STALE-BUDGET ghost"; then ok "(d2) budget without a body → STALE-BUDGET ghost, exit 1"; else bad "(d2) expected STALE-BUDGET, got rc=$RC"; fi
 
@@ -34,6 +34,12 @@ if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q "^STALE-BUDGET ghost"; then o
 echo '{ not json' > "$TMP/broken.json"
 OUT="$(/bin/bash "$MC" --check --budgets "$TMP/broken.json" 2>&1)"; RC=$?
 if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q "^BAD-BUDGETS"; then ok "(d3) unparsable budgets → exit 1 with BAD-BUDGETS"; else bad "(d3) expected exit 1 + BAD-BUDGETS, got rc=$RC: $OUT"; fi
+
+# (d4) a budget that is valid JSON but not an integer is BAD-BUDGETS, not a traceback — in every mode
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["bodies"]["pr"]="4300"; json.dump(d,open(sys.argv[2],"w"))' "$BUD" "$TMP/str.json"
+OUT="$(/bin/bash "$MC" --check --budgets "$TMP/str.json" 2>&1)"; RC=$?
+JOUT="$(/bin/bash "$MC" --json --budgets "$TMP/str.json" 2>&1)"; JRC=$?
+if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q "^BAD-BUDGETS" && [ "$JRC" -eq 0 ] && printf '%s' "$JOUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if any(p.startswith("BAD-BUDGETS") for p in d["problems"]) else 1)'; then ok "(d4) non-integer budget → BAD-BUDGETS in --check (exit 1) and in --json (exit 0, listed)"; else bad "(d4) expected BAD-BUDGETS without a traceback: check rc=$RC json rc=$JRC"; fi
 
 # (e) --json parses and lists every body
 N="$(/bin/bash "$MC" --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d["bodies"]))')"
