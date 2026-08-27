@@ -1,8 +1,8 @@
 #!/bin/bash
 # scripts/validate.sh — everything RELEASING.md step 0 requires, in one command.
 # Stops at the first failure and names the step. `--needles` also runs the
-# rule-loss check from delivery-loop-invariants.md (informational, never a
-# failure — a miss is a signal to READ, not proof of loss).
+# rule-loss check from delivery-loop-invariants.md (needle misses advisory — a miss is a
+# signal to READ, not proof of loss; a DEAD REFERENCE blocks).
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT" || exit 2
 NEEDLES=0
@@ -40,7 +40,7 @@ step "7/7 skill-body budgets (scripts/measure-cost.sh --check)"
 bash scripts/measure-cost.sh --check || fail 7
 
 if [ "$NEEDLES" = 1 ]; then
-  step "needles (informational): delivery-loop-invariants.md"
+  step "needles (misses advisory, dead references blocking): delivery-loop-invariants.md"
   BLOCK="$(awk '/^## How to actually run this checklist/{f=1} f&&/^```bash/{p=1;next} p&&/^```/{exit} p' skills/review/references/delivery-loop-invariants.md)"
   OUT="$(bash -c "$BLOCK" 2>&1)"; MISSING="$(printf '%s\n' "$OUT" | grep -c MISSING)"
   DEAD="$(printf '%s\n' "$OUT" | grep -c 'DEAD REFERENCE')"
