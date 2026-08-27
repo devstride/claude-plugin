@@ -355,7 +355,9 @@ while [ -n "$changed" ]; do
     fi
     for g in $live; do
       [ "$g" = "skills/review/references/$SELF" ] && continue
-      grep -qF "$f" "$g" 2>/dev/null && { live="$live $f"; changed=1; break; }
+      # a reference's own "## Cited by" section is reverse metadata, not a forward citation
+      awk '/^## Cited by/{exit} {print}' "$g" 2>/dev/null | grep -qF "$f" \
+        && { live="$live $f"; changed=1; break; }
     done
   done
 done

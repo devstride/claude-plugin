@@ -83,8 +83,8 @@ mattered — memory reproduces what you already thought about.
   cache copy survives: **Read `${CLAUDE_PLUGIN_ROOT}/skills/<owner>/references/<topic>.md` when
   <step or condition>.** Two kinds are legal and both count as firing: a runtime pointer ("Read
   … when you declare a PRE-SHIP HOLD") and a maintenance pointer ("Read … before changing this
-  rule") for pure rationale no runtime step needs. A reference with neither is dead text and
-  fails the invariants file's dead-reference check.
+  rule") for pure rationale no runtime step needs. A reference must be REACHABLE from a root an agent reads — its own pointer, or a citation
+  from a reachable reference — or the invariants file's dead-reference check fails it.
 - **Naming and placement.** kebab-case, one topic per file, named for what the reader is looking
   for (`progress-table.md`, `detector-evidence.md`), never `notes.md`/`misc.md`; flat under the
   owning skill's `references/`; addressed only by the `${CLAUDE_PLUGIN_ROOT}` path, never a

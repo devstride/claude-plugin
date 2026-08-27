@@ -42,8 +42,10 @@ bash scripts/measure-cost.sh --check || fail 7
 if [ "$NEEDLES" = 1 ]; then
   step "needles (informational): delivery-loop-invariants.md"
   BLOCK="$(awk '/^## How to actually run this checklist/{f=1} f&&/^```bash/{p=1;next} p&&/^```/{exit} p' skills/review/references/delivery-loop-invariants.md)"
-  OUT="$(bash -c "$BLOCK" 2>&1)"; MISSING="$(printf '%s\n' "$OUT" | grep -cE 'MISSING|DEAD REFERENCE')"
+  OUT="$(bash -c "$BLOCK" 2>&1)"; MISSING="$(printf '%s\n' "$OUT" | grep -c MISSING)"
+  DEAD="$(printf '%s\n' "$OUT" | grep -c 'DEAD REFERENCE')"
   printf '%s\n' "$OUT" | grep -E 'MISSING|DEAD REFERENCE'
-  echo "needles: $MISSING MISSING/DEAD line(s)$( [ "$MISSING" -gt 0 ] && echo ' — go and read each one; a miss is not proof of loss' )"
+  echo "needles: $MISSING MISSING line(s)$( [ "$MISSING" -gt 0 ] && echo ' — go and read each one; a miss is not proof of loss' ), $DEAD dead reference(s)"
+  [ "$DEAD" -gt 0 ] && fail needles-dead-reference
 fi
 printf '\nvalidate: all steps passed\n'
