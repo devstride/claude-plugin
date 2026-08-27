@@ -160,8 +160,8 @@ inherit session effort.
 widest size this rule may pick; size the diff as below, then clamp to the ceiling. Say which
 size you picked and, when the ceiling clamped it, say that too:
 
-- **NARROW** (a one-liner, a rename, a config flip): 1–2 finder lenses — **correctness, plus conventions when the diff touches styled
-  or typed frontend code** — with batched verification. The security lens joins these when the
+- **NARROW** (a one-liner, a rename, a config flip): 1–2 finder lenses — **correctness, plus
+  conventions when the diff touches styled or typed frontend code** — with batched verification. The security lens joins these when the
   diff touches the auth boundary (the floor below): an addition to NARROW, not a step up.
 - **CONTAINED** (one subsystem; no deployed-runtime contract, no new permission surface): 2–3
   lenses chosen for the diff's real risk, batched verification (one verifier
@@ -185,9 +185,10 @@ Run over **the hand-written diff only** — computed against the story's WORKING
 PR will target) and **excluding generated files**.
 
 **Stage A — finders** (parallel, one per angle). Each returns findings with a `file:line` anchor
-and a one-sentence claim. Merge the lists deduplicating on the claim (a claim the security lens
-shares keeps `security`), keep every finding's lens, and assign ids (`F1…Fn`) — Stage B's
-verdicts are keyed by them.
+and a one-sentence claim. Merge the lists deduplicating on anchor + claim — never on the claim alone,
+two locations with one defect are two findings — (a duplicate the security lens shares keeps
+`security`), keep every finding's lens, and assign ids (`F1…Fn`) — Stage B's verdicts are keyed
+by them.
 
 **Hand each finder the lessons that match ITS angle** as ADDITIONAL named checks — a judgment
 read from each lesson's Pattern text (the schema records no angle); a lesson matching no lens
@@ -211,8 +212,8 @@ file → the finders' base checklists are the whole story.
 HIGH-RISK **one verifier per file-group** — the findings anchored in one file or a small related
 set (at most 5 findings and 3 files per group) — grouped by
 `${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/scripts/group-findings.py` (no `python3` → group by
-hand by the same rule and say so); at CONTAINED one verifier per finder's list; at NARROW batched. **An auth-boundary finding is never
-grouped: it gets its own verifier at every breadth** (Floor 2) — auth-boundary meaning the
+hand by the same rule and say so); at CONTAINED one verifier per finder's list; at NARROW
+batched. **An auth-boundary finding is never grouped: it gets its own verifier at every breadth** (Floor 2) — auth-boundary meaning the
 security lens raised it, or its anchor file is one the diff's auth-boundary decision named. Every
 verifier returns **one verdict per finding id** — CONFIRMED / PLAUSIBLE / REFUTED, each with
 likelihood and impact, as a JSON list keyed by id; a return missing any id, or carrying one
@@ -220,7 +221,8 @@ verdict for the group, is defective: re-run that group per finding and say so in
 `profileOverrides.verificationGrouping: "per-finding"` restores one verifier per finding at
 HIGH-RISK.
 **CONFIRMED** (real and reproducible) / **PLAUSIBLE** (likely real, not fully verifiable from the
-diff) / **REFUTED** (the verifier shows why the code is fine). A finding is not actionable until CONFIRMED or PLAUSIBLE.
+diff) / **REFUTED** (the verifier shows why the code is fine). A finding is not actionable until
+CONFIRMED or PLAUSIBLE.
 `verificationDefault` is **REFUTED unless reproducible** under every profile: a verifier starts
 from REFUTED and the finding earns its way up — CONFIRMED by reproducing it from the diff,
 PLAUSIBLE only by pointing at the concrete mechanism in THIS diff and showing why it is likely

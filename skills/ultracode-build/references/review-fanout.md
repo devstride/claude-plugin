@@ -57,7 +57,9 @@ auth-boundary finding too, which is why the body has that decision NAME its file
 Grouping decides WHO verifies, never what may be read: a finding whose cause lives in another
 file is grouped by its anchor, and its verifier reads whatever it needs. Lesson-derived findings
 are ordinary findings with ids and go through the same grouping. A group of one is per-finding
-by construction. The `per-finding` override exists for a repository that would rather pay the
+by construction. Deduplication keys on anchor + claim because finders legitimately report one
+defect at several locations — two handlers each missing org scoping are two findings — and a
+claim-only key would drop all but one before it was ever verified. The `per-finding` override exists for a repository that would rather pay the
 old fan-out than trust the grouping; it is scoped to HIGH-RISK because that is the only breadth
 the grouping changed.
 
