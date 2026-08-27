@@ -435,10 +435,11 @@ S1. A convention-only workflow (`opened` plus optionally `converted_to_draft` /
     and reported as the draft-convention check being present. The definition lives once, under
     pattern D; the `opened`-only shape is a subset. The single-job / no-checkout / run-only
     conditions are what keep a real gate out of the exemption; never loosen them.
-S2. The tree-identical skip is judged on whether it CAN FIRE, never on the step existing: it
-    reads `HEAD^2`, so the merge commit's second parent must be in the checkout — `fetch-depth`
-    of 0 or 2+, or a `--deepen=1` in the step; a depth-1 checkout with none of them is
-    "present but inert" in both `doctor` and `setup`. A step-exists test calls it done.
+S2. The tree-identical skip is judged on whether it CAN FIRE, never on the step existing.
+    Its two comparison paths differ: the fallback works at any depth, the merge-promotion path
+    reads `HEAD^2` and needs that parent in the checkout (any depth 0 or 2+, or a deepening
+    fetch — the effect, not the flag). Without it the skip is "present but inert" in both
+    `doctor` and `setup`: it fires until the base tip moves, then silently stops.
 S3. `ci.expectedRunsPerPullRequest` is PER WORKFLOW under `ci.workflowGlobs`: several workflows
     executing once each on one pull request is the design; the excess is a SECOND executed run
     of the SAME workflow, attributed by pull request number (never branch name alone), and an

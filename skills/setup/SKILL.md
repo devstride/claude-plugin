@@ -273,10 +273,11 @@ specific gap. The third row is a legitimate configuration, not a defect: say wha
 keys): a top-level `concurrency:` block with `cancel-in-progress: true`; a step comparing
 `HEAD^{tree}` against the base branch on a production-branch push; a workflow that fails a
 non-draft pull request opened by a person. **`ci.productionTreeSkip` takes three values, not
-two** — `present`, `present but inert`, `absent`: the comparison reads `HEAD^2`, so the merge
-commit's second parent must be in the checkout. Any one of `fetch-depth: 0`, `fetch-depth: 2` or
-more, or a `--deepen=1` in the step itself satisfies that (pattern C). Record a step with none of
-them — a default depth-1 checkout — as `present but inert`, and let `setup ci` offer the
+two** — `present`, `present but inert`, `absent`. Pattern C holds the condition: the merge-promotion
+comparison reads `HEAD^2`, so that parent must be in the checkout — any depth of 0 or 2+, or a
+deepening fetch in the step (judge the effect, not the literal flag). Record a step with none of
+them as `present but inert` — it still fires while the base tip has not moved and stops when it
+does — and let `setup ci` offer the
 `fetch-depth` diff on its own rather than the whole pattern again. **A step in a job with NO
 checkout at all is worse than inert and is not this value**: `git rev-parse` finds no repository
 and fails the step, taking the gate job and everything that `needs` it down on every

@@ -16,11 +16,14 @@ for what each version component means here and how a release is cut.
   there.** `doctor` and `setup` detected pattern C by looking for a step comparing `HEAD^{tree}` —
   but that comparison reads `HEAD^2`, which never resolves over a default depth-1 checkout, so a
   repository could carry the step, be told it had the mechanic, and re-test every promotion at
-  full cost with nothing explaining the minutes. Both skills now ask whether the merge commit's
-  second parent is actually in the checkout — `fetch-depth: 0`, `fetch-depth: 2` or more, or a
-  `--deepen=1` in the step; any one will do. A step with none of them is reported as **present
-  but inert**, naming the depth as the reason, and `setup ci` offers the `fetch-depth` diff on
-  its own. The validation checklist gains the symptom.
+  full cost with nothing explaining the minutes. The pattern has two comparison paths and they do
+  not need the same things: the fast-forward fallback works at any checkout depth, while the
+  merge-promotion path reads `HEAD^2` and needs that parent present. Without it the skip is not
+  dead but **conditional** — it keeps working while the base tip has not moved and silently stops
+  as soon as it has, which on a busy base is most promotions. Both skills now report that state as
+  **present but inert**, judging the effect (any checkout depth of 0 or 2+, or a deepening fetch)
+  rather than a literal flag, and `setup ci` offers the diff on its own. The validation checklist
+  gains the symptom.
 
 ## [2.0.0] — 2026-08-26
 
