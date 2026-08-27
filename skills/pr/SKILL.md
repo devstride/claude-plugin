@@ -81,9 +81,8 @@ timeline event for THAT reviewer, proven within **`reviewerRegistrationWindowMin
 every profile). A request still unproven when the window closes is a failed request: report
 that reviewer as NOT registered and dropped for this run, so `review` never polls for it. The
 mutation's own success return proves nothing.
-Requesting Copilot **in the same call that opens the PR** is what makes the cloud review overlap
-the local engines rather than follow them — the single biggest wall-clock saving in the loop, so
-never defer it to a later turn. An explicitly requested Copilot review runs fine on a draft. Tell
+Request the cloud reviewers **in the same call that opens the PR** — never defer it to a later
+turn. An explicitly requested Copilot review runs fine on a draft. Tell
 `review` which reviewers are already REGISTERED (and which were dropped) — with the `created_at`
 of each one's `review_requested` event, so the learned wait bound starts from the event, not
 from the moment `review` is invoked — so it skips its own request for the former and waits on
@@ -96,20 +95,17 @@ headings). Caller-declared flavors (epic release, hotfix, release) change how th
 FILLED, never the section set. Inline fallback when the key is absent — these four sections:
 
 1. **`## Simple Description`** — plain-language, non-technical: what this does and why,
-   understandable without knowing the codebase. (Deliberately not titled with an
-   "explain-like-I'm-five" abbreviation: the GitHub webhook's item-number matcher historically
-   had no left word boundary, so a heading token embedding a short item number auto-linked
-   every PR to an unrelated low-numbered item. Fixed now, but the safe title costs nothing.)
+   understandable without knowing the codebase.
 2. **`## Technical Description`** — the approach; the commands/queries/services/components
    touched; notable design choices.
 3. **`## Notable Changes to System Architecture or Behavior`** — architecture, data flow, public
    contracts, migrations, permissions, user-visible behavior. "None" explicitly if none.
 4. **`## Testing Steps`** — concrete steps to exercise it, plus which automated tests cover it.
 
-**End every body with the loop marker `<!-- devstride:loop -->`** (an HTML comment — invisible
-when rendered): the draft-convention workflow from the CI cost patterns exempts pull requests
-carrying it, since `gh` opens them as the operator and `github.actor` cannot tell the loop from a
-person. It is not a template section; it goes after the last one.
+**End every body with the loop marker `<!-- devstride:loop -->`** — not a template section; it
+goes after the last one. Read
+`${CLAUDE_PLUGIN_ROOT}/skills/pr/references/body-conventions.md` before changing a section
+heading, the marker, or the same-call rule.
 
 If the config file disagrees with this fallback, the file wins. When
 `prBodyTemplate.noAiAttribution` is true (the fallback default), no
@@ -128,15 +124,11 @@ In driven mode carry its untracked-deferral list back to `build-item`.
 out first. Compute step 2b's selection now (the `when` filter plus the `pathGlobs` match): **if at
 least one `preShipChecks` entry both selects AND matches this PR, declare a PRE-SHIP HOLD** — tell
 `review` to settle the review but STOP at its **7.1b** and hand back, rather than flipping.
-Then run step 2b, and finish at step 2c. **Order is the whole point:** the pre-ship suites must
-test the same diff the reviewers settled and CI is about to run. Let the flip happen first and a
-red pre-ship check forces a fix onto an already-reviewed, already-CI'd PR — the fix reaches CI
-having passed no reviewer.
-**Do not hold on a non-empty config alone.** A repo can have several entries while this PR matches
-none — a frontend-only diff against path-scoped suites, or entries that are all `releaseOnly` — and
-2b is then a documented no-op. Holding for a step that will do nothing buys a pointless round trip.
+Then run step 2b, and finish at step 2c — the flip never precedes the suites.
+**Do not hold on a non-empty config alone**: an entry must both select AND match this PR.
 Nothing selected, or `preShipChecks` absent/empty → no hold; let `review` run straight through
-and skip 2c.
+and skip 2c. Read `${CLAUDE_PLUGIN_ROOT}/skills/pr/references/pre-ship-hold.md` when you
+declare a PRE-SHIP HOLD.
 
 ## 2b. Pre-ship checks — run the repo's configured local suites against the final diff
 
@@ -171,11 +163,9 @@ unresolved threads, flips the PR ready and settles CI. Naming the mode matters: 
 re-invocation restarts at step 0 and re-runs the whole review cycle, re-requesting cloud reviewers
 and corrupting the lessons store.
 
-**A declared hold that is never discharged is a stranded PR** — permanently draft, CI never
-released — and the caller above (`build-item`) will then refuse to merge it, correctly but with
-no explanation of why. So this step is not optional once the hold is taken: if the pre-ship checks
-cannot be brought green, say so explicitly and surface the PR's held state rather than returning
-silently.
+**Never leave a declared hold undischarged** — the PR is stranded (permanently draft, CI never
+released). If the pre-ship checks cannot be brought green, say so explicitly and surface the
+PR's held state rather than returning silently.
 
 ## 3. Optionally link the PR (standalone only)
 
