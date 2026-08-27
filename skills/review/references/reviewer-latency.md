@@ -32,6 +32,12 @@ invoked is already spent. The poll ticks at 20, 30, 45, 68, 90, 90 … seconds (
   it does not turn the result into `all-posted`.
 - A review whose `submitted_at` predates the reviewer's `registeredAt` cannot be this request's
   answer: it neither settles the wait nor becomes a sample.
+- **A learned bound that keeps being missed re-learns itself.** A shortened wait can never
+  observe a reviewer that has slowed down — the loop exits before the late review arrives. So the
+  cache counts consecutive misses at a learned bound (`consecutiveMisses`, reset on any response);
+  at two, the next wait uses the full `pollTimeoutMinutes` (`boundSource: relearning`), sees the
+  real latency, records it, and the p95 moves. Two shortened waits are the price of not being
+  stuck; one would over-react to a single slow day.
 - `timeout` vs `proceed-p95`: `timeout` whenever any non-responder ran to the full
   `pollTimeoutMinutes` (or the fixed bound); `proceed-p95` only when every non-responder was cut
   short by a learned bound — the result names what actually ended the wait.
@@ -72,8 +78,9 @@ check's `newest.json`:
   from that run's `pollTimeoutMinutes`, so one repository's ceiling never leaks into another's.
 - **Advisory, never an error.** A missing file is cold. An unparsable file is `corrupt` and
   behaves cold. A directory that cannot be written leaves the state `unwritable` and the wait
-  still exits normally. Every read and write is wrapped; the `RESULT` line's `cacheState`
-  says which happened. The cache can only ever *shorten* a wait.
+  still exits normally. A write that cannot take the lock within five seconds is skipped
+  (`locked`) rather than made unlocked. Every read and write is wrapped; the `RESULT` line's
+  `cacheState` says which happened. The cache can only ever *shorten* a wait.
 - `--fixed-bound` (the config key off) still records samples, so switching the key on later
   starts warm.
 - A sample carries its `reviewId`; the same review seen twice (a re-invoked step 2) is recorded
@@ -90,7 +97,7 @@ RESULT {"result":"all-posted|proceed-p95|timeout|gh-unavailable|nothing-register
         "sinceReviewId":5036760738,
         "responded":[{"graphqlBotId":"…","reviewId":…,"submittedAt":"…","latencySeconds":156}],
         "nonResponders":[{"graphqlBotId":"…","name":"Copilot","waitedSeconds":300,"boundSeconds":300,"boundSource":"learned-p95|pollTimeoutMinutes|fixed|gh-unavailable"}],
-        "notRegistered":[…],"rejectedSamples":[…],"cacheState":"warm|cold|corrupt|unwritable"}
+        "notRegistered":[…],"rejectedSamples":[…],"cacheState":"warm|cold|corrupt|unwritable|locked"}
 ```
 
 Exit 0 on `all-posted`, 3 when any reviewer did not respond (`proceed-p95`, `timeout`,

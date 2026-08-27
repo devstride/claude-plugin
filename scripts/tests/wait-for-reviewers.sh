@@ -79,7 +79,8 @@ cat > "$TMP/old.json" <<'EOF_FX'
 {"now":"2026-01-01T10:00:00Z","reviews":[{"id":95,"user":{"node_id":"BOT_aaaa","login":"bot-a[bot]"},"submitted_at":"2026-01-03T10:00:00Z"}]}
 EOF_FX
 OUT="$(printf '%s' '[{"name":"Bot A","graphqlBotId":"BOT_aaaa","registeredAt":"2026-01-01T10:00:00Z"}]' | /bin/bash "$W" --dry-run "$TMP/old.json" --repo o/r --pr 1 --reviewers-json - --timeout-minutes 4000 --cache "$TMP/c11b.json" --since-review-id 0 2>&1)"; RC=$?; RESULT="$(printf '%s\n' "$OUT" | sed -n 's/^RESULT //p' | tail -1)"
-if [ "$(field 'd["rejectedSamples"][0]["latencySeconds"]')" = 172800 ] && printf '%s' "$OUT" | grep -q "^rejected sample" && [ ! -e "$TMP/c11b.json" ]; then ok "(11b) a 48 h latency is rejected and printed; nothing cached"; else bad "(11b) rc=$RC $RESULT"; fi
+N11b="$(python3 -c 'import json,sys,os; p=sys.argv[1]; print(len(json.load(open(p))["reviewers"].get("BOT_aaaa",{}).get("samples",[])) if os.path.exists(p) else 0)' "$TMP/c11b.json")"
+if [ "$(field 'd["rejectedSamples"][0]["latencySeconds"]')" = 172800 ] && printf '%s' "$OUT" | grep -q "^rejected sample" && [ "$N11b" = 0 ]; then ok "(11b) a 48 h latency is rejected and printed; no sample cached"; else bad "(11b) rc=$RC samples=$N11b $RESULT"; fi
 
 # (12) gh unavailable three ticks running → gh-unavailable, every reviewer a non-responder with that boundSource
 run gh-down.json "$TMP/c12.json" "[$A]" --since-review-id 0
@@ -165,5 +166,28 @@ for args in "--timeout-minutes twenty" "--timeout-minutes 20 --first-tick 0" "--
   OUT="$(printf '%s' "[$A]" | /bin/bash "$W" --dry-run "$FX/no-show-cold.json" --repo o/r --pr 1 --reviewers-json - --cache "$TMP/c26.json" $args 2>&1)"; RC=$?
   if [ "$RC" -eq 2 ] && ! printf '%s' "$OUT" | grep -q Traceback; then :; else bad "(26) '$args' → rc=$RC: $(printf '%s' "$OUT" | tail -1)"; fi
 done; ok "(26) bad numeric options → exit 2, no traceback"
+
+# (27) two consecutive misses at a learned bound → the third wait runs the full bound (relearning) and a late reviewer is finally learned
+warm "$TMP/c27.json" 150,160,170,175,180,165,155,178,180,172,168,160 BOT_aaaa
+cat > "$TMP/slow.json" <<'EOF_FX'
+{"now":"2026-01-01T10:00:00Z","reviews":[{"id":97,"user":{"node_id":"BOT_aaaa","login":"bot-a[bot]"},"submitted_at":"2026-01-01T10:10:00Z"}]}
+EOF_FX
+run no-show-warm.json "$TMP/c27.json" "[$A]" --since-review-id 0; R1="$(field 'd["result"]')"
+run no-show-warm.json "$TMP/c27.json" "[$A]" --since-review-id 0; R2="$(field 'd["result"]')"
+M27="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["reviewers"]["BOT_aaaa"].get("consecutiveMisses"))' "$TMP/c27.json")"
+OUT="$(printf '%s' "[$A]" | /bin/bash "$W" --dry-run "$TMP/slow.json" --repo o/r --pr 1 --reviewers-json - --timeout-minutes 20 --cache "$TMP/c27.json" --since-review-id 0 2>&1)"; RC=$?; RESULT="$(printf '%s\n' "$OUT" | sed -n 's/^RESULT //p' | tail -1)"
+M27b="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["reviewers"]["BOT_aaaa"]; print(d.get("consecutiveMisses"), d["samples"][-1]["latencySeconds"])' "$TMP/c27.json")"
+if [ "$R1" = proceed-p95 ] && [ "$R2" = proceed-p95 ] && [ "$M27" = 2 ] && [ "$RC" -eq 0 ] && printf '%s' "$OUT" | grep -q "relearning" && [ "$M27b" = "0 600" ]; then ok "(27) two misses at the learned bound → third wait relearns at the full bound, catches the 600 s review, misses reset"; else bad "(27) r1=$R1 r2=$R2 misses=$M27 rc=$RC after=$M27b $RESULT"; fi
+
+# (28) a shell-side usage error still emits a RESULT line
+OUT="$(printf '%s' "[$A]" | /bin/bash "$W" --dry-run "$FX/no-show-cold.json" --repo o/r --pr 1 --reviewers-json - --timeout-minutes twenty 2>&1)"; RC=$?
+if [ "$RC" -eq 2 ] && printf '%s' "$OUT" | grep -q '^RESULT {"result":"usage-error"'; then ok "(28) non-numeric --timeout-minutes → RESULT usage-error, exit 2 (from the shell side)"; else bad "(28) rc=$RC $OUT"; fi
+
+# (29) a lock held by another run → this run skips its write, reports locked, never writes unlocked
+run responder-156.json "$TMP/c29.json" "[$A]" --since-review-id 0
+BEFORE29="$(cat "$TMP/c29.json")"; touch "$TMP/c29.json.lock"
+OUT="$(printf '%s' "[$A]" | /bin/bash "$W" --dry-run "$FX/responder-156.json" --repo o/r --pr 2 --reviewers-json - --timeout-minutes 20 --cache "$TMP/c29.json" --since-review-id 0 2>&1)"; RC=$?; RESULT="$(printf '%s\n' "$OUT" | sed -n 's/^RESULT //p' | tail -1)"
+rm -f "$TMP/c29.json.lock"
+if [ "$(field 'd["cacheState"]')" = locked ] && [ "$(cat "$TMP/c29.json")" = "$BEFORE29" ]; then ok "(29) lock held → cacheState locked, cache file untouched"; else bad "(29) state=$(field 'd["cacheState"]')"; fi
 
 exit $FAIL

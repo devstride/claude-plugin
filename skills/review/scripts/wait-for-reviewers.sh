@@ -27,9 +27,9 @@
 #     [--min-samples 5] [--slack-seconds 120] [--first-tick 20] [--max-tick 90]
 #     [--cache FILE] [--dry-run FIXTURE.json]
 set -u
-command -v python3 >/dev/null 2>&1 || { echo 'RESULT {"result":"usage-error","error":"python3 is required"}'; exit 2; }
+command -v python3 >/dev/null 2>&1 || { echo 'RESULT {"result":"usage-error","error":"python3 is required — the plugin'"'"'s scripts and its session-start hook all need it; doctor reports it"}'; exit 2; }
 REPO=""; PR=""; REVIEWERS=""; TIMEOUT=""; WINDOW=2; SINCE=""; FIXED=0; MINS=5; SLACK=120; FIRST=20; MAXT=90; CACHE=""; DRY=""
-need() { [ $# -ge 2 ] || { echo "wait-for-reviewers: $1 needs a value" >&2; exit 2; }; }
+need() { [ $# -ge 2 ] || { echo "RESULT {\"result\":\"usage-error\",\"error\":\"$1 needs a value\"}"; exit 2; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo) need "$@"; REPO="$2"; shift 2 ;;
@@ -46,14 +46,14 @@ while [ $# -gt 0 ]; do
     --cache) need "$@"; CACHE="$2"; shift 2 ;;
     --dry-run) need "$@"; DRY="$2"; shift 2 ;;
     -h|--help) awk 'NR>1 && !/^#/{exit} NR>1{print}' "$0"; exit 0 ;;
-    *) echo "wait-for-reviewers: unknown argument: $1" >&2; exit 2 ;;
+    *) echo "RESULT {\"result\":\"usage-error\",\"error\":\"unknown argument: $1\"}"; exit 2 ;;
   esac
 done
-for v in REPO PR REVIEWERS TIMEOUT; do eval "val=\${$v}"; [ -n "$val" ] || { echo "wait-for-reviewers: --$(echo "$v" | tr 'A-Z' 'a-z' | sed 's/reviewers/reviewers-json/; s/timeout/timeout-minutes/') is required" >&2; exit 2; }; done
+for v in REPO PR REVIEWERS TIMEOUT; do eval "val=\${$v}"; [ -n "$val" ] || { echo "RESULT {\"result\":\"usage-error\",\"error\":\"--$(echo "$v" | tr 'A-Z' 'a-z' | sed 's/reviewers/reviewers-json/; s/timeout/timeout-minutes/') is required\"}"; exit 2; }; done
 [ -n "$CACHE" ] || CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/devstride-plugin/reviewer-latency.json"
 # `-` means stdin — spool it to a file first, because the python block below is itself fed on stdin.
 if [ "$REVIEWERS" = "-" ]; then REVIEWERS="$(mktemp)"; cat > "$REVIEWERS"; trap 'rm -f "$REVIEWERS"' EXIT; fi
-case "$FIRST$MAXT$TIMEOUT" in *[!0-9.]*) echo "wait-for-reviewers: --first-tick, --max-tick and --timeout-minutes must be numbers" >&2; exit 2 ;; esac
+case "$FIRST$MAXT$TIMEOUT" in *[!0-9.]*) echo 'RESULT {"result":"usage-error","error":"--first-tick, --max-tick and --timeout-minutes must be numbers"}'; exit 2 ;; esac
 export W_REPO="$REPO" W_PR="$PR" W_REVIEWERS="$REVIEWERS" W_TIMEOUT="$TIMEOUT" W_WINDOW="$WINDOW" W_SINCE="$SINCE" W_FIXED="$FIXED" W_MINS="$MINS" W_SLACK="$SLACK" W_FIRST="$FIRST" W_MAXT="$MAXT" W_CACHE="$CACHE" W_DRY="$DRY"
 python3 - <<'PY'
 import json, math, os, subprocess, sys, tempfile, time, datetime as dt, re
@@ -172,12 +172,20 @@ def ring(botid):
         return None
 def p95(samples):
     s = sorted(samples); return s[max(0, math.ceil(0.95 * len(s)) - 1)]
+def misses(botid):
+    try: return int((cache["reviewers"].get(botid) or {}).get("consecutiveMisses", 0) or 0)
+    except Exception: return 0  # noqa: BLE001
 for a in active:
     samples = ring(a["id"])
     if samples is None: cache_state = "corrupt"; samples = []
     lat = [x["latencySeconds"] for x in samples]
+    a["misses"] = misses(a["id"])
     if FIXED: a["bound"], a["source"], a["p95"], a["n"] = TIMEOUT, "fixed", None, len(lat)
     elif cache_state != "warm" or len(lat) < MINS: a["bound"], a["source"], a["p95"], a["n"] = TIMEOUT, "pollTimeoutMinutes", None, len(lat)
+    elif a["misses"] >= 2:
+        # The learned bound has been missed twice running: the reviewer has probably slowed down,
+        # and a shortened wait can never observe that. Wait the full bound once and re-learn.
+        a["p95"], a["n"] = p95(lat), len(lat); a["bound"], a["source"] = TIMEOUT, "relearning"
     else: a["p95"], a["n"] = p95(lat), len(lat); a["bound"], a["source"] = min(max(a["p95"] + SLACK, WINDOW), TIMEOUT), "learned-p95"
 
 # --- high-water mark ------------------------------------------------------------------------
@@ -233,21 +241,27 @@ while True:
     interval = min(interval * 1.5, MAXT)
 
 # --- learn, from server timestamps only; merge under a lock so two runs do not lose a sample ---
-rejected, new_samples = [], {}
+rejected, new_samples, miss_updates = [], {}, {}
 for a in active:
     r = responded.get(a["id"])
-    if not r: continue
+    if not r:
+        if a["id"] in expired and expired[a["id"]]["boundSource"] == "learned-p95": miss_updates[a["id"]] = a["misses"] + 1
+        continue
+    miss_updates[a["id"]] = 0
     if r["latencySeconds"] < 0 or r["latencySeconds"] > 86400:
         rejected.append({"graphqlBotId": a["id"], "latencySeconds": r["latencySeconds"]}); print("rejected sample %s: %ds is outside [0, 86400]" % (a["id"], r["latencySeconds"])); continue
     new_samples[a["id"]] = {"at": iso(now()), "latencySeconds": r["latencySeconds"], "repo": REPO, "pr": int(PR) if str(PR).isdigit() else PR, "reviewId": r["reviewId"]}
-if new_samples:
+if new_samples or (miss_updates and not FIXED):
     lock = CACHE + ".lock"; got = False
     try:
         os.makedirs(os.path.dirname(CACHE), exist_ok=True)
         for _ in range(50):
             try: os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)); got = True; break
             except FileExistsError: time.sleep(0.1)
+        if not got: raise RuntimeError("lock held by another run — skipping this run's cache write")
         latest, _state = load_cache()  # re-read under the lock: another run may have written since we started
+        for botid, m in miss_updates.items():
+            latest["reviewers"].setdefault(botid, {"samples": []})["consecutiveMisses"] = m
         for botid, sample in new_samples.items():
             entry = latest["reviewers"].setdefault(botid, {"samples": []})
             existing = [x for x in (entry.get("samples") or []) if isinstance(x, dict)]
@@ -256,6 +270,8 @@ if new_samples:
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(CACHE), prefix=".reviewer-latency.")
         with os.fdopen(fd, "w", encoding="utf-8") as f: json.dump(latest, f, indent=1); f.write("\n")
         os.replace(tmp, CACHE)
+    except RuntimeError:
+        cache_state = "locked"
     except Exception:  # noqa: BLE001
         cache_state = "unwritable"
     finally:
@@ -266,7 +282,7 @@ if new_samples:
 non = list(expired.values()) + [{"graphqlBotId": a["id"], "name": a["name"], "waitedSeconds": int(now() - a["registeredAt"]), "boundSeconds": int(a["bound"]), "boundSource": "gh-unavailable" if outage else a["source"]} for a in active if a["id"] not in responded and a["id"] not in expired]
 if outage: res = "gh-unavailable"
 elif not non: res = "all-posted"
-elif any(x["boundSource"] in ("pollTimeoutMinutes", "fixed") for x in non): res = "timeout"   # the wait ran to the full bound for someone
+elif any(x["boundSource"] in ("pollTimeoutMinutes", "fixed", "relearning") for x in non): res = "timeout"   # the wait ran to the full bound for someone
 else: res = "proceed-p95"                                                                       # every non-responder was cut short by a learned bound
 result({"result": res, "elapsedSeconds": int(now() - t0), "pollCalls": calls["n"], "sinceReviewId": since,
         "responded": list(responded.values()), "nonResponders": non, "notRegistered": not_registered,
