@@ -288,6 +288,14 @@ skills/build-item/SKILL.md|registered in timeline
 skills/build-item/SKILL.md|FULL diff
 skills/build-item/SKILL.md|live: false
 skills/build-item/references/progress-table.md|not configured
+skills/plan/SKILL.md|yes, build this
+skills/plan/SKILL.md|zero edges
+skills/release/SKILL.md|reviewedHead
+skills/release/SKILL.md|release-notes
+skills/doctor/SKILL.md|text to PRINT
+skills/doctor/SKILL.md|ready_for_review
+skills/rebalance/SKILL.md|convex
+skills/rebalance/SKILL.md|NEVER `delete_item`
 skills/review/SKILL.md|wait-for-reviewers.sh
 skills/review/SKILL.md|adaptiveReviewerWait
 skills/review/references/reviewer-latency.md|nearest-rank
