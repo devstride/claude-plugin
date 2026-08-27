@@ -40,6 +40,11 @@
 #                          columns come from `git show <ref>:<path>`
 #   --write-budgets        rewrite the budgets file from the current measurement
 #   --budgets <path>       use another budgets file (tests)
+#
+# Exit codes: --check and the plain table exit 1 on any problem (a breach, a
+# missing/stale budget, a missing always-on input, a body without frontmatter,
+# a broken budgets file). --json is pure data: it always exits 0 and lists the
+# same problems under "problems". --write-budgets and --table exit 0 on success.
 set -u
 command -v python3 >/dev/null 2>&1 || { echo "measure-cost: python3 is required" >&2; exit 2; }
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -50,7 +55,7 @@ while [ $# -gt 0 ]; do
     --since|--budgets)
       [ $# -ge 2 ] || { echo "measure-cost: $1 needs a value" >&2; exit 2; }
       if [ "$1" = "--since" ]; then SINCE="$2"; else BUDGETS="$2"; fi; shift 2 ;;
-    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
+    -h|--help) awk 'NR>1 && !/^#/{exit} NR>1{print}' "$0"; exit 0 ;;
     *) echo "measure-cost: unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -67,23 +72,26 @@ def nbytes(path): return os.path.getsize(path)
 def rel(p): return os.path.relpath(p, ROOT)
 
 def frontmatter(text):
-    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
-    fm = {}
+    """Minimal YAML front matter: `key: value`, quoted values, and `>`/`|` block scalars whose
+    indented continuation lines are joined with spaces. Returns {} when there is none — callers
+    treat that as a problem, never as an empty description."""
+    text = text.lstrip("\ufeff")
+    m = re.match(r"^---\r?\n(.*?)\r?\n---\r?\n", text, re.S)
+    fm, last = {}, None
     if m:
         for line in m.group(1).splitlines():
-            k, _, v = line.partition(":")
-            if _:
+            if last and line[:1] in (" ", "\t"):
+                fm[last] = (fm[last] + " " + line.strip()).strip(); continue
+            k, sep, v = line.partition(":")
+            if sep and k.strip() and not k[:1].isspace():
                 v = v.strip()
-                if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'": v = v[1:-1]
-                fm[k.strip()] = v
+                if v in (">", "|", ">-", "|-"): v = ""
+                elif len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'": v = v[1:-1]
+                fm[k.strip()] = v; last = k.strip()
     return fm
 
-def listing_line(fm):
-    return "- devstride:%s: %s\n" % (fm.get("name", "?"), fm.get("description", ""))
-
-def measure(read_body):
-    """read_body(name) -> text or None. Returns the always-on context line bytes for a set of bodies."""
-    pass
+def listing_line(fm, dirname):
+    return "- devstride:%s: %s\n" % (fm.get("name") or dirname, fm.get("description", ""))
 
 # --- current tree -------------------------------------------------------------------------
 bodies = {}
@@ -102,12 +110,17 @@ def listed(fm):
     # A skill with `disable-model-invocation: true` is user-invoked only and is left out of the
     # listing the model sees, so it costs nothing per session; its body still costs on invocation.
     return str(fm.get("disable-model-invocation", "")).strip().lower() != "true"
-ctx_bytes = 0
+ctx_bytes, early_problems = 0, []
 for name, b in bodies.items():
     with open(os.path.join(ROOT, b["path"]), encoding="utf-8") as f:
         fm = frontmatter(f.read())
-    if listed(fm): ctx_bytes += len(listing_line(fm).encode("utf-8"))
-executed_bytes = sum(nbytes(os.path.join(ROOT, p)) for p in ("hooks/hooks.json", "hooks/version-check.sh", ".claude-plugin/plugin.json") if os.path.exists(os.path.join(ROOT, p)))
+    if not fm: early_problems.append("NO-FRONTMATTER %s" % b["path"])
+    if listed(fm): ctx_bytes += len(listing_line(fm, name).encode("utf-8"))
+EXECUTED = ("hooks/hooks.json", "hooks/version-check.sh", ".claude-plugin/plugin.json")
+executed_bytes = 0
+for p in EXECUTED:
+    if os.path.exists(os.path.join(ROOT, p)): executed_bytes += nbytes(os.path.join(ROOT, p))
+    else: early_problems.append("MISSING %s (alwaysOn.executed is defined as exactly three files)" % p)
 always = {"context": {"bytes": ctx_bytes, "tokens": tokens(ctx_bytes)}, "executed": {"bytes": executed_bytes}}
 
 # --- budgets --------------------------------------------------------------------------------
@@ -136,7 +149,7 @@ try:
 except Exception as e:  # noqa: BLE001 — a broken budgets file is a failure, not silence
     budget_error = "%s: %s" % (rel(BUDGETS_PATH), e)
 
-problems = []
+problems = list(early_problems)
 if budget_error:
     problems.append("BAD-BUDGETS %s" % budget_error)
 else:
@@ -160,14 +173,14 @@ if MODE == "check":
     if problems: sys.exit(1)
     for n, b in sorted(bodies.items(), key=lambda kv: -kv[1]["tokens"]):
         print("ok %s %s <= %s" % (b["path"], fmt(b["tokens"]), fmt(b["budget"])))
-    print("ok alwaysOn.context %s <= %s" % (fmt(always["context"]["tokens"]), fmt(always["context"]["budget"])))
+    print("alwaysOn.context %s <= %s (budget alwaysOnContext)" % (fmt(always["context"]["tokens"]), fmt(always["context"]["budget"])))
     sys.exit(0)
 
 if MODE == "json":
     print(json.dumps({"method": METHOD, "bodies": {n: {k: v for k, v in b.items()} for n, b in bodies.items()},
                       "references": refs, "scripts": scripts, "alwaysOn": always,
-                      "overBudget": [p for p in problems]}, indent=2, ensure_ascii=False))
-    sys.exit(1 if budget_error else 0)
+                      "problems": list(problems)}, indent=2, ensure_ascii=False))
+    sys.exit(0)
 
 if MODE == "table":
     def git(*args):
@@ -185,7 +198,7 @@ if MODE == "table":
             blob = git("show", "%s:%s" % (SINCE, path)) or b""
             ref_bodies[parts[1]] = {"bytes": len(blob), "tokens": tokens(len(blob)), "path": path}
             fm = frontmatter(blob.decode("utf-8", "replace"))
-            if listed(fm): ref_ctx += len(listing_line(fm).encode("utf-8"))
+            if listed(fm): ref_ctx += len(listing_line(fm, parts[1]).encode("utf-8"))
     print("<!-- scripts/measure-cost.sh --table --since %s @ %s, method: %s -->" % (SINCE, head, METHOD))
     print("| File | bytes@%s | tokens@%s | bytes now | tokens now | Δ tokens | budget |" % (SINCE, SINCE))
     print("|---|---:|---:|---:|---:|---:|---:|")

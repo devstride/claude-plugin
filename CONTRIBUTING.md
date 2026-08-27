@@ -76,9 +76,9 @@ mattered — memory reproduces what you already thought about.
 
 Every `skills/<name>/SKILL.md` has a token budget in `scripts/cost-budgets.json`, and
 `bash scripts/measure-cost.sh --check` fails the moment a body exceeds it. **Run it whenever you
-edit skill text.** The estimator is deliberately simple — `ceil(bytes / 3)`, bytes as `wc -c`
-prints them — so anyone can cross-check a number, and its bias is the same on both sides of every
-before/after table.
+edit skill text.** The method is the `_method` field of `scripts/cost-budgets.json`, explained at
+the top of `scripts/measure-cost.sh` — deliberately simple enough to cross-check with `wc -c`, with
+a bias that is the same on both sides of every before/after table.
 
 The budgets are a **ratchet**: lower one freely; raise one only in the same commit as the text
 that needs it, and say so in the commit message — or, usually better, move the rationale into a
