@@ -84,8 +84,10 @@ mutation's own success return proves nothing.
 Requesting Copilot **in the same call that opens the PR** is what makes the cloud review overlap
 the local engines rather than follow them — the single biggest wall-clock saving in the loop, so
 never defer it to a later turn. An explicitly requested Copilot review runs fine on a draft. Tell
-`review` which reviewers are already REGISTERED (and which were dropped) so it skips its own
-request for the former and waits on neither.
+`review` which reviewers are already REGISTERED (and which were dropped) — with the `created_at`
+of each one's `review_requested` event, so the learned wait bound starts from the event, not
+from the moment `review` is invoked — so it skips its own request for the former and waits on
+neither.
 
 **Body format** — author it (never `--fill`), write to a scratch file, pass `--body-file`, and keep
 a clear, conventional TITLE. Render the sections from config **`prBodyTemplate.sections`**, in

@@ -33,7 +33,7 @@ word**, and the knobs move together. Individual knobs can still be overridden (s
 | `releaseCiOrdering` | CI runs **concurrently** with review on the release PR — the draft hold is not used at runtime, whatever the three `review.*` CI-ordering booleans say | Per the three `review.*` CI-ordering booleans | Per the three `review.*` CI-ordering booleans |
 | `autoRelease` (default written by `setup`) | **true** — the release unit merges to the base branch when its last leaf lands. `setup` says this out loud when it writes it: on a repo whose base branch is effectively production, the owner must know | false | false |
 | `reviewerRegistrationWindowMinutes` — how long to wait for proof that a cloud reviewer was actually asked | 2 | 2 | 2 |
-| `pollTimeoutMinutes` — bound on waiting for a REGISTERED cloud reviewer's review (default written by `setup`) | 5 | 10 | 20 |
+| `pollTimeoutMinutes` — bound on waiting for a REGISTERED cloud reviewer's review (default written by `setup`) — the UPPER bound of the adaptive wait; see `review` step 2 | 5 | 10 | 20 |
 
 Read the `prototype` column as "rails and guidance, fast"; the `enterprise` column as "high
 resolution, minimum exposure to error"; `standard` as the middle a working product wants.
