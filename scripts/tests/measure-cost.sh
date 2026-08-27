@@ -44,4 +44,16 @@ if [ "$DELTAS" = "+0" ]; then ok "(f) --table --since HEAD: every Δ is +0"; els
 # (g) runs under /bin/bash explicitly (macOS 3.2), not only a newer bash
 if /bin/bash "$MC" --check >/dev/null; then ok "(g) runs under /bin/bash $(/bin/bash -c 'echo $BASH_VERSION')"; else bad "(g) failed under /bin/bash"; fi
 
+# (h) an option with no value is a usage error, never a hang
+if perl -e 'alarm 5; exec @ARGV' /bin/bash "$MC" --since >/dev/null 2>&1; then bad "(h) --since with no value should fail"; else RC=$?; [ "$RC" -eq 2 ] && ok "(h) --since with no value → usage error, exit 2" || bad "(h) expected exit 2, got $RC (142 = hung until the alarm)"; fi
+
+# (i) a skill with disable-model-invocation: true is not in the always-on listing
+BEFORE="$(/bin/bash "$TMP/repo/scripts/measure-cost.sh" --json --budgets "$BUD" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["alwaysOn"]["context"]["bytes"])')"
+printf -- '---\nname: zz-test\ndescription: test only\ndisable-model-invocation: true\n---\nbody\n' > "$TMP/repo/skills/zz-test/SKILL.md"
+AFTER="$(/bin/bash "$TMP/repo/scripts/measure-cost.sh" --json --budgets "$BUD" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["alwaysOn"]["context"]["bytes"])')"
+if [ "$AFTER" -lt "$BEFORE" ]; then ok "(i) disable-model-invocation skill leaves the always-on listing ($BEFORE → $AFTER bytes)"; else bad "(i) expected always-on bytes to drop when zz-test became user-only ($BEFORE → $AFTER)"; fi
+
+# (j) references are discovered recursively (the setup templates live one level down)
+if /bin/bash "$MC" --json | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if any("/references/" in k and k.count("/")>=4 for k in d["references"]) else 1)'; then ok "(j) nested references are measured"; else bad "(j) no nested reference found — discovery is not recursive"; fi
+
 exit $FAIL

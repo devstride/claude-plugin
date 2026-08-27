@@ -14,8 +14,11 @@
 # re-baselined against the new method and the diff shows both.
 #
 # What is measured:
-#   bodies       every skills/*/SKILL.md, whole file, frontmatter included —
-#                it is what loads on invocation. Budgeted.
+#   bodies       every skills/*/SKILL.md, the WHOLE file. The loader strips the
+#                YAML frontmatter before the body enters context, so this
+#                over-counts by that much (~1% of a body) — kept deliberately so
+#                the number equals `wc -c`, which anyone can cross-check, and the
+#                bias is identical on both sides of every table. Budgeted.
 #   references   every skills/*/references/*.md — informational, never
 #                budgeted, listed so moved text can be seen to have MOVED.
 #   scripts      hooks/*.sh, scripts/*.sh, skills/*/scripts/* — bytes only,
@@ -44,8 +47,9 @@ MODE=""; SINCE=""; BUDGETS="$ROOT/scripts/cost-budgets.json"
 while [ $# -gt 0 ]; do
   case "$1" in
     --check|--json|--table|--write-budgets) MODE="${1#--}"; shift ;;
-    --since) SINCE="${2:-}"; shift 2 ;;
-    --budgets) BUDGETS="${2:-}"; shift 2 ;;
+    --since|--budgets)
+      [ $# -ge 2 ] || { echo "measure-cost: $1 needs a value" >&2; exit 2; }
+      if [ "$1" = "--since" ]; then SINCE="$2"; else BUDGETS="$2"; fi; shift 2 ;;
     -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
     *) echo "measure-cost: unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -88,16 +92,21 @@ for p in sorted(glob.glob(os.path.join(ROOT, "skills", "*", "SKILL.md"))):
     b = nbytes(p)
     bodies[name] = {"path": rel(p), "bytes": b, "tokens": tokens(b)}
 refs = {}
-for p in sorted(glob.glob(os.path.join(ROOT, "skills", "*", "references", "*.md"))):
+for p in sorted(glob.glob(os.path.join(ROOT, "skills", "*", "references", "**", "*.md"), recursive=True)):
     b = nbytes(p); refs[rel(p)] = {"bytes": b, "tokens": tokens(b)}
 scripts = {}
-for pat in ("hooks/*.sh", "scripts/*.sh", "skills/*/scripts/*"):
-    for p in sorted(glob.glob(os.path.join(ROOT, pat))):
+for pat in ("hooks/*.sh", "scripts/**/*.sh", "skills/*/scripts/**/*"):
+    for p in sorted(glob.glob(os.path.join(ROOT, pat), recursive=True)):
         if os.path.isfile(p): scripts[rel(p)] = {"bytes": nbytes(p)}
+def listed(fm):
+    # A skill with `disable-model-invocation: true` is user-invoked only and is left out of the
+    # listing the model sees, so it costs nothing per session; its body still costs on invocation.
+    return str(fm.get("disable-model-invocation", "")).strip().lower() != "true"
 ctx_bytes = 0
 for name, b in bodies.items():
     with open(os.path.join(ROOT, b["path"]), encoding="utf-8") as f:
-        ctx_bytes += len(listing_line(frontmatter(f.read())).encode("utf-8"))
+        fm = frontmatter(f.read())
+    if listed(fm): ctx_bytes += len(listing_line(fm).encode("utf-8"))
 executed_bytes = sum(nbytes(os.path.join(ROOT, p)) for p in ("hooks/hooks.json", "hooks/version-check.sh", ".claude-plugin/plugin.json") if os.path.exists(os.path.join(ROOT, p)))
 always = {"context": {"bytes": ctx_bytes, "tokens": tokens(ctx_bytes)}, "executed": {"bytes": executed_bytes}}
 
@@ -174,18 +183,20 @@ if MODE == "table":
         parts = path.split("/")
         if len(parts) == 3 and parts[2] == "SKILL.md":
             blob = git("show", "%s:%s" % (SINCE, path)) or b""
-            ref_bodies[parts[1]] = {"bytes": len(blob), "tokens": tokens(len(blob))}
-            ref_ctx += len(listing_line(frontmatter(blob.decode("utf-8", "replace"))).encode("utf-8"))
+            ref_bodies[parts[1]] = {"bytes": len(blob), "tokens": tokens(len(blob)), "path": path}
+            fm = frontmatter(blob.decode("utf-8", "replace"))
+            if listed(fm): ref_ctx += len(listing_line(fm).encode("utf-8"))
     print("<!-- scripts/measure-cost.sh --table --since %s @ %s, method: %s -->" % (SINCE, head, METHOD))
     print("| File | bytes@%s | tokens@%s | bytes now | tokens now | Δ tokens | budget |" % (SINCE, SINCE))
     print("|---|---:|---:|---:|---:|---:|---:|")
     tb = tt = nb = nt = 0
-    for n, b in sorted(bodies.items(), key=lambda kv: -kv[1]["tokens"]):
-        r = ref_bodies.get(n)
+    names = sorted(set(bodies) | set(ref_bodies), key=lambda n: -(bodies.get(n) or ref_bodies[n])["tokens"])
+    for n in names:
+        b, r = bodies.get(n), ref_bodies.get(n)
         if r: tb += r["bytes"]; tt += r["tokens"]
-        nb += b["bytes"]; nt += b["tokens"]
-        delta = ("%+d" % (b["tokens"] - r["tokens"])) if r else "—"
-        print("| %s | %s | %s | %s | %s | %s | %s |" % (b["path"], fmt(r["bytes"]) if r else "—", fmt(r["tokens"]) if r else "—", fmt(b["bytes"]), fmt(b["tokens"]), delta, fmt(b["budget"]) if b.get("budget") is not None else "—"))
+        if b: nb += b["bytes"]; nt += b["tokens"]
+        delta = ("%+d" % ((b["tokens"] if b else 0) - (r["tokens"] if r else 0))) if (b and r) else ("%+d" % -r["tokens"] if r else "—")
+        print("| %s | %s | %s | %s | %s | %s | %s |" % ((b or r)["path"] + ("" if b else " (removed)"), fmt(r["bytes"]) if r else "—", fmt(r["tokens"]) if r else "—", fmt(b["bytes"]) if b else "—", fmt(b["tokens"]) if b else "—", delta, fmt(b["budget"]) if b and b.get("budget") is not None else "—"))
     print("| alwaysOn.context (skill listing) | %s | %s | %s | %s | %+d | %s |" % (fmt(ref_ctx), fmt(tokens(ref_ctx)), fmt(ctx_bytes), fmt(always["context"]["tokens"]), always["context"]["tokens"] - tokens(ref_ctx), fmt(always["context"].get("budget", 0)) if not budget_error else "—"))
     print("| **total (bodies)** | %s | %s | %s | %s | %+d | |" % (fmt(tb), fmt(tt), fmt(nb), fmt(nt), nt - tt))
     sys.exit(0)
