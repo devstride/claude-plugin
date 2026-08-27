@@ -86,11 +86,14 @@ its second parent, and that one must run. Compare against the base tip only as t
 fast-forward promotion, and fetch the base into an explicit remote-tracking ref — a bare
 `git fetch origin <base>` writes only `FETCH_HEAD`, and `origin/<base>` would not exist.
 
-The step needs a checkout before it, and that checkout MUST use `fetch-depth: 2` AND the step
-must still `--deepen=1` the production ref — both, not either (this is what `setup` A5 records as
-`present-inert` when only the step is there, and what `doctor` reports as present-but-cannot-fire): a depth-1 checkout leaves `HEAD` a
-shallow boundary, and a later `--depth=2` fetch of the same ref may not deepen it, so `HEAD^2`
-never resolves, the comparison silently lacks the second parent, and the skip never fires. A gate
+The step needs a checkout before it, and the merge commit's SECOND PARENT has to be in that
+checkout — `HEAD^2` is what the comparison reads. A default depth-1 checkout does not have it:
+`HEAD` is a shallow boundary, and a later `--depth=2` fetch of the same ref may not deepen it, so
+`HEAD^2` never resolves, the comparison silently falls through, and the skip never fires. Any ONE
+of these gives you the parent: `fetch-depth: 2` or more on the checkout, `fetch-depth: 0` for
+full history, or the `--deepen=1` in the step above. The snippet carries both because
+belt-and-braces costs nothing here and survives someone lowering the checkout depth later. A step
+with none of them is what `setup` A5 records and `doctor` reports as **present but inert**. A gate
 job that filters paths through the API alone has no repository on disk at all, and
 `git rev-parse` would fail on every production push. Then fold it into the gate's
 outputs: `backend: ${{ steps.tree.outputs.identical == 'true' && 'false' || steps.filter.outputs.backend }}`

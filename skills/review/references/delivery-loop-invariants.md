@@ -272,7 +272,7 @@ skills/review/SKILL.md|mergeable_state
 skills/review/SKILL.md|per workflow
 skills/ci-audit/SKILL.md|SAME workflow
 skills/doctor/SKILL.md|present but inert
-skills/setup/SKILL.md|present-inert
+skills/setup/SKILL.md|present but inert
 skills/setup/references/config-defaults.md|per workflow
 skills/doctor/SKILL.md|remove it from the population
 skills/setup/SKILL.md|Remove it from the population BEFORE
@@ -436,8 +436,9 @@ S1. A convention-only workflow (`opened` plus optionally `converted_to_draft` /
     pattern D; the `opened`-only shape is a subset. The single-job / no-checkout / run-only
     conditions are what keep a real gate out of the exemption; never loosen them.
 S2. The tree-identical skip is judged on whether it CAN FIRE, never on the step existing: it
-    reads `HEAD^2`, so a depth-1 checkout makes it inert. `doctor` reports present-but-inert and
-    `setup` records `present-inert` — a step-exists test calls a permanently-inert mechanic done.
+    reads `HEAD^2`, so the merge commit's second parent must be in the checkout — `fetch-depth`
+    of 0 or 2+, or a `--deepen=1` in the step; a depth-1 checkout with none of them is
+    "present but inert" in both `doctor` and `setup`. A step-exists test calls it done.
 S3. `ci.expectedRunsPerPullRequest` is PER WORKFLOW under `ci.workflowGlobs`: several workflows
     executing once each on one pull request is the design; the excess is a SECOND executed run
     of the SAME workflow, attributed by pull request number (never branch name alone), and an

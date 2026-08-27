@@ -271,10 +271,11 @@ specific gap. The third row is a legitimate configuration, not a defect: say wha
 keys): a top-level `concurrency:` block with `cancel-in-progress: true`; a step comparing
 `HEAD^{tree}` against the base branch on a production-branch push; a workflow that fails a
 non-draft pull request opened by a person. **`ci.productionTreeSkip` takes three values, not
-two** — `present`, `present-inert`, `absent`: the comparison reads `HEAD^2`, so it can only fire
-when the job's checkout uses `fetch-depth: 2` or deeper AND the step `--deepen=1`s the production
-ref (pattern C). Record a step over a depth-1 checkout as `present-inert`, and let `setup ci`
-offer the `fetch-depth` diff on its own rather than the whole pattern again. The patterns and the measurements behind them are in
+two** — `present`, `present but inert`, `absent`: the comparison reads `HEAD^2`, so the merge
+commit's second parent must be in the checkout. Any one of `fetch-depth: 0`, `fetch-depth: 2` or
+more, or a `--deepen=1` in the step itself satisfies that (pattern C). Record a step with none of
+them — a default depth-1 checkout — as `present but inert`, and let `setup ci` offer the
+`fetch-depth` diff on its own rather than the whole pattern again. The patterns and the measurements behind them are in
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`; `setup ci` is what applies
 them. In a full run just report which are missing and say `setup ci` applies them — the full run
 never edits a workflow.

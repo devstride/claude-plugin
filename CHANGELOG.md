@@ -8,16 +8,19 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-08-27
+
 ### Fixed
 
 - **The tree-identical skip is now judged on whether it can fire, not on whether the step is
   there.** `doctor` and `setup` detected pattern C by looking for a step comparing `HEAD^{tree}` —
   but that comparison reads `HEAD^2`, which never resolves over a default depth-1 checkout, so a
   repository could carry the step, be told it had the mechanic, and re-test every promotion at
-  full cost with nothing explaining the minutes. `doctor` now reports such a step as present but
-  inert and names the depth as the reason; `setup` records `ci.productionTreeSkip` as
-  `present-inert` and `setup ci` offers the `fetch-depth` diff on its own. The validation
-  checklist gains the symptom.
+  full cost with nothing explaining the minutes. Both skills now ask whether the merge commit's
+  second parent is actually in the checkout — `fetch-depth: 0`, `fetch-depth: 2` or more, or a
+  `--deepen=1` in the step; any one will do. A step with none of them is reported as **present
+  but inert**, naming the depth as the reason, and `setup ci` offers the `fetch-depth` diff on
+  its own. The validation checklist gains the symptom.
 
 ## [2.0.0] — 2026-08-26
 
@@ -525,7 +528,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.0.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.1.0...HEAD
+[2.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.0.0...devstride--v2.1.0
 [2.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.2.0...devstride--v2.0.0
 [1.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.1.0...devstride--v1.2.0
 [1.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.0.0...devstride--v1.1.0
