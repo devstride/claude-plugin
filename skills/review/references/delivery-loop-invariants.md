@@ -76,8 +76,11 @@ F2. Use ONE self-terminating background poll; re-launch rather than foreground-l
 F3. [Draft-hold repos only — all three `review.*` CI-ordering flags false means PRs open
     non-draft and none of this applies] Draft holds CI; the ready-flip is what releases it.
 F4. Distinguish flaky/infra from real; bound reruns to ~2.
-F5. [Same condition] A run that failed to TRIGGER is fixed by close+reopen of the PR.
+F5. [Same condition] A run that failed to TRIGGER is first kicked by close+reopen of the PR.
 F6. Require the FINAL head SHA to be observed SUCCESS; absent/stale is not green.
+F7. Close+reopen does not clear a GitHub mergeability stall (`mergeable_state: unknown`, no
+    runs at all — not even skipped ones); a NEW HEAD does: one empty commit, bounded to one per
+    settle, then STOP and surface. An empty commit does not change the patch (no re-review).
 
 ## G. Git safety
 G1. NEVER rebase or force-push a protected head — and a production release PR's head IS the
@@ -214,7 +217,7 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "high-water" "no thread" "localReviewerName" "always()" "single writer" \
               "delivery-profiles.md" "Delivery profile:" "maxLocalReviewRounds" \
               "reviewerRegistrationWindowMinutes" "fixFloor" "reviewBreadthCeiling" \
-              "names the engine" "instanceBoundTo"; do
+              "names the engine" "instanceBoundTo" "allow-empty" "convention-only"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
 
@@ -260,6 +263,14 @@ skills/review/SKILL.md|via path Y
 skills/doctor/references/version-currency.md|devstride--v
 hooks/version-check.sh|NEVER exits non-zero
 hooks/version-check.sh|alarm
+skills/review/SKILL.md|EMPTY COMMIT
+skills/review/SKILL.md|mergeable_state
+skills/review/SKILL.md|per workflow
+skills/ci-audit/SKILL.md|per workflow
+skills/setup/references/config-defaults.md|per workflow
+skills/doctor/SKILL.md|converted_to_draft
+skills/setup/SKILL.md|converted_to_draft
+skills/setup/references/ci-cost-patterns.md|convention-only shape
 hooks/version-check.sh|installPath
 hooks/version-check.sh|show-toplevel
 PAIRS
@@ -409,9 +420,22 @@ R4. It updates ONLY the install the loaded copy belongs to, for THIS repository:
     (that violates R1 for the `ds@` alias and every project-scope install). Config is read from
     the REPOSITORY ROOT, not the launch directory; the diagnostic record is per repository.
 
+## S. CI policy shape and run-once counting
+S1. A convention-only workflow (`opened` plus optionally `converted_to_draft` /
+    `ready_for_review`, never `synchronize`; one run-only job, no checkout, fails on a non-draft
+    `opened`, passes otherwise) is removed from the population BEFORE the four-events,
+    concurrency and draft-gate checks — in `doctor`, `setup` A5 and validation check 6 alike —
+    and reported as the draft-convention check being present. The definition lives once, under
+    pattern D; the `opened`-only shape is a subset. The single-job / no-checkout / run-only
+    conditions are what keep a real gate out of the exemption; never loosen them.
+S2. `ci.expectedRunsPerPullRequest` is PER WORKFLOW under `ci.workflowGlobs`: several workflows
+    executing once each on one pull request is the design; the excess is a SECOND executed run
+    of the SAME workflow, attributed by pull request number (never branch name alone), and an
+    empty re-trigger commit is an excess only when that workflow had already executed.
+
 ---
 
-**Revised total: 53 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) = 101.**
+**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 2 (S) = 104.**
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.

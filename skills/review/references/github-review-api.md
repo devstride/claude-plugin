@@ -213,3 +213,29 @@ means collection MISSED a finding — it is the only cheap check that catches th
 
 Copilot may also leave an overview/summary as an *issue* comment (not a review
 thread) which cannot be resolved; a reply there, or nothing, is fine.
+
+## The mergeability stall — why close+reopen is not enough
+
+`pull_request` workflow runs are built on `refs/pull/<n>/merge`, the merge ref GitHub computes
+when it evaluates mergeability. When that computation stalls — `gh api repos/{owner}/{repo}/pulls/<n>
+--jq '[.mergeable_state,.merge_commit_sha]'` reads `unknown` and `null` for minutes — there is no
+merge ref to build, so GitHub creates **no workflow runs at all** for the event: not even skipped
+ones. A board with no runs reads exactly like "the flip triggered nothing" (step 7.3's known
+race), which is why the two are easy to confuse; the difference is the `mergeable_state` read.
+
+Observed twice on one day, on two repositories at once, which is what shows the stall is
+repo-wide for EXISTING heads rather than a property of one pull request: close+reopen did not
+clear it, re-setting the base (`gh pr edit --base`) did not clear it, and a control pull request
+opened in the same window stalled the same way. What cleared it, both times, was a NEW HEAD — an
+empty commit pushed to the branch. The merge ref was built and runs started within seconds.
+Hence step 7.3's order: close+reopen first (it is the cheap fix for the flip race and costs
+nothing), then one empty commit when `mergeable_state` is still `unknown` ~60 s later, then
+stop — a second empty commit has never been needed, and looping on one would only stack no-op
+commits on the branch.
+
+Two consequences step 7.3 states as rules: the empty commit does not change the patch, so the
+"CHANGED the patch" re-review rule does not fire; and on a protected release head it is a
+fast-forward push, which the protected-head rule permits (it forbids rewriting), at the cost of
+a no-op commit that production inherits at promotion — the tree-identical skip still fires
+there, because the tree is unchanged.
+

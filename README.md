@@ -229,8 +229,8 @@ guarantees it. What the hold does not cover is the rest of the bill: superseded 
 production-branch push re-testing the tree the base branch just tested, a release pull request
 re-run every time something merges beneath it. `/devstride:ci-audit` measures all of it;
 `/devstride:setup ci` applies the workflow mechanics that remove it (as reviewed diffs); the loop
-rules — freeze the release source while a release is ready, report executed runs per pull request
-— are on by default (`ci.freezeBaseWhileReleasePrReady`, `ci.expectedRunsPerPullRequest`).
+rules — freeze the release source while a release is ready, report executed runs per workflow
+per pull request — are on by default (`ci.freezeBaseWhileReleasePrReady`, `ci.expectedRunsPerPullRequest`).
 
 **Documentation and release notes.** The plugin never edits your documentation itself. `setup` asks
 where your docs live, how they are updated, and how release notes are pushed, then scaffolds two
