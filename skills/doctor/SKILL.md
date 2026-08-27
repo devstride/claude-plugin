@@ -241,10 +241,9 @@ Scope the audit to workflows with an `on: pull_request` trigger. A workflow trig
 exempt it, and do not advise gating it. Likewise a **convention-only workflow** — the shape
 defined once under pattern D of `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`:
 `on.pull_request.types` of `opened` plus optionally `converted_to_draft` / `ready_for_review`
-and nothing else (never `synchronize`), one `run:`-only job with no `uses:`/checkout that fails
-on a non-draft `opened` and passes on the other events — is a policy notice, not a CI gate:
-remove it from the population before the four-events, concurrency and draft-gate checks, and
-list it under the INFO line as the draft-convention check being present.
+and nothing else, one run-only job, no checkout, failing on a non-draft
+`opened` — is a policy notice, not a CI gate: remove it from the population before the
+four-events, concurrency and draft-gate checks; list it under the INFO line as present.
 
 Two separate checks, and **the first is the one everyone misses**:
 
@@ -291,8 +290,8 @@ Two separate checks, and **the first is the one everyone misses**:
 - **Run-once in practice.** Run the last seven days through the `ci-audit` skill's method (executed
   runs per workflow per pull request, post-merge push minutes, release pull requests re-run by a
   moving base) and report the ratio `Σ executed PR runs ÷ Σ over pull requests of the distinct
-  workflows that executed on them` — `1.0` is the design; above it, name the pull requests, the
-  workflows and the causes. This is the number the whole draft-hold arrangement exists to
+  workflows that executed on them` — `1.0` is the design; above it, name the pull requests, workflows
+  and causes. This is the number the whole draft-hold arrangement exists to
   produce, and the only way to know it is to measure it.
 
 ## 6. Merge gates (`gates`)

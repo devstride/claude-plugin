@@ -207,11 +207,9 @@ mechanics understand.
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`: `on.pull_request.types` of
 `opened` plus optionally `converted_to_draft` / `ready_for_review` and nothing else (never
 `synchronize`), one `run:`-only job with no checkout, failing on a non-draft `opened` and
-passing otherwise; the older `opened`-only shape is a subset and still counts. It is a policy
-notice, not a CI gate. **Remove it from the population BEFORE the five-case table below is
+passing otherwise; the `opened`-only shape is a subset. **Remove it from the population BEFORE the five-case table below is
 evaluated** — left in, its draft-condition `if` and short `types` list read as an `ambiguous`
-row, and Phase G calls it a FAIL. Record it as `ci.policyCheck` present (either shape; `setup ci`
-offers no upgrade diff).
+row, and Phase G calls it a FAIL.
 
 When it is GitHub Actions, look at the workflows themselves before prefilling the three CI-ordering
 booleans — and look only at the ones this is about: **workflows with an `on: pull_request` trigger.**
@@ -830,7 +828,7 @@ one is how a setup gets called broken because a laptop was on a train.
      Say `/devstride:setup ci` applies both, and `/devstride:ci-audit` shows what they cost.
    - **`FAIL`:** a draft-gated workflow whose trigger cannot rerun it — `types` absent, or an
      explicit list missing any of `opened`, `synchronize`, `reopened`, `ready_for_review` (a
-     convention-only workflow, A5, is exempt by shape and never reaches this check). Here the
+     convention-only workflow, A5, never reaches this check). Here the
      loop cannot finish at all: after a red run, a fix push starts nothing and the close-and-reopen
      fallback has no event to fire on, so it waits forever on a run that cannot exist. A repository
      in that state is not loop-ready, whatever else passes.

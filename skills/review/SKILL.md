@@ -550,14 +550,14 @@ released CI, so treating it as a precondition would be circular.
    and re-evaluates the draft condition; (b) if ~60 s after the reopen `mergeable_state` is
    still `unknown` / `merge_commit_sha` null and there is still no run, push ONE **EMPTY COMMIT**
    (`git commit --allow-empty -m "ci: re-trigger — GitHub did not build this pull request's merge ref"`,
-   then a plain push — a fast-forward, so allowed even on a PROTECTED head, which 7.1 forbids
-   only from REWRITING; it leaves a no-op commit production inherits, so name it in the step-8
-   report); (c) at most one empty commit per settle — still nothing is a GitHub-side incident:
-   STOP and surface it, never loop. A new head forces a per-PR mergeability recompute; the
-   stall is repo-wide for existing heads (mechanism and evidence: `github-review-api.md`,
-   "The mergeability stall"). An empty commit does not CHANGE the patch, so 7.1's re-review
-   rule does not fire. The remedy is keyed on "no run for the head SHA + `mergeable_state:
-   unknown`", not on the flip — step 0's close+reopen for a non-draft PR escalates the same way.
+   then a plain push — a fast-forward, allowed even on a PROTECTED head (7.1 forbids only
+   rewriting) at the cost of a no-op commit production inherits; name it in the step-8 report);
+   (c) at most one empty commit per settle — still nothing is a GitHub-side incident: STOP and
+   surface it, never loop. A new head forces a per-PR mergeability recompute; the stall is
+   repo-wide for existing heads (why: `github-review-api.md`, "The mergeability
+   stall"). An empty commit does not CHANGE the patch, so 7.1's re-review rule does
+   not fire. Keyed on "no run + `mergeable_state: unknown`", not on the flip — step 0's
+   close+reopen escalates the same way.
 
    Report the verified outcome to the caller — `build-item` step 5 and `release` both treat
    "CI settled green" as a precondition for merging, and neither can distinguish a skipped board
@@ -620,8 +620,8 @@ write.
   to `workflow_id` via `gh api repos/{owner}/{repo}/actions/workflows` (method in `ci-audit`). A
   run counts when any job beyond the
   gate/detect job finished other than `skipped` (method in the `ci-audit` skill). Count
-  **per workflow**, one line each — `backend-tests 1 · lint 1 · ci-policy 1 — expected
-  ci.expectedRunsPerPullRequest per workflow (default 1); 0 excess`: several workflows once
+  **per workflow**, one line each — `backend-tests 1 · lint 1 · ci-policy 1 — expected 1 per
+  workflow (ci.expectedRunsPerPullRequest); 0 excess`: several workflows once
   each is the design; the excess is a SECOND executed run of the SAME workflow, named with its
   cause: a push after the ready-flip (a commit dated after the `ready_for_review` timeline
   event), a base that moved (a new run with no new head commit), a PR opened non-draft, or 7.3's
