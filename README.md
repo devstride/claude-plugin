@@ -218,6 +218,9 @@ repository's real branch names rather than copying those two values:
 | `review.localCommand` | A local review CLI to run on every change. `null` means none — the built-in adversarial pass is then your local gate. |
 | `review.automatedReviewers` | Cloud reviewers to request on each pull request. `[]` means none; nothing is requested or waited on. |
 | `review.openPullRequestsAsDraft` | Open pull requests as drafts so CI is held until review settles, then runs once on the final diff. Set `false` if your CI should run immediately. |
+| `review.adaptiveReviewerWait` | Absent means on: the wait for a cloud reviewer is bounded by that reviewer's learned latency (p95 + slack) instead of the full timeout. `false` pins the fixed bound. |
+| `review.localReReviewScope` | Absent means `"delta"`: the local engine's round 2 reviews only the fixes since round 1, falling back to the whole diff by a computed rule. `"full"` pins the whole-diff re-review. |
+| `profileOverrides.verificationGrouping` | `"per-finding"` restores one verifier per finding at HIGH-RISK; the default `"per-file"` verifies findings one agent per file-group, auth-boundary findings always singly. |
 | `docs.updateSkill` | Name of a local skill in your repo (`.claude/skills/<name>/`) that updates your documentation for a shipped delta. `null` means no documentation system; the release skill's docs pass reports itself skipped. |
 | `docs.releaseNotesSkill` | Name of a local skill that writes and publishes a release note. Used only when you pass `--release-notes` to the release skill — notes are never written unasked. |
 
@@ -313,8 +316,8 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | Skill | What it does |
 |---|---|
 | `build-item` | The orchestrator: select → branch → build → review → merge → completion ritual → repeat |
-| `ultracode-build` | The build engine for a single scoped item, including an adversarial review pass |
-| `review` | Runs a PR through every configured review engine, settles every finding, then releases CI |
+| `ultracode-build` | The build engine for a single scoped item, including an adversarial review pass that verifies findings one agent per file-group, auth-boundary findings singly |
+| `review` | Runs a PR through every configured review engine, settles every finding, then releases CI — waiting for cloud reviewers only as long as they have historically taken, and re-reviewing fixes against the round-1 head |
 | `pr` | Opens a pull request and runs the review-and-settle loop |
 | `push` | Stages, commits, type-checks, and pushes following the repo's commit conventions |
 | `branch-feature` / `branch-hotfix` | Cuts a working branch from the development or production branch |
@@ -326,7 +329,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 
 ## Versioning & updates
 
-Current version: **2.3.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **2.4.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at

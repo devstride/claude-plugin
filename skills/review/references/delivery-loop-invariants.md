@@ -208,7 +208,11 @@ fi
 # This is limit 2 below, and the check fell into it on the first attempt.
 SELF="delivery-loop-invariants.md"
 ALL=$(cat skills/*/SKILL.md $(ls skills/*/references/*.md | grep -v "$SELF") \
-          hooks/*.sh AGENTS.md CONTRIBUTING.md "${EXTRA[@]}" | tr '\n' ' ')
+          hooks/*.sh AGENTS.md CONTRIBUTING.md RELEASING.md \
+          $(ls skills/*/scripts/*.sh skills/*/scripts/*.py scripts/*.sh 2>/dev/null) \
+          "${EXTRA[@]}" | tr '\n' ' ')
+# The ls above is the null-match guard: bash 3.2 has no default nullglob, and an unmatched
+# glob handed straight to cat would be a literal (and fatal) file name.
 # Corpus-wide needles: the rule must survive SOMEWHERE an agent reads.
 for needle in "pull_request_review_id" "suppressed due to low confidence" "graphqlBotId" \
               "review_requested" "paginate" "blanket-resolve" "for MINUTES" "xhigh" \
@@ -219,7 +223,10 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "high-water" "no thread" "localReviewerName" "always()" "single writer" \
               "delivery-profiles.md" "Delivery profile:" "maxLocalReviewRounds" \
               "reviewerRegistrationWindowMinutes" "fixFloor" "reviewBreadthCeiling" \
-              "names the engine" "instanceBoundTo" "allow-empty"; do
+              "names the engine" "instanceBoundTo" "allow-empty" \
+              "proceed-p95" "reviewer-latency.json" "localReReviewScope" "rereview-scope.sh" \
+              "verificationGrouping" "measure-cost.sh" "cost-budgets.json" \
+              "wait-for-reviewers.sh"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
 
@@ -264,6 +271,22 @@ skills/setup/references/config-defaults.md|the tooling's way back
 skills/setup/SKILL.md|instanceBoundTo
 skills/doctor/SKILL.md|localEnvironment
 skills/ultracode-build/SKILL.md|via path Y
+skills/review/SKILL.md|wait-for-reviewers.sh
+skills/review/SKILL.md|adaptiveReviewerWait
+skills/review/references/reviewer-latency.md|nearest-rank
+skills/doctor/SKILL.md|reviewer-latency
+skills/review/scripts/wait-for-reviewers.sh|submitted_at
+skills/pr/SKILL.md|created_at
+skills/review/SKILL.md|round-1 head SHA
+skills/review/SKILL.md|never pasted
+skills/review/scripts/rereview-scope.sh|numstat
+skills/review/references/delta-re-review.md|threshold
+skills/ultracode-build/SKILL.md|one verdict per finding id
+skills/plan/references/delivery-profiles.md|verificationGrouping
+skills/ultracode-build/SKILL.md|never grouped
+skills/plan/references/delivery-profiles.md|verified on its own
+RELEASING.md|validate.sh
+CONTRIBUTING.md|measure-cost.sh
 skills/review/SKILL.md|via path Y
 skills/doctor/references/version-currency.md|devstride--v
 hooks/version-check.sh|NEVER exits non-zero
@@ -457,9 +480,36 @@ S4. `ci.expectedRunsPerPullRequest` is PER WORKFLOW under `ci.workflowGlobs`: se
     of the SAME workflow, attributed by pull request number (never branch name alone), and an
     empty re-trigger commit is an excess only when that workflow had already executed.
 
+## T. Review-cost levers (scripts: `skills/review/scripts/`, `skills/ultracode-build/scripts/`;
+##    harness: `scripts/measure-cost.sh`). Written at release time from the DIFF
+##    `devstride--v2.3.0...HEAD`, not from memory (limit 1).
+T1. The wait for a cloud reviewer is the shipped script — ONE background call, a 20→90 s
+    backoff, exit on the tick the review lands — never a poll loop re-spelled inline, and never
+    a wait on a reviewer whose registration was not proven.
+T2. The learned bound is nearest-rank p95 plus slack, clamped to [registration window,
+    pollTimeoutMinutes]; a cold, corrupt or unwritable cache means the full bound; stopping at a
+    learned bound is reported as this-run degradation naming the reviewer, exactly as a timeout.
+T3. Latency is learned from SERVER timestamps (submitted_at − the review_requested event's
+    created_at), keyed by graphqlBotId — never from the tick that noticed the review, which
+    would inflate the bound through the very cadence it drives.
+T4. Round 2 of the local CLI engine runs against the round-1 head SHA — or the `<context>`
+    stdin form, distilled by the skill, never pasted from engine output; 7.1/7.1b re-runs stay
+    full-scope; every launch counts against the round cap.
+T5. The full-diff fallback is decided by a SHA-pinned three-dot diff — a file round 1 never
+    touched, more than half of round 1's lines, or a rebase — computed by the script, never by
+    judgement, and "no fix commits" spends no round.
+T6. HIGH-RISK verification is one verifier per file-group returning one verdict per finding id;
+    a group-level verdict or a missing id is defective and re-runs that group per finding.
+T7. An auth-boundary finding — the security lens raised it, or its anchor file is one the
+    diff's auth-boundary decision named — is verified on its own verifier at every breadth and
+    under every grouping (Floor 2), and the merge that assigns ids keeps its lens.
+T8. Cost is measured, never asserted: every body has a committed budget, a ratchet raised only
+    visibly in the same commit as the text that needs it; validate.sh fails a breach; the
+    CHANGELOG's cost table is generated by the harness, never written by hand.
+
 ---
 
-**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 4 (S) = 106.**
+**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 4 (S) + 8 (T) = 114.**
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.
