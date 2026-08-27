@@ -184,7 +184,8 @@ engines run; serializing wastes minutes.
   phase-3 pass now over the PR diff (`effort: 'max'`, generated files excluded, fan-out breadth
   sized to the diff). No GitHub thread; triage like Codex's.
 - **Local CLI engine (Codex)** — only when on the resolved roster: `review.localCommand` with
-  `--base origin/<baseRefName>`, run in the worktree. Record the head SHA at launch — step 5 scopes round 2 from it.
+  `--base origin/<baseRefName>`, run in the worktree, any `<context>` token removed. Record the head SHA at launch — step 5
+  scopes round 2 from it.
   **Launch it in the background with a long timeout — it runs for MINUTES** and a foreground
   default-timeout call kills it mid-review, which looks *identical* to a clean review.
   Configured-but-unavailable → report as this-run degradation and continue; unconfigured

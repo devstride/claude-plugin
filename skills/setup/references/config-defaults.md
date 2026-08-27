@@ -327,9 +327,11 @@ learned so switching it on later starts warm. Like `profileOverrides`, `setup` n
 key — it is an operator hand-edit.
 
 `localCommand` placeholders: `<base>` (required — the ref the engine diffs against; round 1 gets
-`origin/<baseBranch>`, a delta-scoped round 2 gets the round-1 head SHA) and `<context>`
-(optional — round 2 replaces it with `-` and feeds a distilled account of round 1 on stdin,
-dropping the `--base` pair because the CLI refuses both together). A template without
+`origin/<baseRefName>`, the PR's actual base, and a delta-scoped round 2 gets the round-1 head
+SHA) and `<context>` (optional — a delta-scoped round 2 replaces it with `-` and feeds a
+distilled account of round 1 on stdin, dropping the `--base` pair because the CLI refuses both
+together; round 1 and every `full` launch REMOVE the token, since they are `--base` launches). A
+template with neither placeholder is the pre-placeholder shape: ` --base <value>` is appended. A template without
 `<context>` still gets a delta-scoped round 2, minus the context, and the report says so. A CLI
 that rejects `-` fails its launch — reported as this-run degradation; remove the placeholder.
 

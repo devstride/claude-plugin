@@ -40,7 +40,8 @@ for what each version component means here and how a release is cut.
 - `review.localReReviewScope` — absent means `"delta"`; `"full"` pins the whole-diff re-review.
   And a `<context>` placeholder for `review.localCommand`: round 2 replaces it with `-` and feeds
   a distilled account of round 1 on stdin (the range, each finding, what was fixed where and what
-  was dismissed why). Both operator hand-edits; a template without `<context>` keeps working.
+  was dismissed why). Both operator hand-edits; a template without `<context>` keeps working,
+  and one without `<base>` (the pre-placeholder shape) has ` --base <value>` appended as before.
 - `skills/review/references/delta-re-review.md` — the scope rule, the threshold, the CLI facts.
 
 - **A cost harness, so "how much does a skill cost to load" is a number, not an estimate.**

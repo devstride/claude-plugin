@@ -17,7 +17,7 @@ small". First match wins:
 |---|---|
 | `none` | `HEAD == round1` — there are no fix commits, so there is no round 2 and **no round is spent** |
 | `full: history-rewritten` | `round1` is not an ancestor of `HEAD` — a rebase moved the patch, so "the delta since round 1" no longer describes what changed |
-| `full: new-file <path>` | the delta touches a file round 1 never changed. A rename is matched on BOTH its source and its destination: renaming a round-1 file is still round 1's file under a new name, not a new file |
+| `full: new-file <path>` | the delta touches a file that is not a round-1 file — one that does not exist, changed by round 1, at the round-1 head. A DELTA rename is matched on both its source and its destination (renaming a round-1 file is still round 1's file under a new name); a ROUND-1 rename counts under its destination only, so a fix that recreates the old path is a new file |
 | `full: delta <n> of <m> lines (> 50%)` | the delta's added+deleted lines exceed half of round 1's — the fixes **are** new work, and the whole diff is the honest scope |
 | `delta` | otherwise — the engine would be re-reading a diff it has already read to see a few fixes |
 
@@ -33,7 +33,8 @@ The script prints one JSON line, which is also what the step-8 report line is bu
  "round1Head":"<sha>","head":"<sha>"}
 ```
 
-Report line: `round 2 scope: delta — 314 B of 2,219 B (14.2%), 2 of 14 files` — or
+Report line — the percentage is of LINES, the unit the rule is decided in; bytes are context:
+`round 2 scope: delta — 8 of 56 lines (14.3%), 2 of 14 files, 314 B` — or
 `round 2 scope: full — new-file scripts/x.sh` / `… full — delta 112 of 56 lines (> 50%)` /
 `round 2 skipped: no fix commits`.
 
@@ -66,6 +67,11 @@ Hence the two round-2 launch forms, decided by whether `review.localCommand` car
   outcome. This is the better round 2 and the reason the placeholder exists.
 - **`full`** (by the rule, or `review.localReReviewScope: "full"`) → the template exactly as
   round 1 ran it, `<base>` = `origin/<baseRefName>`, no context. That is 1.2.0's behaviour.
+
+**Round 1, and every `full` launch, REMOVES the `<context>` token** (substitutes nothing — not
+`-`, which would make the engine wait on an empty stdin, and not the literal token, which the
+shell reads as a redirect). Fact 2 is why: a prompt alongside `--base` is refused, and round 1
+is always a `--base` launch. Only a `delta` launch under a `<context>` template feeds stdin.
 
 Every launch counts against `maxLocalReviewRounds`. Delta scope never buys an extra round.
 
@@ -104,8 +110,15 @@ not the floor. Fixing a finding never spends a round.
 
 ## Configuration
 
-- `review.localCommand` placeholders: `<base>` (required — the ref the engine diffs against)
-  and `<context>` (optional — see above). A template without `<context>` still gets a
+- **A template with no `<base>` at all is the pre-placeholder shape** (the contract used to say
+  "the command with `--base origin/<baseRefName>`", which some templates met by carrying no
+  placeholder): every launch APPENDS ` --base <value>` to it, with the same values a `<base>`
+  template gets, so round 2 still scopes to the delta. `doctor` §2 names the shape; `setup`
+  writes `<base>` from this release on.
+- `review.localCommand` placeholders: `<base>` (required — the ref the engine diffs against:
+  `origin/<baseRefName>`, the PR's ACTUAL base — an epic branch, develop, or master for a
+  release — never `baseBranch` by name) and `<context>` (optional — see above; removed on round
+  1 and on every `full` launch). A template without `<context>` still gets a
   delta-scoped round 2, minus the context; the step-8 report says so. A CLI that is not Codex
   and rejects `-` fails its launch, which is reported as this-run degradation — remove the
   placeholder from that template.
