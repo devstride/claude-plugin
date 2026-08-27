@@ -207,7 +207,8 @@ else:
     # a review posted after a reviewer was asked is this cycle's answer, not history.
     min_reg = min(a["registeredAt"] for a in active)
     def _pre(x):
-        t = parse_ts(x.get("submitted_at") or "")
+        try: t = parse_ts(x.get("submitted_at") or "")
+        except Exception: t = None  # noqa: BLE001 — a pending review has no submitted_at
         return t is None or t < min_reg
     since = max([x.get("id", 0) for x in first if isinstance(x.get("id"), int) and _pre(x)] + [0])
     pending = first

@@ -20,7 +20,7 @@ claude plugin validate ./skills || fail 2
 
 step "3/7 plugin manifest (a copy without marketplace.json — the pass the root run skips)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-mkdir "$TMP/plugin" && ( set -o pipefail; tar --exclude=.git -cf - -C "$ROOT" . | tar -xf - -C "$TMP/plugin" ) && rm -f "$TMP/plugin/.claude-plugin/marketplace.json"
+mkdir "$TMP/plugin" && ( set -o pipefail; tar --exclude=.git -cf - -C "$ROOT" . | tar -xf - -C "$TMP/plugin" ) && rm -f "$TMP/plugin/.claude-plugin/marketplace.json" || fail 3
 ( cd "$TMP/plugin" && claude plugin validate . ) || fail 3
 
 step "4/7 marketplace invariant (one source, no version on any entry)"
