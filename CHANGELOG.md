@@ -10,6 +10,13 @@ for what each version component means here and how a release is cut.
 
 ### Changed
 
+- **`review`'s body is a third smaller.** The roster table, mode rationale and poll-shape
+  evidence moved to the new `skills/review/references/roster-and-modes.md`; the flip-race
+  mechanics, gate-job semantics and red-CI classification to the new
+  `skills/review/references/ci-settle.md`; the lessons write's self-verification argument to
+  `lessons-format.md`. 16,905 → ~11,374 tokens, budget ratcheted 17,000 → 11,450; every step
+  number, mode definition, rule and needle kept. The 8,000-token destination remains open here
+  too.
 - **`setup`'s body is less than half its former size.** Detector evidence, failure anecdotes and
   interview rationale moved to two new references (`detector-evidence.md`,
   `interview-rationale.md`) behind runtime pointers; Phase G's run rules joined
