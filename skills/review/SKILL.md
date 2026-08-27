@@ -184,7 +184,7 @@ engines run; serializing wastes minutes.
   phase-3 pass now over the PR diff (`effort: 'max'`, generated files excluded, fan-out breadth
   sized to the diff). No GitHub thread; triage like Codex's.
 - **Local CLI engine (Codex)** — only when on the resolved roster: `review.localCommand` with
-  `--base origin/<baseRefName>`, run in the worktree.
+  `--base origin/<baseRefName>`, run in the worktree. Record the head SHA at launch — step 5 scopes round 2 from it.
   **Launch it in the background with a long timeout — it runs for MINUTES** and a foreground
   default-timeout call kills it mid-review, which looks *identical* to a clean review.
   Configured-but-unavailable → report as this-run degradation and continue; unconfigured
@@ -334,18 +334,18 @@ Follow the repo's `conventionsDoc`. Keep `verify.*` green locally. Regenerate AP
 their own commit if routes/handlers changed. Commit per `commitConventions.reviewFixFormat`
 (fallback: `fix(<scope>): <summary> [<itemNumber> review]`), push via `/devstride:push`.
 
-**Re-review of the fixes — spend the round cap, then STOP.** `maxLocalReviewRounds` is the total
-number of runs of the local CLI engine in this cycle, and step 1 already spent one. Rounds
-remaining → run the engine once more over the fixed diff (same command, same `--base`, same
-background launch) and take its findings back through steps 3–4; each run counts. **At the cap:
-the last round's verified findings are fixed WITHOUT another engine round.** Any further finding
-after that — from Claude's own re-read of the delta, a cloud re-review, or a CI loop-back — is
-triaged at the profile's `fixFloor` exactly as in step 4 (the cap bounds ENGINE ROUNDS, not the
-floor: fixing a finding never spends a round, so the floor does not need to drop), and whatever
-the floor defers goes with a rationale to the owning item or the untracked-deferral list. Claude's intrinsic pass has no cap: re-read the delta of
-every fix yourself. This cap is what turns the fix / re-review / fix spiral — four to eight
-rounds on a large diff, each drawing a fresh handful of findings — into a bounded cycle; do not
-"just run it once more" past it.
+**Re-review of the fixes — spend the round cap, then STOP.** `maxLocalReviewRounds` counts
+every run of the local CLI engine this cycle; step 1 spent one. Rounds remaining →
+`${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/rereview-scope.sh --base origin/<baseRefName>
+--round1 <round-1 head SHA>` decides: `none` (no fix commits) → no round 2, none spent; `full`
+(its rule, or config `localReReviewScope: "full"`) → round 1's command unchanged;
+`delta` → the same command with `<base>` := the round-1 head SHA — or the reference's
+`<context>` stdin form, distilled BY YOU, never pasted. Its findings go
+through steps 3–4; each run counts. **At the cap: the last round's verified findings are fixed
+WITHOUT another engine round.** Any later finding is triaged at `fixFloor` as in step 4; deferrals carry a
+rationale. Claude's intrinsic pass has no cap: re-read the delta of
+every fix yourself. **Read when** unsure:
+`${CLAUDE_PLUGIN_ROOT}/skills/review/references/delta-re-review.md`.
 
 ## 6. Reply to AND resolve every addressed cloud thread
 
@@ -483,7 +483,7 @@ released CI, so treating it as a precondition would be circular.
      diff and settle findings BEFORE the flip, and **re-request the cloud reviewer (when one is
      configured) if the delta is substantive** — otherwise its review stays attached to the old
      diff and the configured-engine contract is satisfied only on paper. With no cloud roster,
-     the re-run local streams are the whole re-review. **The local re-run is bounded by
+     the re-run local streams are the whole re-review. **The local re-run is always FULL scope and bounded by
      `maxLocalReviewRounds`:** a run that would exceed the cap is replaced by a Claude-only
      re-read of the delta (the intrinsic engine has no cap) and a note in the step-8 report; the
      cloud re-request is a different engine and is not capped, but its registration is proven
@@ -616,7 +616,7 @@ write.
 
 - **Report**: **the PROFILE and its source** (and any config key that overrode it), the RESOLVED
   ROSTER (which engines ran; any configured engine that failed or never
-  responded — distinct from not-configured), **local CLI rounds used out of the cap** (and
+  responded — distinct from not-configured), **local CLI rounds used out of the cap** (round 2's scope too, and
   whether a re-run was replaced by a Claude-only re-read), **every reviewer dropped at the
   registration window**, the PR, finding tally (fixed / dismissed / captured / deferred), **the lessons tally** (`N written / M recurrences marked` — or `0`, the common case; call out any recurrence by its `L-NNN` in a driven-mode hand-back, since a lesson that keeps recurring despite being in the store is a signal its Avoid rule is not landing — curation feedback a human should see), resolved-thread
   count, CI state, every captured deferral explicitly, and **any reviewer that never responded**

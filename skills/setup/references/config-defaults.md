@@ -326,6 +326,19 @@ bound of earlier releases; the backoff cadence and the script still apply, and l
 learned so switching it on later starts warm. Like `profileOverrides`, `setup` never writes this
 key — it is an operator hand-edit.
 
+`localCommand` placeholders: `<base>` (required — the ref the engine diffs against; round 1 gets
+`origin/<baseBranch>`, a delta-scoped round 2 gets the round-1 head SHA) and `<context>`
+(optional — round 2 replaces it with `-` and feeds a distilled account of round 1 on stdin,
+dropping the `--base` pair because the CLI refuses both together). A template without
+`<context>` still gets a delta-scoped round 2, minus the context, and the report says so. A CLI
+that rejects `-` fails its launch — reported as this-run degradation; remove the placeholder.
+
+`localReReviewScope` — absent means `"delta"`: round 2 reviews `<round-1 head>...HEAD` unless
+`rereview-scope.sh` decides `full` (a new file, more than half the lines rewritten, or a rebase).
+`"full"` pins the whole-diff re-review of earlier releases. `setup` never writes it — an
+operator hand-edit. Reasoning and the verified CLI facts:
+`${CLAUDE_PLUGIN_ROOT}/skills/review/references/delta-re-review.md`.
+
 ## Documentation hooks
 
 ```json
