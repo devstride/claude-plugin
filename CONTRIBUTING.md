@@ -72,6 +72,38 @@ the words are there. It cannot tell you the rule is still *true* after the chang
 when checking a refactor, derive what to look for from the **diff**, not from memory of what
 mattered — memory reproduces what you already thought about.
 
+## Conventions the skills must keep — body vs reference
+
+- **Split rule.** A `SKILL.md` body carries every imperative, every config-key-honouring
+  instruction, every step number another skill cites, and every scoped needle the invariants
+  file pins to it. Rationale, worked examples, incident evidence and "observed live" anecdotes
+  live in `skills/<owner>/references/<topic>.md`. Test for a paragraph: delete it and ask
+  whether an agent would now do something different — if yes it is a rule and stays.
+- **Pointer form.** Exactly one sentence, placed in the step it serves, path in the form the
+  cache copy survives: **Read `${CLAUDE_PLUGIN_ROOT}/skills/<owner>/references/<topic>.md` when
+  <step or condition>.** Two kinds are legal and both count as firing: a runtime pointer ("Read
+  … when you declare a PRE-SHIP HOLD") and a maintenance pointer ("Read … before changing this
+  rule") for pure rationale no runtime step needs. A reference with neither is dead text and
+  fails the invariants file's dead-reference check.
+- **Naming and placement.** kebab-case, one topic per file, named for what the reader is looking
+  for (`progress-table.md`, `detector-evidence.md`), never `notes.md`/`misc.md`; flat under the
+  owning skill's `references/`; addressed only by the `${CLAUDE_PLUGIN_ROOT}` path, never a
+  relative `../`; a second skill that needs the same fact cites the owner's file rather than
+  restating it. Every reference ends with a `## Cited by` list naming each pointer.
+- **Body budget.** Every `skills/*/SKILL.md`, frontmatter included, measures ≤ 8,000 tokens by
+  `scripts/measure-cost.sh` against `scripts/cost-budgets.json`; the budget check listed in
+  RELEASING.md step 0 fails the release on any body over its row.
+
+### Moving prose out of a body
+
+(a) derive candidates from the file, paragraph by paragraph, with the delete-test above; (b) for
+each moved paragraph, leave the imperative it explained in the body, in its own sentence; (c)
+re-read the moved paragraph in its new home for statements only true in the sequence it left,
+and fix them there; (d) write the pointer at the step; (e) walk every config key the body cites
+(``grep -o '`[A-Za-z]\+\(\.[A-Za-z]\+\)\+`' skills/<name>/SKILL.md | sort -u`` before and after —
+the after-set must contain the before-set, or the removal is named in the PR); (f) run the
+needle check under bash and the footprint measurement, and paste both outputs into the PR.
+
 ## Check that an edit did not grow a body past its budget
 
 Every `skills/<name>/SKILL.md` has a token budget in `scripts/cost-budgets.json`, and

@@ -31,6 +31,11 @@ paths individually) rather than trusting a single root-level run.
 
 ## Layout
 
+- References are FLAT under `skills/<name>/references/` — the needle corpus glob
+  `skills/*/references/*.md` is one level deep, so a nested directory is invisible to the
+  rule-loss check. (The standing exception, `skills/setup/references/docs-skill-templates/`,
+  holds templates, not rules.)
+
 - `.claude-plugin/` holds `plugin.json` and `marketplace.json` — and nothing else.
 - Component directories live at the repo root: `skills/` is auto-scanned, so it does not need
   declaring in `plugin.json`.

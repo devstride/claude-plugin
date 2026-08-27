@@ -271,6 +271,9 @@ skills/setup/references/config-defaults.md|the tooling's way back
 skills/setup/SKILL.md|instanceBoundTo
 skills/doctor/SKILL.md|localEnvironment
 skills/ultracode-build/SKILL.md|via path Y
+skills/pr/SKILL.md|ONE call
+skills/pr/SKILL.md|references/pre-ship-hold.md
+skills/pr/references/pre-ship-hold.md|stranded
 skills/review/SKILL.md|wait-for-reviewers.sh
 skills/review/SKILL.md|adaptiveReviewerWait
 skills/review/references/reviewer-latency.md|nearest-rank
@@ -307,6 +310,15 @@ skills/setup/references/ci-cost-patterns.md|convention-only shape
 hooks/version-check.sh|installPath
 hooks/version-check.sh|show-toplevel
 PAIRS
+
+# DEAD-REFERENCE check: every reference must be pulled in by at least one pointer (runtime or
+# maintenance) somewhere an agent reads — a reference nothing cites is dead text.
+for f in skills/*/references/*.md; do
+  b=$(basename "$f")
+  grep -lF "$b" skills/*/SKILL.md hooks/*.sh AGENTS.md CONTRIBUTING.md RELEASING.md \
+    $(ls skills/*/references/*.md | grep -v "/$b\$") >/dev/null 2>&1 \
+    || echo "DEAD REFERENCE (no pointer): $f"
+done
 ```
 
 **A needle is a phrase, and phrases legitimately change.** Two of the needles above were re-pointed
@@ -510,7 +522,7 @@ T8. Cost is measured, never asserted: every body has a committed budget, a ratch
 
 ---
 
-**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 4 (S) + 8 (T) = 114.**
+**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 4 (S) + 8 (T) + 3 (U: body/reference split, proven on `pr`) = 117.**
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.
