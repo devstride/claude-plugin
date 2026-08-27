@@ -133,7 +133,10 @@ rule disappears along with the paragraph that carried it, and it disappears quie
 reads well, so nothing looks wrong. That has happened to this text more than once, which is why the
 file exists and why the four disciplines above are phrased as warnings rather than advice.
 
-It is a maintenance instrument, not an operating rule — nothing at runtime reads it. Treat a missing
+Its two mechanical companions run in the same `validate.sh --needles` pass: the
+dead-reference loop (a reference no root can reach fails) and the budget check
+(`measure-cost.sh --check`). It is a maintenance instrument, not an operating rule — nothing
+at runtime reads it. Treat a missing
 needle as a prompt to go and look, never as proof of loss: wording legitimately changes, and the
 check cannot tell a rewrite from a deletion. The file is candid about the two further things it
 cannot prove.

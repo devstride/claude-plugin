@@ -8,6 +8,8 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [2.5.0] — 2026-08-27
+
 ### Changed
 
 - **Four more bodies compressed — three of them to the 8,000-token destination.** `release`
@@ -46,6 +48,40 @@ for what each version component means here and how a release is cut.
   checklist's needle run, `validate.sh --needles`). `pr`'s
   body drops its pre-ship-hold and body-convention rationale into two new references, keeping
   every imperative.
+
+### Cost
+
+Every skill body now sits under a committed budget, three of the four heaviest at the epic's
+8,000-token destination. Measured by the harness's method (`ceil(bytes / 3)`, frontmatter
+included) at three points — the 1.2.0 baseline, 2.4.0 (pre-compression), and this release:
+
+| skill | 1.2.0 | 2.4.0 | 2.5.0 | Δ vs 2.4.0 | references (2.5.0) |
+|---|---|---|---|---|---|
+| branch-feature | 1,002 | 1,002 | 1,002 | 0 | 0 |
+| branch-hotfix | 1,465 | 2,712 | 2,712 | 0 | 0 |
+| build-item | 15,713 | 15,732 | 12,177 | -3,555 | 3 |
+| ci-audit | 2,352 | 2,565 | 2,565 | 0 | 0 |
+| comprehend-plan | 2,094 | 2,094 | 2,094 | 0 | 0 |
+| create-defect | 2,391 | 2,391 | 2,391 | 0 | 0 |
+| create-story | 2,290 | 2,290 | 2,290 | 0 | 0 |
+| doctor | 9,046 | 9,942 | 7,991 | -1,951 | 2 |
+| insert-defect | 4,625 | 4,625 | 4,625 | 0 | 0 |
+| insert-story | 4,397 | 4,397 | 4,397 | 0 | 0 |
+| plan | 15,581 | 15,581 | 11,791 | -3,790 | 4 |
+| pr | 4,295 | 4,348 | 4,002 | -346 | 2 |
+| push | 1,372 | 1,372 | 1,372 | 0 | 0 |
+| rationalize-gantt | 3,407 | 3,407 | 3,407 | 0 | 1 |
+| rebalance | 9,150 | 9,150 | 7,965 | -1,185 | 1 |
+| release | 9,054 | 9,175 | 7,997 | -1,178 | 2 |
+| review | 16,297 | 16,905 | 11,444 | -5,461 | 8 |
+| setup | 22,153 | 23,127 | 10,641 | -12,486 | 5 |
+| ultracode-build | 6,783 | 6,749 | 6,749 | 0 | 1 |
+| **all bodies** | **133,467** | **137,564** | **107,612** | **-29,952** | |
+| one build-item iteration (build-item + ultracode-build + review) | 38,793 | 39,386 | 30,370 | -9,016 | |
+
+The always-on cost (hooks + manifest) is unchanged. Four bodies remain above 8,000 — setup
+(10,641), review (11,444), plan (11,791), build-item (12,177) — each a recorded floor where the
+remainder is rules the convention forbids cutting; 8,000 stays their destination.
 
 ## [2.4.0] — 2026-08-27
 
@@ -742,7 +778,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.4.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.5.0...HEAD
+[2.5.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.4.0...devstride--v2.5.0
 [2.4.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.3.0...devstride--v2.4.0
 [2.3.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.2.0...devstride--v2.3.0
 [2.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.1.0...devstride--v2.2.0
