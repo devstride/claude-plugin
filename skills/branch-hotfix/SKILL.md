@@ -58,14 +58,20 @@ Three cases, and the third is the one that matters:
    input redirection, and the command fails in a way that reads like a broken environment rather
    than a broken invocation. Bind `<base>` to the hotfix base ref (`hotfixBaseBranch`, fetched —
    a stale tracking ref rebuilds from an old production commit), `<branch>` to the hotfix branch
-   just created, and **`<name>` to the instance the command is meant to act on — which the
-   COMMAND's shape decides, not this skill.** A command that stands up a second instance needs a
-   new name (the hotfix item number makes an obvious one). A command that resets in place needs
-   the name of the instance the session is ALREADY in, and you cannot infer that: run
-   `localEnvironment.instanceName`, whose output is that name. **If the command contains
-   `<name>`, the shape is in-place, and `instanceName` is null or fails — STOP and ask.** Guessing
-   from a directory name resets the wrong instance, which on a shared machine destroys somebody
-   else's data, and does so silently.
+   just created, and **`<name>` per `localEnvironment.recreateMode`, which is the
+   ONLY thing that says what the command does.** Do not infer it from the command text: an opaque
+   wrapper (`./scripts/recreate <name> <base>`) reveals nothing, and both wrong guesses are bad —
+   treating an in-place command as second-instance leaves the session on the schema-ahead
+   database, and the reverse resets an instance somebody is using.
+   - `"newInstance"` → bind `<name>` to a NEW name (the hotfix item number makes an obvious one),
+     then move the session into the instance it creates.
+   - `"inPlace"` → bind `<name>` to the instance the session is ALREADY in, whose name comes from
+     running `localEnvironment.instanceName`. If that is null or fails, **STOP and ask** — a guess
+     from a directory name resets a different instance, silently, and on a shared machine that is
+     somebody else's data.
+   - **absent or `null` while `recreate` contains `<name>` → STOP and ask.** Say that
+     `recreateMode` is unset and what the two values mean. Never pick one.
+   (A `recreate` with no `<name>` needs no mode: there is nothing to bind.)
 
    **What matters is not how many instances exist afterwards, but that the session is still in a
    working one.** Do not leave the session in a directory whose instance was torn down, or on a

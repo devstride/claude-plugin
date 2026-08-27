@@ -229,6 +229,7 @@ headless runs. The recipe and the record it writes are in
   "localEnvironment": {
     "create": null,
     "recreate": null,
+    "recreateMode": null,
     "instanceName": null,
     "seed": null,
     "migrate": null,
@@ -263,6 +264,12 @@ branch cannot take one that is already checked out somewhere, which is exactly t
 `branch-hotfix` leaves behind. Whichever shape, the rule is that the session must still be in a
 working instance afterwards — never a torn-down directory or a detached HEAD, because no config
 command can move the caller.
+
+**`recreateMode` says which of the two shapes `recreate` is** — `"inPlace"` or `"newInstance"`.
+It exists because the command text does not tell you: a wrapper script is opaque, and each wrong
+guess fails in its own way (an in-place command treated as second-instance leaves the session on
+the old database; the reverse resets an instance in use). Required whenever `recreate` carries
+`<name>`; `branch-hotfix` stops and asks when it is missing.
 
 **`instanceName` exists for the in-place shape.** It is a command whose output is the name of the
 instance THIS checkout belongs to — usually a line read out of a file the tooling writes when it

@@ -25,6 +25,12 @@ for what each version component means here and how a release is cut.
 
 ### Added
 
+- **`localEnvironment.recreateMode`** — `"inPlace"` or `"newInstance"`, saying which of the two
+  shapes `recreate` is. The command text cannot be read for this: a wrapper script is opaque, and
+  each wrong guess fails in its own way — an in-place command treated as second-instance leaves the
+  session on the schema-ahead database, and the reverse resets an instance somebody is using.
+  Required whenever `recreate` carries `<name>`; `branch-hotfix` stops and asks when it is missing
+  rather than picking one.
 - **`localEnvironment.instanceName`** — a command whose output is the name of the instance the
   current checkout belongs to. An in-place `recreate` that carries `<name>` cannot be resolved
   without it: nothing else in the block identifies the current instance, and guessing from a
