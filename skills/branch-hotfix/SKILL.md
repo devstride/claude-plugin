@@ -53,8 +53,14 @@ entirely, which is the commonest shape you will meet, not a rare one. Read a mis
 
 Three cases, and the third is the one that matters:
 
-1. **`recreate` set** → use it: a fresh instance built from the hotfix base. Prefer the form that
-   stands up a NEW instance over one that destroys the instance the session is working in.
+1. **`recreate` set** → use it: a fresh instance built from the hotfix base. **Substitute the
+   placeholders the contract allows before running it, and never pass one through to a shell** —
+   `<base>` reaching `sh` unexpanded is parsed as input redirection, and the command fails in a
+   way that reads like a broken environment rather than a broken invocation. Bind `<base>` to the
+   hotfix base ref (`hotfixBaseBranch`, fetched — a stale tracking ref rebuilds from an old
+   production commit), `<branch>` to the hotfix branch just created, and `<name>` to a NEW
+   instance name distinct from the one in use (the hotfix item number makes an obvious one).
+   Prefer that new instance over destroying the instance the session is working in.
 2. **`recreate` absent or `null`, and you can say WHY the schema has not diverged** (the instance
    has been on the production line all along, or the environment has no schema) → `migrate` then
    `seed`, in that order, since a seed against a stale schema fails or lies.
