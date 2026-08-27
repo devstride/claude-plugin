@@ -8,6 +8,35 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-08-27
+
+### Fixed
+
+- **`recreate`'s `<name>` binds to whatever instance the command acts on, not always a new one.**
+  2.2.0 told `branch-hotfix` to bind it to "a NEW instance name distinct from the one in use",
+  which quietly ruled out the simplest and safest shape a repository can offer: an in-place
+  rebuild of the current instance's database. It also does not survive contact with tooling that
+  reuses an existing branch — such a tool cannot check out the hotfix branch a second time,
+  because `branch-hotfix` has just created it in the current worktree.
+  The rule is now about the outcome that matters: **the session must still be in a working
+  instance afterwards** — never a torn-down directory, never a detached HEAD in a checkout the
+  rebuilt instance no longer belongs to, because a config command cannot move the caller and the
+  skill would then verify its own postcondition from the wrong place.
+
+### Added
+
+- **`localEnvironment.recreateMode`** — `"inPlace"` or `"newInstance"`, saying which of the two
+  shapes `recreate` is. The command text cannot be read for this: a wrapper script is opaque, and
+  each wrong guess fails in its own way — an in-place command treated as second-instance leaves the
+  session on the schema-ahead database, and the reverse resets an instance somebody is using.
+  Required whenever `recreate` carries `<name>`; `branch-hotfix` stops and asks when it is missing
+  rather than picking one.
+- **`localEnvironment.instanceName`** — a command whose output is the name of the instance the
+  current checkout belongs to. An in-place `recreate` that carries `<name>` cannot be resolved
+  without it: nothing else in the block identifies the current instance, and guessing from a
+  directory name resets a different one, which on a shared machine destroys somebody else's data
+  silently. `branch-hotfix` stops and asks when it is needed and absent.
+
 ## [2.2.0] — 2026-08-27
 
 ### Added
@@ -557,7 +586,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.2.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.3.0...HEAD
+[2.3.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.2.0...devstride--v2.3.0
 [2.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.1.0...devstride--v2.2.0
 [2.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.0.0...devstride--v2.1.0
 [2.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.2.0...devstride--v2.0.0

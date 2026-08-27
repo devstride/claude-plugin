@@ -53,14 +53,32 @@ entirely, which is the commonest shape you will meet, not a rare one. Read a mis
 
 Three cases, and the third is the one that matters:
 
-1. **`recreate` set** → use it: a fresh instance built from the hotfix base. **Substitute the
-   placeholders the contract allows before running it, and never pass one through to a shell** —
-   `<base>` reaching `sh` unexpanded is parsed as input redirection, and the command fails in a
-   way that reads like a broken environment rather than a broken invocation. Bind `<base>` to the
-   hotfix base ref (`hotfixBaseBranch`, fetched — a stale tracking ref rebuilds from an old
-   production commit), `<branch>` to the hotfix branch just created, and `<name>` to a NEW
-   instance name distinct from the one in use (the hotfix item number makes an obvious one).
-   Prefer that new instance over destroying the instance the session is working in.
+1. **`recreate` set** → run it. **Substitute the placeholders the contract allows before running
+   it, and never pass one through to a shell** — `<base>` reaching `sh` unexpanded is parsed as
+   input redirection, and the command fails in a way that reads like a broken environment rather
+   than a broken invocation. Bind `<base>` to the hotfix base ref (`hotfixBaseBranch`, fetched —
+   a stale tracking ref rebuilds from an old production commit), `<branch>` to the hotfix branch
+   just created, and **`<name>` per `localEnvironment.recreateMode`, which is the
+   ONLY thing that says what the command does.** Do not infer it from the command text: an opaque
+   wrapper (`./scripts/recreate <name> <base>`) reveals nothing, and both wrong guesses are bad —
+   treating an in-place command as second-instance leaves the session on the schema-ahead
+   database, and the reverse resets an instance somebody is using.
+   - `"newInstance"` → bind `<name>` to a NEW name (the hotfix item number makes an obvious one),
+     then move the session into the instance it creates.
+   - `"inPlace"` → bind `<name>` to the instance the session is ALREADY in, whose name comes from
+     running `localEnvironment.instanceName`. If that is null or fails, **STOP and ask** — a guess
+     from a directory name resets a different instance, silently, and on a shared machine that is
+     somebody else's data.
+   - **absent or `null` while `recreate` contains `<name>` → STOP and ask.** Say that
+     `recreateMode` is unset and what the two values mean. Never pick one.
+   (A `recreate` with no `<name>` needs no mode: there is nothing to bind.)
+
+   **What matters is not how many instances exist afterwards, but that the session is still in a
+   working one.** Do not leave the session in a directory whose instance was torn down, or on a
+   detached HEAD in a checkout the rebuilt instance no longer belongs to: a config command cannot
+   move the caller, so the skill would then check its own postcondition from the wrong place. An
+   in-place rebuild of the current instance's database satisfies this and is usually the simplest
+   thing a repository can offer.
 2. **`recreate` absent or `null`, and you can say WHY the schema has not diverged** (the instance
    has been on the production line all along, or the environment has no schema) → `migrate` then
    `seed`, in that order, since a seed against a stale schema fails or lies.

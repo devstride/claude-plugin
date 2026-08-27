@@ -260,7 +260,7 @@ skills/build-item/SKILL.md|never makes the loop concurrent
 skills/branch-hotfix/SKILL.md|localEnvironment
 skills/branch-hotfix/SKILL.md|BACKWARD transition
 skills/doctor/SKILL.md|null **or absent**
-skills/setup/references/config-defaults.md|fresh instance built from
+skills/setup/references/config-defaults.md|the tooling's way back
 skills/setup/SKILL.md|instanceBoundTo
 skills/doctor/SKILL.md|localEnvironment
 skills/ultracode-build/SKILL.md|via path Y
@@ -445,8 +445,11 @@ S2. The tree-identical skip is judged on whether it CAN FIRE, never on the step 
     `doctor` and `setup`: it fires until the base tip moves, then silently stops.
 S3. A hotfix's local environment is a BACKWARD transition: `migrate` and `seed` go forward, so
     running them there leaves the instance schema-ahead of the code it is now running. Use
-    `localEnvironment.recreate` when it is set, prefer a NEW instance over destroying the current
-    one, and say which path was taken — every path reads as "the environment was reset". An
+    `localEnvironment.recreate` when it is set, bind `<name>` to whichever instance THAT COMMAND
+    acts on, per `localEnvironment.recreateMode` and NEVER inferred from the command text (a
+    wrapper is opaque, and both wrong guesses do damage); `inPlace` resolves the current name via
+    `instanceName`, never a directory guess; missing mode or name means STOP and ask. Leave the
+    session in a working instance, and say which path was taken — every path reads as "the environment was reset". An
     ABSENT key is the shipped `null` (every pre-2.2.0 config omits it), and with no safe command
     and a diverged schema the answer is STOP and ask, never migrate forward and carry on.
 S4. `ci.expectedRunsPerPullRequest` is PER WORKFLOW under `ci.workflowGlobs`: several workflows
