@@ -311,17 +311,31 @@ hooks/version-check.sh|installPath
 hooks/version-check.sh|show-toplevel
 PAIRS
 
-# DEAD-REFERENCE check: every reference must be pulled in by at least one pointer (runtime or
-# maintenance) somewhere an agent reads — a reference nothing cites is dead text. The match is
-# the OWNER-QUALIFIED path (two topics may legally share a basename), and THIS FILE is excluded
-# from the corpus for the same reason the needle check excludes it (limit 2): its needle rows
-# name reference paths as data, and counting those as citations would keep an orphaned
-# reference green.
+# DEAD-REFERENCE check: every reference must be REACHABLE from a root an agent actually reads
+# (a SKILL body, a hook, AGENTS/CONTRIBUTING/RELEASING) — directly, or via a reference that is
+# itself reachable. Matching is by OWNER-QUALIFIED path (two topics may legally share a
+# basename). Two deliberate asymmetries: THIS FILE is checked as a target but never counts as a
+# CITING source (its needle rows name reference paths as data — limit 2's self-satisfying
+# corpus), and reference-to-reference citations count only from a reachable reference, so two
+# orphans citing each other stay dead.
+live=""
+changed=1
+while [ -n "$changed" ]; do
+  changed=""
+  for f in skills/*/references/*.md; do
+    case " $live " in *" $f "*) continue ;; esac
+    if grep -lF "$f" skills/*/SKILL.md hooks/*.sh AGENTS.md CONTRIBUTING.md RELEASING.md \
+         >/dev/null 2>&1; then
+      live="$live $f"; changed=1; continue
+    fi
+    for g in $live; do
+      [ "$g" = "skills/review/references/$SELF" ] && continue
+      grep -qF "$f" "$g" 2>/dev/null && { live="$live $f"; changed=1; break; }
+    done
+  done
+done
 for f in skills/*/references/*.md; do
-  [ "$f" = "skills/review/references/$SELF" ] && continue
-  grep -lF "$f" skills/*/SKILL.md hooks/*.sh AGENTS.md CONTRIBUTING.md RELEASING.md \
-    $(ls skills/*/references/*.md | grep -v "$SELF" | grep -vF "$f") >/dev/null 2>&1 \
-    || echo "DEAD REFERENCE (no pointer): $f"
+  case " $live " in *" $f "*) ;; *) echo "DEAD REFERENCE (not reachable from a root): $f" ;; esac
 done
 ```
 
@@ -530,10 +544,11 @@ U1. A body carries every imperative, config-key-honouring instruction, step numb
     an agent does is a rule and stays. Rationale, examples and incident evidence move to the
     owning skill's `references/`, each moved paragraph leaving its imperative behind in its own
     sentence.
-U2. Every reference is pulled in by at least one pointer — runtime or maintenance, the
-    one-sentence `${CLAUDE_PLUGIN_ROOT}` form — and the dead-reference check above enforces it
-    by OWNER-QUALIFIED path, with this file excluded from the citation corpus (its needle rows
-    name reference paths as data, not as citations).
+U2. Every reference is REACHABLE from a root an agent reads — a pointer (runtime or
+    maintenance, the one-sentence `${CLAUDE_PLUGIN_ROOT}` form) in a body/root file, or a
+    citation from a reference that is itself reachable. The check above enforces it by
+    owner-qualified path; this file is a target but never a citing source (its needle rows are
+    data), and orphan cycles stay dead.
 U3. References are flat under `skills/<name>/references/` — the corpus globs here are one level
     deep, so a nested directory is invisible to every check in this file.
 
