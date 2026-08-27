@@ -38,11 +38,46 @@ Branch name argument: $ARGUMENTS
 4. Push the new branch and set upstream: `git push -u origin <new-branch-name>`
 
 **Local environment.** Now that the branch exists, bring the local environment back into step with
-production code. Read `localEnvironment` from `.claude/ds-config.json`: run `migrate` if it is set,
-then `seed` if it is set — in that order, because a seed against a stale schema fails or lies —
-then restart the dev server pre-flight step 2 asked the user to stop. When the block is absent, or
-both commands are `null`, the procedure is repo-specific and lives with the repo, not in this
-skill: say so and ask rather than guessing, and never invent a reset command.
+production code. Read `localEnvironment` from `.claude/ds-config.json`.
+
+**This is a BACKWARD transition, and that decides which commands to run.** A hotfix branches from
+the production branch, which is OLDER than whatever the instance has been living on. `migrate` and
+`seed` almost always only go forward — migrations do not un-apply, and a seed rewrites rows, not
+schema — so running them here leaves the instance schema-AHEAD of the code it is now running, and
+the hotfix can validate against a schema production does not have, or fail for reasons that have
+nothing to do with the fix.
+
+**An ABSENT key is the shipped `null`** — every config written before `recreate` existed omits it
+entirely, which is the commonest shape you will meet, not a rare one. Read a missing member as
+`null` throughout.
+
+Three cases, and the third is the one that matters:
+
+1. **`recreate` set** → use it: a fresh instance built from the hotfix base. **Substitute the
+   placeholders the contract allows before running it, and never pass one through to a shell** —
+   `<base>` reaching `sh` unexpanded is parsed as input redirection, and the command fails in a
+   way that reads like a broken environment rather than a broken invocation. Bind `<base>` to the
+   hotfix base ref (`hotfixBaseBranch`, fetched — a stale tracking ref rebuilds from an old
+   production commit), `<branch>` to the hotfix branch just created, and `<name>` to a NEW
+   instance name distinct from the one in use (the hotfix item number makes an obvious one).
+   Prefer that new instance over destroying the instance the session is working in.
+2. **`recreate` absent or `null`, and you can say WHY the schema has not diverged** (the instance
+   has been on the production line all along, or the environment has no schema) → `migrate` then
+   `seed`, in that order, since a seed against a stale schema fails or lies.
+3. **`recreate` absent or `null`, and the schema HAS diverged or you cannot tell** → **STOP and
+   ask.** Do not run migrate+seed, and do not restart the server and carry on: that is precisely
+   how a hotfix comes to be validated against a schema production does not have. Say what is
+   missing (`localEnvironment.recreate`), offer the manual route — a fresh instance from the
+   hotfix base — and continue only once the user confirms the environment was rebuilt or tells
+   you to proceed anyway.
+
+**Say which case you took and why.** "The environment was reset" reads identically for all three
+and only two of them are sound. Then restart the dev server pre-flight step 2 asked the user to
+stop.
+
+When the block is absent, or every command is `null`, the procedure is repo-specific and lives
+with the repo, not in this skill: say so and ask rather than guessing, and never invent a reset
+command.
 
 A PR is NOT opened here — a freshly-created branch has no commits ahead of the
 production branch, so there is nothing to compare. A hotfix merges back to the

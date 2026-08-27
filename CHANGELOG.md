@@ -8,6 +8,32 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-08-27
+
+### Added
+
+- **`localEnvironment.recreate`** — the tooling's "a fresh instance built from `<base>`". It exists
+  because `migrate` and `seed` almost always only go FORWARD: migrations do not un-apply and a seed
+  rewrites rows, not schema. So an instance living on development-branch schema cannot be brought
+  back to a production-branch base by running them, and nothing in the previous contract said so.
+
+### Fixed
+
+- **`branch-hotfix` no longer leaves an isolated instance ahead of the code it is running.** A
+  hotfix branches from the production branch, which is older than whatever the instance has been
+  living on — a BACKWARD transition, where running `migrate` then `seed` leaves the schema ahead
+  and the fix can validate against a schema production does not have, or fail for reasons that have
+  nothing to do with it. The skill now uses `recreate` when it is set, prefers standing up a NEW
+  instance over destroying the one the session is working in, falls back to migrate+seed only when
+  `recreate` is absent or null and the schema is known not to have diverged, and **says which path
+  it took** — every path reads identically as "the environment was reset" and only some are sound.
+  When there is no safe command and the schema has diverged, it STOPS and asks rather than
+  restarting the server and carrying on. An absent key is read as the shipped `null`, which is
+  what every configuration written before this release has.
+- **`doctor` warns when the gap exists**: a null `recreate` alongside a non-null `migrate` under
+  `instanceBoundTo: directory` means the hotfix path has no way back. `setup` A9 asks for the
+  command rather than inferring it — nothing in a file distinguishes a rebuild from a reseed.
+
 ## [2.1.0] — 2026-08-27
 
 ### Fixed
@@ -531,7 +557,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.1.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.2.0...HEAD
+[2.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.1.0...devstride--v2.2.0
 [2.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.0.0...devstride--v2.1.0
 [2.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.2.0...devstride--v2.0.0
 [1.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.1.0...devstride--v1.2.0
