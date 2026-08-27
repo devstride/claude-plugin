@@ -131,7 +131,8 @@ and `specDepth` from the contract. The direction of travel decides the operation
   (a Story with a Defect) is not merged without asking.
 - **Draft the successor specs** to the target `specDepth` — inline for a handful; a `Workflow`
   fan-out for many (`parallel()`, one agent per release unit, fed the FULL step-1 re-fetch and
-  the target depth; agents draft and return, never touching the MCP).
+  the target depth; agents draft and return, never touching the MCP; read `args` defensively —
+  `const items = Array.isArray(args) ? args : JSON.parse(args)`).
 
 **Show the proposal as a before/after table** and get the decision in this conversation:
 

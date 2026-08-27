@@ -53,8 +53,8 @@ IMPORTANT — the DevStride MCP targets PRODUCTION; git/gh act on the real repos
 
 ## 1. Cut the release PR (develop → master)
 
-- Open the PR — **as a DRAFT when the repo holds CI on drafts** (`review.openPullRequestsAsDraft`;
-  false → non-draft, CI concurrent, no flip): `gh pr create --draft --base master --head develop`
+- Open the PR — **as a DRAFT when the repo holds CI on drafts** (`review.openPullRequestsAsDraft`
+  — ABSENT means `true`; an explicit `false` → non-draft, CI concurrent, no flip): `gh pr create --draft --base master --head develop`
   (never `--fill`), requesting every configured cloud reviewer (`review.automatedReviewers`;
   empty set → request nothing) in the same call. The draft holds CI (`ci.draftGateCondition`)
   so the suite runs once, on the final reviewed diff; `preShipChecks` suites are NOT in CI —
@@ -97,7 +97,9 @@ IMPORTANT — the DevStride MCP targets PRODUCTION; git/gh act on the real repos
 - **Any configured `preShipChecks` suites run LOCALLY, in step 2b below — never in CI.** An
   absent CI check for one is EXPECTED and CORRECT — never request, rerun or wait on it
   (`verify.skipDuringStoryBuilds` governs slow CLOUD suites, a separate mechanism). Local
-  gating moved the bar, it did not lower it — step 2b is mandatory. **Read
+  gating moved the bar, it did not lower it — step 2b is mandatory. If a cloud job is ever
+  restored for such a suite, add its `verify.skipDuringStoryBuilds` entry AND workflow job
+  together and DROP the `preShipChecks` entry — otherwise it runs twice. **Read
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-gates.md` when a pre-ship check is
   red, when the head no longer equals `<sourceHead>`, or before waiving a check.**
 - Sequencing: local Codex + cloud Copilot review first, concurrently and at max effort

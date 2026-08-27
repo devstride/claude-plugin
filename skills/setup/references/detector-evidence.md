@@ -135,3 +135,5 @@ answer only the owner can give.
 
 - `skills/setup/SKILL.md` — the Phase A pointer (run A5/A6, explain an `ambiguous` row, change a
   detector), A5's traps line (§A5), A6's enumeration line (§A6), and A6's path-table line.
+- `skills/doctor/SKILL.md` §5 — the four-events evidence citation (§A5).
+- `skills/doctor/references/silent-failures.md` §5 — the same citation (one home, two citers).

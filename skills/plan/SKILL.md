@@ -49,7 +49,8 @@ IMPORTANT — this skill orchestrates its heavy drafting via the `Workflow` tool
   silently re-gates the subtree), noting whether the marker was the parent's own or inherited
   (the step-2 sign-off writes a marker only when the parent has none and the profile came from
   elsewhere than an ancestor's marker); **`profileOverrides.grain` / `profileOverrides.specDepth`** (when the repo is known —
-  planning never REQUIRES the config) each name another profile's column for that one knob; and **an argument that disagrees with an existing marker is a QUESTION, never an
+  planning never REQUIRES the config) each name another profile's column for that one knob (an
+  absent key changes nothing; an unknown VALUE is reported and ignored, never guessed at); and **an argument that disagrees with an existing marker is a QUESTION, never an
   override** — the marker is a recorded decision; ask which profile this pass plans under (a
   "change it" answer means `rebalance` first, per step 2). A descendant container may carry its
   own marker — it wins for its subtree; shape leaves beneath it to that profile. State the
