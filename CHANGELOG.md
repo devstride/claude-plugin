@@ -10,6 +10,14 @@ for what each version component means here and how a release is cut.
 
 ### Changed
 
+- **Round 2 of the local CLI review reads the fixes, not the whole diff.** `review` step 5 used to
+  re-run the engine with the same `--base`, so under `enterprise` every cycle with a fixable
+  finding paid a full `xhigh` read of the entire pull request to review a few fix commits. Round
+  2 is now scoped to `<round-1 head>...HEAD` by `skills/review/scripts/rereview-scope.sh`, which
+  falls back to the whole diff by a computed rule — a file round 1 never touched, more than half
+  its lines rewritten, or a rebase — never by judgement. No fix commits means no round 2 and no
+  round spent. On codex-cli 0.147.0 `--base` accepts a bare SHA, but neither `--base` nor
+  `--commit` can be combined with custom instructions; the reference records what that means.
 - **The wait for a cloud reviewer is learned, not fixed.** `review` step 2 used one bound —
   `pollTimeoutMinutes`, 20 minutes under `enterprise` — polled every ~30 s, so a reviewer that
   never answered cost the whole bound and ≈ 40 API calls. It now runs
@@ -29,6 +37,12 @@ for what each version component means here and how a release is cut.
   per reviewer keyed by GraphQL bot id; advisory, never an error; delete it to start cold.
   `doctor` reports what it holds and the bound it implies.
 - `skills/review/references/reviewer-latency.md` — the rule, the reasoning and the fixture shape.
+- `review.localReReviewScope` — absent means `"delta"`; `"full"` pins the whole-diff re-review.
+  And a `<context>` placeholder for `review.localCommand`: round 2 replaces it with `-` and feeds
+  a distilled account of round 1 on stdin (the range, each finding, what was fixed where and what
+  was dismissed why). Both operator hand-edits; a template without `<context>` keeps working,
+  and one without `<base>` (the pre-placeholder shape) has ` --base <value>` appended as before.
+- `skills/review/references/delta-re-review.md` — the scope rule, the threshold, the CLI facts.
 
 - **A cost harness, so "how much does a skill cost to load" is a number, not an estimate.**
   `scripts/measure-cost.sh` measures every skill body, every reference, every shipped script and

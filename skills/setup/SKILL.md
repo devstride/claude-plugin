@@ -385,7 +385,9 @@ branch this repository may not have.** Emit all four on every path, or the loop 
 Report what is here. **Absent is a finding, not a failure** — an empty roster is a legal
 configuration in which the built-in adversarial pass is the local gate.
 
-- **A local review CLI** (`review.localCommand`) — probe with `command -v codex`, and with the name
+- **A local review CLI** (`review.localCommand`) — the template must carry `<base>` (the ref the
+  engine diffs against) and may carry `<context>` (round 2's distilled round-1 outcome on stdin;
+  `config-defaults.md`). Probe with `command -v codex`, and with the name
   of any other review CLI the user names. Found → offer it as a candidate, `ambiguous`, because the
   exact invocation is a choice and the defaults are usually wrong for this: which model, which
   reasoning effort, which flags. Also carry `review.localReviewerName`, so the roster calls the
