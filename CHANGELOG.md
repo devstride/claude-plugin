@@ -10,6 +10,16 @@ for what each version component means here and how a release is cut.
 
 ### Changed
 
+- **Four more bodies compressed — three of them to the 8,000-token destination.** `release`
+  9,175 → 7,921 (gates reasoning to the new `skills/release/references/release-gates.md`),
+  `doctor` 9,942 → 7,991 (the symptom table and long-form explanations to the new
+  `skills/doctor/references/silent-failures.md`; the four-events evidence now cites
+  `detector-evidence.md` — one home, two citers), `rebalance` 9,150 → 7,934 (the write-order
+  reasoning to the new `skills/rebalance/references/recoverable-write-order.md`), and `plan`
+  15,581 → ~11,741 (the worked mini-example to `worked-example.md`, the release-unit shaping
+  rationale to `release-unit-shaping.md`; its remainder is the interactive-loop rules — the
+  8,000 destination stays open for it). Budgets ratcheted accordingly; `ultracode-build`
+  measured 6,749 and was not touched.
 - **`build-item`'s body is a quarter smaller.** The two worked progress tables and their
   reasoning moved to the new `skills/build-item/references/progress-table.md`; step 8's
   epic-release narrative and the one-off bypass rationale to the new

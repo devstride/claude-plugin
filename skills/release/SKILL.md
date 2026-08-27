@@ -3,7 +3,15 @@ name: release
 description: "Promote the release source branch to production — the release that triggers the repo's production deploy: cut the release PR, run the full gated review, update documentation through the repo's registered local docs skill, merge to production on explicit owner go-ahead, and write release notes only when asked (--release-notes) and only after the deploy is confirmed"
 ---
 
-Cut a **production release** by promoting `release.releaseSource` → `release.productionBranch` (shipped default: `develop` → `master`). This is the top tier of the delivery loop: stories advance an integration branch (by local fast merge, or by their own PR when the base is the development branch), integration PRs advance the development branch, and THIS skill advances production — which **triggers the repo's production deploy the moment it merges**, per `release.autoDeployOnMerge`. Because that merge is a real, outward-facing production deploy, the release is **owner-cut**: this skill prepares everything and then **pauses for explicit owner go-ahead before the production merge**. A release also **updates documentation by default** — through the LOCAL skill the repository registered at `docs.updateSkill`, never by editing docs itself, and only AFTER the production merge is confirmed and the deploy verified, so public documentation never describes functionality that is still waiting on the owner's approval — and the owner can suppress that per run with "no docs". **Release notes are opt-in**: written only when the owner passes `--release-notes`, and only after the production deploy is confirmed. This skill never decides for itself that a release deserves a note.
+Cut a **production release** by promoting `release.releaseSource` → `release.productionBranch`
+(shipped default: `develop` → `master`) — the top tier of the delivery loop, and the merge that
+**triggers the repo's production deploy**, per `release.autoDeployOnMerge`. The release is
+therefore **owner-cut**: prepare everything, then **pause for explicit owner go-ahead before
+the production merge**. Documentation **updates by default** — through the LOCAL skill at
+`docs.updateSkill`, never by editing docs itself, and only AFTER the merge is confirmed and
+the deploy verified ("no docs" suppresses per run). **Release notes are opt-in**: only on
+`--release-notes`, only after the confirmed deploy — this skill never decides a release
+deserves a note.
 
 Optional arguments — documentation switches and a scope: $ARGUMENTS
 
@@ -11,7 +19,15 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 - **`no docs` / `skip docs`** — suppress the core-documentation update (step 5b) for this run. Docs are otherwise updated by default whenever a docs skill is registered.
 - **`docs only`** — run step 5b alone against an already-shipped release, with no PR and no merge. **`release-notes only`** — run step 5c alone against an already-shipped release, still subject to the deploy confirmation. Asking for this scope IS the request: it implies `--release-notes true`, or `draft` when the word `draft` accompanies it (`release-notes only draft`).
 
-**Repo config.** The release branches, the auto-deploy fact (`release.autoDeployOnMerge` — a plain-English string describing what the production merge triggers, which you quote back to the owner rather than assuming any particular provider), the optional deploy check (`release.deployVerification`), and the documentation hooks live in **`.claude/ds-config.json`** at the repo root under `release.*` (`release.productionBranch`, `release.releaseSource`, `release.deployVerification`) and `docs.*` (`docs.updateSkill`, `docs.releaseNotesSkill` — the names of LOCAL skills; the contract they meet is `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`, the authority over anything restated here) plus `baseBranch` / `protectedBranches` and the whole `review.*` / `verify.*` blocks the composed review skills consume. Load it first and treat it as authoritative — wherever a step below names a concrete branch, path, or command, substitute the matching config value. The literals shown inline are the plugin's shipped defaults, kept for readability — **if the file disagrees, the file wins**. If the file is absent, fall back to the inline literals and say so.
+**Repo config.** Load `.claude/ds-config.json` first and treat it as authoritative: the keys
+this skill reads are `release.productionBranch`, `release.releaseSource`,
+`release.autoDeployOnMerge` (a plain-English string quoted back to the owner — never assume a
+provider), `release.deployVerification`, `docs.updateSkill` and `docs.releaseNotesSkill` (LOCAL
+skill names; their contract is `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`,
+the authority over anything restated here), plus `baseBranch` / `protectedBranches` /
+`ci.freezeBaseWhileReleasePrReady` and the `review.*` / `verify.*` / `preShipChecks` /
+`prBodyTemplate` blocks the composed skills consume. Inline literals are shipped defaults —
+**if the file disagrees, the file wins**; if it is absent, fall back to them and say so.
 
 IMPORTANT — autonomy boundary:
 - Run steps 0–3 (delta → PR → full gated review → documentation preparation) autonomously; only surface genuine forks (an ambiguous/risky/unverifiable review finding, an unresolvable conflict, or an infra/secret gate that is the owner's to provision).
@@ -25,14 +41,26 @@ IMPORTANT — the DevStride MCP targets PRODUCTION; git/gh act on the real repos
 
 - **Confirm this is a release.** The release is `release.releaseSource` (**develop**) → `release.productionBranch` (**master**). If invoked standalone with the tree on some other branch, that's fine — this skill operates on the two named branches, not the current checkout. If a `develop → master` PR is already open, adopt it instead of cutting a duplicate.
 - **Sync both branches.** `git fetch origin master develop`. Confirm `origin/develop` is ahead of `origin/master` (there is something to release); if not, STOP and say there's nothing to release.
-- **Settle the release source BEFORE cutting** (when `ci.freezeBaseWhileReleasePrReady` is `true`, the default; `false` skips this and the freeze below, and says so). List every open NON-DRAFT pull request into `releaseSource` — green, pending or red alike, since a pending one can turn green and merge mid-review — and decide each NOW, not after the flip: merge it first (it joins this release and the delta is recomputed) or park it (`gh pr ready --undo`) until this release has merged. A merge beneath the release PR re-runs its merge preview — one more full CI run — and makes the reviewed diff stale. Say which choice was made for each, and **keep the list of parked PRs** — step 6 un-parks them.
+- **Settle the release source BEFORE cutting** (when `ci.freezeBaseWhileReleasePrReady` is
+  `true`, the default; `false` skips this and the freeze, and says so): list every open
+  NON-DRAFT PR into `releaseSource` — green, pending or red alike — and decide each NOW: merge
+  it first (it joins this release; the delta is recomputed) or park it (`gh pr ready --undo`)
+  until this release merges. Say which choice was made for each and **keep the parked list** —
+  step 6 un-parks them.
 - **Record `<sourceHead>`** — the SHA of `origin/<releaseSource>` the delta was computed from — whatever the freeze switch says. Every later integrity check compares against this immutable value, never against the branch tip (the release PR's head IS the branch, so the tip and "the PR head" move together and comparing them proves nothing).
 - **Compute the delta** — what this release ships. Read `git log --first-parent origin/master..origin/develop` and the merged PRs in that range (`gh pr list --base develop --state merged` cross-referenced to the range) to assemble: the epics/stories that landed, and — importantly — which changes are **user-facing** (new/changed UI, API, behavior, permissions, migrations) vs internal. This delta drives BOTH the PR body and the docs pass. Note anything that looks like a breaking change or a migration explicitly.
 - Report the delta summary (epic/story list + the user-facing subset) before cutting the PR.
 
 ## 1. Cut the release PR (develop → master)
 
-- Open the PR — **as a DRAFT when the repo holds CI on drafts** (`review.openPullRequestsAsDraft`, true by default; false → open non-draft, CI runs concurrently and there is no flip): `gh pr create --draft --base master --head develop` (do NOT use `--fill`), and request every configured cloud reviewer (`review.automatedReviewers` — an empty set means request nothing) in the same call so the cloud wave reviews concurrently with the local pass. The draft is what holds CI — every workflow job is gated on the draft condition (config `ci.draftGateCondition`). (CI is whatever the repo's workflows run; any configured `preShipChecks` suites are NOT among them — those run locally in step 2b.) Holding the draft until the review has settled means the suite runs once, on the final reviewed diff, instead of being thrown away and restarted by every review-fix push. `review` step 7 marks it ready once every finding is resolved. Author a **release-flavored body** — render the sections from config `prBodyTemplate.sections`, in order (the file wins over the fallback below); the release flavor is HOW each configured section is filled, keyed by POSITION/role, not by heading name (shown against the shipped fallback headings):
+- Open the PR — **as a DRAFT when the repo holds CI on drafts** (`review.openPullRequestsAsDraft`;
+  false → non-draft, CI concurrent, no flip): `gh pr create --draft --base master --head develop`
+  (never `--fill`), requesting every configured cloud reviewer (`review.automatedReviewers`;
+  empty set → request nothing) in the same call. The draft holds CI (`ci.draftGateCondition`)
+  so the suite runs once, on the final reviewed diff; `preShipChecks` suites are NOT in CI —
+  they run locally in 2b. `review` step 7 flips it ready. Author a **release-flavored body** —
+  the sections from `prBodyTemplate.sections`, in order (the file wins over the fallback),
+  flavor keyed by POSITION/role:
   - 1st section (fallback `## Simple Description`) — leads with the release as a whole: what consumers get in this deploy, in plain language. Then a bulleted list of the constituent epics/notable items (`I##### — title`).
   - 2nd section (fallback `## Technical Description`) — the aggregate technical delta: subsystems touched, notable design changes, any migrations.
   - 3rd section (fallback `## Notable Changes to System Architecture or Behavior`) — user-visible behavior, public-contract, permission, or migration changes across the whole release (this is the section the docs pass mines). "None" only if truly none.
@@ -66,24 +94,27 @@ IMPORTANT — the DevStride MCP targets PRODUCTION; git/gh act on the real repos
 - **A release PR's head is protected**, so `review`'s 7.1 never rebases it — the hold still
   fires, deliberately: 7.1b sits on the no-refresh-needed path too, precisely because this is the
   caller whose release-only suites nothing else gates.
-- **Any configured `preShipChecks` suites run LOCALLY, in step 2b below — never in CI.**
-  These are suites the repo deliberately keeps out of the pipeline (see the config's
-  `_preShipChecks_readme`); nothing in CI covers them, so:
-  - **An absent CI check for a preShipChecks suite is EXPECTED and CORRECT.** Never request
-    it, rerun it, wait on it, or read its absence as pending/red. (`verify.skipDuringStoryBuilds`
-    governs slow CLOUD suites and is a separate mechanism; it is `[]` today.)
-  - **Local gating did not lower the bar; it MOVED it.** A regression in one of these suites
-    reaches production unnoticed unless the release runs them — which is why step 2b is
-    mandatory rather than advisory.
-  - If a cloud CI job is ever restored for one of these suites, add its
-    `verify.skipDuringStoryBuilds` entry AND its workflow job together, and drop its
-    `preShipChecks` entry — otherwise it runs twice.
+- **Any configured `preShipChecks` suites run LOCALLY, in step 2b below — never in CI.** An
+  absent CI check for one is EXPECTED and CORRECT — never request, rerun or wait on it
+  (`verify.skipDuringStoryBuilds` governs slow CLOUD suites, a separate mechanism). Local
+  gating moved the bar, it did not lower it — step 2b is mandatory. **Read
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-gates.md` when a pre-ship check is
+  red, when the head no longer equals `<sourceHead>`, or before waiving a check.**
 - Sequencing: local Codex + cloud Copilot review first, concurrently and at max effort
   (every finding verified/triaged/fixed/replied/resolved), THEN the configured pre-ship
   checks (2b), THEN the ready-flip releases CI and it settles last — once, on the final
   reviewed diff.
-- **Scope the review to the release surface.** Every constituent epic/story was already fully reviewed at its own PR into develop, so don't blindly re-review unchanged, already-approved code. Point the review at what per-PR review couldn't see: cross-epic interactions and anything that changed in the develop→master range that wasn't its own reviewed PR. The configured pre-ship checks (2b) stay non-negotiable regardless of what the review scope turns out to be.
-- **Re-validate the head IMMEDIATELY before the flip, and hold the freeze from the flip to the merge.** While the release PR is a draft nothing holds the source (the merge guard keys on a READY release PR), so the branch can advance mid-review — a human merge, a direct push. So, right before `review` flips: the PR head must still equal `<sourceHead>` from step 0; if it does not, the review streams and the delta describe a head that no longer exists — recompute the delta and restart step 2 on the new head, then record the SHA that finally settles as `<reviewedHead>` — and if `review` step 7.3 had to push its one empty re-trigger commit (a GitHub mergeability stall; it is named in `review`'s step-8 report), `<reviewedHead>` is the head AFTER it, whose tree equals the settled tree. Recorded either way, freeze on or off. From the flip on (when the switch is `true`), nothing merges into `releaseSource` until step 4 merges this PR — `build-item`'s merge guard enforces the same rule from the other side. If something lands anyway, the head no longer equals `<reviewedHead>`: the reviewed diff is stale, CI re-ran on a diff nobody reviewed, and the release goes back through step 2 on the new head rather than merging over it.
+- **Scope the review to the release surface** — cross-epic interactions and anything in the
+  range that was not its own reviewed PR; never blindly re-review approved code (why:
+  `release-gates.md`). The pre-ship checks (2b) stay non-negotiable regardless.
+- **Re-validate the head IMMEDIATELY before the flip; hold the freeze from flip to merge.**
+  Right before `review` flips, the PR head must still equal `<sourceHead>`; if not, recompute
+  the delta and restart step 2 on the new head. Record the SHA that finally settles as
+  `<reviewedHead>` — after `review` 7.3's one empty re-trigger commit when that fired (its
+  tree equals the settled tree) — freeze on or off. From the flip on (switch `true`), nothing
+  merges into `releaseSource` until step 4 merges this PR; anything that lands anyway makes
+  the head differ from `<reviewedHead>` → back through step 2 on the new head, never merged
+  over (the reasoning: `release-gates.md`).
 - Genuinely ambiguous/risky findings are the only thing that stalls the review — surface with a recommendation. Out-of-scope-but-real findings are captured (they route back through the plan via the normal `insert-*` path if a plan root is known; otherwise note them for the owner).
 - Do NOT merge here — hold at green-and-settled for the owner gate (step 4).
 
@@ -94,26 +125,17 @@ The repo's config declares its local pre-ship suites in **`preShipChecks`** (see
 `always`} — these are the release's local gates, the only thing validating those suites
 before production. **Absent key or empty array → this step is an explicit no-op — say so.**
 
-- **Run each selected entry UNCONDITIONALLY — paths are irrelevant at the release
-  boundary, deliberately.** A frontend-only or purely-internal release still runs them. Do
-  NOT "optimize" one away by arguing the diff didn't touch its paths; that argument is
-  exactly what this rule overrides (`pathGlobs` on a `releaseOnly` entry is documented as
-  ignored here).
-- Run entries **sequentially, in array order**, each in the BACKGROUND with a long timeout,
-  reading the output file on completion — a foreground default-timeout call kills a long
-  suite mid-run, which looks identical to a clean pass. Surface each entry's `timeoutNote`
-  first: it carries the expected duration and the repo's serialization/environment caveats,
-  which decide whether the run is trustworthy.
-- **A red check is a STOP.** Fix it or surface it to the owner as a release blocker with
-  the failing spec names. Never present a release as green while a pre-ship check is red or
-  unrun, and never describe one as "covered by CI" — it is not, and saying so is the exact
-  false assurance this step exists to remove.
-- Report each result explicitly in the step-4 summary: name, command, pass/fail, and the
-  file and test counts. "Not run" is a legitimate thing to tell the owner if they
-  explicitly waived a check; silently omitting it is not.
-- The owner may waive a check explicitly (e.g. "skip <check name>"). Record the waiver in
-  the step-4 summary so the release's evidence is honest about what was and was not
-  verified.
+- **Run each selected entry UNCONDITIONALLY — paths are irrelevant at the release boundary,
+  deliberately** (`pathGlobs` on a `releaseOnly` entry is documented as ignored here).
+- Run entries **sequentially, in array order**, each in the BACKGROUND with a long timeout —
+  a foreground default-timeout kill looks identical to a clean pass. Surface each entry's
+  `timeoutNote` first.
+- **A red check is a STOP** — fix it or surface it as a release blocker with the failing spec
+  names; never present a release as green over a red or unrun check, and never say "covered
+  by CI" (it is not — `release-gates.md`).
+- Report each result in the step-4 summary: name, command, pass/fail, file+test counts. The
+  owner may explicitly waive a check ("skip <name>") — record the waiver there; "not run" is
+  legitimate to say, silent omission is not.
 
 ## 2c. Release CI — discharge the pre-ship hold
 
@@ -138,7 +160,12 @@ The plugin does not update documentation itself. After the production merge is c
 
 ## 4. Owner go-ahead → merge to master (production deploy)
 
-- **Present the release for go-ahead.** Summarize: the PR (green + settled), the review tally, the delta (epics/stories), **each pre-ship check's result from step 2b (name, command, pass/fail, file+test counts — or the owner's explicit waiver)**, the documentation plan (the registered docs skill that step 5b will invoke after the deploy is confirmed, or "no docs skill registered" / "suppressed with no docs"), the release-notes decision as resolved from `--release-notes` (by default "not requested — none will be written"), and the explicit reminder of what merging triggers, quoted from `release.autoDeployOnMerge`. Then ASK for the go-ahead. Do not proceed without it.
+- **Present the release for go-ahead**: the PR (green + settled), the review tally, the delta,
+  **each 2b pre-ship result (name, command, pass/fail, file+test counts — or the explicit
+  waiver)**, the documentation plan (the registered skill 5b will invoke / "none registered" /
+  "suppressed"), the release-notes decision from `--release-notes` (default "not requested —
+  none will be written"), and what merging triggers, quoted from `release.autoDeployOnMerge`.
+  Then ASK. Do not proceed without it.
   - Do not let the owner infer that CI covered a pre-ship suite. If asked what validated
     it, the true answer is "the local run in step 2b, not the pipeline".
 - On go-ahead: confirm the PR head still equals `<reviewedHead>` (the immutable SHA recorded when review settled — the freeze held; a head that differs from it ONLY by `review` 7.3's empty re-trigger commit, same tree, is the one advance that does not restart step 2 — anything else, back to step 2), that its CI checks are green at that head and — in a draft-hold repo — that the PR is non-draft (there, a still-draft release PR means CI never ran — do NOT merge it; in a CI-runs-on-draft repo only the green-at-final-SHA check applies), that every step-2b pre-ship check passed or was explicitly waived, and that the paginated **zero-unresolved-review-threads** check still reports zero (a comment posted after the review settled — a late reviewer, a second Copilot pass — must be replied-to AND resolved via `review` step 6 before the production merge, not merged over), then `gh pr merge <n> --merge` (a merge commit — NOT `--delete-branch`, the head is `develop`).
@@ -146,7 +173,8 @@ The plugin does not update documentation itself. After the production merge is c
 
 ## 5. After the merge — confirm the deploy, then documentation, then release notes
 
-Nothing in this step runs until the production merge is confirmed, and nothing is published until the deploy is confirmed live. A documentation page or a release note written between "merged" and "deployed" describes the future, and a failed deploy would leave public text about a release that reached nobody.
+Nothing here runs until the production merge is confirmed, and nothing is published until the
+deploy is confirmed live — text written between "merged" and "deployed" describes the future.
 
 ### 5a. Confirm the merge and the deploy
 
