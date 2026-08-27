@@ -10,6 +10,12 @@ for what each version component means here and how a release is cut.
 
 ### Changed
 
+- **`build-item`'s body is a quarter smaller.** The two worked progress tables and their
+  reasoning moved to the new `skills/build-item/references/progress-table.md`; step 8's
+  epic-release narrative and the one-off bypass rationale to the new
+  `skills/build-item/references/epic-release.md`; the profile-resolution restatement became a
+  citation of the contract. 15,732 → ~12,113 tokens, budget 15,800 → 12,200; every rule and
+  scoped needle kept.
 - **`review`'s body is a third smaller.** The roster table, mode rationale and poll-shape
   evidence moved to the new `skills/review/references/roster-and-modes.md`; the flip-race
   mechanics, gate-job semantics and red-CI classification to the new

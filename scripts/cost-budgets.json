@@ -7,7 +7,7 @@
   "bodies": {
     "branch-feature": 1100,
     "branch-hotfix": 2800,
-    "build-item": 15800,
+    "build-item": 12200,
     "ci-audit": 2600,
     "comprehend-plan": 2100,
     "create-defect": 2400,
