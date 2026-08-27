@@ -283,6 +283,11 @@ skills/review/SKILL.md|Monitor
 skills/review/SKILL.md|blanket-resolve
 skills/review/SKILL.md|CHANGED the patch
 skills/review/references/ci-settle.md|skipping
+skills/build-item/SKILL.md|EXPIRED
+skills/build-item/SKILL.md|registered in timeline
+skills/build-item/SKILL.md|FULL diff
+skills/build-item/SKILL.md|live: false
+skills/build-item/references/progress-table.md|not configured
 skills/review/SKILL.md|wait-for-reviewers.sh
 skills/review/SKILL.md|adaptiveReviewerWait
 skills/review/references/reviewer-latency.md|nearest-rank
