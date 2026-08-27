@@ -558,7 +558,7 @@ U3. References are flat under `skills/<name>/references/` — the corpus globs h
 
 ---
 
-**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 4 (S) + 8 (T) + 3 (U) = 121, four of the scoped pairs added by the setup compression.**
+**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 4 (S) + 8 (T) + 3 (U) = 117.** (The setup compression added four scoped needle PAIRS — needles are samples, not new invariants, so the total is unchanged.)
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.

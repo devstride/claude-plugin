@@ -5,9 +5,9 @@ user-invocable: true
 disable-model-invocation: true
 ---
 
-Set the delivery loop up for **this** repository and DevStride organization. Seven phases:
-inspect (A), report (B), map work types onto roles (C), ask what is left (D), write (E) — or
-merge into an existing config (F) — then prove it by running it (G).
+Set the delivery loop up for **this** repository and DevStride organization: inspect (A),
+report (B), map work types onto roles (C), ask what is left (D), write (E) — or merge into an
+existing config (F) — then prove it by running it (G).
 
 Optional argument: $ARGUMENTS
 
@@ -52,8 +52,8 @@ authority of evidence. Three outcomes; the third is not a failure:
 | `ambiguous` | Several plausible answers, or one needing confirmation | A question offering the candidates |
 | `unknown` | The repository does not answer this | A question with no prefill |
 
-Every row carries the evidence that produced it — the file read or the command run. A row
-without evidence is a guess with a status attached.
+Every row carries the evidence that produced it — a row without evidence is a guess with a
+status attached.
 
 ## Ground rules for every detector
 
@@ -112,17 +112,19 @@ Scan `scripts` in the root `package.json` and each workspace's. Ranked exact-nam
 ### A5. CI provider, and the draft gate
 
 `.github/workflows/*.yml|yaml` → **GitHub Actions**, the only provider the draft-hold mechanics
-understand. **A convention-only workflow is exempt** — pattern D of `ci-cost-patterns.md`
-(`opened`-only is a subset). **Remove it from the population BEFORE the five-case table below is
+understand. **A convention-only workflow is exempt** — `opened` plus optionally
+`converted_to_draft`/`ready_for_review`, one run-only job, no checkout, fails on a non-draft
+open (pattern D of `ci-cost-patterns.md`; `opened`-only is a subset). **Remove it from the population BEFORE the five-case table below is
 evaluated** — left in, it reads `ambiguous` and Phase G calls it a FAIL.
 
 Judge **only `on: pull_request` workflows**. The hold needs two things: (1) **jobs gated on
 the draft condition** (`github.event.pull_request.draft == false` or the `!` form) — a job is
-also gated when ANY job it `needs` is gated, unless it overrides with `if: always()` or similar;
+also gated when ANY job it `needs` is gated (unless it overrides with `if: always()` or
+similar) — requiring an explicit `if` on the whole closure is the wrong test;
 (2) **`on.pull_request.types` carries all four of `opened`, `synchronize`, `reopened`,
 `ready_for_review`** — the defaults omit `ready_for_review`, an explicit list **replaces** the
-defaults, and `opened` is required (`converted_to_draft` optional); short → `ambiguous`, naming
-the missing events. The traps behind both are in detector-evidence.md §A5.
+defaults, `opened` is required (`converted_to_draft` optional); short → `ambiguous`, naming the
+missing events. The traps: detector-evidence.md §A5.
 
 Five cases; **every one produces all three boolean rows** (`review.openPullRequestsAsDraft`,
 `review.readyForReviewReleasesCi`, `review.ciHeldUntilReviewSettled`):
@@ -142,7 +144,7 @@ depth, or a deepening fetch, judged by effect; `setup ci` then offers the `fetch
 alone), `absent`. A step in a job with **no checkout** is a broken workflow, its own finding. A
 full run only reports — it never edits a workflow. Any other provider (`.gitlab-ci.yml`, `.circleci/`,
 `Jenkinsfile`, `azure-pipelines.yml`) or none: record the name, three booleans `false`,
-`detected` — different, not degraded. **Nothing provider-specific beyond GitHub Actions.**
+`detected`. **Nothing provider-specific beyond GitHub Actions.**
 
 ### A6. Branches
 
@@ -228,8 +230,8 @@ Eight rows: `localEnvironment.create`, `.recreate`, `.recreateMode`, `.instanceN
 - **`recreateMode` is never `detected`** — `"inPlace"` vs `"newInstance"` is what the command
   does, and a wrapper does not say; ask whenever `recreate` is non-null and carries `<name>`,
   explaining both.
-- **`instanceName` — only when `recreate` resets in place and carries `<name>`**; a marker-file
-  convention usually makes it a one-liner; propose `ambiguous`, never `detected`.
+- **`instanceName` — only when `recreate` resets in place and carries `<name>`**; propose it
+  `ambiguous` (a marker file is the usual source), never `detected`.
 - **`recreate` is asked, never inferred** — propose the composition its own
   `create`/`migrate`/`seed` answers imply; the owner confirms; `null` is legitimate.
 - Candidate shapes — each `ambiguous` for the row it suggests, never `detected`:
@@ -259,8 +261,8 @@ answer.
 ## Phase B — report what was found
 
 Group the summary as it is read — detected / needs a decision / undetermined — leading with
-counts. **On a narrowed run this is the end.** On a full run say the questions are coming and
-nothing is written; Phase D's bulk confirmation is where detected values get sign-off.
+counts. **On a narrowed run this is the end.** On a full run go to Phase C; Phase D's bulk
+confirmation is where detected values get sign-off.
 
 ## Phase C — map the organization's work types onto the loop's roles
 
@@ -269,8 +271,9 @@ completion cuts a release, each getting an integration branch and shipping as on
 increment; **`leaf`** (array) — the executable one-day item types. `Container` is internal
 shorthand — say **parent item**, **grouping item**, or the actual work type name.
 
-**Read them from the organization; never assume canonical spellings** — whatever
-`get_work_type_hierarchy` returns is the truth, misspellings included. Propose from structure
+**Read them from the organization; never assume canonical spellings** —
+`get_workspace_context` establishes WHICH organization is connected (name it); whatever
+`get_work_type_hierarchy` then returns is the truth, misspellings included. Propose from structure
 (childless bottom types → `leaf`; the level above → `releaseUnit`); confirm with
 `AskUserQuestion` even when obvious. More or fewer levels than assumed → ask which level is the
 release boundary (two roles, not a level count); a single work type doing everything → map it to
@@ -283,9 +286,11 @@ the roles** — absent is visible; wrong silently matches nothing.
 
 ## Phase D — ask only what is left
 
-**Every `ambiguous`/`unknown` row is a question** (`AskUserQuestion`) — candidates offered,
-likeliest first. **`detected` rows are confirmed in bulk** — one list, one yes. **An explicit
-answer always beats a detection** — the override is written, never re-applied.
+**Every `ambiguous`/`unknown` row is a question** (`AskUserQuestion`) — an `ambiguous` row
+offers its candidates, likeliest first; an `unknown` row has no prefill, so ask plainly and say
+what the value is for. **`detected` rows are confirmed in bulk** — one list WITH each row's
+evidence, one yes. **An explicit answer always beats a detection** — the override is written,
+never re-applied.
 
 Four things no inspection can reach, asked every run — the first one first:
 
@@ -305,7 +310,8 @@ Four things no inspection can reach, asked every run — the first one first:
   (3)** — the hooks are independent; (2) **how it is updated** — publishing branch / pull
   request / tool / person (the skill then hands them the delta) — capture what makes "publish"
   concrete; (3) **how release notes are pushed** — "we do not publish" →
-  `docs.releaseNotesSkill: null`. Then the skill **names** (defaults `update-documentation`,
+  `docs.releaseNotesSkill: null`, saying that `--release-notes` will then report itself
+  unavailable. Then the skill **names** (defaults `update-documentation`,
   `update-release-notes`) and — separately, optional — **`release.deployVerification`** (exits
   0 only when production serves the commit in `RELEASE_COMMIT`; say what it buys; never invent
   one). Answers go into the E2 scaffolds, not the config; contract:
@@ -321,9 +327,9 @@ answer needs justifying, or when a re-run (Phase F) proposes removing or migrati
 
 One write, after every confirmation, of the whole document. Values from detection, Phase C, or
 Phase D; else the shipped default — present-with-default is inspectable, absent is invisible.
-**The defaults are literal values**:
-`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md` holds every one — **read it
-before writing and copy verbatim**; the delivery skills compare these strings literally.
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md` holds every default —
+**read it before writing and copy verbatim**; the delivery skills compare these strings
+literally.
 
 | Key | Value |
 |---|---|
@@ -353,7 +359,7 @@ was missing and, under `prototype`, that the file now contradicts its profile. *
 and `review.pollTimeoutMinutes` take the profile's values** — `autoRelease: true` for
 `prototype` repeats the consequence at the write, naming `baseBranch`.
 
-Say what was written and where; go to E2, then G. **The run is not finished at the write.**
+Say what was written; go to E2, then G. **The run is not finished at the write.**
 
 ## Phase E2 — scaffold the local documentation skills
 
@@ -410,7 +416,9 @@ phase** — it holds each check's full procedure, its run rules, and the failure
    (`generated.toleratedTypeErrors` in `generated.paths` excepted). **`verify.test` is offered,
    never forced** — declining is `SKIPPED`, reported. The checklist's run rules govern echoing
    hand-typed commands and asking before anything that looks like it writes.
-2. **Branch refs exist** — `git rev-parse --verify` all four role keys, **then confirm against
+2. **Branch refs exist** — `git rev-parse --verify` all four role keys, preferring the
+   remote-tracking ref and falling back to local (a fresh clone has few local branches), **then
+   confirm against
    the remote** (`git ls-remote --heads origin`; no network → `UNVERIFIABLE`, naming the
    possibly-stale cache). Assert `protectedBranches` still holds base, production and release
    source — a config that lost one has the safety off.
@@ -440,19 +448,16 @@ phase** — it holds each check's full procedure, its run rules, and the failure
 
 **The verdict is the output**: every check with its outcome, then one line — **loop-ready** only
 with zero failures; skips and unverifiables are fine, named. Say when **the working tree was
-dirty** (a likelier cause of a failing typecheck than the config) and when **the run was
-offline**.
+dirty** (the likelier typecheck culprit) and when **the run was offline**.
 
 IMPORTANT:
 - **The write boundary is `.claude/ds-config.json`, the E2 scaffolds, and — in `setup ci` only,
-  on acceptance — the pull-request workflows.** Everything else is read-only in every phase; the
-  one exception in effect is the repository's own verify commands, which Phase G runs, asking
-  first where a write looks likely.
+  on acceptance — the pull-request workflows.** Everything else is read-only in every phase;
+  Phase G runs the repository's own verify commands, asking first where a write looks likely.
 - **Never report a guess as `detected`** — the status column is all that stands between a
   detected value and a fabricated one.
 - **Absence is information** — no local CLI, no cloud reviewer, no CI provider are real findings
   with real values, not gaps to fix.
 - **Never write a config that claims an engine the repository does not have** — an aspirational
   roster quietly changes what gets reviewed.
-- **A written config is not a finished one** — Phase G is the difference between looking right
-  and shown to work.
+- **A written config is not a finished one** — Phase G decides.

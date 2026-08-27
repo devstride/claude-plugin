@@ -95,7 +95,7 @@ keys on every path; topic branches never candidates; no silent promotion to prod
 
 | Situation | Assignment |
 |---|---|
-| One long-lived branch (or `trunk`) plus topic branches | All four roles to it, `ambiguous`, saying so |
+| One **production-role candidate** (or `trunk`) plus topic branches | All four roles to it, `ambiguous`, saying so |
 | Only one branch at all | All four to it, `ambiguous` each — single-branch is legitimate, but so is a repository whose second branch is not created yet, and they want different answers |
 | One development-role candidate, no production-role one | `baseBranch` + `release.releaseSource` suggested; production and hotfix roles `ambiguous` |
 | Multiple candidates in either role set | Those roles `ambiguous`; show the matches and ask |
@@ -133,5 +133,5 @@ answer only the owner can give.
 
 ## Cited by
 
-- `skills/setup/SKILL.md` — the pointer at the end of Phase A ("Read … when a detector's result
-  is `ambiguous` … or before changing a detector").
+- `skills/setup/SKILL.md` — the Phase A pointer (run A5/A6, explain an `ambiguous` row, change a
+  detector), A5's traps line (§A5), A6's enumeration line (§A6), and A6's path-table line.
