@@ -274,6 +274,10 @@ skills/ultracode-build/SKILL.md|via path Y
 skills/pr/SKILL.md|ONE call
 skills/pr/SKILL.md|references/pre-ship-hold.md
 skills/pr/references/pre-ship-hold.md|stranded
+skills/setup/SKILL.md|never guess
+skills/setup/SKILL.md|ready_for_review
+skills/setup/SKILL.md|protectedBranches
+skills/setup/references/detector-evidence.md|npm init
 skills/review/SKILL.md|wait-for-reviewers.sh
 skills/review/SKILL.md|adaptiveReviewerWait
 skills/review/references/reviewer-latency.md|nearest-rank
@@ -554,7 +558,7 @@ U3. References are flat under `skills/<name>/references/` — the corpus globs h
 
 ---
 
-**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 4 (S) + 8 (T) + 3 (U) = 117.**
+**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 4 (S) + 8 (T) + 3 (U) = 117.** (The setup compression added four scoped needle PAIRS — needles are samples, not new invariants, so the total is unchanged.)
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.

@@ -10,6 +10,12 @@ for what each version component means here and how a release is cut.
 
 ### Changed
 
+- **`setup`'s body is less than half its former size.** Detector evidence, failure anecdotes and
+  interview rationale moved to two new references (`detector-evidence.md`,
+  `interview-rationale.md`) behind runtime pointers; Phase G's run rules joined
+  `validation-checklist.md`, which that phase already reads by mandate. 23,127 → ~10,641 tokens
+  (−54%), budget ratcheted to 10,700; every rule, table, candidate list and needle kept — the
+  epic's 8,000-token destination for this body remains open, reachable only by cutting rules.
 - **Bodies keep rules; references carry rationale — the split is now a written convention,
   proven on `pr`.** CONTRIBUTING.md carries the split rule, the pointer form, the reference
   naming/placement rule, the 8,000-token body budget and the move procedure; the invariants
