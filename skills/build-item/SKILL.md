@@ -440,7 +440,8 @@ No PR to merge — integrate locally, then push the epic branch:
   Verify the PR is non-draft (a draft means CI never ran — unsettled, not green) and every
   applicable check is successful at the CURRENT head SHA. Re-poll only if you re-pushed. Use the
   same self-terminating background poll as `review` step 7 — never `gh pr checks --watch`.
-- **Red CI:** failed to TRIGGER → close+reopen. Flaky/infra → `gh run rerun <id> --failed`, ~2
+- **Red CI:** failed to TRIGGER → `review` step 7.3's escalation (close+reopen, then one empty
+  commit). Flaky/infra → `gh run rerun <id> --failed`, ~2
   tries. Real → reproduce, fix, push, re-poll. Never merge red; never give up after one failure.
 - Per-story PRs into an epic branch do not wait on `verify.skipDuringStoryBuilds` checks. On a
   develop-base story PR, any suite in that config list is evaluated per its configured

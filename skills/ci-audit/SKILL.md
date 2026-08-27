@@ -1,6 +1,6 @@
 ---
 name: ci-audit
-description: "Measure what the delivery loop actually spends on CI — executed workflow runs per pull request (target: one), post-merge push minutes, release pull requests re-run by a moving base — and name the offenders. Read-only; GitHub Actions via gh."
+description: "Measure what the delivery loop actually spends on CI — executed runs per workflow per pull request (target: one each), post-merge push minutes, release pull requests re-run by a moving base — and name the offenders. Read-only; GitHub Actions via gh."
 ---
 
 Audit the repository's GitHub Actions usage against the loop's run-once design, and say
@@ -66,8 +66,8 @@ minute; report minutes and, where the usage page gives it, the runner type.
 
 | Class | How to recognise it | What "good" looks like |
 |---|---|---|
-| **First run on a pull request** | `event == pull_request`, first executed run for that pull request (by number; head repo + branch as the fallback) | One per pull request — this is the run the loop intends |
-| **Re-run on a pull request** | Any further executed `pull_request` run for the same pull request | Zero. Each one has a cause: a push after the ready-flip, a base that moved (GitHub re-runs the merge preview), or a pull request opened non-draft |
+| **First run of a workflow on a pull request** | `event == pull_request`, first executed run of that WORKFLOW for that pull request (keyed on pull request number, then workflow; head repo + branch only as the fallback) | One per (pull request, workflow) — a full-stack pull request legitimately has one per workflow it touches |
+| **Re-run of a workflow on a pull request** | Any further executed `pull_request` run of the SAME workflow for the same pull request | Zero. Each one has a cause: a push after the ready-flip, a base that moved (GitHub re-runs the merge preview), a pull request opened non-draft, or an empty re-trigger commit (`review` step 7.3) — the last is an excess only when the workflow had already executed |
 | **Release pull request re-run** | Head is `release.releaseSource` (or the release-unit branch) | Zero. These come from merging OTHER pull requests into the release source while the release pull request sat ready — every merge re-runs its preview |
 | **Post-merge health check** | `event == push` on `baseBranch` / `productionBranch` | At most one per merge to the base branch; **zero on the production branch when its tree is identical to the base tip that was just tested** (a promotion merge has the same tree) |
 | **Other** | schedule, `workflow_dispatch`, bots | Named and counted, not judged |
@@ -77,12 +77,15 @@ minute; report minutes and, where the usage page gives it, the runner type.
 Print, for the window:
 
 1. **Totals** — runs, executed runs, executed minutes; the share of minutes per class above.
-2. **Executed runs per pull request** — a table of head branches with more than
-   `ci.expectedRunsPerPullRequest` executed runs, each with its count and the most likely cause
-   (a push after ready: commits on the head dated after the `ready_for_review` timeline event; a
-   moved base: no head commit but a new run; opened non-draft: no draft phase in the timeline).
-   Then the ratio `executed PR runs / pull requests` — the loop's single most telling number;
-   `1.0` is the design.
+2. **Executed runs per workflow per pull request** — a table with one row per (pull request,
+   workflow) that executed more than `ci.expectedRunsPerPullRequest` times: pull request, workflow,
+   executed runs, most likely cause (a push after ready: commits on the head dated after the
+   `ready_for_review` timeline event; a moved base: no head commit but a new run; opened
+   non-draft: no draft phase in the timeline; an empty re-trigger commit: a zero-file commit
+   whose message says so). A pull request with one run per workflow does not appear. Attribution
+   stays by pull request number first, branch second — never branch name alone. Then the ratio
+   `Σ executed PR runs ÷ Σ over pull requests of the distinct workflows that executed on them` —
+   the loop's single most telling number; `1.0` is the design.
 3. **Post-merge push minutes**, split by branch, and how many production-branch runs had a tree
    identical to the base tip (`git rev-parse <sha>^{tree}` on both) — those are pure waste.
 4. **Release pull request re-runs** and the merges that caused each (merges into the release
@@ -90,7 +93,7 @@ Print, for the window:
 5. **Verdict and fixes**, in priority order by minutes saved, each naming the mechanism:
    - Production-branch push re-tests an identical tree → the tree-identical skip
      (`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`, pattern C).
-   - Pull requests with several executed runs → per-pull-request `concurrency` with
+   - Pull requests with a SECOND executed run of the same workflow → per-pull-request `concurrency` with
      cancel-in-progress (pattern B) plus the loop's post-flip discipline (`review` step 8 reports
      the count; `release` freezes the base).
    - Release pull request re-runs → the freeze rule (`ci.freezeBaseWhileReleasePrReady`).

@@ -172,7 +172,7 @@ ambiguous/risky/unverifiable finding, or a destructive/outward-facing action.
   roster resolved the CI-concurrent regime for this run (`prototype`'s `releaseCiOrdering` on a
   release PR) a draft is holding CI that should already be running —
   `gh pr ready` it NOW, before any push, and confirm a workflow run appears for the head SHA
-  (close+reopen if none does). Step 7 then has no flip left to make.
+  (7.3's escalation if none does). Step 7 then has no flip left to make.
 - Resolve `{owner}/{repo}` once.
 
 ## 1. Launch every stream, concurrently
@@ -544,8 +544,26 @@ released CI, so treating it as a precondition would be circular.
    held on drafts (`review.ciHeldUntilReviewSettled`, and not switched off for this run by the
    profile's `releaseCiOrdering`)** — in a repo where CI runs on drafts there
    is no flip to verify and nothing to close+reopen; settle whatever is already running. If the
-   flip produced no run, **close+reopen** the PR: `reopened`
-   is in the workflow's trigger list and re-evaluates the draft condition.
+   flip produced no run within ~60 s, read
+   `gh api repos/{owner}/{repo}/pulls/<n> --jq '[.mergeable_state,.merge_commit_sha]'` and
+   escalate in order, bounded: (a) **close+reopen** the PR — `reopened` is in the trigger list
+   and re-evaluates the draft condition; (b) if ~60 s after the reopen `mergeable_state` is
+   still `unknown` / `merge_commit_sha` null and there is still no run, push ONE **EMPTY COMMIT**
+   onto the PR's OWN head — three preconditions, each with a failure behind it
+   (`github-review-api.md`): index CLEAN (`git diff --cached --quiet`), local `HEAD` IS that PR's
+   head (`gh pr view <n> --json headRefName,headRefOid`), and after
+   `git commit --allow-empty -m "ci: re-trigger — GitHub did not build this pull request's merge ref"`
+   the new `HEAD^{tree}` EQUALS `HEAD~1^{tree}` — else reset and STOP. Then
+   `git push origin HEAD:<headRefName>` — a fast-forward, which 7.1 permits on a PROTECTED head
+   (it forbids only rewriting) though branch protection may still refuse any direct push: then
+   STOP and surface — at the cost of a no-op commit production inherits; name it in the step-8
+   report);
+   (c) at most one empty commit per settle — still nothing is a GitHub-side incident: STOP and
+   surface it, never loop. A new head forces a per-PR mergeability recompute; the stall is
+   repo-wide for existing heads (why: `github-review-api.md`, "The mergeability
+   stall"). An empty commit does not CHANGE the patch, so 7.1's re-review rule does
+   not fire. Keyed on "no run + `mergeable_state: unknown`", not the flip; step 0
+   escalates the same way.
 
    Report the verified outcome to the caller — `build-item` step 5 and `release` both treat
    "CI settled green" as a precondition for merging, and neither can distinguish a skipped board
@@ -569,7 +587,8 @@ released CI, so treating it as a precondition would be circular.
    an absent one is a gate that never ran.
 5. **Red CI:** *flaky/infra* (known-intermittent full-shard classes, a `paths-filter`
    token glitch, concurrent-worker-DB resets) → `gh run rerun <id> --failed`, bounded to ~2. A
-   run that failed to TRIGGER is kicked by close+reopen. *Real* → reproduce, fix, push, re-poll;
+   run that failed to TRIGGER is kicked per 7.3's escalation (close+reopen, then one empty
+   commit). *Real* → reproduce, fix, push, re-poll;
    loop back to step 6 if it draws new comments. Escalate only what you cannot reproduce or
    safely fix.
 
@@ -606,12 +625,13 @@ write.
   count) — across the loop's workflows: those whose file paths match `ci.workflowGlobs`, resolved
   to `workflow_id` via `gh api repos/{owner}/{repo}/actions/workflows` (method in `ci-audit`). A
   run counts when any job beyond the
-  gate/detect job finished other than `skipped` (method in the `ci-audit` skill). Report
-  `N executed run(s); expected ci.expectedRunsPerPullRequest` (default `1`). N above expected →
-  name each extra run's cause: a push after the ready-flip (a commit dated after the
-  `ready_for_review` timeline event), a base that moved (a new run with no new head commit), or a
-  PR opened non-draft. This is the number the draft hold exists to produce; the same cause on a
-  later cycle is a recurrence for that cycle's 6.5.
+  gate/detect job finished other than `skipped` (method in the `ci-audit` skill). Count
+  **per workflow**, one line each — `backend-tests 1 · lint 1 · ci-policy 1 — expected 1 per
+  workflow (ci.expectedRunsPerPullRequest); 0 excess`. Several workflows once each is the design;
+  the excess is a SECOND executed run of the SAME workflow, named with its cause: a push after the ready-flip (a commit dated after the `ready_for_review` timeline
+  event), a base that moved (a new run with no new head commit), a PR opened non-draft, or 7.3's
+  empty re-trigger commit (an excess only if that workflow ALREADY executed). A workflow whose non-gate jobs all skipped executed 0 times: neither. This is the number the draft hold exists to produce; the same cause on a later
+  cycle is a recurrence for that cycle's 6.5.
 - **Standalone** + `review.notifyWhenSettled` → `PushNotification` that the PR is ready. Skip if
   the user is clearly still here.
 - **Driven** → no notification; return the summary + untracked-deferral list to the caller.

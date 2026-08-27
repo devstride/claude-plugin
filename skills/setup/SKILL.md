@@ -203,11 +203,12 @@ Then compose, remembering the shapes differ:
 `.github/workflows/*.yml` or `*.yaml` present → **GitHub Actions**, the only provider the draft-hold
 mechanics understand.
 
-**A convention-only workflow is exempt.** A pull-request workflow subscribed to `opened` alone
-(no `synchronize`), whose single job exists to fail with a message — the draft-convention check in
-the CI cost patterns — is a policy notice, not a CI gate: it must run on a non-draft open and must
-not be judged against the four-events or concurrency rules. Recognise it by that shape and leave
-it out of both checks.
+**A convention-only workflow is exempt.** Its shape is defined once, under pattern D of
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md` (`opened` plus optionally
+`converted_to_draft` / `ready_for_review`, one run-only job, fails on a non-draft open); the
+`opened`-only shape is a subset. **Remove it from the population BEFORE the five-case table
+below is evaluated** — left in, its draft-condition `if` and short `types` list read as an
+`ambiguous` row and Phase G calls it a FAIL.
 
 When it is GitHub Actions, look at the workflows themselves before prefilling the three CI-ordering
 booleans — and look only at the ones this is about: **workflows with an `on: pull_request` trigger.**
@@ -825,7 +826,8 @@ one is how a setup gets called broken because a laptop was on a train.
      runs with no tree-identical skip — CI is correct but pays for superseded and duplicate runs.
      Say `/devstride:setup ci` applies both, and `/devstride:ci-audit` shows what they cost.
    - **`FAIL`:** a draft-gated workflow whose trigger cannot rerun it — `types` absent, or an
-     explicit list missing any of `opened`, `synchronize`, `reopened`, `ready_for_review`. Here the
+     explicit list missing any of `opened`, `synchronize`, `reopened`, `ready_for_review` (a
+     convention-only workflow, A5, never reaches this check). Here the
      loop cannot finish at all: after a red run, a fix push starts nothing and the close-and-reopen
      fallback has no event to fire on, so it waits forever on a run that cannot exist. A repository
      in that state is not loop-ready, whatever else passes.

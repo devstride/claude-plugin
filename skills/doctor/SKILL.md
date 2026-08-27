@@ -238,10 +238,12 @@ a pull request may still open as a draft; audit the gate and report the mixed co
 
 Scope the audit to workflows with an `on: pull_request` trigger. A workflow triggered only by
 `pull_request_review` or `pull_request_review_comment` is PR-related but must run on drafts —
-exempt it, and do not advise gating it. Likewise a **convention-only workflow** — subscribed to
-`opened` alone, no `synchronize`, one job that fails with a message (the draft-convention check
-from the CI cost patterns) — is a policy notice, not a CI gate: exempt it from the four-events and
-concurrency checks; it is supposed to run exactly on a non-draft open.
+exempt it, and do not advise gating it. Likewise a **convention-only workflow** — the shape is
+defined once, under pattern D of
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`, and covers both the
+`opened`-only and the `opened` + `converted_to_draft` + `ready_for_review` forms. It is a policy
+notice, not a CI gate: remove it from the population before the four-events, concurrency and
+draft-gate checks; list it under INFO as present.
 
 Two separate checks, and **the first is the one everyone misses**:
 
@@ -286,9 +288,9 @@ Two separate checks, and **the first is the one everyone misses**:
     warning — it is a courtesy to humans, not a gate).
   Fix for all three: `/devstride:setup ci`, which shows each change as a diff.
 - **Run-once in practice.** Run the last seven days through the `ci-audit` skill's method (executed
-  runs per pull request, post-merge push minutes, release pull requests re-run by a moving base)
-  and report the ratio `executed PR runs / pull requests` — `1.0` is the design; above it, name the
-  pull requests and the causes. This is the number the whole draft-hold arrangement exists to
+  runs per workflow per pull request, post-merge push minutes, release pull requests re-run by a
+  moving base) and report the ratio `Σ executed PR runs ÷ Σ distinct workflows that executed per
+  pull request` — `1.0` is the design; above it, name the pull requests, workflows, causes. This is the number the whole draft-hold arrangement exists to
   produce, and the only way to know it is to measure it.
 
 ## 6. Merge gates (`gates`)

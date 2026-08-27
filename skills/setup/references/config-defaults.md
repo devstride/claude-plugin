@@ -167,8 +167,9 @@ A8 covers where those templates live and how to capture them.
 pull request is ready, `build-item` does not merge anything into the base branch and `release`
 refuses to flip while another pull request into the release source is mergeable — every merge
 beneath a ready release pull request re-runs its merge preview and stales the reviewed diff.
-`expectedRunsPerPullRequest` is the number `review` step 8 reports against: executed CI runs on
-the pull request it settled; anything above it is named with its cause. The workflow mechanics
+`expectedRunsPerPullRequest` is the number `review` step 8 reports against: `1` per workflow
+under `ci.workflowGlobs` on the pull request it settled — several workflows executing once each
+is the design; a SECOND executed run of the same workflow is named with its cause. The workflow mechanics
 these pair with (concurrency, the tree-identical production skip, the draft gate, the
 draft-convention check) are in `ci-cost-patterns.md`, applied by `setup ci`.
 

@@ -38,6 +38,8 @@ names them — a verdict that hides a skipped test suite is claiming more than i
 5. **Lessons store** — the `lessonsDoc` parent directory exists and is writable. **A missing file is
    the normal state**; the review skill creates it on the first lesson.
 6. **CI ordering** — a warning when the draft hold simply does not engage; a **`FAIL`** when a
+   draft-gated workflow's trigger cannot rerun it (a convention-only workflow — pattern D of
+   `ci-cost-patterns.md` — is removed from the population first). In full: a **`FAIL`** when a
    draft-gated workflow's trigger cannot rerun it, because then CI can never settle.
 7. **Documentation hooks** — only when `docs.updateSkill` / `docs.releaseNotesSkill` is set; `null`
    or absent is `N/A`. Each named `.claude/skills/<name>/SKILL.md` exists, and its `check` mode
@@ -108,6 +110,7 @@ timeline. A `PASS` here means *nothing is obviously in the way*.
 | A pull-request workflow has no `concurrency` block, or a production-branch push re-tests a tree the base just tested | The repository never adopted the CI-cost mechanics | `/devstride:setup ci` applies them as reviewed diffs; `/devstride:ci-audit` shows the minutes involved |
 | Workflows are gated but marking ready starts no run | `ready_for_review` is missing from `on.pull_request.types` — the defaults do not include it | Add it. Note that declaring `types` **replaces** the defaults, so the list also needs `opened`, `synchronize` and `reopened` |
 | CI never re-runs after a review-fix push | An explicit `types` list has `ready_for_review` but dropped `synchronize` | Add the missing events. All four are needed: the flip starts the run, `synchronize` covers the fix push, `reopened` is the fallback, and `opened` covers a standalone review on a non-draft pull request — which skips the flip and settles against CI that, without it, was never created |
+| The draft-convention check itself is reported as an ambiguous or ungated workflow | It was judged against the four-events rule instead of being removed from the population first | Nothing to fix in the workflow: a convention-only workflow (the pattern D shape — `opened` plus optionally `converted_to_draft` / `ready_for_review`, one run-only job) is exempt by shape. See `ci-cost-patterns.md` pattern D |
 
 **Never edit a workflow to fix any of these — outside `setup ci`,** which edits only the
 pull-request workflows, only the four CI-cost mechanics, only on an explicit yes per diff. This

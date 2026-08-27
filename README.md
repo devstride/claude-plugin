@@ -229,8 +229,8 @@ guarantees it. What the hold does not cover is the rest of the bill: superseded 
 production-branch push re-testing the tree the base branch just tested, a release pull request
 re-run every time something merges beneath it. `/devstride:ci-audit` measures all of it;
 `/devstride:setup ci` applies the workflow mechanics that remove it (as reviewed diffs); the loop
-rules — freeze the release source while a release is ready, report executed runs per pull request
-— are on by default (`ci.freezeBaseWhileReleasePrReady`, `ci.expectedRunsPerPullRequest`).
+rules — freeze the release source while a release is ready, report executed runs per workflow
+per pull request — are on by default (`ci.freezeBaseWhileReleasePrReady`, `ci.expectedRunsPerPullRequest`).
 
 **Documentation and release notes.** The plugin never edits your documentation itself. `setup` asks
 where your docs live, how they are updated, and how release notes are pushed, then scaffolds two
@@ -322,11 +322,11 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `release` | Promotes the release branch to production with a full gated review; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
 | `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it |
 | `doctor` | Checks your setup — git, `gh`, the plugin, the DevStride connection, config, CI gating and cost mechanics, documentation hooks — and reports what to fix. Read-only |
-| `ci-audit` | Measures what CI actually costs: executed runs per pull request (the design is one), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
+| `ci-audit` | Measures what CI actually costs: executed runs per workflow per pull request (the design is one each), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
 
 ## Versioning & updates
 
-Current version: **1.2.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **2.0.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
