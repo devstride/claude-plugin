@@ -18,15 +18,17 @@ for what each version component means here and how a release is cut.
   ONE empty commit (`git commit --allow-empty`) when the stall persists ~60 s later — bounded to
   one per settle, then stops and surfaces a GitHub-side incident instead of looping. An empty
   commit does not change the patch, so no re-review fires. Invariant F7 and needles pin it;
-  `build-item` and step 7.5 point at the escalation instead of restating close+reopen.
-- **`doctor` no longer reports a finding on a correctly configured draft-convention check.** The
+  `build-item` and step 7.5 point at the escalation instead of restating close+reopen
+  (invariants total 101 → 104: F7 plus the new section S).
+- **`doctor` no longer reports a finding on a correctly configured draft-convention check** —
+  1 finding on such a repository before, 0 after. The
   "convention-only workflow" exemption in `doctor` §5, `setup` A5 and validation check 6
   recognised only the `opened`-only shape; the better shape subscribes to `opened`,
   `converted_to_draft` and `ready_for_review` so a failure at a non-draft open is superseded by a
   pass on the same SHA when the person converts to draft. The definition now lives once, under
   pattern D of the CI cost patterns (opened plus optionally those two events, never
   `synchronize`; one run-only job, no checkout, fails on a non-draft open, passes otherwise), and
-  the workflow is removed from the population BEFORE the four-events table is evaluated. The
+  the workflow is removed from the population before the four-events, concurrency and draft-gate checks. The
   `opened`-only shape stays exempt as a subset.
 - **Pattern C's tree-identical skip could silently never fire.** The checkout must use
   `fetch-depth: 2` AND the step must `--deepen=1` the production ref: a depth-1 checkout leaves
@@ -43,7 +45,8 @@ for what each version component means here and how a release is cut.
   classifies per (pull request, workflow) and its headline ratio is executed runs over the
   distinct workflows that executed per pull request; `doctor`'s run-once line uses the same
   ratio. No config change is needed: the key's name, type and default are unchanged.
-- Pattern D (the draft-convention check) is now the three-event shape verbatim; repositories on
+- Pattern D (the draft-convention check) is now the three-event shape shown in
+  `ci-cost-patterns.md`; repositories on
   the older `opened`-only shape can re-copy it to get the pass-on-conversion behaviour.
 
 ## [1.2.0] — 2026-08-26

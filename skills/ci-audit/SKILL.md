@@ -93,7 +93,7 @@ Print, for the window:
 5. **Verdict and fixes**, in priority order by minutes saved, each naming the mechanism:
    - Production-branch push re-tests an identical tree → the tree-identical skip
      (`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`, pattern C).
-   - Pull requests with several executed runs → per-pull-request `concurrency` with
+   - Pull requests with a SECOND executed run of the same workflow → per-pull-request `concurrency` with
      cancel-in-progress (pattern B) plus the loop's post-flip discipline (`review` step 8 reports
      the count; `release` freezes the base).
    - Release pull request re-runs → the freeze rule (`ci.freezeBaseWhileReleasePrReady`).

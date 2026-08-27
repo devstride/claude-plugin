@@ -158,7 +158,7 @@ contains `opened`, optionally `converted_to_draft` and/or `ready_for_review`, an
 never `synchronize`, and `reopened`, `edited`, `labeled` and the rest also disqualify; exactly one
 job, with no `needs`, no `actions/checkout` or other `uses:` step, `run:` steps only; and that job
 fails with a message on a non-draft `opened` (a job- or step-level `if` naming the draft condition
-together with `github.event.action == 'opened'`) and passes on the other subscribed events. Such
+together with `github.event.action == 'opened'` whenever more than one event is subscribed — with `types: [opened]` the action is implied) and passes on the other subscribed events. Such
 a workflow is a policy notice, not a CI gate: it is removed from the population before the
 four-events, concurrency and draft-gate checks, and reported as the draft-convention check being
 present. The older shape — `opened` alone, one job that fails — is a subset and stays exempt;

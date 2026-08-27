@@ -172,7 +172,7 @@ ambiguous/risky/unverifiable finding, or a destructive/outward-facing action.
   roster resolved the CI-concurrent regime for this run (`prototype`'s `releaseCiOrdering` on a
   release PR) a draft is holding CI that should already be running —
   `gh pr ready` it NOW, before any push, and confirm a workflow run appears for the head SHA
-  (close+reopen if none does). Step 7 then has no flip left to make.
+  (7.3's escalation if none does). Step 7 then has no flip left to make.
 - Resolve `{owner}/{repo}` once.
 
 ## 1. Launch every stream, concurrently

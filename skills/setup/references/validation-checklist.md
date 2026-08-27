@@ -38,6 +38,8 @@ names them — a verdict that hides a skipped test suite is claiming more than i
 5. **Lessons store** — the `lessonsDoc` parent directory exists and is writable. **A missing file is
    the normal state**; the review skill creates it on the first lesson.
 6. **CI ordering** — a warning when the draft hold simply does not engage; a **`FAIL`** when a
+   draft-gated workflow's trigger cannot rerun it (a convention-only workflow — pattern D of
+   `ci-cost-patterns.md` — is removed from the population first). In full: a **`FAIL`** when a
    draft-gated workflow's trigger cannot rerun it, because then CI can never settle.
 7. **Documentation hooks** — only when `docs.updateSkill` / `docs.releaseNotesSkill` is set; `null`
    or absent is `N/A`. Each named `.claude/skills/<name>/SKILL.md` exists, and its `check` mode

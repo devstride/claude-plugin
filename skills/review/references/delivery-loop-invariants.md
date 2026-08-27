@@ -217,7 +217,7 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "high-water" "no thread" "localReviewerName" "always()" "single writer" \
               "delivery-profiles.md" "Delivery profile:" "maxLocalReviewRounds" \
               "reviewerRegistrationWindowMinutes" "fixFloor" "reviewBreadthCeiling" \
-              "names the engine" "instanceBoundTo" "allow-empty" "convention-only"; do
+              "names the engine" "instanceBoundTo" "allow-empty"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
 
@@ -264,12 +264,14 @@ skills/doctor/references/version-currency.md|devstride--v
 hooks/version-check.sh|NEVER exits non-zero
 hooks/version-check.sh|alarm
 skills/review/SKILL.md|EMPTY COMMIT
+skills/release/SKILL.md|empty re-trigger commit
 skills/review/SKILL.md|mergeable_state
 skills/review/SKILL.md|per workflow
-skills/ci-audit/SKILL.md|per workflow
+skills/ci-audit/SKILL.md|SAME workflow
 skills/setup/references/config-defaults.md|per workflow
-skills/doctor/SKILL.md|converted_to_draft
-skills/setup/SKILL.md|converted_to_draft
+skills/doctor/SKILL.md|remove it from the population
+skills/setup/SKILL.md|Remove it from the population BEFORE
+skills/setup/references/validation-checklist.md|removed from the population first
 skills/setup/references/ci-cost-patterns.md|convention-only shape
 hooks/version-check.sh|installPath
 hooks/version-check.sh|show-toplevel
