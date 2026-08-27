@@ -278,6 +278,11 @@ skills/setup/SKILL.md|never guess
 skills/setup/SKILL.md|ready_for_review
 skills/setup/SKILL.md|protectedBranches
 skills/setup/references/detector-evidence.md|npm init
+skills/review/SKILL.md|xhigh
+skills/review/SKILL.md|Monitor
+skills/review/SKILL.md|blanket-resolve
+skills/review/SKILL.md|CHANGED the patch
+skills/review/references/ci-settle.md|skipping
 skills/review/SKILL.md|wait-for-reviewers.sh
 skills/review/SKILL.md|adaptiveReviewerWait
 skills/review/references/reviewer-latency.md|nearest-rank
