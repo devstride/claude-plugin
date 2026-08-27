@@ -283,7 +283,16 @@ Two separate checks, and **the first is the one everyone misses**:
     workflow (a superseded run is cancelled instead of finished);
   - on workflows that also run on `push` to the production branch, a tree-identical skip against
     the base branch (a promotion merge has the same tree the base just tested — re-testing it is
-    pure cost; one repository measured this at half its test minutes);
+    pure cost; one repository measured this at half its test minutes). **Judge it on whether it
+    CAN FIRE, not on whether the step exists.** Pattern C is the authority on the condition: the
+    merge-promotion path reads `HEAD^2`, so that parent must be in the checkout — any depth of 0
+    or 2+, or a deepening fetch in the step (`--deepen`, `--unshallow`; judge the effect, not the
+    flag). Without it the skip is *present but inert*: it still fires while the base tip has not
+    moved, via the fallback path, and silently stops as soon as it has. Report it at the same
+    WARNING level, naming what is missing — it looks like it works, which is why a step-exists
+    test calls it done while `ci-audit` shows the minutes unexplained. A step in a job with NO
+    checkout is a separate, harsher finding: `git rev-parse` fails and takes the gate job — and
+    everything that `needs` it — down on every production push;
   - a draft-convention check that fails a non-draft pull request opened by a person (INFO, not a
     warning — it is a courtesy to humans, not a gate).
   Fix for all three: `/devstride:setup ci`, which shows each change as a diff.

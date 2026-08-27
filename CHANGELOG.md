@@ -8,6 +8,23 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-08-27
+
+### Fixed
+
+- **The tree-identical skip is now judged on whether it can fire, not on whether the step is
+  there.** `doctor` and `setup` detected pattern C by looking for a step comparing `HEAD^{tree}` —
+  but that comparison reads `HEAD^2`, which never resolves over a default depth-1 checkout, so a
+  repository could carry the step, be told it had the mechanic, and re-test every promotion at
+  full cost with nothing explaining the minutes. The pattern has two comparison paths and they do
+  not need the same things: the fast-forward fallback works at any checkout depth, while the
+  merge-promotion path reads `HEAD^2` and needs that parent present. Without it the skip is not
+  dead but **conditional** — it keeps working while the base tip has not moved and silently stops
+  as soon as it has, which on a busy base is most promotions. Both skills now report that state as
+  **present but inert**, judging the effect (any checkout depth of 0 or 2+, or a deepening fetch)
+  rather than a literal flag, and `setup ci` offers the diff on its own. The validation checklist
+  gains the symptom.
+
 ## [2.0.0] — 2026-08-26
 
 **Why a major version.** `ci.expectedRunsPerPullRequest` changes meaning: it now counts executed
@@ -514,7 +531,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.0.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.1.0...HEAD
+[2.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.0.0...devstride--v2.1.0
 [2.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.2.0...devstride--v2.0.0
 [1.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.1.0...devstride--v1.2.0
 [1.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v1.0.0...devstride--v1.1.0

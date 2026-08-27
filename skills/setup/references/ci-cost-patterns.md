@@ -86,11 +86,26 @@ its second parent, and that one must run. Compare against the base tip only as t
 fast-forward promotion, and fetch the base into an explicit remote-tracking ref — a bare
 `git fetch origin <base>` writes only `FETCH_HEAD`, and `origin/<base>` would not exist.
 
-The step needs a checkout before it, and that checkout MUST use `fetch-depth: 2` AND the step
-must still `--deepen=1` the production ref — both, not either: a depth-1 checkout leaves `HEAD` a
-shallow boundary, and a later `--depth=2` fetch of the same ref may not deepen it, so `HEAD^2`
-never resolves, the comparison silently lacks the second parent, and the skip never fires. A gate
-job that filters paths through the API alone has no repository on disk at all, and
+The step needs a checkout before it, and **the two comparison paths above do not need the same
+things — that difference is the whole of what `setup` and `doctor` classify.** The second path
+(the fast-forward fallback) compares against `origin/<base>`, which the step fetches itself, so it
+works at any checkout depth. The FIRST path — the one that fires for a merge promotion, which is
+what `gh pr merge --merge` produces — reads `HEAD^2`, and a default depth-1 checkout does not have
+that parent: `HEAD` is a shallow boundary, and a later `--depth=2` fetch of the same ref may not
+deepen it.
+
+So a step over a shallow checkout is not dead; it is **conditional**. It still skips a promotion
+whose base tip has not moved since (the fallback matches), and silently stops skipping the moment
+the base moves on — which, on a base that merges several times a day, is most promotions. That
+half-working state is what `setup` A5 records and `doctor` reports as **present but inert**, and
+the reason to report it is precisely that it looks like it works.
+
+Anything that puts the parent in the checkout fixes it — judge the EFFECT, not the literal flag:
+`fetch-depth: 2` or more, `fetch-depth: 0` (full history), or a deepening fetch in the step
+(`--deepen=N`, `--unshallow`, an explicit fetch of the parent). The snippet carries both a depth
+and a `--deepen=1` because belt-and-braces costs nothing and survives someone lowering the
+checkout depth later. A gate job that filters paths through the API alone has no repository on
+disk at all, and
 `git rev-parse` would fail on every production push. Then fold it into the gate's
 outputs: `backend: ${{ steps.tree.outputs.identical == 'true' && 'false' || steps.filter.outputs.backend }}`
 (or into each step's `if:` where a workflow gates per step). A hotfix landing directly on the
