@@ -89,6 +89,14 @@ If a check could not be run, say so — never report an unrun check as a pass.
   (tags not Releases; strip the `devstride--v` prefix; `sort -V`; the installed id and scope from
   `claude plugin list --json`, never assumed; both update commands, then restart). Run it and
   report installed vs newest. Behind → print the two commands with the id and scope you read.
+- **`python3` on PATH** — the session-start hook, the reviewer wait script and the cost harness all
+  run their logic in python3; without it the wait exits at once with a usage-error `RESULT`. FAIL
+  with the install hint for the platform.
+- **Learned reviewer latency** — read `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/reviewer-latency.json` and report
+  per reviewer id: samples, p50, p95, and the bound `review` derives under this repository's
+  `pollTimeoutMinutes` — or "cold — the wait uses `pollTimeoutMinutes`" below the script's sample minimum.
+  Informational, never a FAIL; the schema and the doctor line's format are in
+  `${CLAUDE_PLUGIN_ROOT}/skills/review/references/reviewer-latency.md`.
 - **Session-start check** — read the per-repository record
   `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/repo-<sha1 of the repo root, first 12 hex>.json`
   (schema in the same reference; compute the key from `git rev-parse --show-toplevel`) and report `checkedAt`, `running`, `newest`, `mode` and

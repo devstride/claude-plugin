@@ -311,6 +311,21 @@ Any other cloud reviewer must be described the same way — a name the user reco
 review flow understands, and whatever identifier that `how` needs. If the user names a reviewer that
 is not in this catalog, ask for those fields rather than inventing them.
 
+## Review engine options
+
+```json
+{ "review": { "adaptiveReviewerWait": true } }
+```
+
+`adaptiveReviewerWait` — absent means `true`: `review` step 2 stops waiting on a registered
+cloud reviewer once its wait exceeds that reviewer's learned p95 latency plus slack (bounded
+below by `reviewerRegistrationWindowMinutes`, above by `pollTimeoutMinutes`, and the full
+`pollTimeoutMinutes` while the machine's cache is cold — see
+`${CLAUDE_PLUGIN_ROOT}/skills/review/references/reviewer-latency.md`). `false` pins the fixed
+bound of earlier releases; the backoff cadence and the script still apply, and latency is still
+learned so switching it on later starts warm. Like `profileOverrides`, `setup` never writes this
+key — it is an operator hand-edit.
+
 ## Documentation hooks
 
 ```json

@@ -8,7 +8,27 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **The wait for a cloud reviewer is learned, not fixed.** `review` step 2 used one bound —
+  `pollTimeoutMinutes`, 20 minutes under `enterprise` — polled every ~30 s, so a reviewer that
+  never answered cost the whole bound and ≈ 40 API calls. It now runs
+  `skills/review/scripts/wait-for-reviewers.sh`: a 20 s → 90 s backoff (≤ 16 ticks per 20-minute
+  bound), an exit on the tick the review lands, and a per-reviewer bound learned on this machine
+  — that reviewer's p95 latency plus 120 s, never below the registration window, never above
+  `pollTimeoutMinutes`, and the full bound while the cache is cold. Latency is learned from
+  GitHub's own timestamps, never from the tick that noticed the review, so the bound cannot
+  inflate itself. A reviewer that stops the wait at its learned bound is reported exactly as a
+  timeout is; a review that lands later is caught by the zero-unresolved checks, as before.
+
 ### Added
+
+- `review.adaptiveReviewerWait` — absent means on; `false` pins the fixed bound (the cadence and
+  the learning still apply). An operator hand-edit, never written by `setup`.
+- `~/.cache/devstride-plugin/reviewer-latency.json` — the per-machine latency ring, 20 samples
+  per reviewer keyed by GraphQL bot id; advisory, never an error; delete it to start cold.
+  `doctor` reports what it holds and the bound it implies.
+- `skills/review/references/reviewer-latency.md` — the rule, the reasoning and the fixture shape.
 
 - **A cost harness, so "how much does a skill cost to load" is a number, not an estimate.**
   `scripts/measure-cost.sh` measures every skill body, every reference, every shipped script and

@@ -64,6 +64,11 @@ if it still will not register, ask the user to press **Re-request review** in th
 which works. Measured latency once registered is ~3 minutes (measured twice on one
 live PR: 17:22:55Z → 17:25:31Z, and 18:29:22Z → 18:32:17Z) — "nothing yet" long
 past that points at registration, not slowness.
+That figure is the SEED observation only — the wait itself uses the per-reviewer table it learns
+on each machine (`reviewer-latency.md`). Matching a review to its reviewer: verified live, REST
+review objects carry `user.node_id` equal to the bot's GraphQL id (`BOT_kgDOCnlnWA` on the review
+object and on the timeline's `requested_reviewer` alike), so that is the match key; the `/reviews`
+login is a fallback only.
 
 This matters because the opposite assumption once produced a confident and false
 "Copilot is broken" diagnosis with a billing-overage theory, then a second wrong
