@@ -115,7 +115,7 @@ else:
 timeline = None
 active, not_registered = [], []
 for r in reviewers:
-    reg = r.get("registeredAt")
+    reg = r.get("registeredAt") or r.get("created_at")  # the timeline event's field name is accepted too
     if reg is None:
         if timeline is None: timeline = gh_timeline()
         evs = [e for e in timeline if e.get("event") == "review_requested" and (e.get("requested_reviewer") or {}).get("node_id") == r["graphqlBotId"]]
@@ -154,27 +154,34 @@ if SINCE != "":
     sleep(max(0.0, min(FIRST, min(a["bound"] - (now() - a["registeredAt"]) for a in active) if active else FIRST)))
     interval0 = FIRST * 1.5
 else:
-    first = gh_reviews()
-    if first is None: since = 0
-    else: since = max([x.get("id", 0) for x in first] + [0])
+    first = None
+    for attempt in range(3):
+        first = gh_reviews()
+        if first is not None: break
+        print("baseline fetch failed (%d/3)" % (attempt + 1)); sleep(min(FIRST, 20))
+    if first is None:
+        # A baseline of 0 would settle the cycle on any historical review from the same bot — refuse.
+        result({"result": "gh-unavailable", "elapsedSeconds": int(now() - t0), "pollCalls": calls["n"], "responded": [], "cacheState": cache_state,
+                "nonResponders": [{"graphqlBotId": a["id"], "name": a["name"], "waitedSeconds": int(now() - a["registeredAt"]), "boundSeconds": int(a["bound"]), "boundSource": "gh-unavailable"} for a in active],
+                "notRegistered": not_registered, "error": "could not establish the review-id high-water mark"}, 3)
+    since = max([x.get("id", 0) for x in first] + [0])
     interval0 = FIRST
     pending = first  # that fetch IS the first tick's data — do not fetch twice at t0
 
 # --- the loop ---------------------------------------------------------------------------------
-responded, failures, tick, interval = {}, 0, 0, interval0
+responded, expired, failures, tick, interval, outage = {}, {}, 0, 0, interval0, False
 def matches(review, a):
     u = review.get("user") or {}
     return u.get("node_id") == a["id"] or (a["login"] and u.get("login") == a["login"])
+def note_response(a, x):
+    responded[a["id"]] = {"graphqlBotId": a["id"], "reviewId": x["id"], "submittedAt": x["submitted_at"], "latencySeconds": int(round(parse_ts(x["submitted_at"]) - a["registeredAt"]))}
 while True:
     reviews = pending if pending is not None else gh_reviews(); pending = None
     tick += 1
     if reviews is None:
         failures += 1
         print("tick %d +%ds: gh unavailable (%d consecutive)" % (tick, int(now() - t0), failures))
-        if failures >= 3:
-            result({"result": "gh-unavailable", "elapsedSeconds": int(now() - t0), "pollCalls": calls["n"], "responded": [], "cacheState": cache_state,
-                    "nonResponders": [{"graphqlBotId": a["id"], "name": a["name"], "waitedSeconds": int(now() - a["registeredAt"]), "boundSeconds": int(a["bound"]), "boundSource": "gh-unavailable"} for a in active if a["id"] not in responded],
-                    "notRegistered": not_registered}, 3)
+        if failures >= 3: outage = True; break
     else:
         failures = 0
         for a in active:
@@ -182,14 +189,19 @@ while True:
             mine = [x for x in reviews if x.get("id", 0) > since and matches(x, a) and x.get("submitted_at")]
             if mine:
                 x = min(mine, key=lambda x: x["id"])
-                responded[a["id"]] = {"graphqlBotId": a["id"], "reviewId": x["id"], "submittedAt": x["submitted_at"], "latencySeconds": int(round(parse_ts(x["submitted_at"]) - a["registeredAt"]))}
-    waiting = [a for a in active if a["id"] not in responded]
-    past = [a for a in waiting if now() - a["registeredAt"] >= a["bound"]]
+                note_response(a, x)
+                if a["id"] in expired: expired[a["id"]]["respondedLate"] = {"reviewId": x["id"], "latencySeconds": responded[a["id"]]["latencySeconds"]}
+    # A reviewer past its OWN bound is frozen as a non-responder from that tick on — a later post
+    # is still recorded (it is real latency) but does not turn the result into all-posted.
+    for a in active:
+        if a["id"] not in responded and a["id"] not in expired and now() - a["registeredAt"] >= a["bound"]:
+            expired[a["id"]] = {"graphqlBotId": a["id"], "name": a["name"], "waitedSeconds": int(now() - a["registeredAt"]), "boundSeconds": int(a["bound"]), "boundSource": a["source"]}
+    waiting = [a for a in active if a["id"] not in responded and a["id"] not in expired]
     print("tick %d +%ds: " % (tick, int(now() - t0)) + (" | ".join(
-        "%s %s (bound %ds, %s%s)" % (a["id"], "PAST BOUND" if a in past else "waiting", a["bound"], a["source"], (" p95 %ds n=%d" % (a["p95"], a["n"])) if a["p95"] is not None else "") for a in waiting) or "all posted"))
-    if not waiting or len(past) == len(waiting): break
-    # sleep until the next tick, but never past the nearest remaining bound
-    remaining = min(a["bound"] - (now() - a["registeredAt"]) for a in waiting if a not in past)
+        "%s waiting (bound %ds, %s%s)" % (a["id"], a["bound"], a["source"], (" p95 %ds n=%d" % (a["p95"], a["n"])) if a["p95"] is not None else "") for a in waiting)
+        or ("all posted" if not expired else "every remaining reviewer is past its bound")))
+    if not waiting: break
+    remaining = min(a["bound"] - (now() - a["registeredAt"]) for a in waiting)
     sleep(max(0.0, min(interval, remaining)))
     interval = min(interval * 1.5, MAXT)
 
@@ -212,8 +224,9 @@ if any(a["id"] in responded and a["id"] not in {x["graphqlBotId"] for x in rejec
     except Exception:  # noqa: BLE001
         cache_state = "unwritable"
 
-non = [{"graphqlBotId": a["id"], "name": a["name"], "waitedSeconds": int(now() - a["registeredAt"]), "boundSeconds": int(a["bound"]), "boundSource": a["source"]} for a in active if a["id"] not in responded]
-if not non: res = "all-posted"
+non = list(expired.values()) + [{"graphqlBotId": a["id"], "name": a["name"], "waitedSeconds": int(now() - a["registeredAt"]), "boundSeconds": int(a["bound"]), "boundSource": "gh-unavailable" if outage else a["source"]} for a in active if a["id"] not in responded and a["id"] not in expired]
+if outage: res = "gh-unavailable"
+elif not non: res = "all-posted"
 elif any(x["boundSource"] == "learned-p95" for x in non): res = "proceed-p95"
 else: res = "timeout"
 result({"result": res, "elapsedSeconds": int(now() - t0), "pollCalls": calls["n"], "sinceReviewId": since,

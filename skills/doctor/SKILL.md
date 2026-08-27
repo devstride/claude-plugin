@@ -89,7 +89,7 @@ If a check could not be run, say so — never report an unrun check as a pass.
   (tags not Releases; strip the `devstride--v` prefix; `sort -V`; the installed id and scope from
   `claude plugin list --json`, never assumed; both update commands, then restart). Run it and
   report installed vs newest. Behind → print the two commands with the id and scope you read.
-- **Learned reviewer latency** — read `~/.cache/devstride-plugin/reviewer-latency.json` and report
+- **Learned reviewer latency** — read `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/reviewer-latency.json` and report
   per reviewer id: samples, p50, p95, and the bound `review` derives under this repository's
   `pollTimeoutMinutes` — or "cold — the wait uses `pollTimeoutMinutes`" under five samples.
   Informational, never a FAIL; the schema and the doctor line's format are in

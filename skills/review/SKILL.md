@@ -243,21 +243,22 @@ Triage/fix the local findings WHILE the cloud poll runs — don't idle behind it
 ONE self-terminating **background** poll — a single `Bash` call with `run_in_background` running
 `${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/wait-for-reviewers.sh`. **Not a Monitor, not
 re-armed wakeups**, never `gh pr checks --watch`, never a foreground sleep — one tool call,
-zero idle turns; step 7 reuses the shape. Pass it the repo, the PR, the
+zero idle turns. Pass it the repo, the PR, the
 **REGISTERED** set with each reviewer's `graphqlBotId` and the `created_at` of its
-`review_requested` event (from `pr` or step 1), the review-id high-water mark (captured
-first, or a re-review settles on a stale review),
-`pollTimeoutMinutes` and `reviewerRegistrationWindowMinutes`. It backs off 20 s → 90 s, exits
-the tick every registered reviewer has posted **a review from THIS cycle**, and — unless
+`review_requested` event as `registeredAt` (from `pr` or step 1), the review-id high-water
+mark (captured first),
+`pollTimeoutMinutes` and `reviewerRegistrationWindowMinutes`. It backs off 20 s → 90 s, exits when
+every registered reviewer has posted **a review from THIS cycle**, and — unless
 `review.adaptiveReviewerWait` is `false` — stops waiting on a reviewer once its wait exceeds
 that reviewer's learned p95 plus slack — never below the registration window, never above
-`pollTimeoutMinutes`. It learns latency (server timestamps) into
+`pollTimeoutMinutes`. It learns latency into
 `~/.cache/devstride-plugin/reviewer-latency.json` and prints one `RESULT` JSON line; read it
 when the harness re-invokes you. `proceed-p95` and `timeout` are BOTH this-run
-degradation: **record WHICH reviewer failed to respond** and carry it into the step-8 report — a
-later review is caught by the zero-unresolved checks in steps 7 and 8. Wait only on the
-registered set; `pollTimeoutMinutes` bounds only a REGISTERED reviewer's review. Standalone,
-you may instead ask whether to keep waiting. **Read when** tuning the bound:
+degradation: **record WHICH reviewer failed to respond** and carry it into the step-8 report —
+and at the zero-unresolved checks in steps 7 and 8 ALSO re-fetch reviews above the high-water
+mark: a late review's findings may sit in its body with no thread. Wait only on the registered
+set; `pollTimeoutMinutes` bounds only a REGISTERED reviewer's review. Standalone,
+you may instead ask whether to keep waiting. **Read when** tuning:
 `${CLAUDE_PLUGIN_ROOT}/skills/review/references/reviewer-latency.md`.
 
 ## 3. Collect findings — BOTH halves, scoped to this cycle

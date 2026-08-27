@@ -82,4 +82,31 @@ if [ "$RC" -eq 3 ] && [ "$(field 'd["result"]')" = gh-unavailable ] && [ "$(fiel
 OUT="$(/bin/bash "$W" --repo o/r --pr 1 2>&1)"; RC=$?
 if [ "$RC" -eq 2 ]; then ok "(13) missing --reviewers-json/--timeout-minutes → exit 2"; else bad "(13) rc=$RC"; fi
 
+# (14) a reviewer past its OWN bound is frozen: a late post is recorded but the result is not all-posted
+warm "$TMP/c14.json" 150,160,170,175,180,165,155,178,180,172,168,160 BOT_aaaa
+cat > "$TMP/late.json" <<'EOF_FX'
+{"now":"2026-01-01T10:00:00Z","reviews":[{"id":90,"user":{"node_id":"BOT_aaaa","login":"bot-a[bot]"},"submitted_at":"2026-01-01T10:06:00Z"}]}
+EOF_FX
+OUT="$(printf '%s' "[$A,$B]" | /bin/bash "$W" --dry-run "$TMP/late.json" --repo o/r --pr 1 --reviewers-json - --timeout-minutes 20 --cache "$TMP/c14.json" --since-review-id 0 2>&1)"; RC=$?; RESULT="$(printf '%s\n' "$OUT" | sed -n 's/^RESULT //p' | tail -1)"
+if [ "$RC" -eq 3 ] && [ "$(field 'd["result"]')" = proceed-p95 ] && [ "$(field 'd["nonResponders"][0]["graphqlBotId"]')" = BOT_aaaa ] && [ "$(field 'd["nonResponders"][0]["respondedLate"]["latencySeconds"]')" = 360 ] && [ "$(field 'd["responded"][0]["latencySeconds"]')" = 360 ]; then ok "(14) A froze at its 300 s bound; its 360 s post is recorded as late, result stays a degradation"; else bad "(14) rc=$RC $RESULT"; fi
+
+# (15) gh-unavailable after a response keeps the response and learns it
+cat > "$TMP/outage.json" <<'EOF_FX'
+{"now":"2026-01-01T10:00:00Z","reviews":[{"id":91,"user":{"node_id":"BOT_aaaa","login":"bot-a[bot]"},"submitted_at":"2026-01-01T10:00:10Z"}],"failTicks":[1,2,3]}
+EOF_FX
+OUT="$(printf '%s' "[$A,$B]" | /bin/bash "$W" --dry-run "$TMP/outage.json" --repo o/r --pr 1 --reviewers-json - --timeout-minutes 20 --cache "$TMP/c15.json" --since-review-id 0 2>&1)"; RC=$?; RESULT="$(printf '%s\n' "$OUT" | sed -n 's/^RESULT //p' | tail -1)"
+N15="$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["reviewers"]["BOT_aaaa"]["samples"]))' "$TMP/c15.json" 2>/dev/null)"
+if [ "$RC" -eq 3 ] && [ "$(field 'd["result"]')" = gh-unavailable ] && [ "$(field 'd["responded"][0]["graphqlBotId"]')" = BOT_aaaa ] && [ "$N15" = 1 ] && [ "$(field 'd["nonResponders"][0]["graphqlBotId"]')" = BOT_bbbb ]; then ok "(15) outage after A responded → gh-unavailable keeps A's response and its sample; B is the non-responder"; else bad "(15) rc=$RC n=$N15 $RESULT"; fi
+
+# (16) the baseline fetch failing three times → gh-unavailable, never since=0
+cat > "$TMP/nobase.json" <<'EOF_FX'
+{"now":"2026-01-01T10:00:00Z","reviews":[{"id":5,"user":{"node_id":"BOT_aaaa","login":"bot-a[bot]"},"submitted_at":"2025-01-01T10:00:00Z"}],"failTicks":[0,1,2]}
+EOF_FX
+OUT="$(printf '%s' "[$A]" | /bin/bash "$W" --dry-run "$TMP/nobase.json" --repo o/r --pr 1 --reviewers-json - --timeout-minutes 20 --cache "$TMP/c16.json" 2>&1)"; RC=$?; RESULT="$(printf '%s\n' "$OUT" | sed -n 's/^RESULT //p' | tail -1)"
+if [ "$RC" -eq 3 ] && [ "$(field 'd["result"]')" = gh-unavailable ] && [ "$(field 'len(d["responded"])')" = 0 ]; then ok "(16) baseline fetch fails ×3 → gh-unavailable, the historical review is NOT settled on"; else bad "(16) rc=$RC $RESULT"; fi
+
+# (17) the timeline event's own field name, created_at, is accepted as the registration time
+run responder-156.json "$TMP/c17.json" '[{"name":"Bot A","graphqlBotId":"BOT_aaaa","created_at":"2026-01-01T10:00:00Z"}]' --since-review-id 0
+if [ "$RC" -eq 0 ] && [ "$(field 'd["responded"][0]["latencySeconds"]')" = 156 ]; then ok "(17) created_at accepted as registeredAt"; else bad "(17) rc=$RC $RESULT"; fi
+
 exit $FAIL
