@@ -46,6 +46,18 @@ names them — a verdict that hides a skipped test suite is claiming more than i
    passes (read-only by contract). A legacy `release.docsRepo` block is a `FAIL` whenever present, with or without a `docs`
    block beside it. `release.deployVerification`, if set, resolves but is not run.
 
+## Run rules (Phase G cites these; they are the check-execution contract)
+
+- **Echo any command the user typed during the interview before running it the first time** — a
+  detected command came from the repository's own scripts; a hand-entered one has never been
+  seen by anything.
+- **Ask before running anything whose name or flags suggest it writes** (`--fix`, `--write`,
+  `format`, `fmt`, a regen), and note in the verdict when the tree changed during validation —
+  the repository's own scripts are outside setup's write-boundary promise, and reporting `PASS`
+  while having reformatted somebody's source is the unforgivable outcome.
+- **Run every check even after one fails** — someone with three problems learns all three now.
+- The verdict names a dirty working tree and an offline run whenever either is true.
+
 ## Failure modes
 
 ### Verify commands
