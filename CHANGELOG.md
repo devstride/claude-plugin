@@ -8,6 +8,17 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The tree-identical skip is now judged on whether it can fire, not on whether the step is
+  there.** `doctor` and `setup` detected pattern C by looking for a step comparing `HEAD^{tree}` —
+  but that comparison reads `HEAD^2`, which never resolves over a default depth-1 checkout, so a
+  repository could carry the step, be told it had the mechanic, and re-test every promotion at
+  full cost with nothing explaining the minutes. `doctor` now reports such a step as present but
+  inert and names the depth as the reason; `setup` records `ci.productionTreeSkip` as
+  `present-inert` and `setup ci` offers the `fetch-depth` diff on its own. The validation
+  checklist gains the symptom.
+
 ## [2.0.0] — 2026-08-26
 
 **Why a major version.** `ci.expectedRunsPerPullRequest` changes meaning: it now counts executed

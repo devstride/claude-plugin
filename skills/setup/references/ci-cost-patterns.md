@@ -87,7 +87,8 @@ fast-forward promotion, and fetch the base into an explicit remote-tracking ref 
 `git fetch origin <base>` writes only `FETCH_HEAD`, and `origin/<base>` would not exist.
 
 The step needs a checkout before it, and that checkout MUST use `fetch-depth: 2` AND the step
-must still `--deepen=1` the production ref — both, not either: a depth-1 checkout leaves `HEAD` a
+must still `--deepen=1` the production ref — both, not either (this is what `setup` A5 records as
+`present-inert` when only the step is there, and what `doctor` reports as present-but-cannot-fire): a depth-1 checkout leaves `HEAD` a
 shallow boundary, and a later `--depth=2` fetch of the same ref may not deepen it, so `HEAD^2`
 never resolves, the comparison silently lacks the second parent, and the skip never fires. A gate
 job that filters paths through the API alone has no repository on disk at all, and

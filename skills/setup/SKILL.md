@@ -34,7 +34,8 @@ Optional argument: $ARGUMENTS
 - **`ci`** — the CI-cost mode, the second narrowed run that WRITES, and the only mode that touches
   a workflow file: run A1 and A5, detect which of the four mechanics in
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md` each pull-request workflow
-  already carries (the draft gate, per-pull-request `concurrency`, the tree-identical skip on
+  already carries (the draft gate, per-pull-request `concurrency`, the tree-identical skip —
+  including whether it can fire at all, per `ci.productionTreeSkip` in A5 — on
   production-branch pushes, the human draft-convention check), show the **exact diff** for each
   missing one, and apply only the diffs the user accepts — nothing else in the file is rewritten.
   Then write `ci.freezeBaseWhileReleasePrReady` and `ci.expectedRunsPerPullRequest` if absent.
@@ -269,7 +270,11 @@ specific gap. The third row is a legitimate configuration, not a defect: say wha
 `ci.concurrency`, `ci.productionTreeSkip`, `ci.policyCheck` — informational, they are not config
 keys): a top-level `concurrency:` block with `cancel-in-progress: true`; a step comparing
 `HEAD^{tree}` against the base branch on a production-branch push; a workflow that fails a
-non-draft pull request opened by a person. The patterns and the measurements behind them are in
+non-draft pull request opened by a person. **`ci.productionTreeSkip` takes three values, not
+two** — `present`, `present-inert`, `absent`: the comparison reads `HEAD^2`, so it can only fire
+when the job's checkout uses `fetch-depth: 2` or deeper AND the step `--deepen=1`s the production
+ref (pattern C). Record a step over a depth-1 checkout as `present-inert`, and let `setup ci`
+offer the `fetch-depth` diff on its own rather than the whole pattern again. The patterns and the measurements behind them are in
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`; `setup ci` is what applies
 them. In a full run just report which are missing and say `setup ci` applies them — the full run
 never edits a workflow.

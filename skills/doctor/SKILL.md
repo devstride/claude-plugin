@@ -283,7 +283,12 @@ Two separate checks, and **the first is the one everyone misses**:
     workflow (a superseded run is cancelled instead of finished);
   - on workflows that also run on `push` to the production branch, a tree-identical skip against
     the base branch (a promotion merge has the same tree the base just tested — re-testing it is
-    pure cost; one repository measured this at half its test minutes);
+    pure cost; one repository measured this at half its test minutes). **Judge it on whether it
+    CAN FIRE, not on whether the step exists**: the comparison reads `HEAD^2`, so the job's
+    checkout needs `fetch-depth: 2` or deeper AND the step must `--deepen=1` the production ref
+    (pattern C). A step over a default depth-1 checkout is *present but inert* — report it that
+    way, at the same WARNING level, naming the depth as the reason; it never skips anything, and
+    a step-exists test would call it done while `ci-audit` shows the minutes with no explanation;
   - a draft-convention check that fails a non-draft pull request opened by a person (INFO, not a
     warning — it is a courtesy to humans, not a gate).
   Fix for all three: `/devstride:setup ci`, which shows each change as a diff.

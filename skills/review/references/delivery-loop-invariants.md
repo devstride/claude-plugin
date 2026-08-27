@@ -271,6 +271,8 @@ skills/release/SKILL.md|empty re-trigger commit
 skills/review/SKILL.md|mergeable_state
 skills/review/SKILL.md|per workflow
 skills/ci-audit/SKILL.md|SAME workflow
+skills/doctor/SKILL.md|present but inert
+skills/setup/SKILL.md|present-inert
 skills/setup/references/config-defaults.md|per workflow
 skills/doctor/SKILL.md|remove it from the population
 skills/setup/SKILL.md|Remove it from the population BEFORE
@@ -433,14 +435,17 @@ S1. A convention-only workflow (`opened` plus optionally `converted_to_draft` /
     and reported as the draft-convention check being present. The definition lives once, under
     pattern D; the `opened`-only shape is a subset. The single-job / no-checkout / run-only
     conditions are what keep a real gate out of the exemption; never loosen them.
-S2. `ci.expectedRunsPerPullRequest` is PER WORKFLOW under `ci.workflowGlobs`: several workflows
+S2. The tree-identical skip is judged on whether it CAN FIRE, never on the step existing: it
+    reads `HEAD^2`, so a depth-1 checkout makes it inert. `doctor` reports present-but-inert and
+    `setup` records `present-inert` — a step-exists test calls a permanently-inert mechanic done.
+S3. `ci.expectedRunsPerPullRequest` is PER WORKFLOW under `ci.workflowGlobs`: several workflows
     executing once each on one pull request is the design; the excess is a SECOND executed run
     of the SAME workflow, attributed by pull request number (never branch name alone), and an
     empty re-trigger commit is an excess only when that workflow had already executed.
 
 ---
 
-**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 2 (S) = 104.**
+**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 3 (S) = 105.**
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.
