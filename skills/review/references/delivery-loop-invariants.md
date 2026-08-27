@@ -487,7 +487,8 @@ T1. The wait for a cloud reviewer is the shipped script — ONE background call,
     backoff, exit on the tick the review lands — never a poll loop re-spelled inline, and never
     a wait on a reviewer whose registration was not proven.
 T2. The learned bound is nearest-rank p95 plus slack, clamped to [registration window,
-    pollTimeoutMinutes]; a cold, corrupt or unwritable cache means the full bound; stopping at a
+    pollTimeoutMinutes]; a cold or corrupt cache means the full bound (an unwritable cache only
+    stops new samples persisting — the wait still exits normally); stopping at a
     learned bound is reported as this-run degradation naming the reviewer, exactly as a timeout.
 T3. Latency is learned from SERVER timestamps (submitted_at − the review_requested event's
     created_at), keyed by graphqlBotId — never from the tick that noticed the review, which

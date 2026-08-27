@@ -60,8 +60,10 @@ def numstat(a, b):
     return entries, lines, nbytes
 out = {"scope": None, "reason": None, "round1": None, "delta": None, "newFiles": [], "threshold": T, "round1Head": R1, "head": HEAD}
 r1_entries, r1_lines, r1_bytes = numstat(BASE, R1)
-r1_files = {dst for (src, dst) in r1_entries}   # the files as they exist at the round-1 head: a
-# round-1 rename counts under its DESTINATION only — a fix that recreates the old path is a new file
+# The files as they exist AT the round-1 head: a round-1 rename counts under its DESTINATION
+# only, and a path round 1 DELETED is not a round-1 file — recreating either is a new file.
+at_r1 = set(git("ls-tree", "-r", "--name-only", "-z", R1).decode("utf-8", "surrogateescape").split("\0"))
+r1_files = {dst for (src, dst) in r1_entries} & at_r1
 out["round1"] = {"files": len(r1_entries), "lines": r1_lines, "bytes": r1_bytes}
 if HEAD == R1:
     out.update(scope="none", reason="no fix commits: HEAD is the round-1 head", delta={"files": 0, "lines": 0, "bytes": 0})

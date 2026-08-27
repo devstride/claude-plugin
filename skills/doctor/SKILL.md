@@ -99,7 +99,7 @@ If a check could not be run, say so — never report an unrun check as a pass.
   `${CLAUDE_PLUGIN_ROOT}/skills/review/references/reviewer-latency.md`.
 - **Session-start check** — read the per-repository record
   `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/repo-<sha1 of the repo root, first 12 hex>.json`
-  (schema in the same reference; compute the key from `git rev-parse --show-toplevel`) and report `checkedAt`, `running`, `newest`, `mode` and
+  (schema in `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/version-currency.md`; key from `git rev-parse --show-toplevel`) and report `checkedAt`, `running`, `newest`, `mode` and
   `result` as one line. Absent → the check has never run here: say so, and say why it might be
   (plugin older than 1.2.0, hooks disabled, or `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). `mode` comes
   from the repository's `plugin` config block — `notify` is the default; `auto-update` applies
@@ -342,8 +342,9 @@ The point: **find out whether anything actually checks the code before it merges
   `integrationBranch` **and** disable epic branches.
 - **Review roster** — report which engines are configured (`review.localCommand`,
   `review.automatedReviewers`). An empty roster is legal and means the built-in adversarial pass is
-  the only review; say so rather than implying breakage. A `localCommand` with no `<base>` is the
-  pre-placeholder shape — say so (` --base <value>` is appended).
+  the only review; say so rather than implying breakage. A `localCommand` with neither placeholder is the
+  pre-placeholder shape — say so (` --base <value>` is appended); `<context>` WITHOUT `<base>` is a
+  config error.
 - **`preShipChecks`** — if any entry exists, confirm its command resolves (same segment-splitting as
   §4); these run at the ship boundary and nothing in CI covers them.
 

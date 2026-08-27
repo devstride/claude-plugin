@@ -80,6 +80,13 @@ J="$(scope --base main --round1 "$R1" 2>&1)"; RC=$?
 if [ "$RC" -eq 0 ] && [ "$(printf '%s' "$J" | field 'd["scope"]')" = delta ]; then ok "(9) non-UTF-8 byte in the delta → still a decision (delta), exit 0"; else bad "(9) rc=$RC $J"; fi
 g reset -q --hard "$R1"
 
+# (10) a path round 1 DELETED is not a round-1 file: a fix recreating it → full: new-file
+g rm -q f6.txt && g commit -qm "story: delete f6" && R1D="$(g rev-parse HEAD)"
+echo back > "$TMP/r/f6.txt" && g add -A && g commit -qm "fix recreates the deleted file"
+J="$(scope --base main --round1 "$R1D")"
+if [ "$(printf '%s' "$J" | field 'd["scope"]')" = full ] && printf '%s' "$J" | grep -q '"reason":"new-file f6.txt'; then ok "(10) fix recreates a path round 1 deleted → full: new-file"; else bad "(10) $J"; fi
+g reset -q --hard "$R1"
+
 # (7) a rebase moved the patch → full: history-rewritten
 g checkout -q main && echo more >> "$TMP/r/README.md" && g commit -qam "main moves" && g checkout -q story && g rebase -q main >/dev/null 2>&1
 J="$(scope --base main --round1 "$R1")"

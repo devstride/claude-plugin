@@ -36,6 +36,10 @@ if [ "$(printf '%s' "$J" | field 'd["perFinding"]')" = "['F5', 'F6', 'F11']" ] &
 J="$(mutate "$FX/twelve-six-files.json" 'd["findings"][0]["lens"]="Security"; d["findings"][1]["lens"]=" SECURITY "; d["findings"][2]["lens"]=["correctness","security"]' | run)"
 if [ "$(printf '%s' "$J" | field 'd["perFinding"]')" = "['F1', 'F2', 'F3']" ]; then ok "(3c) lens normalised (case, space, list) → security still per-finding"; else bad "(3c) $J"; fi
 
+# (3d) the skill's displayed lens spellings are aliases: contract-match, tests / false-green, cleanup / conventions
+J="$(mutate "$FX/twelve-six-files.json" 'd["findings"][4]["lens"]="Contract-match"; d["findings"][8]["lens"]="tests / false-green"; d["findings"][11]["lens"]="cleanup / conventions"' | run)"
+if [ "$(printf '%s' "$J" | field 'd["counts"]["findings"]')" = 12 ] && [ "$(printf '%s' "$J" | field 'len(d["perFinding"])')" = 0 ]; then ok "(3d) displayed lens aliases accepted and normalised"; else bad "(3d) $J"; fi
+
 # (4) 12 findings in one file → split IN ID ORDER into 5 / 5 / 2
 J="$(gen '{"findings":[{"id":"F%d"%n,"file":"src/one.ts","line":n,"lens":"correctness","claim":"c"} for n in range(1,13)]}' | run)"
 if [ "$(printf '%s' "$J" | field '[g["findings"] for g in d["groups"]]')" = "[['F1', 'F2', 'F3', 'F4', 'F5'], ['F6', 'F7', 'F8', 'F9', 'F10'], ['F11', 'F12']]" ]; then ok "(4) twelve findings in one file → F1–F5 / F6–F10 / F11–F12 (numeric id order, not F1,F10,F11…)"; else bad "(4) $J"; fi

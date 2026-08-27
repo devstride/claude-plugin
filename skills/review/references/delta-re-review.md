@@ -66,7 +66,7 @@ Hence the two round-2 launch forms, decided by whether `review.localCommand` car
   whose first instruction names the range (fact 3). The engine gets the delta AND round 1's
   outcome. This is the better round 2 and the reason the placeholder exists.
 - **`full`** (by the rule, or `review.localReReviewScope: "full"`) → the template exactly as
-  round 1 ran it, `<base>` = `origin/<baseRefName>`, no context. That is 1.2.0's behaviour.
+  round 1 ran it, `<base>` = `origin/<baseRefName>`, no context. That is the pre-2.4.0 behaviour.
 
 **Round 1, and every `full` launch, REMOVES the `<context>` token** (substitutes nothing — not
 `-`, which would make the engine wait on an empty stdin, and not the literal token, which the

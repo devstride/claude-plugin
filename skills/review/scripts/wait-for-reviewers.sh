@@ -175,9 +175,10 @@ def p95(samples):
 def misses(botid):
     try: return int((cache["reviewers"].get(botid) or {}).get("consecutiveMisses", 0) or 0)
     except Exception: return 0  # noqa: BLE001
+for a in active:                      # first pass: a malformed ring corrupts the WHOLE cache,
+    if ring(a["id"]) is None: cache_state = "corrupt"   # whatever order the reviewers come in
 for a in active:
-    samples = ring(a["id"])
-    if samples is None: cache_state = "corrupt"; samples = []
+    samples = ring(a["id"]) or []
     lat = [x["latencySeconds"] for x in samples]
     a["misses"] = misses(a["id"])
     if FIXED: a["bound"], a["source"], a["p95"], a["n"] = TIMEOUT, "fixed", None, len(lat)
@@ -202,7 +203,13 @@ else:
         print("baseline fetch failed (%d/3)" % (attempt + 1)); sleep(min(FIRST, 20))
     if first is None:
         result(unavailable(active, None, {}, cache_state, {"error": "could not establish the review-id high-water mark"}), 3)
-    since = max([x.get("id", 0) for x in first if isinstance(x.get("id"), int)] + [0])
+    # Hoist into the high-water mark ONLY reviews submitted before the earliest registration:
+    # a review posted after a reviewer was asked is this cycle's answer, not history.
+    min_reg = min(a["registeredAt"] for a in active)
+    def _pre(x):
+        t = parse_ts(x.get("submitted_at") or "")
+        return t is None or t < min_reg
+    since = max([x.get("id", 0) for x in first if isinstance(x.get("id"), int) and _pre(x)] + [0])
     pending = first
 
 # --- the loop ---------------------------------------------------------------------------------

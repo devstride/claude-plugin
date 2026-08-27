@@ -51,7 +51,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MODE=""; SINCE=""; BUDGETS="$ROOT/scripts/cost-budgets.json"
 while [ $# -gt 0 ]; do
   case "$1" in
-    --check|--json|--table|--write-budgets) MODE="${1#--}"; shift ;;
+    --check|--json|--table|--write-budgets)
+      [ -n "$MODE" ] && { echo "measure-cost: --$MODE and $1 are both modes — pass exactly one" >&2; exit 2; }
+      MODE="${1#--}"; shift ;;
     --since|--budgets)
       [ $# -ge 2 ] || { echo "measure-cost: $1 needs a value" >&2; exit 2; }
       if [ "$1" = "--since" ]; then SINCE="$2"; else BUDGETS="$2"; fi; shift 2 ;;

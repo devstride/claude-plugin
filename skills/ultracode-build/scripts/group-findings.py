@@ -30,6 +30,8 @@ import re
 import sys
 
 LENSES = ("correctness", "security", "contract", "tests", "cleanup")
+ALIASES = {"contract-match": "contract", "tests / false-green": "tests", "false-green": "tests",
+           "cleanup / conventions": "cleanup", "conventions": "cleanup"}
 
 
 def fail(msg):
@@ -57,7 +59,8 @@ def norm_lens(raw, fid):
     for v in vals:
         if not isinstance(v, str) or not v.strip():
             fail("finding %s has no lens — every merged finding carries its finder's lens" % fid)
-        v = v.strip().lower()
+        v = " ".join(v.strip().lower().split())
+        v = ALIASES.get(v, v)
         if v not in LENSES:
             fail("finding %s has lens %r; expected one of %s" % (fid, v, ", ".join(LENSES)))
         out.append(v)

@@ -96,7 +96,7 @@ One JSON object, the last line of output, authoritative whatever the exit code:
 RESULT {"result":"all-posted|proceed-p95|timeout|gh-unavailable|nothing-registered","elapsedSeconds":300,"pollCalls":6,
         "sinceReviewId":5036760738,
         "responded":[{"graphqlBotId":"…","reviewId":…,"submittedAt":"…","latencySeconds":156}],
-        "nonResponders":[{"graphqlBotId":"…","name":"Copilot","waitedSeconds":300,"boundSeconds":300,"boundSource":"learned-p95|pollTimeoutMinutes|fixed|gh-unavailable"}],
+        "nonResponders":[{"graphqlBotId":"…","name":"Copilot","waitedSeconds":300,"boundSeconds":300,"boundSource":"learned-p95|pollTimeoutMinutes|relearning|fixed|gh-unavailable"}],
         "notRegistered":[…],"rejectedSamples":[…],"cacheState":"warm|cold|corrupt|unwritable|locked"}
 ```
 
