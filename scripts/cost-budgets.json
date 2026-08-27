@@ -1,0 +1,28 @@
+{
+  "_method": "tokens = ceil(utf8_bytes / 3); bytes as `wc -c`",
+  "_generatedBy": "scripts/measure-cost.sh --write-budgets at 2.3.0 on 2026-08-27",
+  "_rounding": "measured tokens rounded UP to the next multiple of 100",
+  "_readme": "A RATCHET. --check fails any skills/<name>/SKILL.md whose tokens exceed its budget. Lower freely. Raise only in the same commit as the text that needs it, and say so in the commit message — or move rationale to a references/ file instead. Changing _method re-baselines every entry in the same commit (--write-budgets).",
+  "alwaysOnContext": 1300,
+  "bodies": {
+    "branch-feature": 1100,
+    "branch-hotfix": 2800,
+    "build-item": 15800,
+    "ci-audit": 2600,
+    "comprehend-plan": 2100,
+    "create-defect": 2400,
+    "create-story": 2300,
+    "doctor": 9950,
+    "insert-defect": 4700,
+    "insert-story": 4400,
+    "plan": 15600,
+    "pr": 4400,
+    "push": 1400,
+    "rationalize-gantt": 3500,
+    "rebalance": 9200,
+    "release": 9200,
+    "review": 17000,
+    "setup": 23200,
+    "ultracode-build": 6800
+  }
+}

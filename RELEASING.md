@@ -36,20 +36,27 @@ depend on, it does not freeze the surface.
 
 ## The checklist
 
-0. **Validate what you are about to ship.** Three passes, because one run does not cover it:
+0. **Validate what you are about to ship.**
 
    ```bash
-   claude plugin validate .          # marketplace manifest ONLY — see the caveat in AGENTS.md
-   claude plugin validate ./skills   # skill frontmatter; a malformed SKILL.md ships silently otherwise
+   bash scripts/validate.sh --needles
    ```
 
-   Then validate the **plugin** manifest, which the root-level run skips whenever a marketplace
-   manifest is present: copy the repo to a scratch directory, delete `.claude-plugin/marketplace.json`
-   from the copy, and run `claude plugin validate` against it.
+   That one command runs everything: the three `claude plugin validate` passes (the marketplace
+   manifest, the skill frontmatter, and the plugin manifest from a copy without
+   `marketplace.json` — one run does not cover it, and the root-level run silently skips the
+   third), the marketplace invariant, `bash -n` over every shipped script, the script tests, and
+   the skill-body budget check. **A budget breach blocks the release exactly like a manifest
+   error** — raise the budget visibly in the same commit as the text that needs it, or move
+   rationale to a reference. `--needles` adds the rule-loss check from
+   `delivery-loop-invariants.md`, which is informational: a miss is a prompt to read, not a failure.
 
 1. **Move the `Unreleased` entries** in `CHANGELOG.md` under a new `## [x.y.z] — YYYY-MM-DD`
    heading, add the comparison link at the bottom, and **re-point `[unreleased]`** at the tag you are
-   about to create — otherwise it spans the release you just cut.
+   about to create — otherwise it spans the release you just cut. Then paste the output of
+   `bash scripts/measure-cost.sh --table --since <previous tag>` under the new heading as a
+   `### Cost` subsection: the numbers are generated, never edited by hand, and the table's leading
+   comment names the ref and commit it was measured against.
 
    *If `Unreleased` is empty*, one of two things is true. Either nothing user-visible changed, in
    which case do not cut a release at all; or the entries were never written, in which case write

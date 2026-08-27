@@ -184,7 +184,8 @@ engines run; serializing wastes minutes.
   phase-3 pass now over the PR diff (`effort: 'max'`, generated files excluded, fan-out breadth
   sized to the diff). No GitHub thread; triage like Codex's.
 - **Local CLI engine (Codex)** — only when on the resolved roster: `review.localCommand` with
-  `--base origin/<baseRefName>`, run in the worktree.
+  `--base origin/<baseRefName>`, run in the worktree, any `<context>` token removed. Record the head SHA at launch — step 5
+  scopes round 2 from it.
   **Launch it in the background with a long timeout — it runs for MINUTES** and a foreground
   default-timeout call kills it mid-review, which looks *identical* to a clean review.
   Configured-but-unavailable → report as this-run degradation and continue; unconfigured
@@ -217,7 +218,8 @@ engines run; serializing wastes minutes.
   never wait out `pollTimeoutMinutes` on it. The window measures the timeline event, not the
   mutation's return value, which reports success while creating nothing.
   **Track the REGISTERED set** — which configured reviewers actually produced a
-  `review_requested` event (including any the caller registered). Everything downstream keys off
+  `review_requested` event (including any the caller registered), with the `created_at` of
+  each reviewer's event. Everything downstream keys off
   that set, not the configured one.
 - **If the roster degrades to Claude-only on a PR path**, the two causes diverge — and the
   distinction is the whole policy:
@@ -239,28 +241,27 @@ expected, and reading it as red or as a reason to wait is the confusion this ord
 
 Triage/fix the local findings WHILE the cloud poll runs — don't idle behind it.
 
-ONE self-terminating **background** poll — a single `Bash` call with `run_in_background`. **Not a
-Monitor, not re-armed wakeups**, never `gh pr checks --watch`, never a foreground sleep. (The
-harness suggests Monitor for waiting on a condition; here it is the wrong shape — the point is
-ONE tool call and zero idle context turns, and step 7 reuses this shape for a CI wait that can
-run well past the reviewer poll's bound.) The loop: every ~30s, bounded by `review.pollTimeoutMinutes`, gather reviewer
-state and inline-comment count, echo one status line per tick, and exit early when every
-**REGISTERED** reviewer has posted **a review from THIS cycle**, or on timeout. Wait only on the
-registered set — polling a reviewer already known to have hard-errored guarantees a pointless
-full-timeout wait. Read its output
-file when the harness re-invokes you.
-
-**`pollTimeoutMinutes` bounds ONLY the wait for a REGISTERED reviewer's review.** Registration
-itself was already proven or dropped at step 1's window; this poll never waits for a reviewer it
-cannot prove was asked. When `review.pollTimeoutMinutes` is absent from config, take the
-profile's default from the contract (`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`);
-a key present in the file wins over the profile.
-
-"Posted" must mean this cycle — capture a review-id high-water mark first, or a re-review
-settles instantly on the stale review. On timeout, proceed with what you have — and **record WHICH
-reviewer failed to respond**, carrying it into the step-8 report. A PR reported as fully settled
-while a configured engine silently never answered is the degradation this whole gate exists to
-prevent. Standalone, you may instead ask whether to keep waiting.
+ONE self-terminating **background** poll — a single `Bash` call with `run_in_background` running
+`${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/wait-for-reviewers.sh`. **Not a Monitor, not
+re-armed wakeups**, never `gh pr checks --watch`, never a foreground sleep. Pass it the repo,
+the PR, the
+**REGISTERED** set with each reviewer's `graphqlBotId` and the `created_at` of its
+`review_requested` event as `registeredAt` (from `pr` or step 1), the review-id high-water
+mark (captured first),
+`pollTimeoutMinutes` and `reviewerRegistrationWindowMinutes`. It backs off 20 s → 90 s, exits when
+every registered reviewer has posted **a review from THIS cycle**, and — unless
+`review.adaptiveReviewerWait` is `false` (then pass `--fixed-bound`) — stops waiting on a
+reviewer once its wait exceeds
+that reviewer's learned p95 plus slack — never below the registration window, never above
+`pollTimeoutMinutes`. It learns latency into
+`~/.cache/devstride-plugin/reviewer-latency.json` and prints one `RESULT` JSON line; read it
+when the harness re-invokes you. `proceed-p95` and `timeout` are BOTH this-run
+degradation: **record WHICH reviewer failed to respond** and carry it into the step-8 report —
+and at steps 7–8's zero-unresolved checks ALSO re-fetch reviews above the high-water mark — a
+late review's findings may sit in its body with no thread. Wait only on the registered
+set; `pollTimeoutMinutes` bounds only a REGISTERED reviewer's review. Standalone, you may ask to
+keep waiting. **Read when** tuning:
+`${CLAUDE_PLUGIN_ROOT}/skills/review/references/reviewer-latency.md`.
 
 ## 3. Collect findings — BOTH halves, scoped to this cycle
 
@@ -334,18 +335,18 @@ Follow the repo's `conventionsDoc`. Keep `verify.*` green locally. Regenerate AP
 their own commit if routes/handlers changed. Commit per `commitConventions.reviewFixFormat`
 (fallback: `fix(<scope>): <summary> [<itemNumber> review]`), push via `/devstride:push`.
 
-**Re-review of the fixes — spend the round cap, then STOP.** `maxLocalReviewRounds` is the total
-number of runs of the local CLI engine in this cycle, and step 1 already spent one. Rounds
-remaining → run the engine once more over the fixed diff (same command, same `--base`, same
-background launch) and take its findings back through steps 3–4; each run counts. **At the cap:
-the last round's verified findings are fixed WITHOUT another engine round.** Any further finding
-after that — from Claude's own re-read of the delta, a cloud re-review, or a CI loop-back — is
-triaged at the profile's `fixFloor` exactly as in step 4 (the cap bounds ENGINE ROUNDS, not the
-floor: fixing a finding never spends a round, so the floor does not need to drop), and whatever
-the floor defers goes with a rationale to the owning item or the untracked-deferral list. Claude's intrinsic pass has no cap: re-read the delta of
-every fix yourself. This cap is what turns the fix / re-review / fix spiral — four to eight
-rounds on a large diff, each drawing a fresh handful of findings — into a bounded cycle; do not
-"just run it once more" past it.
+**Re-review of the fixes — spend the round cap, then STOP.** `maxLocalReviewRounds` counts
+every run of the local CLI engine this cycle; step 1 spent one. Rounds remaining →
+`${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/rereview-scope.sh --base origin/<baseRefName>
+--round1 <round-1 head SHA>` decides: `none` (no fix commits) → no round 2, none spent; `full`
+(its rule, or config `localReReviewScope: "full"`) → round 1's command unchanged;
+`delta` → the same command with `<base>` := the round-1 head SHA — or the reference's
+`<context>` stdin form, distilled BY YOU, never pasted. Its findings go
+through steps 3–4; each run counts. **At the cap: the last round's verified findings are fixed
+WITHOUT another engine round.** Any later finding is triaged at `fixFloor` as in step 4; deferrals carry a
+rationale. Claude's intrinsic pass has no cap: re-read the delta of
+every fix yourself. **Read when** unsure:
+`${CLAUDE_PLUGIN_ROOT}/skills/review/references/delta-re-review.md`.
 
 ## 6. Reply to AND resolve every addressed cloud thread
 
@@ -483,7 +484,7 @@ released CI, so treating it as a precondition would be circular.
      diff and settle findings BEFORE the flip, and **re-request the cloud reviewer (when one is
      configured) if the delta is substantive** — otherwise its review stays attached to the old
      diff and the configured-engine contract is satisfied only on paper. With no cloud roster,
-     the re-run local streams are the whole re-review. **The local re-run is bounded by
+     the re-run local streams are the whole re-review. **The local re-run is always FULL scope and bounded by
      `maxLocalReviewRounds`:** a run that would exceed the cap is replaced by a Claude-only
      re-read of the delta (the intrinsic engine has no cap) and a note in the step-8 report; the
      cloud re-request is a different engine and is not capped, but its registration is proven
@@ -570,7 +571,8 @@ released CI, so treating it as a precondition would be circular.
    from a passing one on its own. (Observed on a live PR: a merge push and `gh pr ready` one second
    apart left every check `skipping`, and it read as correctly-excluded until the run's *event* and
    the gate job's own conclusion were inspected.)
-4. **Settle** with the same single self-terminating background poll (checks only). A short lag
+4. **Settle** with a poll of the same shape (one background `Bash` call) over CHECKS, not the
+   reviewer script. A short lag
    before checks appear is normal. Require the FINAL head SHA observed SUCCESS for every
    applicable check — absent, skipped, pending or stale-SHA is not green; only proven
    non-applicable suites may be absent.
@@ -615,10 +617,11 @@ write.
 
 - **Report**: **the PROFILE and its source** (and any config key that overrode it), the RESOLVED
   ROSTER (which engines ran; any configured engine that failed or never
-  responded — distinct from not-configured), **local CLI rounds used out of the cap** (and
+  responded — distinct from not-configured), **local CLI rounds used out of the cap** (round 2's scope too, and
   whether a re-run was replaced by a Claude-only re-read), **every reviewer dropped at the
   registration window**, the PR, finding tally (fixed / dismissed / captured / deferred), **the lessons tally** (`N written / M recurrences marked` — or `0`, the common case; call out any recurrence by its `L-NNN` in a driven-mode hand-back, since a lesson that keeps recurring despite being in the store is a signal its Avoid rule is not landing — curation feedback a human should see), resolved-thread
-  count, CI state, every captured deferral explicitly, and **any reviewer that never responded**.
+  count, CI state, every captured deferral explicitly, and **any reviewer that never responded**
+  (and whether its wait ended at the learned bound or at `pollTimeoutMinutes`).
 - **CI runs on this PR — the run-once number.** Count the executed workflow runs attributed to THIS
   pull request — by `pull_requests[].number` on the runs API, falling back to head repository plus
   branch bounded to the PR's lifetime (a reused branch name, or the same name on a fork, must not
