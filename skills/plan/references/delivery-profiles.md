@@ -48,8 +48,9 @@ lighter loop and no loop:
    runs on every story at NARROW breadth or wider, with `effort: 'max'` on its agents. A profile
    sets the ceiling, never zero.
 2. **The security lens is mandatory on an auth boundary**, at every breadth — and an
-   auth-boundary FINDING is verified on its own verifier at every breadth and under every
-   grouping. See [The auth boundary](#the-auth-boundary).
+   auth-boundary FINDING (one the security lens raised, or anchored in a file the diff's
+   auth-boundary decision named) is verified on its own verifier at every breadth and under
+   every grouping. See [The auth boundary](#the-auth-boundary).
 3. **A fast-merged story has at least one engine behind it** — the existing floor in
    `build-item` step 4a; Claude's pass satisfies it.
 4. **A story's local gate is green before it merges.** The gate's WIDTH is the profile's
@@ -138,8 +139,8 @@ prose-valued knobs, `grain` and `specDepth`, the value is another profile's NAME
 dedicated config key (`autoRelease`, `fastStoryMerges.enabled`, `pollTimeoutMinutes`) and both are
 present, the dedicated key wins — an override adjusts the profile's default, it does not outrank
 an operator's explicit setting. `verificationGrouping` accepts `per-file` | `per-finding`
-(`per-finding` restores one verifier per finding — this override IS the mechanism; there is no
-top-level key). An override
+(`per-finding` restores one verifier per finding at HIGH-RISK, the only breadth the grouping
+changed — this override IS the mechanism; there is no top-level key). An override
 cannot go below a floor (`reviewBreadthCeiling` cannot be lower than NARROW, and setting it does
 not remove the auth-boundary security lens). Unknown knob names are reported and ignored, never
 silently honoured as something else.
@@ -159,7 +160,7 @@ silently honoured as something else.
 ## Cited by
 
 - `plan` SKILL.md (grain, spec depth, root marker)
-- `ultracode-build` SKILL.md (readers, breadth ceiling, fix floor, story verify)
+- `ultracode-build` SKILL.md (readers, breadth ceiling, verification default and grouping, fix floor, story verify)
 - `review` SKILL.md (round cap, fix floor, registration window)
 - `build-item` SKILL.md (resolution, per-story PR, auto-release)
 - `setup` SKILL.md and `setup/references/config-defaults.md` (the `profile` key)

@@ -15,8 +15,9 @@ for what each version component means here and how a release is cut.
   "twenty-five agents" the CONTAINED bullet contrasts itself with, paid on every story under
   `enterprise`. Verification is now grouped by anchor file by
   `skills/ultracode-build/scripts/group-findings.py` (at most 5 findings and 3 files per group,
-  deterministic, sorted output), each verifier returning one verdict per finding id, with a
-  defective return re-run per finding. An auth-boundary finding is never grouped — its own
+  deterministic, sorted output; every lens validated and every path normalised, so the floor
+  cannot fail open on a capital letter or a `./`), each verifier returning one verdict per
+  finding id, with a defective return re-run per finding. An auth-boundary finding is never grouped — its own
   verifier at every breadth, Floor 2 of the profile contract. The new profile knob
   `verificationGrouping` (`per-file` under every profile) is an override target:
   `profileOverrides.verificationGrouping: "per-finding"` restores the old fan-out. Rationale
