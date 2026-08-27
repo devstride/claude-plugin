@@ -59,9 +59,13 @@ Three cases, and the third is the one that matters:
    than a broken invocation. Bind `<base>` to the hotfix base ref (`hotfixBaseBranch`, fetched —
    a stale tracking ref rebuilds from an old production commit), `<branch>` to the hotfix branch
    just created, and **`<name>` to the instance the command is meant to act on — which the
-   COMMAND's shape decides, not this skill.** A command that resets in place needs the instance
-   the session is already in; one that stands up a second instance needs a new name (the hotfix
-   item number makes an obvious one). Read the command before binding it.
+   COMMAND's shape decides, not this skill.** A command that stands up a second instance needs a
+   new name (the hotfix item number makes an obvious one). A command that resets in place needs
+   the name of the instance the session is ALREADY in, and you cannot infer that: run
+   `localEnvironment.instanceName`, whose output is that name. **If the command contains
+   `<name>`, the shape is in-place, and `instanceName` is null or fails — STOP and ask.** Guessing
+   from a directory name resets the wrong instance, which on a shared machine destroys somebody
+   else's data, and does so silently.
 
    **What matters is not how many instances exist afterwards, but that the session is still in a
    working one.** Do not leave the session in a directory whose instance was torn down, or on a

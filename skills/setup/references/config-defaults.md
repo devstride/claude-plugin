@@ -229,6 +229,7 @@ headless runs. The recipe and the record it writes are in
   "localEnvironment": {
     "create": null,
     "recreate": null,
+    "instanceName": null,
     "seed": null,
     "migrate": null,
     "teardown": null,
@@ -261,7 +262,14 @@ up from `<base>` also works, but check it can be built at all: a tool that reuse
 branch cannot take one that is already checked out somewhere, which is exactly the state
 `branch-hotfix` leaves behind. Whichever shape, the rule is that the session must still be in a
 working instance afterwards — never a torn-down directory or a detached HEAD, because no config
-command can move the caller. A repository whose environment genuinely has no schema (a stateless dev server) leaves it
+command can move the caller.
+
+**`instanceName` exists for the in-place shape.** It is a command whose output is the name of the
+instance THIS checkout belongs to — usually a line read out of a file the tooling writes when it
+creates one. Without it, a `<name>` in an in-place `recreate` cannot be resolved: nothing else in
+this block identifies the current instance, and a guess from the directory name resets a
+different one. Leave it `null` where `recreate` needs no `<name>`, or where there are no
+instances; `branch-hotfix` stops and asks rather than guessing. A repository whose environment genuinely has no schema (a stateless dev server) leaves it
 `null`, and nothing is lost.
 
 ## Known cloud reviewers

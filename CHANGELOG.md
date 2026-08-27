@@ -23,6 +23,14 @@ for what each version component means here and how a release is cut.
   rebuilt instance no longer belongs to, because a config command cannot move the caller and the
   skill would then verify its own postcondition from the wrong place.
 
+### Added
+
+- **`localEnvironment.instanceName`** — a command whose output is the name of the instance the
+  current checkout belongs to. An in-place `recreate` that carries `<name>` cannot be resolved
+  without it: nothing else in the block identifies the current instance, and guessing from a
+  directory name resets a different one, which on a shared machine destroys somebody else's data
+  silently. `branch-hotfix` stops and asks when it is needed and absent.
+
 ## [2.2.0] — 2026-08-27
 
 ### Added

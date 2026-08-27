@@ -446,8 +446,9 @@ S2. The tree-identical skip is judged on whether it CAN FIRE, never on the step 
 S3. A hotfix's local environment is a BACKWARD transition: `migrate` and `seed` go forward, so
     running them there leaves the instance schema-ahead of the code it is now running. Use
     `localEnvironment.recreate` when it is set, bind `<name>` to whichever instance THAT COMMAND
-    acts on (in-place rebuild: the current one), leave the session in a working instance, and
-    say which path was taken — every path reads as "the environment was reset". An
+    acts on — an in-place shape means the CURRENT one, resolved by `localEnvironment.instanceName`
+    and never guessed from a directory (a guess resets somebody else's instance) — leave the
+    session in a working instance, and say which path was taken — every path reads as "the environment was reset". An
     ABSENT key is the shipped `null` (every pre-2.2.0 config omits it), and with no safe command
     and a diverged schema the answer is STOP and ask, never migrate forward and carry on.
 S4. `ci.expectedRunsPerPullRequest` is PER WORKFLOW under `ci.workflowGlobs`: several workflows
