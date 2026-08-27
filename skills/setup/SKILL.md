@@ -449,8 +449,15 @@ configuration in which the built-in adversarial pass is the local gate.
 
 ### A9. Local environment
 
-How this repository stands up an isolated local instance, if it can. Five rows:
-`localEnvironment.create`, `.seed`, `.migrate`, `.teardown`, `.instanceBoundTo`.
+How this repository stands up an isolated local instance, if it can. Six rows:
+`localEnvironment.create`, `.recreate`, `.seed`, `.migrate`, `.teardown`, `.instanceBoundTo`.
+
+**`recreate` is the one to ask about rather than infer.** It is "a fresh instance from `<base>`",
+and it exists because `migrate` and `seed` usually only go forward, so neither can bring an
+instance back to an older base — the transition `branch-hotfix` performs. Nothing in a file
+distinguishes a command that rebuilds from one that reseeds, so propose the composition its own
+`create`/`migrate`/`seed` answers imply and let the owner confirm it. `null` is a legitimate
+answer for an environment with no schema to go backward on.
 
 - Look for the shapes that usually mean one exists: `docker-compose*.yml`, `docker-compose*.yaml`, `compose.yml` or
   `compose.yaml`, a `.devcontainer/`, a `flake.nix` or `shell.nix`, a `Tiltfile` or `skaffold.yaml`, and root scripts
@@ -651,7 +658,7 @@ paraphrased into something that means the same thing is a default that no longer
 | `docs` | `updateSkill` and `releaseNotesSkill` — the local skill names Phase E2 scaffolds, or `null` where the owner said there is nothing to update; `updateOnEpicRelease: false` |
 | `conventionsDoc`, `itemTagFormat`, `lessonsDoc` | From A8, the answers, and the shipped default path |
 | `plugin` | Verbatim from the defaults reference — `updateCheck: true`, `autoUpdate: false`, `pin: null`. Not asked: the default is right for nearly every repository, and the block is documented where the owner will find it |
-| `localEnvironment` | `create`, `seed`, `migrate`, `teardown` (each a command string or `null`) and `instanceBoundTo`, from A9 and the answers. Write the block even when every command is `null` — `branch-hotfix` and `build-item` read it, and an absent block reads as "nobody asked", not "there is none" |
+| `localEnvironment` | `create`, `recreate`, `seed`, `migrate`, `teardown` (each a command string or `null`) and `instanceBoundTo`, from A9 and the answers. Write the block even when every command is `null` — `branch-hotfix` and `build-item` read it, and an absent block reads as "nobody asked", not "there is none" |
 
 **The roster must describe what actually exists.** This is the one place where writing an aspirational
 config does real damage, because every later run reads these keys as fact:

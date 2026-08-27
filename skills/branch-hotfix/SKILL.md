@@ -38,11 +38,25 @@ Branch name argument: $ARGUMENTS
 4. Push the new branch and set upstream: `git push -u origin <new-branch-name>`
 
 **Local environment.** Now that the branch exists, bring the local environment back into step with
-production code. Read `localEnvironment` from `.claude/ds-config.json`: run `migrate` if it is set,
-then `seed` if it is set — in that order, because a seed against a stale schema fails or lies —
-then restart the dev server pre-flight step 2 asked the user to stop. When the block is absent, or
-both commands are `null`, the procedure is repo-specific and lives with the repo, not in this
-skill: say so and ask rather than guessing, and never invent a reset command.
+production code. Read `localEnvironment` from `.claude/ds-config.json`.
+
+**This is a BACKWARD transition, and that decides which commands to run.** A hotfix branches from
+the production branch, which is OLDER than whatever the instance has been living on. `migrate` and
+`seed` almost always only go forward — migrations do not un-apply, and a seed rewrites rows, not
+schema — so running them here leaves the instance schema-AHEAD of the code it is now running, and
+the hotfix can validate against a schema production does not have, or fail for reasons that have
+nothing to do with the fix.
+
+So: when `recreate` is set, use it — a fresh instance built from the hotfix base. Prefer the form
+that stands up a NEW instance over one that destroys the instance the session is working in.
+Fall back to `migrate` then `seed` (in that order — a seed against a stale schema fails or lies)
+ONLY when `recreate` is `null` AND you can say why the schema has not diverged; **say which path
+you took and why**, because "the environment was reset" reads identically either way and only one
+of them is sound. Then restart the dev server pre-flight step 2 asked the user to stop.
+
+When the block is absent, or every command is `null`, the procedure is repo-specific and lives
+with the repo, not in this skill: say so and ask rather than guessing, and never invent a reset
+command.
 
 A PR is NOT opened here — a freshly-created branch has no commits ahead of the
 production branch, so there is nothing to compare. A hotfix merges back to the

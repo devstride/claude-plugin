@@ -228,6 +228,7 @@ headless runs. The recipe and the record it writes are in
 {
   "localEnvironment": {
     "create": null,
+    "recreate": null,
     "seed": null,
     "migrate": null,
     "teardown": null,
@@ -247,6 +248,16 @@ tool that defaults the branch to the instance name mints a nonconforming one) wh
 tooling needs them. This block tells the loop what exists; it never makes the loop
 concurrent — the serial-execution rule in `build-item` stands, because a per-checkout instance
 isolates dev servers and app data, not shared test infrastructure.
+
+**`recreate` exists because `migrate` and `seed` usually only go FORWARD.** Migrations do not
+un-apply and a seed rewrites rows, not schema — so an instance living on development-branch schema
+cannot be brought back to a production-branch base by running them. It stays schema-AHEAD of the
+code it is now running, and a hotfix can then validate against a schema production does not have.
+`recreate` is the tooling's "a fresh instance built from `<base>`" — whatever that costs. Prefer
+a form that stands up a NEW instance rather than destroying the one the session is working in:
+the safe shape is `create` from the hotfix base under a different `<name>`, then `migrate`, then
+`seed`. A repository whose environment genuinely has no schema (a stateless dev server) leaves it
+`null`, and nothing is lost.
 
 ## Known cloud reviewers
 

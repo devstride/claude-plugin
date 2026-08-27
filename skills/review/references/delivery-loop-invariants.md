@@ -258,6 +258,9 @@ skills/doctor/SKILL.md|profile
 skills/release/SKILL.md|delivery-profiles.md
 skills/build-item/SKILL.md|never makes the loop concurrent
 skills/branch-hotfix/SKILL.md|localEnvironment
+skills/branch-hotfix/SKILL.md|BACKWARD transition
+skills/doctor/SKILL.md|null` `recreate`
+skills/setup/references/config-defaults.md|fresh instance built from
 skills/setup/SKILL.md|instanceBoundTo
 skills/doctor/SKILL.md|localEnvironment
 skills/ultracode-build/SKILL.md|via path Y
@@ -440,14 +443,18 @@ S2. The tree-identical skip is judged on whether it CAN FIRE, never on the step 
     reads `HEAD^2` and needs that parent in the checkout (any depth 0 or 2+, or a deepening
     fetch — the effect, not the flag). Without it the skip is "present but inert" in both
     `doctor` and `setup`: it fires until the base tip moves, then silently stops.
-S3. `ci.expectedRunsPerPullRequest` is PER WORKFLOW under `ci.workflowGlobs`: several workflows
+S3. A hotfix's local environment is a BACKWARD transition: `migrate` and `seed` go forward, so
+    running them there leaves the instance schema-ahead of the code it is now running. Use
+    `localEnvironment.recreate` when it is set, prefer a NEW instance over destroying the current
+    one, and say which path was taken — both read as "the environment was reset".
+S4. `ci.expectedRunsPerPullRequest` is PER WORKFLOW under `ci.workflowGlobs`: several workflows
     executing once each on one pull request is the design; the excess is a SECOND executed run
     of the SAME workflow, attributed by pull request number (never branch name alone), and an
     empty re-trigger commit is an excess only when that workflow had already executed.
 
 ---
 
-**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 3 (S) = 105.**
+**Revised total: 54 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 9 (O) + 3 (P) + 2 (Q) + 4 (R) + 4 (S) = 106.**
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.
