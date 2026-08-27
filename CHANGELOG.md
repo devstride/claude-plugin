@@ -13,7 +13,8 @@ for what each version component means here and how a release is cut.
 - **Bodies keep rules; references carry rationale — the split is now a written convention,
   proven on `pr`.** CONTRIBUTING.md carries the split rule, the pointer form, the reference
   naming/placement rule, the 8,000-token body budget and the move procedure; the invariants
-  file gains a dead-reference check (a reference no pointer cites fails validation). `pr`'s
+  file gains a dead-reference check (a reference no pointer cites fails the release
+  checklist's needle run, `validate.sh --needles`). `pr`'s
   body drops its pre-ship-hold and body-convention rationale into two new references, keeping
   every imperative.
 

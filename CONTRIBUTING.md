@@ -90,9 +90,11 @@ mattered — memory reproduces what you already thought about.
   owning skill's `references/`; addressed only by the `${CLAUDE_PLUGIN_ROOT}` path, never a
   relative `../`; a second skill that needs the same fact cites the owner's file rather than
   restating it. Every reference ends with a `## Cited by` list naming each pointer.
-- **Body budget.** Every `skills/*/SKILL.md`, frontmatter included, measures ≤ 8,000 tokens by
-  `scripts/measure-cost.sh` against `scripts/cost-budgets.json`; the budget check listed in
-  RELEASING.md step 0 fails the release on any body over its row.
+- **Body budget.** Every `skills/*/SKILL.md`, frontmatter included, has a committed row in
+  `scripts/cost-budgets.json`, and `scripts/measure-cost.sh --check` — in the RELEASING.md
+  step-0 checklist — fails the release on any body over its row. The rows are a ratchet with a
+  destination: **8,000 tokens per body**. A row at or under 8,000 may never be raised past it;
+  a row still above 8,000 (a body not yet compressed) only moves down.
 
 ### Moving prose out of a body
 
@@ -101,7 +103,9 @@ each moved paragraph, leave the imperative it explained in the body, in its own 
 re-read the moved paragraph in its new home for statements only true in the sequence it left,
 and fix them there; (d) write the pointer at the step; (e) walk every config key the body cites
 (``grep -o '`[A-Za-z]\+\(\.[A-Za-z]\+\)\+`' skills/<name>/SKILL.md | sort -u`` before and after —
-the after-set must contain the before-set, or the removal is named in the PR); (f) run the
+the after-set must contain the before-set, or the removal is named in the PR; the dotted grep
+misses TOP-LEVEL keys, so also check the body's backticked single words against the top-level
+names in `skills/setup/references/config-defaults.md`); (f) run the
 needle check under bash and the footprint measurement, and paste both outputs into the PR.
 
 ## Check that an edit did not grow a body past its budget
