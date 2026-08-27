@@ -37,7 +37,9 @@ Optional argument: $ARGUMENTS
   already carries (the draft gate, per-pull-request `concurrency`, the tree-identical skip —
   including whether it can fire at all, per `ci.productionTreeSkip` in A5 — on
   production-branch pushes, the human draft-convention check), show the **exact diff** for each
-  missing one, and apply only the diffs the user accepts — nothing else in the file is rewritten.
+  one that is missing OR present but inert — a mechanic that is there and cannot fire needs a
+  diff exactly as much as an absent one, and the tree skip's checkout depth is the common case —
+  and apply only the diffs the user accepts — nothing else in the file is rewritten.
   Then write `ci.freezeBaseWhileReleasePrReady` and `ci.expectedRunsPerPullRequest` if absent.
   **When the draft-gate diffs were accepted and the three `review.*` CI-ordering booleans are
   `false`, propose flipping them `true` as part of the same change** — a gate the workflows now
@@ -275,7 +277,11 @@ two** — `present`, `present but inert`, `absent`: the comparison reads `HEAD^2
 commit's second parent must be in the checkout. Any one of `fetch-depth: 0`, `fetch-depth: 2` or
 more, or a `--deepen=1` in the step itself satisfies that (pattern C). Record a step with none of
 them — a default depth-1 checkout — as `present but inert`, and let `setup ci` offer the
-`fetch-depth` diff on its own rather than the whole pattern again. The patterns and the measurements behind them are in
+`fetch-depth` diff on its own rather than the whole pattern again. **A step in a job with NO
+checkout at all is worse than inert and is not this value**: `git rev-parse` finds no repository
+and fails the step, taking the gate job and everything that `needs` it down on every
+production-branch push. Report that as its own finding, naming the missing checkout — it is a
+broken workflow, not a cost saving that happens not to save. The patterns and the measurements behind them are in
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`; `setup ci` is what applies
 them. In a full run just report which are missing and say `setup ci` applies them — the full run
 never edits a workflow.
@@ -829,8 +835,11 @@ one is how a setup gets called broken because a laptop was on a train.
    - **Warning:** the config opens pull requests as drafts and no workflow carries a draft gate. The
      hold does not engage, so CI runs more often than intended. Wasteful, not broken.
    - **Warning:** a pull-request workflow has no `concurrency` block, or the production-branch push
-     runs with no tree-identical skip — CI is correct but pays for superseded and duplicate runs.
-     Say `/devstride:setup ci` applies both, and `/devstride:ci-audit` shows what they cost.
+     runs with no tree-identical skip — or carries one that cannot fire (`present but inert`, A5:
+     the step is there but the merge commit's second parent is not in the checkout, so it never
+     skips and the cost is identical to not having it). CI is correct but pays for superseded and
+     duplicate runs. Say `/devstride:setup ci` applies all of these, and `/devstride:ci-audit`
+     shows what they cost.
    - **`FAIL`:** a draft-gated workflow whose trigger cannot rerun it — `types` absent, or an
      explicit list missing any of `opened`, `synchronize`, `reopened`, `ready_for_review` (a
      convention-only workflow, A5, never reaches this check). Here the

@@ -290,7 +290,7 @@ someone to read — and the fix is to re-point the needle at the surviving wordi
 loss and never to "restore" a rule that never left.
 
 **The needle list is a SAMPLE, not one per fact.** It covers the highest-cost facts and at least
-one from every section; it does not enumerate all 83, and pretending otherwise would be the same
+one from every section; it does not enumerate every entry, and pretending otherwise would be the same
 species of unverified claim as the miscount above. A clean run means *these* rules survived — it is
 evidence, not a proof of completeness. When you have compressed something specific, add its needle
 before you run it.

@@ -290,7 +290,9 @@ Two separate checks, and **the first is the one everyone misses**:
     commit's parents), or the step itself deepens the production ref (`--deepen=1`, pattern C).
     A step with NONE of them — the default depth-1 checkout — is *present but inert*: report it
     that way, at the same WARNING level, naming the depth as the reason. It never skips anything,
-    and a step-exists test would call it done while `ci-audit` shows the minutes unexplained;
+    and a step-exists test would call it done while `ci-audit` shows the minutes unexplained.
+    A step in a job with NO checkout is a separate, harsher finding: `git rev-parse` fails and
+    takes the gate job — and everything that `needs` it — down on every production push;
   - a draft-convention check that fails a non-draft pull request opened by a person (INFO, not a
     warning — it is a courtesy to humans, not a gate).
   Fix for all three: `/devstride:setup ci`, which shows each change as a diff.
