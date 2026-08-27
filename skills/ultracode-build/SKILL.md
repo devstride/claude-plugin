@@ -23,8 +23,8 @@ note, no prompt, no setup step.
 **Delivery profile.** How much of this engine's budget a story gets is set by the delivery
 profile — the canonical contract is
 `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`, and this skill honours
-five of its knobs: `understandReaders` (phase 1), `reviewBreadthCeiling`, `verificationDefault`
-and `fixFloor` (phase 3), and `storyVerify` (phases 2 and 4). Resolve it ONCE, before phase 1,
+six of its knobs: `understandReaders` (phase 1), `reviewBreadthCeiling`, `verificationDefault`,
+`verificationGrouping` and `fixFloor` (phase 3), and `storyVerify` (phases 2 and 4). Resolve it ONCE, before phase 1,
 and announce it with its source:
 
 - **Passed in the invocation** (`profile: <name>` — the `build-item` path): use it as given, do
@@ -154,54 +154,48 @@ runs pre-PR so issues never become GitHub threads.
 
 **MANDATORY, at `effort: 'max'`, on every story — no trivial-diff skip**
 (`review.reviewDepthPolicy`). Pass `effort: 'max'` on every finder and verifier agent; do not
-inherit session effort. The loop front-loads its quality budget here precisely so CI — held until
-review settles — runs once on an already-clean diff. A skipped pass just moves the defect to the
-expensive, serialized part of the pipeline.
+inherit session effort.
 
 **Breadth scales with risk; existence does not.** The profile's `reviewBreadthCeiling` is the
 widest size this rule may pick; size the diff as below, then clamp to the ceiling. Say which
 size you picked and, when the ceiling clamped it, say that too:
 
-- **NARROW** (one-liner, copy tweak, rename, config flip): 1–2 finder lenses — **correctness, plus
-  conventions when the diff touches styled or typed frontend code** — with batched verification.
-  Cheap; skipping is what costs. The security lens joins these when the diff touches the auth
-  boundary (the floor below); that is an addition to NARROW, not a step up in size.
-- **CONTAINED** (one subsystem, no deployed-runtime contract change, no new permission surface —
-  a CLI verb, a test harness, a self-contained few-hundred-line refactor): 2–3 lenses chosen for the
-  diff's real risk, batched verification (one verifier per finder's list, not per finding). Half a
-  dozen agents, not twenty-five.
-- **HIGH-RISK** (cross-module contracts, deployed handlers/routes, migrations, permission/security
-  surface, event reshapes, anything the deploy-safety contract flags): all five lenses,
-  per-finding verification.
+- **NARROW** (a one-liner, a rename, a config flip): 1–2 finder lenses — **correctness, plus
+  conventions when the diff touches styled or typed frontend code** — with batched verification. The security lens joins these when the
+  diff touches the auth boundary (the floor below): an addition to NARROW, not a step up.
+- **CONTAINED** (one subsystem; no deployed-runtime contract, no new permission surface): 2–3
+  lenses chosen for the diff's real risk, batched verification (one verifier
+  per finder's list, not per finding).
+- **HIGH-RISK** (cross-module contracts, deployed handlers, migrations, permission or security
+  surface, event reshapes — anything the deploy-safety contract flags): all five lenses,
+  verification grouped by file.
 
-Unsure → go one size up, **never past the ceiling**. Where the contract lets a ceiling rise for
-one story (a diff that itself touches an auth boundary or a migration), that is the contract's
-exception to read there, not a judgment call to make here.
+Unsure → go one size up, **never past the ceiling**; a ceiling the contract lets rise for one
+story is the contract's exception, not a judgment call here. **Read when** the size is unclear:
+`${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/review-fanout.md` — the reasoning behind
+the sizes, the grouping, the lesson routing and the verification mechanics.
 
 **FLOORS — no profile or override removes these.** The Claude pass itself always runs, at NARROW
 or wider. And **the security lens is added whenever the DIFF touches the auth boundary** — as
 the contract defines it — at every breadth, including NARROW under a NARROW ceiling. Decide
-that from the diff in hand, not from the plan's theme: a scaffold or runbook story in an auth
-plan does not touch the boundary; the login-callback story does.
+that from the diff in hand, not from the plan's theme, and NAME the files that make it so — they
+are Stage B's `authBoundaryFiles`.
 
 Run over **the hand-written diff only** — computed against the story's WORKING BASE (the branch the
-PR will target) and **excluding generated files**; reviewing generated code wastes finder budget
-and produces noise.
+PR will target) and **excluding generated files**.
 
 **Stage A — finders** (parallel, one per angle). Each returns findings with a `file:line` anchor
-and a one-sentence claim.
+and a one-sentence claim. Merge the lists deduplicating on anchor + claim — never on the claim alone,
+two locations with one defect are two findings — (a duplicate the security lens shares keeps
+`security`), keep every finding's lens, and assign ids (`F1…Fn`) — Stage B's verdicts are keyed
+by them.
 
-**Hand each finder the lessons that match ITS angle** as ADDITIONAL named checks. Routing is a
-JUDGMENT read from each lesson's Pattern text — the schema records a curation `class`
-(`repeat`/`general`/`common`), never an angle, so there is nothing to look up. A lesson whose
-Pattern matches no lens you provisioned for this story is simply dropped for this build, by
-design: at NARROW or CONTAINED breadth most angles have no finder at all, and the lesson has
-already done its main job as a phase-1 constraint. Two
-guardrails, both load-bearing: lessons **EXTEND** a finder's checklist and never narrow it — a
-finder that tunnels onto lesson patterns and misses a novel defect has done the opposite of its
-job; and a lesson-derived finding goes through Stage B verification like any other, with a
-concrete `file:line` claim about THIS diff. A lesson is a hypothesis about where defects
-cluster, never a verdict. No lessons file → the finders' base checklists are the whole story.
+**Hand each finder the lessons that match ITS angle** as ADDITIONAL named checks — a judgment
+read from each lesson's Pattern text (the schema records no angle); a lesson matching no lens
+provisioned for this story is dropped for this build. Two imperatives: lessons **EXTEND** a
+finder's checklist and never narrow it; and a lesson-derived finding goes through Stage B
+verification like any other, with a concrete `file:line` claim about THIS diff. No lessons
+file → the finders' base checklists are the whole story.
 
 - **Correctness** — logic bugs, edge cases, off-by-one, null/undefined, swallowed `Result` errors,
   races, wrong state transitions.
@@ -214,10 +208,21 @@ cluster, never a verdict. No lessons file → the finders' base checklists are t
   fresh tab, a keyboard shortcut, a retry) — name the unexercised paths as findings.
 - **Cleanup / conventions** — `conventionsDoc` violations, dead code, leftover debug, KISS/YAGNI/DRY.
 
-**Stage B — verification** (per-finding at HIGH-RISK, batched per-finder at CONTAINED):
+**Stage B — verification.** Fan out by the profile's `verificationGrouping` (contract): at
+HIGH-RISK **one verifier per file-group** — the findings anchored in one file or a small related
+set (at most 5 findings and 3 files per group) — grouped by
+`${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/scripts/group-findings.py` (no `python3` → group by
+hand by the same rule and say so); at CONTAINED one verifier per finder's list; at NARROW
+batched. **An auth-boundary finding is never grouped: it gets its own verifier at every breadth** (Floor 2) — auth-boundary meaning the
+security lens raised it, or its anchor file is one the diff's auth-boundary decision named. Every
+verifier returns **one verdict per finding id** — CONFIRMED / PLAUSIBLE / REFUTED, each with
+likelihood and impact, as a JSON list keyed by id; a return missing any id, or carrying one
+verdict for the group, is defective: re-run that group per finding and say so in the report.
+`profileOverrides.verificationGrouping: "per-finding"` restores one verifier per finding at
+HIGH-RISK.
 **CONFIRMED** (real and reproducible) / **PLAUSIBLE** (likely real, not fully verifiable from the
-diff) / **REFUTED** (the verifier shows why the code is fine). This stage exists precisely so you
-do NOT blind-apply finder suggestions — a finding is not actionable until CONFIRMED or PLAUSIBLE.
+diff) / **REFUTED** (the verifier shows why the code is fine). A finding is not actionable until
+CONFIRMED or PLAUSIBLE.
 `verificationDefault` is **REFUTED unless reproducible** under every profile: a verifier starts
 from REFUTED and the finding earns its way up — CONFIRMED by reproducing it from the diff,
 PLAUSIBLE only by pointing at the concrete mechanism in THIS diff and showing why it is likely
@@ -229,15 +234,10 @@ corrupted or lost data, or a security hole; a security finding is P1 whatever it
 
 **A verdict that rests on having LOOKED — a browser, a running service, a manual run — names
 the path it exercised.** The report vocabulary is **"verified X via path Y"**, never a bare
-"verified". Behavioural states are usually reachable by more than one route, and a fix confirmed
-on one of them has proven nothing about the others: before calling a behavioural fix verified,
-enumerate the ways the state can be reached and say which were exercised and which were not — a
-reviewer later finding an untried path is the process working, not a surprise. Assert what you
-are measuring: scope DOM or API queries to the live container and check its count, because a
-stale mounted panel or a cached response answers with equal confidence and makes a broken state
-read as a pass, or as a different bug; and use one clean load per case, since in-place navigation
-lets cases bleed into each other. A stale session, an expired login or a service that is not up
-looks identical to a broken feature — rule those out before reading code.
+"verified". Before calling a behavioural fix verified, enumerate the routes to that state and
+name which were NOT tried; scope DOM or API queries to the live container and check its count;
+one clean load per case; rule out a stale session, an expired login or a service that is not up
+before reading code (the reference has why).
 
 Then act by the profile's `fixFloor` — which verified findings get fixed IN THIS STORY, read
 from those verdicts:
@@ -264,7 +264,7 @@ ambiguous or risky finding is a fork — ask, with your recommendation.
 
 Close the phase with a one-line **review report**: the profile, the breadth picked (and whether
 the ceiling clamped it), the lens count (naming the security lens when the auth-boundary floor
-added it), the agent count across both stages, and the tally — raised / fixed / deferred /
+added it), the agent count across both stages (**verifiers: G groups + A per-finding**), and the tally — raised / fixed / deferred /
 dismissed.
 
 ## 4. Hand back

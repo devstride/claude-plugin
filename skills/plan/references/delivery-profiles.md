@@ -24,6 +24,7 @@ word**, and the knobs move together. Individual knobs can still be overridden (s
 | `understandReaders` — `ultracode-build` phase 1 fan-out | **0** — read the relevant files inline, no Workflow | **≤ 2** readers, only for angles the spec does not pin | Up to the six the skill defines |
 | `reviewBreadthCeiling` — the widest breadth `ultracode-build` phase 3 may pick | **NARROW**, plus the security lens whenever the diff touches an [auth boundary](#the-auth-boundary) | **CONTAINED**; HIGH-RISK only for a story whose OWN diff touches an auth boundary or a migration | As the skill's sizing rule says — HIGH-RISK is available for any story that warrants it |
 | `verificationDefault` | REFUTED unless reproducible | REFUTED unless reproducible | REFUTED unless reproducible |
+| `verificationGrouping` — how HIGH-RISK verification fans out | `per-file` | `per-file` | `per-file` |
 | `fixFloor` — which verified findings get fixed in-story | **`p1-security`**: P1 correctness and any security finding. Everything else is deferred with a one-line rationale (to the item that owns it, or the untracked-deferral list) | **`likely-important`**: findings that are both likely to occur and material if they do. The rest is dismissed with a rationale | **`all-confirmed`**: every CONFIRMED and PLAUSIBLE finding |
 | `localCliEngine` — does the local CLI reviewer (Codex, by default) run on stories | **No** — Claude's build-time pass is the local gate | Yes, when configured | Yes, when configured |
 | `maxLocalReviewRounds` — total runs of the local CLI engine per story, re-reviews included | 0 | **1** — one review; its findings are fixed; **no re-review of the fixes** | **2** — one review, one re-review of the fixes, then stop |
@@ -46,8 +47,10 @@ lighter loop and no loop:
 1. **One adversarial pass always runs.** Claude's build-time review (`ultracode-build` phase 3)
    runs on every story at NARROW breadth or wider, with `effort: 'max'` on its agents. A profile
    sets the ceiling, never zero.
-2. **The security lens is mandatory on an auth boundary**, at every breadth. See
-   [The auth boundary](#the-auth-boundary).
+2. **The security lens is mandatory on an auth boundary**, at every breadth — and an
+   auth-boundary FINDING (one the security lens raised, or anchored in a file the diff's
+   auth-boundary decision named) is verified on its own verifier at every breadth and under
+   every grouping. See [The auth boundary](#the-auth-boundary).
 3. **A fast-merged story has at least one engine behind it** — the existing floor in
    `build-item` step 4a; Claude's pass satisfies it.
 4. **A story's local gate is green before it merges.** The gate's WIDTH is the profile's
@@ -135,7 +138,9 @@ prose-valued knobs, `grain` and `specDepth`, the value is another profile's NAME
 "enterprise"` means "slice at standard but spec at enterprise depth"). When a knob also has a
 dedicated config key (`autoRelease`, `fastStoryMerges.enabled`, `pollTimeoutMinutes`) and both are
 present, the dedicated key wins — an override adjusts the profile's default, it does not outrank
-an operator's explicit setting. An override
+an operator's explicit setting. `verificationGrouping` accepts `per-file` | `per-finding`
+(`per-finding` restores one verifier per finding at HIGH-RISK, the only breadth the grouping
+changed — this override IS the mechanism; there is no top-level key). An override
 cannot go below a floor (`reviewBreadthCeiling` cannot be lower than NARROW, and setting it does
 not remove the auth-boundary security lens). Unknown knob names are reported and ignored, never
 silently honoured as something else.
@@ -145,7 +150,7 @@ silently honoured as something else.
 | Skill | Knobs it honours |
 |---|---|
 | `plan` | `grain`, `specDepth`; writes the root marker |
-| `ultracode-build` | `understandReaders`, `reviewBreadthCeiling`, `verificationDefault`, `fixFloor`, `storyVerify` |
+| `ultracode-build` | `understandReaders`, `reviewBreadthCeiling`, `verificationDefault`, `verificationGrouping`, `fixFloor`, `storyVerify` |
 | `review` | `localCliEngine`, `maxLocalReviewRounds`, `fixFloor`, `reviewerRegistrationWindowMinutes`, `pollTimeoutMinutes`, `releaseCiOrdering` |
 | `build-item` | resolves the profile for the run; `perStoryPullRequest`, `storyVerify`, `autoRelease`, `releaseCiOrdering` |
 | `setup` | asks the profile; writes `profile` and the profile-consistent defaults |
@@ -155,7 +160,7 @@ silently honoured as something else.
 ## Cited by
 
 - `plan` SKILL.md (grain, spec depth, root marker)
-- `ultracode-build` SKILL.md (readers, breadth ceiling, fix floor, story verify)
+- `ultracode-build` SKILL.md (readers, breadth ceiling, verification default and grouping, fix floor, story verify)
 - `review` SKILL.md (round cap, fix floor, registration window)
 - `build-item` SKILL.md (resolution, per-story PR, auto-release)
 - `setup` SKILL.md and `setup/references/config-defaults.md` (the `profile` key)

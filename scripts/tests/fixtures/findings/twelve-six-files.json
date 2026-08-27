@@ -1,0 +1,20 @@
+{
+  "findings": [
+    {"id": "F1", "file": "src/orders/checkout.ts", "line": 40, "lens": "correctness", "claim": "total ignores a zero-quantity line"},
+    {"id": "F2", "file": "src/orders/checkout.ts", "line": 88, "lens": "tests", "claim": "no negative-quantity case"},
+    {"id": "F3", "file": "src/orders/cart.ts", "line": 12, "lens": "correctness", "claim": "merge drops the last item when ids collide"},
+    {"id": "F4", "file": "src/orders/cart.ts", "line": 57, "lens": "cleanup", "claim": "unused import"},
+    {"id": "F5", "file": "src/pricing/discount.ts", "line": 9, "lens": "contract", "claim": "returns cents where the caller expects dollars"},
+    {"id": "F6", "file": "src/pricing/discount.ts", "line": 31, "lens": "correctness", "claim": "percentage above 100 not rejected"},
+    {"id": "F7", "file": "src/pricing/tax.ts", "line": 22, "lens": "correctness", "claim": "rounding differs from the invoice path"},
+    {"id": "F8", "file": "src/pricing/tax.ts", "line": 70, "lens": "tests", "claim": "only one region exercised"},
+    {"id": "F9", "file": "src/ui/CartPanel.vue", "line": 118, "lens": "cleanup", "claim": "leftover debug log"},
+    {"id": "F10", "file": "src/ui/CartPanel.vue", "line": 140, "lens": "correctness", "claim": "stale total after removal"},
+    {"id": "F11", "file": "src/ui/CheckoutButton.vue", "line": 15, "lens": "contract", "claim": "emits the old event name"},
+    {"id": "F12", "file": "src/ui/CheckoutButton.vue", "line": 33, "lens": "cleanup", "claim": "dead branch"}
+  ],
+  "authBoundaryFiles": [],
+  "grouping": "per-file",
+  "maxFindings": 5,
+  "maxFiles": 3
+}
