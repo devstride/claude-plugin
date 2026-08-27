@@ -218,10 +218,12 @@ If a check could not be run, say so — never report an unrun check as a pass.
   and `build-item` treats the current checkout as the only environment. Present: report
   `instanceBoundTo` and each command's resolution per the rule below. `instanceBoundTo: directory`
   with a `null` `create` is a WARNING — it claims isolated instances exist and gives the loop no
-  way to make one. A `null` `recreate` alongside a non-null `migrate` is also a WARNING: those
-  commands go forward, so `branch-hotfix` has no way to bring an instance BACK to a production
-  base and will fall back to leaving it schema-ahead of the code it is running. Name the config
-  key; the reasoning is in `config-defaults.md` under Local environment.
+  way to make one. A `recreate` that is null **or absent** — every config written before the key
+  existed omits it — alongside a non-null `migrate` is also a WARNING: those commands go forward,
+  so `branch-hotfix` has no command that brings an instance BACK to a production base. It will
+  then either migrate forward (only where the schema is known not to have diverged) or STOP and
+  ask, so this is a gap in what the loop can do unattended, not a guaranteed wrong schema. Name
+  the config key; the reasoning is in `config-defaults.md` under Local environment.
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
   **array**, so iterate it — `review.localCommand`, `generated.regenCommand`,
   `preShipChecks[].command`, and each non-null `localEnvironment.*` command): split on `&&` and `;`, take the first token of **each** segment, and

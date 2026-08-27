@@ -47,12 +47,27 @@ schema — so running them here leaves the instance schema-AHEAD of the code it 
 the hotfix can validate against a schema production does not have, or fail for reasons that have
 nothing to do with the fix.
 
-So: when `recreate` is set, use it — a fresh instance built from the hotfix base. Prefer the form
-that stands up a NEW instance over one that destroys the instance the session is working in.
-Fall back to `migrate` then `seed` (in that order — a seed against a stale schema fails or lies)
-ONLY when `recreate` is `null` AND you can say why the schema has not diverged; **say which path
-you took and why**, because "the environment was reset" reads identically either way and only one
-of them is sound. Then restart the dev server pre-flight step 2 asked the user to stop.
+**An ABSENT key is the shipped `null`** — every config written before `recreate` existed omits it
+entirely, which is the commonest shape you will meet, not a rare one. Read a missing member as
+`null` throughout.
+
+Three cases, and the third is the one that matters:
+
+1. **`recreate` set** → use it: a fresh instance built from the hotfix base. Prefer the form that
+   stands up a NEW instance over one that destroys the instance the session is working in.
+2. **`recreate` absent or `null`, and you can say WHY the schema has not diverged** (the instance
+   has been on the production line all along, or the environment has no schema) → `migrate` then
+   `seed`, in that order, since a seed against a stale schema fails or lies.
+3. **`recreate` absent or `null`, and the schema HAS diverged or you cannot tell** → **STOP and
+   ask.** Do not run migrate+seed, and do not restart the server and carry on: that is precisely
+   how a hotfix comes to be validated against a schema production does not have. Say what is
+   missing (`localEnvironment.recreate`), offer the manual route — a fresh instance from the
+   hotfix base — and continue only once the user confirms the environment was rebuilt or tells
+   you to proceed anyway.
+
+**Say which case you took and why.** "The environment was reset" reads identically for all three
+and only two of them are sound. Then restart the dev server pre-flight step 2 asked the user to
+stop.
 
 When the block is absent, or every command is `null`, the procedure is repo-specific and lives
 with the repo, not in this skill: say so and ask rather than guessing, and never invent a reset

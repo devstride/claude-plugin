@@ -25,8 +25,11 @@ for what each version component means here and how a release is cut.
   and the fix can validate against a schema production does not have, or fail for reasons that have
   nothing to do with it. The skill now uses `recreate` when it is set, prefers standing up a NEW
   instance over destroying the one the session is working in, falls back to migrate+seed only when
-  `recreate` is null and the schema is known not to have diverged, and **says which path it took** —
-  both read identically as "the environment was reset" and only one of them is sound.
+  `recreate` is absent or null and the schema is known not to have diverged, and **says which path
+  it took** — every path reads identically as "the environment was reset" and only some are sound.
+  When there is no safe command and the schema has diverged, it STOPS and asks rather than
+  restarting the server and carrying on. An absent key is read as the shipped `null`, which is
+  what every configuration written before this release has.
 - **`doctor` warns when the gap exists**: a null `recreate` alongside a non-null `migrate` under
   `instanceBoundTo: directory` means the hotfix path has no way back. `setup` A9 asks for the
   command rather than inferring it — nothing in a file distinguishes a rebuild from a reseed.
