@@ -329,7 +329,11 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 
 ## Versioning & updates
 
-Current version: **2.4.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+2.5.0 loads roughly a quarter less skill text per invocation than 2.4.0 — every body sits
+under a committed token budget, with rationale moved to per-skill references loaded only at
+the step that needs them; the full before/after table is in the CHANGELOG.
+
+Current version: **2.5.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at

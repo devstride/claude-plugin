@@ -134,6 +134,17 @@ borderline entry costs more than it saves.
 5. **Lessons are repo data, not plugin content**: the plugin ships this format doc and the
    mechanism, never anyone's accumulated lessons.
 
+
+## Self-verification (why the unreviewed lesson write is a bounded exemption)
+
+A lesson entry lands after the reviewers settle, and step 7 re-runs them only if a rebase
+changes the patch — so nothing else looks at it. That is acceptable, not a hole in the
+reviewed-diff contract, because the file is DATA, never executable; consumers treat lessons as
+checks that EXTEND a finder's list and never narrow it; and every lesson-derived finding is
+still independently verified downstream. A bad lesson costs signal quality, never a gate —
+which is why the write's own rule is re-read-against-this-file plus a visible heading+class in
+the report, not an engine round.
+
 ## Cited by
 
 - `.claude/ds-config.json` `_lessonsDoc_readme` — the addressing key.

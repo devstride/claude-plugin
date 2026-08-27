@@ -8,6 +8,84 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [2.5.0] — 2026-08-27
+
+### Changed
+
+- **Four more bodies compressed — three of them to the 8,000-token destination.** `release`
+  9,175 → 7,997 (gates reasoning to the new `skills/release/references/release-gates.md`),
+  `doctor` 9,942 → 7,991 (the symptom table and explanations to the new
+  `skills/doctor/references/silent-failures.md`; the four-events evidence now cites
+  `detector-evidence.md` — one home, two citers), `rebalance` 9,150 → 7,965 (the write-order
+  reasoning to the new `skills/rebalance/references/recoverable-write-order.md`), and `plan`
+  15,581 → 11,791 (the worked mini-example to `worked-example.md`, the release-unit shaping
+  rationale to `release-unit-shaping.md`; its remainder is the interactive-loop rules — the
+  8,000 destination stays open for it). Budgets ratcheted accordingly; `ultracode-build`
+  measured 6,749 and was not touched.
+- **`build-item`'s body is a quarter smaller.** The two worked progress tables and their
+  reasoning moved to the new `skills/build-item/references/progress-table.md`; step 8's
+  epic-release narrative and the one-off bypass rationale to the new
+  `skills/build-item/references/epic-release.md`; the profile-resolution restatement became a
+  citation of the contract. 15,732 → ~12,113 tokens, budget 15,800 → 12,200; every rule and
+  scoped needle kept.
+- **`review`'s body is a third smaller.** The roster table, mode rationale and poll-shape
+  evidence moved to the new `skills/review/references/roster-and-modes.md`; the flip-race
+  mechanics, gate-job semantics and red-CI classification to the new
+  `skills/review/references/ci-settle.md`; the lessons write's self-verification argument to
+  `lessons-format.md`. 16,905 → ~11,374 tokens, budget ratcheted 17,000 → 11,450; every step
+  number, mode definition, rule and needle kept. The 8,000-token destination remains open here
+  too.
+- **`setup`'s body is less than half its former size.** Detector evidence, failure anecdotes and
+  interview rationale moved to two new references (`detector-evidence.md`,
+  `interview-rationale.md`) behind runtime pointers; Phase G's run rules joined
+  `validation-checklist.md`, which that phase already reads by mandate. 23,127 → ~10,641 tokens
+  (−54%), budget ratcheted to 10,700; every rule, table, candidate list and needle kept — the
+  epic's 8,000-token destination for this body remains open, reachable only by cutting rules.
+- **Bodies keep rules; references carry rationale — the split is now a written convention,
+  proven on `pr`.** CONTRIBUTING.md carries the split rule, the pointer form, the reference
+  naming/placement rule, the 8,000-token body budget and the move procedure; the invariants
+  file gains a dead-reference check (a reference not REACHABLE from a root an agent reads —
+  directly, or via a citation from a reachable reference — fails `validate.sh --needles`). `pr`'s
+  body drops its pre-ship-hold and body-convention rationale into two new references, keeping
+  every imperative.
+
+### Cost
+
+Every skill body now sits under a committed budget — three more bodies at the epic's
+8,000-token destination, and the four heaviest as recorded floors above it. Measured by the
+harness's method (`tokens = ceil(utf8_bytes / 3)`, frontmatter included) at three refs —
+`devstride--v1.2.0`, `devstride--v2.4.0` and the release commit; cross-check any row with
+`bash scripts/measure-cost.sh --table --since devstride--v2.4.0`, whose two-ref output this
+three-ref summary extends:
+
+| skill | 1.2.0 | 2.4.0 | 2.5.0 | Δ vs 2.4.0 | references (2.5.0) |
+|---|---|---|---|---|---|
+| branch-feature | 1,002 | 1,002 | 1,002 | 0 | 0 |
+| branch-hotfix | 1,465 | 2,712 | 2,712 | 0 | 0 |
+| build-item | 15,713 | 15,732 | 12,177 | -3,555 | 3 |
+| ci-audit | 2,352 | 2,565 | 2,565 | 0 | 0 |
+| comprehend-plan | 2,094 | 2,094 | 2,094 | 0 | 0 |
+| create-defect | 2,391 | 2,391 | 2,391 | 0 | 0 |
+| create-story | 2,290 | 2,290 | 2,290 | 0 | 0 |
+| doctor | 9,046 | 9,942 | 7,991 | -1,951 | 2 |
+| insert-defect | 4,625 | 4,625 | 4,625 | 0 | 0 |
+| insert-story | 4,397 | 4,397 | 4,397 | 0 | 0 |
+| plan | 15,581 | 15,581 | 11,791 | -3,790 | 4 |
+| pr | 4,295 | 4,348 | 4,002 | -346 | 2 |
+| push | 1,372 | 1,372 | 1,372 | 0 | 0 |
+| rationalize-gantt | 3,407 | 3,407 | 3,407 | 0 | 1 |
+| rebalance | 9,150 | 9,150 | 7,965 | -1,185 | 1 |
+| release | 9,054 | 9,175 | 7,997 | -1,178 | 2 |
+| review | 16,297 | 16,905 | 11,444 | -5,461 | 8 |
+| setup | 22,153 | 23,127 | 10,641 | -12,486 | 5 |
+| ultracode-build | 6,783 | 6,749 | 6,749 | 0 | 1 |
+| **all bodies** | **133,467** | **137,564** | **107,612** | **-29,952** | |
+| one build-item iteration (build-item + ultracode-build + review) | 38,793 | 39,386 | 30,370 | -9,016 | |
+
+The always-on cost (hooks + manifest) is unchanged. Four bodies remain above 8,000 — setup
+(10,641), review (11,444), plan (11,791), build-item (12,177) — each a recorded floor where the
+remainder is rules the convention forbids cutting; 8,000 stays their destination.
+
 ## [2.4.0] — 2026-08-27
 
 ### Changed
@@ -98,31 +176,6 @@ Generated by `scripts/measure-cost.sh --table --since devstride--v2.3.0`, at the
 | skills/branch-feature/SKILL.md | 3,006 | 1,002 | 3,006 | 1,002 | +0 | 1,100 |
 | alwaysOn.context (skill listing) | 3,779 | 1,260 | 3,779 | 1,260 | +0 | 1,300 |
 | **total (bodies)** | 411,541 | 137,184 | 412,681 | 137,564 | +380 | |
-```
-<!-- scripts/measure-cost.sh --table --since devstride--v2.3.0 @ b31d1b2, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
-| File | bytes@devstride--v2.3.0 | tokens@devstride--v2.3.0 | bytes now | tokens now | Δ tokens | budget |
-|---|---:|---:|---:|---:|---:|---:|
-| skills/setup/SKILL.md | 69,211 | 23,071 | 69,379 | 23,127 | +56 | 23,200 |
-| skills/review/SKILL.md | 50,719 | 16,907 | 50,714 | 16,905 | -2 | 17,000 |
-| skills/build-item/SKILL.md | 47,196 | 15,732 | 47,196 | 15,732 | +0 | 15,800 |
-| skills/plan/SKILL.md | 46,743 | 15,581 | 46,743 | 15,581 | +0 | 15,600 |
-| skills/doctor/SKILL.md | 28,905 | 9,635 | 29,730 | 9,910 | +275 | 9,950 |
-| skills/release/SKILL.md | 27,525 | 9,175 | 27,525 | 9,175 | +0 | 9,200 |
-| skills/rebalance/SKILL.md | 27,448 | 9,150 | 27,448 | 9,150 | +0 | 9,200 |
-| skills/ultracode-build/SKILL.md | 20,349 | 6,783 | 20,246 | 6,749 | -34 | 6,800 |
-| skills/insert-defect/SKILL.md | 13,873 | 4,625 | 13,873 | 4,625 | +0 | 4,700 |
-| skills/insert-story/SKILL.md | 13,191 | 4,397 | 13,191 | 4,397 | +0 | 4,400 |
-| skills/pr/SKILL.md | 12,885 | 4,295 | 13,044 | 4,348 | +53 | 4,400 |
-| skills/rationalize-gantt/SKILL.md | 10,221 | 3,407 | 10,221 | 3,407 | +0 | 3,500 |
-| skills/branch-hotfix/SKILL.md | 8,135 | 2,712 | 8,135 | 2,712 | +0 | 2,800 |
-| skills/ci-audit/SKILL.md | 7,695 | 2,565 | 7,695 | 2,565 | +0 | 2,600 |
-| skills/create-defect/SKILL.md | 7,173 | 2,391 | 7,173 | 2,391 | +0 | 2,400 |
-| skills/create-story/SKILL.md | 6,870 | 2,290 | 6,870 | 2,290 | +0 | 2,300 |
-| skills/comprehend-plan/SKILL.md | 6,280 | 2,094 | 6,280 | 2,094 | +0 | 2,100 |
-| skills/push/SKILL.md | 4,116 | 1,372 | 4,116 | 1,372 | +0 | 1,400 |
-| skills/branch-feature/SKILL.md | 3,006 | 1,002 | 3,006 | 1,002 | +0 | 1,100 |
-| alwaysOn.context (skill listing) | 3,779 | 1,260 | 3,779 | 1,260 | +0 | 1,300 |
-| **total (bodies)** | 411,541 | 137,184 | 412,585 | 137,532 | +348 | |
 ```
 
 ## [2.3.0] — 2026-08-27
@@ -703,7 +756,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.4.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.5.0...HEAD
+[2.5.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.4.0...devstride--v2.5.0
 [2.4.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.3.0...devstride--v2.4.0
 [2.3.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.2.0...devstride--v2.3.0
 [2.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.1.0...devstride--v2.2.0

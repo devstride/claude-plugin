@@ -49,7 +49,8 @@ depend on, it does not freeze the surface.
    the skill-body budget check. **A budget breach blocks the release exactly like a manifest
    error** — raise the budget visibly in the same commit as the text that needs it, or move
    rationale to a reference. `--needles` adds the rule-loss check from
-   `delivery-loop-invariants.md`, which is informational: a miss is a prompt to read, not a failure.
+   `delivery-loop-invariants.md` — a needle MISS is advisory (a prompt to read, not a failure); a
+   DEAD REFERENCE is blocking and fails the step.
 
 1. **Move the `Unreleased` entries** in `CHANGELOG.md` under a new `## [x.y.z] — YYYY-MM-DD`
    heading, add the comparison link at the bottom, and **re-point `[unreleased]`** at the tag you are
