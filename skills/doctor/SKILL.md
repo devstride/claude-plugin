@@ -194,9 +194,24 @@ reasoning behind §4–§6.
   and will migrate forward only where safe, else STOP and ask; a gap in the unattended loop,
   not a guaranteed wrong schema; reasoning in `config-defaults.md`). **Never warn under
   `branch` binding** — no backward transition happens there.
+- **`stage`** — absent, or `resolve: null` → **N/A, not a failure**: this repository deploys no
+  per-environment infrastructure, which is the common case. Present → run `resolve` ONCE from the
+  repository root and report what it printed; empty output is "no stage bound here", never an
+  error. A non-zero exit WITH output, or output spanning several lines, is a FAIL — consumers read
+  one line and treat empty as absent, so a noisy command silently renders the wrong stage. Report
+  `productionStages`, and WARN when the resolved stage is in it: this checkout points at
+  production. **Never infer a stage from the branch name, and never report
+  `localEnvironment.instanceName` as one** — different axes; `silent-failures.md` §4 has why.
+- **The status line** — `.claude/statusline.sh` plus `statusLine` in `.claude/settings.json`.
+  Neither → **N/A**, the repository has none. One without the other is a FAIL naming the missing
+  half: a `statusLine` pointing at a file that is not there renders nothing and reports no error.
+  Both → run it once and require non-empty output:
+  `printf '{"workspace":{"current_dir":"%s"}}' "$PWD" | bash .claude/statusline.sh`. Also
+  `git check-ignore` the script — an ignored one works for its author and nobody else. Fix, in
+  every case: `/devstride:setup`.
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
   **array**, so iterate it — `review.localCommand`, `generated.regenCommand`,
-  `preShipChecks[].command`, and each non-null `localEnvironment.*` command): split on `&&` and `;`, take the first token of **each** segment, and
+  `preShipChecks[].command`, each non-null `localEnvironment.*` command, and `stage.resolve`): split on `&&` and `;`, take the first token of **each** segment, and
   skip shell builtins. Checking only the very first token is vacuous for the commonest shape:
   `cd backend && pnpm test` starts with `cd`, which always resolves, so the check would pass on a
   machine with no `pnpm` at all. A single-word command that does not resolve may be a shell alias or

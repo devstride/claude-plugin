@@ -40,6 +40,15 @@ Branch name argument: $ARGUMENTS
 **Local environment.** Now that the branch exists, bring the local environment back into step with
 production code. Read `localEnvironment` from `.claude/ds-config.json`.
 
+**Say which stage this checkout is pointed at before touching anything**, when the repository has
+a `stage` block: run `stage.resolve` and name the result. A hotfix is the one flow that both
+resets a database and runs against production code, so "this checkout deploys to `<stage>`" is
+the sentence that makes the confirmation below meaningful. If the resolved stage is in
+`stage.productionStages`, **STOP and ask before any environment command** — a `recreate` aimed at
+a production stack is the worst outcome this skill can produce, and no config value authorizes it
+in advance. No `stage` block, or an empty result → carry on; this adds a warning, never a gate
+the repository did not ask for.
+
 **This is a BACKWARD transition, and that decides which commands to run.** A hotfix branches from
 the production branch, which is OLDER than whatever the instance has been living on. `migrate` and
 `seed` almost always only go forward — migrations do not un-apply, and a seed rewrites rows, not

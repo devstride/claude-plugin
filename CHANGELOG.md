@@ -8,6 +8,48 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **The loop knows what a deployment stage is** — a new `stage` block in
+  `.claude/ds-config.json`: `resolve` (a command whose stdout is the stage THIS checkout deploys
+  to, the same shape as `localEnvironment.instanceName`) and `productionStages` (the names where a
+  deploy reaches real users, because no name is universal). Both default to nothing, and most
+  repositories legitimately have no stage — `resolve: null` records that somebody looked, which an
+  absent block cannot. `setup` gains detector **A10**, which proposes a command from the shapes it
+  finds (`sst.config.*` beside `.sst/stage`, `serverless.yml`, `Pulumi.*.yaml`, a Terraform
+  workspace, a `*_STAGE` variable) but never reports one as `detected`: finding the tooling does
+  not say how a given checkout picks its stage. The loop only ever READS a stage — it never
+  creates, changes or tears one down.
+- **`release` names the stage at the production gate.** "This merge deploys to `<stage>`" beside
+  `release.autoDeployOnMerge`, so the go-ahead is an informed one rather than a sentence the owner
+  has read many times.
+- **`branch-hotfix` says which stage the checkout points at before touching a database**, and
+  **STOPS to ask** when that stage is in `productionStages`. A `recreate` aimed at a production
+  stack is the worst outcome that skill can produce, and no config value authorizes it in advance.
+- **`setup` can write the repository a status line** (new Phase **E3**, offered every run):
+  `Model · Effort · Repo · Checkout · Branch · Stage · PR`, every segment labelled, each omitted
+  when it does not apply. **Checkout** distinguishes the main checkout from a linked worktree —
+  under `epicIntegrationBranches` the loop puts work in worktrees, so "which checkout am I in"
+  stops being obvious exactly when it starts to matter — and **Stage** appears only where A10
+  found one, red for a `productionStages` name. Effort is read from the session transcript, the
+  only reliable source: the status-line payload carries no effort field, and the persisted
+  `effortLevel` is only the default. The shipped script is repo-agnostic and reads the consuming
+  repository's config at runtime, so it is copied verbatim, is identical everywhere, and is safe
+  to re-copy; `setup` never overwrites one it did not write.
+- **`doctor` reports both**, and treats absence as N/A rather than failure. It runs `stage.resolve`
+  once and fails a command that exits non-zero with output or prints several lines — consumers read
+  one line and treat empty as absent, so a noisy command silently renders the wrong stage. It runs
+  the status line once and requires non-empty output, and fails a `statusLine` setting whose script
+  is missing or gitignored: that renders nothing and reports no error.
+
+### Changed
+
+- Body budgets raised for the four skills carrying the new text: `setup` 10,700 → 11,700,
+  `doctor` 8,000 → 8,500, `release` 8,000 → 8,200, `branch-hotfix` 2,800 → 3,000. Rationale went
+  to references first — detector A10's evidence to `detector-evidence.md` §A10, the stage
+  reporting argument to `silent-failures.md` §4 — and only the imperatives stayed in the bodies.
+
+
 ## [2.5.0] — 2026-08-27
 
 ### Changed
