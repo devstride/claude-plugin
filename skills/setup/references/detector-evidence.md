@@ -131,9 +131,36 @@ gets its own database is a property of the tooling's design that no file states 
 `recreateMode` and `instanceBoundTo` are never `detected`, and why `null` (no such command) is an
 answer only the owner can give.
 
+## A10 — why finding the tooling is not finding the stage
+
+Every candidate shape in A10 proves only that per-environment infrastructure EXISTS. None of them
+says how *this checkout* picks its stage, and that gap is the whole reason `resolve` is a command
+the owner confirms rather than a path the detector reads.
+
+`sst.config.ts` beside `.sst/stage` is the clearest case. The file is the personal stage SST
+writes, and it looks authoritative — but SST honours an environment variable over it, and a repo
+wrapper may honour a different variable over both. Read the file alone and you render the stage
+the tooling would use only when nobody has overridden it, which is exactly when the answer is
+least interesting. The same holds elsewhere: `Pulumi.*.yaml` enumerates the stacks that exist, not
+the one selected; a Terraform workspace is process state, not repository state; and a
+`serverless.yml` `--stage` default is what you get having passed nothing.
+
+Two further properties no file states, which is why both rows are `ambiguous` at best:
+
+- **Cheapness.** `resolve` runs on a timer behind a status line. Reading a marker file the tooling
+  already wrote costs nothing; invoking the deploy CLI to ask costs a second or more, every
+  render. A detector cannot tell which shape a proposed command is.
+- **Which stages are production.** No name is universal — `prod`, `live`, the company name — and
+  the consequence of getting it wrong is a stage that never turns red. Only the owner knows, so
+  `productionStages` is always asked.
+
+Both rows are legitimately `null`: most repositories deploy nothing per-environment, and a `stage`
+block written with `resolve: null` records that somebody looked, which an absent block cannot.
+
 ## Cited by
 
 - `skills/setup/SKILL.md` — the Phase A pointer (run A5/A6, explain an `ambiguous` row, change a
-  detector), A5's traps line (§A5), A6's enumeration line (§A6), and A6's path-table line.
+  detector), A5's traps line (§A5), A6's enumeration line (§A6), A6's path-table line, and A10's
+  candidate-shape line (§A10).
 - `skills/doctor/SKILL.md` §5 — the four-events evidence citation (§A5).
 - `skills/doctor/references/silent-failures.md` §5 — the same citation (one home, two citers).

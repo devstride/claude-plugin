@@ -244,6 +244,25 @@ Eight rows: `localEnvironment.create`, `.recreate`, `.recreateMode`, `.instanceN
 - Existing config: record the current block, per A8. Nothing found → rows `unknown`, not `null`
   — only the owner can say "there is none".
 
+### A10. Deployment stage
+
+Two rows: `stage.resolve`, `stage.productionStages`.
+
+- **Most repositories have no stage**, and that is an answer, not a gap. Nothing found → both rows
+  `unknown`; ask plainly whether this repository deploys per-environment infrastructure, and take
+  `null` as complete.
+- Candidate shapes — each `ambiguous`, **never `detected`**, because finding the tooling does not
+  say how THIS checkout picks its stage: `sst.config.*` beside `.sst/stage`; `serverless.yml`;
+  `Pulumi.*.yaml`; a Terraform workspace; a root script reading a `*_STAGE` / `ENVIRONMENT`
+  variable. Propose the command the shape implies; the owner corrects it. Traps: §A10.
+- **`resolve` must be cheap and quiet** — it runs on a timer. Prefer a marker file the tooling
+  already writes over invoking that tooling.
+- **`productionStages` is never detected.** Ask whenever `resolve` is non-null, saying that a stage
+  named here is one where a deploy reaches real users. An empty list is legitimate.
+- **Never fold this into `localEnvironment`** — that names the LOCAL instance the loop creates and
+  destroys; a stage is a CLOUD stack the loop only reads. Table: `config-defaults.md`.
+- Existing config: record the current block, per A8.
+
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.md` when running A5 or
 A6, when a detector's result is `ambiguous` and the candidates need explaining, or before
 changing a detector.**
@@ -317,6 +336,12 @@ Four things no inspection can reach, asked every run — the first one first:
   one). Answers go into the E2 scaffolds, not the config; contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`. **Release notes are opt-in
   per release** — no "warranted" policy; the owner passes `--release-notes`.
+- **Whether to write the repository a status line** — one yes/no, every run. It renders
+  `Model · Effort · Repo · Checkout · Branch · Stage · PR`; the segment worth naming when asking is
+  **Checkout** (main checkout vs linked worktree — the loop puts epic work in worktrees, so this
+  stops being obvious exactly when it starts to matter). Say it writes `.claude/statusline.sh` and
+  the `statusLine` setting, both the owner's to edit afterwards, and that declining changes nothing
+  else. Written in E3.
 - **Where the lessons store lives**, if not the default path. **Never offer to create the file**
   — the store has a single writer, and it is not this skill. Write the key, nothing else.
 
@@ -347,6 +372,7 @@ literally.
 | `docs` | `updateSkill`, `releaseNotesSkill` — the names E2 scaffolds, or `null`; `updateOnEpicRelease: false` |
 | `conventionsDoc`, `itemTagFormat`, `lessonsDoc` | From A8, the answers, and the shipped default path |
 | `plugin` | Verbatim — `updateCheck: true`, `autoUpdate: false`, `pin: null`. Not asked |
+| `stage` | The two A10 keys — `resolve`, `productionStages`. Write the block even when `resolve` is `null`: absent reads as "nobody asked", and most repositories legitimately have no stage |
 | `localEnvironment` | The eight A9 keys. Write the block even when every command is `null` — absent reads as "nobody asked" |
 
 **The roster must describe what actually exists** — later runs read these keys as fact. No
@@ -359,7 +385,7 @@ was missing and, under `prototype`, that the file now contradicts its profile. *
 and `review.pollTimeoutMinutes` take the profile's values** — `autoRelease: true` for
 `prototype` repeats the consequence at the write, naming `baseBranch`.
 
-Say what was written; go to E2, then G. **The run is not finished at the write.**
+Say what was written; go to E2, then E3, then G. **The run is not finished at the write.**
 
 ## Phase E2 — scaffold the local documentation skills
 
@@ -372,6 +398,34 @@ directory name; **leave no placeholder unfilled**. **Never overwrite an existing
 so instead. Confirm the files are not gitignored (`git check-ignore` exits 1). Say what was
 written, that each skill's `check` mode is what Phase G and `/devstride:doctor` run, and that
 the skills are the owner's to refine.
+
+## Phase E3 — write the status line
+
+Only when Phase D said yes. Copy
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline.sh` to `.claude/statusline.sh`,
+`chmod +x` it, and MERGE into `.claude/settings.json` — never replace the document:
+
+```json
+{ "statusLine": { "type": "command", "command": "bash .claude/statusline.sh", "padding": 0 } }
+```
+
+**Copy it verbatim — nothing is substituted.** It is repo-agnostic and reads the consuming
+repository's config at runtime for `stage.*`, which is what lets one file serve every repository
+and makes re-copying it safe; a `{{PLACEHOLDER}}` edited in is a bug, not a customization.
+
+**Never overwrite an existing `.claude/statusline.sh`** — the owner may have edited it or written
+their own. Say it is already there and leave it.
+
+Then prove it runs, because a status line fails silently — Claude Code renders nothing and reports
+no error:
+
+```bash
+printf '{"workspace":{"current_dir":"%s"}}' "$PWD" | bash .claude/statusline.sh; echo
+```
+
+Non-empty output is the pass. Confirm neither file is gitignored (`git check-ignore` exits 1) — a
+status line only one machine has is the commonest fresh-clone surprise — and say both are the
+owner's to edit.
 
 ## Phase F — re-running on a repository that already has a config
 

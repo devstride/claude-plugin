@@ -279,6 +279,68 @@ different one. Leave it `null` where `recreate` needs no `<name>`, or where ther
 instances; `branch-hotfix` stops and asks rather than guessing. A repository whose environment genuinely has no schema (a stateless dev server) leaves it
 `null`, and nothing is lost.
 
+## Deployment stage
+
+```json
+{
+  "stage": {
+    "resolve": null,
+    "productionStages": []
+  }
+}
+```
+
+The shipped default says: **this repository does not deploy per-environment infrastructure.**
+Most do not, and `null` is the honest answer rather than a gap — nothing renders a stage, nothing
+asks about one, and `doctor` reports the block as not applicable instead of missing.
+
+**`resolve` is a command whose stdout is the stage THIS checkout deploys to**, run from the
+repository root — the same shape as `localEnvironment.instanceName`, and for the same reason: only
+the repository knows where its own answer lives, so the plugin takes a command rather than
+guessing at file paths or environment-variable names. It must print one line and exit non-zero (or
+print nothing) when there is no stage; every consumer treats empty as "no stage" and never as an
+error. Keep it cheap — it runs on a timer, not once.
+
+**`productionStages` lists the stage names that are production**, and it exists because no name is
+universal: one organization's production stage is `prod`, another's is `live`, another's is the
+company name. Consumers use it for one thing — making the dangerous answer impossible to miss —
+so listing a stage here is a claim that deploying to it affects real users.
+
+**Do not confuse the stage with `localEnvironment`.** They are different axes and the failure is
+quiet, because both produce a per-checkout name:
+
+| | `localEnvironment` | `stage` |
+|---|---|---|
+| What it names | The LOCAL instance — this checkout's database, tables, ports | The CLOUD stack this checkout deploys to |
+| Normally scoped to | A worktree (`instanceBoundTo: "directory"`) | A machine or a person — several worktrees legitimately share one |
+| Who owns the lifecycle | The loop: `create`, `recreate`, `teardown` | The repository's own deploy tooling; the loop only READS it |
+
+The loop never creates, changes or tears down a stage. Reading it is the whole contract — a stage
+is infrastructure somebody else provisioned, and a delivery skill that mutated one on its way past
+would be doing the most dangerous thing in the repository as a side effect.
+
+## Status line
+
+`setup` offers to write the repository a status line, copying
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline.sh` to `.claude/statusline.sh` and
+pointing `statusLine.command` at it in `.claude/settings.json`. There is **no config key** — the
+presence of the file and the setting is the whole state, and a key that only restated them would
+be a third thing to keep in sync.
+
+It renders `Model · Effort · Repo · Checkout · Branch · Stage · PR`, every segment labelled, and
+omits the ones that do not apply. Two of those segments are the reason it ships here rather than
+being left to each repository:
+
+- **Checkout** distinguishes the main checkout from a linked worktree, naming the REPO in `Repo:`
+  and the WORKTREE in `Checkout:`. Under `epicIntegrationBranches` the loop puts work in
+  worktrees, and "which checkout am I in" stops being obvious exactly when it starts to matter.
+- **Stage** is `stage.resolve`, so it appears only in repositories that have one, and turns red
+  for a `productionStages` name.
+
+The script is repo-agnostic and identical everywhere — it reads the consuming repository's config
+at runtime, so copying it needs no substitution and re-copying it is always safe. It is the
+owner's to edit afterwards; `setup` never overwrites a `.claude/statusline.sh` it did not write.
+
 ## Known cloud reviewers
 
 An `automatedReviewers` entry is requested by the review flow **per its `how`**, and a

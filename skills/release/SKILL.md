@@ -168,6 +168,13 @@ The plugin does not update documentation itself. After the production merge is c
   "suppressed"), the release-notes decision from `--release-notes` (default "not requested —
   none will be written"), and what merging triggers, quoted from `release.autoDeployOnMerge`.
   Then ASK. Do not proceed without it.
+  - **Name the stage the deploy lands on** when the repository has one — run `stage.resolve`
+    from `.claude/ds-config.json` and quote the result beside `release.autoDeployOnMerge`. "This
+    merge deploys to `<stage>`" is what makes the go-ahead an informed one; "this merge triggers
+    the production deploy" is a sentence the owner has read many times. No `stage` block, or an
+    empty result → say nothing; never guess a stage name, and never substitute
+    `localEnvironment.instanceName` for one — that names the local instance, not the deploy
+    target.
   - Do not let the owner infer that CI covered a pre-ship suite. If asked what validated
     it, the true answer is "the local run in step 2b, not the pipeline".
 - On go-ahead: confirm the PR head still equals `<reviewedHead>` (the immutable SHA recorded when review settled — the freeze held; a head that differs from it ONLY by `review` 7.3's empty re-trigger commit, same tree, is the one advance that does not restart step 2 — anything else, back to step 2), that its CI checks are green at that head and — in a draft-hold repo — that the PR is non-draft (there, a still-draft release PR means CI never ran — do NOT merge it; in a CI-runs-on-draft repo only the green-at-final-SHA check applies), that every step-2b pre-ship check passed or was explicitly waived, and that the paginated **zero-unresolved-review-threads** check still reports zero (a comment posted after the review settled — a late reviewer, a second Copilot pass — must be replied-to AND resolved via `review` step 6 before the production merge, not merged over), then `gh pr merge <n> --merge` (a merge commit — NOT `--delete-branch`, the head is `develop`).

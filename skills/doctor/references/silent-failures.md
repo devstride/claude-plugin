@@ -16,6 +16,8 @@ error, usually much later:
 | Workflows missing `ready_for_review` | The ready-flip creates **no run at all**; the loop waits forever |
 | Workflow jobs not gated on draft | CI runs on open and again after every fix — the run-once design never engages |
 | `verify.test` unset with fast merges on | Items merge with no LOCAL gate — under fast mode the local suites are the only gate the item itself gets |
+| `statusLine` set to a script that is not there | A blank status line. No error, no warning — it simply renders nothing |
+| `stage.resolve` printing more than one line | The wrong stage renders, confidently, wherever a stage is shown |
 | `profile: prototype` beside a hand-set `autoRelease: false` | The loop stops at release-ready and the profile looks ignored. It is not — the explicit key wins, and nothing says so |
 
 The value of doctor is not the checks. It is turning silence into a sentence.
@@ -51,6 +53,17 @@ citers). The tree-identical skip is judged on whether it CAN FIRE because the fa
 path), and silently stops as soon as it has — a step-exists test calls it done while
 `ci-audit` shows the minutes unexplained. A step in a job with no checkout is harsher: it
 fails the gate job and everything that `needs` it on every production push.
+
+## §4 — why stage is reported, never inferred
+
+A stage is the only thing in the config naming infrastructure that already exists and that the
+loop does not own: `localEnvironment` describes instances the loop creates and destroys, while
+`stage.resolve` reads a stack somebody else provisioned. So doctor runs the command and reports
+what it says, and refuses two tempting shortcuts. It never derives a stage from the branch name,
+because a branch is not proof of what deploys and a confidently wrong "prod" is worse than
+silence. And it never reports `localEnvironment.instanceName`'s answer as the stage: both produce
+a per-checkout name, so the substitution reads perfectly and is wrong in the one direction that
+matters.
 
 ## §6 — why the fix must match their config
 
