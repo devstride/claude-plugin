@@ -1,4 +1,8 @@
 #!/bin/bash
+# ds-statusline: managed v2.8.0 — installed and kept up to date by the devstride
+# plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
+# replaces a file that still carries it, and never touches one that does not.
+#
 # Claude Code status line for a repository running the DevStride delivery loop.
 #
 #   Model: Opus 5 · Effort: high · Repo: acme · Checkout: ⑂ i123-widget ·
@@ -10,8 +14,12 @@
 # own `.claude/ds-config.json`, so this file is identical everywhere and needs
 # no substitution when it is copied.
 #
-# Segments that do not apply are omitted rather than rendered empty: a repo with
-# no `stage` block shows no Stage, and a branch with no pull request shows no PR.
+# NO VALUE MEANS NO SEGMENT. Every segment is emitted through `seg`, which drops
+# it when its guard is empty, so a fact this repository does not have never
+# renders as a label with nothing after it ("Checkout:    "). A dangling label is
+# worse than a missing one: it reads as a value that failed to load, and sends
+# people looking for a break that is not there. `statusLine.hiddenSegments` in
+# ds-config.json suppresses a segment that DOES resolve but is not wanted.
 #
 # Requires python3 (the plugin already does) and, for the PR segment, gh.
 
@@ -61,6 +69,10 @@ except Exception:
 stage = cfg.get("stage") or {}
 emit("SL_STAGE_RESOLVE", stage.get("resolve"))
 emit("SL_PROD_STAGES", " ".join(stage.get("productionStages") or []))
+# Segments the owner has confirmed do not apply here. A segment with no value is
+# already dropped; this is for one that WOULD render and is not wanted.
+sl = cfg.get("statusLine") or {}
+emit("SL_HIDDEN", " ".join(str(x) for x in (sl.get("hiddenSegments") or [])))
 ' 2>/dev/null
 )"
 
@@ -74,8 +86,21 @@ MAGENTA=$'\033[35m'; RED=$'\033[31m'; GRAY=$'\033[90m'; BLUE=$'\033[34m'
 # OSC 8 hyperlink: ESC ] 8 ;; <url> ESC \  <text>  ESC ] 8 ;; ESC \
 OSC8=$'\033]8;;'; OSC8_END=$'\033\\'
 
-model_out=""
-[ -n "$SL_MODEL" ] && model_out="${DIM}Model:${RESET} ${BLUE}${SL_MODEL}${RESET}"
+# --- segment assembly ------------------------------------------------------
+# seg <key> <label> <guard> <body>
+#   Appends "Label: body" only when <guard> is non-empty and <key> is not
+#   suppressed. <guard> is the RAW value and <body> the rendered one, because a
+#   rendered body is never empty - it always carries colour escapes - so testing
+#   it would defeat the whole check.
+out=""
+seg() {
+  [ -n "$3" ] || return 0
+  case " $SL_HIDDEN " in *" $1 "*) return 0 ;; esac
+  [ -n "$out" ] && out="$out ${DIM}·${RESET} "
+  out="$out${DIM}${2}:${RESET} ${4}"
+}
+
+seg model "Model" "$SL_MODEL" "${BLUE}${SL_MODEL}${RESET}"
 
 # --- effort ----------------------------------------------------------------
 # The status-line payload carries no effort field, and the persisted
@@ -94,8 +119,6 @@ if [ -n "$SL_TRANSCRIPT" ] && [ -f "$SL_TRANSCRIPT" ]; then
   effort=$(tail -c 131072 "$SL_TRANSCRIPT" 2>/dev/null \
     | grep -o '"effort":"[a-z]*"' | tail -1 | cut -d'"' -f4)
 fi
-
-effort_out=""
 if [ -n "$effort" ]; then
   case "$effort" in
     max|xhigh) ec=$MAGENTA ;;
@@ -103,22 +126,13 @@ if [ -n "$effort" ]; then
     medium)    ec=$YELLOW ;;
     *)         ec=$GRAY ;;
   esac
-  effort_out="${DIM}Effort:${RESET} ${ec}${effort}${RESET}"
-fi
-
-head_out="$model_out"
-if [ -n "$effort_out" ]; then
-  if [ -n "$head_out" ]; then head_out="$head_out ${DIM}·${RESET} ${effort_out}"
-  else head_out="$effort_out"; fi
+  seg effort "Effort" "$effort" "${ec}${effort}${RESET}"
 fi
 
 toplevel=$(git rev-parse --show-toplevel 2>/dev/null)
 if [ -z "$toplevel" ]; then
-  if [ -n "$head_out" ]; then
-    printf '%s' "${head_out} ${DIM}·${RESET} ${DIM}—not a git repo—${RESET}"
-  else
-    printf '%s' "${DIM}—not a git repo—${RESET}"
-  fi
+  [ -n "$out" ] && out="$out ${DIM}·${RESET} "
+  printf '%s' "${out}${DIM}—not a git repo—${RESET}"
   exit 0
 fi
 
@@ -141,8 +155,26 @@ else
   repo=$(basename "$toplevel")
 fi
 
+seg repo "Repo" "$repo" "${CYAN}${repo}${RESET}"
+
+# ⑂ and yellow mark a linked worktree, because "you are not in the main
+# checkout" is exactly what you want to notice before you commit. The main
+# checkout stays dim so the loud colour keeps meaning the unusual case.
+if [ -n "$worktree" ]; then
+  seg checkout "Checkout" "$worktree" "${YELLOW}⑂ ${worktree}${RESET}"
+else
+  seg checkout "Checkout" "main" "${GRAY}main${RESET}"
+fi
+
+# A detached HEAD with no commit yet resolves to no sha at all; rendering
+# "Branch: (detached)" with nothing in front of it is the dangling label this
+# file exists to avoid, so the fallback only applies when there IS a sha.
 branch=$(git branch --show-current 2>/dev/null)
-[ -z "$branch" ] && branch="$(git rev-parse --short HEAD 2>/dev/null) (detached)"
+if [ -z "$branch" ]; then
+  sha=$(git rev-parse --short HEAD 2>/dev/null)
+  [ -n "$sha" ] && branch="$sha (detached)"
+fi
+seg branch "Branch" "$branch" "${GREEN}${branch}${RESET}"
 
 # --- stage -----------------------------------------------------------------
 # Only repositories that deploy per-environment infrastructure have a stage, so
@@ -166,8 +198,6 @@ if [ -n "$SL_STAGE_RESOLVE" ]; then
     printf '%s' "$stage" >"$scache" 2>/dev/null
   fi
 fi
-
-stage_out=""
 if [ -n "$stage" ]; then
   # Production is red because a stage indicator only earns its space if the
   # dangerous answer is impossible to skim past. Which stages are production is
@@ -176,21 +206,8 @@ if [ -n "$stage" ]; then
   for p in $SL_PROD_STAGES; do
     [ "$stage" = "$p" ] && sc=$RED && break
   done
-  stage_out="${DIM}Stage:${RESET} ${sc}${stage}${RESET}"
+  seg stage "Stage" "$stage" "${sc}${stage}${RESET}"
 fi
-
-out="${DIM}Repo:${RESET} ${CYAN}${repo}${RESET}"
-# ⑂ and yellow mark a linked worktree, because "you are not in the main
-# checkout" is exactly what you want to notice before you commit. The main
-# checkout stays dim so the loud colour keeps meaning the unusual case.
-if [ -n "$worktree" ]; then
-  out="$out ${DIM}·${RESET} ${DIM}Checkout:${RESET} ${YELLOW}⑂ ${worktree}${RESET}"
-else
-  out="$out ${DIM}·${RESET} ${DIM}Checkout:${RESET} ${GRAY}main${RESET}"
-fi
-out="$out ${DIM}·${RESET} ${DIM}Branch:${RESET} ${GREEN}${branch}${RESET}"
-[ -n "$stage_out" ] && out="$out ${DIM}·${RESET} ${stage_out}"
-[ -n "$head_out" ] && out="${head_out} ${DIM}·${RESET} ${out}"
 
 # --- PR (cached, refreshed in the background) ------------------------------
 # gh is a network call; rendering must never block on it. Serve the cache, and
@@ -233,7 +250,11 @@ if [ -n "$pr" ]; then
   else
     link="$num"
   fi
-  out="$out ${DIM}·${RESET} ${DIM}PR:${RESET} ${c}${link} ${state}${RESET}"
+  # A truncated cache line can yield a number with no state; guard on the number
+  # and render only the parts that resolved, rather than "PR: #412 ".
+  body="${c}${link}${RESET}"
+  [ -n "$state" ] && body="${c}${link} ${state}${RESET}"
+  seg pr "PR" "$num" "$body"
 fi
 
 printf '%s' "$out"

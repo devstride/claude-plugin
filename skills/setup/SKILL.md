@@ -427,6 +427,12 @@ Non-empty output is the pass. Confirm neither file is gitignored (`git check-ign
 status line only one machine has is the commonest fresh-clone surprise — and say both are the
 owner's to edit.
 
+Then **look at which segments that render actually produced**, and ask about the structurally
+absent ones — in practice `stage`, the only blank whose cause is genuinely ambiguous. Answers
+either write config (`stage.resolve`) or record `statusLine.hiddenSegments`; an unanswered question
+writes nothing. The segment table, the transient-versus-structural split and the exact question are
+in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
+
 ## Phase F — re-running on a repository that already has a config
 
 A re-run must never cost someone their hand edits.

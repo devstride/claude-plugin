@@ -32,6 +32,7 @@ configuration, or reaches a deployed stage.
 | --- | --- | --- |
 | Status line missing or half-configured (§4) | **A** | Write it — mechanics below |
 | Status line set only in `~/.claude/settings.json` (§4) | **A** | Offer the same repair, which is what makes it repository-wide |
+| A structurally absent status-line segment (§4) | **A** | Ask what it should read from; write `stage.resolve`, or record `statusLine.hiddenSegments` |
 | `gh` not authenticated (§1) | **B** | `gh auth login` |
 | `gh` missing a scope (§1) | **B** | `gh auth refresh -s <all needed scopes in ONE list>` |
 | Auth coming from `GH_TOKEN`/`GITHUB_TOKEN` (§1) | **C** | `refresh` cannot touch an environment token; say to unset it or reissue |
@@ -78,6 +79,19 @@ Phase E3 of `/devstride:setup` owns these mechanics and is the authority if this
    Non-empty output is the pass. Confirm neither file is gitignored (`git check-ignore` exits 1).
 5. Leave both files **unstaged and uncommitted**, say so, and say why it matters: until they are
    committed the status line is still one machine's, which is the failure being repaired.
+
+## Blank status-line segments
+
+A segment with no value is already invisible — `seg` drops the label with it — so this repair is
+not about hiding anything. It is about **deciding** whether a blank segment is a repository that
+has no such fact or a setting nobody made, and recording the answer so the question is asked once.
+
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md` is the authority: the
+segment table, which blanks are structural and which are transient, and the three ends the question
+can have. Two rules matter most and are easy to get wrong. **Only `stage` is worth asking about** —
+every other blank is transient or already reported by another check, and asking about those turns a
+diagnostic into an interrogation. And **silence means "do not know", not "not applicable"**: leave
+the segment alone and say so. Writing `hiddenSegments` on an unanswered question buries it.
 
 ## Making the offer
 

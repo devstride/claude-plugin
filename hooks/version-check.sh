@@ -14,6 +14,10 @@
 #   - Config comes from the REPOSITORY ROOT's .claude/ds-config.json (`plugin` block), not the
 #     launch directory: updateCheck (true), autoUpdate (false), pin (null).
 #   - Session start is the ONLY moment an update may be applied (opt-in).
+#   - It also refreshes the repository's COPY of the status line, which no plugin update can
+#     reach on its own. Only a file still carrying the shipped `ds-statusline: managed v<x.y.z>`
+#     marker is ever replaced, the previous one is kept as .bak, and a repo without a status
+#     line never gets one created here — that needs consent, which is setup's and doctor's job.
 #   - Recipe for "newest release": skills/doctor/references/version-currency.md — TAGS not
 #     GitHub Releases; strip the `devstride--v` prefix; compare with sort -V.
 # DEVSTRIDE_PLUGIN_UPDATE_CHECK=0 disables the check; DEVSTRIDE_PLUGIN_REPO overrides the source.
@@ -37,14 +41,46 @@ try: print(json.load(open(sys.argv[1]+"/.claude-plugin/plugin.json")).get("versi
 except Exception: print("")' "$ROOT" 2>/dev/null)
 [ -n "$RUNNING" ] || exit 0
 
-read -r CHECK AUTO PIN <<EOF
+read -r CHECK AUTO SLAUTO PIN <<EOF
 $(python3 -c 'import json,sys
-p={}
-try: p=json.load(open(sys.argv[1]+"/.claude/ds-config.json")).get("plugin",{}) or {}
+d={}
+try: d=json.load(open(sys.argv[1]+"/.claude/ds-config.json"))
 except Exception: pass
-print("1" if p.get("updateCheck",True) else "0", "1" if p.get("autoUpdate",False) else "0", p.get("pin") or "-")' "$REPO" 2>/dev/null || echo "1 0 -")
+p=d.get("plugin",{}) or {}; s=d.get("statusLine",{}) or {}
+print("1" if p.get("updateCheck",True) else "0", "1" if p.get("autoUpdate",False) else "0",
+      "1" if s.get("autoUpdate",True) else "0", p.get("pin") or "-")' "$REPO" 2>/dev/null || echo "1 0 1 -")
 EOF
 [ "$CHECK" = "0" ] && exit 0
+
+newer() { [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$2" ] && [ "$1" != "$2" ]; } # newer A B: B > A
+
+# --- the repository's status line -------------------------------------------
+# `.claude/statusline.sh` is a COPY of the file this plugin ships, so a fix to it
+# reaches nobody who already has one unless something refreshes it. That is this, on the same
+# session-start pass as the version check — and it is a local file compare, no network.
+#
+# Replaced ONLY while it still carries the shipped marker; deleting that line is how an owner
+# takes the file over for good. The previous copy is kept as .bak so even a clobbered edit is
+# recoverable, and this never CREATES a status line: a repo without one has not asked for one.
+SL_RESULT="n/a"
+SL_REPO="$REPO/.claude/statusline.sh"; SL_SHIPPED="$ROOT/skills/setup/references/statusline.sh"
+sl_ver() { sed -n 's/^# ds-statusline: managed v\([0-9][0-9.]*\) .*/\1/p' "$1" 2>/dev/null | head -1; }
+if [ "$SLAUTO" = "1" ] && [ -f "$SL_REPO" ] && [ -f "$SL_SHIPPED" ]; then
+  SL_HAVE=$(sl_ver "$SL_REPO"); SL_WANT=$(sl_ver "$SL_SHIPPED")
+  if [ -z "$SL_HAVE" ]; then
+    SL_RESULT="owner-managed"                                   # marker removed: never touched again
+  elif [ -n "$SL_WANT" ] && newer "$SL_HAVE" "$SL_WANT"; then
+    if cp "$SL_REPO" "$SL_REPO.bak" 2>/dev/null && cp "$SL_SHIPPED" "$SL_REPO" 2>/dev/null; then
+      chmod +x "$SL_REPO" 2>/dev/null
+      SL_RESULT="updated:$SL_HAVE:$SL_WANT"
+      echo "devstride status line: updated $SL_HAVE → $SL_WANT (.claude/statusline.sh; previous kept as .bak). Live now — no restart needed. Commit it so every clone gets it."
+    else
+      SL_RESULT="update-failed"
+    fi
+  else
+    SL_RESULT="current"
+  fi
+fi
 
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/devstride-plugin"; mkdir -p "$CACHE_DIR" 2>/dev/null
 NEWEST_CACHE="$CACHE_DIR/newest.json"                       # shared: the newest tag is not per-repo
@@ -77,12 +113,10 @@ finish() { # writes the per-repo record once, then exits 0 — the single exit p
   python3 -c 'import json,sys,time
 json.dump({"checkedAt":int(time.time()),"repo":sys.argv[2],"running":sys.argv[3],"newest":sys.argv[4] or None,
            "source":sys.argv[5],"mode":sys.argv[6],"result":sys.argv[7],"install":sys.argv[8] or None,
-           "notifiedFor":sys.argv[9]},open(sys.argv[1],"w"))' \
-    "$RECORD" "$REPO" "$RUNNING" "$NEWEST" "$SOURCE" "$MODE" "$RESULT" "${INSTALL:-}" "$NOTIFIED" 2>/dev/null
+           "notifiedFor":sys.argv[9],"statusLine":sys.argv[10]},open(sys.argv[1],"w"))' \
+    "$RECORD" "$REPO" "$RUNNING" "$NEWEST" "$SOURCE" "$MODE" "$RESULT" "${INSTALL:-}" "$NOTIFIED" "${SL_RESULT:-n/a}" 2>/dev/null
   exit 0
 }
-newer() { [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$2" ] && [ "$1" != "$2" ]; } # newer A B: B > A
-
 [ -z "$NEWEST" ] && { RESULT="unreachable"; finish; }          # offline: quiet; doctor shows it
 
 if [ "$PIN" != "-" ]; then

@@ -12,7 +12,7 @@
     "comprehend-plan": 2100,
     "create-defect": 2400,
     "create-story": 2300,
-    "doctor": 9100,
+    "doctor": 9300,
     "insert-defect": 4700,
     "insert-story": 4400,
     "plan": 11800,
@@ -22,7 +22,7 @@
     "rebalance": 8000,
     "release": 8200,
     "review": 11450,
-    "setup": 11700,
+    "setup": 11900,
     "ultracode-build": 6800
   }
 }

@@ -8,6 +8,51 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [2.8.0] — 2026-08-28
+
+### Fixed
+
+- **A status-line segment with no value no longer renders as a bare label.** Every segment now goes
+  through one `seg` helper that drops the label, the value and the separator together when the
+  value is empty, so a repository without a stage, a branch without a pull request, or a payload
+  without a model name simply shows nothing there — never `Checkout:` with blank space after it. A
+  dangling label is worse than a missing segment: it reads as a value that failed to load and sends
+  people looking for a break that is not there. Two cases that used to produce one are also fixed
+  at the source: a detached HEAD with no commit yet rendered `Branch: (detached)` with nothing in
+  front of it, and a truncated PR cache line rendered `PR: #412 ` with an empty state. New test
+  `scripts/tests/statusline.sh` asserts, on every case it covers, that no label is ever left
+  dangling.
+
+### Added
+
+- **`statusLine.hiddenSegments`** — segment keys (`model`, `effort`, `repo`, `checkout`, `branch`,
+  `stage`, `pr`) this repository has confirmed do not apply. A blank segment is already invisible,
+  so this is not primarily about hiding: it **records the decision**, which is what stops `setup`
+  and `doctor` asking about it again. An unrecognized key is inert.
+- **`setup` and `doctor` now ask about a blank segment — but only a structurally blank one.** New
+  reference `skills/setup/references/statusline-segments.md` holds the segment table and splits
+  blanks into transient (`model`, `effort`, `branch`, and a `pr` on a branch that simply has none)
+  and structural (`stage` — the one blank whose cause is genuinely ambiguous, since a repository
+  that deploys nothing and one whose `stage.resolve` was never configured look identical). Only the
+  structural kind becomes a question; asking about the transient ones every run would turn a
+  diagnostic into an interrogation and train people to skip the answers that matter. The question
+  has three ends: configure it (`stage.resolve`), record it as not applicable
+  (`statusLine.hiddenSegments`), or — on silence or "I don't know" — **write nothing and say the
+  question is open**. Silence is never taken as "not applicable".
+- **The session-start hook now refreshes the repository's copy of the status line.**
+  `.claude/statusline.sh` is a copy, so no plugin update could ever reach it; a fix to the shipped
+  script stayed shipped and never arrived. The hook now compares the two on every session start (a
+  local file compare, no network) and brings an older copy forward. It replaces the file **only**
+  while it still carries the shipped `# ds-statusline: managed v<x.y.z>` marker on line 2, keeps
+  the previous copy as `.claude/statusline.sh.bak`, and **never creates** a status line that is not
+  already there — that needs consent, which is `setup`'s and `doctor`'s business. **Deleting the
+  marker line is how an owner takes the file over for good**, which is what the marker itself says.
+  Opt out per repository with `statusLine.autoUpdate: false`. The outcome is recorded in the
+  per-repo cache record so `doctor` can report what the last session start did. New test
+  `scripts/tests/statusline-refresh.sh` covers all of it.
+- The `doctor` and `setup` body budgets rise to 9,300 and 11,900 tokens; the segment table, the
+  interview and the config contract live in the new reference rather than in either body.
+
 ## [2.7.0] — 2026-08-28
 
 ### Changed

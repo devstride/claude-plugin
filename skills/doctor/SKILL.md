@@ -222,7 +222,11 @@ reasoning behind §4–§6.
   **Neither → read `~/.claude/settings.json` before calling it N/A.** A `statusLine` set there
   renders for this owner and for nobody else, so a bare "N/A" reads to them as *mine is fine* and
   buries the finding; WARN, naming the asymmetry. With no status line anywhere, N/A is correct.
-  Fix: repairable in Phase 2, else `/devstride:setup`.
+  Fix: repairable in Phase 2, else `/devstride:setup`. Finally, **say which SEGMENTS rendered** —
+  a segment with no value is dropped, label and all, so an absent one is invisible by design. Only
+  a STRUCTURALLY absent segment (`stage`) becomes a Phase 2 question; a transient one (`model`,
+  `effort`, `branch`, or a `pr` on a branch that simply has none) is never asked about, per
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
   **array**, so iterate it — `review.localCommand`, `generated.regenCommand`,
   `preShipChecks[].command`, each non-null `localEnvironment.*` command, and `stage.resolve`): split on `&&` and `;`, take the first token of **each** segment, and
