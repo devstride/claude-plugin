@@ -1,19 +1,29 @@
 ---
 name: doctor
-description: Check that this repo and machine are set up correctly for the delivery loop — git, gh, the plugin, the DevStride connection, the config file, the CI draft gate and CI cost mechanics, the merge gates and the documentation hooks — and report exactly what is missing and the command that fixes it. Read-only.
+description: Check that this repo and machine are set up correctly for the delivery loop — git, gh, the plugin, the DevStride connection, the config file, the CI draft gate and CI cost mechanics, the merge gates and the documentation hooks — and report exactly what is missing and the command that fixes it. Two phases: it diagnoses read-only, then offers to carry out the repairs that are safe to automate.
 ---
 
 Diagnose whether the delivery loop will actually work here, and say precisely what to fix if
 it will not — after installing, after changing `.claude/ds-config.json`, or when the loop
 behaves unexpectedly.
 
-**This skill is READ-ONLY.** It runs inspection commands and reads files. It never *mutates* git
-state — no commit, checkout, fetch-that-writes, push, branch or config change — never installs or
-updates anything, never edits a workflow, and never calls a DevStride write tool.
+**Doctor runs in two phases.** Phase 1 **diagnoses** and is READ-ONLY: it runs inspection commands
+and reads files, and never *mutates* git state — no commit, checkout, fetch-that-writes, push,
+branch or config change — never installs or updates anything, never edits a workflow, and never
+calls a DevStride write tool. Phase 2 **offers to repair** what Phase 1 found: after the finished
+report, never during it, and never without a yes.
 
-> **Every "Fix:" below is text to PRINT, not a command to run.** Even when a fix looks safe
-> and obvious, report it and stop — running the repair is what would make this skill unsafe to
-> recommend as the first thing anyone tries.
+> **Nothing in Phase 1 is a command to run.** Every "Fix:" below is text to PRINT. Even when a fix
+> looks safe and obvious, finish diagnosing first — someone with three problems should learn all
+> three, and a run that stops to repair the first one buries the other two. Repairs happen in Phase
+> 2, from the completed list, or not at all.
+
+**What Phase 2 may touch is a fixed classification, not a judgement call.** The tiers and the
+finding-by-finding mapping live in
+`${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/repairs.md`; **read it before offering anything.**
+In outline: doctor writes only inside this repository's `.claude/`, it *offers to run* the command
+that already owns a fix rather than reimplementing it, and it never repairs a workflow file, git
+state, a DevStride record, or anything that reaches a deployed stage.
 
 Optional argument — a section name (`env`, `plugin`, `devstride`, `config`, `ci`, `gates`, `docs`) to
 check just one: $ARGUMENTS
@@ -154,8 +164,9 @@ reasoning behind §4–§6.
   target a ref that is not there. For an absent-key fallback, include the candidate mapping above.
   For an explicit configured name, identify the invalid key but do not silently replace the user's
   choice with a heuristic. Fix: run `/devstride:setup` to confirm and write detected roles, or edit
-  the four keys explicitly and re-run `/devstride:doctor config`. Doctor remains read-only — it
-  prints suggested JSON but never writes it. If the shipped fallback refs do exist, PASS and report
+  the four keys explicitly and re-run `/devstride:doctor config`. Doctor never writes config
+  itself — it prints suggested JSON, and Phase 2 offers `/devstride:setup`, which owns that write.
+  If the shipped fallback refs do exist, PASS and report
   them; a user can still run setup to make the roles explicit.
 - **Delivery profile — the effective one, and its source.** Read `profile` and report it as one
   line: `profile: <name> — from .claude/ds-config.json`, or `profile: standard — key absent, shipped
@@ -203,12 +214,19 @@ reasoning behind §4–§6.
   production. **Never infer a stage from the branch name, and never report
   `localEnvironment.instanceName` as one** — different axes; `silent-failures.md` §4 has why.
 - **The status line** — `.claude/statusline.sh` plus `statusLine` in `.claude/settings.json`.
-  Neither → **N/A**, the repository has none. One without the other is a FAIL naming the missing
-  half: a `statusLine` pointing at a file that is not there renders nothing and reports no error.
-  Both → run it once and require non-empty output:
+  One without the other is a FAIL naming the missing half: a `statusLine` pointing at a file that
+  is not there renders nothing and reports no error. Both → run it once and require non-empty
+  output:
   `printf '{"workspace":{"current_dir":"%s"}}' "$PWD" | bash .claude/statusline.sh`. Also
-  `git check-ignore` the script — an ignored one works for its author and nobody else. Fix, in
-  every case: `/devstride:setup`.
+  `git check-ignore` the script — an ignored one works for its author and nobody else.
+  **Neither → read `~/.claude/settings.json` before calling it N/A.** A `statusLine` set there
+  renders for this owner and for nobody else, so a bare "N/A" reads to them as *mine is fine* and
+  buries the finding; WARN, naming the asymmetry. With no status line anywhere, N/A is correct.
+  Fix: repairable in Phase 2, else `/devstride:setup`. Finally, **say which SEGMENTS rendered** —
+  a segment with no value is dropped, label and all, so an absent one is invisible by design. Only
+  a STRUCTURALLY absent segment (`stage`) becomes a Phase 2 question; a transient one (`model`,
+  `effort`, `branch`, or a `pr` on a branch that simply has none) is never asked about, per
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
   **array**, so iterate it — `review.localCommand`, `generated.regenCommand`,
   `preShipChecks[].command`, each non-null `localEnvironment.*` command, and `stage.resolve`): split on `&&` and `;`, take the first token of **each** segment, and
@@ -326,14 +344,24 @@ as a failure, and say what it means: the release skill's docs pass reports itsel
 - **Say the release-notes default** — notes only on `--release-notes`; nothing in the loop
   decides a release "deserves" one.
 
-## Closing
+## Closing — the report, then the offer
 
 Print the verdict, then — if anything failed — the fixes in the order they should be applied,
 separating commands from manual edits. Someone should get from a failing report to a working setup
 without rereading the explanations.
 
+**Then, and only then, Phase 2.** Follow
+`${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/repairs.md` — it is the authority on eligibility
+and on how to ask. Its shape: one numbered offer list, **one question for the batch**, then repairs
+in order, each re-verified by re-running its Phase 1 check. Name the failures you did NOT offer, or
+a short offer list reads as a short problem list. Leave every written file unstaged and
+uncommitted, and say so. **Invoked non-interactively, print the list and repair nothing** — the
+skills that call doctor consented to a report, not a write.
+
 IMPORTANT:
 - **Never emit a command you have not confirmed exists.** Check flags with `--help` first. A
   confidently wrong command is worse than no suggestion, because it will be trusted and it wastes
   the run it was meant to save.
-- **Never "fix" anything** — see the note at the top. Print, do not run.
+- **Never repair during Phase 1, and never repair what `repairs.md` does not list.** The
+  classification is the safety property. Widening it in the moment — because a fix looks obviously
+  right — is exactly how a diagnostic becomes a thing nobody dares run first.

@@ -8,6 +8,96 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [2.8.0] — 2026-08-28
+
+### Fixed
+
+- **A status-line segment with no value no longer renders as a bare label.** Every segment now goes
+  through one `seg` helper that drops the label, the value and the separator together when the
+  value is empty, so a repository without a stage, a branch without a pull request, or a payload
+  without a model name simply shows nothing there — never `Checkout:` with blank space after it. A
+  dangling label is worse than a missing segment: it reads as a value that failed to load and sends
+  people looking for a break that is not there. Two cases that used to produce one are also fixed
+  at the source: a detached HEAD with no commit yet rendered `Branch: (detached)` with nothing in
+  front of it, and a truncated PR cache line rendered `PR: #412 ` with an empty state. New test
+  `scripts/tests/statusline.sh` asserts, on every case it covers, that no label is ever left
+  dangling.
+
+### Added
+
+- **`statusLine.hiddenSegments`** — segment keys (`model`, `effort`, `repo`, `checkout`, `branch`,
+  `stage`, `pr`) this repository has confirmed do not apply. A blank segment is already invisible,
+  so this is not primarily about hiding: it **records the decision**, which is what stops `setup`
+  and `doctor` asking about it again. An unrecognized key is inert.
+- **`setup` and `doctor` now ask about a blank segment — but only a structurally blank one.** New
+  reference `skills/setup/references/statusline-segments.md` holds the segment table and splits
+  blanks into transient (`model`, `effort`, `branch`, and a `pr` on a branch that simply has none)
+  and structural (`stage` — the one blank whose cause is genuinely ambiguous, since a repository
+  that deploys nothing and one whose `stage.resolve` was never configured look identical). Only the
+  structural kind becomes a question; asking about the transient ones every run would turn a
+  diagnostic into an interrogation and train people to skip the answers that matter. The question
+  has three ends: configure it (`stage.resolve`), record it as not applicable
+  (`statusLine.hiddenSegments`), or — on silence or "I don't know" — **write nothing and say the
+  question is open**. Silence is never taken as "not applicable".
+- **The session-start hook now refreshes the repository's copy of the status line.**
+  `.claude/statusline.sh` is a copy, so no plugin update could ever reach it; a fix to the shipped
+  script stayed shipped and never arrived. The hook now compares the two on every session start (a
+  local file compare, no network) and brings an older copy forward. It replaces the file **only**
+  while it still carries the shipped `# ds-statusline: managed v<x.y.z>` marker on line 2, keeps
+  the previous copy as `.claude/statusline.sh.bak`, and **never creates** a status line that is not
+  already there — that needs consent, which is `setup`'s and `doctor`'s business. **Deleting the
+  marker line is how an owner takes the file over for good**, which is what the marker itself says.
+  Opt out per repository with `statusLine.autoUpdate: false`. The outcome is recorded in the
+  per-repo cache record so `doctor` can report what the last session start did. New test
+  `scripts/tests/statusline-refresh.sh` covers all of it.
+- The `doctor` and `setup` body budgets rise to 9,300 and 11,900 tokens; the segment table, the
+  interview and the config contract live in the new reference rather than in either body.
+
+## [2.7.0] — 2026-08-28
+
+### Changed
+
+- **`doctor` is now two phases: it diagnoses, then offers to fix what it found.** Phase 1 is the
+  skill as it was — READ-ONLY, walking every section, printing every "Fix:" as text. Phase 2 comes
+  after the finished report: one numbered list of the findings doctor can repair, **one question
+  for the batch**, then repairs in order, each re-verified by re-running its own Phase 1 check.
+  Nothing is repaired during diagnosis — a run that stopped to fix the first problem would bury the
+  other two, and learning all of them in one run is what doctor is for.
+- **Eligibility is a fixed classification, not a judgement made in the moment** — new reference
+  `skills/doctor/references/repairs.md`, which doctor must read before offering anything. Tier A is
+  repaired directly and qualifies only if every write lands inside this repository's `.claude/`,
+  needs no network or account, changes no git state, is undone by reverting a file, and can be
+  verified by a Phase 1 check — today that is the status line alone. Tier B is *offered as the
+  command that already owns the fix* (`gh auth login`, `gh auth refresh`, `claude plugin update`,
+  `/devstride:setup`, `/devstride:setup docs`), never reimplemented, because a second copy of
+  setup's config writer would drift and the drifted copy is the one running while somebody believes
+  they ran setup. Tier C is reported only: workflow files, git state, DevStride records,
+  machine-wide configuration, anything reaching a deployed stage. **A finding absent from the table
+  is tier C** — absence is a decision, not a gap to fill by analogy.
+- **The status-line repair itself.** Doctor writes `.claude/statusline.sh` from the shipped
+  reference and merges the `statusLine` key into `.claude/settings.json`, then proves it renders.
+  It never overwrites an existing `.claude/statusline.sh` — the commonest half-configured
+  repository is the one that already has the script and lacks the setting — and never writes the
+  key to `.claude/settings.local.json`, which is conventionally gitignored and would recreate the
+  one-machine-only problem being fixed. Git is untouched: the files are left uncommitted and the
+  owner is told, because until they are committed the status line is still only one machine's.
+  Phase E3 of `setup` remains the authority on the mechanics.
+- **Invoked non-interactively, doctor repairs nothing** and prints the offer list as a
+  recommendation. Other skills call it; none of them consented to a write.
+- The `doctor` body budget rises 8,500 → 9,100 tokens. The two-phase contract and the offer
+  protocol are instructions the model needs without opening a reference; the mechanics and the tier
+  table moved to `references/repairs.md` rather than into the body.
+
+### Fixed
+
+- **A status line configured only at the user level no longer reports as N/A.** The check was
+  scoped to `.claude/statusline.sh` and a repository-level `statusLine`, so a machine whose status
+  line lives in `~/.claude/settings.json` — rendering perfectly for its owner and for nobody else —
+  passed as "this repository has none". That is precisely the fresh-clone asymmetry the check
+  exists to catch, and it was invisible to the one person able to fix it. Now a WARNING that names
+  the asymmetry and offers the tier A repair, which is what makes the status line repository-wide.
+  Added to the silent-failures table.
+
 ## [2.6.0] — 2026-08-28
 
 ### Added

@@ -52,6 +52,11 @@ depend on, it does not freeze the surface.
    `delivery-loop-invariants.md` — a needle MISS is advisory (a prompt to read, not a failure); a
    DEAD REFERENCE is blocking and fails the step.
 
+   **If this release changes `skills/setup/references/statusline.sh`**, raise the
+   `# ds-statusline: managed v<x.y.z>` marker on its line 2 in the same commit — the session-start
+   hook compares that marker against the copy in each repository, so an unchanged marker strands
+   the fix in the field. Leave it alone when the script did not change.
+
 1. **Move the `Unreleased` entries** in `CHANGELOG.md` under a new `## [x.y.z] — YYYY-MM-DD`
    heading, add the comparison link at the bottom, and **re-point `[unreleased]`** at the tag you are
    about to create — otherwise it spans the release you just cut. Then paste the output of
