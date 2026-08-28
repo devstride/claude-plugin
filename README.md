@@ -324,7 +324,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end |
 | `release` | Promotes the release branch to production with a full gated review; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
 | `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it |
-| `doctor` | Checks your setup — git, `gh`, the plugin, the DevStride connection, config, CI gating and cost mechanics, documentation hooks — and reports what to fix. Read-only |
+| `doctor` | Checks your setup — git, `gh`, the plugin, the DevStride connection, config, CI gating and cost mechanics, documentation hooks — and reports what to fix, then offers to carry out the repairs that are safe to automate |
 | `ci-audit` | Measures what CI actually costs: executed runs per workflow per pull request (the design is one each), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
 
 ## Versioning & updates

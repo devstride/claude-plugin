@@ -17,6 +17,7 @@ error, usually much later:
 | Workflow jobs not gated on draft | CI runs on open and again after every fix — the run-once design never engages |
 | `verify.test` unset with fast merges on | Items merge with no LOCAL gate — under fast mode the local suites are the only gate the item itself gets |
 | `statusLine` set to a script that is not there | A blank status line. No error, no warning — it simply renders nothing |
+| A status line set only in `~/.claude/settings.json` | It renders perfectly for the person who set it up and for nobody else. Every other clone is blank, and the author has no way to see that |
 | `stage.resolve` printing more than one line | The wrong stage renders, confidently, wherever a stage is shown |
 | `profile: prototype` beside a hand-set `autoRelease: false` | The loop stops at release-ready and the profile looks ignored. It is not — the explicit key wins, and nothing says so |
 
