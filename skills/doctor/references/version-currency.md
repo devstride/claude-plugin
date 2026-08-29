@@ -1,24 +1,22 @@
 # Version currency — the one recipe
 
-The single authority for "what is the newest devstride plugin release, and is this install
-behind?" Cited by `doctor` §2 and executed by `hooks/version-check.sh` at every session start.
-Both must keep matching this file; a second copy of the recipe is a second place for it to drift.
+The shared contract for newest-release and installed-version decisions. `doctor` §2 reports it;
+`hooks/version-check.sh` and `/devstride:update` execute it through
+`skills/update/scripts/latest-version.sh`. Keep all three paths aligned.
 
 ## Newest release
 
 ```bash
-git ls-remote --tags https://github.com/devstride/claude-plugin \
-  | awk '{print $2}' | sed 's|refs/tags/||' | grep -v '\^{}' | sed 's/.*--v//' \
-  | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1
+bash "${CLAUDE_PLUGIN_ROOT}/skills/update/scripts/latest-version.sh"
 ```
 
 Three traps, each one a real misreport:
 
 - **Tags, not GitHub Releases.** This project tags every release and creates no Release objects, so
   a `releases` query returns empty and reads as "up to date" forever.
-- **Strip the `devstride--v` prefix before comparing.** The tag is `devstride--v1.1.0`; the plugin
-  reports `1.1.0`. Comparing the two shapes reports every current install as behind.
-- **Compare with `sort -V`**, never lexically: `1.10.0` sorts before `1.9.0` as a string.
+- **Accept only the strict `devstride--vMAJOR.MINOR.PATCH` tag shape**, then return its bare version.
+  A loose suffix match can treat another plugin's tag as this plugin's release.
+- **Compare the three numeric components portably**, never lexically: `1.10.0` must beat `1.9.0`.
 
 ## The running version — not the on-disk one
 
@@ -28,28 +26,31 @@ disagree. The version-check hook runs *from the loaded copy*, so it reads
 and reports that. `doctor`, which runs as a skill inside the session, reports what
 `claude plugin list` says and labels it as disk.
 
-## Updating — two commands, and one alone does nothing
+## Updating — explicit skill or native bootstrap
+
+From 3.1.0, `/devstride:update` resolves the loaded copy, requires the canonical marketplace at the
+newest tag commit, compares the installed files with that tag, and verifies disk again. It may
+change a user/project/local install, but never a pin, managed install, or ambiguity. Reload and
+confirm no DevStride load error; restart if reload is unavailable or fails.
+
+Version 3.0.0 and older do not contain that skill. Bootstrap with both commands:
 
 ```bash
 claude plugin marketplace update devstride     # refresh the catalog; changes NO installed plugin
 claude plugin update <installed-id> --scope <scope>
 ```
 
-then restart. **Take `<installed-id>` and `<scope>` from `claude plugin list --json`** — never
-assume them. The marketplace publishes the same plugin under two entry names, `devstride` and the
-`ds` alias; the id is whichever one that machine installed through, and naming the other reports
-"not installed", which reads as a broken setup while the user stays on the old version believing
-they updated. `update` acts on the `user` scope unless told otherwise, so always pass the
-resolved scope. Repository `autoUpdate` may mutate only a `project`/`local` row whose
-`projectPath` exactly matches this repository. A `user` or `managed` row is shared state: the
-hook prints this manual command and never lets one repo update every other repo's installation.
-After an automatic command, re-read `claude plugin list --json` and require the requested
-version; exit status alone is not proof that disk changed.
+Take both placeholders from `claude plugin list --json`; the installed id may be the `ds` alias and
+`update` otherwise defaults to user scope. Repository `autoUpdate` runs only at session start and
+may mutate only a project/local row bound to that repository. Shared user rows hand off to update,
+managed rows to their administrator, and unbound/ambiguous rows to Doctor. Exit zero alone proves
+nothing. After native bootstrap, verify with `claude plugin list`, then reload and check for errors.
 
 ## What the session-start check records
 
 Two files under `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/`. `newest.json` is shared — the
-newest tag is not per-repository — and holds `newest` + `fetchedAt` for the six-hour TTL.
+newest tag is not per-repository — and holds a schema, canonical source, `newest`, and `fetchedAt`
+for the six-hour TTL. Older/untrusted cache shapes are ignored.
 `repo-<sha1-of-repo-root>.json` is per repository, because `mode` comes from that repository's
 config and two repositories with different pins would otherwise overwrite each other's status.
 Written on every run:
@@ -61,11 +62,11 @@ Written on every run:
 | `running` | The version the session that ran the check was serving |
 | `newest` | Newest tag seen, or `null` when unreachable |
 | `source` | `network` (fetched this run) or `cache` (within the 6-hour TTL) |
-| `mode` | `notify` (default), `auto-update`, or `pinned` — from the repo's `plugin` config block |
-| `result` | `current`, `behind`, `behind-pinned`, `pin-drift`, `updated`, `update-failed`, `update-verification-failed`, `shared-scope-auto-refused`, `scope-binding-unverified`, `lookup-failed`, or `unreachable` |
+| `mode` | `notify` (default), `auto-update`, `pinned`, or `invalid` when config/runtime could not be trusted |
+| `result` | `current`, `behind`, `behind-pinned`, `pin-drift`, `pinned-ahead`, `running-ahead`, `invalid-config`, `invalid-runtime`, `disk-current-unverified`, `disk-current-verified`, `installed-ahead`, `updated`, `update-failed`, `update-verification-failed`, `shared-scope-auto-refused`, `scope-binding-unverified`, `lookup-failed`, or `unreachable` |
 | `install` | The `id scope` identified from the enabled row whose `installPath` is the loaded copy — or `null` |
 | `notifiedFor` | What the pinned/drift line was last printed for; the same situation is said once, not every start |
-| `statusLine` | Independent managed-copy result: `n/a`, `current`, `owner-managed`, `updated:<old>:<new>`, or `update-failed` |
+| `statusLine` | Independent managed-copy result: `n/a`, `current`, `owner-managed`, `updated:<old>:<new>`, or `update-refused` |
 
 Absent per-repo file → the check has never run for this repository on this machine: the plugin predates it, hooks are disabled,
 or `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` is set. That is what `doctor` reports.

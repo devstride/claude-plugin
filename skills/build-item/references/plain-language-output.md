@@ -99,3 +99,4 @@ into one dense sentence. The goal is minimum reading for maximum correct underst
 - `skills/review/SKILL.md`
 - `skills/setup/SKILL.md`
 - `skills/ultracode-build/SKILL.md`
+- `skills/update/SKILL.md`

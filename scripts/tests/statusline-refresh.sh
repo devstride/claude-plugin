@@ -1,13 +1,13 @@
 #!/bin/bash
 # Tests for the status-line half of hooks/version-check.sh — the session-start refresh of a
-# repository's copied .claude/statusline.sh. Offline: DEVSTRIDE_PLUGIN_REPO points at a path
-# with no git remote, so the version half reaches "unreachable" and finishes without network.
+# repository's copied .claude/statusline.sh. The fake plugin omits the update helper, so the version
+# half finishes quietly without network after the status-line result is recorded.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; HOOK="$ROOT/hooks/version-check.sh"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
-export XDG_CACHE_HOME="$WORK/cache" DEVSTRIDE_PLUGIN_REPO="$WORK/no-such-remote"
+export XDG_CACHE_HOME="$WORK/cache"
 
 # A fake plugin root: the hook reads the RUNNING version and the shipped status line from it.
 FAKE="$WORK/plugin"; mkdir -p "$FAKE/.claude-plugin" "$FAKE/skills/setup/references"
@@ -16,9 +16,10 @@ shipped() { printf '# ds-statusline: managed v%s — marker\necho shipped-%s\n' 
 shipped 2.8.0
 
 mkrepo() { # mkrepo NAME [STATUSLINE-CONTENT] [CONFIG]
-  local d="$WORK/$1"; mkdir -p "$d/.claude"; git -C "$d" init -q
+  local d="$WORK/$1" config="${3:-}"; mkdir -p "$d/.claude"; git -C "$d" init -q
   [ -n "${2:-}" ] && printf '%s' "$2" > "$d/.claude/statusline.sh"
-  printf '%s' "${3:-{\}}" > "$d/.claude/ds-config.json"
+  [ -n "$config" ] || config='{}'
+  printf '%s' "$config" > "$d/.claude/ds-config.json"
   printf '%s' "$d"
 }
 run() { CLAUDE_PLUGIN_ROOT="$FAKE" bash "$HOOK" <<< "$(printf '{"cwd":"%s"}' "$1")" 2>/dev/null; }
@@ -31,6 +32,16 @@ if grep -q 'shipped-2.8.0' "$R/.claude/statusline.sh" && grep -q 'local-2.7.0' "
    && printf '%s' "$OUT" | grep -q 'status line: updated 2.7.0 → 2.8.0'; then
   ok "(1) managed v2.7.0 → replaced with the shipped v2.8.0, .bak kept, one line printed"
 else bad "(1) out=$OUT file=$(cat "$R/.claude/statusline.sh" 2>/dev/null)"; fi
+
+# (1b) a later release can safely rotate an existing ordinary backup
+shipped 2.9.0
+OUT="$(run "$R")"
+if grep -q 'shipped-2.9.0' "$R/.claude/statusline.sh" \
+   && grep -q 'shipped-2.8.0' "$R/.claude/statusline.sh.bak" \
+   && printf '%s' "$OUT" | grep -q 'status line: updated 2.8.0 → 2.9.0'; then
+  ok "(1b) a later managed update rotates the existing safe .bak"
+else bad "(1b) out=$OUT file=$(cat "$R/.claude/statusline.sh" 2>/dev/null)"; fi
+shipped 2.8.0
 
 # (2) an up-to-date copy is left alone and says nothing — silence is the contract
 R="$(mkrepo current "$(managed 2.8.0)")"

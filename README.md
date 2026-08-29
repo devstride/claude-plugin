@@ -4,7 +4,7 @@ DevStride's agentic delivery loop, packaged as a Claude Code plugin. Plan a road
 existence, then let the loop walk it one story at a time — branch, build, adversarially review,
 merge, and release — against your own repository and your own DevStride organization.
 
-> **Status: early.** The nineteen delivery-loop skills and the DevStride MCP connection are both
+> **Status: early.** The twenty delivery-loop skills and the DevStride MCP connection are both
 > bundled — installing the plugin is all the *configuration* the connection needs, though you still
 > sign in once. `/devstride:setup` then configures the plugin for your repository and proves the
 > config by running it.
@@ -48,7 +48,8 @@ claude plugin update ds@devstride
 
 Running the `devstride@devstride` form against an alias install reports the plugin as not installed —
 which reads like something broke, when in fact you are simply on the other id. `claude plugin list`
-tells you which you have.
+tells you which you have. From plugin 3.1.0, a direct `/devstride:update` resolves the installed
+alias and scope for you.
 
 </details>
 
@@ -230,7 +231,7 @@ repository's real branch names rather than copying those two values:
 | `profileOverrides.verificationGrouping` | `"per-finding"` restores one verifier per finding at HIGH-RISK; the default `"per-file"` verifies findings one agent per file-group, auth-boundary findings always singly. |
 | `docs.updateSkill` | Name of a local skill in your repo (`.claude/skills/<name>/`) that updates your documentation for a shipped delta. `null` means no documentation system; the release skill's docs pass reports itself skipped. |
 | `docs.releaseNotesSkill` | Name of a local skill that writes and publishes a release note. Used only when you pass `--release-notes` to the release skill — notes are never written unasked. |
-| `plugin.autoUpdate` | Setup writes `true`: session start safely applies only repository-bound project/local installs; shared user/managed installs get a manual command instead. Restart is always required. |
+| `plugin.autoUpdate` | Setup writes `true`: session start may update only a repository-bound project/local install. Shared user installs hand off to `/devstride:update`; managed installs stay with their administrator. After verified changes, reload the plugin (restart only if reload fails). |
 
 The full contract — every key, its shape and default — is in the
 [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference).
@@ -341,6 +342,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `release` | Promotes the release branch to production with a full gated review; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
 | `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it |
 | `doctor` | Checks git, `gh`, the plugin, DevStride, config, CI gates, docs and personal status-line settings; after the shared replacement is committed and verified, it can separately remove only the personal `statusLine` key you approve while preserving every other setting and script |
+| `update` | Updates the exact loaded copy, verifies its official tag and files, then stops for a checked plugin reload (restart is the fallback) |
 | `ci-audit` | Measures what CI actually costs: executed runs per workflow per pull request (the design is one each), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
 
 ## Versioning & updates
@@ -349,23 +351,31 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.0.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.1.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
-**Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
-its version until you either turn auto-update on or ask for the new one explicitly.
+**Getting a new release.** Claude's marketplace auto-update is off by default for a manually added
+marketplace. Separately, Setup defaults `plugin.autoUpdate` on only for a project/local install
+bound to that repository; it never gives one repo authority over a shared user or managed copy.
 
 *Once, to stop thinking about it:* open `/plugin`, select the devstride marketplace, and choose
 **Enable auto-update**. Claude Code then refreshes the marketplace and its installed plugins for you.
 
-*Otherwise, per release:* two commands, and **both** are needed —
+*From version 3.1.0 onward:* invoke `/devstride:update`. It finds the exact copy that loaded the
+command, verifies the official tag and installed files, and updates that copy. When reload is
+needed, run `/reload-plugins` and confirm it reports no DevStride load error; restart if reload is
+unavailable or fails. Do not invoke another DevStride command first.
+
+*To get 3.1.0 from 3.0.0 or older, or when the skill is unavailable:* use two commands, and
+**both** are needed —
 
 ```bash
 claude plugin marketplace update devstride   # refresh the catalog
 claude plugin update devstride@devstride     # upgrade the installed plugin
 ```
 
-then restart Claude Code to apply it. Two things to watch:
+Then run `/reload-plugins` and confirm it reports no DevStride load error; restart Claude Code if
+reload is unavailable or fails. Two things to watch:
 
 - The update command needs a **fully-qualified** id — `devstride@devstride`, or `ds@devstride` if you
   installed through the [short alias](#install). `claude plugin list` shows which you have, and using
@@ -396,21 +406,20 @@ claude plugin install devstride@devstride
 ```
 
 Every release is tagged, so any version in the [changelog](CHANGELOG.md) is pinnable. To unpin, run
-the same three commands with the bare `devstride/claude-plugin` as the source. Restart Claude Code
-afterwards either way.
+the same three commands with the bare `devstride/claude-plugin` as the source. Reload the plugin
+afterwards; restart only if reload fails.
 
 ### The plugin tells you when it is behind
 
-From 1.2.0 the plugin checks for a newer release at every session start — silently when you are
-current or offline, and with one line naming the exact two commands when you are not. It reads the
-version *this session* is running, not the one on disk, and it never blocks a session. Per
-repository, `.claude/ds-config.json` can turn it off (`plugin.updateCheck: false`), have it apply
-updates at session start when the install belongs only to that repository
-(`plugin.autoUpdate: true` — you are asked to restart), or hold a version deliberately
-(`plugin.pin`). A normal user-scope install is shared by every repository, so this repo setting
-checks it but never changes it; enable marketplace auto-update once in `/plugin` for automatic
-user-scope updates. `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` disables the check for a CI or headless run.
-`/devstride:doctor` reports when it last ran and what it found.
+From 1.2.0 the plugin checks at every session start, using a six-hour release cache so most starts
+make no network request. It is silent when current or offline, reads the version *this session* is
+running, and always finishes under a deadline. Per-repository config may disable checks, update a
+project/local copy bound to that repo, or pin a version. A shared user copy hands off to
+`/devstride:update`; a managed copy stays with its administrator; an ambiguous copy hands off to
+Doctor. Claude marketplace auto-update remains the automatic option for user-scope installs.
+`DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` disables the check for CI/headless runs. Doctor reports the last
+result. Repository automatic updates remain session-start-only; direct `/devstride:update` is
+separate user authority and stops before newly loaded behavior can enter an active delivery loop.
 
 ## License
 

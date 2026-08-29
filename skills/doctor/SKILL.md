@@ -48,13 +48,14 @@ next action. For each failure symptom, read
 ## 2. Plugin install (`plugin`)
 
 - **Installed and enabled** — parse `claude plugin list --json`; report its disk version. Also name
-  the running version: sessions keep the startup copy, so disk and runtime can differ until restart.
+  the running version: disk and runtime can differ until plugin reload or restart.
 - **Marketplace registered** — `claude plugin marketplace list`. Absent → the plugin cannot update.
   Fix: `claude plugin marketplace add devstride/claude-plugin`.
 - **Version currency** — run
-  `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/version-currency.md`: compare tags (not Releases;
-  strip `devstride--v`, `sort -V`) and report installed/newest. If behind, print both update commands
-  using the id/scope from `plugin list --json`, then restart; never assume either.
+  `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/version-currency.md`: use its strict shared tag
+  helper (not Releases) and report installed/newest. If behind, tell the user to invoke
+  `/devstride:update` separately and stop; Doctor must not invoke this explicit-only command. If the
+  skill is unavailable, print exact id/scope bootstrap commands, then reload and check for errors.
 - **`python3` on PATH** — the session-start hook, the reviewer wait script and the cost harness all
   run their logic in python3; without it the wait exits at once with a usage-error `RESULT`. FAIL
   with the install hint for the platform.
@@ -69,9 +70,9 @@ next action. For each failure symptom, read
   line report `checkedAt`, `running`, `newest`, `mode`, `result`, `install`, `statusLine`. Absent:
   say never run here (possible pre-1.2.0 plugin, disabled hooks, or
   `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). Modes: `notify` fallback; `auto-update` only for a repo-bound
-  project/local install (shared scope gets its exact manual command); `pinned` never updates.
-  `updated` means post-verification passed but still needs restart. `unreachable` is INFO: offline
-  checks are silent and recorded.
+  project/local install; `pinned` never updates. Shared user copies hand off to update, managed
+  copies to their administrator, and ambiguous copies to Doctor. Explain every result using the
+  reference. A verified disk change needs plugin reload (restart only if reload fails).
 - **Repo declaration** — `.claude/settings.json` enables but does not install. Print the one-time
   `claude plugin install <id>` using its actual `enabledPlugins` id. Always run both
   `git ls-files --error-unmatch .claude/settings.json` (tracked?) and

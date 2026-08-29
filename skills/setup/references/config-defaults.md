@@ -212,10 +212,11 @@ All three start empty, and empty is a real answer rather than a placeholder:
 The session-start version check (`hooks/version-check.sh`) reads this block from the repository
 root and uses a six-hour cache, so resume/start checks do not add a network wait to every skill.
 `updateCheck: true` checks; `autoUpdate: true` applies on disk only when the loaded install is
-project/local-scoped to this repository, then post-verifies the version and asks for a restart.
-Shared user/managed installs are never silently mutated by one repository: the hook prints the
-exact manual update + restart instruction instead. Updates happen only at session start; changing
-skills mid-loop would mix contracts, and the running session cannot load the new text anyway.
+project/local-scoped to this repository, then verifies the official tag and installed files.
+Shared user copies hand off to `/devstride:update`; managed copies stay with their administrator;
+ambiguous copies hand off to Doctor. That automatic path runs only at session start. A direct
+`/devstride:update` is separate user authority. After a verified change, run `/reload-plugins`,
+confirm no DevStride load error, and restart only if reload is unavailable or fails.
 `pin` — a version this repository is deliberately holding at (an incident, a known-good
 baseline): the check reports "pinned at X, newest is Y" once and never nags. Setting the
 environment variable `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` disables the check regardless, for CI and

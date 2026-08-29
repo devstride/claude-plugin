@@ -51,7 +51,8 @@ TABLE="$(/bin/bash "$MC" --table --since HEAD)"
 if ! printf '%s' "$TABLE" | head -1 | grep -q '^<!-- scripts/measure-cost.sh --table --since HEAD @'; then bad "(f) missing provenance comment"; fi
 FBAD=0; ROWS=0
 while IFS='|' read -r _ path rb rt nb nt delta _; do
-  path="$(echo "$path" | tr -d ' ')"; [ -n "$path" ] || continue; ROWS=$((ROWS+1))
+  path="$(printf '%s' "$path" | sed -e 's/^ *//' -e 's/ *$//' -e 's/ (added)$//')"
+  [ -n "$path" ] || continue; ROWS=$((ROWS+1))
   HB="$(git -C "$ROOT" show "HEAD:$path" 2>/dev/null | wc -c | tr -d ' ')"; NB="$(wc -c < "$ROOT/$path" | tr -d ' ')"
   EXP="$(python3 -c "import math;print('%+d' % (math.ceil($NB/3)-math.ceil($HB/3)))")"; GOT="$(echo "$delta" | tr -d ' ')"
   [ "$GOT" = "$EXP" ] || { FBAD=1; echo "       $path: table Δ $GOT, recomputed $EXP"; }
