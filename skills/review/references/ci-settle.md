@@ -36,6 +36,10 @@ GitHub-side incident to surface, never to loop on.
 
 ## Classifying red CI
 
+A pending check gets at most two bounded poll instances. The first timeout may be ordinary queue
+latency; the second stops with each required check's current status. Never turn a healthy but slow
+run into an unbounded chain of background polls.
+
 *Flaky/infra* means the failure class is known-intermittent and code-independent: full-shard
 timeout classes, a `paths-filter` token glitch, concurrent-worker database resets — rerun
 (`gh run rerun <id> --failed`), bounded to ~2, because a third identical failure is evidence,

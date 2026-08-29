@@ -21,9 +21,9 @@ engine actually registered would have surfaced that in one glance.
 | Profile | standard — from `.claude/ds-config.json` (one-off: no root marker) |
 | 1 · In Progress | ✅ |
 | 2 · Branch | ✅ jane/03-14-26/I20110-… |
-| 3 · Build + Claude pass | ✅ 1 finding fixed |
-| 4b · PR + review + CI | #42 — draft, CI held (release is `review` step 7) |
-| — Codex (local, xhigh) | ✅ 3 findings → fixed |
+| 3 · Build + risk screen | ✅ 1 finding fixed |
+| 4b · PR + review + CI | #42 — draft; cloud tests wait until review finishes |
+| — Configured local review | ✅ 3 findings found and fixed |
 | — Copilot (cloud) | ⏳ request registered in timeline |
 | 5b · Merge | — |
 | 6 · Completion ritual | — |
@@ -35,11 +35,11 @@ engine actually registered would have surfaced that in one glance.
 ## The fast-path shape (4a/5a) — deferred cloud rows stay visible
 
 ```
-| Profile | standard — from the plan root I20100 (marker read with view: 'full') |
+| Profile | standard — from the plan root I20100 |
 | 4a · Fast review (no PR) | epic branch — cloud gate deferred to step 8 |
-| — Claude (build, max) | ✅ step 3, 2 findings fixed |
-| — Codex (local, xhigh) | ✅ 4 findings → 3 fixed, 1 captured |
-| — Local suites | ✅ green (storyVerify: standard) — file/test pass counts recorded in the commit body |
+| — Story risk screen | ✅ 2 findings found and fixed |
+| — Configured local review | ✅ 4 findings → 3 fixed, 1 captured |
+| — Required local checks | ✅ passed — file/test counts recorded in the commit body |
 | — Copilot + CI | ⏸ deferred to the epic release PR (step 8) |
 | 5a · Fast merge | ✅ merged --no-ff → jane/03-14-26/I20104-attachment-storage |
 ```

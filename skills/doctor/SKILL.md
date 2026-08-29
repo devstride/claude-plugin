@@ -1,138 +1,102 @@
 ---
 name: doctor
-description: Check that this repo and machine are set up correctly for the delivery loop — git, gh, the plugin, the DevStride connection, the config file, the CI draft gate and CI cost mechanics, the merge gates and the documentation hooks — and report exactly what is missing and the command that fixes it. Two phases: it diagnoses read-only, then offers to carry out the repairs that are safe to automate.
+description: Diagnose delivery-loop prerequisites read-only — environment, plugin, DevStride, config, CI, merge gates and docs — then offer only approved safe repairs.
 ---
 
-Diagnose whether the delivery loop will actually work here, and say precisely what to fix if
-it will not — after installing, after changing `.claude/ds-config.json`, or when the loop
-behaves unexpectedly.
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
-**Doctor runs in two phases.** Phase 1 **diagnoses** and is READ-ONLY: it runs inspection commands
-and reads files, and never *mutates* git state — no commit, checkout, fetch-that-writes, push,
-branch or config change — never installs or updates anything, never edits a workflow, and never
-calls a DevStride write tool. Phase 2 **offers to repair** what Phase 1 found: after the finished
-report, never during it, and never without a yes.
+Diagnose whether this checkout can run the delivery loop and give exact repairs. Optional section:
+`env`, `plugin`, `devstride`, `config`, `ci`, `gates`, or `docs`: $ARGUMENTS
+With a repo root, run §4's status-line check on every invocation regardless of section; otherwise N/A.
 
-> **Nothing in Phase 1 is a command to run.** Every "Fix:" below is text to PRINT. Even when a fix
-> looks safe and obvious, finish diagnosing first — someone with three problems should learn all
-> three, and a run that stops to repair the first one buries the other two. Repairs happen in Phase
-> 2, from the completed list, or not at all.
+**Two-phase contract:**
 
-**What Phase 2 may touch is a fixed classification, not a judgement call.** The tiers and the
-finding-by-finding mapping live in
-`${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/repairs.md`; **read it before offering anything.**
-In outline: doctor writes only inside this repository's `.claude/`, it *offers to run* the command
-that already owns a fix rather than reimplementing it, and it never repairs a workflow file, git
-state, a DevStride record, or anything that reaches a deployed stage.
-
-Optional argument — a section name (`env`, `plugin`, `devstride`, `config`, `ci`, `gates`, `docs`) to
-check just one: $ARGUMENTS
+- **Phase 1 is READ-ONLY.** Inspect and report every requested check before fixing anything. Do not
+  commit, checkout, write-fetch, push, create branches, change config, install/update, edit
+  workflows, or call a DevStride write tool. Every "Fix:" below is text to print.
+- **Phase 2 starts only after the complete report and an explicit yes.** First read
+  `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/repairs.md`; its eligibility tiers are fixed.
+  Write only under this repo's `.claude/`, except the separately confirmed personal-status-line
+  cleanup in `repairs.md`; never repair workflows, git state, DevStride records, or stages.
 
 ## How to report
 
-Walk every section, even after a failure. Someone with three problems should learn all three in one
-run, not one restart at a time.
-
-Each check emits **PASS**, **FAIL**, or **N/A** (with the reason). Every FAIL carries three things —
-never a bare cross:
-
-1. **What is wrong**, concretely.
-2. **What it breaks** — the symptom they would otherwise be debugging.
-3. **The exact command or edit that fixes it.** If a check genuinely has no command fix, say what to
-   change and where; never leave a FAIL without a next action.
-
-Finish with a verdict: ready, ready-with-warnings (naming them), or not-ready (naming the
-blockers). If a check could not be run, say so — never report an unrun check as a pass.
-**Every prerequisite of this loop fails silently — the value is turning silence into a
-sentence. Read `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/silent-failures.md` when
-writing the "what it breaks" line of a FAIL** — it holds the symptom table and the extended
-reasoning behind §4–§6.
+**Human recap.** Walk every requested section after failures. For each result say **PASS**,
+**FAIL**, or **N/A**, then `Found:` in plain words. A failure adds `Why it matters:` and `Fix:`
+with the exact command or edit. After any repair add `Changed:` and `Result:`. Never pass an unrun
+check. End `ready`, `ready-with-warnings` (name them), or `not-ready` (name blockers), plus one
+next action. For each failure symptom, read
+`${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/silent-failures.md` (also the rationale for §4–§6).
 
 ## 1. Environment (`env`)
 
 - **git** — `git --version`; confirm you are inside a repo (`git rev-parse --is-inside-work-tree`).
   Not a repo → the rest is N/A; say so and stop the section.
-- **An `origin` remote** — `git remote get-url origin`, checked **by name**: the delivery
-  skills hardcode it, and a fork checkout with only `upstream`/`fork` passes a generic
-  has-a-remote test then fails at the first push. Other remotes but no `origin` → say which.
+- **An `origin` remote** — `git remote get-url origin`, checked **by name** because delivery skills
+  hardcode it. Other remotes but no `origin` → say which.
 - **gh present** — `gh --version`. Missing → the whole delivery half is unavailable: no pull
   requests, no review threads, no ready-flip. Fix: install GitHub CLI (`brew install gh`, or
   cli.github.com).
-- **gh authenticated** — `gh auth status`. The one people miss, because an *installed* `gh` looks
-  like a working one. Fix: `gh auth login`.
+- **gh authenticated** — `gh auth status`. Fix: `gh auth login`.
 - **gh scopes, for the ACTIVE account** — read the account marked active (`gh auth status`
   can list several). Minimum `repo` + `read:org`, plus `workflow` if the loop edits workflow
   files. Fix: `gh auth refresh -s repo,read:org` — **including `workflow` in the SAME list
   when that is the missing scope**. Auth from `GH_TOKEN`/`GITHUB_TOKEN` → say so: `refresh`
   cannot touch an environment token; unset it or reissue with the scopes.
-- **Forge** — if `origin`'s URL is not GitHub, say plainly that the delivery half assumes GitHub and
-  GitHub Actions and has no adapter for other forges. The planning half still works.
+- **Forge** — non-GitHub `origin`: delivery assumes GitHub/Actions; planning still works.
 
 ## 2. Plugin install (`plugin`)
 
-- **Installed and enabled** — `claude plugin list` (prefer `--json` if parsing). Report the version.
-- **`claude plugin list` reads DISK, not this session** — a session serves what it loaded at
-  startup, so the two can disagree (installed-but-not-restarted; removed-but-still-running).
-  Say which you are reporting.
+- **Installed and enabled** — parse `claude plugin list --json`; report its disk version. Also name
+  the running version: sessions keep the startup copy, so disk and runtime can differ until restart.
 - **Marketplace registered** — `claude plugin marketplace list`. Absent → the plugin cannot update.
   Fix: `claude plugin marketplace add devstride/claude-plugin`.
-- **Version currency** — the recipe is `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/version-currency.md`
-  (tags not Releases; strip the `devstride--v` prefix; `sort -V`; the installed id and scope from
-  `claude plugin list --json`, never assumed; both update commands, then restart). Run it and
-  report installed vs newest. Behind → print the two commands with the id and scope you read.
+- **Version currency** — run
+  `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/version-currency.md`: compare tags (not Releases;
+  strip `devstride--v`, `sort -V`) and report installed/newest. If behind, print both update commands
+  using the id/scope from `plugin list --json`, then restart; never assume either.
 - **`python3` on PATH** — the session-start hook, the reviewer wait script and the cost harness all
   run their logic in python3; without it the wait exits at once with a usage-error `RESULT`. FAIL
   with the install hint for the platform.
-- **Learned reviewer latency** — read `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/reviewer-latency.json` and report
-  per reviewer id: samples, p50, p95, and the bound `review` derives under this repository's
-  `pollTimeoutMinutes` — or "cold — the wait uses `pollTimeoutMinutes`" below the script's sample minimum.
-  Informational, never a FAIL; the schema and the doctor line's format are in
+- **Learned reviewer latency** — from
+  `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/reviewer-latency.json`, report each reviewer's
+  samples, p50, p95, and derived bound under this repo's `pollTimeoutMinutes`; below the sample
+  minimum report `cold — the wait uses pollTimeoutMinutes`. INFO only; schema/format:
   `${CLAUDE_PLUGIN_ROOT}/skills/review/references/reviewer-latency.md`.
 - **Session-start check** — read the per-repository record
-  `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/repo-<sha1 of the repo root, first 12 hex>.json`
-  (schema in `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/version-currency.md`; key from `git rev-parse --show-toplevel`) and report `checkedAt`, `running`, `newest`, `mode` and
-  `result` as one line. Absent → the check has never run here: say so, and say why it might be
-  (plugin older than 1.2.0, hooks disabled, or `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). `mode` comes
-  from the repository's `plugin` config block — `notify` is the default; `auto-update` applies
-  releases at session start and asks for a restart; `pinned` reports and never nags. A
-  `result` of `unreachable` on the last run is informational, not a FAIL: the check stays
-  silent offline by design and records it here instead.
-- **Repo-level declaration** — `.claude/settings.json` registers and enables, it does **not
-  install**: every teammate still runs `claude plugin install <id>` once, and **the id comes
-  from the `enabledPlugins` key you just read**, never a printed literal (a repo may enable
-  either marketplace entry). **Then check the file reaches them — two questions, two
-  commands**: `git ls-files --error-unmatch .claude/settings.json` (TRACKED — run this
-  unconditionally; an uncommitted file shows no ignore output and reaches nobody) and
-  `git check-ignore -v .claude/settings.json`.
+  `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/repo-<first-12-hex sha1 of repo root>.json`; derive
+  the root with `git rev-parse --show-toplevel` and use the schema in `version-currency.md`. On one
+  line report `checkedAt`, `running`, `newest`, `mode`, `result`, `install`, `statusLine`. Absent:
+  say never run here (possible pre-1.2.0 plugin, disabled hooks, or
+  `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). Modes: `notify` fallback; `auto-update` only for a repo-bound
+  project/local install (shared scope gets its exact manual command); `pinned` never updates.
+  `updated` means post-verification passed but still needs restart. `unreachable` is INFO: offline
+  checks are silent and recorded.
+- **Repo declaration** — `.claude/settings.json` enables but does not install. Print the one-time
+  `claude plugin install <id>` using its actual `enabledPlugins` id. Always run both
+  `git ls-files --error-unmatch .claude/settings.json` (tracked?) and
+  `git check-ignore -v .claude/settings.json` (ignored?); an untracked file reaches nobody.
 
 ## 3. DevStride connection (`devstride`)
 
 - **A server exists and is CONNECTED** — `claude mcp list`. The bundled one appears as
   `plugin:devstride:devstride`; a plain `devstride` entry is one you or your project configured.
-- **Not connected → the big one.** Say explicitly: *until you sign in, the skills have no DevStride
-  tools at all, and nothing will prompt you — the symptom is missing tools, not an authorization
-  error.* Fix: run `/mcp` and connect (browser sign-in).
-- **More than one connected** — flag it, with the right reason: the two servers expose the
-  same tools under **different namespaces** (`mcp__devstride__*` vs
-  `mcp__plugin_devstride_devstride__*`) and nothing pins which one a call uses, so it can land
-  in either organization. **The fix depends on the auth**: `claude mcp logout <name>` clears
-  OAuth only — a no-op against API-key headers; those need `claude mcp remove <name>` (check
-  with `claude mcp get <name>`).
+- **Not connected.** Say: until sign-in, skills have no DevStride tools and nothing prompts; the
+  symptom is missing tools, not an authorization error. Fix `/mcp` and browser sign-in.
+- **More than one connected** — FAIL: different namespaces (`mcp__devstride__*` and
+  `mcp__plugin_devstride_devstride__*`) leave calls able to reach either organization. Inspect with
+  `claude mcp get <name>`; OAuth uses `claude mcp logout <name>`, API-key headers require
+  `claude mcp remove <name>`.
 - **Do not call a DevStride tool to test this.** Presence and connection state are enough; a write
   would violate the read-only contract.
 
 ## 4. Config file (`config`)
 
-- **Present and parses** — read `.claude/ds-config.json`. Absent is legal, not an error: every key
-  has a shipped default. Say which defaults are therefore in force — but do not call the repository
-  ready until those effective branch names have been checked against `origin` below.
-- **Branch roles resolve on the connected repository.** Run the minimal read-only repository-root
-  and `origin` probes even when the user invoked `/devstride:doctor config` by itself; do not require
-  them to run the whole environment section first. Enumerate the actual remote heads with
-  `git ls-remote --heads origin` (read-only; never `fetch`). If the network check cannot run, fall
-  back to normalized local and
-  `refs/remotes/origin/*` names, label that evidence possibly stale, and do not turn an unconfirmed
-  branch into a PASS.
+- **Present and parses** — read `.claude/ds-config.json`. Absence is legal: report shipped defaults,
+  but do not call ready until the effective branches pass below.
+- **Branch roles resolve.** Even for `doctor config`, find the repo/origin and run read-only
+  `git ls-remote --heads origin` (never fetch). If unavailable, use normalized local and
+  `refs/remotes/origin/*` names, label them possibly stale, and never PASS an unconfirmed branch.
 
   Resolve all four effective values, including inline fallbacks when their keys are absent:
 
@@ -143,31 +107,24 @@ reasoning behind §4–§6.
   | production | `release.productionBranch` | `master` |
   | hotfix base | `hotfixBaseBranch` | `master` |
 
-  Check each effective value exists on `origin`, and that `protectedBranches` contains the
-  effective base, release source and production branches. **Explicit configured names win even
-  when unconventional** — heuristics never overwrite or warn against a valid explicit choice.
-  When an ABSENT key falls back to a branch that does not exist, apply setup's exact-name
-  candidate vocabulary to the enumerated heads (production-role: `main`, `master`,
-  `production`, `prod`; development-role: `develop`, `development`, `staging`, `stage`,
-  `canary`, `test`, `testing`, `qa`; `trunk` a possible single trunk; whole names only).
+  Require every value on `origin`; require effective base, release source, and production in
+  `protectedBranches`. Explicit valid names win without heuristic warnings. Only when an absent
+  key's fallback is missing, match whole remote-head names: production = `main`, `master`,
+  `production`, `prod`; development = `develop`, `development`, `staging`, `stage`, `canary`,
+  `test`, `testing`, `qa`; `trunk` may be a single trunk.
 
-  - Exactly one development candidate and one production candidate → print the concrete suggested
-    four-key mapping, with base/release source on the former and production/hotfix on the latter.
-  - More than one candidate for either role → list the matches and say the role is ambiguous. Never
-    pick the first list entry.
-  - One production candidate or `trunk` plus only topic branches → suggest the single-trunk mapping
-    for all four roles, but say it needs confirmation.
-  - One development candidate with no production candidate → suggest only the base and release
-    source; never promote staging, canary, test or QA to production by name alone.
+  - One development + one production candidate: print the four-key mapping (base/release source on
+    development; production/hotfix on production).
+  - Multiple candidates for either role: list them as ambiguous; never pick first.
+  - One production candidate or `trunk` plus topic branches only: suggest all four on that trunk,
+    requiring confirmation.
+  - Development only: suggest base/release source only; never infer production from staging,
+    canary, test, or QA.
 
-  Any nonexistent effective branch is a FAIL: feature checkout, hotfix creation or release will
-  target a ref that is not there. For an absent-key fallback, include the candidate mapping above.
-  For an explicit configured name, identify the invalid key but do not silently replace the user's
-  choice with a heuristic. Fix: run `/devstride:setup` to confirm and write detected roles, or edit
-  the four keys explicitly and re-run `/devstride:doctor config`. Doctor never writes config
-  itself — it prints suggested JSON, and Phase 2 offers `/devstride:setup`, which owns that write.
-  If the shipped fallback refs do exist, PASS and report
-  them; a user can still run setup to make the roles explicit.
+  A missing effective branch FAILs. For an absent-key fallback include the candidate mapping; for
+  an explicit name identify its key and never replace it heuristically. Print suggested JSON; Phase
+  2 may offer `/devstride:setup`, or the user can edit all four keys, then rerun `doctor config`.
+  If shipped fallbacks exist, PASS and report them.
 - **Delivery profile — the effective one, and its source.** Read `profile` and report it as one
   line: `profile: <name> — from .claude/ds-config.json`, or `profile: standard — key absent, shipped
   default`. The contract behind the word is
@@ -213,22 +170,25 @@ reasoning behind §4–§6.
   `productionStages`, and WARN when the resolved stage is in it: this checkout points at
   production. **Never infer a stage from the branch name, and never report
   `localEnvironment.instanceName` as one** — different axes; `silent-failures.md` §4 has why.
-- **The status line** — `.claude/statusline.sh` plus `statusLine` in `.claude/settings.json`.
-  One without the other is a FAIL naming the missing half: a `statusLine` pointing at a file that
-  is not there renders nothing and reports no error. Both → run it once and require non-empty
-  output:
-  `printf '{"workspace":{"current_dir":"%s"}}' "$PWD" | bash .claude/statusline.sh`. Also
-  `git check-ignore` the script — an ignored one works for its author and nobody else.
-  **Neither → read `~/.claude/settings.json` before calling it N/A.** A `statusLine` set there
-  renders for this owner and for nobody else, so a bare "N/A" reads to them as *mine is fine* and
-  buries the finding; WARN, naming the asymmetry. With no status line anywhere, N/A is correct.
-  Fix: repairable in Phase 2, else `/devstride:setup`. Finally, **say which SEGMENTS rendered** —
-  a segment with no value is dropped, label and all, so an absent one is invisible by design. Only
-  a STRUCTURALLY absent segment (`stage`) becomes a Phase 2 question; a transient one (`model`,
-  `effort`, `branch`, or a `pr` on a branch that simply has none) is never asked about, per
+- **Status line / personal settings** — run the helper as `inspect --local <repo-root>` and
+  `inspect --user <repo-root>`; it lives at
+  `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/statusline-override.py`. Read shared settings too;
+  user settings use `CLAUDE_CONFIG_DIR`, else `~/.claude`. Never print a personal command.
+  Precedence is managed > CLI > local > shared project > user. Resolve accessible
+  `disableAllHooks`; effective `true` FAILs and blocks cleanup. Known managed/CLI disables also
+  block cleanup but remain report-only. Local masking and invalid personal JSON FAIL; after shared
+  works, a user fallback is INFO.
+
+  Require the canonical shared pair regular, unignored, committed in `HEAD`, clean in index/tree,
+  and rendering non-empty output from `bash .claude/statusline.sh`. No shared/personal setting is
+  N/A; one shared half FAILs. Phase 2 repairs shared first, then asks separately per personal key.
+  After removal restart, rerun `doctor config`, inspect `/status`, and report rendered segments.
+  Only structural `stage` absence becomes a question; never ask about transient model, effort,
+  branch, or PR blanks. Details:
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
-  **array**, so iterate it — `review.localCommand`, `generated.regenCommand`,
+  **array**, so iterate it — `review.localCommand`, `review.localAssistCommand`,
+  `generated.regenCommand`,
   `preShipChecks[].command`, each non-null `localEnvironment.*` command, and `stage.resolve`): split on `&&` and `;`, take the first token of **each** segment, and
   skip shell builtins. Checking only the very first token is vacuous for the commonest shape:
   `cd backend && pnpm test` starts with `cd`, which always resolves, so the check would pass on a
@@ -239,10 +199,12 @@ reasoning behind §4–§6.
 
 ## 5. The CI draft gate (`ci`)
 
-**Applicability comes from all three draft-hold flags** — `review.openPullRequestsAsDraft`,
-`readyForReviewReleasesCi`, `ciHeldUntilReviewSettled`. All false is a CI-runs-on-draft repo: N/A.
-**Mixed values are not N/A** — `review` and `pr` fall back to the strictest configured behaviour, so
-a pull request may still open as a draft; audit the gate and report the mixed configuration.
+**Applicability comes from workflows plus all three draft-hold flags** —
+`review.openPullRequestsAsDraft`, `readyForReviewReleasesCi`,
+`ciHeldUntilReviewSettled`. No PR workflows + all false is N/A. PR workflows + all false is a
+**FAIL**: the loop cannot keep cloud CI behind review; fix `/devstride:setup ci`. **Mixed values
+are also a config FAIL** — runtime takes the strictest safe behavior, but the guarantee is not
+legible until all three and the workflows agree.
 
 Scope the audit to workflows with an `on: pull_request` trigger. A workflow triggered only by
 `pull_request_review` or `pull_request_review_comment` is PR-related but must run on drafts —
@@ -302,24 +264,23 @@ The point: **find out whether anything actually checks the code before it merges
   branch** and `epicIntegrationBranches.fastStoryMerges.enabled` is on (the default). Such an item
   gets no pull request and no CI of its own, so its local suites are the only gate *it* receives —
   the cloud engines and CI are deferred to the release pull request, not removed.
-- **So in that mode, the profile's story gate must be runnable.** WHICH commands that needs is the
-  effective profile's `storyVerify` (§4 resolved the profile; the contract is
-  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`): under `prototype`,
-  `verify.typecheck` plus `verify.testSingle` — `verify.test` is not required, because that gate is
-  type-checks and the touched suites, and `setup` deliberately enables fast merges on exactly that
-  shape; under `standard` and `enterprise`, `verify.test` and `verify.typecheck` both. Requiring
-  the wider pair under `prototype` would FAIL the very config `setup` just wrote. If a required
-  command is missing, say plainly: *code merges to the integration branch with nothing locally
-  checking it* — and name the commands THAT profile needs.
+- **The effective profile's story gate and epic gate must be runnable.** Read `storyVerify` and
+  its release-boundary width from
+  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`. Type-check/touched-suite
+  story gates need `verify.typecheck` and, where available, `verify.testSingle`; the epic's full
+  gate needs `verify.test` unless an exact matching CI job owns it. Enterprise additionally needs
+  lint where applicable. Name the missing command and which boundary would otherwise be unchecked.
 - **Give the fix that matches their config**: check `integrationBranch` FIRST — an explicit
   value takes precedence over `epicIntegrationBranches.enabled` entirely, so with one set,
   flipping the flag changes nothing. Say which case applies: set the verify commands, or clear
   `integrationBranch` **and** disable epic branches.
-- **Review roster** — report which engines are configured (`review.localCommand`,
-  `review.automatedReviewers`). An empty roster is legal and means the built-in adversarial pass is
-  the only review; say so rather than implying breakage. A `localCommand` with neither placeholder is the
-  pre-placeholder shape — say so (` --base <value>` is appended); `<context>` WITHOUT `<base>` is a
-  config error.
+- **Review roster** — report `review.localCommand`, optional `review.localAssistCommand`, and
+  `review.automatedReviewers`. An empty configured roster is legal: the built-in merge-boundary
+  pass remains. A context-first command may carry `<context>` without `<base>`; it must accept
+  stdin. A legacy base-only command may omit placeholders (` --base <value>` is appended), but
+  WARN that contextual follow-ups will be skipped. Validate `<effort>` where present; a known
+  Codex command with literal `xhigh` is an optimization warning and `/devstride:setup review`
+  is the migration.
 - **`preShipChecks`** — if any entry exists, confirm its command resolves (same segment-splitting as
   §4); these run at the ship boundary and nothing in CI covers them.
 
@@ -334,8 +295,9 @@ as a failure, and say what it means: the release skill's docs pass reports itsel
 - **Each named skill exists** — `.claude/skills/<name>/SKILL.md`; missing → FAIL (a dangling
   hook; fix `/devstride:setup docs`). Also `git check-ignore` the path — a skill on one machine
   only is the commonest fresh-clone failure.
-- **Each skill's `check` mode passes** — invoke it with `check` (read-only by contract); relay
-  its verdict and fix verbatim. No `check` mode → FAIL naming the template to rebuild from.
+- **Each skill's `check` mode passes** — invoke it with `check` (read-only by contract); translate
+  its verdict and fix into **Found / Why it matters / Fix**, keeping exact command/path evidence.
+  Never paste raw prose. No `check` mode → FAIL naming the template to rebuild from.
 - **A legacy `release.docsRepo` block**, with or without a `docs` block beside it → FAIL: the
   release skill never acts on it. Fix: `/devstride:setup docs` (migrates and removes it).
 - **`release.deployVerification`** — if set, its first token resolves (§4's rule); never run
@@ -346,17 +308,11 @@ as a failure, and say what it means: the release skill's docs pass reports itsel
 
 ## Closing — the report, then the offer
 
-Print the verdict, then — if anything failed — the fixes in the order they should be applied,
-separating commands from manual edits. Someone should get from a failing report to a working setup
-without rereading the explanations.
+Print the verdict, then ordered fixes, separating commands from manual edits.
 
-**Then, and only then, Phase 2.** Follow
-`${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/repairs.md` — it is the authority on eligibility
-and on how to ask. Its shape: one numbered offer list, **one question for the batch**, then repairs
-in order, each re-verified by re-running its Phase 1 check. Name the failures you did NOT offer, or
-a short offer list reads as a short problem list. Leave every written file unstaged and
-uncommitted, and say so. **Invoked non-interactively, print the list and repair nothing** — the
-skills that call doctor consented to a report, not a write.
+Only then follow `references/repairs.md`: one numbered offer list, **one batch question**, ordered
+repairs, and rerun each Phase 1 check. Name failures not offered. Leave writes unstaged/uncommitted
+and say so. Non-interactive invocation prints the list and repairs nothing.
 
 IMPORTANT:
 - **Never emit a command you have not confirmed exists.** Check flags with `--help` first. A

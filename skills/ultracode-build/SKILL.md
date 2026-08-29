@@ -1,18 +1,19 @@
 ---
 name: ultracode-build
-description: "Build engine for a single scoped DevStride story: understand, build, adversarial review, and fix loop via ultracode Workflows"
+description: "Build engine for a scoped DevStride story: understand, build, verify, and run a risk-sized pre-handoff check"
 ---
 
-The build engine for one scoped story: understand → build (committing often) → adversarial review
-→ hand back. Invoked by `build-item` once the branch exists, the item is In Progress, and
-`$ARGUMENTS` carries the item number plus a one-line scope — and, when the caller has resolved
-it, the delivery profile.
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
-Argument — item number + one-line goal, optionally followed by `profile: <name>` (e.g.
-`I20130 enforce the seat-count invariant profile: standard`): $ARGUMENTS
+The build engine for one scoped story: understand → build → verify → risk check → hand back.
+Invoked by `build-item` once the branch exists and the item is In Progress.
+
+Argument — item number + one-line goal, optionally followed by `profile: <name>` and
+`review-moment: release-deferred|pr-boundary` (e.g. `I20130 enforce the seat-count invariant
+profile: standard review-moment: release-deferred`): $ARGUMENTS
 
 **Config**: `.claude/ds-config.json` (`verify.*`, `baseBranch`, `generated.*`,
-`preCommitWiringChecks`, `conventionsDoc`, `lessonsDoc`, `profile`, `profileOverrides`) —
+`preCommitWiringChecks`, `conventionsDoc`, `lessonsDoc`, `review.localAssistCommand`, `profile`, `profileOverrides`) —
 authoritative over any literal here.
 Coding conventions live in `conventionsDoc` (`AGENTS.md`), not the config. `lessonsDoc` (inline
 fallback `.claude/ds-lessons.md`) is the repo's lessons store, distilled from past review
@@ -20,11 +21,16 @@ findings — **this skill READS it and never writes it**; `review` owns every wr
 absent or empty lessons file is a valid state: proceed exactly as you would without it**, no
 note, no prompt, no setup step.
 
+**Engineering economy.** Read
+`${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/engineering-economy.md` before choosing
+an approach or launching agents. It governs reuse, DRY/YAGNI, bounded parallelism, task-sized
+Claude models/effort, and the optional read-only local support call.
+
 **Delivery profile.** How much of this engine's budget a story gets is set by the delivery
 profile — the canonical contract is
 `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`, and this skill honours
-six of its knobs: `understandReaders` (phase 1), `reviewBreadthCeiling`, `verificationDefault`,
-`verificationGrouping` and `fixFloor` (phase 3), and `storyVerify` (phases 2 and 4). Resolve it ONCE, before phase 1,
+three of its knobs: `understandReaders` (phase 1), `fixFloor` (phase 3), and `storyVerify`
+(phases 2 and 4). Resolve it ONCE, before phase 1,
 and announce it with its source:
 
 - **Passed in the invocation** (`profile: <name>` — the `build-item` path): use it as given, do
@@ -38,10 +44,9 @@ and announce it with its source:
   where it came from ("profile: prototype — from the plan root", "… — from config",
   "… — default").
 
-Then apply `profileOverrides` from config to the individual knobs, within the contract's floors:
-no override lowers the breadth below NARROW or removes the auth-boundary security lens, and an
-unknown knob name is reported and ignored. Each phase below says what its knob changes; the
-floors the contract lists hold under every profile and are marked as such.
+Then apply `profileOverrides` to those knobs within the contract's floors; report and ignore an
+unknown knob. The immediate auth/migration/deployed-contract verifier below cannot be overridden
+away.
 
 Stop and ask ONLY at a genuine fork: an ambiguous or risky review finding, scope that turns out
 human- or infra-gated, or a destructive/outward-facing action.
@@ -64,14 +69,13 @@ mistake class. Where it does not, ignore it — silently, with no note. A lesson
 skip this paragraph entirely and build as usual.
 
 - **Trivial story** (one-line fix, copy tweak, rename, config flip with no contract surface):
-  no Workflow. Read the few relevant files inline. (Phase 3 still reviews it — narrowly.)
+  no Workflow. Read the few relevant files inline; phase 3 still self-checks the diff.
 - **Fresh grounding refresh on the item** (a dated section naming exact files, symbols, prior art,
   adjusted scope): treat as pre-paid. Verify its claims with targeted reads and spin up at most
   1–2 readers for angles it doesn't cover.
-- **Otherwise** run a Workflow fanning parallel readers, each returning structured findings — file
-  paths, line ranges, the concrete fact found, not vibes.
-- **Unsure which side of the line a story falls on? Treat it as SUBSTANTIVE.** An unnecessary
-  Workflow costs little next to a missed contract mismatch or a false-green test.
+- **Otherwise**, name the independent questions whose answers can change the build plan, then fan
+  only those readers. Each returns paths, line ranges, and concrete facts. If uncertainty is vague,
+  read inline until it becomes a real question; uncertainty alone is not a reason to fan out.
 
 The cap bounds every branch of that triage:
 
@@ -84,6 +88,13 @@ The cap bounds every branch of that triage:
 - **Up to the six this phase defines** (`enterprise`): the triage exactly as written.
 
 Announce the count you actually provisioned against the cap.
+
+Route mechanical inventories to `haiku`/`low`; routine contract or test-plan reading to
+`sonnet`/`medium`; cross-file contract synthesis to `sonnet`/`high`. Add one `opus`/`high` critic
+only when an independent view can change a cross-module decision. If
+`review.localAssistCommand` is configured and this story meets its narrow trigger, launch its one
+read-only call concurrently with independent readers per the engineering-economy contract; routine
+stories skip it.
 
 Three **core readers** carry the build:
 
@@ -108,37 +119,34 @@ STOP and surface it — do not build a half-thing around a missing dependency.
 
 ## 2. BUILD
 
-Implement against the plan in the main agent (not a Workflow). Tight loop: small increment →
-checks green → commit → repeat.
+Implement against the plan in the main agent (not a Workflow). Use coherent increments: targeted
+check → commit. Do not create micro-commits that rerun hooks without improving isolation.
 
 - Follow the contract per file; reuse what UNDERSTAND found; **read the repo's `conventionsDoc`
   and obey every rule in it**. It is the authority on this repo's typing rules, styling tokens,
   error handling, module boundaries and logging policy — do not substitute conventions you
   remember from elsewhere.
-- **Commit OFTEN** — one per coherent step, not one at the end. Message per
+- **Commit per coherent step**, not every edit and not one giant commit at the end. Message per
   `commitConventions.messageFormat`, with the tag shaped per `itemTagFormat` (fallback:
   Conventional Commits with scope and the item tag,
   e.g. `fix(subscription): enforce seat-count invariant [I20130]`). AI attribution is
   optional; never invent or reuse attribution metadata. PR bodies get none.
-- **Keep checks green as you go**: every command in `verify.typecheck`, every entry in
-  `preCommitWiringChecks` (when the repo configures any), and the touched test suite via
-  `verify.testSingle`, **widened when the change is broad**. A red type-check, wiring
-  check, or test is stop-and-fix, never commit-anyway.
-- **The story's green gate is as wide as the profile's `storyVerify` says** — that it must be
-  green is a floor; the profile sets only the WIDTH. The per-commit loop above is the
-  `prototype` width in full (type-checks plus the touched suites, widened when broad; the full
-  suite waits for the release PR). `standard` adds the full `verify.test` before hand-back;
-  `enterprise` adds `verify.lint` on top, where the diff touches lintable code. Run the wider
-  gate before phase 3 and again after any review fix lands — never only once, early.
+- **Use the fastest relevant feedback while building**: the affected type-check target, configured
+  wiring checks, and touched tests via `verify.testSingle`, widened when the change is broad. A red
+  required check is stop-and-fix, never commit-anyway.
+- **Run the profile's complete `storyVerify` gate once on the final story SHA.** It is a floor;
+  the profile sets only its width. If phase 3 changes that SHA, rerun the affected checks and any
+  gate whose result the change can invalidate. Never repeat an unchanged command on an unchanged
+  SHA. Record the tree/SHA, config hash, commands, results and counts exactly as
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/verification-receipts.md` defines.
 - **Generated-file type errors are tolerated** only where config says so — a file matching
   `generated.paths` failing with a pattern in `generated.toleratedTypeErrors`. Everything else
   stops. Fix those by re-running `generated.regenCommand`, never by hand-editing the file.
 - **Skip `verify.skipDuringStoryBuilds` suites** when that config list is non-empty — those suites
   are gated elsewhere (at the PR/release boundary their config entries define), so don't run them
   locally during a story build and don't expect their checks here. An empty list means there is
-  nothing to skip, and a full `verify.test` run under `standard` or `enterprise` still leaves
-  the listed suites out. Exception: if the diff touches one of those suites' own files, run just
-  the touched spec directly.
+  nothing to skip; any full `verify.test` run still leaves the listed suites out. Exception: if
+  the diff touches one of those suites' files, run that touched spec directly.
 - **Regenerate API artifacts when routes/handlers change** (`generated.regenCommand`) and commit
   the output in its OWN commit — it is build output, not hand-written code, and the next phase
   excludes it from review. Committing it yourself first keeps the pre-push hook's regen a no-op and
@@ -146,101 +154,44 @@ checks green → commit → repeat.
 - Let the git hooks own wiring checks, regen and the commit-amend — don't script them by hand.
   Expect a commit to fail the wiring checks; surface that output and fix the omission.
 
-## 3. ADVERSARIAL REVIEW (before the PR)
+## 3. STORY RISK CHECK (before hand-off)
 
-The **Claude build-time pass** — the first engine, and the one every profile keeps (the local
-CLI engine and the cloud reviewers follow via `review`, as the profile and config allow). It
-runs pre-PR so issues never become GitHub threads.
+Inspect the hand-written diff against the story's working base once, excluding generated files.
+This is a bounded story check, not the full merge-boundary adversarial review; that later pass uses
+`${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/review-fanout.md`:
 
-**MANDATORY, at `effort: 'max'`, on every story — no trivial-diff skip**
-(`review.reviewDepthPolicy`). Pass `effort: 'max'` on every finder and verifier agent; do not
-inherit session effort.
+- `review-moment: release-deferred` means this fast story batches on a release-unit branch; the
+  complete finder/verifier and configured-engine pass waits for that release PR's full diff.
+- `review-moment: pr-boundary` means `review` runs that complete pass on the direct story PR next.
+- A standalone invocation with no marker performs this story check and reports the missing caller
+  context; it never guesses that a full merge review already happened.
 
-**Breadth scales with risk; existence does not.** The profile's `reviewBreadthCeiling` is the
-widest size this rule may pick; size the diff as below, then clamp to the ceiling. Say which
-size you picked and, when the ceiling clamped it, say that too:
+Every story gets a main-agent self-check for acceptance-criteria match, correctness at changed
+boundaries, meaningful negative tests, repo conventions, and unnecessary custom machinery or
+duplication under the engineering-economy contract. Apply relevant lessons as hypotheses, not
+verdicts. For a routine diff, fix what this check finds and launch no generic review fan-out.
 
-- **NARROW** (a one-liner, a rename, a config flip): 1–2 finder lenses — **correctness, plus
-  conventions when the diff touches styled or typed frontend code** — with batched verification. The security lens joins these when the
-  diff touches the auth boundary (the floor below): an addition to NARROW, not a step up.
-- **CONTAINED** (one subsystem; no deployed-runtime contract, no new permission surface): 2–3
-  lenses chosen for the diff's real risk, batched verification (one verifier
-  per finder's list, not per finding).
-- **HIGH-RISK** (cross-module contracts, deployed handlers, migrations, permission or security
-  surface, event reshapes — anything the deploy-safety contract flags): all five lenses,
-  verification grouped by file.
+**Immediate risk floor.** If the DIFF touches authentication/authorization, a migration or
+irreversible state transition, or a deployed-runtime contract, name the files and risk. Launch one
+focused `opus`/`xhigh` verifier per independent boundary, maximum two, rather than five generic
+finders; if there are more boundaries, group related ones without dropping any. It must try to
+reproduce a concrete failure, check the matching security/deploy invariant,
+and return anchored findings with CONFIRMED / PLAUSIBLE / REFUTED verdicts. REFUTED is the default;
+"could not rule it out" is not evidence. The profile cannot remove this floor.
 
-Unsure → go one size up, **never past the ceiling**; a ceiling the contract lets rise for one
-story is the contract's exception, not a judgment call here. **Read when** the size is unclear:
-`${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/review-fanout.md` — the reasoning behind
-the sizes, the grouping, the lesson routing and the verification mechanics.
+When configured, the one read-only `review.localAssistCommand` call may run concurrently on a
+distinct risk question per the engineering-economy contract. Its output is advisory and never a
+second mandatory pass.
 
-**FLOORS — no profile or override removes these.** The Claude pass itself always runs, at NARROW
-or wider. And **the security lens is added whenever the DIFF touches the auth boundary** — as
-the contract defines it — at every breadth, including NARROW under a NARROW ceiling. Decide
-that from the diff in hand, not from the plan's theme, and NAME the files that make it so — they
-are Stage B's `authBoundaryFiles`.
+Assign ids (`F1…Fn`) using `review-fanout`'s canonical fingerprint/occurrence rule; retain every
+source/anchor. A security duplicate keeps its classification. For a verdict based
+on a browser, service, or manual run, name the path exercised and the relevant paths not exercised;
+never report a bare "verified".
 
-Run over **the hand-written diff only** — computed against the story's WORKING BASE (the branch the
-PR will target) and **excluding generated files**.
-
-**Stage A — finders** (parallel, one per angle). Each returns findings with a `file:line` anchor
-and a one-sentence claim. Merge the lists deduplicating on anchor + claim — never on the claim alone,
-two locations with one defect are two findings — (a duplicate the security lens shares keeps
-`security`), keep every finding's lens, and assign ids (`F1…Fn`) — Stage B's verdicts are keyed
-by them.
-
-**Hand each finder the lessons that match ITS angle** as ADDITIONAL named checks — a judgment
-read from each lesson's Pattern text (the schema records no angle); a lesson matching no lens
-provisioned for this story is dropped for this build. Two imperatives: lessons **EXTEND** a
-finder's checklist and never narrow it; and a lesson-derived finding goes through Stage B
-verification like any other, with a concrete `file:line` claim about THIS diff. No lessons
-file → the finders' base checklists are the whole story.
-
-- **Correctness** — logic bugs, edge cases, off-by-one, null/undefined, swallowed `Result` errors,
-  races, wrong state transitions.
-- **Security** — missing `Auth.requireAccess`, IDOR / org-scoping gaps, injection, secrets in code,
-  over-broad ACLs.
-- **Contract-match** — does the code actually satisfy UNDERSTAND's downstream contract?
-- **Tests / false-green** — assertions that can't fail, mocked-away behavior under test, missing
-  negative/permission cases, a green suite not covering the new path, and a behavioural fix
-  verified on ONE path to a state that other paths also reach (a second navigation route, a
-  fresh tab, a keyboard shortcut, a retry) — name the unexercised paths as findings.
-- **Cleanup / conventions** — `conventionsDoc` violations, dead code, leftover debug, KISS/YAGNI/DRY.
-
-**Stage B — verification.** Fan out by the profile's `verificationGrouping` (contract): at
-HIGH-RISK **one verifier per file-group** — the findings anchored in one file or a small related
-set (at most 5 findings and 3 files per group) — grouped by
-`${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/scripts/group-findings.py` (no `python3` → group by
-hand by the same rule and say so); at CONTAINED one verifier per finder's list; at NARROW
-batched. **An auth-boundary finding is never grouped: it gets its own verifier at every breadth** (Floor 2) — auth-boundary meaning the
-security lens raised it, or its anchor file is one the diff's auth-boundary decision named. Every
-verifier returns **one verdict per finding id** — CONFIRMED / PLAUSIBLE / REFUTED, each with
-likelihood and impact, as a JSON list keyed by id; a return missing any id, or carrying one
-verdict for the group, is defective: re-run that group per finding and say so in the report.
-`profileOverrides.verificationGrouping: "per-finding"` restores one verifier per finding at
-HIGH-RISK.
-**CONFIRMED** (real and reproducible) / **PLAUSIBLE** (likely real, not fully verifiable from the
-diff) / **REFUTED** (the verifier shows why the code is fine). A finding is not actionable until
-CONFIRMED or PLAUSIBLE.
-`verificationDefault` is **REFUTED unless reproducible** under every profile: a verifier starts
-from REFUTED and the finding earns its way up — CONFIRMED by reproducing it from the diff,
-PLAUSIBLE only by pointing at the concrete mechanism in THIS diff and showing why it is likely
-reached. A finder's confidence moves nothing on its own, and "could not rule it out" is
-REFUTED. Every CONFIRMED or PLAUSIBLE verdict also carries the two facts the fix floor reads
-next: **likelihood** (how readily the defect is reached in real use) and **impact** (what it
-costs when it is). **P1** means the impact is a broken acceptance criterion of this story,
-corrupted or lost data, or a security hole; a security finding is P1 whatever its likelihood.
-
-**A verdict that rests on having LOOKED — a browser, a running service, a manual run — names
-the path it exercised.** The report vocabulary is **"verified X via path Y"**, never a bare
-"verified". Before calling a behavioural fix verified, enumerate the routes to that state and
-name which were NOT tried; scope DOM or API queries to the live container and check its count;
-one clean load per case; rule out a stale session, an expired login or a service that is not up
-before reading code (the reference has why).
-
-Then act by the profile's `fixFloor` — which verified findings get fixed IN THIS STORY, read
-from those verdicts:
+Verified P1 and serious-P2 findings (defined in `review-fanout`) are a universal fix floor. If this
+check or a verifier finds one, fix it, run affected checks and launch/re-run a focused verifier
+with the cumulative story ledger until a pass finds none; there is no numeric cap. No patch change,
+no progress or an unavailable verifier while one remains STOPS for human help. Then apply the profile's `fixFloor`:
 
 - **`p1-security`** (`prototype`): P1 correctness and any security finding. Everything else is
   deferred with a one-line rationale, tagged as below.
@@ -249,8 +200,7 @@ from those verdicts:
   question. The rest is dismissed with a one-line rationale, recorded in the hand-back.
 - **`all-confirmed`** (`enterprise`): **fix every CONFIRMED and PLAUSIBLE.**
 
-What is not fixed is either explicitly DEFERRED with a reason and a tag, or DISMISSED with its
-rationale — never silently dropped:
+What is not fixed is explicitly DEFERRED or DISMISSED with a reason, never silently dropped:
 
 - **Has a home** — belongs to a tracked downstream story or sits behind this story's intentional
   seam. Record the rationale and owning item.
@@ -258,23 +208,29 @@ rationale — never silently dropped:
   it is invisible to the loop forever, so carry it on the hand-back's **untracked-deferral list**
   for `build-item` step 6.5.
 
-**Drop every REFUTED finding** — don't "fix" code the verification stage proved correct. Commit
-fixes per `commitConventions.reviewFixFormat` (fallback: `fix(<scope>): <summary> [<itemNumber> review]`); regenerate API artifacts again if routes changed. A genuinely
-ambiguous or risky finding is a fork — ask, with your recommendation.
+Drop REFUTED findings. Commit fixes per `commitConventions.reviewFixFormat` (fallback:
+`fix(<scope>): <summary> [<itemNumber> review]`) and regenerate artifacts if routes changed. Ask
+on a genuinely ambiguous risky finding, with a recommendation.
 
-Close the phase with a one-line **review report**: the profile, the breadth picked (and whether
-the ceiling clamped it), the lens count (naming the security lens when the auth-boundary floor
-added it), the agent count across both stages (**verifiers: G groups + A per-finding**), and the tally — raised / fixed / deferred /
-dismissed.
+Create a compact **story review ledger**: item-number namespace, base/head SHA, risk/files,
+each finding's id/fingerprint/anchors/claim/verdict/disposition, checks rerun,
+and any local-assist conclusion. The later review receives this ledger as context; it may challenge
+it, but must not rediscover or reverse a settled finding without new evidence.
+
+Close with a one-line **risk-check report**: profile, review moment, routine vs immediate-risk,
+agents used (normally zero; focused verifier count when required), and raised/fixed/deferred/
+dismissed totals.
 
 ## 4. Hand back
 
-Done when the branch holds a built, self-reviewed, all-green story: commits made and pushed,
+Done when the branch holds a built, risk-checked, all-green story: commits made and pushed,
 type-checks / wiring checks green, and the test gate green at the profile's `storyVerify` width.
 
-Report to `build-item`: the item number, a one-line summary, **the profile and its source**,
-green-checks confirmation **naming the gate that was run** (the commands, so the caller can see
-the width without re-deriving it), the phase-3 review report, and four lists —
+**Human recap.** Lead with `Built / Checked / Next`: state the outcomes, what validation and review
+ran or did not run, and whether the story is ready for its merge path. Then report to `build-item`:
+the item number, **the profile and its source**,
+the SHA-keyed verification receipt, the phase-3 risk-check report and story review ledger, and four
+lists —
 
 - **buildable-now-vs-deferred scope line** (build + review deferrals, each tagged has-a-home vs
   untracked);

@@ -1,5 +1,5 @@
 {
-  "description": "Session-start version check: says when a newer plugin release exists, and how to get it. Silent when current. Never blocks a session.",
+  "description": "Session-start version check: reports newer releases, safely applies an opted-in repository-scoped update, and says when restart is required. Silent when current; never blocks a session.",
   "hooks": {
     "SessionStart": [
       {

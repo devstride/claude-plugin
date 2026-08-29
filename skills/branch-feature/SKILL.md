@@ -3,6 +3,8 @@ name: branch-feature
 description: Create a new feature branch off develop with proper naming convention
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Create a new feature branch with the following workflow:
 
 Branch name argument: $ARGUMENTS

@@ -3,6 +3,8 @@ name: review
 description: Run a PR through every configured review engine (as configured in `review.*`), address every verified finding, resolve the addressed threads, release CI and settle it green, then report or notify
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Take an open pull request through the **full review-and-settle loop**: run every review engine,
 address each verified finding, reply-to and RESOLVE each addressed cloud thread, then release CI
 and settle it green. The reusable engine `pr` composes; also runnable standalone as
@@ -21,91 +23,86 @@ is `lessonsDoc` — the per-repo lessons store this skill writes (fallback:
 
 ## The two contracts
 
-**EVERY CONFIGURED ENGINE, EVERY PR, MAX EFFORT.** No trivial-diff skip
-(`review.reviewDepthPolicy`) — degradation narrows WHO reviews, never how hard. Under fast
-develop mode the configured engines are satisfied **per epic** — local engines on each story,
-the cloud roster and CI on the epic release PR — but every line still passes every configured
-engine before it reaches develop. See LOCAL-ONLY mode below.
+**Spend full adversarial review at a merge boundary, and size it to the risk.** A fast story
+accumulating on an epic branch gets a bounded local risk screen; the epic release PR is its full
+Claude + configured local + cloud pass. A direct PR, hotfix, epic release and production release
+are merge boundaries. Scope/breadth come from `delivery-profiles.md`; model/effort come through
+`review-fanout.md` from its engineering-economy route. Never repeat already-covered scope.
+Before cycle 1 read `${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/review-fanout.md`;
+it is the canonical finder/verifier procedure.
 
-**The delivery profile — resolve it BEFORE the roster, announce it with its source.** Canonical
-definition: `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` — read it, do
-not restate it. This skill honours six knobs: `localCliEngine`, `maxLocalReviewRounds` (whether
-and how often the local CLI engine runs on a fast-mode STORY review — never whether it is on the
-roster), `fixFloor`, `reviewerRegistrationWindowMinutes`, `pollTimeoutMinutes`,
-`releaseCiOrdering`. A caller that resolved it (`build-item`, `pr`, `release`) passes it in;
-otherwise resolve it by the contract's order (explicit argument → the plan root's marker, read
-with `get_item(view: 'full')` → config `profile` → `standard`). **Either way apply
-`profileOverrides` to THIS skill's knobs** — a caller passes the profile NAME, not the
-overrides, so skipping this on a driven path silently drops a pinned `fixFloor` or
-`maxLocalReviewRounds`. Announce next to the roster ("profile: standard — from
+**Resolve the delivery profile BEFORE the roster; announce it with its source.** Read
+`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`. This skill honours `localCliEngine`, `maxLocalReviewRounds`,
+`fixFloor`, reviewer timeouts and `releaseCiOrdering`. Accept a caller's resolved name; else use
+(argument → full-view root marker → config → `standard`). **Apply overrideable `profileOverrides`;**
+reject a cycle-target override. Two cycles is fixed; P1/serious-P2 safety cycles have no numeric/local cap. Announce
+("profile: standard — from
 `.claude/ds-config.json`").
 **An explicit config key wins over the profile** where a knob has its own key
 (`review.pollTimeoutMinutes`): a PRESENT key is the operator's decision — honour it, report the
 contradiction. Two `review.*` keys are NOT overrides of that kind: **`review.localCommand`
 NAMES the engine, it does not schedule it**, and **the three CI-ordering booleans describe what
-the workflows SUPPORT** — under `prototype` the hold is simply not used at runtime, whatever
-they say (the reasoning: `roster-and-modes.md`).
+the workflows SUPPORT**. No profile bypasses a supported hold (the reasoning:
+`roster-and-modes.md`).
 
 **Roster resolution — at the start of EVERY run, announced.** From config plus probes, never
 assumption:
 
-- **Claude adversarial** — intrinsic; always on the roster (`ultracode-build` phase 3, or step 1
-  here).
+- **Claude adversarial** — intrinsic; always on a PR-boundary roster. A fast story's risk screen
+  is not a substitute for the epic release pass.
 - **Local CLI engine** — **call it by `review.localReviewerName`**. On the roster iff
   `review.localCommand` is non-null AND its first token resolves (`command -v` before
   launching); `null` is a legal, documented value. **A present `localCommand` puts the engine
-  on the roster for EVERY PR-path review under EVERY profile** — release PR, one-off, hotfix;
-  the profile decides only its rounds on a fast-mode story (zero under `prototype` is a
-  choice, not a degradation).
+  on the roster for EVERY PR-boundary review under EVERY profile** — release PR, one-off,
+  hotfix. Routine fast stories defer it with the rest of the full roster.
 - **Cloud reviewers** — exactly the `review.automatedReviewers` entries; `[]` is legal ("no
   cloud wave" — absent reviews are correct, not pending).
 - **Draft-hold mechanics** — per `review.openPullRequestsAsDraft` /
-  `readyForReviewReleasesCi` / `ciHeldUntilReviewSettled`. All false = a CI-runs-on-draft
-  repo: non-draft opens, no flip machinery, CI settles concurrently. Mixed values → the
-  strictest configured behavior, said so. **`prototype`'s `releaseCiOrdering` on a RELEASE PR
-  treats all three as false FOR THIS RUN** — announce it; a still-draft PR there is flipped at
-  step 0. Per-story, one-off and hotfix PRs keep the configured hold.
+  `readyForReviewReleasesCi` / `ciHeldUntilReviewSettled`. All true = review and pre-ship work
+  finish before one CI release. Mixed values → use the strictest safe behavior and report the
+  repair. All false with PR workflows = ungated and not optimized: CI may already be running;
+  report `/devstride:setup ci`. No PR workflows = N/A.
 
 Announce the resolved roster by name ("engines this run: Claude + Codex + Copilot" / "Claude
 only — localCommand null, no cloud reviewers"). **Configured-but-failing is NOT
 not-configured**: a probe failure or unresponsive configured reviewer is a degradation THIS RUN,
 reported; an unconfigured engine is silent-by-design. A missing engine narrows the roster —
-never a hard stop — with ONE floor: fast story merges require ≥ 1 local engine (`build-item`
-step 4). **With no config file present, the fallback roster is CLAUDE-ONLY** — nothing was
-configured to fail; proceed on the Claude pass and say so. In the body stays one flag rule:
-pass `xhigh` in `review.localCommand` — do not drop the flag; the user default is only `high`.
+never a hard stop — with ONE floor: fast story merges require a completed local risk screen
+(`build-item` step 4). **With no config file present, the fallback roster is CLAUDE-ONLY** —
+nothing was configured to fail; proceed and say so. Substitute `<effort>` in a local command
+from the canonical task/risk route. For a legacy Codex template with a literal
+`model_reasoning_effort`, replace that value for this invocation; do not let stale config pin
+every task to `xhigh`, and do not choose its model for the operator.
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/roster-and-modes.md` when a roster
 resolves to fewer engines than the config declares, or before changing a mode definition** — it
 holds the fully-configured roster table and which paths never ran a Claude pass.
 
-**REVIEW FIRST, CI LAST**, held mechanically (`review.ciHeldUntilReviewSettled`) — in the
+**REVIEW FIRST, PRE-SHIP SECOND, CI LAST**, held mechanically
+(`review.ciHeldUntilReviewSettled`) — in the
 draft-hold regime PRs open as drafts, every job gates on `ci.draftGateCondition` (here
 `github.event.pull_request.draft == false`), so during review **nothing is running** — nothing
 to poll, nothing to triage; the step-7 ready-flip releases CI once, on the final reviewed diff.
-(All booleans false → CI runs concurrently and only the settle-at-final-SHA rule applies.)
+(An adopted PR in an ungated repo can only settle at its final SHA; report that the run-once
+guarantee was unavailable.)
 
 **PRE-SHIP RESUME mode** (the caller names it — `pr` step 2c, `release` step 2c): the return
-from a **7.1b pre-ship hold**. **Skip steps 0–6.5 entirely; start at 7.1**: re-resolve the PR,
+from a **7.1b pre-ship hold**. **Start at 7.1**: re-resolve the PR,
 re-run 7.1's base/patch check and the paginated zero-unresolved check, then flip and settle.
-Never re-enter the earlier steps (the why — re-requested reviewers, corrupted lesson
-recurrences — is in `roster-and-modes.md`). The one exception is 7.1b's own: a pre-ship fix
-that changed the patch SUBSTANTIVELY re-runs the local streams and re-requests the cloud
-reviewers for that delta — a targeted re-review, not a restart. The held invocation's lessons
-tally carries into this one's report.
+Skip 0–6.5 unless 7.1 finds a changed patch: then run step 5's contextual wave through 3–6.5,
+return to 7.1 and prove zero threads before flipping. Never restart. Carry ledger, counters,
+safety triggers and lessons tally.
 
 **LOCAL-ONLY mode** (fast develop mode — `build-item` step 4a invokes it by name; the caller
-passes a base REF, not a PR number): no PR — run the **Codex stream only**, STOP after triage.
-Zero story rounds by profile (`prototype`) → no Codex stream either: steps 3–5 over the
-caller's build-time Claude findings, reported as "zero rounds by profile", not degradation.
-Skip steps 0, 2, 6, 7, 8. Run step 1's Codex bullet with `--base <the passed ref>`, steps 3–5
-over its findings, then **step 6.5 (THE LESSONS WRITE) — this path MUST write**
+passes a base REF, not a PR number): no PR and no routine second review. Consume the caller's
+risk-screen ledger and findings, run steps 3–5 only for triage/fixes, then **step 6.5 (THE
+LESSONS WRITE) — this path MUST write**
 (`roster-and-modes.md` holds why), and return the triaged findings, the untracked-deferral
 list, **and the lessons tally** to the caller, which owns the merge (the engine contract is
-satisfied across the epic). **CLI engine unavailable here**: proceed on the Claude pass alone
-ONLY when the caller confirms the build-time pass covered this diff (`build-item` step 3 always
-does); a probe FAILURE of a configured engine is this-run degradation; STOP only if ZERO local
-engines would stand behind the story. **Callers invoke this mode even with no CLI engine
-configured** — a Claude-only fast story still has findings to distill.
+satisfied at the epic boundary). A configured `review.localAssistCommand` may already have
+provided the targeted read-only second opinion `ultracode-build` requests for ambiguity or
+critical risk; never launch it again here. Missing risk-screen evidence routes the story through
+the full PR path. **Callers invoke this mode even with no CLI engine configured** — it owns
+settle-time triage and lessons, not an unconditional engine launch. Skip steps 0–2 and 6–8.
 
 **Driven mode** (invoked by another skill — it says so): on poll timeout proceed with what you
 have; do NOT notify; return the findings summary + untracked-deferral list; still CAPTURE
@@ -119,35 +116,39 @@ ambiguous/risky/unverifiable finding, or a destructive/outward-facing action.
 - **Confirm the PR is OPEN** — an explicitly passed number can name a closed or merged PR;
   without this guard the loop launches reviewers and mutations against it.
 - **A DRAFT is the NORMAL state — never skip it, never ask whether to review it.** You flip it
-  ready in step 7. **One exception:** in the CI-concurrent regime (`prototype`'s
-  `releaseCiOrdering` on a release PR) a draft is holding CI for no reason — `gh pr ready` NOW,
-  before any push, and confirm a workflow run appears for the head SHA (7.3's escalation if
-  none). Step 7 then has no flip left.
+  ready only in step 7, after review and any pre-ship checks. No profile starts CI early.
 - Resolve `{owner}/{repo}` once.
 
-## 1. Launch every stream, concurrently
+Initialize the cumulative ledger described in
+`${CLAUDE_PLUGIN_ROOT}/skills/review/references/review-ledger.md`: review moment, risk/scope,
+base and head SHAs, effective cycle/local targets, and any caller-supplied story or release evidence.
+Record one reviewed-head row as each engine returns; every later pass consumes this ledger.
 
-Kick all of them off in one turn — Copilot reviews in the cloud the whole time the local engines
-run; serializing wastes minutes.
+## 1. Launch cycle 1, concurrently
 
-- **Claude** — skip only if `ultracode-build` phase 3 covered THIS diff; otherwise run that
-  phase-3 pass now over the PR diff (`effort: 'max'`, generated files excluded, breadth sized to
-  the diff). No GitHub thread; triage like Codex's.
+Kick all off in one turn; serializing wastes minutes. Capture `cycleAnchor = HEAD` first and freeze
+through step 3. It remains the common anchor even if one engine reports another SHA.
+
+- **Claude** — run the canonical PR-boundary adversarial route over the caller-declared scope,
+  generated files excluded. Use the task/risk-sized model alias and effort from
+  `delivery-profiles.md`; a fast story's earlier risk screen does not cover an epic release.
+  No GitHub thread; triage like the local CLI's.
 - **Local CLI engine (Codex)** — only when on the resolved roster: `review.localCommand` with
-  `--base origin/<baseRefName>`, run in the worktree, any `<context>` token removed. Record the
-  head SHA at launch — step 5 scopes round 2 from it. **Launch in the background with a long
+  `<base>` = `origin/<baseRefName>` and `<effort>` = the resolved route, run in the worktree. A
+  context-first template receives the cycle scope and current ledger on stdin; a legacy
+  base-only template removes `<context>`. Record the head SHA at launch. **Launch in the
+  background with a long
   timeout — it runs for MINUTES**; a foreground default-timeout call kills it mid-review, which
   looks *identical* to a clean review. Configured-but-unavailable → this-run degradation,
-  continue; unconfigured → skip silently. **This launch is round 1 of
-  `maxLocalReviewRounds`** — the TOTAL runs of this engine this cycle, re-reviews included;
-  step 5 spends the rest, 7.1/7.1b are bounded by the same cap; count every launch. On a PR
-  path a configured engine reviews under every profile — read `prototype` there as "one review,
-  no re-review".
+  continue; unconfigured → skip silently. This spends cycle 1 and local round 1; later ordinary
+  launches follow both targets, while P1/serious-P2 safety cycles override them. On a PR path a configured engine reviews under every
+  profile.
 - **Cloud reviewers** — skip this bullet's REQUESTING and step 2's poll when
   `review.automatedReviewers` is `[]`. (Step 6 is skipped only when no review threads EXIST — a
   human reviewer may comment on any PR, and those threads get the full treatment.) If the
-  caller already requested them at PR-open (`pr` does), go straight to the wait for those it
-  reports REGISTERED; request the rest. **Iterate `review.automatedReviewers`, requesting EACH
+  caller already requested them at PR-open (`pr` does), accept its per-reviewer baseline count,
+  request time and mutation outcome, then prove registration here while local streams run;
+  request entries with no handoff. **Iterate `review.automatedReviewers`, requesting EACH
   entry per its `how`** — never assume a single Copilot-shaped reviewer. For a
   `requested_reviewer` bot: GraphQL with the entry's `graphqlBotId` (REST rejects bots), **then
   confirm a NEW `review_requested` timeline event appears** — the mutation reports success even
@@ -169,27 +170,14 @@ run; serializing wastes minutes.
 
 ## 2. Wait for the cloud reviewer
 
-**Skip entirely when no cloud reviewer is on the roster** (`automatedReviewers: []`, or nothing
-registered) — waiting manufactures a timeout. **Reviewers only — never poll CI here**: nothing
-runs on a draft, and an absent check is expected, not red. Triage/fix the local findings WHILE
-the poll runs.
-
-ONE self-terminating **background** poll — a single `Bash` call with `run_in_background` running
-`${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/wait-for-reviewers.sh`. **Not a Monitor, not
-re-armed wakeups**, never `gh pr checks --watch`, never a foreground sleep (the why:
-`roster-and-modes.md`). Pass the repo, the PR, the **REGISTERED** set (each reviewer's
-`graphqlBotId` + its `review_requested` event's `created_at` as `registeredAt`), the review-id
-high-water mark (captured first), `pollTimeoutMinutes` and
-`reviewerRegistrationWindowMinutes`. It backs off 20 s → 90 s, exits when every registered
-reviewer has posted a review from THIS cycle, and — unless `review.adaptiveReviewerWait` is
-`false` (then pass `--fixed-bound`) — stops waiting on a reviewer past its learned p95 plus
-slack, never below the window, never above `pollTimeoutMinutes` (cache:
-`~/.cache/devstride-plugin/reviewer-latency.json`; one authoritative `RESULT` line to read on
-re-invoke). `proceed-p95` and `timeout` are BOTH this-run degradation: **record WHICH reviewer
-failed to respond** for the step-8 report — and at steps 7–8's zero-unresolved checks ALSO
-re-fetch reviews above the high-water mark: a late review's findings may sit in its body with
-no thread. `pollTimeoutMinutes` bounds only a REGISTERED reviewer. Standalone, you may ask to
-keep waiting. **Read when** tuning:
+No registered cloud reviewer → skip; never manufacture a wait. Poll reviewers only, while local
+triage continues — CI is held. Launch ONE self-terminating background call to
+`${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/wait-for-reviewers.sh`; never Monitor, re-armed
+wakeups, `gh pr checks --watch`, or foreground sleep. Pass repo/PR, registered reviewer ids +
+server `created_at`, review-id high-water mark, and both time bounds. Honour
+`adaptiveReviewerWait` (`false` → `--fixed-bound`). Its `RESULT` is authoritative;
+`proceed-p95`/`timeout` degrade the named reviewer. At steps 7–8 also fetch reviews above the
+high-water mark for late body-only findings. Standalone may ask to keep waiting. Details:
 `${CLAUDE_PLUGIN_ROOT}/skills/review/references/reviewer-latency.md`.
 
 ## 3. Collect findings — BOTH halves, scoped to this cycle
@@ -201,22 +189,25 @@ keep waiting. **Read when** tuning:
   including a collapsed *"Comments suppressed due to low confidence"* block — treat those as
   real (one was a genuine race that shipped as a defect). Zero inline comments never means zero
   findings.
-- **The caller's build-time Claude pass counts as one of the engines here, on EVERY path** —
-  when step 1 skipped its own Claude stream, that phase's triaged findings are part of this
-  cycle's input set (otherwise they are invisible to the dedup guard and step 6.5).
-- Merge all engines' findings and de-duplicate — **on the CLAIM, not the location**: different
-  defects routinely share a line. **Genuine duplicates keep the CLOUD reviewer's entry** — it
+- **Caller-supplied story risk-screen findings remain inputs, not a PR-boundary engine result.**
+  Namespace imported ids (`story:<item>:F1`, `pr:<number>:R001`) as source aliases; fingerprint
+  into this run's `RNNN`, never matching bare ids. Import dispositions for dedup/lessons;
+  step 1's Claude stream still reviews the merge-boundary scope.
+- Merge all engines' findings by the ledger's canonical fingerprint, retaining every source and
+  anchor; a distinct affected contract or independently fixable occurrence gets its own id.
+  **Genuine duplicates keep the CLOUD reviewer's entry** — it
   carries the thread step 6 must reply to and resolve; collapsing onto the local copy leaves
   that thread unanswered. Mark each finding's disposition route: *inline thread* → reply +
   resolve; *review-body* → fix, then record in one PR comment; *local (Codex/Claude)* → just
-  fix.
+  fix. Attach duplicate sources to the ledger's stable `RNNN`. Update verdict, evidence, disposition and reviewed-head rows as triage
+  progresses. Never overwrite an earlier dismissal or fix — later evidence appends to it.
 
 ## 4. Verify and triage
 
 Read the actual code before changing anything — never blind-apply a suggestion. A behavioural
-finding whose fix is confirmed by looking names the path it exercised —
-**"verified X via path Y"**, never a bare "verified" — and says which other routes were NOT tried (the rule
-`ultracode-build` phase 3 Stage B states in full). Sort each finding into exactly one bucket:
+finding whose fix is confirmed by looking names the path it exercised — **"verified X via path
+Y"**, never a bare "verified" — and says which other routes were NOT tried (the verification
+honesty rule in `delivery-loop-invariants.md`). Sort each finding into exactly one bucket:
 
 **Dedup guard** — load `lessonsDoc` ONCE at this step's entry (absent/empty → skip the guard; a
 valid state). As each finding lands in CONFIRMED/PLAUSIBLE, test it against the stored lessons
@@ -229,10 +220,11 @@ Pattern test itself only to findings arriving UNMARKED (loop-back arrivals). One
 entry points, no second opinion. REFUTED findings never bump a lesson.
 
 - **REFUTED** → dismiss with a posted rationale. Never silently ignore.
-- **CONFIRMED/PLAUSIBLE, in scope, at or above the profile's `fixFloor`** → fix now. The floor
+- **CONFIRMED/PLAUSIBLE P1 or serious P2, in scope** → fix now under every profile. `review-fanout`
+  defines serious P2 as below P1 with likelihood = likely and impact = material.
+- **Other CONFIRMED/PLAUSIBLE, in scope, at or above the profile's `fixFloor`** → fix now. The floor
   is the contract's, exactly as defined (`p1-security` / `likely-important` / `all-confirmed`),
-  read from the same two facts every verified verdict carries — **likelihood** and **impact**,
-  with **P1** as `ultracode-build` defines it; a security finding is material by definition.
+  read from every verdict's **likelihood** and **impact**; security is material by definition.
 - **CONFIRMED/PLAUSIBLE, in scope, BELOW the floor** → not fixed this cycle. Defer with a
   one-line POSTED rationale — to the owning item, else the untracked-deferral list (driven) or
   a named offer of `/devstride:insert-defect` (standalone) — or dismiss where the contract says
@@ -245,20 +237,26 @@ entry points, no second opinion. REFUTED findings never bump a lesson.
 
 ## 5. Fix and push
 
+For any code fix on a non-draft PR, run `gh pr ready --undo` before push where supported; settle
+below and re-enter 7.1–7.3. Never poll CI while draft.
 Follow the repo's `conventionsDoc`. Keep `verify.*` green locally. Regenerate API artifacts in
 their own commit if routes/handlers changed. Commit per `commitConventions.reviewFixFormat`
-(fallback: `fix(<scope>): <summary> [<itemNumber> review]`), push via `/devstride:push`.
+(fallback: `fix(<scope>): <summary> [<itemNumber> review]`), push via `/devstride:push`, passing
+any exact-head verification receipt it can legally reuse.
 
-**Re-review of the fixes — spend the round cap, then STOP.** `maxLocalReviewRounds` counts
-every run of the local CLI engine this cycle; step 1 spent one. Rounds remaining →
-`${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/rereview-scope.sh --base origin/<baseRefName>
---round1 <round-1 head SHA>` decides: `none` (no fix commits) → no round 2, none spent; `full`
-(its rule, or config `localReReviewScope: "full"`) → round 1's command unchanged; `delta` → the
-same command with `<base>` := the round-1 head SHA — or the reference's `<context>` stdin form,
-distilled BY YOU, never pasted. Its findings go through steps 3–4; each run counts. **At the
-cap: the last round's verified findings are fixed WITHOUT another engine round.** Any later
-finding is triaged at `fixFloor` as in step 4; deferrals carry a rationale. Claude's intrinsic
-pass has no cap: re-read the delta of every fix yourself. **Read when** unsure:
+**One contextual follow-up at a time.** For a changed patch, resolve ONE scope per
+`delta-re-review.md`: explicit `full`, else `rereview-scope.sh` from the prior cycle anchor;
+`none` spends nothing. Capture/freeze the next anchor; launch streams on that exact range with the
+ledger, updating its PR comment before cloud re-request. Findings return through steps 3–6.5 and
+the paginated zero-thread check before any ready flip.
+
+Normally stop after `targetAdversarialCycles` (two). Beyond it, any P1/serious P2 verified against
+the current head — by a reviewer, main-agent inspection, pre-ship or CI — opens another after its
+fix and checks. Consume trigger ids at launch; only a
+changed-head fix or new evidence reopens one. Repeat until a cycle finds none, without numeric or
+local-round cap. Lower findings get `fixFloor`, checks, receipt update and one main-agent ledger
+inspection. An open safety trigger with no patch/progress or required reviewer is a human gate.
+Every finding gets a terminal disposition. **Read before any follow-up:**
 `${CLAUDE_PLUGIN_ROOT}/skills/review/references/delta-re-review.md`.
 
 ## 6. Reply to AND resolve every addressed cloud thread
@@ -290,16 +288,13 @@ handled.
 
 ## 6.5 THE LESSONS WRITE — distill this cycle's findings into `lessonsDoc`
 
-**Its own step, run UNCONDITIONALLY** — never nested inside conditional step 6. Two entries:
-**PR path — here, BEFORE step 7 releases CI** (the lesson commit is part of the SHA CI tests);
-**LOCAL-ONLY — after step 5, before returning**. **`review` is the ONLY skill that DISTILLS
-into `lessonsDoc`.** ONE exemption: whoever resolves a merge conflict in the file applies the
-format doc's collision policy — conflict RESOLUTION, not distillation.
+Run unconditionally outside step 6: PR path here before CI; LOCAL-ONLY after step 5. `review` is
+the only skill that DISTILLS into `lessonsDoc`; merge-conflict resolution may apply the format's
+collision policy but creates no lesson.
 
 - **The written entry gets no engine review, so it is self-verified and visible**: re-read it
   against `${CLAUDE_PLUGIN_ROOT}/skills/review/references/lessons-format.md` (schema, caps,
-  curation bar) and put the entry's heading + class in the report or hand-back. (Why this is a
-  bounded exemption, not a hole: the format doc's "Self-verification" note.)
+  curation bar) and put the entry's heading + class in the report or hand-back.
 - **Run AT MOST ONCE per review cycle.** A red-CI loop-back never re-distills findings already
   distilled — only genuinely NEW findings raised in the loop-back, and only if fixed and
   pushed. **A post-settle re-entry that is reply/resolve-only writes NOTHING** — its commit
@@ -308,7 +303,7 @@ format doc's collision policy — conflict RESOLUTION, not distillation.
   on a `develop → master` release the head IS `develop`. On a protected head skip the write and
   say so.
 - **When:** only after every finding has a terminal disposition AND its fixes are made. Input:
-  this cycle's CONFIRMED and PLAUSIBLE findings — REFUTED findings are never lesson material.
+  CONFIRMED and PLAUSIBLE findings — REFUTED is never lesson material.
 - **Classify and curate** strictly per the format doc — it owns the curation bar (including
   checking `conventionsDoc` before minting), schema, caps, eviction, and the concurrent-branch
   ID-collision policy. Read it before writing; never work from memory. Writing NOTHING is the
@@ -331,11 +326,11 @@ format doc's collision policy — conflict RESOLUTION, not distillation.
 
 ## 7. Release CI (ready-flip) and settle green
 
-**When the draft-hold booleans are all false (CI-runs-on-draft repo) — or the profile treats
-them as false for this run (`prototype`, release PR; step 0 already flipped any draft) — ONLY
-step 7.3's flip mechanics do not apply.** Everything else runs: the entry gate, the pre-flip
-paginated zero-unresolved check, 7.1's base refresh, 7.2's applicability — then settle at 7.4,
-green at the FINAL head SHA. **Read
+**When the draft-hold booleans are all false, only step 7.3's flip mechanics do not apply.**
+Everything else runs: the entry gate, the pre-release paginated zero-unresolved check, 7.1's
+base refresh, 7.2's applicability, then settle at 7.4 green at the FINAL head SHA. If PR
+workflows exist, this is the degraded ungated case already reported — never describe it as
+CI-last or run-once. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/review/references/ci-settle.md` when the flip produces no run, a
 check reads `skipping`, or CI is red.**
 
@@ -354,28 +349,24 @@ circular.
    - **Disposable head:** fetch the base, rebase onto it, push via `/devstride:push` (a rebase
      rewrites SHAs; `push` uses `--force-with-lease`). An unresolvable conflict is a genuine
      fork — STOP.
-   - **If the rebase CHANGED the patch, no engine has seen this diff.** Compare pre- and
-     post-rebase patches. Identical → proceed. Different → re-run the LOCAL streams over the
-     new diff and settle findings BEFORE the flip, and **re-request the cloud reviewer (when
-     configured) if the delta is substantive**. **The local re-run is always FULL scope and
-     bounded by `maxLocalReviewRounds`**: past the cap it is replaced by a Claude-only re-read
-     of the delta, noted in the step-8 report; the cloud re-request is not capped, but its
-     registration is proven within the same window as step 1 or the reviewer is dropped.
+   - **If the rebase CHANGED the patch, no reviewed-head row covers it.** Compare pre- and
+     post-rebase patches. Identical → carry the receipt/ledger forward. Different → apply step
+     5's target/safety rule. Beyond the target, noncritical unreviewed change gets affected checks,
+     main-agent inspection and human review; P1/serious-P2 fixes continue. Rebase never resets it.
 7.1b. **PRE-SHIP HOLD — when the caller declared one, STOP HERE and hand control back.**
-   **Applies only when `review.ciHeldUntilReviewSettled` is true** (in a CI-runs-on-draft repo
-   there is no flip to hold — continue to 7.2; the caller runs its checks before its own merge
-   gate). A caller with non-empty `preShipChecks` (`pr` step 2b, `release` step 2b) runs local
-   suites nothing in CI covers. **The hold sits AFTER 7.1 deliberately**: the suites must run
+   **Applies whenever the caller declared it**, including no-CI or CI-runs-on-draft repos: those
+   paths still return so the caller tests the final head, then resume skips any inapplicable flip.
+   A caller with non-empty `preShipChecks` (`pr` step 2b, `release` step 2b) runs local suites
+   nothing in CI covers. **The hold sits AFTER 7.1 deliberately**: the suites must run
    against the FINAL, base-refreshed head — the SHA CI is about to test.
    - Hand back: review settled, head current, PR still a draft, pre-ship checks outstanding.
    - **The caller MUST re-invoke** (PRE-SHIP RESUME). A never-resumed hold strands the PR as a
      permanent draft; if the caller cannot complete its checks it says so — resume or
      explicitly abandon, never silently stop.
    - **Re-entry re-runs 7.1** (base/patch check — NOT top-level step 1) and the paginated
-     zero-unresolved check before flipping. A substantive pre-ship fix → re-run the local
-     streams AND **re-request every configured cloud reviewer**, exactly as 7.1 after a rebase;
-     the local re-run counts against the same cap, with the same Claude-only substitute past
-     it. A fix that rewrites the head again repeats this hold.
+     zero-unresolved check before flipping. A substantive pre-ship fix follows step 5's same
+     target/safety rule with the cumulative ledger; only verified P1/serious P2 can continue past
+     the target. Re-run only failed/affected pre-ship commands.
 2. **Slow-suite applicability — read `verify.skipDuringStoryBuilds` and branch.** **Empty (the
    default): THERE IS NOTHING TO COMPUTE** — require no extra checks, add no label, never wait
    on or rerun a slow-suite check. Suites a repo keeps out of CI live in `preShipChecks` and
@@ -410,35 +401,45 @@ circular.
    reviewer script. A short lag before checks appear is normal. Require the FINAL head SHA
    observed SUCCESS for every applicable check — absent, skipped, pending or stale-SHA is not
    green; only proven non-applicable suites may be absent. **If the poll times out while a
-   required check is still pending, LAUNCH ANOTHER INSTANCE of the same shape** — never a
-   foreground or manual loop; `pollTimeoutMinutes` bounds the REVIEWER poll and CI can outlast
-   it. **No check for a `preShipChecks` suite will EVER appear on this board** — never wait on,
+   required check is still pending, LAUNCH ANOTHER INSTANCE exactly once; a second timeout STOPS
+   with statuses. Never start a foreground/manual loop. **No check for a `preShipChecks` suite
+   will EVER appear on this board** — never wait on,
    request, or rerun one; and a NON-EMPTY `skipDuringStoryBuilds`'s mapped checks are
    mandatory — an absent one is a gate that never ran.
 5. **Red CI:** *flaky/infra* → `gh run rerun <id> --failed`, bounded to ~2 (classification
    examples: `ci-settle.md`); a run that failed to TRIGGER is kicked per 7.3's escalation.
-   *Real* → reproduce, fix, push, re-poll; loop back to step 6 if it draws new comments.
-   Escalate only what you cannot reproduce or safely fix. A CI failure that draws code changes
-   puts you back in review — and each push now re-runs CI; that is the cost of a defect local
-   review missed, not a reason to loosen the ordering.
+   *Real* → reproduce and run the failing command locally before fixing. Permit at most TWO
+   code-repair pushes for the settle, re-running only affected checks; a second still red STOPS.
+   Each substantive repair returns through step 5 before pushing, then steps 3–6.5 and 7.1–7.3;
+   safety cycles never reset this CI ceiling. Re-poll only after the ready flip at the new SHA.
+   Each push now re-runs CI, so the hard repair bound is
+   part of the run-once cost report, not a reason to loosen ordering.
 
 ## 8. Settle and report
+
+Before DONE, fetch reviews above the cycle high-water mark. Late findings return through 3–6.5;
+code fixes use step 5, then 7.1–7.4. Fetch again on the settled head; only no-new-finding reports.
 
 DONE when every finding is fixed-or-dismissed, every addressed thread replied-to and resolved,
 the PR is marked ready (in a draft-hold repo), and CI is green (or the only red is a documented
 owner-gated infra check). **In a draft-hold repo, a PR left as a draft is NOT settled** — CI
 never ran. **Verify zero unresolved threads; do not assume. PAGINATE the query** — an
 unpaginated `reviewThreads(first:100)` reports a reassuring zero while a finding sits on page
-two. Step 6.5 already ran before step 7; this step only REPORTS its tally.
+two. With no late finding, step 6.5 already ran and this step only REPORTS its tally.
 
-- **Report**: **the PROFILE and its source** (and any overriding config key), the RESOLVED
-  ROSTER (which engines ran; configured-but-failed distinct from not-configured), **local CLI
-  rounds used out of the cap** (round 2's scope too, and any Claude-only substitute),
+- **Human recap.** Lead with the PR's practical outcome (`READY`, `HELD`, or `BLOCKED`), what was
+  reviewed and fixed, what validation/CI ran or did not run, remaining risk, and one next action.
+  Then give the engineering evidence: **the PROFILE and its source** (and any overriding config key), the RESOLVED
+  ROSTER (which engines ran; configured-but-failed distinct from not-configured), **global
+  adversarial/local rounds against normal targets plus safety cycles** (and scope), each
+  reviewed head SHA and whether the final head used main-agent target validation,
   **every reviewer dropped at the registration window**, the PR, finding tally
   (fixed / dismissed / captured / deferred), **the lessons tally** (`N written / M recurrences
   marked`, or `0` — recurrences named by `L-NNN`), resolved-thread count, CI state, every
   captured deferral explicitly, and **any reviewer that never responded** (whether its wait
-  ended at the learned bound or at `pollTimeoutMinutes`).
+  ended at the learned bound or at `pollTimeoutMinutes`). Name the ledger deletion and the final
+  verification receipt's tree/SHA + command set. Persist the sanitized final ledger marker, then
+  delete the scratch ledger; retain scratch only when blocked or abandoned.
 - **CI runs on this PR — the run-once number.** Count executed workflow runs attributed to THIS
   pull request — by `pull_requests[].number` on the runs API, falling back to head repository +
   branch bounded to the PR's lifetime — across the workflows matching `ci.workflowGlobs`

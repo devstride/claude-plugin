@@ -74,6 +74,14 @@ mattered — memory reproduces what you already thought about.
 
 ## Conventions the skills must keep — body vs reference
 
+**Engineering economy is a product rule, not optional style.** Planning and implementation paths
+must use the canonical contract in
+`skills/ultracode-build/references/engineering-economy.md`: challenge materially slower or more
+complex routes, search the repository/dependencies/standard library first, evaluate mature open
+source for non-trivial commodity capability, keep confirmed reuse DRY, and reject speculative
+abstraction under YAGNI. Keep that contract in one owner file and point consumers to it; do not
+paste variants into every skill.
+
 - **Split rule.** A `SKILL.md` body carries every imperative, every config-key-honouring
   instruction, every step number another skill cites, and every scoped needle the invariants
   file pins to it. Rationale, worked examples, incident evidence and "observed live" anecdotes
@@ -90,11 +98,12 @@ mattered — memory reproduces what you already thought about.
   owning skill's `references/`; addressed only by the `${CLAUDE_PLUGIN_ROOT}` path, never a
   relative `../`; a second skill that needs the same fact cites the owner's file rather than
   restating it. Every reference ends with a `## Cited by` list naming each pointer.
-- **Body budget.** Every `skills/*/SKILL.md`, frontmatter included, has a committed row in
+- **Load budget.** Every body and reference has a committed row in
   `scripts/cost-budgets.json`, and `scripts/measure-cost.sh --check` — in the RELEASING.md
-  step-0 checklist — fails the release on any body over its row. The rows are a ratchet with a
-  destination: **8,000 tokens per body**. A row at or under 8,000 may never be raised past it;
-  a row still above 8,000 (a body not yet compressed) only moves down.
+  step-0 checklist — fails the release on any row or representative composed path over budget.
+  Body rows are also bounded by hard code-level ceilings: **8,000 tokens normally**; the four
+  bodies already above it when introduced have frozen named ceilings and only move down. Reference
+  and path rows prevent a body "saving" that merely moves the same mandatory context elsewhere.
 
 ### Moving prose out of a body
 
@@ -110,17 +119,17 @@ needle check under bash and the footprint measurement, and paste both outputs in
 
 ## Check that an edit did not grow a body past its budget
 
-Every `skills/<name>/SKILL.md` has a token budget in `scripts/cost-budgets.json`, and
-`bash scripts/measure-cost.sh --check` fails the moment a body exceeds it. **Run it whenever you
-edit skill text.** The method is the `_method` field of `scripts/cost-budgets.json`, explained at
-the top of `scripts/measure-cost.sh` — deliberately simple enough to cross-check with `wc -c`, with
-a bias that is the same on both sides of every before/after table.
+Every skill body and reference has a token budget in `scripts/cost-budgets.json`; the same file
+lists representative composed load paths. `bash scripts/measure-cost.sh --check` fails the moment
+any row/path exceeds its ratchet or a body exceeds its hard ceiling. **Run it whenever you edit
+skill text.** The method is the `_method` field of `scripts/cost-budgets.json`, explained at the
+top of `scripts/measure-cost.sh` — deliberately simple enough to cross-check with `wc -c`.
 
 The budgets are a **ratchet**: lower one freely; raise one only in the same commit as the text
-that needs it, and say so in the commit message — or, usually better, move the rationale into a
-`references/` file with a "Read when …" pointer and keep only the rule in the body. A rule costs
-what it costs; explanation is what the budget is for. `bash scripts/validate.sh` is the one
-command that runs this together with every other pre-release check.
+that needs it, and say so in the commit message. Moving rationale into a reference can make the
+runtime path clearer, but is not free: reference and composed-path budgets still count it. A rule
+costs what it costs; explanation is what the budget is for. `bash scripts/validate.sh` runs this
+together with every other pre-release check.
 
 ## Check that an edit did not drop a rule
 

@@ -46,9 +46,10 @@ depend on, it does not freeze the surface.
    manifest, the skill frontmatter, and the plugin manifest from a copy without
    `marketplace.json` — one run does not cover it, and the root-level run silently skips the
    third), the marketplace invariant, `bash -n` over every shipped script, the script tests, and
-   the skill-body budget check. **A budget breach blocks the release exactly like a manifest
-   error** — raise the budget visibly in the same commit as the text that needs it, or move
-   rationale to a reference. `--needles` adds the rule-loss check from
+   the body/reference/composed-path budget check. **A budget or hard-ceiling breach blocks the
+   release exactly like a manifest error** — reduce the load, or raise only an eligible ratchet
+   visibly with the text that needs it; moving text to a reference does not bypass the check.
+   `--needles` adds the rule-loss check from
    `delivery-loop-invariants.md` — a needle MISS is advisory (a prompt to read, not a failure); a
    DEAD REFERENCE is blocking and fails the step.
 

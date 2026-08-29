@@ -8,6 +8,109 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-08-29
+
+### Added
+
+- **One canonical engineering-economy contract** now governs planning and implementation: challenge
+  materially slower or more complex directions, search the repository/dependencies/standard library
+  first, evaluate mature open source for commodity capability, keep confirmed reuse DRY, and apply
+  YAGNI before introducing abstractions, toggles, compatibility layers, or custom machinery.
+- **Task- and risk-sized model routing.** Mechanical read-only work uses `haiku`/`low`, routine work
+  uses `sonnet`/`medium` or `high`, a separate `opus` critic is reserved for consequential ambiguity,
+  and `opus`/`xhigh` is reserved for critical boundaries and merge gates. The main model remains
+  inherited; `max` requires an explicit evaluated override. An optional read-only
+  `review.localAssistCommand` can ask Codex for one parallel second opinion on ambiguous designs,
+  critical contracts, or stubborn diagnosis without adding a routine review pass.
+- **Cumulative review ledgers and exact-tree verification receipts.** Every follow-up reviewer gets
+  stable finding IDs, prior dispositions, fix commits, and reviewed heads, which prevents reviewers
+  from rediscovering or reversing settled findings. Passing command results can be reused only when
+  tree SHA, relevant config, exact command list, and clean-worktree state still match. Every settled
+  PR also keeps one sanitized final marker so aggregate production review can reuse its dispositions.
+- **One plain-English output contract now covers all nineteen skills.** Questions lead with the
+  decision and its consequence; agent/tool output is translated instead of pasted; exact risk and
+  evidence remain visible. Each completed item, pull request, merge, release, doctor finding and
+  doctor repair ends with a short outcome-first recap. Composed skills reuse the contract instead of
+  loading it repeatedly.
+
+### Changed
+
+- **`review.localReReviewScope` now selects one shared scope for each Claude, local CLI and
+  cloud review.** The legacy name remains, but `"full"` no longer widens only the local engine while
+  other reviewers inspect a delta. This existing config key's reach changes, so this is a major
+  release under the plugin's compatibility policy.
+
+- **Routine stories use a bounded risk screen; full adversarial review runs at merge boundaries.**
+  Authentication, migrations, irreversible state, and deployed contracts still receive isolated
+  high-risk verification. Direct pull requests, release-unit merges, and production merges retain
+  the full independent gate instead of paying for it on every intermediate story as well.
+- **Two adversarial cycles is the normal target, with an uncapped release-safety floor.** Every
+  contextual pass shares one cumulative ledger and latest-reviewed-head scope across Claude, local
+  CLI, cloud, rebase, pre-ship and CI-repair review. A verified P1 or serious P2 (likelihood = likely
+  and impact = material) forces fix, checks and another pass until clear; lower findings cannot
+  extend the target, and no-progress retries stop for human help. CI repair still allows only two
+  pushes per settle, and pending CI gets at most two bounded polls.
+- **CI-last is now a floor for every delivery profile.** Pull requests stay draft until review and
+  uncovered pre-ship checks settle, then CI runs on the final head. Cloud-review registration proof
+  overlaps local review instead of adding a registration-window delay. Repositories with no CI are
+  valid; repositories with costly pull-request workflows whose complete hold cannot be proven stop
+  for setup repair rather than silently spending CI early.
+- **Verification is deduplicated by evidence.** Standard story builds run targeted tests and type
+  checks, the complete suite waits for the release-unit boundary, an exact receipt can satisfy a
+  later identical gate, and commands already covered by final-head CI are not repeated locally.
+- **Session-start update checks are safer and more useful.** Opted-in automatic updates apply only
+  to an exact repository-bound project/local install, then verify the installed version before
+  claiming success. Shared user/managed installs and ambiguous scopes are never mutated; they get
+  an exact manual command and restart instruction. Status-line refresh remains independent of
+  update-check opt-outs, uses atomic replacement, and refuses linked source, target or backup files.
+- **Doctor now finds personal status-line settings.** It inspects shared, repository-local and user
+  settings every run. Cleanup waits until the shared replacement is committed, unchanged, renders
+  directly and is not disabled by accessible settings, then asks separately before removing only
+  one personal `statusLine` key. A user value is only the fallback for repositories without their
+  own line. Other settings and scripts remain, and the removed key gets a durable private backup;
+  managed, command-line and trust overrides remain report-only boundaries.
+- **Cost controls now cover the whole load.** All skill bodies and references have ratcheting
+  budgets, three representative composed paths have aggregate budgets, and code-level hard body
+  ceilings prevent an ordinary body from growing past 8,000 tokens or a grandfathered body from
+  exceeding its frozen cap.
+
+### Tests
+
+- Added eighteen deterministic session-start/update checks, 37 personal-status-line behavioral
+  safety checks, a
+  plugin-wide plain-English output contract suite, a
+  cycle-N latest-reviewed-head scope case, an executable two-cycle-target/safety-continuation
+  contract, and expanded cost tests for hard ceilings, reference/composed-path budgets,
+  missing-path detection, and non-bypassable caps. The invariant sample grew from 135 to 173
+  needles for the new merge-boundary contracts.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v2.8.0 @ 80ef5a6, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v2.8.0 | tokens@devstride--v2.8.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/build-item/SKILL.md | 36,530 | 12,177 | 36,580 | 12,194 | +17 | 12,200 |
+| skills/plan/SKILL.md | 35,372 | 11,791 | 34,654 | 11,552 | -239 | 11,600 |
+| skills/review/SKILL.md | 34,331 | 11,444 | 34,194 | 11,398 | -46 | 11,400 |
+| skills/setup/SKILL.md | 35,566 | 11,856 | 31,855 | 10,619 | -1237 | 10,700 |
+| skills/rebalance/SKILL.md | 23,893 | 7,965 | 23,936 | 7,979 | +14 | 8,000 |
+| skills/doctor/SKILL.md | 27,694 | 9,232 | 23,819 | 7,940 | -1292 | 8,000 |
+| skills/release/SKILL.md | 24,561 | 8,187 | 23,631 | 7,877 | -310 | 7,900 |
+| skills/ultracode-build/SKILL.md | 20,246 | 6,749 | 16,798 | 5,600 | -1149 | 5,600 |
+| skills/insert-defect/SKILL.md | 13,873 | 4,625 | 14,052 | 4,684 | +59 | 4,700 |
+| skills/insert-story/SKILL.md | 13,191 | 4,397 | 13,370 | 4,457 | +60 | 4,500 |
+| skills/pr/SKILL.md | 12,005 | 4,002 | 13,013 | 4,338 | +336 | 4,400 |
+| skills/rationalize-gantt/SKILL.md | 10,221 | 3,407 | 10,400 | 3,467 | +60 | 3,500 |
+| skills/branch-hotfix/SKILL.md | 8,836 | 2,946 | 9,015 | 3,005 | +59 | 3,100 |
+| skills/ci-audit/SKILL.md | 7,695 | 2,565 | 7,466 | 2,489 | -76 | 2,500 |
+| skills/create-defect/SKILL.md | 7,173 | 2,391 | 7,352 | 2,451 | +60 | 2,500 |
+| skills/create-story/SKILL.md | 6,870 | 2,290 | 7,049 | 2,350 | +60 | 2,400 |
+| skills/comprehend-plan/SKILL.md | 6,280 | 2,094 | 6,459 | 2,153 | +59 | 2,200 |
+| skills/push/SKILL.md | 4,116 | 1,372 | 3,908 | 1,303 | -69 | 1,400 |
+| skills/branch-feature/SKILL.md | 3,006 | 1,002 | 3,185 | 1,062 | +60 | 1,100 |
+| alwaysOn.context (skill listing) | 3,868 | 1,290 | 3,532 | 1,178 | -112 | 1,200 |
+| **total (bodies)** | 331,459 | 110,492 | 320,736 | 106,918 | -3574 | |
+
 ## [2.8.0] — 2026-08-28
 
 ### Cost
@@ -945,7 +1048,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v2.8.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.0.0...HEAD
+[3.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.8.0...devstride--v3.0.0
 [2.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.6.0...devstride--v2.8.0
 [2.6.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.5.0...devstride--v2.6.0
 [2.5.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.4.0...devstride--v2.5.0

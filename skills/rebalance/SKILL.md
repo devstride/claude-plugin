@@ -3,10 +3,10 @@ name: rebalance
 description: Re-slice a live DevStride plan's not-started leaves to a different delivery profile in place — merge or split them to the new grain, preserve every absorbed spec, re-wire the dependency chain, and re-date — without re-planning from scratch
 ---
 
-Re-slice a live DevStride plan's NOT-STARTED leaves to a new delivery profile, in place —
-re-balancing the remaining work at the new grain instead of archiving the plan and starting
-over. Shipped and in-flight work is never touched; every spec already paid for travels into
-its successor verbatim; nothing is ever deleted.
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
+Re-slice a live DevStride plan's NOT-STARTED leaves to a new delivery profile in place. Never
+touch shipped or in-flight work; carry every existing spec into its successor; delete nothing.
 
 The profile itself — what `grain` and `specDepth` mean for each of `prototype` / `standard` /
 `enterprise`, the resolution order, and the root marker this skill rewrites — is defined ONCE, in

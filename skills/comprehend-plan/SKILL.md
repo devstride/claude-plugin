@@ -3,6 +3,8 @@ name: comprehend-plan
 description: Recursively read a DevStride plan (descriptions and comments, every level) to build full grounded context before editing it
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Recursively read a DevStride plan — descriptions AND comments, at every level — to build a full,
 grounded understanding of what a parent item at any grouping level of your org's hierarchy (e.g.
 this org's Module/Capability/Epic) actually contains, where it stands, and what its real (not just
