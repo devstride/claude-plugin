@@ -1,104 +1,125 @@
 ---
 name: ci-audit
-description: "Measure what the delivery loop actually spends on CI — executed runs per workflow per pull request (target: one each), post-merge push minutes, release pull requests re-run by a moving base — and name the offenders. Read-only; GitHub Actions via gh."
+description: "Measure executed CI minutes, premature runs before the final reviewed head, per-workflow PR reruns, post-merge pushes, and release-PR churn. Read-only; GitHub Actions via gh."
 ---
 
-Audit the repository's GitHub Actions usage against the loop's run-once design, and say
-precisely where the minutes go. The draft hold makes CI run once per pull request in theory; this
-skill measures whether it does in practice, and where the rest of the bill comes from.
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
-**Read-only.** It runs `gh` queries and prints a report. It never cancels a run, edits a workflow,
-or changes a setting — every fix is text to print.
+Audit GitHub Actions against the loop's floor: every profile spends expensive pull-request CI
+once, after review and matched pre-ship checks settle on the final HEAD. Count minutes, expose
+early work as well as reruns, and name the repair.
 
-Optional argument — a window in days (default `7`), and/or a workflow name to focus on:
-$ARGUMENTS
+**Read-only.** Query with `gh` and print a report; never cancel a run, edit a workflow, or change
+a setting. Optional argument — window in days (default `7`) and/or workflow name: $ARGUMENTS
 
-**Config.** `.claude/ds-config.json`: `ci.workflowGlobs` (which workflows belong to the loop),
-`ci.expectedRunsPerPullRequest` (default `1`), `release.releaseSource` / `release.productionBranch`
-/ `baseBranch` (to recognise release pull requests and post-merge pushes).
+**Config.** `.claude/ds-config.json`: `ci.workflowGlobs`,
+`ci.expectedRunsPerPullRequest` (default `1`), `release.releaseSource`,
+`release.productionBranch`, and `baseBranch`.
 
-## Why runs are the wrong number, and minutes are the right one
+## Why the Actions run count lies
 
-The Actions usage page counts a **run** every time a workflow is triggered — a push to a draft
-pull request creates a run whose jobs all skip, and that run costs seconds. So a repository with a
-working draft hold still shows hundreds of runs per workflow. **Count executed jobs and their
-minutes**, never runs: a run whose expensive jobs were skipped is the gate working, not a cost.
+A push to a correctly held draft still creates an all-skipped run costing seconds. Count a run as
+**executed** only when a job beyond the configured gate/detect job finishes other than `skipped`;
+sum non-skipped job minutes. A run can meet the one-per-workflow count and still be waste: if it
+was triggered before the final ready flip, the suite was released before review/pre-ship settlement.
 
 ## 1. Collect
 
 ```bash
 gh api "repos/{owner}/{repo}/actions/runs?per_page=100&created=>=$(date -u -v-${DAYS}d +%Y-%m-%d 2>/dev/null || date -u -d "-${DAYS} days" +%Y-%m-%d)&status=completed" --paginate \
-  --jq '.workflow_runs[]|{id,event,head_branch,head_repository:.head_repository.full_name,workflow_id,name,created_at,conclusion,pull_requests:[(.pull_requests // [])[].number]}'
+  --jq '.workflow_runs[]|{id,event,head_sha,head_branch,head_repository:.head_repository.full_name,workflow_id,name,created_at,run_started_at,conclusion,pull_requests:(.pull_requests // [])}'
 ```
 
-Use the REST list, not `gh run list`: it carries `pull_requests[].number` and the head
-repository, and `status=completed` keeps still-running runs (with `completed_at: null` jobs that
-break the minute arithmetic) out of the window. Attribute runs to a **pull request number** where
-the API gives one, falling back to `head_repository + head_branch` — a branch name reused for a
-second pull request, or the same name on two forks, would otherwise count the later pull
-request's first run as a re-run of the earlier one.
+Use REST, not `gh run list`: pull-request associations and head repository prevent a reused branch
+or same-named fork from joining two PRs. Paginate to the window start; if the API stops short,
+report a floor. Resolve workflow FILES first, then filter by id — names are not unique:
 
-Paginate to the window start; if the API stops short of it, say so — the totals are then a
-floor, not the whole window.
+```bash
+gh api "repos/{owner}/{repo}/actions/workflows?per_page=100" --paginate \
+  --jq '.workflows[]|{id,name,path}'
+```
 
-`ci.workflowGlobs` names workflow FILES, and runs carry a `workflow_id` — resolve one to the
-other first: `gh api "repos/{owner}/{repo}/actions/workflows?per_page=100" --paginate --jq '.workflows[]|{id,name,path}'`
-(paginate: a repository can have more workflows than one page), keep the entries whose `path`
-matches a glob, and filter the collected runs by those **ids** — never by display name, which two
-files can share and a rename leaves behind on old runs. Then, for each run in that set, fetch its
-jobs:
+Keep ids whose `path` matches `ci.workflowGlobs`. Fetch every run's jobs with all attempts:
 
 ```bash
 gh api "repos/{owner}/{repo}/actions/runs/<id>/jobs?filter=all&per_page=100" --paginate \
   --jq '[.jobs[]|select(.completed_at!=null and .started_at!=null)|{name,conclusion,attempt:.run_attempt,minutes:(((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601))/60)}]'
 ```
 
-`filter=all` includes every attempt — a run retried with `gh run rerun` bills its failed attempt
-too, and the default returns only the latest — and `--paginate` covers matrices with more than
-one page of jobs. Guard both timestamps: a job that never started, or is still running, has nulls
-that make `fromdateiso8601` abort the whole query.
+`filter=all` includes billed retry attempts; timestamp guards avoid null arithmetic; pagination
+covers large matrices. Report runner type where available because hosted-larger minutes cost more.
 
-A run **executed** when any job other than the gate/detect job finished with a conclusion other
-than `skipped`. Sum minutes over non-skipped jobs. Runs on `hosted-larger` runners cost more per
-minute; report minutes and, where the usage page gives it, the runner type.
+For each associated PR, fetch its recorded final source head and state:
 
-## 2. Classify every executed run
+```bash
+gh pr view <pr> --json headRefOid,createdAt,mergedAt,state,isDraft,url
+gh api "repos/{owner}/{repo}/issues/<pr>/timeline?per_page=100" --paginate --slurp
+```
 
-| Class | How to recognise it | What "good" looks like |
+From the timeline's ordered `ready_for_review` / `convert_to_draft` events, the **final-ready
+event** is the latest ready event only when no later conversion returned the PR to draft. An
+initially non-draft PR has no such event; that absence is evidence that ordering was not gated.
+The ready flip is the observable proxy for “review and pre-ship checks settled.”
+
+Resolve the run's **source-head SHA**, not blindly `head_sha`: a pull-request run may name
+GitHub's synthetic merge commit and `pull_request_target` may name the base. Prefer the run's
+embedded `pull_requests[].head.sha`, then `head_commit.id`; when only a synthetic merge SHA is
+available, inspect its parents and use the PR-head parent. If it cannot be resolved, report
+`unknown` rather than inventing a premature run.
+
+## 2. Classify executed runs
+
+| Class | Recognition | Target |
 |---|---|---|
-| **First run of a workflow on a pull request** | `event == pull_request`, first executed run of that WORKFLOW for that pull request (keyed on pull request number, then workflow; head repo + branch only as the fallback) | One per (pull request, workflow) — a full-stack pull request legitimately has one per workflow it touches |
-| **Re-run of a workflow on a pull request** | Any further executed `pull_request` run of the SAME workflow for the same pull request | Zero. Each one has a cause: a push after the ready-flip, a base that moved (GitHub re-runs the merge preview), a pull request opened non-draft, or an empty re-trigger commit (`review` step 7.3) — the last is an excess only when the workflow had already executed |
-| **Release pull request re-run** | Head is `release.releaseSource` (or the release-unit branch) | Zero. These come from merging OTHER pull requests into the release source while the release pull request sat ready — every merge re-runs its preview |
-| **Post-merge health check** | `event == push` on `baseBranch` / `productionBranch` | At most one per merge to the base branch; **zero on the production branch when its tree is identical to the base tip that was just tested** (a promotion merge has the same tree) |
-| **Other** | schedule, `workflow_dispatch`, bots | Named and counted, not judged |
+| **PR first** | First executed run of this workflow for this PR number (`pull_request` or `pull_request_target`) | One per touched workflow |
+| **PR rerun** | Later executed run or `run_attempt` of the same workflow and PR | Zero |
+| **Release-PR rerun** | Head is `release.releaseSource` or a release-unit branch | Zero |
+| **Post-merge push** | `push` on `baseBranch` / `productionBranch` | ≤1 per base merge; zero for a tree-identical production promotion |
+| **Other** | Schedule, dispatch, bot, unmatched event | Name; do not judge |
+
+Apply a separate **PREMATURE** flag to every executed PR run when ANY is true:
+
+- no final-ready event exists (non-draft/ungated open; this includes historical `prototype` PRs);
+- the run was triggered (`created_at`) before the final-ready event; or
+- its resolved source-head SHA differs from the PR's final `headRefOid`.
+
+Never exempt a delivery profile, release PR, or loop body marker. A later distinct head before the
+ready event is a **pre-ready repair rerun** — review and pre-ship fixes are indistinguishable in
+Actions metadata, so label it `review/pre-ship repair` unless commit evidence proves which. This
+is still waste even when only one run of that workflow exists at each SHA.
+
+For ordinary reruns, infer causes from evidence: head commit after ready → post-flip fix; same head
+and new run → moved base; no ready/draft phase → non-draft open; zero-file “re-trigger” commit →
+review's fallback (excess only if that workflow had executed already). Attribute by PR number
+first, head repo + branch only as fallback.
 
 ## 3. Report
 
-Print, for the window:
+Lead with one to three plain bullets: total CI cost, avoidable waste, and the single highest-value
+fix. Then print the supporting evidence for the window:
 
-1. **Totals** — runs, executed runs, executed minutes; the share of minutes per class above.
-2. **Executed runs per workflow per pull request** — a table with one row per (pull request,
-   workflow) that executed more than `ci.expectedRunsPerPullRequest` times: pull request, workflow,
-   executed runs, most likely cause (a push after ready: commits on the head dated after the
-   `ready_for_review` timeline event; a moved base: no head commit but a new run; opened
-   non-draft: no draft phase in the timeline; an empty re-trigger commit: a zero-file commit
-   whose message says so). A pull request with one run per workflow does not appear. Attribution
-   stays by pull request number first, branch second — never branch name alone. Then the ratio
-   `Σ executed PR runs ÷ Σ over pull requests of the distinct workflows that executed on them` —
-   the loop's single most telling number; `1.0` is the design.
-3. **Post-merge push minutes**, split by branch, and how many production-branch runs had a tree
-   identical to the base tip (`git rev-parse <sha>^{tree}` on both) — those are pure waste.
-4. **Release pull request re-runs** and the merges that caused each (merges into the release
-   source between the release pull request's ready-flip and its merge).
-5. **Verdict and fixes**, in priority order by minutes saved, each naming the mechanism:
-   - Production-branch push re-tests an identical tree → the tree-identical skip
-     (`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`, pattern C).
-   - Pull requests with a SECOND executed run of the same workflow → per-pull-request `concurrency` with
-     cancel-in-progress (pattern B) plus the loop's post-flip discipline (`review` step 8 reports
-     the count; `release` freezes the base).
-   - Release pull request re-runs → the freeze rule (`ci.freezeBaseWhileReleasePrReady`).
-   - A human-opened non-draft pull request → the policy check (pattern D).
-   `/devstride:setup ci` applies the workflow patterns; the loop rules are on by default.
+1. **Totals** — triggered runs, executed runs/minutes, and minute share by class.
+2. **Premature expensive CI** — one row per flagged run: PR, workflow, run id/time, source head,
+   final head, final-ready time or `MISSING`, minutes, and evidenced cause. Separately total
+   initial ungated runs and review/pre-ship-repair reruns; include `prototype`, never hide it in
+   “expected by profile.” Unknown SHA/time evidence is `unverifiable`, not green.
+3. **Executed runs per workflow per PR** — rows above
+   `ci.expectedRunsPerPullRequest`, with cause. Then print
+   `Σ executed PR runs ÷ Σ distinct workflows executed per PR`; `1.0` is the count target, while
+   the premature table proves ordering.
+4. **Post-merge push minutes**, by branch, plus production runs whose tree equals the just-tested
+   base tree — pure waste.
+5. **Release-PR reruns** and merges into the release source between final-ready and merge that
+   caused each preview rerun.
+6. **Verdict and fixes**, ordered by measured minutes:
+   - premature / non-draft / pre-ready repair run → `/devstride:setup ci` applies the complete
+     draft gate; the PR/release loop must keep every profile draft through pre-ship settlement;
+   - second PR workflow run → pattern B concurrency plus post-flip discipline;
+   - release-preview rerun → `ci.freezeBaseWhileReleasePrReady`;
+   - identical production push → pattern C tree skip;
+   - human non-draft open → pattern D policy check.
+   Patterns are in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`.
 
-Keep the report honest about what it cannot see: job minutes come from timestamps, not billing;
-runner multipliers and included minutes are the usage page's business.
+Be explicit about limits: timestamps approximate billed minutes; runner multipliers and included
+minutes come from the usage page; GitHub cannot distinguish a review fix from a pre-ship fix
+without repository evidence.

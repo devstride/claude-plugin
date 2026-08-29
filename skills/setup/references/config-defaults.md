@@ -30,7 +30,7 @@ next section:
 | Key | `prototype` | `standard` | `enterprise` |
 |---|---|---|---|
 | `epicIntegrationBranches.autoRelease` | `true` | `false` | `false` |
-| `epicIntegrationBranches.fastStoryMerges.enabled` | `true` whenever `verify.typecheck` is set — Claude's build-time pass is the local engine | the existing rule, below | the existing rule, below |
+| `epicIntegrationBranches.fastStoryMerges.enabled` | `true` whenever `verify.typecheck` is set — the built-in risk screen is the local review floor | the existing rule, below | the existing rule, below |
 | `review.pollTimeoutMinutes` | `5` | `10` | `20` |
 
 Under every profile `fastStoryMerges.enabled` still turns on the repository's own commands and
@@ -89,14 +89,12 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   write, naming the base branch: where that branch is production, or is promoted to it without a
   gate, this is a release with nobody's hand on it, and the owner must hear that from setup rather
   than discover it from a deploy.
-- **`fastStoryMerges.enabled`** — the precondition depends on the profile. Under `standard` and
-  `enterprise`, write `true` **only** when a local CLI review engine is configured
-  (`review.localCommand` non-null) *and* `verify.test` and `verify.typecheck` are both set. Under
-  `prototype`, write `true` whenever `verify.typecheck` is set: Claude's build-time adversarial pass
-  is the local engine there — it meets the contract's floor on its own — and the profile's story
-  gate is type-checks plus the touched suites, so `verify.test` is not required. Under fast merges
-  an item gets no pull request and no CI of its own, so the local engines and those local suites
-  are the only gate it receives. Otherwise write `false` and say which precondition was missing —
+- **`fastStoryMerges.enabled`** — under `standard` and `enterprise`, write `true` when
+  `verify.test` and `verify.typecheck` are set; the full suite is available for the epic boundary,
+  while story gates use the profile's narrower width. Under `prototype`, `verify.typecheck` is
+  enough. Every fast story still gets the built-in risk screen and exact-tree verification
+  receipt; a local CLI is an optional targeted support engine, not a routine merge precondition.
+  Otherwise write `false` and say which verification command was missing —
   a `false` under `prototype` contradicts the profile, and the doctor will report it as such.
 
 ## Commit conventions
@@ -205,17 +203,19 @@ All three start empty, and empty is a real answer rather than a placeholder:
 {
   "plugin": {
     "updateCheck": true,
-    "autoUpdate": false,
+    "autoUpdate": true,
     "pin": null
   }
 }
 ```
 
 The session-start version check (`hooks/version-check.sh`) reads this block from the repository
-it starts in. `updateCheck: true` — it runs, silent when current or offline, and speaks only when
-a newer release exists: one line with the exact update commands. `autoUpdate: true` — it applies
-the update on disk at session start (the only safe moment; applying mid-loop would change skill
-behaviour between the steps of a build) and asks for a restart; the running session is unchanged.
+root and uses a six-hour cache, so resume/start checks do not add a network wait to every skill.
+`updateCheck: true` checks; `autoUpdate: true` applies on disk only when the loaded install is
+project/local-scoped to this repository, then post-verifies the version and asks for a restart.
+Shared user/managed installs are never silently mutated by one repository: the hook prints the
+exact manual update + restart instruction instead. Updates happen only at session start; changing
+skills mid-loop would mix contracts, and the running session cannot load the new text anyway.
 `pin` — a version this repository is deliberately holding at (an incident, a known-good
 baseline): the check reports "pinned at X, newest is Y" once and never nags. Setting the
 environment variable `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` disables the check regardless, for CI and
@@ -395,19 +395,34 @@ bound of earlier releases; the backoff cadence and the script still apply, and l
 learned so switching it on later starts warm. Like `profileOverrides`, `setup` never writes this
 key — it is an operator hand-edit.
 
-`localCommand` placeholders: `<base>` (required — the ref the engine diffs against; round 1 gets
-`origin/<baseRefName>`, the PR's actual base, and a delta-scoped round 2 gets the round-1 head
-SHA) and `<context>` (optional — a delta-scoped round 2 replaces it with `-` and feeds a
-distilled account of round 1 on stdin, dropping the `--base` pair because the CLI refuses both
-together; round 1 and every `full` launch REMOVE the token, since they are `--base` launches). A
-template with neither placeholder is the pre-placeholder shape: ` --base <value>` is appended. A template without
-`<context>` still gets a delta-scoped round 2, minus the context, and the report says so. A CLI
-that rejects `-` fails its launch — reported as this-run degradation; remove the placeholder.
+When Codex is detected and the user confirms it, setup offers this context-first pair (a
+catalogued decision, not an unconditional default):
 
-`localReReviewScope` — absent means `"delta"`: round 2 reviews `<round-1 head>...HEAD` unless
-`rereview-scope.sh` decides `full` (a new file, more than half the lines rewritten, or a rebase).
-`"full"` pins the whole-diff re-review of earlier releases. `setup` never writes it — an
-operator hand-edit. Reasoning and the verified CLI facts:
+```json
+{
+  "review": {
+    "localReviewerName": "Codex",
+    "localCommand": "codex exec --ephemeral --sandbox read-only -c model_reasoning_effort=\"<effort>\" -c mcp_servers.devstride.enabled=false <context>",
+    "localAssistCommand": "codex exec --ephemeral --sandbox read-only -c model_reasoning_effort=\"<effort>\" -c mcp_servers.devstride.enabled=false <context>"
+  }
+}
+```
+
+`review` replaces `<context>` with `-` and sends a distilled prompt containing the exact
+three-dot scope plus cumulative ledger; `ultracode-build` uses the assist command only for
+ambiguous cross-module work, critical boundaries or stubborn diagnosis. `<effort>` is routed per
+task; the template deliberately omits `--model`, leaving model choice to operator/managed policy.
+Read-only sandboxing and the disabled DevStride MCP are load-bearing.
+
+Legacy base-mode `localCommand` remains supported: `<base>` receives the PR's actual base and a
+missing placeholder gets ` --base <value>` appended. It can run cycle 1, but a blind follow-up
+is skipped because it cannot receive prior dispositions. A template carrying both placeholders
+uses base mode initially, then context mode. Details:
+`${CLAUDE_PLUGIN_ROOT}/skills/review/references/delta-re-review.md`.
+
+`localReReviewScope` — the legacy-named shared contextual-follow-up scope. Absent means delta unless
+`rereview-scope.sh` decides full; `"full"` pins Claude/local/cloud to the whole diff. `setup` never writes it — an
+operator hand-edit; it applies to every later cycle. Reasoning and the verified CLI facts:
 `${CLAUDE_PLUGIN_ROOT}/skills/review/references/delta-re-review.md`.
 
 ## Documentation hooks

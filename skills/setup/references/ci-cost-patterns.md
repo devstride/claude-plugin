@@ -1,10 +1,17 @@
 # CI cost patterns — the workflow mechanics behind "run CI once, at the end"
 
-The delivery loop's design is that CI runs **once per pull request, on the final reviewed diff**,
-and once per merge to the base branch. Four workflow mechanics enforce that mechanically, so it
-does not depend on anyone's discipline. `/devstride:setup ci` detects which are present, proposes
-the missing ones as exact diffs, and applies them only on acceptance; `/devstride:doctor` reports
-them; `/devstride:ci-audit` measures the result.
+Every delivery profile has the same floor: expensive CI runs **once per pull request, on the
+final reviewed and pre-ship-checked HEAD**, and once per merge to the base branch. Four workflow
+mechanics enforce that mechanically, so it does not depend on discipline. `/devstride:setup ci`
+detects which are present, proposes missing ones as exact diffs, and applies them only on
+acceptance; `/devstride:doctor` reports them; `/devstride:ci-audit` measures both excess runs and
+runs that started before the final ready-for-review event.
+
+If pull-request workflows exist without a complete draft gate, the repository is **degraded / not
+CI-last optimized**. A new loop PR stops before creation on false, mixed or ambiguous hold facts;
+an already-open adopted PR uses the strictest available behavior and reports
+`/devstride:setup ci`. A repository with no expensive pull-request workflow is valid: there
+is no cloud suite to defer. A delivery profile never bypasses a gate the repository supports.
 
 Measured on one repository over six days before any of B–D: the draft gate (A) already held —
 107 of 177 test runs skipped every expensive job for a total of six minutes — while **51% of the
@@ -114,16 +121,17 @@ for.
 
 ## D. The convention check for humans
 
-The loop opens every pull request as a draft. People forget. A cheap job that fails a
-**non-draft pull request opened by a person** — with the convention in its message — makes the
-rule self-explaining without making it a required check:
+The loop opens every pull request with expensive cloud checks as a draft. People forget. A cheap
+job that fails a **non-draft pull request opened by a person** — with the convention in its
+message — makes the rule self-explaining without making it a required check:
 
 ```yaml
 name: CI policy
 
-# The delivery loop opens every pull request as a DRAFT, settles review, then
+# In a repository with pull-request CI, the delivery loop opens each PR as a
+# DRAFT, settles review, then
 # marks it ready — that flip is what starts CI, so the suite runs once, on the
-# final reviewed diff. People forget. This fails a non-draft pull request opened
+# final reviewed and pre-ship-checked diff. People forget. This fails a non-draft pull request opened
 # by a person, with the convention in the message. Not a required check: a
 # courtesy that makes the rule self-explaining. Exempt: bots (dependabot), and
 # the loop's own pull requests — `gh` opens those as the OPERATOR, so the actor
@@ -156,16 +164,16 @@ jobs:
           !endsWith(github.actor, '[bot]') &&
           !contains(github.event.pull_request.body, '<!-- devstride:loop -->')
         run: |
-          echo "::error::This repository runs CI once, on the final reviewed diff. Open pull requests as DRAFTS (gh pr create --draft), settle review, then mark ready — the ready flip is what starts CI. Convert this one with: gh pr ready --undo ${{ github.event.pull_request.number }}"
+          echo "::error::This repository runs CI once, on the final reviewed and pre-ship-checked diff. Open pull requests as DRAFTS (gh pr create --draft), settle review and pre-ship checks, then mark ready — the ready flip starts CI. Convert this one with: gh pr ready --undo ${{ github.event.pull_request.number }}"
           exit 1
       - run: |
           echo "Draft convention satisfied (event ${{ github.event.action }})."
 ```
 
-Under a delivery profile whose release pull requests open non-draft (`prototype`, or
-`review.openPullRequestsAsDraft: false`), the loop's pull requests are opened by `gh` as the
-operator, not a bot — the body marker is what exempts them, and `pr` and `release` write it into
-every body they author. The check is informational by design: never make it a required status.
+Under every profile, a loop-managed PR with expensive cloud checks opens draft. In a valid no-CI
+repository it may open non-draft; `gh` still opens it as the operator, not a bot, so the body
+marker exempts it. `pr` and `release` write that marker into every body they author. The check is
+informational by design: never make it a required status.
 
 **The convention-only shape — the one definition `setup`, `doctor` and the validation checklist
 point at.** A pull-request workflow is convention-only when ALL of these hold: `on.pull_request.types`
@@ -185,6 +193,9 @@ runs the mistaken open started in the other workflows.
 
 ## The loop rules these mechanics pair with
 
+- **CI last is a profile floor, not a rigor knob.** Every profile holds expensive workflows until
+  review and matched pre-ship checks have settled at the final HEAD. Cloud-review registration
+  happens alongside local review; waiting for proof must not delay useful local work.
 - **Freeze the release source while a release pull request is ready**
   (`ci.freezeBaseWhileReleasePrReady`, default `true`): `release` refuses to flip while another
   pull request into the release source is mergeable, and `build-item` does not merge to the base
@@ -194,3 +205,7 @@ runs the mistaken open started in the other workflows.
   default `1`): `review` step 8 counts executed runs PER WORKFLOW under `ci.workflowGlobs` on the
   pull request it just settled — a full-stack pull request runs several workflows once each — and
   names a SECOND run of the same workflow with its cause; a repeat becomes a lesson.
+- **No premature expensive run.** `ci-audit` compares every executed pull-request run with the
+  pull request's final head SHA and final `ready_for_review` event. An earlier SHA, a run before
+  that event, or an ungated pull request with no event is reported even when the workflow ran only
+  once — this catches non-draft opens and review/pre-ship-fix reruns that a count alone misses.

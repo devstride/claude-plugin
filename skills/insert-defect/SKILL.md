@@ -3,6 +3,8 @@ name: insert-defect
 description: Insert a new Defect into a live DevStride roadmap, spliced into the dependency chain and dated for the build-item loop
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Insert a NEW Defect (the one-day leaf role — this org's Defect type) into a live DevStride roadmap — spliced into the dependency chain and dated so the `/devstride:build-item` loop picks it up NEXT. Its POSITION in the sequence looks native to the plan; its DESCRIPTION stays an honest repro/root-cause of the real bug (see the IMPORTANT note below — this is a splice/date operation, not a fabricated history). This is also the canonical capture path that `build-item` step 6.5 and `ultracode-build` use to turn a newly-discovered defect into tracked, dependency-ordered work.
 
 Argument — free text describing the defect, optionally prefixed/suffixed with a parent item number

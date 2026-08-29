@@ -197,8 +197,14 @@ repository's real branch names rather than copying those two values:
 
   "review": {
     "localCommand": null,
+    "localAssistCommand": null,
     "automatedReviewers": [],
     "openPullRequestsAsDraft": true
+  },
+  "plugin": {
+    "updateCheck": true,
+    "autoUpdate": true,
+    "pin": null
   }
 }
 ```
@@ -211,18 +217,20 @@ repository's real branch names rather than copying those two values:
 | `release.releaseSource` | The branch promoted during a production release, normally the same as `baseBranch`. |
 | `release.productionBranch` | The production release target. |
 | `conventionsDoc` | Your coding-standards file. The build skill reads it and obeys it — this is how the loop writes code that looks like yours. |
-| `verify.typecheck` | Commands run before every commit and merge. |
+| `verify.typecheck` | Type checks; unchanged-tree receipts prevent identical reruns. |
 | `verify.test` | Your test suite. Green is a gate, not a suggestion. |
 | `verify.testSingle` | How to run one test file, for the tight build loop. |
 | `verify.lint` | Linter, run when the diff touches the paths it covers. |
-| `review.localCommand` | A local review CLI to run on every change. `null` means none — the built-in adversarial pass is then your local gate. |
+| `review.localCommand` | A local CLI for PR/release merge-boundary review. Context-first templates receive the cumulative ledger; `<effort>` is routed by risk. |
+| `review.localAssistCommand` | Optional read-only support for ambiguous cross-module work, critical boundaries, or stubborn diagnosis; never a routine story call. |
 | `review.automatedReviewers` | Cloud reviewers to request on each pull request. `[]` means none; nothing is requested or waited on. |
-| `review.openPullRequestsAsDraft` | Open pull requests as drafts so CI is held until review settles, then runs once on the final diff. Set `false` if your CI should run immediately. |
+| `review.openPullRequestsAsDraft` | Open pull requests as drafts so review and pre-ship checks settle before CI runs once. With PR workflows, disabling the hold makes the optimized loop not ready. |
 | `review.adaptiveReviewerWait` | Absent means on: the wait for a cloud reviewer is bounded by that reviewer's learned latency (p95 + slack) instead of the full timeout. `false` pins the fixed bound. |
-| `review.localReReviewScope` | Absent means `"delta"`: the local engine's round 2 reviews only the fixes since round 1, falling back to the whole diff by a computed rule. `"full"` pins the whole-diff re-review. |
+| `review.localReReviewScope` | Legacy-named shared follow-up scope. Absent means computed delta/full; `"full"` pins every stream to the whole diff. |
 | `profileOverrides.verificationGrouping` | `"per-finding"` restores one verifier per finding at HIGH-RISK; the default `"per-file"` verifies findings one agent per file-group, auth-boundary findings always singly. |
 | `docs.updateSkill` | Name of a local skill in your repo (`.claude/skills/<name>/`) that updates your documentation for a shipped delta. `null` means no documentation system; the release skill's docs pass reports itself skipped. |
 | `docs.releaseNotesSkill` | Name of a local skill that writes and publishes a release note. Used only when you pass `--release-notes` to the release skill — notes are never written unasked. |
+| `plugin.autoUpdate` | Setup writes `true`: session start safely applies only repository-bound project/local installs; shared user/managed installs get a manual command instead. Restart is always required. |
 
 The full contract — every key, its shape and default — is in the
 [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference).
@@ -244,6 +252,13 @@ never before (suppress with `no docs`) — and writes a release note **only** wh
 production merge is confirmed and the deploy verified live. Nothing in the loop decides on its own
 that a release "deserves" a note.
 
+**Plain-English questions and recaps.** Every skill translates agent and tool output into the
+simplest accurate words before showing it. Questions lead with the real decision and consequence;
+technical commands and identifiers remain as evidence. Each built item says what changed, what was
+checked and what happens next; every merge or release lists what landed and whether it is live; and
+doctor explains each finding, why it matters, what it fixed and the final result. The shared rule is
+loaded once per top-level run so composed skills do not repeatedly spend context on it.
+
 > **Or run `/devstride:setup` and let it write this for you.** It inspects your repository, maps your
 > DevStride work types onto the loop's roles, asks only about what it could not work out, writes the
 > file, and then executes it — running your verify commands, resolving your branches, probing your
@@ -256,21 +271,22 @@ that a release "deserves" a note.
 ## Choose a delivery profile
 
 One word sets how much rigor the loop spends per unit of work — how finely a plan is sliced, how
-deep each spec goes, how wide the adversarial review fans out, how many local review rounds run,
+deep each spec goes, how wide merge review fans out, how many contextual review cycles run,
 and which gates a story passes before it merges:
 
 | Profile | For | Shape |
 |---|---|---|
-| `prototype` | A small team validating an idea; no production users yet | One story per user-visible slice; light specs; Claude's review pass only, at narrow breadth; touched tests as the story gate; no per-story PR; release units auto-release |
-| `standard` (default) | A working product | Stories of an hour or two; capped specs; contained review breadth; one local CLI review round; full local suite per story |
-| `enterprise` | Regulated, revenue-bearing, or shared-platform code | Fine stories; full specs; the widest review breadth available; every confirmed finding fixed; two local review rounds |
+| `prototype` | A small team validating an idea; no production users yet | One story per user-visible slice; light specs; bounded story risk screen; touched tests; no per-story PR; full review when the release unit auto-releases |
+| `standard` (default) | A working product | Stories of an hour or two; capped specs; targeted story checks; contained review with configured engines once at the merge boundary; full suite at release |
+| `enterprise` | Regulated, revenue-bearing, or shared-platform code | Fine stories; full specs; full story gate; widest merge review; two-cycle normal target |
 
 `/devstride:setup` asks which one and writes `"profile"` into `.claude/ds-config.json`; a plan can
 carry its own choice as a `Delivery profile:` line in its root item's description; an explicit
-profile word in a skill's arguments wins over both. Floors hold under every profile: one
-adversarial pass always runs, the security lens is mandatory on any auth-boundary diff, and the
-release pull request still gets every configured engine and CI over the full diff. The full
-contract, knob by knob, is `skills/plan/references/delivery-profiles.md`.
+profile word in a skill's arguments wins over both. Floors hold under every profile: each story
+gets a risk screen and green local gate; authentication, migrations and deployed contracts get
+focused verification immediately; the initial full adversarial pass runs at the direct/release-unit
+merge boundary; P1/serious-P2 fixes are re-reviewed until clear; and CI waits for that final head. The full contract is
+`skills/plan/references/delivery-profiles.md`.
 
 Picked too heavy a profile and watching the loop take far too long? `/devstride:rebalance <root>
 <profile>` re-slices the not-started part of a live plan in place.
@@ -316,15 +332,15 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | Skill | What it does |
 |---|---|
 | `build-item` | The orchestrator: select → branch → build → review → merge → completion ritual → repeat |
-| `ultracode-build` | The build engine for a single scoped item, including an adversarial review pass that verifies findings one agent per file-group, auth-boundary findings singly |
-| `review` | Runs a PR through every configured review engine, settles every finding, then releases CI — waiting for cloud reviewers only as long as they have historically taken, and re-reviewing fixes against the round-1 head |
+| `ultracode-build` | The build engine for one scoped item: fast feedback, exact-tree verification receipt, bounded risk screen, and focused critical-boundary verification when needed |
+| `review` | Runs every configured reviewer, settles findings, then releases CI — re-reviewing from the latest common cycle anchor and continuing P1/serious-P2 fixes until clear |
 | `pr` | Opens a pull request and runs the review-and-settle loop |
 | `push` | Stages, commits, type-checks, and pushes following the repo's commit conventions |
 | `branch-feature` / `branch-hotfix` | Cuts a working branch from the development or production branch |
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end |
 | `release` | Promotes the release branch to production with a full gated review; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
 | `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it |
-| `doctor` | Checks your setup — git, `gh`, the plugin, the DevStride connection, config, CI gating and cost mechanics, documentation hooks — and reports what to fix, then offers to carry out the repairs that are safe to automate |
+| `doctor` | Checks git, `gh`, the plugin, DevStride, config, CI gates, docs and personal status-line settings; after the shared replacement is committed and verified, it can separately remove only the personal `statusLine` key you approve while preserving every other setting and script |
 | `ci-audit` | Measures what CI actually costs: executed runs per workflow per pull request (the design is one each), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
 
 ## Versioning & updates
@@ -333,7 +349,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **2.8.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.0.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Updates are **not automatic by default** — an installed plugin stays at
@@ -389,8 +405,11 @@ From 1.2.0 the plugin checks for a newer release at every session start — sile
 current or offline, and with one line naming the exact two commands when you are not. It reads the
 version *this session* is running, not the one on disk, and it never blocks a session. Per
 repository, `.claude/ds-config.json` can turn it off (`plugin.updateCheck: false`), have it apply
-updates at session start (`plugin.autoUpdate: true` — you are asked to restart), or hold a version
-deliberately (`plugin.pin`). `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` disables it for a CI or headless run.
+updates at session start when the install belongs only to that repository
+(`plugin.autoUpdate: true` — you are asked to restart), or hold a version deliberately
+(`plugin.pin`). A normal user-scope install is shared by every repository, so this repo setting
+checks it but never changes it; enable marketplace auto-update once in `/plugin` for automatic
+user-scope updates. `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` disables the check for a CI or headless run.
 `/devstride:doctor` reports when it last ran and what it found.
 
 ## License

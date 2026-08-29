@@ -34,8 +34,9 @@ lessons in it; the review skill creates it the first time it has a lesson worth 
 
 Every later run reads the roster keys as fact, so an aspirational config does real damage
 quietly: a claimed engine is never probed again, it simply never reviews. Fast story merges get
-no pull request and no CI of their own — the local engines and suites are the only gate — so
-enabling them with nothing behind them merges code nothing checked. The defaults are copied
+no pull request and no CI of their own — the built-in risk screen and declared story suites are
+their immediate gate, while configured engines wait for the release PR. Enabling a command with
+nothing behind it still creates a false gate. The defaults are copied
 verbatim because the delivery skills compare against those strings literally: a default
 paraphrased into something that means the same thing no longer matches.
 

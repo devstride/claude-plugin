@@ -3,6 +3,8 @@ name: build-item
 description: "Orchestrate one DevStride work item end-to-end: select, branch, build, review, merge, and completion ritual — epic stories batch onto the epic's integration branch in fast develop mode (local engines, no per-story PR) and the fully-reviewed epic release PR carries them to develop; one-off items ship straight to develop with the full per-story PR ritual"
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Orchestrate ONE DevStride one-day leaf item (this org's Story or Defect types) end-to-end: select → In Progress → branch → build →
 review → PR → merge → completion ritual → sync → next. This is the ORCHESTRATOR. It composes
 the other delivery skills and owns ONLY the DevStride glue (selection, lane transitions, the
@@ -38,9 +40,9 @@ part of a sequenced plan is auto-detected as a one-off: $ARGUMENTS
 The delivery profile is the one user-facing choice that sets how much rigor the loop spends per
 story. Its knobs, its floors, its resolution order and its root marker are defined ONLY in
 `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` — read that file; never
-restate its table. This skill resolves the profile for the run and honours four of its knobs:
-`perStoryPullRequest` (step 4), `storyVerify` (step 4a), `autoRelease` and `releaseCiOrdering`
-(step 8). The composed skills honour their own knobs, but they must not each re-resolve the
+restate its table. This skill resolves the profile for the run and honours `perStoryPullRequest`
+(step 4), `storyVerify` (step 4a), `autoRelease` and `releaseCiOrdering` (step 8). The composed
+skills honour their own routing/cycle knobs, but they must not each re-resolve the
 profile — a story built under one profile and reviewed under another is worse than either — so
 **pass the resolved profile EXPLICITLY, by name, in the invocation text** of `ultracode-build`
 (step 3), `review` (steps 4a and 4b) and `pr` (steps 4b and 8).
@@ -60,9 +62,8 @@ the profile fills only an
 ABSENT key, and a present key that contradicts the profile is honoured AND reported ("profile
 prototype, but `autoRelease` is false in config — stopping at release-ready as configured").
 **The three `review.*` CI-ordering booleans are different**: they describe what the workflows
-SUPPORT; under `prototype` the RELEASE PR (step 8) does not use the hold whatever they say,
-while a base-branch story's own PR (4b) keeps the configured hold under every profile — its
-only cloud gate.
+SUPPORT. Every profile uses a supported hold for story and release PRs; PR workflows without
+one are a setup fault, not a profile speed option.
 
 **`profileOverrides` pins individual knobs**: apply it to the four knobs this skill owns after
 resolving the profile and BEFORE any decision reads them (a PRESENT dedicated key still wins
@@ -205,11 +206,12 @@ explicitly so it overrides its own config resolution.
 
 ## 3. Build
 
-Invoke **`ultracode-build`** as `I<number> <one-line goal/scope> profile: <name>` — the
-trailing clause is the form the engine parses; it honours its own knobs and must not
-re-resolve the profile behind you. It returns: the item number, a one-line summary,
-green-checks confirmation, the **deferral line**, the **deviations list**, the
-**untracked-deferral list**, and the **dismissed-findings list**. Carry all four forward —
+Invoke **`ultracode-build`** as `I<number> <goal> profile: <name> review-moment:
+<release-deferred|pr-boundary>` — `release-deferred` for fast mode, `pr-boundary` for 4b. The
+engine parses those clauses, honours its own routing and must not re-resolve them. It returns:
+the item/summary, the risk-screen or deferred-review report, a verification receipt keyed to the
+final tree, the **deferral line**, **deviations list**, **untracked-deferral list**, and
+**dismissed-findings list**. Carry the receipt and all four lists forward —
 deferrals + deviations to the PR body (step 4) and the as-built reconciliation (step 6);
 untracked deferrals to step 6.5; dismissed findings to the PR body (4b) or the merge-commit
 body (5a). Step 6 does not reconcile dismissals — a dismissal is a review disposition, not a
@@ -220,8 +222,8 @@ spec divergence.
 **Which path you are on is decided by the WORKING BASE step 0 resolved and the profile's
 `perStoryPullRequest`, not by the diff, the item, or how the run feels.** Epic integration branch:
 under **`prototype`** → **4a** whenever `fastStoryMerges.enabled` is ABSENT or `true` — fast mode
-is the profile's default, and Claude's build-time pass is the ≥ 1 local engine the floor asks
-for; a PRESENT `false` wins, routes the story to 4b, and is reported as a contradiction. Under
+is the profile's default and the build-time risk screen + green gate meet the local floor; a
+PRESENT `false` wins, routes the story to 4b, and is reported as a contradiction. Under
 **`standard` / `enterprise`** →
 **4a** iff `epicIntegrationBranches.fastStoryMerges.enabled`, exactly as before; the profile
 supplies no value while that key is present. Working base is `baseBranch` → **4b**, under every
@@ -232,23 +234,16 @@ never been cloud-reviewed.
 ### 4a. FAST DEVELOP MODE — no per-story PR (epic-branch stories)
 
 The story is not a release; the epic it batches into is — the cloud half (cloud reviewers,
-CI, thread bookkeeping) is **deferred to the epic release PR** and the story settles entirely
-locally, every LOCAL engine on the resolved roster at full effort.
+CI, thread bookkeeping) and full adversarial pass are **deferred to the epic release PR**. The
+story settles with the routed local risk screen and green verification gate.
 
-**THE FLOOR: fast mode requires ≥ 1 local engine behind the story.** No local CLI engine AND no
-build-time Claude pass (a caller bypassed `ultracode-build`) → route through **4b** and say
-why. The floor does not move with the profile: under `prototype` Claude's build-time pass is
-the engine behind the story — satisfied, not lowered.
+**THE FLOOR:** no completed `ultracode-build` risk screen or no valid verification receipt →
+route through **4b** and say why. A configured local CLI is not a routine story tax; an optional
+read-only support call is already recorded when ambiguity or critical risk required it.
 
-- **Claude adversarial** — already ran as `ultracode-build` phase 3 in step 3. Do not re-run it.
-- **Local CLI engine (Codex, by default)** — invoke **`review` in local-only mode** (say so
-  explicitly; pass the epic branch as the base ref **and the resolved profile by name** —
-  `review` owns `localCliEngine` and `maxLocalReviewRounds`). Use the skill, never the CLI
-  directly: the load-bearing flags live there (notably
-  `-c mcp_servers.devstride.enabled=false`, without which the review wedges silently).
-  Unconfigured → the Claude pass is the local gate; a failed probe is this-run degradation.
-  **Invoke `review` in local-only mode EITHER WAY** — it owns the settle-time steps; skipping
-  it because there is nothing to launch drops them silently.
+- Invoke **`review` in LOCAL-ONLY mode** with the epic base, profile and caller ledger. It launches
+  no routine second engine; it owns finding triage, fixes and the lessons write. Skipping it
+  because there is nothing new to launch silently drops those settle-time steps.
 - **Fix every finding `review` hands back as fix-in-story before merging** — its `fixFloor`
   triage decides which confirmed findings those are under the profile, and a finding it deferred
   with a rationale is not re-imposed here — committed per
@@ -258,11 +253,10 @@ the engine behind the story — satisfied, not lowered.
 - **Local suites are the gate** (`fastStoryMerges.requireLocalVerifyGreen`). The gate's WIDTH is
   the profile's `storyVerify` — take it from
   `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`, not from memory of a fixed
-  suite list — and say which width ran; that it must be GREEN is a floor no profile moves.
-  **Record the pass counts in the
-  commit body** — with no CI run behind the story, that line is the only durable evidence the gate
-  ran. Red suites are a STOP, never a "the epic release will catch it": at the epic release the
-  failure arrives with N stories of diff to bisect.
+  suite list. Validate the receipt by
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/verification-receipts.md`; unchanged tree +
+  exact command set means REUSE, not rerun. Review fixes invalidate it and rerun only affected
+  checks plus the required gate. Record commands/counts in the merge-commit body. Red is a STOP.
 - **No PR, no draft, no Copilot request, no CI poll.** An absent check here is not pending and not
   skipped — nothing was ever asked to run. Do not open a PR "just to have a record"; the epic
   release PR is the record, and it lists the constituent stories.
@@ -273,15 +267,15 @@ Then go to **step 5 (fast merge)**.
 
 Invoke **`pr`** in autonomous (driven-by-`build-item`) mode — say so explicitly, pass the
 working base as the pre-answered base **and the resolved profile by name** (it hands the profile
-on to `review`, which owns the round cap and fix floor), and note that this loop owns PR-to-item
+on to `review`, which owns the normal cycle target, P1/serious-P2 safety continuation and fix floor), and note that this loop owns PR-to-item
 linking (step 6), not `pr`.
 
 It opens the PR — as a draft when the repo holds CI on drafts (`review.openPullRequestsAsDraft`)
-**under every profile, `prototype` included**: `releaseCiOrdering` applies to the RELEASE PR
-only, and this PR is the story's sole cloud gate — every configured cloud reviewer requested
+**under every profile, `prototype` included**. This PR is the story's sole merge gate — every
+configured cloud reviewer requested
 in the same call, then the review-and-settle loop via `review`. **Review first, CI last**;
-never flip a PR ready yourself to start CI early. This is ADDITIONAL to step 3's build-time
-pass.
+never flip a PR ready yourself to start CI early. Step 3 deliberately deferred the full pass to
+this boundary, so `review` runs it once rather than duplicating it.
 
 Ensure every deferral, deviation and dismissed finding (with its rationale) is in the PR body.
 `review` returns its triage; out-of-scope
@@ -319,9 +313,10 @@ No PR to merge — integrate locally, then push the epic branch:
 - **The rebase already happened** in `review` step 7, before the ready-flip. Do NOT redo it by
   reflex; just CHECK whether the base moved since — only then rebase, push via
   `/devstride:push`, and accept the re-run (unresolvable conflict → genuine fork). **A re-push
-  may change the reviewed patch**: compare pre-/post-rebase patches, and if CHANGED, re-run
-  the local streams (re-requesting the cloud reviewer if the delta is substantive) before
-  accepting the new CI run. **Non-empty `verify.skipDuringStoryBuilds` → RECOMPUTE
+  may change the reviewed patch**: compare pre-/post-rebase patches, and if CHANGED, return to
+  `review` with its cumulative ledger, normal target and safety-trigger state — never open a fresh
+  budget. A tree-identical change keeps its receipt; otherwise affected checks rerun.
+  **Non-empty `verify.skipDuringStoryBuilds` → RECOMPUTE
   applicability from the new SHA before judging CI** — a rebase can change the path set, and a
   check that just became mandatory would sit absent.
 - **A `skipping` check is not a passing check.** Confirm the applicable jobs actually RAN — see
@@ -398,13 +393,10 @@ goes on that item instead — capture-as-new is only for work with no home. Repo
   delivery profile and its source** (never the profile alone — a resumed session re-resolves it
   from the root), and **the epic's integration branch keyed to its epic number** (or "develop —
   no epic").
-- **Close-out summary**, computed AFTER 6.5 so spliced items are counted:
-  ```
-  ✅ Completed [23] I20130 — Enforce seat invariant
-  🎚 Profile: standard — from the plan root I20100
-  📦 3 stories remaining in Epic "V1 Seat Management" until release-ready
-     (12 remaining in the full plan)
-  ```
+- **Human recap.** After 6.5, use the matching format. After a direct pull-request merge (5b), lead
+  with `Merged / Released`: item/effect, destination/live state, checks/CI, risk and next action.
+  Otherwise lead with `Built / Checked / Next`: outcomes, checks run or skipped, destination/link
+  or SHA, CI, profile, remaining counts and next action.
   Count not-Done leaf descendants (`hierarchyRoles.leaf` types) of
   **the SAME release-unit ancestor step 0 resolved to derive the working base** — never merely the direct parent, which
   excludes sibling subtrees and can read zero while the release unit still has open work,
@@ -431,34 +423,32 @@ ONE reviewed PR.
 - **Refresh from develop**: pull the epic branch, fetch `baseBranch`, capture the fetched tip as
   `<baseOid>`, and **merge that exact OID** — merge, NOT rebase; story SHAs on a shared branch must
   not be rewritten. Resolve conflicts in-loop if safe and mechanical; otherwise STOP. Push.
-- **Verify locally**: type-checks and `verify.test` (the repo's full test suite — where the
-  profile's `storyVerify` ran less than that per story, this is the batch's first full run, so
-  do not skip it on the strength of green stories). Compute the
-  release diff against the same merged tip. If `verify.skipDuringStoryBuilds` is non-empty and a
-  listed suite's configured applicability fires, its CI check is mandatory on the PR below — do
-  NOT also run it locally, a double-run is waste. (With the list empty, local-only suites in
-  `preShipChecks` are the callers' step-2b responsibility instead.) Fix failures in-loop before
-  cutting the PR.
+- **Build one final verification plan for the merged tree.** Aggregate story receipts, then
+  invalidate only what the develop refresh/conflict resolution or combined tree changed. Inspect
+  the configured PR workflows: when the exact `verify.typecheck` / `verify.test` / `verify.lint`
+  gate runs there, do not run it locally too — draft-held CI is its single release-boundary run.
+  A required command absent from CI becomes a caller-declared pre-ship check for the PR below and
+  runs once on the final reviewed head. `preShipChecks` remain local-only. A non-empty
+  `verify.skipDuringStoryBuilds` entry whose applicability fires remains cloud-only. Record the
+  resulting command/location map and receipts; never infer coverage from a job name.
 - **Cut via `/devstride:pr`** in autonomous mode, head = epic branch, base =
   `epicIntegrationBranches.releaseTarget` (a config key naming where completed release units land;
   the shipped default is `baseBranch`, and a repo that stages releases elsewhere sets it there),
   flagged as an
   **EPIC RELEASE PR** so the body leads with the epic and lists the constituent stories, **with
-  the resolved profile named in the invocation** (it reaches `review` through `pr`).
-  **`releaseCiOrdering`:** under `prototype`, tell `pr` and `review` that the draft hold is OFF
-  for this PR — it opens non-draft and CI runs concurrently with the review —
-  **unconditionally**, whatever the three `review.*` CI-ordering booleans say: they describe
-  what the workflows support, and a prototype run does not use the hold. Under `standard` /
-  `enterprise` the booleans govern the hold as configured (the review-first, CI-once ordering
-  step 4b describes).
+  the resolved profile named in the invocation** (it reaches `review` through `pr`), the
+  verification plan/pre-ship commands, and the aggregate story risk-screen ledger. Every profile
+  uses the supported draft hold: full review → uncovered local pre-ship checks → ready flip → CI.
 - **Review-and-settle — CHECK WHICH SCOPE APPLIES, because fast mode changes it.**
   - **Fast mode was used** (`fastStoryMerges.epicReleaseIsFirstCloudPass`, the default path):
     **this PR is the FIRST cloud-side pass over ANY of this code — review the FULL diff**,
-    every story in the batch, never just the integration surface (why this is the one place
-    fast mode's quality is defended: `references/epic-release.md`).
+    every story in the batch, using the aggregate ledgers to avoid re-raising settled risk-screen
+    findings (why this is the one place fast mode's quality is defended:
+    `references/epic-release.md`).
   - **Stories took the full 4b ritual**: each was already reviewed at its own PR — point the
-    review at what per-story review COULD NOT see: the cross-story integration surface and the
-    develop-merge conflict resolutions.
+    review at what per-story review COULD NOT see: pass a computed scope manifest of cross-story
+    contracts, combined behavior and develop-merge conflict resolutions rather than a blind full
+    local reread. Cloud reviewers may still cover the whole PR.
   - Either way: any suite in `verify.skipDuringStoryBuilds` is decided by its configured
     applicability — a suite that fires is mandatory, with no story-level exemption. With the list
     empty, no slow cloud suite gates the release; local pre-ship suites remain the
@@ -475,7 +465,7 @@ ONE reviewed PR.
   this epic (`kind: "epic-release"`, the release PR, the merge commit, every constituent leaf with
   a plain-English `summary` and a `userFacing` judgement, and **`live: false`** — shape in
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`) and invoke that skill in
-  mode `update`; relay what it reports. `live: false` is not optional: the epic reached the
+  mode `update`; translate its result and preserve exact links. `live: false` is not optional: the epic reached the
   base branch, not production — the skill STAGES; the production release publishes. **Never
   release notes here**, under any setting (why: `references/epic-release.md`).
 - **Close out**: `add_comment` on the RELEASE-UNIT item (release PR link, list of shipped leaves,
@@ -484,6 +474,9 @@ ONE reviewed PR.
 - **Link the release PR onto each constituent leaf whose as-built note deferred it** —
   `link_pull_request` (or `add_comment`) on every leaf in the batch; this is where step 6's
   fast-mode promise is kept.
+- **Human recap.** After the release PR merges, lead with `Merged / Released`: list every included
+  item and its effect, where it landed, validation/review/CI, documentation, whether it is live,
+  and the remaining production-promotion action.
 - Surface — never perform — the follow-on owner-cut `develop → master` promotion (`/devstride:release`).
 - Out-of-scope findings from this review go through step 6.5 like any other.
 

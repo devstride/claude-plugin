@@ -76,4 +76,30 @@ if [ "$AFTER" -lt "$BEFORE" ]; then ok "(i) disable-model-invocation skill leave
 # (j) references are discovered recursively (the setup templates live one level down)
 if /bin/bash "$MC" --json | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if any("/references/" in k and k.count("/")>=4 for k in d["references"]) else 1)'; then ok "(j) nested references are measured"; else bad "(j) no nested reference found — discovery is not recursive"; fi
 
+# (k) raising a ratchet cannot bypass the immutable ordinary-body ceiling
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["bodies"]["pr"]=9000; json.dump(d,open(sys.argv[2],"w"))' "$BUD" "$TMP/high.json"
+OUT="$(/bin/bash "$MC" --check --budgets "$TMP/high.json")"; RC=$?
+if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^BUDGET-ABOVE-HARD-CEILING pr 9,000 > 8,000'; then ok "(k) raised body budget cannot bypass hard ceiling"; else bad "(k) expected BUDGET-ABOVE-HARD-CEILING, got rc=$RC: $OUT"; fi
+
+# (l) reference budgets are enforced and cannot be omitted
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["references"]["skills/review/references/ci-settle.md"]=1; json.dump(d,open(sys.argv[2],"w"))' "$BUD" "$TMP/low-ref.json"
+OUT="$(/bin/bash "$MC" --check --budgets "$TMP/low-ref.json")"; RC=$?
+if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^OVER-REFERENCE skills/review/references/ci-settle.md'; then ok "(l) lowered reference budget is enforced"; else bad "(l) expected OVER-REFERENCE, got rc=$RC: $OUT"; fi
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); del d["references"]["skills/review/references/ci-settle.md"]; json.dump(d,open(sys.argv[2],"w"))' "$BUD" "$TMP/missing-ref.json"
+OUT="$(/bin/bash "$MC" --check --budgets "$TMP/missing-ref.json")"; RC=$?
+if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^MISSING-REFERENCE-BUDGET skills/review/references/ci-settle.md'; then ok "(l2) unbudgeted reference is rejected"; else bad "(l2) expected MISSING-REFERENCE-BUDGET, got rc=$RC: $OUT"; fi
+
+# (m) representative composed paths fail on aggregate growth or a missing member
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["paths"]["fastStoryLoop"]["budget"]=1; json.dump(d,open(sys.argv[2],"w"))' "$BUD" "$TMP/low-path.json"
+OUT="$(/bin/bash "$MC" --check --budgets "$TMP/low-path.json")"; RC=$?
+if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^OVER-PATH fastStoryLoop'; then ok "(m) composed path budget is enforced"; else bad "(m) expected OVER-PATH, got rc=$RC: $OUT"; fi
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["paths"]["fastStoryLoop"]["files"].append("skills/missing/SKILL.md"); json.dump(d,open(sys.argv[2],"w"))' "$BUD" "$TMP/missing-path.json"
+OUT="$(/bin/bash "$MC" --check --budgets "$TMP/missing-path.json")"; RC=$?
+if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^PATH-MISSING fastStoryLoop skills/missing/SKILL.md'; then ok "(m2) missing composed-path member is rejected"; else bad "(m2) expected PATH-MISSING, got rc=$RC: $OUT"; fi
+
+# (n) even a raised row cannot hide an actual body above its hard ceiling
+python3 -c 'import sys; open(sys.argv[1],"a").write("x"*12000)' "$TMP/repo/skills/pr/SKILL.md"
+OUT="$(/bin/bash "$TMP/repo/scripts/measure-cost.sh" --check --budgets "$TMP/high.json")"; RC=$?
+if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^HARD-OVER skills/pr/SKILL.md'; then ok "(n) body growth beyond hard ceiling is rejected"; else bad "(n) expected HARD-OVER, got rc=$RC: $OUT"; fi
+
 exit $FAIL

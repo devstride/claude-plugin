@@ -3,6 +3,8 @@ name: branch-hotfix
 description: Create a new hotfix branch off a fresh copy of the production branch, for urgent fixes that must not carry unreleased work
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Create a new hotfix branch off a fresh copy of the production branch. Use for urgent fixes that
 must branch from production code rather than from the development branch — a hotfix cut from the
 development branch would drag every unreleased change along with it.

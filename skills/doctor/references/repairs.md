@@ -1,30 +1,23 @@
 # Phase 2 — what doctor may repair, and what it must only report
 
-Phase 1 diagnoses and touches nothing. Phase 2 offers to fix. This file decides which findings are
-eligible, because that decision must be a **fixed classification and not a judgement made in the
-moment**. A diagnostic people trust enough to run first is one whose blast radius they already
-know; a skill that decides case by case how much to repair has no blast radius anyone can state.
+Phase 1 only diagnoses; Phase 2 offers fixes. These tiers are fixed—never improvise eligibility.
 
 ## The tiers
 
-**Tier A — doctor performs the repair itself.** A finding qualifies only when its fix meets every
-one of these:
+**Tier A — doctor repairs.** The fix must meet all five rules:
 
-- every write lands inside **this repository's `.claude/`** directory;
+- every write lands inside **this repository's `.claude/`**, except the one personal-key cleanup
+  defined below;
 - it needs **no network** and no external account;
-- it changes **no git state** — no stage, commit, checkout, branch, remote or push;
-- it is **undone by deleting or reverting a file**, with nothing else to unwind;
+- it changes **no git state**;
+- it is **undone by deleting/reverting a file** (or restoring the cleanup's private key backup);
 - and doctor can **verify it worked** by re-running a Phase 1 check.
 
-**Tier B — doctor offers to run the command that owns the fix.** The repair exists already, in a
-skill or a CLI built for it. Doctor never reimplements one of these; a second implementation of
-`setup`'s config writer would drift from it, and the copy that drifts is the one running while
-somebody believes they ran setup. Doctor names the exact command, runs it on a yes, and reports
-what it printed.
+**Tier B — offer the existing repair command.** Never reimplement a skill/CLI. On yes, run its exact
+command, summarize plainly, and show the exact command/result only as evidence.
 
-**Tier C — report only, never repair.** Everything else, and specifically anything that edits a
-workflow file, changes git state, writes a DevStride record, alters machine-wide or cross-repository
-configuration, or reaches a deployed stage.
+**Tier C — report only.** This includes workflows, git/DevStride/deployed state, and machine-wide
+config beyond the narrow personal `statusLine` exception.
 
 ## The classification
 
@@ -32,11 +25,12 @@ configuration, or reaches a deployed stage.
 | --- | --- | --- |
 | Status line missing or half-configured (§4) | **A** | Write it — mechanics below |
 | Status line set only in `~/.claude/settings.json` (§4) | **A** | Offer the same repair, which is what makes it repository-wide |
+| Personal `statusLine` in local or user settings (§4) | **A, narrow exception** | After the shared pair is committed and clean, offer key-only cleanup separately |
 | A structurally absent status-line segment (§4) | **A** | Ask what it should read from; write `stage.resolve`, or record `statusLine.hiddenSegments` |
 | `gh` not authenticated (§1) | **B** | `gh auth login` |
 | `gh` missing a scope (§1) | **B** | `gh auth refresh -s <all needed scopes in ONE list>` |
 | Auth coming from `GH_TOKEN`/`GITHUB_TOKEN` (§1) | **C** | `refresh` cannot touch an environment token; say to unset it or reissue |
-| Plugin behind the newest release (§2) | **B** | `claude plugin marketplace update devstride` then `claude plugin update <installed-id>@devstride` — **the id must match the installed one** (`devstride@devstride` or `ds@devstride`), or the command reports the plugin as not installed and silently leaves the old version. Then say a **restart** is required; doctor cannot do that half |
+| Plugin behind newest (§2) | **B** | Marketplace update, then `claude plugin update <installed-id>@devstride`; use the installed `devstride`/`ds` id, then restart |
 | Config absent, or branch roles that do not resolve (§4) | **B** | `/devstride:setup` |
 | Unrecognized or misspelled config key (§4) | **C** | Doctor prints suggested JSON; the owner decides. A "correction" to a key doctor merely failed to recognize is a silent config change |
 | `localEnvironment` / `stage` gaps (§4) | **B** | `/devstride:setup` |
@@ -48,61 +42,64 @@ configuration, or reaches a deployed stage.
 | More than one DevStride MCP server connected (§3) | **C** | Doctor cannot know which organization is the right one, and removing the wrong server disconnects work elsewhere |
 | Not a git repository, no `origin`, `git`/`gh` not installed (§1) | **C** | Outside the repository, or the precondition for having one |
 
-When a finding is not in this table, it is **tier C**. Absence is a decision, not a gap to fill by
-analogy.
+Anything absent from this table is **tier C**.
 
 ## The status-line repair
 
-Phase E3 of `/devstride:setup` owns these mechanics and is the authority if this ever drifts:
+Phase E3 of `/devstride:setup` is authoritative:
 
-1. Copy `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline.sh` to `.claude/statusline.sh`
-   and `chmod +x` it. **Copy it verbatim** — it is repo-agnostic and reads the consuming
-   repository's own config at runtime, so there is nothing to substitute, and a `{{PLACEHOLDER}}`
-   edited in is a bug rather than a customization.
-2. **Never overwrite an existing `.claude/statusline.sh`.** The owner may have edited it or written
-   their own — and the commonest half-configured repository is exactly the one that has the script
-   and lacks the setting. Say it is already there and leave it.
+1. Copy `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline.sh` verbatim to
+   `.claude/statusline.sh`; `chmod +x`. It reads repo config at runtime—substitute nothing.
+2. **Never overwrite an existing script.** Say it exists and leave it.
 3. MERGE this into `.claude/settings.json` — never replace the document:
 
    ```json
    { "statusLine": { "type": "command", "command": "bash .claude/statusline.sh", "padding": 0 } }
    ```
 
-   **Never write it to `.claude/settings.local.json`**, which is conventionally gitignored: that
-   recreates the one-machine-only problem the repair exists to remove.
-4. Verify, because a status line fails silently — Claude Code renders nothing and reports no error:
+   Never use `.claude/settings.local.json`; that recreates one-machine-only config.
+4. Verify non-empty output (failure is otherwise silent):
 
    ```bash
    printf '{"workspace":{"current_dir":"%s"}}' "$PWD" | bash .claude/statusline.sh; echo
    ```
 
-   Non-empty output is the pass. Confirm neither file is gitignored (`git check-ignore` exits 1).
-5. Leave both files **unstaged and uncommitted**, say so, and say why it matters: until they are
-   committed the status line is still one machine's, which is the failure being repaired.
+   Confirm neither file is ignored. Leave both **unstaged and uncommitted**; until committed, the
+   fix reaches one machine. Do not offer cleanup until the owner commits and reruns doctor.
+
+## Personal status-line cleanup
+
+Once shared is committed in `HEAD`, clean in both index and working tree, and passes, inspect each
+scope with `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/statusline-override.py`. Show path/scope,
+never command; ask outside the batch. Local: “Remove only `statusLine` from `<file>` so shared takes over?” User:
+shared already wins here; ask: “Remove the fallback? Repositories without their own project status
+line lose it; repositories with project status lines keep theirs.”
+
+Yes → `remove` with that scope and `--expect-sha256 <digest>`; no → unchanged. The helper proves
+shared, resolves accessible `disableAllHooks`, rejects unsafe files/races, preserves siblings, and
+backs up the key in a private durable state directory. Report the path. Recovery merges that sole
+key into the same file, never replacing that file. Refusal has no manual fallback. Restart, rerun
+`doctor config`, inspect `/status`. Known managed/CLI overrides block cleanup as tier C.
 
 ## Blank status-line segments
 
-A segment with no value is already invisible — `seg` drops the label with it — so this repair is
-not about hiding anything. It is about **deciding** whether a blank segment is a repository that
-has no such fact or a setting nobody made, and recording the answer so the question is asked once.
+A blank segment is already invisible. This repair records whether the fact is absent or unset.
 
-`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md` is the authority: the
-segment table, which blanks are structural and which are transient, and the three ends the question
-can have. Two rules matter most and are easy to get wrong. **Only `stage` is worth asking about** —
-every other blank is transient or already reported by another check, and asking about those turns a
-diagnostic into an interrogation. And **silence means "do not know", not "not applicable"**: leave
-the segment alone and say so. Writing `hiddenSegments` on an unanswered question buries it.
+Use `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`. **Ask only about `stage`**; other blanks are
+transient/reported elsewhere. Silence means “do not know”: leave it unchanged, never hide it.
 
 ## Making the offer
 
-- **One list, one question.** Number the eligible findings, one line each — the finding, the action,
-  the tier — then ask once for all / some by number / none. A prompt per finding turns a report into
+- **One list, one batch question (personal cleanup excluded).** Number findings with action/tier,
+  then ask once for all / some by number / none. A prompt per finding turns a report into
   an interrogation, and a queue of yes/no prompts manufactures agreement rather than collecting it.
 - **Name the exclusions.** Say which failures are not on the offer list and that they are tier C by
   rule. Otherwise a short offer list reads as a short problem list.
 - **Never bundle a tier B command into an "all".** Each tier B repair runs something that reaches
   outside this repository — an account, an install, another skill. Confirm those individually even
   when the batch was accepted wholesale.
+- **Never bundle personal status-line removal into "all".** Each scope gets its own explicit
+  question after the shared line passes.
 - **Report each outcome as you go**, and re-run the corresponding Phase 1 check afterwards. A
   repair that fails stops itself, not the batch.
 - **Non-interactive invocation → no repairs.** Print the list as a recommendation. Doctor is called

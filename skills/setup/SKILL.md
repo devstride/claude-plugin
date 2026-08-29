@@ -5,6 +5,8 @@ user-invocable: true
 disable-model-invocation: true
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Set the delivery loop up for **this** repository and DevStride organization: inspect (A),
 report (B), map work types onto roles (C), ask what is left (D), write (E) — or merge into an
 existing config (F) — then prove it by running it (G).
@@ -111,20 +113,13 @@ Scan `scripts` in the root `package.json` and each workspace's. Ranked exact-nam
 
 ### A5. CI provider, and the draft gate
 
-`.github/workflows/*.yml|yaml` → **GitHub Actions**, the only provider the draft-hold mechanics
-understand. **A convention-only workflow is exempt** — `opened` plus optionally
-`converted_to_draft`/`ready_for_review`, one run-only job, no checkout, fails on a non-draft
-open (pattern D of `ci-cost-patterns.md`; `opened`-only is a subset). **Remove it from the population BEFORE the five-case table below is
-evaluated** — left in, it reads `ambiguous` and Phase G calls it a FAIL.
-
-Judge **only `on: pull_request` workflows**. The hold needs two things: (1) **jobs gated on
-the draft condition** (`github.event.pull_request.draft == false` or the `!` form) — a job is
-also gated when ANY job it `needs` is gated (unless it overrides with `if: always()` or
-similar) — requiring an explicit `if` on the whole closure is the wrong test;
-(2) **`on.pull_request.types` carries all four of `opened`, `synchronize`, `reopened`,
-`ready_for_review`** — the defaults omit `ready_for_review`, an explicit list **replaces** the
-defaults, `opened` is required (`converted_to_draft` optional); short → `ambiguous`, naming the
-missing events. The traps: detector-evidence.md §A5.
+`.github/workflows/*.yml|yaml` means GitHub Actions, the only supported hold. Read
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.md` §A5 and
+`ci-cost-patterns.md`. Remove convention-only workflows BEFORE judging `on: pull_request`:
+one run-only/no-checkout job on `opened` (optionally draft/ready events) that enforces draft open.
+For the rest require (1) every expensive job draft-gated directly or through `needs` (unless it
+overrides with `always()`), and (2) explicit `opened`, `synchronize`, `reopened`,
+`ready_for_review` trigger types. Name missing events/jobs.
 
 Five cases; **every one produces all three boolean rows** (`review.openPullRequestsAsDraft`,
 `review.readyForReviewReleasesCi`, `review.ciHeldUntilReviewSettled`):
@@ -133,66 +128,44 @@ Five cases; **every one produces all three boolean rows** (`review.openPullReque
 |---|---|
 | Draft-gated, explicit `types` naming all four of `opened`, `synchronize`, `reopened`, `ready_for_review` | `true`, `detected` |
 | Draft-gated, `types` absent or missing any of the four | `ambiguous` — the hold cannot work as written; point at `/devstride:doctor` |
-| None draft-gated | `false`, `detected` — legitimate; say the cost (CI on open and after every fix push) |
+| None draft-gated, one or more PR workflows | `ambiguous` — not loop-ready: CI starts before review and after fix pushes; offer `/devstride:setup ci` |
 | Some jobs gated, others not | `ambiguous` — name the ungated jobs and ask |
 | No pull-request workflow | `false`, `detected` — nothing to hold |
 
-**Record, per pull-request workflow, the CI-cost mechanics** (informational rows
-`ci.concurrency`, `ci.productionTreeSkip`, `ci.policyCheck`). **`ci.productionTreeSkip` takes
-three values** — `present`, `present but inert` (the `HEAD^2` parent is not in the checkout —
-depth, or a deepening fetch, judged by effect; `setup ci` then offers the `fetch-depth` diff
-alone), `absent`. A step in a job with **no checkout** is a broken workflow, its own finding. A
-full run only reports — it never edits a workflow. Any other provider (`.gitlab-ci.yml`, `.circleci/`,
-`Jenkinsfile`, `azure-pipelines.yml`) or none: record the name, three booleans `false`,
-`detected`. **Nothing provider-specific beyond GitHub Actions.**
+Record per workflow `ci.concurrency`, `ci.productionTreeSkip` (`present` / `present but inert` /
+`absent`) and `ci.policyCheck`; a no-checkout step is its own fault. Full mode only reports.
+Any other provider (`.gitlab-ci.yml`,
+`.circleci/`, `Jenkinsfile`, `azure-pipelines.yml`) records the name and three booleans `false`,
+`unknown` — the plugin cannot promise CI-last there. No CI records `false`, `detected` and N/A.
+**Nothing provider-specific beyond GitHub Actions.**
 
 ### A6. Branches
 
-From git alone — network only as fallback.
-
-- **Enumerate, then reason** — local AND remote branch lists, only `origin`'s refs,
-  normalized (prefix stripped, `origin/HEAD` dropped, deduplicated; a fork's `upstream/*` is
-  never a candidate); a role resting on only-local or cached evidence is confirmed with
-  `git ls-remote --heads origin`, and unconfirmable → `ambiguous`, naming the possibly-stale
-  cache. The full enumeration procedure — commands, the default-branch fallback — is
-  detector-evidence.md §A6; read it when running this detector.
-- **Classify only exact, whole names; never substring or prefix.** Production-role candidates:
-  `main`, `master`, `production`, `prod`. Development-role candidates: `develop`,
-  `development`, `staging`, `stage`, `canary`, `test`, `testing`, `qa`. `trunk` is a common
-  single-trunk name, not proof of a separate production role. Preserve the repository's
-  spelling; the lists assign likely roles among branches proved to exist — never the refs to
-  probe for, and a name is not proof of what deploys.
-- **One exact development + one exact production candidate → all four roles `detected`**
-  (`baseBranch` + `release.releaseSource` from the development one; `release.productionBranch`
-  + `hotfixBaseBranch` from the production one). List order is NOT a ranking — two names from
-  either set → those roles `ambiguous`, showing the matches. `origin/HEAD` supports the
-  ordinary PR base — never proof of production, never overriding an exact pair or an explicit
-  answer.
-
-**Four keys hang off this — `baseBranch` (where work branches from and merges to),
-`release.releaseSource` (what promotes to production, normally `baseBranch`),
-`release.productionBranch` (what production deploys from), `hotfixBaseBranch` (what an urgent
-fix branches from, normally the production branch). Emit all four on every path** — each has a
-shipped default naming a branch this repository may not have. When the pair rule above does not
-decide, **read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.md` §A6 and
-assign per its path table**; the constants: topic branches are never role candidates, a
-staging/canary/test/qa branch is never silently promoted to production, and an undecidable role
-is `ambiguous` with its candidates shown, never omitted. **Always compute `protectedBranches`
-containing the base, production AND release-source branches** — all three even when two are one
-ref; an unlisted branch is one the loop treats as disposable. **Detached HEAD** blocks nothing;
-**no `origin`** does: branch keys `ambiguous`, with that reason.
+Read `detector-evidence.md` §A6. Enumerate normalized local + `origin` refs; confirm cached/local
+evidence with `git ls-remote`, else `ambiguous`. Match whole names only: production candidates
+`main|master|production|prod`; development candidates
+`develop|development|staging|stage|canary|test|testing|qa`. One of each detects all four roles:
+development → `baseBranch` + `release.releaseSource`; production →
+`release.productionBranch` + `hotfixBaseBranch`. Multiple candidates are ambiguous; list order
+never ranks, `origin/HEAD` never proves production, topic branches never qualify, and staging is
+never silently promoted. Emit all four keys on every path. `protectedBranches` always includes
+base, production and release source. No `origin` makes branch roles ambiguous; detached HEAD does
+not.
 
 ### A7. Review engines
 
 **Absent is a finding, not a failure** — an empty roster is legal; the built-in adversarial pass
 is then the local gate.
 
-- **Local review CLI** (`review.localCommand`) — the template must carry `<base>` (the ref
-  the engine diffs against) and may carry `<context>` (round 2's distilled round-1 outcome on
-  stdin; `config-defaults.md`). Probe `command -v codex` and any CLI the user names. Found → a
-  candidate, `ambiguous` (model, effort, flags are choices); carry `review.localReviewerName`.
-  **Not found → `unknown`, never a detected `null`** — one missed probe is not absence. Report
-  what was probed.
+- **Local review/support CLI** — probe `command -v codex` and any CLI the user names. A review
+  template must accept either `<context>` on stdin (preferred: every cycle receives scope + the
+  cumulative ledger) or `<base>`; `<effort>` enables task-sized reasoning. For Codex, offer the
+  context-first read-only template from `config-defaults.md` as both `review.localCommand` and
+  optional `review.localAssistCommand`; it leaves model choice to operator/managed config and
+  disables the DevStride MCP. Found → `ambiguous` until confirmed; carry
+  `review.localReviewerName`. Existing base-only/literal-effort commands remain supported but
+  get a migration proposal, never a silent rewrite. **Not found → `unknown`, never detected
+  `null`** — report what was probed.
 - **Cloud reviewers** (`review.automatedReviewers`) — possible when origin is GitHub and
   `gh auth status` succeeds. **An entry is more than a name**: a `requested_reviewer` bot is
   requested by its `graphqlBotId`; missing fields silently request nothing — take the complete
@@ -246,22 +219,12 @@ Eight rows: `localEnvironment.create`, `.recreate`, `.recreateMode`, `.instanceN
 
 ### A10. Deployment stage
 
-Two rows: `stage.resolve`, `stage.productionStages`.
-
-- **Most repositories have no stage**, and that is an answer, not a gap. Nothing found → both rows
-  `unknown`; ask plainly whether this repository deploys per-environment infrastructure, and take
-  `null` as complete.
-- Candidate shapes — each `ambiguous`, **never `detected`**, because finding the tooling does not
-  say how THIS checkout picks its stage: `sst.config.*` beside `.sst/stage`; `serverless.yml`;
-  `Pulumi.*.yaml`; a Terraform workspace; a root script reading a `*_STAGE` / `ENVIRONMENT`
-  variable. Propose the command the shape implies; the owner corrects it. Traps: §A10.
-- **`resolve` must be cheap and quiet** — it runs on a timer. Prefer a marker file the tooling
-  already writes over invoking that tooling.
-- **`productionStages` is never detected.** Ask whenever `resolve` is non-null, saying that a stage
-  named here is one where a deploy reaches real users. An empty list is legitimate.
-- **Never fold this into `localEnvironment`** — that names the LOCAL instance the loop creates and
-  destroys; a stage is a CLOUD stack the loop only reads. Table: `config-defaults.md`.
-- Existing config: record the current block, per A8.
+Rows: `stage.resolve`, `stage.productionStages`. Nothing found → unknown; ask whether this repo
+deploys per-environment infrastructure, accepting null. SST/serverless/Pulumi/Terraform/env-script
+signals are ambiguous candidates, never detection; read detector-evidence §A10. `resolve` must be
+cheap, quiet and preferably read a marker. When non-null, always ask `productionStages`; empty is
+valid. Never confuse this read-only cloud stage with the mutable LOCAL `localEnvironment`. Record
+existing config per A8.
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.md` when running A5 or
 A6, when a detector's result is `ambiguous` and the candidates need explaining, or before
@@ -323,17 +286,15 @@ Four things no inspection can reach, asked every run — the first one first:
 - **What does merging to the production branch actually do?** (`release.autoDeployOnMerge`) —
   one plain-English sentence; the release skill quotes it back at the production gate. Nothing
   can detect it; no sensible default exists.
-- **Documentation — three questions, together** (`docs.*`): (1) **where it lives** — a
+- **Documentation, asked in dependency order** (`docs.*`): first ask **where it lives** — a
   directory here, a sibling checkout (path + branch), a hosted service (URL), or "nowhere" →
-  `docs.updateSkill: null`, skip (2), say the docs pass will report itself skipped, **still ask
-  (3)** — the hooks are independent; (2) **how it is updated** — publishing branch / pull
-  request / tool / person (the skill then hands them the delta) — capture what makes "publish"
-  concrete; (3) **how release notes are pushed** — "we do not publish" →
-  `docs.releaseNotesSkill: null`, saying that `--release-notes` will then report itself
-  unavailable. Then the skill **names** (defaults `update-documentation`,
-  `update-release-notes`) and — separately, optional — **`release.deployVerification`** (exits
-  0 only when production serves the commit in `RELEASE_COMMIT`; say what it buys; never invent
-  one). Answers go into the E2 scaffolds, not the config; contract:
+  `docs.updateSkill: null`. When it exists, next ask **how it is updated** — publishing branch /
+  pull request / tool / person — and capture what makes "publish" concrete. Then separately ask
+  **how release notes are pushed**; "we do not publish" → `docs.releaseNotesSkill: null`, so
+  `--release-notes` reports itself unavailable. Then ask for the skill **names** (defaults
+  `update-documentation`, `update-release-notes`) and, separately and optionally,
+  **`release.deployVerification`** (exits 0 only when production serves `RELEASE_COMMIT`; explain
+  its value; never invent one). Answers go into the E2 scaffolds, not the config; contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`. **Release notes are opt-in
   per release** — no "warranted" policy; the owner passes `--release-notes`.
 - **Whether to write the repository a status line** — one yes/no, every run. It renders
@@ -371,15 +332,15 @@ literally.
 | `release` | `productionBranch`, `releaseSource`, `autoDeployOnMerge`, `deployVerification` (`null` unless given). Never `docsRepo` — retired; Phase F migrates |
 | `docs` | `updateSkill`, `releaseNotesSkill` — the names E2 scaffolds, or `null`; `updateOnEpicRelease: false` |
 | `conventionsDoc`, `itemTagFormat`, `lessonsDoc` | From A8, the answers, and the shipped default path |
-| `plugin` | Verbatim — `updateCheck: true`, `autoUpdate: false`, `pin: null`. Not asked |
+| `plugin` | Verbatim — `updateCheck: true`, `autoUpdate: true`, `pin: null`; automatic mutation is project/local-scope only |
 | `stage` | The two A10 keys — `resolve`, `productionStages`. Write the block even when `resolve` is `null`: absent reads as "nobody asked", and most repositories legitimately have no stage |
 | `localEnvironment` | The eight A9 keys. Write the block even when every command is `null` — absent reads as "nobody asked" |
 
 **The roster must describe what actually exists** — later runs read these keys as fact. No
 local CLI detected → **omit `localCommand`** (or `null`). No cloud reviewer →
 **`automatedReviewers: []`**. **`fastStoryMerges.enabled`, precondition by profile**:
-`standard`/`enterprise` → `true` only with a local CLI engine on the roster *and* `verify.test`
-and `verify.typecheck` set; `prototype` → `true` whenever `verify.typecheck` is set (the exact
+`standard`/`enterprise` → `true` with `verify.test` and `verify.typecheck` set; `prototype` →
+`true` whenever `verify.typecheck` is set (the exact
 rule is in the defaults reference — apply, do not re-derive); unmet → `false`, saying which part
 was missing and, under `prototype`, that the file now contradicts its profile. **`autoRelease`
 and `review.pollTimeoutMinutes` take the profile's values** — `autoRelease: true` for
@@ -472,39 +433,30 @@ phase** — it holds each check's full procedure, its run rules, and the failure
 **Run every check, even after one fails.** Each ends `PASS`, `FAIL`, `SKIPPED` (by the user) or
 `UNVERIFIABLE` (offline, or a prerequisite absent) — the last two are **not** failures:
 
-1. **Verify commands run** — every `verify.typecheck` entry and `verify.lint`; exit 0 passes
-   (`generated.toleratedTypeErrors` in `generated.paths` excepted). **`verify.test` is offered,
-   never forced** — declining is `SKIPPED`, reported. The checklist's run rules govern echoing
-   hand-typed commands and asking before anything that looks like it writes.
-2. **Branch refs exist** — `git rev-parse --verify` all four role keys, preferring the
-   remote-tracking ref and falling back to local (a fresh clone has few local branches), **then
-   confirm against
-   the remote** (`git ls-remote --heads origin`; no network → `UNVERIFIABLE`, naming the
-   possibly-stale cache). Assert `protectedBranches` still holds base, production and release
-   source — a config that lost one has the safety off.
-2b. **The GitHub toolchain** — unconditional: `origin` **by name**, host GitHub, `gh`
-   authenticated **with write access** (scopes + `gh api repos/{owner}/{repo} --jq .permissions`;
-   read-only → `FAIL`, fix `gh auth refresh -s repo,read:org`). Non-GitHub host → `FAIL`, not a
-   warning: the delivery half has no adapter; the planning half works.
-3. **Declared review engines respond** — only what the config declares. Local CLI: probe the
-   binary, get a version. Cloud: `gh auth status` + repository read — **saying what that does
+1. **Verify** — run every typecheck + lint, applying only configured generated tolerances; offer
+   `verify.test` (decline = reported `SKIPPED`). Follow the checklist's write-risk prompts.
+2. **Branches** — verify all four roles locally/remote, prefer remote-tracking, confirm with
+   `ls-remote` (offline = `UNVERIFIABLE`), and require protected branches to include base,
+   production and release source.
+2b. **GitHub** — require `origin`, GitHub host, authenticated `gh`, scopes and repository write
+   permission. Read-only/non-GitHub = `FAIL`; the checklist gives the exact auth repair.
+3. **Declared review engines respond** — only what the config declares. Probe the binary/version
+   for `review.localCommand` and `review.localAssistCommand`; validate its placeholders, and for
+   known Codex confirm `exec`, `--sandbox`, and the configured effort tiers from help without
+   spending a model call. Cloud: `gh auth status` + repository read — **saying what that does
    not prove**: only a real pull request settles whether a request registers.
-4. **Work-type roles still resolve** — every `hierarchyRoles` name still in the hierarchy
-   (renames fail silently: the loop matches nothing, every item becomes a one-off). Connection
-   unavailable → Phase C's message, `UNVERIFIABLE`.
+4. **Work types** — every `hierarchyRoles` name still resolves; connection unavailable is
+   `UNVERIFIABLE` with Phase C's message.
 5. **The lessons store has somewhere to live** — the `lessonsDoc` parent directory exists and is
    writable; **setup never creates the file** — missing is the normal state.
-6. **CI ordering is self-consistent** — warnings (drafts configured but nothing gated; missing
-   `concurrency`; tree skip absent or `present but inert` — `/devstride:setup ci` applies the
-   fixes) except one **`FAIL`**: a draft-gated workflow whose trigger cannot rerun it — `types`
-   absent or missing any of the four events (a convention-only workflow never reaches this
-   check); a fix push then starts nothing — not loop-ready, whatever else passes. Point at
-   `/devstride:doctor` either way. **Never edit a workflow to fix it.**
-7. **Documentation hooks respond** — only when set (absent/`null` → `N/A`, said so): the skill
-   file exists (missing → `FAIL`, fix `/devstride:setup docs`), its `check` mode runs and its
-   verdict is taken; no `check` mode → `FAIL` naming the template. A `release.docsRepo` block →
-   `FAIL` naming the Phase F migration. `release.deployVerification` set → confirm its first
-   token resolves; do not run it.
+6. **CI ordering is self-consistent.** No PR workflow → N/A. Any expensive PR workflow without
+   the draft hold → **FAIL**: the loop cannot keep CI last; fix `/devstride:setup ci`. Also FAIL a
+   draft-gated workflow whose `types` omit any of `opened`, `synchronize`, `reopened`,
+   `ready_for_review` (a convention-only workflow is excluded). Missing `concurrency` and a tree
+   skip absent/`present but inert` remain cost warnings. **Never edit a workflow in a full or
+   validate run; only `setup ci` may apply an accepted diff.**
+7. **Docs hooks** — null = N/A; otherwise require the skill + passing `check` mode. Legacy
+   `release.docsRepo` fails with the Phase F migration. Probe but do not run deploy verification.
 
 **The verdict is the output**: every check with its outcome, then one line — **loop-ready** only
 with zero failures; skips and unverifiables are fine, named. Say when **the working tree was

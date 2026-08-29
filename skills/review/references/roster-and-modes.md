@@ -6,36 +6,36 @@ fewer engines than the config declares, or for whoever changes a mode definition
 
 ## The fully-configured roster
 
-| engine | where | effort |
+| engine | where | route |
 | --- | --- | --- |
-| Claude adversarial | pre-PR (`ultracode-build` phase 3) on the `build-item` story path; otherwise step 1 runs it in `review` | `effort: 'max'` |
-| Codex CLI | local, this worktree | `xhigh` (in `review.localCommand`) |
+| Claude adversarial | a risk screen on a release-deferred story; otherwise step 1 at the PR boundary | task/risk model alias and effort from `delivery-profiles.md` |
+| Local CLI | local, read-only in this worktree | `<effort>` from the same route; operator/managed config chooses its model |
 | Copilot | cloud, on the PR | — |
 
-Standalone `/devstride:review`, human-driven `/devstride:pr`, hotfixes and `/devstride:release`
-never invoke `ultracode-build`, so on those paths no Claude pass has run when `review` starts —
-which is why step 1 establishes which case it is in rather than assuming the pass "already ran".
+Standalone `/devstride:review`, human-driven `/devstride:pr`, hotfixes and production releases
+do not arrive with a PR-boundary Claude pass. Fast story work arrives only with its local risk
+screen; the epic release is its first full adversarial pass. Step 1 therefore resolves the review
+moment and reviewed-head ledger instead of assuming that any earlier Claude work covered this
+scope.
 
 ## Why `localCommand` names the engine but does not schedule it
 
-A present `localCommand` puts the engine on the roster for every PR-path review under every
-profile — the release PR, a one-off, a hotfix — because those paths have no later gate behind
-them. The profile's `localCliEngine` and `maxLocalReviewRounds` schedule it only on fast-mode
-STORY reviews, where the epic release PR still puts the cloud roster and CI over the same code.
-Zero story rounds under `prototype` is therefore a profile choice, not a degradation: the engine
-never left the roster, it simply does not run on that story. The contract file
+A present `localCommand` puts the engine on the roster for every PR-boundary review under every
+profile — release PR, one-off and hotfix. Fast-mode stories defer that full pass to the epic
+release; an optional `localAssistCommand` may still provide one targeted, read-only second opinion
+for ambiguous or critical work. `maxLocalReviewRounds` is subordinate to the normal
+`targetAdversarialCycles`; verified P1/serious-P2 safety cycles override both. Neither schedules a routine extra story review. The contract file
 (`delivery-profiles.md`) states this; the body cites it rather than restating it, because a
 restated rule drifts.
 
-## Why `prototype` ignores the draft hold on a release PR
+## Why every profile keeps CI last
 
 The three CI-ordering booleans record what the repository's workflows SUPPORT — `setup` writes
-them as detected facts under every profile. `prototype`'s `releaseCiOrdering` chooses not to USE
-the hold on a release PR: CI runs concurrently with review there, whatever the booleans say,
-because that profile trades the run-once guarantee for wall-clock. The knob is scoped to the
-release PR by the contract; per-story, one-off and hotfix PRs keep the configured hold, since
-their own PR is their only cloud gate. A PR still a draft on entry in that regime has CI held
-for no reason — hence step 0's immediate flip.
+them as detected facts under every profile. No delivery profile bypasses a supported hold: a
+prototype release that starts CI beside review often pays for a second run after the first fix,
+which is slower as well as more expensive. Where pull-request workflows exist but are not
+draft-gated, setup/doctor report the loop as not optimized and point to `/devstride:setup ci`;
+the review cannot manufacture a hold that the workflows do not support.
 
 ## Why the poll is one background script call
 
@@ -56,7 +56,7 @@ even on a Claude-only roster, and why callers invoke the mode even when no CLI e
 configured.
 
 PRE-SHIP RESUME re-enters at 7.1 rather than step 0 because a fresh invocation would relaunch
-every review stream, re-request every cloud reviewer, and re-run step 6.5 — whose
+every review stream outside the shared ledger/target and re-run step 6.5 — whose
 at-most-once-per-cycle rule exists precisely to stop a re-matched finding inflating
 `recurrences` and corrupting the store's eviction order. The lessons tally from the held
 invocation carries into the resumed one's report rather than being recomputed, for the same

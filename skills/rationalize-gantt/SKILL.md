@@ -3,6 +3,8 @@ name: rationalize-gantt
 description: Backfill synthetic dates and rationalize the dependency graph of a DevStride plan so its Gantt renders as a clean cascade
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Backfill synthetic dates and rationalize the dependency graph of a DevStride plan so its Gantt renders as a maximally-compressed, gapless, fully-valid dependency cascade. Use it after building out (or partway through) a plan whose item dates have drifted, gone stale, sit in the future, or never reflected the real `blocked_by` graph — and to surface/clean up wrong or coarse dependencies (the red "invalid dependency" lines are a free lint of your plan graph). Assumes every story takes exactly ONE day — the Claude Code build pace — so the timeline is a synthetic critical-path view, not a forecast.
 
 Plan-root argument — the item number whose descendant tree IS the plan (a parent item at any

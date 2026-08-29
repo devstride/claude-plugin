@@ -19,8 +19,10 @@
 #                over-counts by that much (~1% of a body) — kept deliberately so
 #                the number equals `wc -c`, which anyone can cross-check, and the
 #                bias is identical on both sides of every table. Budgeted.
-#   references   every skills/*/references/*.md — informational, never
-#                budgeted, listed so moved text can be seen to have MOVED.
+#   references   every skills/*/references/*.md. Budgeted individually so moving
+#                mandatory text out of a body cannot manufacture a free saving.
+#   paths        a few representative, explicitly listed composed load paths.
+#                Budgeted as the sum of their body/reference files.
 #   scripts      hooks/*.sh, scripts/*.sh, skills/*/scripts/* — bytes only,
 #                "executed, not loaded".
 #   alwaysOn.context   what enters every session's context: the skill listing,
@@ -33,8 +35,8 @@
 # Flags:
 #   (none)                 human table
 #   --check                exit 1 on any OVER / MISSING-BUDGET / STALE-BUDGET /
-#                          always-on breach / unparsable budgets; else one ok
-#                          line per body
+#                          hard-ceiling / path / always-on breach or unparsable
+#                          budgets; else summarize bodies, references and paths
 #   --json                 the same data as one JSON document
 #   --table --since <ref>  markdown before/after table for CHANGELOG; @ref
 #                          columns come from `git show <ref>:<path>`
@@ -42,7 +44,7 @@
 #   --budgets <path>       use another budgets file (tests)
 #
 # Exit codes: --check and the plain table exit 1 on any problem (a breach, a
-# missing/stale budget, a missing always-on input, a body without frontmatter,
+# missing/stale budget or path, a missing always-on input, a body without frontmatter,
 # a broken budgets file). --json is pure data: it always exits 0 and lists the
 # same problems under "problems". --write-budgets and --table exit 0 on success.
 set -u
@@ -68,6 +70,15 @@ import glob, json, math, os, re, subprocess, sys, datetime
 
 ROOT, MODE, SINCE, BUDGETS_PATH = (os.environ[k] for k in ("MC_ROOT", "MC_MODE", "MC_SINCE", "MC_BUDGETS"))
 METHOD = "tokens = ceil(utf8_bytes / 3); bytes as `wc -c`"
+DEFAULT_HARD_BODY_CEILING = 8000
+# These were already above the destination when the ceiling was introduced. Their
+# caps are code constants, not editable budget rows: they may shrink, never grow.
+GRANDFATHERED_HARD_BODY_CEILINGS = {
+    "build-item": 12200,
+    "plan": 11800,
+    "review": 11450,
+    "setup": 10700,
+}
 
 def tokens(nbytes): return math.ceil(nbytes / 3)
 def nbytes(path): return os.path.getsize(path)
@@ -131,38 +142,98 @@ def round_up_100(n): return n if n % 100 == 0 else (n // 100 + 1) * 100
 if MODE == "write-budgets":
     with open(os.path.join(ROOT, ".claude-plugin", "plugin.json"), encoding="utf-8") as f:
         version = json.load(f).get("version", "?")
+    try:
+        with open(BUDGETS_PATH, encoding="utf-8") as f:
+            previous = json.load(f)
+        path_specs = previous.get("paths", {})
+        if not isinstance(path_specs, dict) or not path_specs:
+            raise ValueError("paths must contain at least one representative composed path")
+    except Exception as e:  # noqa: BLE001 — never erase the hand-curated path membership
+        print("measure-cost: cannot preserve composed paths from %s: %s" % (rel(BUDGETS_PATH), e), file=sys.stderr)
+        sys.exit(2)
+    measured_files = {b["path"]: b["tokens"] for b in bodies.values()}
+    measured_files.update({p: r["tokens"] for p, r in refs.items()})
+    written_paths = {}
+    for name, spec in sorted(path_specs.items()):
+        files = spec.get("files") if isinstance(spec, dict) else None
+        if not isinstance(files, list) or not files or any(p not in measured_files for p in files):
+            raise SystemExit("measure-cost: paths.%s has an invalid or missing file" % name)
+        written_paths[name] = {"budget": round_up_100(sum(measured_files[p] for p in files)), "files": files}
     out = {
         "_method": METHOD,
         "_generatedBy": "scripts/measure-cost.sh --write-budgets at %s on %s" % (version, datetime.date.today().isoformat()),
         "_rounding": "measured tokens rounded UP to the next multiple of 100",
-        "_readme": "A RATCHET. --check fails any skills/<name>/SKILL.md whose tokens exceed its budget. Lower freely. Raise only in the same commit as the text that needs it, and say so in the commit message — or move rationale to a references/ file instead. Changing _method re-baselines every entry in the same commit (--write-budgets).",
+        "_readme": "A RATCHET over bodies, references, and representative composed paths. Hard body ceilings live in measure-cost.sh: 8,000 normally, with four frozen grandfathered caps. Lower freely; raise a ratchet only with the text that needs it. Changing _method re-baselines every entry.",
         "alwaysOnContext": round_up_100(always["context"]["tokens"]),
         "bodies": {n: round_up_100(b["tokens"]) for n, b in sorted(bodies.items())},
+        "references": {p: round_up_100(r["tokens"]) for p, r in sorted(refs.items())},
+        "paths": written_paths,
     }
     with open(BUDGETS_PATH, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2, ensure_ascii=False); f.write("\n")
-    print("wrote %s: %d bodies, alwaysOnContext %d" % (rel(BUDGETS_PATH), len(out["bodies"]), out["alwaysOnContext"]))
+    print("wrote %s: %d bodies, %d references, %d paths, alwaysOnContext %d" %
+          (rel(BUDGETS_PATH), len(out["bodies"]), len(out["references"]), len(out["paths"]), out["alwaysOnContext"]))
     sys.exit(0)
 
 budgets, budget_error = None, None
 try:
     with open(BUDGETS_PATH, encoding="utf-8") as f: budgets = json.load(f)
-    if not isinstance(budgets.get("bodies"), dict) or not isinstance(budgets.get("alwaysOnContext"), int) or isinstance(budgets.get("alwaysOnContext"), bool): raise ValueError("missing bodies/alwaysOnContext")
-    for k, v in budgets["bodies"].items():
-        if not isinstance(v, int) or isinstance(v, bool) or v < 0: raise ValueError("bodies.%s must be a non-negative integer, got %r" % (k, v))
+    if (not isinstance(budgets.get("bodies"), dict) or
+            not isinstance(budgets.get("references"), dict) or
+            not isinstance(budgets.get("paths"), dict) or not budgets["paths"] or
+            not isinstance(budgets.get("alwaysOnContext"), int) or
+            isinstance(budgets.get("alwaysOnContext"), bool)):
+        raise ValueError("missing bodies/references/paths/alwaysOnContext")
+    for section in ("bodies", "references"):
+        for k, v in budgets[section].items():
+            if not isinstance(v, int) or isinstance(v, bool) or v < 0:
+                raise ValueError("%s.%s must be a non-negative integer, got %r" % (section, k, v))
+    for name, spec in budgets["paths"].items():
+        if not isinstance(spec, dict): raise ValueError("paths.%s must be an object" % name)
+        value, files = spec.get("budget"), spec.get("files")
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise ValueError("paths.%s.budget must be a non-negative integer" % name)
+        if not isinstance(files, list) or not files or any(not isinstance(p, str) for p in files):
+            raise ValueError("paths.%s.files must be a non-empty string list" % name)
+        if len(files) != len(set(files)): raise ValueError("paths.%s.files contains a duplicate" % name)
 except Exception as e:  # noqa: BLE001 — a broken budgets file is a failure, not silence
     budget_error = "%s: %s" % (rel(BUDGETS_PATH), e)
 
 problems = list(early_problems)
+composed_paths = {}
 if budget_error:
     problems.append("BAD-BUDGETS %s" % budget_error)
 else:
     for n, b in bodies.items():
         b["budget"] = budgets["bodies"].get(n)
+        b["hardCeiling"] = GRANDFATHERED_HARD_BODY_CEILINGS.get(n, DEFAULT_HARD_BODY_CEILING)
         if b["budget"] is None: problems.append("MISSING-BUDGET %s" % n)
         elif b["tokens"] > b["budget"]: problems.append("OVER %s %s > %s (+%s)" % (b["path"], format(b["tokens"], ","), format(b["budget"], ","), format(b["tokens"] - b["budget"], ",")))
+        if b["tokens"] > b["hardCeiling"]:
+            problems.append("HARD-OVER %s %s > %s" % (b["path"], format(b["tokens"], ","), format(b["hardCeiling"], ",")))
+        if b["budget"] is not None and b["budget"] > b["hardCeiling"]:
+            problems.append("BUDGET-ABOVE-HARD-CEILING %s %s > %s" % (n, format(b["budget"], ","), format(b["hardCeiling"], ",")))
     for n in budgets["bodies"]:
         if n not in bodies: problems.append("STALE-BUDGET %s" % n)
+    for p, r in refs.items():
+        r["budget"] = budgets["references"].get(p)
+        if r["budget"] is None: problems.append("MISSING-REFERENCE-BUDGET %s" % p)
+        elif r["tokens"] > r["budget"]:
+            problems.append("OVER-REFERENCE %s %s > %s (+%s)" % (p, format(r["tokens"], ","), format(r["budget"], ","), format(r["tokens"] - r["budget"], ",")))
+    for p in budgets["references"]:
+        if p not in refs: problems.append("STALE-REFERENCE-BUDGET %s" % p)
+    measured_files = {b["path"]: b["tokens"] for b in bodies.values()}
+    measured_files.update({p: r["tokens"] for p, r in refs.items()})
+    for name, spec in budgets["paths"].items():
+        missing = [p for p in spec["files"] if p not in measured_files]
+        if missing:
+            for p in missing: problems.append("PATH-MISSING %s %s" % (name, p))
+            total = None
+        else:
+            total = sum(measured_files[p] for p in spec["files"])
+            if total > spec["budget"]:
+                problems.append("OVER-PATH %s %s > %s (+%s)" % (name, format(total, ","), format(spec["budget"], ","), format(total - spec["budget"], ",")))
+        composed_paths[name] = {"tokens": total, "budget": spec["budget"], "files": spec["files"]}
     always["context"]["budget"] = budgets["alwaysOnContext"]
     if always["context"]["tokens"] > always["context"]["budget"]:
         problems.append("OVER alwaysOn.context %s > %s" % (format(always["context"]["tokens"], ","), format(always["context"]["budget"], ",")))
@@ -176,13 +247,16 @@ if MODE == "check":
     for p in problems: print(p)
     if problems: sys.exit(1)
     for n, b in sorted(bodies.items(), key=lambda kv: -kv[1]["tokens"]):
-        print("ok %s %s <= %s" % (b["path"], fmt(b["tokens"]), fmt(b["budget"])))
+        print("ok %s %s <= %s (hard %s)" % (b["path"], fmt(b["tokens"]), fmt(b["budget"]), fmt(b["hardCeiling"])))
+    print("ok references %s/%s budgeted" % (len(refs), len(refs)))
+    for name, path in sorted(composed_paths.items()):
+        print("ok path %s %s <= %s" % (name, fmt(path["tokens"]), fmt(path["budget"])))
     print("alwaysOn.context %s <= %s (budget alwaysOnContext)" % (fmt(always["context"]["tokens"]), fmt(always["context"]["budget"])))
     sys.exit(0)
 
 if MODE == "json":
     print(json.dumps({"method": METHOD, "bodies": {n: {k: v for k, v in b.items()} for n, b in bodies.items()},
-                      "references": refs, "scripts": scripts, "alwaysOn": always,
+                      "references": refs, "paths": composed_paths, "scripts": scripts, "alwaysOn": always,
                       "problems": list(problems)}, indent=2, ensure_ascii=False))
     sys.exit(0)
 
@@ -223,8 +297,15 @@ print("%-40s %9s %8s %8s %9s  %s" % ("body", "bytes", "tokens", "budget", "headr
 for n, b in sorted(bodies.items(), key=lambda kv: -kv[1]["tokens"]):
     bud = b.get("budget"); status = "ok" if bud is not None and b["tokens"] <= bud else ("OVER" if bud is not None else "no budget")
     print("%-40s %9s %8s %8s %9s  %s" % (b["path"], fmt(b["bytes"]), fmt(b["tokens"]), fmt(bud) if bud is not None else "—", fmt(bud - b["tokens"]) if bud is not None else "—", status))
-print("\n%-40s %9s %8s   (informational — never budgeted)" % ("reference", "bytes", "tokens"))
-for p, r in sorted(refs.items(), key=lambda kv: -kv[1]["tokens"]): print("%-40s %9s %8s" % (p, fmt(r["bytes"]), fmt(r["tokens"])))
+print("\n%-56s %9s %8s %8s %9s  %s" % ("reference", "bytes", "tokens", "budget", "headroom", "status"))
+for p, r in sorted(refs.items(), key=lambda kv: -kv[1]["tokens"]):
+    bud = r.get("budget"); status = "ok" if bud is not None and r["tokens"] <= bud else ("OVER" if bud is not None else "no budget")
+    print("%-56s %9s %8s %8s %9s  %s" % (p, fmt(r["bytes"]), fmt(r["tokens"]), fmt(bud) if bud is not None else "—", fmt(bud - r["tokens"]) if bud is not None else "—", status))
+print("\n%-32s %8s %8s %9s  %s" % ("composed path", "tokens", "budget", "headroom", "status"))
+for name, path in sorted(composed_paths.items()):
+    total, bud = path["tokens"], path["budget"]
+    status = "ok" if total is not None and total <= bud else "OVER"
+    print("%-32s %8s %8s %9s  %s" % (name, fmt(total) if total is not None else "—", fmt(bud), fmt(bud - total) if total is not None else "—", status))
 print("\n%-40s %9s   (executed, not loaded)" % ("script", "bytes"))
 for p, s in sorted(scripts.items()): print("%-40s %9s" % (p, fmt(s["bytes"])))
 print("\nalwaysOn.context   %s bytes / %s tokens  budget %s — the skill listing every session loads; the session-start hook adds at most two lines of stdout, and only when it speaks" % (fmt(ctx_bytes), fmt(always["context"]["tokens"]), fmt(always["context"].get("budget", 0)) if not budget_error else "—"))

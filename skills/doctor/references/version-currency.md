@@ -39,8 +39,12 @@ then restart. **Take `<installed-id>` and `<scope>` from `claude plugin list --j
 assume them. The marketplace publishes the same plugin under two entry names, `devstride` and the
 `ds` alias; the id is whichever one that machine installed through, and naming the other reports
 "not installed", which reads as a broken setup while the user stays on the old version believing
-they updated. `update` acts on the `user` scope unless told otherwise, so a project-scope install
-needs `--scope project`.
+they updated. `update` acts on the `user` scope unless told otherwise, so always pass the
+resolved scope. Repository `autoUpdate` may mutate only a `project`/`local` row whose
+`projectPath` exactly matches this repository. A `user` or `managed` row is shared state: the
+hook prints this manual command and never lets one repo update every other repo's installation.
+After an automatic command, re-read `claude plugin list --json` and require the requested
+version; exit status alone is not proof that disk changed.
 
 ## What the session-start check records
 
@@ -58,9 +62,10 @@ Written on every run:
 | `newest` | Newest tag seen, or `null` when unreachable |
 | `source` | `network` (fetched this run) or `cache` (within the 6-hour TTL) |
 | `mode` | `notify` (default), `auto-update`, or `pinned` — from the repo's `plugin` config block |
-| `result` | `current`, `behind`, `behind-pinned`, `pin-drift` (running a version other than the pin), `updated`, `update-failed`, `lookup-failed` (the loaded copy matched no row of `claude plugin list --json`, so no id was named), or `unreachable` |
-| `install` | The `id scope` the check identified as THIS install — the enabled row whose `installPath` is the loaded copy, a project-scope row for this repository preferred — or `null` |
+| `result` | `current`, `behind`, `behind-pinned`, `pin-drift`, `updated`, `update-failed`, `update-verification-failed`, `shared-scope-auto-refused`, `scope-binding-unverified`, `lookup-failed`, or `unreachable` |
+| `install` | The `id scope` identified from the enabled row whose `installPath` is the loaded copy — or `null` |
 | `notifiedFor` | What the pinned/drift line was last printed for; the same situation is said once, not every start |
+| `statusLine` | Independent managed-copy result: `n/a`, `current`, `owner-managed`, `updated:<old>:<new>`, or `update-failed` |
 
 Absent per-repo file → the check has never run for this repository on this machine: the plugin predates it, hooks are disabled,
 or `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` is set. That is what `doctor` reports.

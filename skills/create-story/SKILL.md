@@ -3,6 +3,8 @@ name: create-story
 description: Create a one-off Story (inbound request / ad-hoc work not in a sequenced plan), place it in the map + on a board, assign it to the current user, then deliver it end-to-end via the build-item build loop — single-shot, no plan loop
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Create a NEW one-off Story (the one-day leaf role — this org's Story type) — an inbound request or ad-hoc piece of work that is NOT part of a sequenced `/devstride:plan` roadmap — file it where you want in the DevStride map, put it on a board, assign it to the current user, then deliver it end-to-end with the SAME build loop `/devstride:build-item` runs, exactly ONCE (no plan walk, no next-story selection, no dependency chain). Use **`/devstride:insert-story`** instead when the work belongs in an existing sequenced plan's dependency chain — that one splices + numbers + lets the loop pick it up in order; this one is a standalone create + single build.
 
 Argument — free text describing the story, optionally prefixed/suffixed with a parent item or workstream number (e.g. `I20100 add rate limiting to webhook intake`, `F42 ...`, or just `add rate limiting to webhook intake`): $ARGUMENTS
