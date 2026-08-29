@@ -8,6 +8,62 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.1.0] — 2026-08-29
+
+### Added
+
+- **`/devstride:update` updates the DevStride copy that is actually in use.** It preserves the
+  installed `devstride` or `ds` name and scope, requires the canonical marketplace at the newest
+  tag commit, compares the installed files with that tag, and then asks the user to reload. It
+  stops instead of guessing when an install is pinned, managed, unbound, or ambiguous.
+
+### Changed
+
+- **Manual updates and automatic updates now share one install resolver.** The session-start hook
+  still updates only an opted-in, repository-bound project/local install. Both paths now recognize
+  a stale loaded cache path, fail closed on malformed config/cache/install data, serialize the
+  shared marketplace, preserve its cache on refresh failure, bound and clean up child processes,
+  and re-read the exact installed row before claiming success.
+- **Updating no longer always requires a full restart.** `/reload-plugins` activates a newly
+  installed version in supported Claude Code releases; the handoff requires a clean DevStride load
+  result, with restart as the fallback. Doctor reports the fix but never invokes this explicit-only
+  command on the user's behalf.
+
+### Tests
+
+- Added deterministic coverage for exact user/project scopes, the `ds` alias, stale loaded copies,
+  pins, managed and duplicate installs, missing or offline marketplaces, source/tag/payload truth,
+  poisoned caches, malformed config, concurrency, process/output deadlines, false CLI success,
+  post-update verification, repair safety, and the reload handoff.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.0.0 @ fda58a3, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.0.0 | tokens@devstride--v3.0.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/build-item/SKILL.md | 36,580 | 12,194 | 36,580 | 12,194 | +0 | 12,200 |
+| skills/plan/SKILL.md | 34,654 | 11,552 | 34,654 | 11,552 | +0 | 11,600 |
+| skills/review/SKILL.md | 34,194 | 11,398 | 34,194 | 11,398 | +0 | 11,400 |
+| skills/setup/SKILL.md | 31,855 | 10,619 | 31,855 | 10,619 | +0 | 10,700 |
+| skills/doctor/SKILL.md | 23,819 | 7,940 | 23,955 | 7,985 | +45 | 8,000 |
+| skills/rebalance/SKILL.md | 23,936 | 7,979 | 23,936 | 7,979 | +0 | 8,000 |
+| skills/release/SKILL.md | 23,631 | 7,877 | 23,631 | 7,877 | +0 | 7,900 |
+| skills/ultracode-build/SKILL.md | 16,798 | 5,600 | 16,798 | 5,600 | +0 | 5,600 |
+| skills/insert-defect/SKILL.md | 14,052 | 4,684 | 14,052 | 4,684 | +0 | 4,700 |
+| skills/insert-story/SKILL.md | 13,370 | 4,457 | 13,370 | 4,457 | +0 | 4,500 |
+| skills/pr/SKILL.md | 13,013 | 4,338 | 13,013 | 4,338 | +0 | 4,400 |
+| skills/rationalize-gantt/SKILL.md | 10,400 | 3,467 | 10,400 | 3,467 | +0 | 3,500 |
+| skills/branch-hotfix/SKILL.md | 9,015 | 3,005 | 9,015 | 3,005 | +0 | 3,100 |
+| skills/ci-audit/SKILL.md | 7,466 | 2,489 | 7,466 | 2,489 | +0 | 2,500 |
+| skills/create-defect/SKILL.md | 7,352 | 2,451 | 7,352 | 2,451 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 7,049 | 2,350 | 7,049 | 2,350 | +0 | 2,400 |
+| skills/comprehend-plan/SKILL.md | 6,459 | 2,153 | 6,459 | 2,153 | +0 | 2,200 |
+| skills/push/SKILL.md | 3,908 | 1,303 | 3,908 | 1,303 | +0 | 1,400 |
+| skills/branch-feature/SKILL.md | 3,185 | 1,062 | 3,185 | 1,062 | +0 | 1,100 |
+| skills/update/SKILL.md (added) | — | — | 2,347 | 783 | +783 | 800 |
+| alwaysOn.context (skill listing) | 3,532 | 1,178 | 3,532 | 1,178 | +0 | 1,200 |
+| **total (bodies)** | 320,736 | 106,918 | 323,219 | 107,746 | +828 | |
+
 ## [3.0.0] — 2026-08-29
 
 ### Added
@@ -1048,7 +1104,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.0.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.1.0...HEAD
+[3.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.0.0...devstride--v3.1.0
 [3.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.8.0...devstride--v3.0.0
 [2.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.6.0...devstride--v2.8.0
 [2.6.0]: https://github.com/devstride/claude-plugin/compare/devstride--v2.5.0...devstride--v2.6.0

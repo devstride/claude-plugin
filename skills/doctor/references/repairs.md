@@ -30,7 +30,7 @@ config beyond the narrow personal `statusLine` exception.
 | `gh` not authenticated (§1) | **B** | `gh auth login` |
 | `gh` missing a scope (§1) | **B** | `gh auth refresh -s <all needed scopes in ONE list>` |
 | Auth coming from `GH_TOKEN`/`GITHUB_TOKEN` (§1) | **C** | `refresh` cannot touch an environment token; say to unset it or reissue |
-| Plugin behind newest (§2) | **B** | Marketplace update, then `claude plugin update <installed-id>@devstride`; use the installed `devstride`/`ds` id, then restart |
+| Plugin behind newest (§2) | **C** | Tell the user to invoke `/devstride:update` separately, then stop. Older copies use the native bootstrap; Doctor never invokes the explicit-only skill |
 | Config absent, or branch roles that do not resolve (§4) | **B** | `/devstride:setup` |
 | Unrecognized or misspelled config key (§4) | **C** | Doctor prints suggested JSON; the owner decides. A "correction" to a key doctor merely failed to recognize is a silent config change |
 | `localEnvironment` / `stage` gaps (§4) | **B** | `/devstride:setup` |

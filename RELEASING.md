@@ -25,7 +25,7 @@ Semantic versioning, interpreted for a plugin whose product is instructions:
 
 **Worked examples.** Renaming `build-item` to `deliver` is MAJOR, even though it is a one-word edit:
 every user's muscle memory, saved commands, and any wrapper scripts break. Adding a brand-new skill
-alongside the existing fifteen is MINOR — nothing that worked before stops working. **Adding** a
+alongside the existing skills is MINOR — nothing that worked before stops working. **Adding** a
 config key is MINOR (existing configs keep working); **redefining** one is MAJOR (existing configs
 now mean something else). Fixing a misleading sentence inside a skill is PATCH.
 
@@ -115,15 +115,16 @@ depend on, it does not freeze the surface.
    claude plugin list          # confirm the reported version is the one you just cut
    ```
 
-8. **Announce it**, including the two update commands from the section below. Users who have not
-   enabled auto-update will not receive the release until they run them.
+8. **Announce it**, including `/devstride:update` for installations already on 3.1.0 or newer and
+   the two native bootstrap commands below. Older copies do not contain the new skill.
 
 ## When your users actually get it
 
 **Not automatically, unless they opted in — but from 1.2.0 they are told.** The plugin's own
-session-start check (`hooks/version-check.sh`) compares the version a session is running against
-the newest tag and prints the two update commands when it is behind; a repository can opt in to
-having it apply the update at session start (`plugin.autoUpdate`). That is why tagging is part of
+session-start check (`hooks/version-check.sh`) compares the running version with the newest tag
+(using a six-hour cache). When behind, it routes shared user copies to `/devstride:update`, managed
+copies to their administrator, ambiguous copies to Doctor, and may update a repository-bound
+project/local copy when `plugin.autoUpdate` is enabled. That is why tagging is part of
 publishing, not bookkeeping: an untagged release is invisible to the check. Claude Code's own
 auto-update is a separate, per-marketplace setting and it is **off by default** for a manually
 added marketplace. A user who enables it (in `/plugin` → the
@@ -131,14 +132,19 @@ devstride marketplace → **Enable auto-update**) gets releases without doing an
 stays on their installed version indefinitely — verified on Claude Code 2.1.233, where starting a
 fresh session with a newer version available left the installed plugin untouched.
 
-For everyone else, two commands, and **both** are required:
+From 3.1.0 onward, `/devstride:update` resolves the loaded copy, attests the canonical tag and
+installed files, then stops. Run `/reload-plugins` and confirm no DevStride load error; restart if
+reload is unavailable or fails. Repository-driven automatic updates remain session-start-only.
+
+To get 3.1.0 from 3.0.0 or older — or when the skill is unavailable — two commands are required:
 
 ```bash
 claude plugin marketplace update devstride   # refresh the catalog
 claude plugin update devstride@devstride     # upgrade the installed plugin
 ```
 
-followed by a restart to apply. Three traps worth repeating in the announcement:
+followed by `/reload-plugins` (confirm no DevStride load error), with restart as the fallback. Three
+traps worth repeating in the announcement:
 
 - **`marketplace update` alone does nothing to an installed plugin.** It refreshes catalog metadata
   and prints success, while the installed copy stays exactly where it was. This looks like the fix
@@ -148,9 +154,9 @@ followed by a restart to apply. Three traps worth repeating in the announcement:
 - **It defaults to the `user` scope.** A project-, local- or managed-scope install needs a matching
   `--scope`, or the command reports the plugin is not installed and changes nothing.
 
-So the answer to "when does my team get the fix" is: immediately if they enabled auto-update,
-otherwise when they run those two commands. Say which in the announcement rather than assuming it
-propagates.
+So the answer to "when does my team get the fix" is: when marketplace auto-update next runs, at an
+opted-in repository's next session start, through `/devstride:update` on 3.1.0+, or after the two
+bootstrap commands on an older copy. Say which rather than assuming it propagates.
 
 ### Pinning
 

@@ -1,5 +1,5 @@
 {
-  "description": "Session-start version check: reports newer releases, safely applies an opted-in repository-scoped update, and says when restart is required. Silent when current; never blocks a session.",
+  "description": "Session-start version check: reports newer releases, safely applies an opted-in repository-scoped update, and gives a verified reload handoff. Silent when current; every operation is bounded.",
   "hooks": {
     "SessionStart": [
       {

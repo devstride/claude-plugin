@@ -350,8 +350,11 @@ skills/build-item/SKILL.md|verification receipt keyed
 RELEASING.md|validate.sh
 CONTRIBUTING.md|measure-cost.sh
 skills/doctor/references/version-currency.md|devstride--v
+skills/update/SKILL.md|standalone user-authorized update
+skills/update/SKILL.md|finds the exact loaded copy
+skills/update/SKILL.md|reloadRequired
 hooks/version-check.sh|NEVER exits non-zero
-hooks/version-check.sh|alarm
+hooks/version-check.sh|total-timeout 120
 skills/review/SKILL.md|EMPTY COMMIT
 skills/review/SKILL.md|diff --cached --quiet
 skills/release/SKILL.md|empty re-trigger commit
@@ -527,28 +530,24 @@ Q2. Assert what you are measuring: scope DOM/API queries to the live container a
     read as a pass AND as a different bug); one clean load per case; a stale session or a
     service that is not up looks identical to a broken feature.
 
-## R. Plugin version check (`hooks/version-check.sh`, recipe: `skills/doctor/references/version-currency.md`)
-R1. Newest release = TAGS not GitHub Releases (the project creates none, so a releases query
-    reads "up to date" forever); strip the `devstride--v` prefix before comparing; `sort -V`.
-    The installed id AND scope come from `claude plugin list --json` — the `ds@` alias exists,
-    and naming the wrong id reports "not installed" while the user stays on the old version.
-R2. The hook NEVER blocks and NEVER exits non-zero; every failure records itself and stays
-    quiet. Silent when current or unreachable; it speaks only when there is something to do.
-    Session start is the ONLY moment an update may be applied: mid-loop would change
-    skill behaviour between build steps. macOS has no `timeout` — EVERY network command (the tag
-    lookup AND both update commands) runs under perl's alarm; an uncapped update offline blocks
-    every session start.
-R3. It reads the RUNNING version from the loaded copy (`$CLAUDE_PLUGIN_ROOT/.claude-plugin/
-    plugin.json`), not from disk — a session serves what it loaded at startup, and
-    `claude plugin list` cannot see that.
-R4. Automatic mutation is allowed ONLY for a project/local install whose `installPath` is the
-    loaded copy and whose `projectPath` exactly matches THIS repository. User/managed or unbound
-    installs get the exact manual id/scope command; one repo never mutates shared plugin state.
-    Config is read from the REPOSITORY ROOT, not the launch directory.
-R5. An update command's exit 0 is not success: re-read `claude plugin list --json` and require the
-    requested installed version. The per-repo record includes this result and the independent
-    managed status-line refresh result; disabling plugin checks does not disable status-line
-    refresh.
+## R. Plugin version/update contract (`hooks/version-check.sh`, `skills/update`, recipe: `skills/doctor/references/version-currency.md`)
+R1. Newest = TAGS, not nonexistent GitHub Releases. The shared helper accepts only strict
+    `devstride--vMAJOR.MINOR.PATCH` tags and compares numeric components portably. Resolve installed
+    id and scope from `claude plugin list --json`; the `ds@` alias makes guessing fail.
+R2. The hook never exits non-zero or waits without a deadline; failures record quietly. Automatic
+    updates run only at session start. The helper owns its total deadline and kills active child
+    processes before releasing its update lock.
+R3. Read RUNNING from `$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json`, not disk: the session keeps
+    its startup copy while `claude plugin list` can already show a newer installed version.
+R4. Automatic mutation requires a project/local row bound exactly to THIS repository. Shared user
+    copies hand off to update, managed copies to their administrator, and ambiguous/unbound copies
+    to Doctor; config comes from the repo root.
+R5. Exit 0 and matching version text are not proof: attest the canonical tag commit, compare the
+    installed payload, and re-read the row. The record also carries status-line refresh; disabling
+    plugin checks never disables that independent refresh.
+R6. Direct `/devstride:update` is separate user authority for the exact loaded user/project/local
+    install. Pins, managed or ambiguous installs block. Reload only after `safeToReload`; confirm no
+    DevStride load error and restart on failure. Never continue a loop with mid-session behavior.
 
 ## S. CI policy shape and run-once counting
 S1. A convention-only workflow (`opened` plus optionally `converted_to_draft` /

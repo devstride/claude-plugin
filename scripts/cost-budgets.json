@@ -1,6 +1,6 @@
 {
   "_method": "tokens = ceil(utf8_bytes / 3); bytes as `wc -c`",
-  "_generatedBy": "scripts/measure-cost.sh --write-budgets at 3.0.0 on 2026-08-29",
+  "_generatedBy": "scripts/measure-cost.sh --write-budgets at 3.1.0 on 2026-08-29",
   "_rounding": "measured tokens rounded UP to the next multiple of 100",
   "_readme": "A RATCHET over bodies, references, and representative composed paths. Hard body ceilings live in measure-cost.sh: 8,000 normally, with four frozen grandfathered caps. Lower freely; raise a ratchet only with the text that needs it. Changing _method re-baselines every entry.",
   "alwaysOnContext": 1200,
@@ -23,7 +23,8 @@
     "release": 7900,
     "review": 11400,
     "setup": 10700,
-    "ultracode-build": 5600
+    "ultracode-build": 5600,
+    "update": 800
   },
   "references": {
     "skills/build-item/references/epic-release.md": 1200,
@@ -45,7 +46,7 @@
     "skills/release/references/docs-hooks.md": 2700,
     "skills/release/references/release-gates.md": 1100,
     "skills/review/references/ci-settle.md": 1200,
-    "skills/review/references/delivery-loop-invariants.md": 15300,
+    "skills/review/references/delivery-loop-invariants.md": 15200,
     "skills/review/references/delta-re-review.md": 1700,
     "skills/review/references/github-review-api.md": 4700,
     "skills/review/references/lessons-format.md": 3000,
@@ -114,6 +115,14 @@
         "skills/review/references/roster-and-modes.md",
         "skills/review/references/review-ledger.md",
         "skills/push/SKILL.md"
+      ]
+    },
+    "manualPluginUpdate": {
+      "budget": 3800,
+      "files": [
+        "skills/update/SKILL.md",
+        "skills/build-item/references/plain-language-output.md",
+        "skills/doctor/references/version-currency.md"
       ]
     },
     "productionReleaseGate": {
