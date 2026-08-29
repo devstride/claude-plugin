@@ -277,11 +277,12 @@ The point: **find out whether anything actually checks the code before it merges
   `integrationBranch` **and** disable epic branches.
 - **Review roster** — report `review.localCommand`, optional `review.localAssistCommand`, and
   `review.automatedReviewers`. An empty configured roster is legal: the built-in merge-boundary
-  pass remains. A context-first command may carry `<context>` without `<base>`; it must accept
-  stdin. A legacy base-only command may omit placeholders (` --base <value>` is appended), but
-  WARN that contextual follow-ups will be skipped. Validate `<effort>` where present; a known
-  Codex command with literal `xhigh` is an optimization warning and `/devstride:setup review`
-  is the migration.
+  pass remains. Hold every engine to the contract in
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/review-engines.md` — **never fault one for being
+  unrecognised**; apply a catalogued engine's extras (Codex: a literal effort tier is an
+  optimization warning). A legacy base-only command may omit placeholders (` --base <value>` is
+  appended), but WARN that contextual follow-ups will be skipped. `/devstride:setup review`
+  migrates.
 - **`preShipChecks`** — if any entry exists, confirm its command resolves (same segment-splitting as
   §4); these run at the ship boundary and nothing in CI covers them.
 

@@ -8,6 +8,34 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **The local review engine is model-agnostic, and setup and doctor now say so.** The mechanism
+  never was Codex-specific — `review.localCommand` is a command line, and any CLI that resolves on
+  `PATH`, takes the prompt on stdin via `<context>` (or a diff base via `<base>`), writes findings
+  to stdout and can run read-only qualifies. But `setup` A7 probed `command -v codex` and nothing
+  else, only Codex had an offered template, and validation and `doctor` carried Codex-shaped
+  special cases with no equivalent for anything else — so a team running Grok, Gemini, DeepSeek or
+  an open-weight model locally had a supported path that nothing told them about.
+  A7 now probes every catalogued engine and **always offers to name another**, building a template
+  to the contract for one it does not know. Setup's validation and doctor's roster check are
+  contract-level: an uncatalogued engine is held to the contract and **never faulted for being
+  unrecognised**, with catalogued extras applied only where the engine is recognised.
+  **Codex remains what setup offers when nothing else is chosen** — a leading model whose template
+  is verified — as a default, not a requirement.
+- Invariant D generalized from "Local Codex" to the local CLI engine: **a killed engine is
+  indistinguishable from one that found nothing** is true of every engine, not just one, and it is
+  the trap most likely to make an unfamiliar reviewer look like a clean pass.
+
+### Added
+
+- `skills/setup/references/review-engines.md` — the engine contract (four requirements), the two
+  launch shapes, how to choose, and the catalogue. Ships Codex verified plus a generic shape to
+  adapt; names Grok, Gemini, DeepSeek and locally-served open-weight models as equally capable,
+  and states why no unverified command line is shipped for them: an invocation that silently fails
+  reads as "no findings".
+
+
 ## [3.1.1] — 2026-08-29
 
 ### Fixed
