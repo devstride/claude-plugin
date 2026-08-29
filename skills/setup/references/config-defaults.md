@@ -396,7 +396,7 @@ bound of earlier releases; the backoff cadence and the script still apply, and l
 learned so switching it on later starts warm. Like `profileOverrides`, `setup` never writes this
 key — it is an operator hand-edit.
 
-The role is model-agnostic; `references/review-engines.md` is authoritative for the contract any
+The role is model-agnostic; `review-engines.md` is authoritative for the contract any
 CLI must meet and the engine catalogue. Codex is what setup offers when nothing else is chosen —
 a verified template, never the only option:
 
