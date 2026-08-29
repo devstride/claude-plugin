@@ -46,9 +46,9 @@ C4. Only resolve threads you actually addressed; never blanket-resolve.
 C5. Copilot may leave an issue comment (not a thread) that cannot be resolved.
 C6. Body findings have no thread — report them in one PR comment or they vanish.
 
-## D. Local Codex
+## D. Local CLI engine
 D1. Runs for MINUTES; never a foreground default-timeout call.
-D2. A killed Codex is indistinguishable from a Codex that found nothing.
+D2. A killed engine is indistinguishable from one that found nothing.
 D3. A base-mode launch uses the PR's actual base ref (`origin/<baseRefName>`); a context-first
     launch receives the exact three-dot scope in its distilled stdin prompt.
 D4. Local reasoning effort is task/risk-sized (`medium` / `high` / `xhigh`) and substituted per

@@ -133,7 +133,7 @@ through step 3. It remains the common anchor even if one engine reports another 
   generated files excluded. Use the task/risk-sized model alias and effort from
   `delivery-profiles.md`; a fast story's earlier risk screen does not cover an epic release.
   No GitHub thread; triage like the local CLI's.
-- **Local CLI engine (Codex)** — only when on the resolved roster: `review.localCommand` with
+- **Local CLI engine** — only when on the resolved roster: `review.localCommand` with
   `<base>` = `origin/<baseRefName>` and `<effort>` = the resolved route, run in the worktree. A
   context-first template receives the cycle scope and current ledger on stdin; a legacy
   base-only template removes `<context>`. Record the head SHA at launch. **Launch in the

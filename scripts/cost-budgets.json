@@ -63,7 +63,8 @@
     "skills/setup/references/statusline-segments.md": 1900,
     "skills/setup/references/validation-checklist.md": 4700,
     "skills/ultracode-build/references/engineering-economy.md": 1400,
-    "skills/ultracode-build/references/review-fanout.md": 2100
+    "skills/ultracode-build/references/review-fanout.md": 2100,
+    "skills/setup/references/review-engines.md": 1700
   },
   "paths": {
     "epicReleaseGate": {

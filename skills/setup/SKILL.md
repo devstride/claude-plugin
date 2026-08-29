@@ -157,12 +157,12 @@ not.
 **Absent is a finding, not a failure** — an empty roster is legal; the built-in adversarial pass
 is then the local gate.
 
-- **Local review/support CLI** — probe `command -v codex` and any CLI the user names. A review
-  template must accept either `<context>` on stdin (preferred: every cycle receives scope + the
-  cumulative ledger) or `<base>`; `<effort>` enables task-sized reasoning. For Codex, offer the
-  context-first read-only template from `config-defaults.md` as both `review.localCommand` and
-  optional `review.localAssistCommand`; it leaves model choice to operator/managed config and
-  disables the DevStride MCP. Found → `ambiguous` until confirmed; carry
+- **Local review/support CLI** — the role is **model-agnostic**; contract, catalogue and
+  templates live in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/review-engines.md`, which is
+  authoritative. Probe `command -v` for every catalogued engine AND **always offer to name
+  another** — the default is never the only option. Offer that engine's catalogued template as
+  `review.localCommand` and optional `review.localAssistCommand`; for an engine the user names,
+  build one to the contract and confirm it. Found → `ambiguous` until confirmed; carry
   `review.localReviewerName`. Existing base-only/literal-effort commands remain supported but
   get a migration proposal, never a silent rewrite. **Not found → `unknown`, never detected
   `null`** — report what was probed.
@@ -441,9 +441,10 @@ phase** — it holds each check's full procedure, its run rules, and the failure
 2b. **GitHub** — require `origin`, GitHub host, authenticated `gh`, scopes and repository write
    permission. Read-only/non-GitHub = `FAIL`; the checklist gives the exact auth repair.
 3. **Declared review engines respond** — only what the config declares. Probe the binary/version
-   for `review.localCommand` and `review.localAssistCommand`; validate its placeholders, and for
-   known Codex confirm `exec`, `--sandbox`, and the configured effort tiers from help without
-   spending a model call. Cloud: `gh auth status` + repository read — **saying what that does
+   for `review.localCommand` and `review.localAssistCommand`; validate the contract in
+   `references/review-engines.md`, then any catalogued engine extras, from help alone without
+   spending a model call. An uncatalogued engine is held to the contract only, never failed for
+   being unrecognised. Cloud: `gh auth status` + repository read — **saying what that does
    not prove**: only a real pull request settles whether a request registers.
 4. **Work types** — every `hierarchyRoles` name still resolves; connection unavailable is
    `UNVERIFIABLE` with Phase C's message.
