@@ -133,4 +133,15 @@ if head -3 "$SL" | grep -qE '^# ds-statusline: managed v[0-9]+\.[0-9]+\.[0-9]+ '
   ok "(14) the shipped file carries its 'ds-statusline: managed v<x.y.z>' marker"
 else bad "(14) marker line missing or malformed"; fi
 
+# (15) nothing renders in ANSI bright black (90). Themes are free to set that
+#      slot AT the background - most put comment text there - so a value in it
+#      can come out invisible while its DIM label still renders, which reads as
+#      a lookup that broke. The source check catches the paths this harness has
+#      no fixture for (a draft PR, a low effort level); the render check catches
+#      a colour reaching the terminal from anywhere at all.
+RAW="$(printf '{"workspace":{"current_dir":"%s"}}' "$R" | bash "$SL" 2>/dev/null)"
+if ! grep -q '\[90m' "$SL" && ! printf '%s' "$RAW" | grep -q $'\033\[90m'; then
+  ok "(15) no segment uses ANSI bright black, which some themes render invisible"
+else bad "(15) ANSI bright black (90) is back in the status line"; fi
+
 exit $FAIL
