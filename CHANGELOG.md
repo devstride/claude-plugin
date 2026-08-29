@@ -8,6 +8,17 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The status line no longer renders values in ANSI bright black.** That slot is where most
+  themes put comment text, and many set it at or very near the background, so `Checkout: main`,
+  a `draft` pull request number and a low effort level could come out invisible while their
+  labels still rendered — reading as a lookup that had broken rather than a quiet value. Those
+  three now use DIM, an attribute on the theme's own foreground, which cannot collide with the
+  background and degrades to full-brightness text on a terminal that ignores it. Colour is left
+  to values worth looking at. The `ds-statusline: managed` marker moves to v3.1.1 so the
+  session-start refresh carries the fix to repositories that already have the script.
+
 ## [3.1.0] — 2026-08-29
 
 ### Added

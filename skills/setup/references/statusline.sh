@@ -1,5 +1,5 @@
 #!/bin/bash
-# ds-statusline: managed v2.8.0 — installed and kept up to date by the devstride
+# ds-statusline: managed v3.1.1 — installed and kept up to date by the devstride
 # plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
 # replaces a file that still carries it, and never touches one that does not.
 #
@@ -79,9 +79,23 @@ emit("SL_HIDDEN", " ".join(str(x) for x in (sl.get("hiddenSegments") or [])))
 [ -n "$SL_CWD" ] && cd "$SL_CWD" 2>/dev/null
 
 # Colors
+#
+# NOTHING USES ANSI BRIGHT BLACK (90). It is the one palette slot themes are
+# free to set AT the background - it is where most of them put comment text -
+# so a value rendered in it can come out invisible while its DIM label still
+# renders. That failure is worse than a wrong colour: "Checkout:" with nothing
+# after it reads as a lookup that broke, which is exactly the dangling label
+# this file's header promises never to emit, and it is invisible to the person
+# who chose the theme's author rather than the theme.
+#
+# So a value that is the UNREMARKABLE case is dimmed rather than coloured: DIM
+# is an attribute applied to the theme's own foreground, so it cannot collide
+# with the background, and a terminal that does not implement it falls back to
+# full-brightness foreground - still legible. Colour is reserved for values
+# worth looking at, which is what makes the coloured ones carry meaning.
 RESET=$'\033[0m'; DIM=$'\033[2m'
 CYAN=$'\033[36m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'
-MAGENTA=$'\033[35m'; RED=$'\033[31m'; GRAY=$'\033[90m'; BLUE=$'\033[34m'
+MAGENTA=$'\033[35m'; RED=$'\033[31m'; BLUE=$'\033[34m'
 
 # OSC 8 hyperlink: ESC ] 8 ;; <url> ESC \  <text>  ESC ] 8 ;; ESC \
 OSC8=$'\033]8;;'; OSC8_END=$'\033\\'
@@ -124,7 +138,7 @@ if [ -n "$effort" ]; then
     max|xhigh) ec=$MAGENTA ;;
     high)      ec=$GREEN ;;
     medium)    ec=$YELLOW ;;
-    *)         ec=$GRAY ;;
+    *)         ec=$DIM ;;
   esac
   seg effort "Effort" "$effort" "${ec}${effort}${RESET}"
 fi
@@ -163,7 +177,7 @@ seg repo "Repo" "$repo" "${CYAN}${repo}${RESET}"
 if [ -n "$worktree" ]; then
   seg checkout "Checkout" "$worktree" "${YELLOW}⑂ ${worktree}${RESET}"
 else
-  seg checkout "Checkout" "main" "${GRAY}main${RESET}"
+  seg checkout "Checkout" "main" "${DIM}main${RESET}"
 fi
 
 # A detached HEAD with no commit yet resolves to no sha at all; rendering
@@ -239,7 +253,7 @@ if [ -n "$pr" ]; then
     open)   c=$GREEN ;;
     merged) c=$MAGENTA ;;
     closed) c=$RED ;;
-    draft)  c=$GRAY ;;
+    draft)  c=$DIM ;;
     *)      c=$YELLOW ;;
   esac
   # OSC 8 makes the PR number clickable in terminals that support it; those that
