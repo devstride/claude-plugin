@@ -351,7 +351,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.2.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.3.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

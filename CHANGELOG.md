@@ -8,6 +8,8 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.3.0] — 2026-09-02
+
 ### Added
 
 - **Ground truth before the loop acts.** `build-item` step 0 and `release` step 0 now begin with
@@ -43,6 +45,34 @@ for what each version component means here and how a release is cut.
   `release-gates.md` and `docs-hooks.md`), `plain-language-output.md`, `config-defaults.md`,
   `delivery-loop-invariants.md`, and the composed paths that load them. `build-item` and `doctor` stay at their ceilings — their
   additions were paid for by trimming duplicated rationale in the same bodies.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.2.0 @ c5425ef, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.2.0 | tokens@devstride--v3.2.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/build-item/SKILL.md | 36,580 | 12,194 | 36,581 | 12,194 | +0 | 12,200 |
+| skills/plan/SKILL.md | 34,654 | 11,552 | 34,654 | 11,552 | +0 | 11,600 |
+| skills/review/SKILL.md | 34,186 | 11,396 | 34,186 | 11,396 | +0 | 11,400 |
+| skills/setup/SKILL.md | 31,945 | 10,649 | 31,945 | 10,649 | +0 | 10,700 |
+| skills/doctor/SKILL.md | 23,999 | 8,000 | 23,994 | 7,998 | -2 | 8,000 |
+| skills/release/SKILL.md | 23,631 | 7,877 | 23,985 | 7,995 | +118 | 8,000 |
+| skills/rebalance/SKILL.md | 23,936 | 7,979 | 23,936 | 7,979 | +0 | 8,000 |
+| skills/ultracode-build/SKILL.md | 16,798 | 5,600 | 16,798 | 5,600 | +0 | 5,600 |
+| skills/insert-defect/SKILL.md | 14,052 | 4,684 | 14,052 | 4,684 | +0 | 4,700 |
+| skills/insert-story/SKILL.md | 13,370 | 4,457 | 13,370 | 4,457 | +0 | 4,500 |
+| skills/pr/SKILL.md | 13,013 | 4,338 | 13,013 | 4,338 | +0 | 4,400 |
+| skills/rationalize-gantt/SKILL.md | 10,400 | 3,467 | 10,400 | 3,467 | +0 | 3,500 |
+| skills/branch-hotfix/SKILL.md | 9,015 | 3,005 | 9,015 | 3,005 | +0 | 3,100 |
+| skills/ci-audit/SKILL.md | 7,466 | 2,489 | 7,466 | 2,489 | +0 | 2,500 |
+| skills/create-defect/SKILL.md | 7,352 | 2,451 | 7,352 | 2,451 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 7,049 | 2,350 | 7,049 | 2,350 | +0 | 2,400 |
+| skills/comprehend-plan/SKILL.md | 6,459 | 2,153 | 6,459 | 2,153 | +0 | 2,200 |
+| skills/push/SKILL.md | 3,908 | 1,303 | 3,908 | 1,303 | +0 | 1,400 |
+| skills/branch-feature/SKILL.md | 3,185 | 1,062 | 3,185 | 1,062 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,347 | 783 | 2,347 | 783 | +0 | 800 |
+| alwaysOn.context (skill listing) | 3,532 | 1,178 | 3,532 | 1,178 | +0 | 1,200 |
+| **total (bodies)** | 323,345 | 107,789 | 323,695 | 107,905 | +116 | |
 
 ## [3.2.0] — 2026-08-29
 
@@ -1239,7 +1269,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.2.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.3.0...HEAD
+[3.3.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.2.0...devstride--v3.3.0
 [3.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.1.1...devstride--v3.2.0
 [3.1.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.1.0...devstride--v3.1.1
 [3.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.0.0...devstride--v3.1.0
