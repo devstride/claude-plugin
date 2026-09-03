@@ -8,6 +8,42 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Ground truth before the loop acts.** `build-item` step 0 and `release` step 0 now begin with
+  `git fetch --prune origin` and a read of what other authors landed on the branches the run will
+  touch, say explicitly when another session appears active, and treat every fact carried in
+  from handoff memory — the integration branch, the last shipped story, "nothing else has
+  landed" — as a claim to verify against the remote before acting on it. Rationale and the
+  two quiet failure shapes it prevents: `skills/build-item/references/ground-truth-at-start.md`.
+- **`localEnvironment.fetchOnSessionStart`** (default `false`). When `true`, the session-start
+  hook runs a bounded, prompt-free `git fetch --prune origin` for the repository root and prints
+  one line only when the current branch is behind its upstream. It never blocks a session — a
+  hung fetch is killed at the deadline and every failure stays silent — and it runs whether or
+  not the plugin update check is enabled. Covered by `scripts/tests/session-fetch.sh`.
+- **`release.postDeployCheckSkill`** — a post-deploy health seam, shaped like the documentation
+  hooks: the name of a LOCAL skill that checks production after a deploy. `release` invokes it
+  once the deploy is confirmed and before documentation, release notes and the close-out, with
+  `check` and a `{productionBranch, mergeCommit, deployConfirmedAt}` payload. The skill's first
+  line is `POST-DEPLOY HEALTH: PASS`, `FAIL` or `NOT RUN`; `FAIL` stops the release for a
+  rollback decision, `NOT RUN` is reported as degradation and asked about, and an absent key
+  reports **not configured**. `doctor` checks a configured name resolves to an existing skill.
+  Contract: `skills/release/references/post-deploy-check.md`.
+
+### Changed
+
+- **Human-facing output** (`plain-language-output.md`) gains two rules: a claim about repository
+  or delivery state (merged, published, CI green, "nothing else has landed", another session
+  active) is read from `origin`/`gh`/the live target at the moment it is made — never from the
+  local checkout, a summary or memory — and is labelled **unverified** when it cannot be; and
+  every handoff, plan or reviewer prompt ends with two explicit lists, **steps the loop does**
+  and **steps you must do yourself** (an empty second list says "nothing required from you").
+- Budget ratchets raised with the text that needed them: `release` body 7,900 → 8,000 (its hard
+  ceiling; the additions were paid for by trimming rationale that already lives in
+  `release-gates.md` and `docs-hooks.md`), `plain-language-output.md`, `config-defaults.md`,
+  `delivery-loop-invariants.md`, and the composed paths that load them. `build-item` and `doctor` stay at their ceilings — their
+  additions were paid for by trimming duplicated rationale in the same bodies.
+
 ## [3.2.0] — 2026-08-29
 
 ### Changed

@@ -20,7 +20,7 @@
     "push": 1400,
     "rationalize-gantt": 3500,
     "rebalance": 8000,
-    "release": 7900,
+    "release": 8000,
     "review": 11400,
     "setup": 10700,
     "ultracode-build": 5600,
@@ -29,7 +29,7 @@
   "references": {
     "skills/build-item/references/epic-release.md": 1200,
     "skills/build-item/references/next-unblocked.md": 700,
-    "skills/build-item/references/plain-language-output.md": 1500,
+    "skills/build-item/references/plain-language-output.md": 1800,
     "skills/build-item/references/progress-table.md": 1300,
     "skills/build-item/references/verification-receipts.md": 800,
     "skills/doctor/references/repairs.md": 2300,
@@ -46,7 +46,7 @@
     "skills/release/references/docs-hooks.md": 2700,
     "skills/release/references/release-gates.md": 1100,
     "skills/review/references/ci-settle.md": 1200,
-    "skills/review/references/delivery-loop-invariants.md": 15200,
+    "skills/review/references/delivery-loop-invariants.md": 16200,
     "skills/review/references/delta-re-review.md": 1700,
     "skills/review/references/github-review-api.md": 4700,
     "skills/review/references/lessons-format.md": 3000,
@@ -55,7 +55,7 @@
     "skills/review/references/roster-and-modes.md": 1400,
     "skills/review/references/slow-suite-gating.md": 1700,
     "skills/setup/references/ci-cost-patterns.md": 4400,
-    "skills/setup/references/config-defaults.md": 8000,
+    "skills/setup/references/config-defaults.md": 8600,
     "skills/setup/references/detector-evidence.md": 3900,
     "skills/setup/references/docs-skill-templates/update-documentation.md": 1400,
     "skills/setup/references/docs-skill-templates/update-release-notes.md": 1200,
@@ -64,11 +64,13 @@
     "skills/setup/references/validation-checklist.md": 4700,
     "skills/ultracode-build/references/engineering-economy.md": 1400,
     "skills/ultracode-build/references/review-fanout.md": 2100,
-    "skills/setup/references/review-engines.md": 1700
+    "skills/setup/references/review-engines.md": 1700,
+    "skills/build-item/references/ground-truth-at-start.md": 1000,
+    "skills/release/references/post-deploy-check.md": 1100
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 66100,
+      "budget": 67400,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -91,11 +93,12 @@
         "skills/ultracode-build/references/engineering-economy.md",
         "skills/ultracode-build/references/review-fanout.md",
         "skills/release/references/docs-hooks.md",
-        "skills/push/SKILL.md"
+        "skills/push/SKILL.md",
+        "skills/build-item/references/ground-truth-at-start.md"
       ]
     },
     "fastStoryLoop": {
-      "budget": 58900,
+      "budget": 60300,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -115,11 +118,12 @@
         "skills/review/SKILL.md",
         "skills/review/references/roster-and-modes.md",
         "skills/review/references/review-ledger.md",
-        "skills/push/SKILL.md"
+        "skills/push/SKILL.md",
+        "skills/build-item/references/ground-truth-at-start.md"
       ]
     },
     "manualPluginUpdate": {
-      "budget": 3800,
+      "budget": 4100,
       "files": [
         "skills/update/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
@@ -127,7 +131,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 54900,
+      "budget": 57400,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
@@ -145,7 +149,9 @@
         "skills/review/references/ci-settle.md",
         "skills/review/references/slow-suite-gating.md",
         "skills/ultracode-build/references/engineering-economy.md",
-        "skills/ultracode-build/references/review-fanout.md"
+        "skills/ultracode-build/references/review-fanout.md",
+        "skills/build-item/references/ground-truth-at-start.md",
+        "skills/release/references/post-deploy-check.md"
       ]
     }
   }

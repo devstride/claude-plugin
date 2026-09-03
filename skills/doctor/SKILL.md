@@ -48,7 +48,7 @@ next action. For each failure symptom, read
 ## 2. Plugin install (`plugin`)
 
 - **Installed and enabled** — parse `claude plugin list --json`; report its disk version. Also name
-  the running version: disk and runtime can differ until plugin reload or restart.
+  the running version (disk and runtime differ until reload/restart).
 - **Marketplace registered** — `claude plugin marketplace list`. Absent → the plugin cannot update.
   Fix: `claude plugin marketplace add devstride/claude-plugin`.
 - **Version currency** — run
@@ -56,9 +56,9 @@ next action. For each failure symptom, read
   helper (not Releases) and report installed/newest. If behind, tell the user to invoke
   `/devstride:update` separately and stop; Doctor must not invoke this explicit-only command. If the
   skill is unavailable, print exact id/scope bootstrap commands, then reload and check for errors.
-- **`python3` on PATH** — the session-start hook, the reviewer wait script and the cost harness all
-  run their logic in python3; without it the wait exits at once with a usage-error `RESULT`. FAIL
-  with the install hint for the platform.
+- **`python3` on PATH** — the session-start hook, the reviewer wait script and the cost harness
+  run in python3; without it the wait exits at once with a usage-error `RESULT`. FAIL with a
+  platform install hint.
 - **Learned reviewer latency** — from
   `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/reviewer-latency.json`, report each reviewer's
   samples, p50, p95, and derived bound under this repo's `pollTimeoutMinutes`; below the sample
@@ -68,7 +68,7 @@ next action. For each failure symptom, read
   `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/repo-<first-12-hex sha1 of repo root>.json`; derive
   the root with `git rev-parse --show-toplevel` and use the schema in `version-currency.md`. On one
   line report `checkedAt`, `running`, `newest`, `mode`, `result`, `install`, `statusLine`. Absent:
-  say never run here (possible pre-1.2.0 plugin, disabled hooks, or
+  say never run here (pre-1.2.0 plugin, disabled hooks, or
   `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). Modes: `notify` fallback; `auto-update` only for a repo-bound
   project/local install; `pinned` never updates. Shared user copies hand off to update, managed
   copies to their administrator, and ambiguous copies to Doctor. Explain every result using the
@@ -83,13 +83,12 @@ next action. For each failure symptom, read
 - **A server exists and is CONNECTED** — `claude mcp list`. The bundled one appears as
   `plugin:devstride:devstride`; a plain `devstride` entry is one you or your project configured.
 - **Not connected.** Say: until sign-in, skills have no DevStride tools and nothing prompts; the
-  symptom is missing tools, not an authorization error. Fix `/mcp` and browser sign-in.
+  symptom is missing tools, not an auth error. Fix `/mcp` and browser sign-in.
 - **More than one connected** — FAIL: different namespaces (`mcp__devstride__*` and
   `mcp__plugin_devstride_devstride__*`) leave calls able to reach either organization. Inspect with
   `claude mcp get <name>`; OAuth uses `claude mcp logout <name>`, API-key headers require
   `claude mcp remove <name>`.
-- **Do not call a DevStride tool to test this.** Presence and connection state are enough; a write
-  would violate the read-only contract.
+- **Do not call a DevStride tool to test this.** Presence and connection state are enough.
 
 ## 4. Config file (`config`)
 
@@ -290,23 +289,25 @@ The point: **find out whether anything actually checks the code before it merges
 
 The plugin never edits documentation itself; it invokes local skills named in `docs.updateSkill` and
 `docs.releaseNotesSkill` (contract: `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`).
-A repository with neither set has no documentation system registered — report that as **N/A**, not
-as a failure, and say what it means: the release skill's docs pass reports itself skipped, and
+Neither set → **N/A**, not a failure: the release skill's docs pass reports itself skipped and
 `--release-notes` reports itself unavailable.
 
 - **Each named skill exists** — `.claude/skills/<name>/SKILL.md`; missing → FAIL (a dangling
-  hook; fix `/devstride:setup docs`). Also `git check-ignore` the path — a skill on one machine
-  only is the commonest fresh-clone failure.
+  hook; fix `/devstride:setup docs`). Also `git check-ignore` the path (a gitignored skill
+  exists on one machine only).
 - **Each skill's `check` mode passes** — invoke it with `check` (read-only by contract); translate
   its verdict and fix into **Found / Why it matters / Fix**, keeping exact command/path evidence.
-  Never paste raw prose. No `check` mode → FAIL naming the template to rebuild from.
+  No `check` mode → FAIL naming the template to rebuild from.
 - **A legacy `release.docsRepo` block**, with or without a `docs` block beside it → FAIL: the
   release skill never acts on it. Fix: `/devstride:setup docs` (migrates and removes it).
 - **`release.deployVerification`** — if set, its first token resolves (§4's rule); never run
-  it. Unset → say the release skill will ask the owner to confirm the deploy — legitimate, not
-  a gap.
-- **Say the release-notes default** — notes only on `--release-notes`; nothing in the loop
-  decides a release "deserves" one.
+  it. Unset → the release skill asks the owner to confirm the deploy; not a gap.
+- **`release.postDeployCheckSkill`** — set → `.claude/skills/<name>/SKILL.md` must exist
+  (missing → FAIL, a dangling hook; contract:
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/post-deploy-check.md`). Unset → N/A; the close-out
+  reports `not configured`.
+- **Say the release-notes default** — notes only on `--release-notes`; the loop never decides a
+  release "deserves" one.
 
 ## Closing — the report, then the offer
 

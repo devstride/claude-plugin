@@ -235,10 +235,21 @@ headless runs. The recipe and the record it writes are in
     "seed": null,
     "migrate": null,
     "teardown": null,
-    "instanceBoundTo": "none"
+    "instanceBoundTo": "none",
+    "fetchOnSessionStart": false
   }
 }
 ```
+
+**`fetchOnSessionStart`** — `true` makes the session-start hook (`hooks/version-check.sh`) run a
+bounded `git fetch --prune origin` for the repository root and print ONE line only when the
+current branch is behind its upstream afterwards; `false` (the default) fetches nothing. The
+fetch never blocks a session: it runs under a hard deadline (about ten seconds, no terminal
+prompts), a timed-out process group is killed, and every failure stays silent. It narrows the
+stale-checkout window for a fresh session; it does not replace the ground-truth step the loop
+skills run at their own start (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`),
+because a session that has run for hours is exactly the one whose session-start fetch is old.
+`setup` leaves it `false`; a repository turns it on by hand.
 
 The shipped default says: this repository has not described an isolated local environment.
 `branch-hotfix` then asks before touching a database, and `build-item` treats the current checkout
@@ -451,6 +462,24 @@ the release skill**, and only after `release.deployVerification` (or the owner) 
 is live. There is deliberately no "when a note is warranted" key: the loop does not interpret one.
 `release.docsRepo` is the pre-1.0 shape and is migrated, not written. The contract is
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`.
+
+## Post-deploy health check
+
+```json
+{
+  "release": {
+    "postDeployCheckSkill": null
+  }
+}
+```
+
+The plugin does not know what "healthy" means for a production system, so — as with
+documentation — it holds one fact: the name of a LOCAL skill that checks production after a
+deploy. `release` invokes it once the deploy is confirmed and before documentation, release notes
+and the close-out; `PASS` continues, `FAIL` stops for a rollback decision, `NOT RUN` is reported as
+degradation and asked about, and `null` reports **not configured**. `setup` does not write it; a
+repository adds it by hand once such a skill exists. The contract is
+`${CLAUDE_PLUGIN_ROOT}/skills/release/references/post-deploy-check.md`.
 
 ## Lessons store
 

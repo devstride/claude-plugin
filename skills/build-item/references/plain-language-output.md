@@ -28,6 +28,22 @@ one when the evidence supports it. For destructive, billable,
 production-facing or externally visible action, state the blast radius before asking. Never imply
 consent. Say what “no” or waiting does.
 
+## State claims come from the source, not the checkout
+
+A claim about repository or delivery state — merged, published, CI green, "nothing else has
+landed", another session active — is read from `origin`, `gh`, or the live target at the moment
+it is made, never from the local checkout, a summary, an earlier message or memory. A claim that
+cannot be backed that way is labelled **unverified** in every message that repeats it. Say what
+was checked and when ("`origin/develop` at 14:02"), not that it "should" be so.
+
+## Handoffs separate who does what
+
+Every handoff, plan, reviewer prompt or continuation prompt ends with two explicit lists: **Steps
+the loop does** and **Steps you must do yourself**. Put every action the reader personally
+performs — a login, an approval, a dashboard check, a command only they can run — in the second
+list, in order. When there is none, the second list says **nothing required from you**. Never
+leave the reader to infer which side of the line a step is on.
+
 ## End each unit with a human recap
 
 Do not repeat the engineering report. Put its short translation first; supporting evidence may

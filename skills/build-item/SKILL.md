@@ -86,8 +86,7 @@ rather than dropped. **State EVIDENCE, not intent** — "request registered in t
 why. On the fast path, rows 4/5 take their 4a/5a forms and the deferred cloud rows stay
 visible. It is a status render, not a gate — never let it delay the step it describes. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/progress-table.md` when you render the
-table for the first time in a session, or when resuming after a compaction** — it holds both
-worked tables and the reasoning.
+table for the first time in a session, or when resuming after a compaction**.
 
 ## Working base — epic integration branches (the default)
 
@@ -167,6 +166,11 @@ Deltas — **steps 1–6 run VERBATIM**, because the point is that the inner bui
 
 ## 0. Select the story
 
+- **Ground truth first.** `git fetch --prune origin`, then read what OTHER authors landed on the
+  base branch (and the epic branch, once resolved) since the handoff; say explicitly when another
+  session appears active. Every memory-carried fact — branch, last shipped story, "nothing else
+  landed" — is a claim verified against `origin` before it is acted on. Read
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md` at this step.
 - **Resolve the plan root first**: `$ARGUMENTS`, else the handoff project memory. If neither
   yields ONE unambiguous root and several plans are open, STOP and ask — a wrong root silently
   executes the wrong plan.
@@ -175,8 +179,8 @@ Deltas — **steps 1–6 run VERBATIM**, because the point is that the inner bui
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` — in full, including its
   projection warning: fetch each candidate's `relationships` explicitly before computing the
   ready-set.
-- **Surface the ready-set** (all unblocked, non-gated candidates), not just the pick — the loop
-  runs them serially, but the ready-set shows where the parallel waves are.
+- **Surface the ready-set** (all unblocked, non-gated candidates), not just the pick — it shows
+  where the parallel waves are.
 - **DRY-CHAIN / TERMINAL:** zero not-Done, non-gated, unblocked candidates → DONE. Exit
   cleanly; never loop back to re-ask. Report which: plan complete / N blocked by X, Y / N gated
   on human-infra decisions. Suggest `/devstride:plan <root>` to extend when the chain simply ran
@@ -257,9 +261,9 @@ read-only support call is already recorded when ambiguity or critical risk requi
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/verification-receipts.md`; unchanged tree +
   exact command set means REUSE, not rerun. Review fixes invalidate it and rerun only affected
   checks plus the required gate. Record commands/counts in the merge-commit body. Red is a STOP.
-- **No PR, no draft, no Copilot request, no CI poll.** An absent check here is not pending and not
-  skipped — nothing was ever asked to run. Do not open a PR "just to have a record"; the epic
-  release PR is the record, and it lists the constituent stories.
+- **No PR, no draft, no cloud-review request, no CI poll.** An absent check here is not pending
+  and not skipped — nothing was asked to run. Never open a PR "for the record"; the epic release
+  PR is the record and lists the constituent stories.
 
 Then go to **step 5 (fast merge)**.
 
@@ -274,16 +278,15 @@ It opens the PR — as a draft when the repo holds CI on drafts (`review.openPul
 **under every profile, `prototype` included**. This PR is the story's sole merge gate — every
 configured cloud reviewer requested
 in the same call, then the review-and-settle loop via `review`. **Review first, CI last**;
-never flip a PR ready yourself to start CI early. Step 3 deliberately deferred the full pass to
-this boundary, so `review` runs it once rather than duplicating it.
+never flip a PR ready yourself to start CI early. Step 3 deferred the full pass to this
+boundary; `review` runs it once.
 
 Ensure every deferral, deviation and dismissed finding (with its rationale) is in the PR body.
 `review` returns its triage; out-of-scope
 findings with no tracked home come back on the untracked-deferral list for step 6.5.
 
-**The push/ready-flip race is `review` step 7's to prevent** — the sequencing and post-flip
-verification live there for every caller. In summary: flip-with-push means CI never runs while
-every job reports `skipping`. `review` returns the verified outcome; step 5 must not treat a
+**The push/ready-flip race is `review` step 7's to prevent** (the sequencing and post-flip
+verification live there): flip-with-push means CI never runs while every job reports `skipping`. `review` returns the verified outcome; step 5 must not treat a
 skipped board as green.
 
 ## 5. Merge
@@ -303,8 +306,7 @@ No PR to merge — integrate locally, then push the epic branch:
   re-run the local suites, then merge back; unresolvable conflict → genuine fork.
 - Push the epic branch. **Only once that push SUCCEEDS**, delete the story branch **locally AND
   on the remote** — a rejected epic push means the merge exists only locally, and deleting the
-  remote story branch would destroy the sole remote copy; deleting only the local one leaves a
-  stale remote branch every time.
+  remote story branch would destroy the sole remote copy.
 - **Skip the rest of step 5** — the CI rules below describe a PR that does not exist here. Go
   to step 6.
 
@@ -322,8 +324,7 @@ No PR to merge — integrate locally, then push the epic branch:
 - **A `skipping` check is not a passing check.** Confirm the applicable jobs actually RAN — see
   step 4's push/flip warning. Reading a skipped board as green is how a PR reaches merge with zero
   CI behind it.
-- **Observe greenness, don't assume it.** Normally you are confirming an already-green state.
-  Verify the PR is non-draft (a draft means CI never ran — unsettled, not green) and every
+- **Observe greenness, don't assume it.** Verify the PR is non-draft (a draft means CI never ran — unsettled, not green) and every
   applicable check is successful at the CURRENT head SHA. Re-poll only if you re-pushed. Use the
   same self-terminating background poll as `review` step 7 — never `gh pr checks --watch`.
 - **Red CI:** failed to TRIGGER → `review` step 7.3's escalation (close+reopen, then one empty
@@ -371,9 +372,7 @@ No PR to merge — integrate locally, then push the epic branch:
   undocumented on the item.
 - **Report** the item (with its `[N]` prefix), lane, dates, **the PR link (4b) or the merge SHA +
   integration branch (4a — a fast-mode story has no PR to link)**, **the profile it was built
-  under with its source**, and whether the spec was
-  reconciled — otherwise nothing confirms the Done move, the date window, the link, the rigor
-  the story actually got and the as-built reconciliation actually happened.
+  under with its source**, and whether the spec was reconciled.
 
 ## 6.5 Capture untracked findings as tracked items
 
