@@ -8,6 +8,10 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`release` no longer skips the deploy confirmation when a post-deploy check is configured.** Step 5a skipped the confirmation whenever neither documentation nor release notes would run, which the `release.postDeployCheckSkill` contract (invoked only after a confirmed deploy) never allowed: the check would have measured the previous release, or an in-flight rollout. The skip now also requires that key to be unset.
+
 ## [3.4.0] — 2026-09-02
 
 ### Added
