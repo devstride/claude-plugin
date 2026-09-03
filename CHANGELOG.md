@@ -8,6 +8,20 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **`review.mandatoryLenses`** — a repository can force its own review lens on its own risk
+  surface. Each entry names a lens, the anchored path globs that select it, and the question a
+  finder must answer for every changed hunk. When a file in the diff matches, `ultracode-build`
+  phase 3 and the merge-boundary adversarial review each add ONE focused finder for it, on the
+  same footing as the forced security lens — the breadth ceiling and the delivery profile never
+  remove it — and the local review engine receives the question as a hypothesis through
+  `<context>`. Findings are verified like any other; a matched entry is reported as
+  `mandatory lens <name>: ran (N findings)`, an unmatched one is not mentioned, and a malformed
+  one is named once and ignored. `doctor` validates entry shape and warns on a glob that would
+  match every file. `setup` never writes entries. Contract:
+  `skills/ultracode-build/references/mandatory-lenses.md`.
+
 ## [3.3.0] — 2026-09-02
 
 ### Added

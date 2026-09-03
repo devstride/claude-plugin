@@ -27,7 +27,10 @@ Clamp the diff's actual risk to the profile ceiling:
   always `opus`/`xhigh` even when the rest of the diff is narrower.
 
 The ceiling clamps generic finder breadth only; it never removes a focused immediate-risk or final
-merge-gate verifier.
+merge-gate verifier. A repository's `review.mandatoryLenses` entry whose `paths` match a file in
+the diff adds ONE focused finder on that same footing, carrying the entry's `name` and `question`
+— read `${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/mandatory-lenses.md` when one
+matches.
 
 Never default agents to `max`. The engineering-economy contract reserves it for an explicit,
 evaluated override tied to a named unresolved risk. Prefer distinct questions and bounded
@@ -41,7 +44,8 @@ Matching fingerprints share one id only for the same fixable occurrence, retaini
 a separate occurrence adds its stable enclosing symbol/path discriminator. A security duplicate
 keeps the security lens.
 
-Use the five lenses only when the risk warrants them:
+Use the five lenses only when the risk warrants them (a matched mandatory lens is a sixth, and
+always runs):
 
 - **Correctness** — logic, edge cases, state transitions, error handling, races.
 - **Security** — authentication, authorization, tenant scope, injection, secrets, ACL breadth.

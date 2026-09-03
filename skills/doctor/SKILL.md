@@ -148,22 +148,20 @@ next action. For each failure symptom, read
   recognize and let the user judge. **Exclude by convention**: any key whose leaf name starts with
   `_` (the `_*_readme` documentation convention, used pervasively in real configs) and `$schema`.
   Check against the published [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference),
-  **not** by grepping skill prose — several real keys are descriptive and appear in no skill, so a
-  prose grep flags valid configuration as misspelled and buries the one genuine typo in the noise.
+  **not** by grepping skill prose — several real keys are descriptive and appear in no skill.
   Where a key is one edit away from a real one, offer that as a possibility, not a verdict.
-  `profile` and `profileOverrides` are recognized keys — they belong to the delivery-profile
-  contract — whether or not the published reference lists them yet.
+  `profile` and `profileOverrides` are recognized keys whether or not the published reference
+  lists them yet.
 - **`localEnvironment`** — report the block. Absent → the shipped default is in force (every
   command `null`, `instanceBoundTo: none`): `branch-hotfix` asks before touching a database.
   Present → report `instanceBoundTo` and each command's resolution per the rule below.
   WARNINGS: `instanceBoundTo: directory` with a `null` `create` (claims isolated instances,
   gives no way to make one); and under `directory`, a null **or absent** `recreate` beside a
   non-null `migrate` (those commands go forward — `branch-hotfix` then has no backward path
-  and will migrate forward only where safe, else STOP and ask; a gap in the unattended loop,
-  not a guaranteed wrong schema; reasoning in `config-defaults.md`). **Never warn under
+  and will migrate forward only where safe, else STOP and ask; reasoning in `config-defaults.md`). **Never warn under
   `branch` binding** — no backward transition happens there.
 - **`stage`** — absent, or `resolve: null` → **N/A, not a failure**: this repository deploys no
-  per-environment infrastructure, which is the common case. Present → run `resolve` ONCE from the
+  per-environment infrastructure. Present → run `resolve` ONCE from the
   repository root and report what it printed; empty output is "no stage bound here", never an
   error. A non-zero exit WITH output, or output spanning several lines, is a FAIL — consumers read
   one line and treat empty as absent, so a noisy command silently renders the wrong stage. Report
@@ -190,12 +188,11 @@ next action. For each failure symptom, read
   **array**, so iterate it — `review.localCommand`, `review.localAssistCommand`,
   `generated.regenCommand`,
   `preShipChecks[].command`, each non-null `localEnvironment.*` command, and `stage.resolve`): split on `&&` and `;`, take the first token of **each** segment, and
-  skip shell builtins. Checking only the very first token is vacuous for the commonest shape:
-  `cd backend && pnpm test` starts with `cd`, which always resolves, so the check would pass on a
-  machine with no `pnpm` at all. A single-word command that does not resolve may be a shell alias or
+  skip shell builtins (`cd backend && pnpm test` starts with `cd`, which always resolves). A
+  single-word command that does not resolve may be a shell alias or
   function rather than a real gap — report "not on PATH (may be an alias)" rather than a flat FAIL.
-- **`conventionsDoc` exists** — if set, the file must be present; the build engine reads it to write
-  code in this repo's style, and a missing one quietly costs you that.
+- **`conventionsDoc` exists** — if set, the file must be present; the build engine reads it, and
+  a missing one quietly costs you that.
 
 ## 5. The CI draft gate (`ci`)
 
@@ -282,6 +279,10 @@ The point: **find out whether anything actually checks the code before it merges
   optimization warning). A legacy base-only command may omit placeholders (` --base <value>` is
   appended), but WARN that contextual follow-ups will be skipped. `/devstride:setup review`
   migrates.
+- **`review.mandatoryLenses`** — absent or `[]` → N/A. Each entry needs `name`, `paths` (a
+  non-empty array) and `question`; anything else → FAIL naming the entry (the skills ignore it
+  aloud). WARN a glob with no `/`, or a bare `*`/`**`: it matches every file, so the lens runs on
+  every diff. Contract: `${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/mandatory-lenses.md`.
 - **`preShipChecks`** — if any entry exists, confirm its command resolves (same segment-splitting as
   §4); these run at the ship boundary and nothing in CI covers them.
 

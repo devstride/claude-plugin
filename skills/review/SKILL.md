@@ -113,8 +113,7 @@ ambiguous/risky/unverifiable finding, or a destructive/outward-facing action.
 ## 0. Resolve the PR
 
 - `$ARGUMENTS` if a number, else the current branch's open PR. None open → STOP.
-- **Confirm the PR is OPEN** — an explicitly passed number can name a closed or merged PR;
-  without this guard the loop launches reviewers and mutations against it.
+- **Confirm the PR is OPEN** — an explicitly passed number can name a closed or merged PR.
 - **A DRAFT is the NORMAL state — never skip it, never ask whether to review it.** You flip it
   ready only in step 7, after review and any pre-ship checks. No profile starts CI early.
 - Resolve `{owner}/{repo}` once.
@@ -126,17 +125,18 @@ Record one reviewed-head row as each engine returns; every later pass consumes t
 
 ## 1. Launch cycle 1, concurrently
 
-Kick all off in one turn; serializing wastes minutes. Capture `cycleAnchor = HEAD` first and freeze
+Kick all off in one turn. Capture `cycleAnchor = HEAD` first and freeze
 through step 3. It remains the common anchor even if one engine reports another SHA.
 
 - **Claude** — run the canonical PR-boundary adversarial route over the caller-declared scope,
   generated files excluded. Use the task/risk-sized model alias and effort from
   `delivery-profiles.md`; a fast story's earlier risk screen does not cover an epic release.
-  No GitHub thread; triage like the local CLI's.
+  No GitHub thread; triage like the local CLI's. Matched `review.mandatoryLenses` entries add
+  their finders on the security-lens footing (`mandatory-lenses.md`).
 - **Local CLI engine** — only when on the resolved roster: `review.localCommand` with
   `<base>` = `origin/<baseRefName>` and `<effort>` = the resolved route, run in the worktree. A
-  context-first template receives the cycle scope and current ledger on stdin; a legacy
-  base-only template removes `<context>`. Record the head SHA at launch. **Launch in the
+  context-first template receives the cycle scope, current ledger and each matched mandatory-lens
+  `question` (as a hypothesis) on stdin; a legacy base-only template removes `<context>`. Record the head SHA at launch. **Launch in the
   background with a long
   timeout — it runs for MINUTES**; a foreground default-timeout call kills it mid-review, which
   looks *identical* to a clean review. Configured-but-unavailable → this-run degradation,
@@ -149,7 +149,7 @@ through step 3. It remains the common anchor even if one engine reports another 
   caller already requested them at PR-open (`pr` does), accept its per-reviewer baseline count,
   request time and mutation outcome, then prove registration here while local streams run;
   request entries with no handoff. **Iterate `review.automatedReviewers`, requesting EACH
-  entry per its `how`** — never assume a single Copilot-shaped reviewer. For a
+  entry per its `how`**. For a
   `requested_reviewer` bot: GraphQL with the entry's `graphqlBotId` (REST rejects bots), **then
   confirm a NEW `review_requested` timeline event appears** — the mutation reports success even
   when it creates nothing. A draft does not block an explicitly requested review; never flip
@@ -158,8 +158,7 @@ through step 3. It remains the common anchor even if one engine reports another 
   DROPPED for this run** (2 minutes under every profile): re-count that reviewer's
   `review_requested` events on a short interval until the window closes; unproven → this-run
   degradation, dropped, never waited out. **Track the REGISTERED set** — who actually produced
-  a `review_requested` event, with each event's `created_at`. Everything downstream keys off
-  that set.
+  a `review_requested` event, with each event's `created_at`.
 - **Roster degraded to Claude-only on a PR path** — the two causes diverge, and the distinction
   is the whole policy:
   - **Configured-but-FAILED** (a configured cloud reviewer never registered/responded AND the

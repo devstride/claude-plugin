@@ -438,6 +438,32 @@ uses base mode initially, then context mode. Details:
 operator hand-edit; it applies to every later cycle. Reasoning and the verified CLI facts:
 `${CLAUDE_PLUGIN_ROOT}/skills/review/references/delta-re-review.md`.
 
+## Mandatory review lenses
+
+```json
+{
+  "review": {
+    "mandatoryLenses": [
+      {
+        "name": "concurrency-and-rolling-deploy",
+        "paths": ["backend/src/**/*transaction*", "backend/src/**/events/**", "backend/migrations/**"],
+        "question": "For every changed hunk: what ordering or isolation assumption does it make; what happens under READ COMMITTED; what happens while old and new revisions run side by side during a rolling deploy; which claim in the change summary cannot be proven from test or command output?"
+      }
+    ]
+  }
+}
+```
+
+Absent or `[]` means no mandatory lens. Each entry names a lens, the ANCHORED path globs that
+select it, and the question its finder must answer for every changed hunk. When a file in the
+diff under review matches an entry, `ultracode-build` phase 3 and the merge-boundary review each
+add ONE focused finder for it, on the same footing as the forced security lens — the breadth
+ceiling and the delivery profile never remove it — and the local review engine receives the
+question as a hypothesis through `<context>`. Findings are verified like any other. `setup`
+mentions the key and never writes entries: only the repository knows its own risk surface. The
+example above is a shape, not a recommendation for any particular repository. Contract:
+`${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/mandatory-lenses.md`.
+
 ## Documentation hooks
 
 ```json

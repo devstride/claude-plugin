@@ -13,7 +13,8 @@ Argument — item number + one-line goal, optionally followed by `profile: <name
 profile: standard review-moment: release-deferred`): $ARGUMENTS
 
 **Config**: `.claude/ds-config.json` (`verify.*`, `baseBranch`, `generated.*`,
-`preCommitWiringChecks`, `conventionsDoc`, `lessonsDoc`, `review.localAssistCommand`, `profile`, `profileOverrides`) —
+`preCommitWiringChecks`, `conventionsDoc`, `lessonsDoc`, `review.localAssistCommand`,
+`review.mandatoryLenses`, `profile`, `profileOverrides`) —
 authoritative over any literal here.
 Coding conventions live in `conventionsDoc` (`AGENTS.md`), not the config. `lessonsDoc` (inline
 fallback `.claude/ds-lessons.md`) is the repo's lessons store, distilled from past review
@@ -178,6 +179,13 @@ finders; if there are more boundaries, group related ones without dropping any. 
 reproduce a concrete failure, check the matching security/deploy invariant,
 and return anchored findings with CONFIRMED / PLAUSIBLE / REFUTED verdicts. REFUTED is the default;
 "could not rule it out" is not evidence. The profile cannot remove this floor.
+
+**Mandatory lenses.** A `review.mandatoryLenses` entry whose `paths` match a hand-written file in
+the diff is an immediate-risk boundary of its own: launch one focused verifier carrying its `name`
+and `question`, even for an otherwise routine diff, and report `mandatory lens <name>: ran (N
+findings)`; an entry that matched nothing is not mentioned, and a malformed entry is named once
+and ignored. Read `${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/mandatory-lenses.md`
+when one matches.
 
 When configured, the one read-only `review.localAssistCommand` call may run concurrently on a
 distinct risk question per the engineering-economy contract. Its output is advisory and never a
