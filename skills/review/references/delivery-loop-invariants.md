@@ -243,7 +243,8 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "verificationGrouping" "measure-cost.sh" "cost-budgets.json" \
               "wait-for-reviewers.sh" "simplest accurate words" "Human recap" \
               "not run" "not configured" "ground-truth-at-start.md" "fetchOnSessionStart" \
-              "postDeployCheckSkill" "POST-DEPLOY HEALTH" "nothing required from you"; do
+              "postDeployCheckSkill" "POST-DEPLOY HEALTH" "nothing required from you" \
+              "mandatoryLenses" "mandatory lens" "mandatory-lenses.md"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
 
@@ -380,6 +381,11 @@ skills/release/SKILL.md|never proceed to 5b, 5c or 6
 skills/release/references/post-deploy-check.md|POST-DEPLOY HEALTH: NOT RUN
 skills/doctor/SKILL.md|postDeployCheckSkill
 hooks/version-check.sh|fetchOnSessionStart
+skills/ultracode-build/SKILL.md|mandatoryLenses
+skills/ultracode-build/references/review-fanout.md|mandatory-lenses.md
+skills/review/SKILL.md|mandatoryLenses
+skills/doctor/SKILL.md|mandatoryLenses
+skills/setup/references/config-defaults.md|mandatoryLenses
 hooks/version-check.sh|GIT_TERMINAL_PROMPT
 scripts/tests/session-fetch.sh|hanging fetch
 PAIRS
@@ -696,9 +702,23 @@ W5. `release.postDeployCheckSkill` names a LOCAL skill invoked once, after the d
 W6. Doctor checks that a configured `postDeployCheckSkill` names an existing local skill; `setup`
     never writes the key.
 
+## X. Mandatory review lenses (config: `review.mandatoryLenses`; contract: `skills/ultracode-build/references/mandatory-lenses.md`)
+X1. An entry `{name, paths, question}` whose ANCHORED `paths` match a hand-written file in the diff
+    under review adds ONE focused finder carrying its `name` and `question`, in `ultracode-build`
+    phase 3 and in the merge-boundary fan-out, on the same footing as the forced security lens:
+    the breadth ceiling and the delivery profile clamp generic breadth and never remove it.
+X2. Its findings are verified like any other (REFUTED by default; CONFIRMED reproduces;
+    PLAUSIBLE names mechanism and path) and are not P1 by virtue of the lens.
+X3. Each matched entry's `question` travels to the local review engine through `<context>` as a
+    hypothesis, never as a finding.
+X4. A matched entry is reported as `mandatory lens <name>: ran (N findings)`; an entry that
+    matched nothing is not mentioned; a malformed entry is named once and ignored, never guessed.
+X5. Doctor FAILs a malformed entry and WARNs a glob with no `/` or a bare `*`/`**`; `setup` never
+    writes entries.
+
 ---
 
-**Revised total: 55 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 10 (O) + 3 (P) + 2 (Q) + 5 (R) + 4 (S) + 8 (T) + 5 (U) + 10 (V) + 6 (W) = 138 facts.** (Needles are a SAMPLE, not one per fact; recount their loops after editing.)
+**Revised total: 55 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 10 (O) + 3 (P) + 2 (Q) + 5 (R) + 4 (S) + 8 (T) + 5 (U) + 10 (V) + 6 (W) + 5 (X) = 143 facts.** (Needles are a SAMPLE, not one per fact; recount their loops after editing.)
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.
