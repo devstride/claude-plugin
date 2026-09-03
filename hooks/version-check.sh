@@ -42,7 +42,7 @@ CWD="${CWD:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 # The repository root, so a session launched from packages/web still finds the repo's config.
 REPO=$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null); REPO="${REPO:-$CWD}"
 
-read -r CHECK AUTO SLAUTO PIN CONFIG_VALID <<EOF
+read -r CHECK AUTO SLAUTO FETCH PIN CONFIG_VALID <<EOF
 $(python3 -c 'import json,os,re,stat,sys
 path=os.path.join(sys.argv[1],".claude","ds-config.json"); valid=True
 if os.path.lexists(path):
@@ -63,9 +63,11 @@ if os.path.lexists(path):
     d={}; valid=False
 else: d={}
 if not isinstance(d,dict): d={}; valid=False
-p=d.get("plugin",{}); s=d.get("statusLine",{})
+p=d.get("plugin",{}); s=d.get("statusLine",{}); l=d.get("localEnvironment",{})
 if not isinstance(p,dict): p={}; valid=False
 if not isinstance(s,dict): s={}; valid=False
+if l is None: l={}
+if not isinstance(l,dict): l={}; valid=False
 def flag(obj,key,default):
   global valid
   if key not in obj: return default
@@ -75,9 +77,10 @@ pin=p.get("pin")
 if pin is not None and (not isinstance(pin,str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+",pin)):
   valid=False; pin=None
 print("1" if flag(p,"updateCheck",True) else "0", "1" if flag(p,"autoUpdate",False) else "0",
-      "1" if flag(s,"autoUpdate",True) else "0", pin or "-", "1" if valid else "0")' "$REPO" 2>/dev/null || echo "0 0 0 - 0")
+      "1" if flag(s,"autoUpdate",True) else "0", "1" if flag(l,"fetchOnSessionStart",False) else "0",
+      pin or "-", "1" if valid else "0")' "$REPO" 2>/dev/null || echo "0 0 0 0 - 0")
 EOF
-[ "$CONFIG_VALID" = "1" ] || { CHECK=1; AUTO=0; SLAUTO=0; PIN="-"; }
+[ "$CONFIG_VALID" = "1" ] || { CHECK=1; AUTO=0; SLAUTO=0; FETCH=0; PIN="-"; }
 
 newer() { python3 -c 'import sys
 try: a,b=(tuple(map(int,v.split("."))) for v in sys.argv[1:]); raise SystemExit(0 if b>a else 1)
@@ -314,6 +317,47 @@ PY
       SL_HAVE=$(printf '%s' "$SL_RESULT" | cut -d: -f2); SL_WANT=$(printf '%s' "$SL_RESULT" | cut -d: -f3)
       echo "devstride status line: updated $SL_HAVE → $SL_WANT (.claude/statusline.sh; previous kept as .bak). Live now — no restart needed. Commit it so every clone gets it."
       ;;
+  esac
+fi
+
+# --- the repository's opt-in session-start fetch ---------------------------
+# `localEnvironment.fetchOnSessionStart: true` narrows the stale-checkout window: a bounded
+# `git fetch --prune origin`, then ONE line only when the current branch is behind its upstream.
+# Same contract as everything above — never blocks, never exits non-zero, silent on failure and
+# on "nothing to say". The deadline is a hard kill of the fetch's own process group (macOS has no
+# `timeout`), terminal prompts are disabled so a credential helper cannot hang it, and it runs
+# even when the plugin check is disabled — a fetch is a repository decision, not a plugin one.
+if [ "$FETCH" = "1" ] && git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  FETCH_RESULT=$(python3 - "$REPO" "${DEVSTRIDE_SESSION_FETCH_TIMEOUT:-10}" <<'PYFETCH' 2>/dev/null || echo fetch-failed
+import os, signal, subprocess, sys
+repo, deadline = sys.argv[1], float(sys.argv[2])
+env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="/bin/false")
+env.setdefault("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
+def run(argv, timeout):
+    process = subprocess.Popen(argv, cwd=repo, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.DEVNULL, env=env, start_new_session=True)
+    try:
+        out, _ = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try: os.killpg(process.pid, signal.SIGKILL)
+        except Exception: pass
+        try: process.wait(timeout=2)
+        except Exception: pass
+        return None
+    return process.returncode, out.decode("utf-8", "replace")
+result = run(["git", "fetch", "--prune", "--quiet", "origin"], deadline)
+if result is None or result[0] != 0:
+    print("fetch-failed"); raise SystemExit(0)
+result = run(["git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}"], 5)
+if result is None or result[0] != 0:
+    print("fetched-no-upstream"); raise SystemExit(0)
+parts = result[1].split()
+behind = int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else 0
+print("behind %d" % behind if behind > 0 else "fetched-current")
+PYFETCH
+)
+  case "$FETCH_RESULT" in
+    behind\ *) echo "devstride: fetched origin — this branch is ${FETCH_RESULT#behind } commit(s) behind its upstream; pull before reasoning from the checkout." ;;
   esac
 fi
 
