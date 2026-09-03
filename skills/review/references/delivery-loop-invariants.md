@@ -242,7 +242,8 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "proceed-p95" "reviewer-latency.json" "localReReviewScope" "rereview-scope.sh" \
               "verificationGrouping" "measure-cost.sh" "cost-budgets.json" \
               "wait-for-reviewers.sh" "simplest accurate words" "Human recap" \
-              "not run" "not configured"; do
+              "not run" "not configured" "ground-truth-at-start.md" "fetchOnSessionStart" \
+              "postDeployCheckSkill" "POST-DEPLOY HEALTH" "nothing required from you"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
 
@@ -370,6 +371,17 @@ skills/setup/references/validation-checklist.md|removed from the population firs
 skills/setup/references/ci-cost-patterns.md|convention-only shape
 hooks/version-check.sh|installPath
 hooks/version-check.sh|show-toplevel
+skills/build-item/SKILL.md|Ground truth first
+skills/release/SKILL.md|Ground truth
+skills/build-item/references/plain-language-output.md|labelled **unverified**
+skills/build-item/references/plain-language-output.md|Steps you must do yourself
+skills/release/SKILL.md|postDeployCheckSkill
+skills/release/SKILL.md|never proceed to 5b, 5c or 6
+skills/release/references/post-deploy-check.md|POST-DEPLOY HEALTH: NOT RUN
+skills/doctor/SKILL.md|postDeployCheckSkill
+hooks/version-check.sh|fetchOnSessionStart
+hooks/version-check.sh|GIT_TERMINAL_PROMPT
+scripts/tests/session-fetch.sh|hanging fetch
 PAIRS
 
 # DEAD-REFERENCE check: every reference must be REACHABLE from a root an agent actually reads
@@ -660,9 +672,33 @@ V10. Every skill loads one shared human-output contract once per top-level run. 
      the decision and consequence; agent output is translated; build, merge, release and doctor
      recaps lead with plain outcomes without hiding failed, unrun or unconfigured evidence.
 
+## W. Ground truth and post-deploy health
+W1. A loop starts with `git fetch --prune origin` and a read of what OTHER authors landed on the
+    branches it will touch; another active session is stated explicitly, never inferred silent.
+    Every memory-carried fact (branch, last shipped story, "nothing else landed", open PRs) is a
+    CLAIM verified against `origin`/`gh` before it is acted on. A diff against `HEAD` cannot
+    catch this: the checkout can be current while the conversation is not.
+W2. A claim about repository or delivery state — merged, published, CI green, another session
+    active — is read from the source at the moment of the claim; one that cannot be backed that
+    way is labelled **unverified** wherever it is repeated.
+W3. Every handoff, plan or reviewer prompt ends with two lists — steps the loop does, steps the
+    reader must do themselves — and an empty second list says so ("nothing required from you").
+W4. `localEnvironment.fetchOnSessionStart` (default `false`) makes the session-start hook run a
+    bounded, prompt-free `git fetch --prune origin` and print ONE line only when the branch is
+    behind its upstream. It never blocks, never exits non-zero, kills a hung fetch's process
+    group, runs independently of the plugin update check, and does not replace W1.
+W5. `release.postDeployCheckSkill` names a LOCAL skill invoked once, after the deploy is confirmed
+    and before docs/release notes/close-out, with `check` + `{productionBranch, mergeCommit,
+    deployConfirmedAt}`. Its first line is `POST-DEPLOY HEALTH: PASS|FAIL|NOT RUN`, evidence
+    lines name their commands. `FAIL` STOPS for a rollback decision — never on to 5b/5c/6 alone;
+    `NOT RUN` is degradation and asked about; absent key reports **not configured**. `NOT RUN`
+    and **not configured** are different facts and never collapse into each other.
+W6. Doctor checks that a configured `postDeployCheckSkill` names an existing local skill; `setup`
+    never writes the key.
+
 ---
 
-**Revised total: 55 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 10 (O) + 3 (P) + 2 (Q) + 5 (R) + 4 (S) + 8 (T) + 5 (U) + 10 (V) = 132 facts.** (Needles are a SAMPLE, not one per fact; recount their loops after editing.)
+**Revised total: 55 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 10 (O) + 3 (P) + 2 (Q) + 5 (R) + 4 (S) + 8 (T) + 5 (U) + 10 (V) + 6 (W) = 138 facts.** (Needles are a SAMPLE, not one per fact; recount their loops after editing.)
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.
