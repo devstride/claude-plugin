@@ -44,6 +44,30 @@ performs — a login, an approval, a dashboard check, a command only they can ru
 list, in order. When there is none, the second list says **nothing required from you**. Never
 leave the reader to infer which side of the line a step is on.
 
+## Describe behaviour, never mechanism
+
+A recap of finished work says what a person now experiences, one paragraph per item:
+
+1. A **bold headline in everyday words naming the outcome**, with the item's number in brackets.
+2. What happens now, from the user's point of view. Then what used to happen. Then, only if it
+   matters, the conditions, in everyday words.
+3. No class, method, column, enum, flag or setting names, and no word that names how the code does
+   it ("transaction", "lock", "handler", "migration", "marker"). Those belong in the commit body
+   and in the evidence below the plain paragraph, where an engineer reads them on purpose.
+
+Wanted:
+
+> **Forwarded emails land on the right ticket (#42).** When a staff member forwards a customer's
+> email to the support address, and the attached original was itself a reply to something the desk
+> had sent, the system now adds the customer's words to that ticket as a public reply. Before, it
+> always opened a duplicate ticket. It only does this when the forwarder is a verified staff member
+> and the email passed authentication.
+
+Not wanted, though every word is true: "New thread-resolution rule FORWARDED_ORIGIN: origin
+Message-ID/References matched against the outbound ledger under the member/DMARC gates." The
+reader deciding whether to ship cannot use it. The **Built** and **Merged / Released** lines below
+are written in the wanted shape.
+
 ## End each unit with a human recap
 
 Do not repeat the engineering report. Put its short translation first; supporting evidence may
@@ -54,7 +78,7 @@ a waiver or a required check that did not run.
 
 ```text
 Built
-- <one to three user or system outcomes, one sentence each>
+- <one to three outcomes in the wanted shape above: what a person experiences now, then before>
 Checked
 - <tests and review in plain words; name anything not run>
 Next
@@ -71,7 +95,7 @@ cloud tests have not run; a repo with no CI says **not configured**, never “gr
 
 ```text
 Merged / Released
-- <every included item and its human-visible or system effect, one sentence each>
+- <every included item in the wanted shape above: headline, what happens now, what happened before>
 Delivery
 - <where it landed, whether it is live, and what deploy the merge triggers>
 Remaining

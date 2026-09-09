@@ -1,6 +1,6 @@
 {
   "_method": "tokens = ceil(utf8_bytes / 3); bytes as `wc -c`",
-  "_generatedBy": "scripts/measure-cost.sh --write-budgets at 3.1.0 on 2026-08-29",
+  "_generatedBy": "scripts/measure-cost.sh --write-budgets at 3.4.1 on 2026-09-08",
   "_rounding": "measured tokens rounded UP to the next multiple of 100",
   "_readme": "A RATCHET over bodies, references, and representative composed paths. Hard body ceilings live in measure-cost.sh: 8,000 normally, with four frozen grandfathered caps. Lower freely; raise a ratchet only with the text that needs it. Changing _method re-baselines every entry.",
   "alwaysOnContext": 1200,
@@ -28,8 +28,9 @@
   },
   "references": {
     "skills/build-item/references/epic-release.md": 1200,
+    "skills/build-item/references/ground-truth-at-start.md": 1000,
     "skills/build-item/references/next-unblocked.md": 700,
-    "skills/build-item/references/plain-language-output.md": 1800,
+    "skills/build-item/references/plain-language-output.md": 2300,
     "skills/build-item/references/progress-table.md": 1300,
     "skills/build-item/references/verification-receipts.md": 800,
     "skills/doctor/references/repairs.md": 2300,
@@ -44,6 +45,7 @@
     "skills/rationalize-gantt/references/auto-scheduler-off.md": 800,
     "skills/rebalance/references/recoverable-write-order.md": 1000,
     "skills/release/references/docs-hooks.md": 2700,
+    "skills/release/references/post-deploy-check.md": 1100,
     "skills/release/references/release-gates.md": 1100,
     "skills/review/references/ci-settle.md": 1200,
     "skills/review/references/delivery-loop-invariants.md": 16700,
@@ -60,18 +62,16 @@
     "skills/setup/references/docs-skill-templates/update-documentation.md": 1400,
     "skills/setup/references/docs-skill-templates/update-release-notes.md": 1200,
     "skills/setup/references/interview-rationale.md": 1500,
+    "skills/setup/references/review-engines.md": 1700,
     "skills/setup/references/statusline-segments.md": 1900,
     "skills/setup/references/validation-checklist.md": 4700,
     "skills/ultracode-build/references/engineering-economy.md": 1400,
-    "skills/ultracode-build/references/review-fanout.md": 2200,
-    "skills/setup/references/review-engines.md": 1700,
-    "skills/build-item/references/ground-truth-at-start.md": 1000,
-    "skills/release/references/post-deploy-check.md": 1100,
-    "skills/ultracode-build/references/mandatory-lenses.md": 1800
+    "skills/ultracode-build/references/mandatory-lenses.md": 1800,
+    "skills/ultracode-build/references/review-fanout.md": 2200
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 69300,
+      "budget": 69800,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -100,7 +100,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 62300,
+      "budget": 62800,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -126,7 +126,7 @@
       ]
     },
     "manualPluginUpdate": {
-      "budget": 4100,
+      "budget": 4600,
       "files": [
         "skills/update/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
@@ -134,7 +134,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 59200,
+      "budget": 59700,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
