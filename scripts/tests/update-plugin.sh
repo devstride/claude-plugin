@@ -303,9 +303,66 @@ printf 'post-tag code\n' > "$MARKET/post-tag.txt"
 "$REAL_GIT" -C "$MARKET" commit -qm post-tag
 OUT="$(run_apply)"; RC=$?
 if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
+   && [ "$(field shippedChanges)" = "['post-tag.txt']" ] && [ "$(field descendsFromRelease)" = True ] \
    && not_called 'claude:plugin update'; then
-  ok "(15) same manifest version on later commit → untagged code blocked"
+  ok "(15) same manifest version on later commit with a shipped change → blocked, the path named"
 else bad "(15) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15b. A commit after the tag that touches only inert maintainer files still serves that release,
+# and the inert copies Claude takes from that later commit do not fail the payload proof.
+setup_case inert-after devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; mkdir -p "$MARKET/scripts"; printf 'echo tool\n' > "$MARKET/scripts/tool.sh"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -qm docs
+printf 'docs\n' > "$LINEAGE/3.1.0/README.md"
+mkdir -p "$LINEAGE/3.1.0/scripts"; printf 'echo tool\n' > "$LINEAGE/3.1.0/scripts/tool.sh"
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] && [ "$(field safeToReload)" = True ] \
+   && called 'claude:plugin update devstride@devstride --scope user'; then
+  ok "(15b) docs/tooling-only commit after the tag → the release installs and verifies"
+else bad "(15b) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15c. An install already at the release is not called broken because main moved on in docs only.
+setup_case inert-current devstride user 3.0.0 3.0.0 3.0.0
+printf 'notes\n' > "$MARKET/CHANGELOG.md"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -qm changelog
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = current ] && [ "$(field safeToReload)" = True ] \
+   && [ "$(field repairRequired)" = False ] && not_called 'claude:plugin update'; then
+  ok "(15c) current install + docs-only commit after the tag → current, no false repair"
+else bad "(15c) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15d. A docs-only difference on a history that does not contain the tag is not the release.
+setup_case inert-rewritten devstride user 3.0.0 3.1.0 3.1.0
+"$REAL_GIT" -C "$MARKET" checkout -q --orphan rewritten
+printf 'docs\n' > "$MARKET/README.md"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -qm rewritten
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
+   && [ "$(field descendsFromRelease)" = False ] && not_called 'claude:plugin update'; then
+  ok "(15d) docs-only change on a history without the tag → blocked"
+else bad "(15d) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15e. A shipped change beside docs is still a shipped change, and only it is named.
+setup_case mixed-after devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; printf 'new skill text\n' > "$MARKET/skills/update/NOTE.md"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -qm mixed
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
+   && [ "$(field shippedChanges)" = "['skills/update/NOTE.md']" ] && not_called 'claude:plugin update'; then
+  ok "(15e) shipped file beside docs → blocked, names only the shipped path"
+else bad "(15e) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15f. Moving a shipped file into an inert directory removes it from the release: still shipped.
+setup_case moved-inert devstride user 3.0.0 3.1.0 3.1.0
+mkdir -p "$MARKET/scripts"
+"$REAL_GIT" -C "$MARKET" mv skills/update/scripts/latest-version.sh scripts/latest-version.sh
+"$REAL_GIT" -C "$MARKET" commit -qm move
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
+   && [ "$(field shippedChanges)" = "['skills/update/scripts/latest-version.sh']" ] \
+   && not_called 'claude:plugin update'; then
+  ok "(15f) shipped file moved into scripts/ → blocked, the removed path is named"
+else bad "(15f) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
 # 16. The marketplace name alone grants no trust; its source must be the official repository.
 setup_case wrong-source devstride user 3.0.0 3.1.0 3.1.0
@@ -457,6 +514,7 @@ else bad "(25b) rc=$RC out=$OUT orphan=$([ -e "$UP_STATE/orphan-child" ] && echo
 
 # 26. Static command contract: user-only, plain output, shared resolver, no silent mid-loop switch.
 if grep -qF 'disable-model-invocation: true' "$ROOT/skills/update/SKILL.md" \
+   && grep -qF -- 'apply --root "${CLAUDE_PLUGIN_ROOT}"' "$ROOT/skills/update/SKILL.md" \
    && grep -qF 'plain-language-output.md' "$ROOT/skills/update/SKILL.md" \
    && grep -qF 'Run `/reload-plugins`' "$ROOT/skills/update/SKILL.md" \
    && grep -qF 'safeToReload' "$ROOT/skills/update/SKILL.md" \
@@ -467,5 +525,31 @@ if grep -qF 'disable-model-invocation: true' "$ROOT/skills/update/SKILL.md" \
    && ! grep -R -qF 'marketplace remove' "$ROOT/skills/update"; then
   ok "(26) skill is explicit-only, plain, shared with hook, and stops for reload"
 else bad "(26) static update contract drifted"; fi
+
+# 27. A skill's shell gets no CLAUDE_PLUGIN_ROOT: with neither it nor --root the helper uses the
+# copy that holds it, which is the loaded copy when a skill runs it by full path.
+setup_case own-root devstride user 3.0.0 3.1.0 3.1.0
+mkdir -p "$PLUGIN/skills/update/scripts"
+cp "$HELPER" "$PLUGIN/skills/update/scripts/update-plugin.py"
+OUT="$(cd "$REPO" && env -u CLAUDE_PLUGIN_ROOT -u CLAUDE_PROJECT_DIR \
+  python3 "$PLUGIN/skills/update/scripts/update-plugin.py" apply 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called 'claude:plugin update devstride@devstride --scope user'; then
+  ok "(27) no CLAUDE_PLUGIN_ROOT and no --root → the helper's own copy is the loaded copy"
+else bad "(27) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 28. The inert list is only safe while nothing a session runs reads those paths.
+INERT_RE="$(python3 - "$HELPER" <<'PY'
+import importlib.util, re, sys
+spec = importlib.util.spec_from_file_location("h", sys.argv[1])
+h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
+print("|".join([re.escape(n) for n in sorted(h.INERT_FILES)] + [re.escape(d) for d in h.INERT_DIRS]))
+PY
+)"
+RUNTIME_REFS="$(grep -rnE "(PLUGIN_ROOT|ROOT)\}?\"?/($INERT_RE)" "$ROOT/skills" "$ROOT/hooks" 2>/dev/null; \
+  grep -nE "\"\./($INERT_RE)" "$ROOT/.claude-plugin/plugin.json" 2>/dev/null)"
+if [ -n "$INERT_RE" ] && [ -z "$RUNTIME_REFS" ]; then
+  ok "(28) no skill, hook or manifest path reads an inert file"
+else bad "(28) inert list unreadable or referenced at runtime: ${RUNTIME_REFS:-no list}"; fi
 
 exit "$FAIL"

@@ -25,6 +25,14 @@ SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$")
 SCOPES = {"user", "project", "local", "managed"}
 CANONICAL_REPO = "devstride/claude-plugin"
+# Maintainer files no session reads: the root documents and the scripts/ tooling. No skill, hook or
+# manifest references them (scripts/tests/update-plugin.sh pins that), so a commit touching only
+# these ships nothing: it needs no version bump (scripts/check-version-bump.sh imports is_inert) and
+# it does not stop an update from installing the release it follows. Every other path is shipped.
+INERT_FILES = frozenset(
+    {".gitignore", "AGENTS.md", "CHANGELOG.md", "CONTRIBUTING.md", "LICENSE", "README.md", "RELEASING.md"}
+)
+INERT_DIRS = ("scripts/",)
 TOTAL_DEADLINE: Optional[float] = None
 
 
@@ -43,6 +51,18 @@ def emit(payload: dict[str, Any], exit_code: int) -> None:
 
 def real(path: str | Path) -> str:
     return os.path.realpath(os.fspath(path))
+
+
+def is_inert(path: str) -> bool:
+    return path in INERT_FILES or path.startswith(INERT_DIRS)
+
+
+def own_root() -> Optional[str]:
+    # The copy holding this file: <root>/skills/update/scripts/update-plugin.py. A skill's shell
+    # command does not receive CLAUDE_PLUGIN_ROOT (hooks do), and a skill runs this helper by the
+    # loaded copy's full path, so its own location is that copy.
+    parents = Path(__file__).resolve().parents
+    return str(parents[3]) if len(parents) > 3 else None
 
 
 def semver(value: str) -> tuple[int, int, int]:
@@ -454,7 +474,37 @@ def newest_release(cwd: str) -> dict[str, str]:
     }
 
 
-def attest_marketplace(row: dict[str, Any], release: dict[str, str], cwd: str) -> None:
+def shipped_changes(location: str, release_commit: str, head: str, cwd: str) -> Optional[list[str]]:
+    """Shipped paths a later HEAD changes relative to the release, or None when HEAD does not
+    descend from it — a rewritten or diverged history is never 'the release plus maintainer docs'."""
+    code, _, _ = run_command(
+        ["git", "-C", location, "merge-base", "--is-ancestor", release_commit, head],
+        cwd=cwd,
+        timeout=10,
+    )
+    if code != 0:
+        return None
+    # --no-renames: a move out of skills/ must list the shipped path it removes, not only the
+    # inert path it lands on.
+    code, out, _ = run_command(
+        ["git", "-C", location, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z",
+         release_commit, head],
+        cwd=cwd,
+        timeout=10,
+    )
+    if code != 0:
+        raise UpdateProblem("marketplace-checkout-invalid")
+    try:
+        paths = [raw.decode("utf-8") for raw in out.split(b"\0") if raw]
+    except UnicodeDecodeError as exc:
+        raise UpdateProblem("marketplace-checkout-invalid") from exc
+    return sorted(path for path in paths if not is_inert(path))
+
+
+def attest_marketplace(row: dict[str, Any], release: dict[str, str], cwd: str) -> str:
+    """Prove the catalogue checkout serves the release: HEAD is the tag's commit, or a descendant
+    that changes only inert files, so what Claude copies from it ships exactly the release. Returns
+    HEAD, which the re-attestation before mutation must see again."""
     location = real(str(row["installLocation"]))
     checks = (
         (["git", "-C", location, "rev-parse", "--show-toplevel"], "root"),
@@ -471,15 +521,23 @@ def attest_marketplace(row: dict[str, Any], release: dict[str, str], cwd: str) -
         raise UpdateProblem("marketplace-checkout-invalid")
     if values["status"]:
         raise UpdateProblem("marketplace-checkout-dirty")
-    if values["head"] != release["commit"]:
-        raise UpdateProblem(
-            "marketplace-checkout-untagged",
-            expectedCommit=release["commit"],
-            actualCommit=values["head"],
-        )
+    head = values["head"]
+    if head != release["commit"]:
+        shipped = shipped_changes(location, release["commit"], head, cwd)
+        if shipped is None or shipped:
+            raise UpdateProblem(
+                "marketplace-checkout-untagged",
+                expectedCommit=release["commit"],
+                actualCommit=head,
+                descendsFromRelease=shipped is not None,
+                shippedChanges=(shipped or [])[:5],
+            )
+    return head
 
 
 def tagged_payload(row: dict[str, Any], release: dict[str, str], cwd: str) -> dict[str, tuple[str, str]]:
+    """The release's shipped files. Inert files are left out: the install may carry a later
+    commit's copies of them, and nothing a session runs reads them."""
     location = real(str(row["installLocation"]))
     code, out, _ = run_command(
         ["git", "-C", location, "ls-tree", "-r", "-z", release["commit"]],
@@ -507,7 +565,8 @@ def tagged_payload(row: dict[str, Any], release: dict[str, str], cwd: str) -> di
                 or path in entries
             ):
                 raise ValueError
-            entries[path] = (mode, blob)
+            if not is_inert(path):
+                entries[path] = (mode, blob)
     except (UnicodeDecodeError, ValueError) as exc:
         raise UpdateProblem("marketplace-tree-invalid") from exc
     if not entries:
@@ -614,14 +673,14 @@ def _verify_installed_payload(root: str, entries: dict[str, tuple[str, str]]) ->
             relative_dir = os.path.relpath(directory, root)
             for name in list(dirs):
                 path = name if relative_dir == "." else f"{relative_dir}/{name}"
-                if path == ".in_use":
+                if path == ".in_use" or is_inert(f"{path}/"):
                     dirs.remove(name)
                 elif os.path.islink(os.path.join(directory, name)):
                     actual.add(path)
                     dirs.remove(name)
             for name in files:
                 path = name if relative_dir == "." else f"{relative_dir}/{name}"
-                if path != ".in_use" and not path.startswith(".in_use/"):
+                if path != ".in_use" and not path.startswith(".in_use/") and not is_inert(path):
                     actual.add(path)
     except OSError as exc:
         raise UpdateProblem("installed-payload-unreadable") from exc
@@ -843,7 +902,7 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
             raise UpdateProblem("marketplace-changed-during-update", **base)
 
     release = contextual(base, newest_release, repo)
-    contextual(base, attest_marketplace, second_marketplace, release, repo)
+    attested_head = contextual(base, attest_marketplace, second_marketplace, release, repo)
     payload = contextual(base, tagged_payload, second_marketplace, release, repo)
     target = contextual(
         base, marketplace_target, second_marketplace, before["id"].split("@", 1)[0]
@@ -890,7 +949,8 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
     for key in ("name", "source", "repo", "ref", "installLocation"):
         if second_marketplace.get(key) != current_marketplace.get(key):
             raise UpdateProblem("marketplace-changed-during-update", **base)
-    contextual(base, attest_marketplace, current_marketplace, release, repo)
+    if contextual(base, attest_marketplace, current_marketplace, release, repo) != attested_head:
+        raise UpdateProblem("marketplace-changed-during-update", **base)
     if contextual(
         base, marketplace_target, current_marketplace, before["id"].split("@", 1)[0]
     ) != target:
@@ -963,7 +1023,7 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="action", required=True)
     for action in ("inspect", "apply"):
         command = subparsers.add_parser(action)
-        command.add_argument("--root", default=os.environ.get("CLAUDE_PLUGIN_ROOT"))
+        command.add_argument("--root", default=os.environ.get("CLAUDE_PLUGIN_ROOT") or own_root())
         command.add_argument("--repo")
         command.add_argument("--total-timeout", type=float)
     latest = subparsers.add_parser("latest")

@@ -47,4 +47,14 @@ expect "(4) bump without a CHANGELOG heading → refused" 1 "CHANGELOG.md has no
 new_case tooling-only; echo two > "$R/scripts/tool.sh"; check
 expect "(5) maintainer-script change after a release, no bump → ok, not 'already released'" 0 "no bump required"
 
+new_case new-component; printf '{}\n' > "$R/.mcp.json"; check
+expect "(6) a new root-level plugin component without a bump → refused, names it" 1 "without a version bump.*\.mcp\.json"
+
+new_case docs-only; printf 'Current version: **1.0.0** — one clarified sentence\n' > "$R/README.md"
+echo "more history" >> "$R/CHANGELOG.md"; check
+expect "(7) README/CHANGELOG-only change → ok, no bump required" 0 "no bump required"
+
+new_case moved-out; git -C "$R" mv skills/a/SKILL.md scripts/SKILL.md; check
+expect "(8) a skill moved into scripts/ still ships (it leaves the release) → refused" 1 "without a version bump.*skills/a/SKILL.md"
+
 exit $FAIL

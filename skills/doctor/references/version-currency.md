@@ -32,7 +32,8 @@ and reports that. `doctor`, which runs as a skill inside the session, reports wh
 ## Updating — explicit skill or native bootstrap
 
 From 3.1.0, `/devstride:update` resolves the loaded copy, requires the canonical marketplace at the
-newest tag commit, compares the installed files with that tag, and verifies disk again. It may
+newest tag commit (from 3.5.1, or a descendant changing only inert maintainer files), compares the
+installed shipped files with that tag, and verifies disk again. It may
 change a user/project/local install, but never a pin, managed install, or ambiguity. Reload and
 confirm no DevStride load error; restart if reload is unavailable or fails.
 

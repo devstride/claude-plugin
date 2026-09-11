@@ -72,7 +72,7 @@ next action. For each failure symptom, read
   copies to their administrator, and ambiguous copies to Doctor. Explain every result using the
   reference. A verified disk change needs plugin reload (restart only if reload fails).
 - **Repo declaration** — `.claude/settings.json` enables but does not install. Print the one-time
-  `claude plugin install <id>` using its actual `enabledPlugins` id. Always run both
+  `claude plugin install <id> --scope project` with its actual `enabledPlugins` id. Always run both
   `git ls-files --error-unmatch .claude/settings.json` (tracked?) and
   `git check-ignore -v .claude/settings.json` (ignored?); an untracked file reaches nobody.
 

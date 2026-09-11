@@ -11,18 +11,35 @@ merge, and release — against your own repository and your own DevStride organi
 
 ## Install
 
+From the root of each repository you use it in:
+
+```bash
+claude plugin marketplace add devstride/claude-plugin
+claude plugin install devstride@devstride --scope project
 ```
-/plugin marketplace add devstride/claude-plugin
-/plugin install devstride@devstride
-```
+
+**Install at project scope — strongly recommended.** It binds the copy to that repository:
+
+- **The repository governs its own copy.** `plugin.autoUpdate` and `plugin.pin` in its
+  `.claude/ds-config.json` act only on a copy bound to that repository. A machine-wide copy is
+  shared: an update run from any repository changes it for all of them, so no repository's pin can
+  hold it still.
+- **One copy per repository.** A machine-wide copy *beside* a project copy is two installs that both
+  apply, and `/devstride:update` stops rather than guess which to change.
+- **It matches the team rollout** below, where the repository enables the plugin for everyone.
+
+A machine-wide install (`--scope user`, the CLI's default) still works. If you have one beside a
+project install, keep the project copy and remove the other with
+`claude plugin uninstall devstride@devstride --scope user --keep-data` — other repositories on the
+machine then need their own project install.
 
 <details>
 <summary>The shorter <code>ds</code> spelling</summary>
 
 The marketplace carries a second entry, `ds`, pointing at the same plugin:
 
-```
-/plugin install ds@devstride
+```bash
+claude plugin install ds@devstride --scope project
 ```
 
 **It is the same plugin** — same skills, same version, one manifest. `devstride` is the canonical
@@ -43,7 +60,7 @@ actually installed under, so a `ds` install updates with:
 
 ```bash
 claude plugin marketplace update devstride
-claude plugin update ds@devstride
+claude plugin update ds@devstride --scope project
 ```
 
 Running the `devstride@devstride` form against an alias install reports the plugin as not installed —
@@ -69,7 +86,7 @@ You can declare the marketplace and enable the plugin for a whole repository by 
 ```
 
 **This registers and enables the plugin — it does not install it.** Each person still runs
-`claude plugin install devstride@devstride` once on their machine. Worth saying out loud in your
+`claude plugin install devstride@devstride --scope project` once, in the repository. Worth saying out loud in your
 onboarding docs, because the failure is silent: the skills simply are not there, with nothing
 explaining why.
 
@@ -397,7 +414,7 @@ unavailable or fails. Do not invoke another DevStride command first.
 
 ```bash
 claude plugin marketplace update devstride   # refresh the catalog
-claude plugin update devstride@devstride     # upgrade the installed plugin
+claude plugin update devstride@devstride --scope project   # the scope you installed at
 ```
 
 Then run `/reload-plugins` and confirm it reports no DevStride load error; restart Claude Code if
@@ -407,8 +424,8 @@ reload is unavailable or fails. Two things to watch:
   installed through the [short alias](#install). `claude plugin list` shows which you have, and using
   the wrong one reports the plugin as not installed rather than doing nothing visible; the bare plugin name
   reports "not found".
-- It acts on the **user** scope by default. If you installed with `--scope project`, `local` or
-  `managed`, pass the same `--scope` or it will report the plugin isn't installed and change nothing.
+- It acts on the **user** scope by default. The recommended project install needs `--scope project`
+  (likewise `local` or `managed`), or it reports the plugin isn't installed and changes nothing.
 
 Running only the first command is a common mistake — it refreshes marketplace metadata and reports
 success while leaving your installed copy exactly where it was.
@@ -428,7 +445,7 @@ flag — the ref goes in the source itself.
 ```bash
 claude plugin marketplace remove devstride
 claude plugin marketplace add devstride/claude-plugin@devstride--v<version>
-claude plugin install devstride@devstride
+claude plugin install devstride@devstride --scope project
 ```
 
 Every release is tagged, so any version in the [changelog](CHANGELOG.md) is pinnable. To unpin, run
