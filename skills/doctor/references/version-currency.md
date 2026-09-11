@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Version currency — the one recipe
 
 The shared contract for newest-release and installed-version decisions. `doctor` §2 reports it;
@@ -70,3 +73,12 @@ Written on every run:
 
 Absent per-repo file → the check has never run for this repository on this machine: the plugin predates it, hooks are disabled,
 or `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` is set. That is what `doctor` reports.
+
+## Cited by
+
+- `skills/doctor/SKILL.md` §2 — the **Version currency** bullet ("run … use its strict shared tag
+  helper (not Releases) and report installed/newest").
+- `skills/doctor/SKILL.md` §2 — the **Session-start check** bullet, for the per-repository record's
+  schema and for explaining every `result` value.
+- `skills/setup/references/config-defaults.md` — the update-check keys point here for the recipe.
+- `hooks/version-check.sh` — its header names this file as the recipe for "newest release".

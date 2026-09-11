@@ -1,3 +1,6 @@
+---
+load: rationale
+---
 # Release-unit shaping — why the boundary rules are what they are
 
 The rules live in the body's step 2; this file holds the reasoning, read when proposing the
@@ -7,7 +10,9 @@ release-unit breakdown or when a user asks why a boundary is wrong.
 
 The release-unit item is a MECHANICAL release boundary, not just a conceptual one: the delivery
 loop gives each release unit its own integration branch, batches its story merges onto it, and
-when the last story lands cuts the branch → develop release PR through the full review loop. So
+when the last story lands cuts the branch → develop release PR through the full review loop
+(automatically only when `epicIntegrationBranches.autoRelease` is enabled; otherwise it stops at
+release-ready and an owner cuts it). So
 when a release unit's leaves are all Done it SHIPS as one reviewed increment — which is why it
 must deliver real, end-user-visible value ON ITS OWN (a develop merge of "nothing usable yet"
 is a pointless release). Every release unit costs a full review: too many micro release units
@@ -36,10 +41,19 @@ section, where the delivery loop meets them at the release gate instead of redis
 Deferred enhancements, tech debt, compat-shim removals and "harden later" items under a value
 release unit stop it ever reaching zero remaining leaves, so its release can never cut — and
 under frequent promotion that means the release unit never ships or someone hand-waves a
-partial release. A dedicated deferred/cleanup release unit holds them, `blocked_by` edges
-pointing back at the release unit that produced them (a later unit depending on an earlier one
-is the normal direction). A leaf whose theme does not match its release unit is a rehoming
-signal, not a naming problem.
+partial release. So the parking place is a plain container directly under the PLAN ROOT, titled
+by `defects.deferredContainerTitle`, and it is deliberately NOT a release unit: anything the
+loop can cut has to reach zero, and a bucket that fills as fast as it drains never will. The
+same reasoning rules out the edge type. A `blocked_by` edge would splice parked work back into
+the dependency chain — giving it an execution position, an `[N]` number and eventually a build
+agent — which is the opposite of deferring it; a related-to edge records WHICH item's review
+produced the finding without scheduling anything. That is also why the container's children are
+never auto-selected: `build-item` walks the chain, and they are not on it.
+
+Discovered SCOPE is the deliberate exception. A new story that the plan genuinely needs is not
+deferred work — it belongs in the chain, so it splices in through `insert-story` and takes its
+execution number like any other leaf. A leaf whose theme does not match its release unit is a
+rehoming signal, not a naming problem.
 
 ## Cited by
 

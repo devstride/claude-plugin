@@ -74,8 +74,9 @@ from the canonical task/risk route. For a legacy Codex template with a literal
 `model_reasoning_effort`, replace that value for this invocation; do not let stale config pin
 every task to `xhigh`, and do not choose its model for the operator.
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/roster-and-modes.md` when a roster
-resolves to fewer engines than the config declares, or before changing a mode definition** — it
-holds the fully-configured roster table and which paths never ran a Claude pass.
+resolves to fewer engines than the config declares, or before changing a mode definition or a
+deferral route** — it holds the fully-configured roster table and which paths never ran a
+Claude pass.
 
 **REVIEW FIRST, PRE-SHIP SECOND, CI LAST**, held mechanically
 (`review.ciHeldUntilReviewSettled`) — in the
@@ -205,8 +206,8 @@ high-water mark for late body-only findings. Standalone may ask to keep waiting.
 
 Read the actual code before changing anything — never blind-apply a suggestion. A behavioural
 finding whose fix is confirmed by looking names the path it exercised — **"verified X via path
-Y"**, never a bare "verified" — and says which other routes were NOT tried (the verification
-honesty rule in `delivery-loop-invariants.md`). Sort each finding into exactly one bucket:
+Y"**, never a bare "verified" — and says which other routes were NOT tried: a fix confirmed on
+one path proves nothing about the others. Sort each finding into exactly one bucket:
 
 **Dedup guard** — load `lessonsDoc` ONCE at this step's entry (absent/empty → skip the guard; a
 valid state). As each finding lands in CONFIRMED/PLAUSIBLE, test it against the stored lessons
@@ -226,12 +227,11 @@ entry points, no second opinion. REFUTED findings never bump a lesson.
   read from every verdict's **likelihood** and **impact**; security is material by definition.
 - **CONFIRMED/PLAUSIBLE, in scope, BELOW the floor** → not fixed this cycle. Defer with a
   one-line POSTED rationale — to the owning item, else the untracked-deferral list (driven) or
-  a named offer of `/devstride:insert-defect` (standalone) — or dismiss where the contract says
-  so. A below-floor finding that vanishes without a rationale is indistinguishable from a
-  missed one.
+  a named offer of `/devstride:create-defect deferred <item#>` (standalone; `<item#>` = the
+  item under review) — or dismiss where the contract says so.
 - **CONFIRMED/PLAUSIBLE, out of scope, no tracked item** → CAPTURE (driven: the
-  untracked-deferral list; standalone: name it and offer `/devstride:insert-defect` /
-  `insert-story`). Left as PR prose it is invisible to the loop forever.
+  untracked-deferral list; standalone: name it and make that same deferred offer for a defect,
+  `insert-story` for discovered scope).
 - **Genuinely ambiguous / risky / unverifiable** → ask. The only bucket that stalls a run.
 
 ## 5. Fix and push

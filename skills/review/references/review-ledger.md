@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Review ledger — one cumulative handoff across every engine and cycle
 
 `review` keeps one cumulative uncommitted ledger per review run under

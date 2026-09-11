@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Detector evidence — why each rule in Phase A is shaped the way it is
 
 The rules live in the body; this file holds the evidence and the failure stories behind them, per
@@ -13,6 +16,21 @@ knows the test command, git knows the branches, `PATH` knows which review engine
 corollary matters as much as the rule: a wrong detected value arrives wearing the authority of
 evidence, and the user accepts it without reading — which is why `unknown` is an honest answer
 and never a failure.
+
+## A1 — a config whose base branch is not the branch you are on
+
+`.claude/ds-config.json` describes the repository as its maintainer left it: the branch roles, the
+verify commands, the workflows that exist. Check that config out on a stale branch and every one of
+those statements is about a repository that no longer exists — usually an older, smaller one. Phase
+A then inspects the stale tree, Phase B reports it as evidence, and Phase E/F writes the result
+back over the maintained file. Nothing errors; the config simply regresses, and the diff looks like
+ordinary detection.
+
+The tell is cheap and available before any inspection runs: a config is present, its `baseBranch`
+resolves on `origin`, and HEAD is on something else. That is not proof of a mistake — a legitimate
+setup re-run happens on a topic branch all the time — which is why the body's rule is to *say so
+and offer to switch*, not to switch or to refuse. The switch offer is placed before the detectors
+because after them the wrong answers are already in the summary, wearing the authority of evidence.
 
 ## A2 — two lockfiles, and the placeholder trap's cousin
 
@@ -159,8 +177,9 @@ block written with `resolve: null` records that somebody looked, which an absent
 
 ## Cited by
 
-- `skills/setup/SKILL.md` — the Phase A pointer (run A5/A6, explain an `ambiguous` row, change a
-  detector), A5's traps line (§A5), A6's enumeration line (§A6), A6's path-table line, and A10's
-  candidate-shape line (§A10).
+- `skills/setup/SKILL.md` — the Phase A pointer, which addresses this file by section: A5's traps
+  line (§A5), A6's enumeration and path-table lines (§A6), A10's candidate-shape line (§A10), and
+  the whole file before changing a detector. An `ambiguous` result sends the reader to
+  `detector-evidence.digest.md` instead; §A1 backs A1's stale-branch rule.
 - `skills/doctor/SKILL.md` §5 — the four-events evidence citation (§A5).
 - `skills/doctor/references/silent-failures.md` §5 — the same citation (one home, two citers).

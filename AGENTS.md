@@ -41,6 +41,10 @@ paths individually) rather than trusting a single root-level run.
   declaring in `plugin.json`.
 - Shared reference docs belong to the skill that owns them (`skills/<name>/references/`), not to
   a repo-level directory.
+- `hooks/` holds `hooks.json` and the two hook scripts it registers: `version-check.sh`
+  (SessionStart) and `session-gate.sh` (UserPromptSubmit). Both fail open and never block a
+  session by accident. Skill-owned helpers live under `skills/<name>/scripts/` and are run by
+  the skill's text, never read as context.
 - `scripts/` holds repo-level maintenance scripts (`validate.sh`, `measure-cost.sh`, their tests).
   Nothing at runtime reads them and the plugin loader ignores the directory — it is not a
   component directory, and it must not move under `.claude-plugin/`.

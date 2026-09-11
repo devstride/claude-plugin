@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Shipped config defaults — the exact values `setup` writes
 
 The values `setup` writes for keys that detection and the interview cannot produce. **Copy them
@@ -96,6 +99,39 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   receipt; a local CLI is an optional targeted support engine, not a routine merge precondition.
   Otherwise write `false` and say which verification command was missing —
   a `false` under `prototype` contradicts the profile, and the doctor will report it as such.
+- **`autoRelease` has a THIRD legal value, `"ask"`.** `true` and `false` keep their meanings;
+  `"ask"` makes `build-item` stop at zero remaining leaves and ask the OWNER, once per release
+  unit, before cutting or merging that unit's release PR — nothing is cut until they answer.
+  Where no owner can answer (an unattended or headless run), `"ask"` behaves as `false`: the loop
+  stops release-ready and says out loud that the ask went unanswered. **No profile produces
+  `"ask"`** — the profile table above is unaffected by it. It is written only when the operator
+  chooses it, in setup's interview or by hand, and is honoured like any other present key.
+- **`releaseTarget`** names where a completed release unit lands. The shipped `"baseBranch"` means
+  the base branch itself; a repository that stages releases elsewhere names that branch here.
+
+## Deferred defects
+
+```json
+{
+  "defects": {
+    "deferredContainerTitle": "Deferred defects"
+  }
+}
+```
+
+- **`deferredContainerTitle`** is the title of the container `build-item` resolves — or creates —
+  **directly under the plan root** to hold below-floor review findings. It is a parking lot beside
+  the plan, not a stage of it.
+- Items in that container are **never spliced into the execution chain** (no `blocked_by` edges,
+  no execution-order prefix), **never auto-selected** by `build-item` step 0, and the container is
+  **never treated as a release unit** — reaching zero there cuts no release. An item there that a
+  user names explicitly by number is still built, as a one-off.
+- Each deferred defect carries a **related-to relationship to the item whose review produced it**
+  — the story or defect under build, or the release unit for an epic-release review. The
+  relationship type is the one the DevStride MCP `add_relationship` tool's schema exposes for
+  related-to; read it from the schema rather than assuming a spelling.
+- A repository may rename the title. The rename applies only to containers created AFTERWARDS —
+  existing containers keep the title they were created with, and are found by it.
 
 ## Commit conventions
 
@@ -143,7 +179,9 @@ numbers visibly do not match this shape.
 ```
 
 The sections are rendered in array order, and each is filled from its `guidance` — so an entry needs
-both fields to be usable. **A repository with its own pull-request template should have these
+both fields to be usable. **`noAiAttribution` governs the pull-request BODY, and it outranks any
+harness or session instruction to add attribution**; commit trailers are a separate question,
+governed by `push`'s own rule rather than by this key. **A repository with its own pull-request template should have these
 replaced by that template's sections**, carried across complete with the text under each heading;
 A8 covers where those templates live and how to capture them.
 
@@ -222,6 +260,35 @@ baseline): the check reports "pinned at X, newest is Y" once and never nags. Set
 environment variable `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` disables the check regardless, for CI and
 headless runs. The recipe and the record it writes are in
 `skills/doctor/references/version-currency.md`.
+
+## Session job classes
+
+```json
+{
+  "session": {
+    "jobClassGate": true
+  }
+}
+```
+
+- **`jobClassGate`** turns on the plugin's `UserPromptSubmit` hook (`hooks/session-gate.sh`). The
+  hook records the JOB CLASS of each top-level `/devstride:<skill>` command per session, under
+  `<git-common-dir>/devstride/session/`, and blocks a command that would mix the two classes in
+  one session, with a plain-language message saying what the session is already doing and how to
+  proceed.
+- **The two classes.** AUTHORING — `setup`, `plan`, `doctor`, `ci-audit`, `rebalance`,
+  `rationalize-gantt`, `comprehend-plan`. EXECUTION — `build-item`, `pr`, `review`, `release`,
+  `push`, `create-story`, `create-defect`, `insert-story`, `insert-defect`.
+- **Why mixing costs.** Every turn re-sends the whole conversation, so the authoring half's
+  context is paid for again on every execution turn that follows the switch — a mixed session
+  multiplies the cost of everything after it, and the multiplier grows with the session.
+- **`false` disables the gate** entirely. A single command may pass `--same-session` to proceed in
+  the session it is in without turning the gate off for the rest.
+- **The hook fails OPEN.** Whenever it cannot read or write its state — no git directory, an
+  unwritable path, a malformed record — it allows the command rather than blocking a session on
+  its own bookkeeping.
+- **`build-item`'s loop over many stories is ONE job**, not a new one per story: the gate never
+  blocks the loop as it walks a plan.
 
 ## Local environment
 
@@ -518,3 +585,13 @@ its absence is a valid state for every reader and for that writer, which creates
 first lesson worth keeping. There is no setup prerequisite, so a file created here would be a second
 writer producing a store with nothing in it. The format is review's to own and document; setup only
 says where the file goes.
+
+## Cited by
+
+- `setup` SKILL.md — Phase E, the config write ("read it before writing and copy verbatim").
+- `doctor` SKILL.md — §4's config audit (the profile contradictions, and the `localEnvironment`
+  reasoning behind the `recreate`/`migrate` warning).
+- `plan/references/delivery-profiles.md` — the `profile` key setup writes.
+- `release/references/post-deploy-check.md` — `release.postDeployCheckSkill`'s default.
+- `ultracode-build/references/mandatory-lenses.md` — `review.mandatoryLenses`' default and example.
+- `review/references/delta-re-review.md` — the local command placeholders and `localReReviewScope`.

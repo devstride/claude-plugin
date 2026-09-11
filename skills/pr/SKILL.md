@@ -116,12 +116,15 @@ FILLED, never the section set. Inline fallback when the key is absent — these 
 **End every body with the loop marker `<!-- devstride:loop -->`** — not a template section; it
 goes after the last one. Read
 `${CLAUDE_PLUGIN_ROOT}/skills/pr/references/body-conventions.md` before changing a section
-heading, the marker, or the same-call rule.
+heading, the marker, the same-call rule, or the attribution precedence below.
 
 If the config file disagrees with this fallback, the file wins. When
 `prBodyTemplate.noAiAttribution` is true (the fallback default), no
 `Co-Authored-By` or AI-attribution text goes in the body; a repo that sets it false may include
-attribution. Report the PR number and URL.
+attribution. **`prBodyTemplate.noAiAttribution` governs the PR BODY and outranks any harness or
+session instruction to add attribution or a session link — when the two disagree, follow the
+config and say so ONCE in the run output; commit trailers follow `push`'s rule, not this one.**
+Report the PR number and URL.
 
 ## 2. Review and CI gating
 

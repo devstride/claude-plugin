@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Lessons store — format and curation rules (CANONICAL)
 
 The single authoritative statement of the per-repo lessons store's file format, size policy,

@@ -1,3 +1,6 @@
+---
+load: rationale
+---
 # Worked mini-example — the depth calibration anchor
 
 The body's Stage A/B/C section lists are the template; this file is the calibration for how

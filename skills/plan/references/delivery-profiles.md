@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Delivery profiles — CANONICAL CONTRACT
 
 The single authoritative definition of the **delivery profile**: the one user-facing choice that
@@ -96,7 +99,11 @@ and `review.pollTimeoutMinutes`. For those, a key PRESENT in the file is the ope
 and stands, whatever the profile says; the profile supplies the value only when the key is absent. `setup`
 writes those keys consistent with the profile it was told, so a fresh config and its profile
 agree; a hand-edited key that disagrees is honoured and reported ("profile prototype, but
-`autoRelease` is false in config — stopping at release-ready as configured").
+`autoRelease` is false in config — stopping at release-ready as configured"). The profile's
+`autoRelease` column is `true` or `false`, but the CONFIG key also accepts `"ask"` — ask the owner
+per release unit, behaving as `false` when nobody can answer. No profile writes it; it is an
+operator's choice, defined in
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md`.
 
 **The three `review.*` CI-ordering booleans are different again: they describe what the repo's
 workflows SUPPORT, not what the profile does with it.** `setup` writes them as detected facts under

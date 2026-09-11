@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Merge-boundary adversarial review — CANONICAL PROCEDURE
 
 Run the full adversarial pass once where a diff can merge into a protected or release branch:

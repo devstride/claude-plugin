@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Execution-order numbering — CANONICAL CONVENTION
 
 The single authoritative definition of the bracketed `[N]` execution-order prefix in leaf

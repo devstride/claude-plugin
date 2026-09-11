@@ -93,6 +93,16 @@ paste variants into every skill.
   … when you declare a PRE-SHIP HOLD") and a maintenance pointer ("Read … before changing this
   rule") for pure rationale no runtime step needs. A reference must be REACHABLE from a root an agent reads — its own pointer, or a citation
   from a reachable reference — or the invariants file's dead-reference check fails it.
+- **Load mode.** Every flat reference opens with a `load:` frontmatter field, the first thing an
+  agent reading it sees, and `measure-cost.sh --check` fails without one. `contract`: the citing
+  skill copies its strings literally (config keys and defaults, table rows, formats, exact commands,
+  pattern letters) — cite the section the step needs and read that section in full, never a
+  summary. `rationale`: consulted for one question; a digest may stand in. `digest`: a stand-in of
+  400 words or fewer beside a large rationale or mixed file, named by the owner's `digest:` field,
+  answering the question the citing step actually asks and keeping the owner's section anchors so
+  the reader knows which full section to open. `tooling`: read by scripts and maintainers, never
+  at runtime — nothing at runtime should cite it. Of the nine references at or above 8 KB, seven
+  are contracts and one is tooling; the size of a file says nothing about how it must be read.
 - **Naming and placement.** kebab-case, one topic per file, named for what the reader is looking
   for (`progress-table.md`, `detector-evidence.md`), never `notes.md`/`misc.md`; flat under the
   owning skill's `references/`; addressed only by the `${CLAUDE_PLUGIN_ROOT}` path, never a
@@ -147,8 +157,21 @@ dead-reference loop (a reference no root can reach fails) and the budget check
 (`measure-cost.sh --check`). It is a maintenance instrument, not an operating rule — nothing
 at runtime reads it. Treat a missing
 needle as a prompt to go and look, never as proof of loss: wording legitimately changes, and the
-check cannot tell a rewrite from a deletion. The file is candid about the two further things it
-cannot prove.
+check cannot tell a rewrite from a deletion. The file is candid about the four limits it
+cannot overcome.
+
+## Scripts a skill runs instead of text it reads
+
+A check an agent can only eyeball in prose belongs in a script the skill runs: scripts are
+"executed, not loaded", so they cost no body tokens, they can be tested, and their output is the
+same every time. `skills/setup/scripts/check-review-engine.sh` is the model — setup check 3 and
+doctor §6 each spend one sentence to run it, and `scripts/tests/check-review-engine.sh` pins every
+command template the engine catalogue ships to pass it. A hook is the same idea at the harness
+level: `hooks/session-gate.sh` enforces one job class per session from a `UserPromptSubmit` hook
+rather than from a step 0 in twenty bodies, and fails open. Every script under `hooks/`,
+`scripts/` and `skills/*/scripts/` gets `bash -n` in `validate.sh`; every test under
+`scripts/tests/` is auto-discovered by `run.sh`; a new hook script must also be added to the
+executed-files tuple in `measure-cost.sh`.
 
 ## Repo conventions
 

@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # GitHub review-API reference — exact queries, and the traps behind each rule
 
 Read this when executing a step that touches the GitHub review APIs. `SKILL.md`

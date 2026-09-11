@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # The adaptive reviewer wait — how the bound is learned, and why
 
 `review` step 2 waits for the cloud reviewers it registered. Before this, the wait was one

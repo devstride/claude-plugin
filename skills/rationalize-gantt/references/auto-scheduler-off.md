@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Organization-wide dependency auto-scheduler (Enable Link Mode) — CANONICAL RULE
 
 The single authoritative rule for the auto-scheduler check that must precede any date or

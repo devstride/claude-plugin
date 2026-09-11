@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # CI cost patterns — the workflow mechanics behind "run CI once, at the end"
 
 Every delivery profile has the same floor: expensive CI runs **once per pull request, on the

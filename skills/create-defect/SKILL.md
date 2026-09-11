@@ -1,17 +1,17 @@
 ---
 name: create-defect
-description: Create a one-off Defect (inbound bug report / ad-hoc fix not in a sequenced plan), place it in the map + on a board, assign it to the current user, then deliver it end-to-end via the build-item build loop — single-shot, no plan loop
+description: Create a Defect (inbound bug report / ad-hoc fix not in a sequenced plan), place it in the map + on a board, assign it to the current user, then deliver it end-to-end via the build-item build loop — single-shot, no plan loop; `deferred <item#>` instead parks a review finding under the plan root's deferred-defects container, never built
 ---
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
 Create a NEW one-off Defect (the one-day leaf role — this org's Defect type) — an inbound bug report or ad-hoc fix that is NOT part of a sequenced `/devstride:plan` roadmap — file it where you want in the DevStride map, put it on a board, assign it to the current user, then deliver it end-to-end with the SAME build loop `/devstride:build-item` runs, exactly ONCE (no plan walk, no next-story selection, no dependency chain). Use **`/devstride:insert-defect`** instead when the fix belongs in an existing sequenced plan's dependency chain — that one splices + numbers + lets the loop pick it up in order; this one is a standalone create + single build.
 
-Argument — free text describing the defect, optionally prefixed/suffixed with a parent item or workstream number (e.g. `I20100 webhook retries duplicate on 429`, `F42 ...`, or just `webhook retries duplicate on 429`): $ARGUMENTS
+Argument — free text describing the defect, optionally prefixed/suffixed with a parent item or workstream number (e.g. `I20100 webhook retries duplicate on 429`, `F42 ...`, or just `webhook retries duplicate on 429`) — a leading `deferred <item#>` selects DEFERRED placement instead: $ARGUMENTS
 
 IMPORTANT — the DevStride MCP targets PRODUCTION (`api.devstride.com`). Every create/update here is a real, user-visible change to the live workspace — there is no draft/sandbox mode.
 
-This skill has two phases: **(A)** CREATE + PLACE the item interactively (steps 0–1), then **(B)** DELIVER it by invoking `build-item` in its one-off mode (step 2). Phase B is the EXACT same branch → build → review → PR → merge → completion ritual the plan loop uses — the only difference is it runs once and is not part of a sequenced plan.
+This skill has two PLACEMENT modes. **ONE-OFF** (the default, steps 0–2) has two phases: **(A)** CREATE + PLACE the item interactively (steps 0–1), then **(B)** DELIVER it by invoking `build-item` in its one-off mode (step 2). Phase B is the EXACT same branch → build → review → PR → merge → completion ritual the plan loop uses — the only difference is it runs once and is not part of a sequenced plan. **DEFERRED** (the "D" section below) replaces steps 0–2 entirely: park the defect under the plan root, relate it back, and STOP — no build. Decide the mode FIRST.
 
 ## 0. Gather placement + assignment — ask at the OUTSET, do not guess
 
@@ -44,7 +44,41 @@ Once you have a real repro/root-cause, pin these down (inbound work has no natur
 - `build-item` then runs the identical build loop — mark In Progress → `branch-feature` → `ultracode-build` → `pr` (+ `review`) → merge → completion ritual → sync develop — and TERMINATES after this one item. Do not re-spell those phases here; `build-item` and its composed sub-skills own them.
 - If the fix surfaces genuine out-of-scope follow-ups, capture each as ITS OWN one-off item (`/devstride:create-defect` or `/devstride:create-story`) or note it on the item — there is no plan chain to splice into via `insert-*`.
 
+## D. DEFERRED placement — park a review's finding, never build it now
+
+Enter this mode INSTEAD of steps 0–2 when `build-item` step 6.5 invokes this skill in DEFERRED
+placement, or when `$ARGUMENTS` says `deferred` together with the item number the finding was
+found against (e.g. `deferred I20431 retry loop double-counts on 429`). It applies under EVERY
+delivery profile.
+
+- **Resolve the plan root.** `get_item` with `view: "full"` on the named item and walk its
+  hierarchy UPWARD to the top-most item under the portfolio. That root — not the named item's
+  own parent — owns the container.
+- **Find or create the container.** Read `defects.deferredContainerTitle` from the repo's
+  `.claude/ds-config.json` (fallback: `Deferred defects`) and look for a DIRECT child of the
+  root whose title equals it. Reuse it if it exists; never create a second one. If it is
+  absent, create it with the work type the org's hierarchy requires directly under the root
+  (resolve with `get_work_type_hierarchy`, and create every intermediate level the
+  `parentWorkTypeId` chain requires between the root and it).
+- **Create the defect** with `create_item`: `parentNumber` = that container, `isBug: true`,
+  `title` + `description` written as the same honest repro/root-cause spec step 1 requires.
+  NO execution-order `[N]` prefix and NO `blocked_by`/`blocks` edge in either direction — the
+  container is not a release unit the loop ever cuts, and a parked defect must never be
+  selected by `build-item` nor keep a release unit from reaching zero remaining leaves.
+- **Relate it back.** `add_relationship` from the new defect to the item the finding was found
+  against — the story or defect under build, or the release unit for an epic-release review —
+  using the relationship type the `add_relationship` schema exposes for related-to; read the
+  schema, never assume the literal.
+- **Skip the placement interview.** No board, lane, priority or assignee questions: this mode
+  normally runs unattended inside a build loop. Set any of them only if a user is present and
+  asks for it.
+- **SKIP phase B.** NEVER invoke `build-item` for a deferred defect — deferral means it is not
+  being built this cycle. Report the created number, its title, the container it landed in, and
+  the related-to target, then STOP.
+
 IMPORTANT:
+- DEFERRED placement never splices, never numbers, and never builds; ONE-OFF placement builds
+  exactly once. Neither wires a dependency edge.
 - Use **`/devstride:insert-defect`** (not this) when the fix belongs in a sequenced plan — it splices into the dependency chain, numbers it, and lets `/devstride:build-item` pick it up in order. This skill is for standalone inbound/ad-hoc bug reports.
 - Ask for placement (parent + board) and confirm the assignee at the OUTSET — never guess a home for inbound work.
 - One-off items get NO execution-order number and NO dependency edges — they are not part of a cascade, so `rationalize-gantt` is not run for them.

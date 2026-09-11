@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Phase 2 — what doctor may repair, and what it must only report
 
 Phase 1 only diagnoses; Phase 2 offers fixes. These tiers are fixed—never improvise eligibility.
@@ -104,3 +107,21 @@ transient/reported elsewhere. Silence means “do not know”: leave it unchange
   repair that fails stops itself, not the batch.
 - **Non-interactive invocation → no repairs.** Print the list as a recommendation. Doctor is called
   by other skills; none of them consented to a write.
+
+## Why the two closing prohibitions are absolute
+
+**Never emit an unconfirmed command.** A confidently wrong command is worse than no suggestion at
+all, because a report carries enough authority that it will be trusted, and the run it wastes is
+the run the fix was meant to save. Confirming flags with `--help` before printing costs one call.
+
+**Never widen the tiers in the moment.** The classification *is* the safety property; it is not a
+starting point to be reasoned past. Widening it because a particular fix looks obviously right is
+exactly how a diagnostic becomes a thing nobody dares run first — and a diagnostic nobody runs
+first protects nothing. This holds in both phases: during Phase 1 nothing is repaired at all, and
+in Phase 2 only what is listed above.
+
+## Cited by
+
+- `skills/doctor/SKILL.md` — the Phase 2 clause of the two-phase contract ("First read … its
+  eligibility tiers are fixed") and the Closing section ("Only then follow `references/repairs.md`").
+- `skills/doctor/SKILL.md` — the closing IMPORTANT list, whose two prohibitions are explained here.

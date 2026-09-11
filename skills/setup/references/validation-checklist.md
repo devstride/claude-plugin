@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Validation checklist — the checks, and what each failure means
 
 The checks Phase G runs, and a failure-mode table: what the user sees, what usually causes it, and
@@ -33,7 +36,11 @@ names them — a verdict that hides a skipped test suite is claiming more than i
    authenticated for that host. Checked unconditionally: the delivery half cannot push, open a pull
    request or merge without them.
 3. **Declared review engines** — the local CLI is invocable; the cloud reviewer's host is
-   authenticated and the repository readable. Only what the config declares is checked.
+   authenticated and the repository readable. Only what the config declares is checked. Each
+   declared `review.localCommand` / `review.localAssistCommand` is also put through
+   `${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/check-review-engine.sh`, whose lines are reported
+   verbatim: a catalogued engine missing its read-only flag is a `FAIL` (the reviewer can write to
+   the tree it reviews), an uncatalogued engine is `UNVERIFIABLE` and held to the contract only.
 4. **Work-type roles** — every name in `hierarchyRoles` still resolves in the organization.
 5. **Lessons store** — the `lessonsDoc` parent directory exists and is writable. **A missing file is
    the normal state**; the review skill creates it on the first lesson.
@@ -90,6 +97,9 @@ names them — a verdict that hides a skipped test suite is claiming more than i
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | A declared local CLI does not respond | Not installed, or installed as a shell alias a non-interactive shell never loads | Install it so it is on `PATH`, or set `review.localCommand` to `null` — the roster degrades to the built-in adversarial pass, which is a legal configuration |
+| `MISSING READ-ONLY FLAG` | A hand-written or pre-3.0 command without the engine's sandbox flag. The engine's own default then applies, which may be full write access — a reviewer that can edit the tree it is reviewing | Add the exact flag for that engine: `codex exec` → `--sandbox read-only`; `codex review` → `-c sandbox_mode=read-only` (it refuses `--sandbox`); `codex exec review` → `-c sandbox_mode=read-only`, or `-s read-only` before the subcommand. Or take the catalogued template from `review-engines.md` |
+| `SANDBOX DISABLED` | The command carries a bypass flag (`--dangerously-bypass-approvals-and-sandbox`, `--full-auto`, or `sandbox_mode=danger-full-access`) | Remove it. Nothing about a review needs it, and the flag is unambiguous wherever it appears — the reviewer can write to the tree it reviews |
+| `SANDBOX WIDENED` | A sandbox flag is present but set above read-only (`--sandbox workspace-write`) | Set it to `read-only`. Write access is not what makes a reviewer better; it is what lets one leave files behind in the tree under review |
 | `gh auth status` fails | Signed out, or authenticated against a different host than the repository's | `gh auth login` for the right host. If auth comes from `GH_TOKEN`/`GITHUB_TOKEN`, `gh auth refresh` cannot help — reissue the token |
 | Repository read fails while auth succeeds | The token's scopes are short, or it has no access to this repository | `gh auth refresh -s repo,read:org` (add `workflow` if the loop will edit workflow files) |
 | A cloud review never arrives on a real pull request, though this check passed | **This check cannot catch that** — see below | Confirm the reviewer is enabled for the repository and the account is entitled to it |
@@ -141,3 +151,8 @@ bend for a helpful one-line change to somebody's CI. Validation itself writes no
 | The skill has no `check` mode | Hand-written before the contract, or the mode was removed | Rebuild it from `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/docs-skill-templates/`, keeping the repository's own sections |
 | `release.docsRepo` is present (with or without a `docs` block) | The config predates 1.0 | Run `/devstride:setup docs`: it scaffolds the local skills from the block's values, writes `docs.*`, and removes `docsRepo` |
 | Release notes were requested and nothing happened | `docs.releaseNotesSkill` is `null` — the owner said this repository does not publish notes | Nothing to do, or run `/devstride:setup docs` to register one |
+
+## Cited by
+
+- `skills/setup/SKILL.md` — the Phase G pointer ("Read … when you run this phase"), which maps
+  every failure to a row here rather than improvising one.

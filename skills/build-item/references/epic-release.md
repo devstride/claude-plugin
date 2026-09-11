@@ -1,3 +1,6 @@
+---
+load: rationale
+---
 # The epic release, and the one-off bypass — why they are shaped this way
 
 The rules live in the body (step 8, and the one-off mode section); this file holds the
@@ -14,6 +17,37 @@ cost quality, and the full-diff scope at step 8 is where it is prevented — now
 the stories took the full 4b ritual instead, each was already cloud-reviewed at its own PR, so
 the release review points at what per-story review could not see: the cross-story integration
 surface and the develop-merge conflict resolutions.
+
+## Why stories merge into the integration branch, and why `--no-ff`
+
+A story that merged straight to the base branch would put half a release unit on the shared dev
+stage; batching onto the release unit's integration branch leaves that stage untouched until the
+unit is complete and reviewed as one PR. Each story goes in with `--no-ff` because the merge
+commit is the legible first-parent unit the release PR body and the close-out counts are read
+off — a fast-forward would dissolve the batch into indistinguishable commits.
+
+## Why the story branch is deleted only after the epic push succeeds
+
+A rejected push of the integration branch means the story's merge exists only locally. Deleting
+the remote story branch at that moment destroys the sole remote copy of the work, so the deletion
+waits on a push that actually succeeded — local and remote together, never the remote first.
+
+## Why deferred defects live beside the plan, not inside its chain
+
+An out-of-scope or below-floor finding that lives only in a PR body is invisible to every later
+selection, so it has to become a tracked item. But WHERE it is tracked decides whether it is also
+execution order. A below-floor defect spliced into the dependency chain with `blocked_by` edges is
+work the loop must build before the plan can reach zero: the plan never finishes, and the finding
+that was explicitly deferred is not deferred at all. Under a light profile, where the fix floor
+defers most of what review confirms, that turns one plan into an open-ended queue of defects
+nobody chose to schedule.
+
+So deferred defects go into a container of their own directly under the plan root, related to the
+item whose review produced them and blocked by nothing. The container is deliberately NOT a
+release unit: a parking lot that later reached zero remaining leaves would trip the auto-release
+decision and cut a release PR for work that was parked, not planned. Items in it are tracked,
+visible and re-schedulable by a human — which is what deferring is supposed to mean — and an
+explicitly named one can still be built as a one-off.
 
 ## Why docs stage rather than publish
 
@@ -52,3 +86,6 @@ full 4b ritual under every profile, and why fast mode is never available to it.
 - `skills/build-item/SKILL.md` — the step-8 pointer ("Read … when step 7 reports the release
   unit at zero") and the one-off section's pointer ("Read … before changing the one-off
   classification or its step-0 delta").
+- `skills/build-item/SKILL.md` — the working-base note on why stories merge into the integration
+  branch, step 5a's story-branch deletion, step 6.5's below-floor defect placement, and step 8's
+  `live: false` / no-release-notes rules, each citing this file with "(why: …)".

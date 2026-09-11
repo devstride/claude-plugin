@@ -1,3 +1,6 @@
+---
+load: rationale
+---
 # Roster and modes — the reasoning and the reference tables
 
 The rules live in the `review` body; this file holds the fully-configured roster table, the
@@ -62,7 +65,24 @@ at-most-once-per-cycle rule exists precisely to stop a re-matched finding inflat
 invocation carries into the resumed one's report rather than being recomputed, for the same
 reason.
 
+## Why a deferral must leave a trace, and where it goes
+
+A below-floor finding that vanishes without a posted rationale is indistinguishable from a
+finding nobody ever looked at: the next reviewer re-raises it, or nobody does. The same applies
+to an out-of-scope capture — left as PR prose it is invisible to the loop forever, because
+nothing downstream reads a PR comment looking for work.
+
+The route differs by what the finding IS. A defect goes to `create-defect` in DEFERRED
+placement, which parks it in a container directly under the plan root and records a related-to
+edge back to the item whose review produced it — no `blocked_by`, no execution-order number, so
+no build agent ever picks it up and no release unit is held away from zero remaining leaves by
+work that was explicitly deferred. Discovered SCOPE is the exception: a story the plan actually
+needs belongs in the dependency chain, so it splices in through `insert-story`. Driven runs
+hand both kinds back on the untracked-deferral list instead of filing them inline, because
+`build-item` step 6.5 is the single place that files them — one writer, one shape.
+
 ## Cited by
 
 - `skills/review/SKILL.md` — the pointer after the roster announcement ("Read … when a roster
-  resolves to fewer engines than the config declares, or before changing a mode definition").
+  resolves to fewer engines than the config declares, or before changing a mode definition or a
+  deferral route").

@@ -103,4 +103,22 @@ python3 -c 'import sys; open(sys.argv[1],"a").write("x"*12000)' "$TMP/repo/skill
 OUT="$(/bin/bash "$TMP/repo/scripts/measure-cost.sh" --check --budgets "$TMP/high.json")"; RC=$?
 if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^HARD-OVER skills/pr/SKILL.md'; then ok "(n) body growth beyond hard ceiling is rejected"; else bad "(n) expected HARD-OVER, got rc=$RC: $OUT"; fi
 
+# (o) every flat reference declares how it must be loaded; a digest is capped at 400 words
+mkdir "$TMP/repo-o" && tar --exclude=.git -cf - -C "$ROOT" . | tar -xf - -C "$TMP/repo-o" || { bad "(o) could not copy the repo"; exit 1; }
+python3 - "$TMP/repo-o/skills/review/references/ci-settle.md" <<'PY2'
+import sys; p=sys.argv[1]; s=open(p).read(); open(p,"w").write(s.replace("load: contract\n","",1))
+PY2
+OUT="$(/bin/bash "$TMP/repo-o/scripts/measure-cost.sh" --check --budgets "$BUD" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^NO-LOAD-FIELD skills/review/references/ci-settle.md'; then ok "(o) a reference without load: is rejected"; else bad "(o) expected NO-LOAD-FIELD, got rc=$RC: $OUT"; fi
+python3 - "$TMP/repo-o/skills/review/references/ci-settle.md" <<'PY2'
+import sys; p=sys.argv[1]; s=open(p).read(); open(p,"w").write("---\nload: digest\n---\n" + ("word " * 401))
+PY2
+OUT="$(/bin/bash "$TMP/repo-o/scripts/measure-cost.sh" --check --budgets "$BUD" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^DIGEST-TOO-LONG skills/review/references/ci-settle.md 401 words'; then ok "(o2) a digest over 400 words is rejected"; else bad "(o2) expected DIGEST-TOO-LONG, got rc=$RC: $OUT"; fi
+python3 - "$TMP/repo-o/skills/review/references/ci-settle.md" <<'PY2'
+import sys; p=sys.argv[1]; open(p,"w").write("---\nload: contract\ndigest: ci-settle.digest.md\n---\n# x\n")
+PY2
+OUT="$(/bin/bash "$TMP/repo-o/scripts/measure-cost.sh" --check --budgets "$BUD" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^DIGEST-MISSING skills/review/references/ci-settle.md names ci-settle.digest.md'; then ok "(o3) a digest: field naming a missing file is rejected"; else bad "(o3) expected DIGEST-MISSING, got rc=$RC: $OUT"; fi
+
 exit $FAIL
