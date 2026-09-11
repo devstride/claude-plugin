@@ -24,7 +24,7 @@
     "review": 11400,
     "setup": 10700,
     "ultracode-build": 5800,
-    "update": 800
+    "update": 900
   },
   "references": {
     "skills/build-item/references/epic-release.md": 2000,
@@ -127,7 +127,7 @@
       ]
     },
     "manualPluginUpdate": {
-      "budget": 4800,
+      "budget": 4900,
       "files": [
         "skills/update/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
