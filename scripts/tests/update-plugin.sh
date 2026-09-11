@@ -538,6 +538,26 @@ if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
   ok "(27) no CLAUDE_PLUGIN_ROOT and no --root → the helper's own copy is the loaded copy"
 else bad "(27) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
+# 29. A linked worktree of the bound repository is that repository for a PROJECT install: the
+# update proceeds and runs in the bound checkout. A LOCAL install does not carry into a worktree.
+setup_case worktree devstride project 3.0.0 3.1.0 3.1.0 1
+"$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m base
+"$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
+WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called "pwd=$REPO claude:plugin update devstride@devstride --scope project"; then
+  ok "(29) project install from a linked worktree → bound, updated in the bound checkout"
+else bad "(29) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+setup_case worktree-local devstride local 3.0.0 3.1.0 3.1.0 1
+"$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m base
+"$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
+WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = project-install-unbound ] && not_called 'claude:plugin update'; then
+  ok "(29b) local install from a linked worktree → unbound, no mutation"
+else bad "(29b) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
 # 28. The inert list is only safe while nothing a session runs reads those paths.
 INERT_RE="$(python3 - "$HELPER" <<'PY'
 import importlib.util, re, sys

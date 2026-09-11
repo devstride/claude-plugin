@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager
 import fcntl
+import functools
 import hashlib
 import json
 import os
@@ -271,10 +272,38 @@ def is_devstride(row: dict[str, Any]) -> bool:
     }
 
 
+@functools.lru_cache(maxsize=None)
+def repository_identities(repo: str) -> frozenset[str]:
+    """This checkout's root, plus the main worktree's root when it is a linked worktree."""
+    identities = {real(repo)}
+    try:
+        result = subprocess.run(
+            ["git", "-C", repo, "rev-parse", "--git-common-dir"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            check=False,
+        )
+        common = result.stdout.decode().strip() if result.returncode == 0 else ""
+    except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError):
+        common = ""
+    if common:
+        common = real(common if os.path.isabs(common) else os.path.join(repo, common))
+        if os.path.basename(common) == ".git":
+            identities.add(os.path.dirname(common))
+    return frozenset(identities)
+
+
 def row_bound_to_repo(row: dict[str, Any], repo: str) -> bool:
     scope = row.get("scope")
     project = row.get("projectPath")
-    return scope in {"project", "local"} and isinstance(project, str) and real(project) == repo
+    if scope not in {"project", "local"} or not isinstance(project, str):
+        return False
+    # A linked worktree checks out the same committed .claude/settings.json, so a project install
+    # applies there too; a local install lives in one checkout's settings.local.json and does not.
+    roots = repository_identities(repo) if scope == "project" else frozenset({real(repo)})
+    return real(project) in roots
 
 
 def inspect_install(root: str, repo: str) -> dict[str, Any]:
@@ -955,8 +984,10 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
         base, marketplace_target, current_marketplace, before["id"].split("@", 1)[0]
     ) != target:
         raise UpdateProblem("marketplace-changed-during-update", **base)
+    # From a linked worktree, run the mutation in the repository the install is bound to.
+    update_cwd = before["projectPath"] or repo
     update_code, _, _ = contextual(
-        base, run_command, update, cwd=repo, timeout=60, extra_env=keep_cache
+        base, run_command, update, cwd=update_cwd, timeout=60, extra_env=keep_cache
     )
     try:
         after = inspect_install(root, repo)
