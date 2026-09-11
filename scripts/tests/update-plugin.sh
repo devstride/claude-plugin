@@ -1,6 +1,8 @@
 #!/bin/bash
 # Deterministic tests for `/devstride:update`; every Claude/network call is stubbed.
 set -u
+# The maintainer's own git config (diff.renames and the like) must not decide these results.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 HELPER="$ROOT/skills/update/scripts/update-plugin.py"
 FAIL=0
@@ -39,6 +41,10 @@ if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "list" ]; then
     printf 'changed after attestation\n' > "$MARKET/race.txt"
     "$REAL_GIT" -C "$MARKET" add race.txt
     "$REAL_GIT" -C "$MARKET" commit -qm race
+  fi
+  if [ "${UP_MODE:-ok}" = "swap-inert-before-update" ] && [ "$count" -eq 4 ]; then
+    printf 'docs moved after attestation\n' > "$MARKET/README.md"
+    "$REAL_GIT" -C "$MARKET" commit -qam docs-race
   fi
   if [ -f "$UP_STATE/updated" ]; then cat "$UP_STATE/list-after.json"
   else cat "$UP_STATE/list-before.json"
@@ -117,6 +123,9 @@ PY
   mkdir -p "$MARKET/skills/update/scripts"
   cp "$ROOT/skills/update/scripts/update-plugin.py" "$MARKET/skills/update/scripts/update-plugin.py"
   cp "$ROOT/skills/update/scripts/latest-version.sh" "$MARKET/skills/update/scripts/latest-version.sh"
+  # A real release tree carries maintainer files; the payload proof must be seen skipping them.
+  printf 'readme at release\n' > "$MARKET/README.md"
+  mkdir -p "$MARKET/scripts"; printf 'echo tool\n' > "$MARKET/scripts/tool.sh"
   "$REAL_GIT" -C "$MARKET" init -q
   "$REAL_GIT" -C "$MARKET" config user.name test
   "$REAL_GIT" -C "$MARKET" config user.email test@example.com
@@ -135,6 +144,8 @@ PY
   mkdir -p "$LINEAGE/$AFTER/skills/update/scripts"
   cp "$ROOT/skills/update/scripts/update-plugin.py" "$LINEAGE/$AFTER/skills/update/scripts/update-plugin.py"
   cp "$ROOT/skills/update/scripts/latest-version.sh" "$LINEAGE/$AFTER/skills/update/scripts/latest-version.sh"
+  cp "$MARKET/README.md" "$LINEAGE/$AFTER/README.md"
+  mkdir -p "$LINEAGE/$AFTER/scripts"; cp "$MARKET/scripts/tool.sh" "$LINEAGE/$AFTER/scripts/tool.sh"
 }
 
 run_apply() {
@@ -303,9 +314,154 @@ printf 'post-tag code\n' > "$MARKET/post-tag.txt"
 "$REAL_GIT" -C "$MARKET" commit -qm post-tag
 OUT="$(run_apply)"; RC=$?
 if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
+   && [ "$(field shippedChanges)" = "['post-tag.txt']" ] && [ "$(field descendsFromRelease)" = True ] \
    && not_called 'claude:plugin update'; then
-  ok "(15) same manifest version on later commit → untagged code blocked"
+  ok "(15) same manifest version on later commit with a shipped change → blocked, the path named"
 else bad "(15) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15b. A commit after the tag that touches only inert maintainer files still serves that release,
+# and the inert copies Claude takes from that later commit do not fail the payload proof.
+setup_case inert-after devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; printf 'echo tool v2\n' > "$MARKET/scripts/tool.sh"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -qm docs
+printf 'docs\n' > "$LINEAGE/3.1.0/README.md"; printf 'echo tool v2\n' > "$LINEAGE/3.1.0/scripts/tool.sh"
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] && [ "$(field safeToReload)" = True ] \
+   && called 'claude:plugin update devstride@devstride --scope user'; then
+  ok "(15b) docs/tooling-only commit after the tag → the release installs and verifies"
+else bad "(15b) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15c. An install already at the release is not called broken because main moved on in docs only.
+setup_case inert-current devstride user 3.0.0 3.0.0 3.0.0
+printf 'notes\n' > "$MARKET/CHANGELOG.md"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -qm changelog
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = current ] && [ "$(field safeToReload)" = True ] \
+   && [ "$(field repairRequired)" = False ] && not_called 'claude:plugin update'; then
+  ok "(15c) current install + docs-only commit after the tag → current, no false repair"
+else bad "(15c) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15d. A docs-only difference on a history that does not contain the tag is not the release.
+setup_case inert-rewritten devstride user 3.0.0 3.1.0 3.1.0
+"$REAL_GIT" -C "$MARKET" checkout -q --orphan rewritten
+printf 'docs\n' > "$MARKET/README.md"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -qm rewritten
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
+   && [ "$(field descendsFromRelease)" = False ] && not_called 'claude:plugin update'; then
+  ok "(15d) docs-only change on a history without the tag → blocked"
+else bad "(15d) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15e. A shipped change beside docs is still a shipped change, and only it is named.
+setup_case mixed-after devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; printf 'new skill text\n' > "$MARKET/skills/update/NOTE.md"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -qm mixed
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
+   && [ "$(field shippedChanges)" = "['skills/update/NOTE.md']" ] && not_called 'claude:plugin update'; then
+  ok "(15e) shipped file beside docs → blocked, names only the shipped path"
+else bad "(15e) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15f. Moving a shipped file into an inert directory removes it from the release: still shipped.
+setup_case moved-inert devstride user 3.0.0 3.1.0 3.1.0
+"$REAL_GIT" -C "$MARKET" config diff.renames true   # the helper must not depend on rename detection being off
+"$REAL_GIT" -C "$MARKET" mv skills/update/scripts/latest-version.sh scripts/latest-version.sh
+"$REAL_GIT" -C "$MARKET" commit -qm move
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
+   && [ "$(field shippedChanges)" = "['skills/update/scripts/latest-version.sh']" ] \
+   && not_called 'claude:plugin update'; then
+  ok "(15f) shipped file moved into scripts/ → blocked, the removed path is named"
+else bad "(15f) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15g. Claude Code clones a marketplace with --depth 1: a copy cloned at a docs-only commit after
+# the tag lacks the release commit. The helper deepens it once and the release installs.
+setup_case shallow devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; "$REAL_GIT" -C "$MARKET" commit -qam docs
+"$REAL_GIT" clone -q --depth 1 "file://$MARKET" "$CASE_DIR/shallow" 2>/dev/null
+python3 - "$UP_STATE/marketplaces.json" "$CASE_DIR/shallow" <<'PY'
+import json, sys
+rows = json.load(open(sys.argv[1])); rows[0]["installLocation"] = sys.argv[2]; json.dump(rows, open(sys.argv[1], "w"))
+PY
+BEFORE_SHALLOW="$("$REAL_GIT" -C "$CASE_DIR/shallow" rev-parse --is-shallow-repository)"
+OUT="$(run_apply)"; RC=$?
+if [ "$BEFORE_SHALLOW" = true ] && [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && [ "$("$REAL_GIT" -C "$CASE_DIR/shallow" rev-parse --is-shallow-repository)" = false ] \
+   && called 'claude:plugin update devstride@devstride --scope user'; then
+  ok "(15g) depth-1 marketplace copy after a docs-only commit → deepened once, release installs"
+else bad "(15g) shallow=$BEFORE_SHALLOW rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15h. A shallow copy that cannot be deepened says so, instead of claiming rewritten history.
+setup_case shallow-offline devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; "$REAL_GIT" -C "$MARKET" commit -qam docs
+"$REAL_GIT" clone -q --depth 1 "file://$MARKET" "$CASE_DIR/shallow" 2>/dev/null
+"$REAL_GIT" -C "$CASE_DIR/shallow" remote set-url origin "file://$CASE_DIR/nowhere"
+python3 - "$UP_STATE/marketplaces.json" "$CASE_DIR/shallow" <<'PY'
+import json, sys
+rows = json.load(open(sys.argv[1])); rows[0]["installLocation"] = sys.argv[2]; json.dump(rows, open(sys.argv[1], "w"))
+PY
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 4 ] && [ "$(field code)" = marketplace-deepen-failed ] && not_called 'claude:plugin update'; then
+  ok "(15h) shallow copy that cannot be deepened → marketplace-deepen-failed, no mutation"
+else bad "(15h) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15i. A path counts as inert only when the RELEASE lists it too: a release that narrows the list
+# is honoured by this helper, so a later scripts/ change blocks.
+setup_case narrowed devstride user 3.0.0 3.1.0 3.1.0
+python3 - "$MARKET/skills/update/scripts/update-plugin.py" <<'PY'
+import sys; p = sys.argv[1]; s = open(p).read(); open(p, "w").write(s.replace('INERT_DIRS = ("scripts/",)', "INERT_DIRS = ()"))
+PY
+cp "$MARKET/skills/update/scripts/update-plugin.py" "$LINEAGE/3.1.0/skills/update/scripts/update-plugin.py"
+"$REAL_GIT" -C "$MARKET" commit -qa --amend -m narrowed
+UP_RELEASE_COMMIT="$("$REAL_GIT" -C "$MARKET" rev-parse HEAD)"; export UP_RELEASE_COMMIT
+printf 'echo changed\n' > "$MARKET/scripts/tool.sh"; "$REAL_GIT" -C "$MARKET" commit -qam tool
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
+   && [ "$(field shippedChanges)" = "['scripts/tool.sh']" ] && not_called 'claude:plugin update'; then
+  ok "(15i) release narrows the inert list → the running helper honours it, scripts/ change blocks"
+else bad "(15i) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15j. A shipped link may point only at a shipped regular file of the same release. Into scripts/,
+# at the tree root, at a letter-case variant, or at another link: the release is refused.
+for spec in "tool-link:../../scripts/tool.sh" "root-link:../.." "case-link:../../SCRIPTS/tool.sh" "chain-link:plain-link"; do
+  name="${spec%%:*}"; target="${spec#*:}"
+  setup_case "linked-$name" devstride user 3.0.0 3.1.0 3.1.0
+  ln -s scripts/latest-version.sh "$MARKET/skills/update/plain-link"
+  ln -s "$target" "$MARKET/skills/update/$name"
+  "$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -q --amend -m linked
+  UP_RELEASE_COMMIT="$("$REAL_GIT" -C "$MARKET" rev-parse HEAD)"; export UP_RELEASE_COMMIT
+  OUT="$(run_apply)"; RC=$?
+  if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-tree-invalid ] \
+     && [ "$(field path)" = "skills/update/$name" ] && not_called 'claude:plugin update'; then
+    ok "(15j) shipped symlink $name → $target → release refused, no mutation"
+  else bad "(15j) $name rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+done
+setup_case linked-file devstride user 3.0.0 3.1.0 3.1.0
+ln -s scripts/latest-version.sh "$MARKET/skills/update/plain-link"
+ln -s scripts/latest-version.sh "$LINEAGE/3.1.0/skills/update/plain-link"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -q --amend -m linked
+UP_RELEASE_COMMIT="$("$REAL_GIT" -C "$MARKET" rev-parse HEAD)"; export UP_RELEASE_COMMIT
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ]; then
+  ok "(15j) a link to a shipped regular file → allowed and verified"
+else bad "(15j) plain-link rc=$RC out=$OUT"; fi
+
+# 15k. A leftover .git/shallow.lock (a deepen killed without cleanup) is named, never hidden.
+setup_case shallow-lock devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; "$REAL_GIT" -C "$MARKET" commit -qam docs
+"$REAL_GIT" clone -q --depth 1 "file://$MARKET" "$CASE_DIR/shallow" 2>/dev/null
+python3 - "$UP_STATE/marketplaces.json" "$CASE_DIR/shallow" <<'PY'
+import json, sys
+rows = json.load(open(sys.argv[1])); rows[0]["installLocation"] = sys.argv[2]; json.dump(rows, open(sys.argv[1], "w"))
+PY
+: > "$CASE_DIR/shallow/.git/shallow.lock"
+OUT="$(run_apply)"; RC=$?
+case "$(field path)" in *"/shallow/.git/shallow.lock") LOCK_NAMED=1 ;; *) LOCK_NAMED=0 ;; esac
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-shallow-lock ] && [ "$LOCK_NAMED" = 1 ] \
+   && [ -e "$CASE_DIR/shallow/.git/shallow.lock" ] && [ "$(field retryCommand)" = None ] \
+   && not_called 'claude:plugin update'; then
+  ok "(15k) leftover shallow.lock → named, left for the owner, no retry offered, no mutation"
+else bad "(15k) rc=$RC out=$OUT"; fi
 
 # 16. The marketplace name alone grants no trust; its source must be the official repository.
 setup_case wrong-source devstride user 3.0.0 3.1.0 3.1.0
@@ -337,6 +493,16 @@ if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
    && not_called 'claude:plugin update'; then
   ok "(18) checkout changed after attestation → second proof blocks update"
 else bad "(18) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 18b. HEAD moving to ANOTHER docs-only commit between the proof and the mutation still passes the
+# re-attestation itself; the same-HEAD check is what stops it.
+setup_case checkout-inert-race devstride user 3.0.0 3.1.0 3.1.0
+UP_MODE=swap-inert-before-update; export UP_MODE
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-changed-during-update ] \
+   && not_called 'claude:plugin update'; then
+  ok "(18b) docs-only commit lands after attestation → same-HEAD check blocks update"
+else bad "(18b) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
 # 19. A CLI row is not disk proof: the selected cache path must contain a matching safe manifest.
 setup_case missing-payload devstride user 3.0.0 3.1.0 3.1.0
@@ -457,6 +623,7 @@ else bad "(25b) rc=$RC out=$OUT orphan=$([ -e "$UP_STATE/orphan-child" ] && echo
 
 # 26. Static command contract: user-only, plain output, shared resolver, no silent mid-loop switch.
 if grep -qF 'disable-model-invocation: true' "$ROOT/skills/update/SKILL.md" \
+   && grep -qF -- 'apply --root "${CLAUDE_PLUGIN_ROOT}"' "$ROOT/skills/update/SKILL.md" \
    && grep -qF 'plain-language-output.md' "$ROOT/skills/update/SKILL.md" \
    && grep -qF 'Run `/reload-plugins`' "$ROOT/skills/update/SKILL.md" \
    && grep -qF 'safeToReload' "$ROOT/skills/update/SKILL.md" \
@@ -467,5 +634,231 @@ if grep -qF 'disable-model-invocation: true' "$ROOT/skills/update/SKILL.md" \
    && ! grep -R -qF 'marketplace remove' "$ROOT/skills/update"; then
   ok "(26) skill is explicit-only, plain, shared with hook, and stops for reload"
 else bad "(26) static update contract drifted"; fi
+
+# 27. A skill's shell gets no CLAUDE_PLUGIN_ROOT: with neither it nor --root the helper uses the
+# copy that holds it, which is the loaded copy when a skill runs it by full path.
+setup_case own-root devstride user 3.0.0 3.1.0 3.1.0
+mkdir -p "$PLUGIN/skills/update/scripts"
+cp "$HELPER" "$PLUGIN/skills/update/scripts/update-plugin.py"
+OUT="$(cd "$REPO" && env -u CLAUDE_PLUGIN_ROOT -u CLAUDE_PROJECT_DIR \
+  python3 "$PLUGIN/skills/update/scripts/update-plugin.py" apply 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called 'claude:plugin update devstride@devstride --scope user'; then
+  ok "(27) no CLAUDE_PLUGIN_ROOT and no --root → the helper's own copy is the loaded copy"
+else bad "(27) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 29. A linked worktree of the bound repository is that repository for a project or local install,
+# as Claude Code applies it: the update proceeds and runs in the checkout the install is recorded in.
+setup_case worktree devstride project 3.0.0 3.1.0 3.1.0 1
+"$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m base
+"$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
+WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called "pwd=$REPO claude:plugin update devstride@devstride --scope project"; then
+  ok "(29) project install from a linked worktree → bound, updated in the bound checkout"
+else bad "(29) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+setup_case worktree-local devstride local 3.0.0 3.1.0 3.1.0 1
+"$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m base
+"$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
+WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called "pwd=$REPO claude:plugin update devstride@devstride --scope local"; then
+  ok "(29b) local install from a linked worktree → bound as Claude Code binds it, updated in its checkout"
+else bad "(29b) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 28. The inert list is only safe while nothing a session runs reads those paths. Scan every shipped
+# file for the ways a path is built — ${ROOT}/x, quoted literals in code, ../ traversal — check
+# shipped symlinks, and keep the list clear of folders Claude Code loads on its own.
+runtime_refs() {  # runtime_refs ROOT HELPER — prints each hit; empty output means clean
+python3 - "$1" "$2" <<'PY'
+import importlib.util, os, re, subprocess, sys
+root, helper = sys.argv[1:]
+spec = importlib.util.spec_from_file_location("h", helper); h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
+names = sorted(h.INERT_FILES) + [d.rstrip("/") for d in h.INERT_DIRS]
+if not names:
+    print("inert list unreadable"); sys.exit()
+alt = "|".join(re.escape(n) for n in names)
+rooted = re.compile(r"(PLUGIN_ROOT|ROOT)(:-[^}]*)?\}?\"?/(" + alt + r")(/|\b)")
+quoted = re.compile(r"[\"'](" + alt + r")[\"'/]")
+traversal = re.compile(r"(\.\./)+(" + alt + r")(/|\b)")
+auto = {"commands", "skills", "agents", "hooks", "output-styles", "themes", "monitors", "workflows",
+        "bin", ".mcp.json", ".lsp.json", "settings.json", ".claude-plugin"}
+hits = ["inert name is an auto-loaded component: " + n for n in names if n in auto]
+top = subprocess.run(["git", "-C", root, "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+files = []
+if top.returncode == 0 and os.path.realpath(top.stdout.strip()) == os.path.realpath(root):
+    for line in subprocess.run(["git", "-C", root, "ls-files", "-s"], capture_output=True, text=True).stdout.splitlines():
+        meta, path = line.split("\t", 1)
+        files.append((meta.split()[0], path))
+if not files:  # not a checkout of its own (an export, a tarball): walk the files instead
+    for d, dirs, fs in os.walk(root):
+        dirs[:] = [x for x in dirs if x not in (".git", ".claude")]  # local state, never shipped
+        for x in dirs + fs:
+            full = os.path.join(d, x)
+            if os.path.islink(full) or os.path.isfile(full):
+                files.append(("120000" if os.path.islink(full) else "100644", os.path.relpath(full, root)))
+if not files:
+    print("no shipped files found to scan"); sys.exit()
+for mode, path in files:
+    if h.is_inert(path):
+        continue
+    full = os.path.join(root, path)
+    if mode == "120000":
+        target = os.readlink(full)
+        resolved = os.path.normpath(os.path.join(os.path.dirname(path), target))
+        if os.path.isabs(target) or resolved.startswith("..") or h.is_inert(resolved) or h.is_inert(resolved + "/"):
+            hits.append(f"{path}: symlink to {resolved}")
+        continue
+    try:
+        text = open(full, encoding="utf-8").read()
+    except (UnicodeDecodeError, OSError):
+        continue
+    if path == "skills/update/scripts/update-plugin.py":
+        text = re.sub(r"INERT_FILES = frozenset\((.|\n)*?\)\nINERT_DIRS = \([^)]*\)", "", text)
+    code = path.endswith((".sh", ".py", ".json"))
+    for n, ln in enumerate(text.splitlines(), 1):
+        if rooted.search(ln) or (code and (quoted.search(ln) or traversal.search(ln))):
+            hits.append(f"{path}:{n}: {ln.strip()[:120]}")
+print("\n".join(hits))
+PY
+}
+RUNTIME_REFS="$(runtime_refs "$ROOT" "$HELPER")"
+if [ -z "$RUNTIME_REFS" ]; then
+  ok "(28) no shipped file, symlink or auto-loaded folder reaches an inert path"
+else bad "(28) inert path reachable at runtime: $RUNTIME_REFS"; fi
+
+# 28b. Outside a git checkout the scan walks the files, and still finds a planted read.
+NOGIT="$WORK/nogit"; mkdir -p "$NOGIT"; (cd "$ROOT" && tar --exclude=.git --exclude=.claude -cf - .) | (cd "$NOGIT" && tar -xf -)
+CLEAN="$(runtime_refs "$NOGIT" "$NOGIT/skills/update/scripts/update-plugin.py")"
+printf '\n_NOTES = Path(ROOT, "README.md")\n' >> "$NOGIT/skills/doctor/scripts/statusline-override.py"
+PLANTED="$(runtime_refs "$NOGIT" "$NOGIT/skills/update/scripts/update-plugin.py")"
+if [ -z "$CLEAN" ] && printf '%s' "$PLANTED" | grep -q "statusline-override.py"; then
+  ok "(28b) without .git the scan walks the files: clean tree clean, planted read found"
+else bad "(28b) clean=[$CLEAN] planted=[$PLANTED]"; fi
+
+# 30. A timed-out command gets SIGTERM before SIGKILL, so git can remove its own lock files.
+MARKER="$WORK/term-marker"
+T30="$(python3 - "$HELPER" "$MARKER" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("h", sys.argv[1]); h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
+try:
+    h.run_command(["bash", "-c", 'trap "touch %s; exit 0" TERM; sleep 30 & wait' % sys.argv[2]], cwd="/", timeout=1)
+    print("no-timeout")
+except h.UpdateProblem as exc:
+    print(exc.code)
+PY
+)"
+if [ "$T30" = command-timeout ] && [ -e "$MARKER" ]; then
+  ok "(30) timed-out command → SIGTERM delivered first (its cleanup ran), then the group is killed"
+else bad "(30) result=$T30 marker=$([ -e "$MARKER" ] && echo yes || echo no)"; fi
+
+# 31. Another repository's project install of the same version shares the cache folder; it no
+# longer blocks this repository's update.
+setup_case two-repos devstride project 3.0.0 3.1.0 3.1.0 1
+OTHER="$CASE_DIR/other-repo"; mkdir -p "$OTHER"; "$REAL_GIT" -C "$OTHER" init -q
+python3 - "$UP_STATE/list-before.json" "$UP_STATE/list-after.json" "$OTHER" "$PLUGIN" <<'PY'
+import json, sys
+before, after, other, root = sys.argv[1:]
+row = {"id": "devstride@devstride", "version": "3.0.0", "scope": "project", "enabled": True, "installPath": root, "projectPath": other}
+for f in (before, after):
+    rows = json.load(open(f)); rows.append(dict(row)); json.dump(rows, open(f, "w"))
+PY
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called "pwd=$REPO claude:plugin update devstride@devstride --scope project"; then
+  ok "(31) another repository's project install at the same version → this one still updates"
+else bad "(31) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# worktree_case NAME [PIN] — a project install bound to REPO, plus a linked worktree WT.
+worktree_case() {
+  setup_case "$1" devstride project 3.0.0 3.1.0 3.1.0 1 "${2:--}"
+  "$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m base
+  "$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
+  WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"; export WT
+}
+# 32. A checkout and its worktree each with a project install: Claude Code may load either, so the
+# helper stops, naming both folders, instead of guessing.
+worktree_case wt-own
+python3 - "$UP_STATE/list-before.json" "$UP_STATE/list-after.json" "$REPO" "$WT" "$PLUGIN" "$LINEAGE" <<'PY'
+import json, os, sys
+before, after, repo, wt, root, lineage = sys.argv[1:]
+mk = lambda project, version, path: {"id": "devstride@devstride", "version": version, "scope": "project", "enabled": True, "installPath": path, "projectPath": project}
+json.dump([mk(repo, "3.0.0", root), mk(wt, "3.0.0", root)], open(before, "w"))
+json.dump([mk(repo, "3.0.0", root), mk(wt, "3.1.0", os.path.join(lineage, "3.1.0"))], open(after, "w"))
+PY
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+CANDIDATES="$(field candidates)"
+if [ "$RC" -eq 3 ] && [ "$(field code)" = multiple-applicable-installs ] \
+   && printf '%s' "$CANDIDATES" | grep -qF "$REPO)" && printf '%s' "$CANDIDATES" | grep -qF "$WT)" \
+   && not_called 'claude:plugin update'; then
+  ok "(32) a checkout and its worktree each with a project install → stopped, both folders named"
+else bad "(32) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 33. An install made from a linked worktree is bound in the main checkout too (either direction).
+worktree_case wt-made
+python3 - "$UP_STATE/list-before.json" "$UP_STATE/list-after.json" "$WT" <<'PY'
+import json, sys
+for f in sys.argv[1:3]:
+    rows = json.load(open(f)); rows[0]["projectPath"] = sys.argv[3]; json.dump(rows, open(f, "w"))
+PY
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called "pwd=$WT claude:plugin update devstride@devstride --scope project"; then
+  ok "(33) install made in a worktree, updated from the main checkout → bound, runs in the worktree"
+else bad "(33) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 34. The checkout a copy is bound to pins it even when the update runs from a worktree whose own
+# (uncommitted-config) checkout sets no pin.
+worktree_case wt-pin 3.0.0
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+if [ ! -e "$WT/.claude/ds-config.json" ] && [ "$RC" -eq 3 ] && [ "$(field code)" = repository-pinned ] \
+   && printf '%s' "$(field pinSources)" | grep -qF "$REPO/.claude/ds-config.json" \
+   && not_called 'marketplace update'; then
+  ok "(34) main checkout pins, update from a worktree → still pinned"
+else bad "(34) rc=$RC out=$OUT"; fi
+
+# 35. A repair offered from a worktree runs in the checkout the install is recorded in.
+worktree_case wt-repair
+printf '\n# changed payload\n' >> "$LINEAGE/3.1.0/skills/update/scripts/latest-version.sh"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 4 ] && [ "$(field code)" = installed-payload-mismatch ] && [ "$(field projectPath)" = "$REPO" ] \
+   && printf '%s' "$(field repairCommands)" | grep -qF "(cd $REPO && claude plugin uninstall devstride@devstride --scope project --keep-data)"; then
+  ok "(35) repair offered from a worktree → its commands run in the checkout the install is recorded in"
+else bad "(35) rc=$RC out=$OUT"; fi
+
+# 36. A deepen that runs out of time is a failed deepen, not a bare command-timeout.
+setup_case deepen-timeout devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; "$REAL_GIT" -C "$MARKET" commit -qam docs
+"$REAL_GIT" clone -q --depth 1 "file://$MARKET" "$CASE_DIR/shallow" 2>/dev/null
+T36="$(python3 - "$HELPER" "$CASE_DIR/shallow" "$UP_RELEASE_COMMIT" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("h", sys.argv[1]); h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
+real_git_code = h.git_code
+def stalled(location, args, cwd, timeout=10):
+    if "--unshallow" in args:
+        raise h.UpdateProblem("command-timeout", status="failed", command=["git", "-C", location])
+    return real_git_code(location, args, cwd, timeout)
+h.git_code = stalled
+try:
+    h.ensure_release_history(h.real(sys.argv[2]), sys.argv[3], "/")
+    print("no-error")
+except h.UpdateProblem as exc:
+    print(exc.code, exc.fields.get("reason"))
+PY
+)"
+if [ "$T36" = "marketplace-deepen-failed timeout" ]; then
+  ok "(36) deepen out of time → marketplace-deepen-failed (reason timeout)"
+else bad "(36) got [$T36]"; fi
+
+# 37. A malformed config in the checkout the copy is recorded in names that file.
+worktree_case wt-badcfg
+printf '{not json' > "$REPO/.claude/ds-config.json"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = repository-config-invalid ] \
+   && [ "$(field path)" = "$REPO/.claude/ds-config.json" ] && not_called 'marketplace update'; then
+  ok "(37) malformed config in the owning checkout → the result names that file"
+else bad "(37) rc=$RC out=$OUT"; fi
 
 exit "$FAIL"

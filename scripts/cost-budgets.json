@@ -24,7 +24,7 @@
     "review": 11400,
     "setup": 10700,
     "ultracode-build": 5800,
-    "update": 800
+    "update": 1000
   },
   "references": {
     "skills/build-item/references/epic-release.md": 2000,
@@ -35,7 +35,7 @@
     "skills/build-item/references/verification-receipts.md": 800,
     "skills/doctor/references/repairs.md": 2700,
     "skills/doctor/references/silent-failures.md": 3300,
-    "skills/doctor/references/version-currency.md": 1700,
+    "skills/doctor/references/version-currency.md": 2000,
     "skills/plan/references/delivery-profiles.md": 4800,
     "skills/plan/references/execution-order-numbering.md": 1100,
     "skills/plan/references/release-unit-shaping.md": 1400,
@@ -127,7 +127,7 @@
       ]
     },
     "manualPluginUpdate": {
-      "budget": 4800,
+      "budget": 5300,
       "files": [
         "skills/update/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

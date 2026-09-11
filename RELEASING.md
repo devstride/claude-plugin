@@ -95,6 +95,17 @@ depend on, it does not freeze the surface.
    Tag first and a rejected or forgotten branch push leaves an immutable public release tag for a
    commit that is not on `main`.
 
+   Until the tag exists, `/devstride:update` and the session-start auto-update stop on every machine
+   (`marketplace-checkout-untagged`), so tag straight away. A later commit that touches only the
+   maintainer files `skills/update/scripts/update-plugin.py` lists as inert — the root documents and
+   `scripts/` — needs neither a bump nor a tag: updates still install the release beneath it. **That
+   holds only on machines already running 3.5.1 or newer**, whose helper knows the rule; a 3.5.0 or
+   older copy still needs `main` exactly on the newest tag. Until most machines have moved, keep
+   `main` on the tag and hold maintainer-only commits for the next release. Widening the inert list is
+   the compatibility event: helpers older than the release that widened it still treat the new paths
+   as shipped, so hold `main` on the tag after a widening too. Narrowing is safe — a path is skipped
+   only when both the running helper and the release being installed list it.
+
 6. **Tag.** Use the official tooling rather than tagging by hand. Preview it first:
 
    ```bash
@@ -113,12 +124,13 @@ depend on, it does not freeze the surface.
 
    ```bash
    claude plugin marketplace update devstride
-   claude plugin update devstride@devstride
+   claude plugin update devstride@devstride --scope project   # the scratch project's install
    claude plugin list          # confirm the reported version is the one you just cut
    ```
 
-8. **Announce it**, including `/devstride:update` for installations already on 3.1.0 or newer and
-   the two native bootstrap commands below. Older copies do not contain the new skill.
+8. **Announce it**, including `/devstride:update` for installations on 3.5.1 or newer and the two
+   native bootstrap commands below for everything older — on 3.1.0–3.5.0 `/devstride:update` can
+   stop with `plugin-root-missing` (fixed in 3.5.1), and older copies do not contain the skill.
 
 ## When your users actually get it
 
@@ -134,15 +146,15 @@ devstride marketplace → **Enable auto-update**) gets releases without doing an
 stays on their installed version indefinitely — verified on Claude Code 2.1.233, where starting a
 fresh session with a newer version available left the installed plugin untouched.
 
-From 3.1.0 onward, `/devstride:update` resolves the loaded copy, attests the canonical tag and
+From 3.5.1 onward (3.1.0–3.5.0 can stop with `plugin-root-missing`), `/devstride:update` resolves the loaded copy, attests the canonical tag and
 installed files, then stops. Run `/reload-plugins` and confirm no DevStride load error; restart if
 reload is unavailable or fails. Repository-driven automatic updates remain session-start-only.
 
-To get 3.1.0 from 3.0.0 or older — or when the skill is unavailable — two commands are required:
+On 3.5.0 or older — or when the skill is unavailable — two commands are required:
 
 ```bash
 claude plugin marketplace update devstride   # refresh the catalog
-claude plugin update devstride@devstride     # upgrade the installed plugin
+claude plugin update devstride@devstride --scope <scope>   # the scope claude plugin list shows
 ```
 
 followed by `/reload-plugins` (confirm no DevStride load error), with restart as the fallback. Three
@@ -153,23 +165,26 @@ traps worth repeating in the announcement:
   did not ship.
 - **`claude plugin update devstride` fails** with "Plugin not found" — the update command needs the
   fully-qualified `devstride@devstride`.
-- **It defaults to the `user` scope.** A project-, local- or managed-scope install needs a matching
-  `--scope`, or the command reports the plugin is not installed and changes nothing.
+- **It defaults to the `user` scope.** Pass the scope `claude plugin list` shows — `project` for the
+  recommended install, `user` for an older machine-wide one (likewise local or managed) — or the
+  command reports the plugin is not installed and changes nothing.
 
 So the answer to "when does my team get the fix" is: when marketplace auto-update next runs, at an
-opted-in repository's next session start, through `/devstride:update` on 3.1.0+, or after the two
+opted-in repository's next session start, through `/devstride:update` on 3.5.1+, or after the two
 bootstrap commands on an older copy. Say which rather than assuming it propagates.
 
 ### Pinning
 
-Users pin by appending `@<tag>` to the marketplace source. There is no `--ref` flag; the ref belongs
-in the source argument. **`marketplace remove` uninstalls every plugin that came from that
-marketplace, and re-adding it does not bring them back** — so the reinstall is a required third step:
+Users hold one repository with `plugin.pin` in its `.claude/ds-config.json`. Pinning the marketplace
+(append `@<tag>` to its source; there is no `--ref` flag) holds every repository on the machine, and
+**`marketplace remove` uninstalls every plugin that came from that marketplace, in every repository
+and scope, and re-adding it does not bring them back** — so note each row first and reinstall each:
 
 ```bash
+claude plugin list --json                 # note every DevStride row: id, scope, projectPath
 claude plugin marketplace remove devstride
 claude plugin marketplace add devstride/claude-plugin@devstride--v<version>
-claude plugin install devstride@devstride
+claude plugin install <id> --scope <scope>   # once per row: its id and scope, from its projectPath
 ```
 
 Unpinning is the same three commands with the bare `devstride/claude-plugin` as the source.

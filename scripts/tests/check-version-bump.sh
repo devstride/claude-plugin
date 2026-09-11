@@ -17,6 +17,7 @@ new_case() {
   R="$WORK/$1"; mkdir -p "$R/.claude-plugin" "$R/skills/a" "$R/scripts"
   git -C "$R" init -q; set_version 1.0.0
   echo one > "$R/skills/a/SKILL.md"; echo one > "$R/scripts/tool.sh"
+  mkdir -p "$R/skills/update/scripts"; cp "$ROOT/skills/update/scripts/update-plugin.py" "$R/skills/update/scripts/update-plugin.py"
   printf '# Changelog\n\n## [Unreleased]\n\n## [1.0.0] — 2026-01-01\n' > "$R/CHANGELOG.md"
   git -C "$R" add -A; git -C "$R" commit -qm base; git -C "$R" tag devstride--v1.0.0
   BASE="$(git -C "$R" rev-parse HEAD)"
@@ -46,5 +47,23 @@ expect "(4) bump without a CHANGELOG heading → refused" 1 "CHANGELOG.md has no
 
 new_case tooling-only; echo two > "$R/scripts/tool.sh"; check
 expect "(5) maintainer-script change after a release, no bump → ok, not 'already released'" 0 "no bump required"
+
+new_case new-component; printf '{}\n' > "$R/.mcp.json"; check
+expect "(6) a new root-level plugin component without a bump → refused, names it" 1 "without a version bump.*\.mcp\.json"
+
+new_case docs-only; printf 'Current version: **1.0.0** — one clarified sentence\n' > "$R/README.md"
+echo "more history" >> "$R/CHANGELOG.md"; check
+expect "(7) README/CHANGELOG-only change → ok, no bump required" 0 "no bump required"
+
+new_case moved-out; git -C "$R" mv skills/a/SKILL.md scripts/SKILL.md; check
+expect "(8) a skill moved into scripts/ still ships (it leaves the release) → refused" 1 "without a version bump.*skills/a/SKILL.md"
+
+new_case escaped; printf 'x\n' > "$R/scripts/café tool.sh"; check
+expect "(9) a scripts/ file with an accented, spaced name → still maintainer tooling, no bump" 0 "no bump required"
+
+new_case unlisted-base; printf '# a release older than 3.5.1 carries no inert list\n' > "$R/skills/update/scripts/update-plugin.py"
+git -C "$R" commit -qam "base without the list"; BASE="$(git -C "$R" rev-parse HEAD)"
+echo two > "$R/scripts/tool.sh"; check
+expect "(10) after a release with no inert list, a scripts/ change needs a bump — the updater's strict rule" 1 "without a version bump.*scripts/tool.sh"
 
 exit $FAIL

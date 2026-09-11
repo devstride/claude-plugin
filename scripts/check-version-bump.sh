@@ -1,15 +1,17 @@
 #!/bin/bash
 # scripts/check-version-bump.sh — a change to shipped files must arrive with a version bump.
 #
-# Why: `version` in .claude-plugin/plugin.json is the install cache key. A change to skills/,
-# hooks/ or plugin.json that lands on main without a bump is invisible to every installed copy,
-# and it fails silently — the repo looks right and no user sees it. This check makes the bump
-# mechanical: run it against the base the change will land on (RELEASING.md step 4).
+# Why: `version` in .claude-plugin/plugin.json is the install cache key. A shipped change that
+# lands on main without a bump is invisible to every installed copy, and it fails silently — the
+# repo looks right and no user sees it. This check makes the bump mechanical: run it against the
+# base the change will land on (RELEASING.md step 4).
 #
 # Rules, checked against `<base>...<head>`:
-#   1. If any shipped file changed (skills/**, hooks/**, .claude-plugin/plugin.json other than
-#      its version line), the head version must be greater than the base version (numeric
-#      semver compare).
+#   1. If any shipped file changed — any path outside the inert maintainer files (root documents,
+#      scripts/) that BOTH this checkout's skills/update/scripts/update-plugin.py and the one at the
+#      merge base list, other than a version-only edit of .claude-plugin/plugin.json — the head
+#      version must be greater than the base version (numeric semver compare). The updater applies
+#      that same intersection to a commit after a release, so "ships nothing" means one thing in both.
 #   2. If the version changed, the head version must not already be a tag
 #      (`devstride--v<version>`), unless HEAD is the commit that tag points at. An unchanged
 #      version is rule 1's business: a change that ships nothing needs no bump.
@@ -31,6 +33,8 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$BASE" ] || { echo "check-version-bump: --base <ref> is required" >&2; exit 2; }
 command -v python3 >/dev/null 2>&1 || { echo "check-version-bump: python3 is required" >&2; exit 2; }
+VB_HELPER="$(cd "$(dirname "$0")/.." && pwd)/skills/update/scripts/update-plugin.py"; export VB_HELPER
+[ -f "$VB_HELPER" ] || { echo "check-version-bump: missing $VB_HELPER" >&2; exit 2; }
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "check-version-bump: not a git repository" >&2; exit 2; }
 cd "$ROOT" || exit 2
 git rev-parse --verify -q "$BASE^{commit}" >/dev/null || { echo "check-version-bump: unknown ref: $BASE" >&2; exit 2; }
@@ -38,8 +42,10 @@ git rev-parse --verify -q "$HEAD_REF^{commit}" >/dev/null || { echo "check-versi
 MB="$(git merge-base "$BASE" "$HEAD_REF")" || { echo "check-version-bump: no merge base between $BASE and $HEAD_REF" >&2; exit 2; }
 export VB_MB="$MB" VB_HEAD="$HEAD_REF"
 python3 - <<'PY'
-import json, os, re, subprocess, sys
+import importlib.util, json, os, re, subprocess, sys
 MB, HEAD = os.environ["VB_MB"], os.environ["VB_HEAD"]
+spec = importlib.util.spec_from_file_location("update_plugin", os.environ["VB_HELPER"])
+helper = importlib.util.module_from_spec(spec); spec.loader.exec_module(helper)
 def sh(*a):
     return subprocess.run(["git", *a], capture_output=True, text=True).stdout
 def version_at(ref):
@@ -54,8 +60,21 @@ base_v, head_v = version_at(MB), version_at(HEAD)
 problems = []
 if semver(head_v) is None:
     problems.append("head version %r is not MAJOR.MINOR.PATCH" % head_v)
-changed = [l for l in sh("diff", "--name-only", MB, HEAD).splitlines() if l]
-shipped = [f for f in changed if f.startswith("skills/") or f.startswith("hooks/")]
+# The release this change follows decides what is inert, intersected with this checkout's list —
+# exactly what the updater applies to a commit after that release.
+base_files, base_dirs = helper.parse_inert(sh("show", "%s:skills/update/scripts/update-plugin.py" % MB))
+inert = lambda p: helper.is_inert(p) and (p in base_files or p.startswith(base_dirs))
+# -z and --no-renames: an escaped path reads as the path it is, and a skill moved into scripts/
+# still lists the shipped path it removes. An undecodable path counts as shipped.
+raw = subprocess.run(["git", "diff", "--no-renames", "--name-only", "-z", MB, HEAD], capture_output=True).stdout
+changed = []
+for p in raw.split(b"\0"):
+    if p:
+        try:
+            changed.append(p.decode("utf-8"))
+        except UnicodeDecodeError:
+            changed.append("(undecodable) " + p.decode("utf-8", "replace"))
+shipped = [f for f in changed if not inert(f) and f != ".claude-plugin/plugin.json"]
 if ".claude-plugin/plugin.json" in changed:
     # a version-only edit is the bump itself, not a shipped change
     d = sh("diff", MB, HEAD, "--", ".claude-plugin/plugin.json")

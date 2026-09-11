@@ -4,20 +4,23 @@
 from __future__ import annotations
 
 import argparse
+import ast
 from contextlib import contextmanager
 import fcntl
+import functools
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import selectors
+import shlex
 import signal
 import stat
 import subprocess
 import sys
 import time
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 
 MAX_OUTPUT = 1024 * 1024
@@ -25,6 +28,14 @@ SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$")
 SCOPES = {"user", "project", "local", "managed"}
 CANONICAL_REPO = "devstride/claude-plugin"
+# Maintainer files no session reads: the root documents and the scripts/ tooling. No skill, hook or
+# manifest references them (scripts/tests/update-plugin.sh pins that), so a commit touching only
+# these ships nothing: it needs no version bump (scripts/check-version-bump.sh imports is_inert) and
+# it does not stop an update from installing the release it follows. Every other path is shipped.
+INERT_FILES = frozenset(
+    {".gitignore", "AGENTS.md", "CHANGELOG.md", "CONTRIBUTING.md", "LICENSE", "README.md", "RELEASING.md"}
+)
+INERT_DIRS = ("scripts/",)
 TOTAL_DEADLINE: Optional[float] = None
 
 
@@ -43,6 +54,57 @@ def emit(payload: dict[str, Any], exit_code: int) -> None:
 
 def real(path: str | Path) -> str:
     return os.path.realpath(os.fspath(path))
+
+
+def is_inert(path: str) -> bool:
+    return path in INERT_FILES or path.startswith(INERT_DIRS)
+
+
+def parse_inert(source: str) -> tuple[frozenset[str], tuple[str, ...]]:
+    """INERT_FILES / INERT_DIRS as a helper's source text defines them, read with ast and never
+    executed. A missing or malformed list reads as empty: nothing inert, the strict rule."""
+    files: frozenset[str] = frozenset()
+    dirs: tuple[str, ...] = ()
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return files, dirs
+    for node in tree.body:
+        if not (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+        ):
+            continue
+        name, value = node.targets[0].id, node.value
+        try:
+            if (
+                name == "INERT_FILES"
+                and isinstance(value, ast.Call)
+                and getattr(value.func, "id", None) == "frozenset"
+                and len(value.args) == 1
+                and not value.keywords
+            ):
+                parsed = ast.literal_eval(value.args[0])
+                if isinstance(parsed, (set, frozenset)) and all(isinstance(x, str) for x in parsed):
+                    files = frozenset(parsed)
+            elif name == "INERT_DIRS":
+                parsed = ast.literal_eval(value)
+                if isinstance(parsed, tuple) and all(
+                    isinstance(x, str) and x.endswith("/") for x in parsed
+                ):
+                    dirs = parsed
+        except (ValueError, TypeError, SyntaxError):
+            continue
+    return files, dirs
+
+
+def own_root() -> Optional[str]:
+    # The copy holding this file: <root>/skills/update/scripts/update-plugin.py. A skill's shell
+    # command does not receive CLAUDE_PLUGIN_ROOT (hooks do), and a skill runs this helper by the
+    # loaded copy's full path, so its own location is that copy.
+    parents = Path(__file__).resolve().parents
+    return str(parents[3]) if len(parents) > 3 else None
 
 
 def semver(value: str) -> tuple[int, int, int]:
@@ -166,15 +228,18 @@ def run_command(
     finally:
         selector.close()
         if process is not None and not completed_normally:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                if process.poll() is None:
-                    process.kill()
-            try:
-                process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                pass
+            # SIGTERM first, so git can remove its own lock files (a SIGKILLed deepen leaves
+            # .git/shallow.lock and wedges every later one), then SIGKILL the whole group.
+            for sig, fallback in ((signal.SIGTERM, process.terminate), (signal.SIGKILL, process.kill)):
+                try:
+                    os.killpg(process.pid, sig)
+                except (ProcessLookupError, PermissionError):
+                    if process.poll() is None:
+                        fallback()
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    pass
         if process is not None:
             if process.stdout is not None:
                 process.stdout.close()
@@ -215,17 +280,20 @@ def read_pin(repo: str) -> Optional[str]:
     path = Path(repo, ".claude", "ds-config.json")
     if not os.path.lexists(path):
         return None
-    data = safe_json_file(path, "repository-config", within=repo)
+    try:
+        data = safe_json_file(path, "repository-config", within=repo)
+    except UpdateProblem as exc:
+        raise UpdateProblem(exc.code, status=exc.status, **{**exc.fields, "path": str(path)}) from exc
     if not isinstance(data, dict):
-        raise UpdateProblem("repository-config-invalid")
+        raise UpdateProblem("repository-config-invalid", path=str(path))
     plugin = data.get("plugin") or {}
     if not isinstance(plugin, dict):
-        raise UpdateProblem("repository-config-invalid")
+        raise UpdateProblem("repository-config-invalid", path=str(path))
     pin = plugin.get("pin")
     if pin is None:
         return None
     if not isinstance(pin, str) or not SEMVER.fullmatch(pin):
-        raise UpdateProblem("repository-pin-invalid")
+        raise UpdateProblem("repository-pin-invalid", path=str(path))
     return pin
 
 
@@ -251,10 +319,43 @@ def is_devstride(row: dict[str, Any]) -> bool:
     }
 
 
+@functools.lru_cache(maxsize=None)
+def repository_key(path: str) -> str:
+    """The main worktree's root for any checkout of a repository (via its git common dir), so the
+    main checkout and every linked worktree share one key; the path itself when git cannot say."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", path, "rev-parse", "--git-common-dir"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            check=False,
+        )
+        common = result.stdout.decode().strip() if result.returncode == 0 else ""
+    except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError):
+        common = ""
+    if common:
+        common = real(common if os.path.isabs(common) else os.path.join(path, common))
+        if os.path.basename(common) == ".git":
+            return os.path.dirname(common)
+    return real(path)
+
+
+def describe_row(row: dict[str, Any]) -> str:
+    project = row.get("projectPath")
+    where = f", {real(project)}" if isinstance(project, str) else ""
+    return f"{row_id(row)} ({row.get('scope', 'unknown')}{where})"
+
+
 def row_bound_to_repo(row: dict[str, Any], repo: str) -> bool:
     scope = row.get("scope")
     project = row.get("projectPath")
-    return scope in {"project", "local"} and isinstance(project, str) and real(project) == repo
+    if scope not in {"project", "local"} or not isinstance(project, str):
+        return False
+    # Claude Code applies a project or local install to every checkout of its repository — the main
+    # checkout and each linked worktree — so the helper binds it the same way.
+    return real(project) == repo or repository_key(real(project)) == repository_key(repo)
 
 
 def inspect_install(root: str, repo: str) -> dict[str, Any]:
@@ -276,26 +377,26 @@ def inspect_install(root: str, repo: str) -> dict[str, Any]:
         for row in devstride_rows
         if real(str(row.get("installPath") or "")) == root
     ]
-    if any(row.get("enabled", True) is not True for row in root_rows):
-        raise UpdateProblem("loaded-install-disabled")
-    exact_rows = [row for row in root_rows if row.get("enabled", True) is True]
+    # One version's installs share one cache folder, so other repositories' project installs can
+    # point at the loaded copy too; they do not apply here. What applies is every machine-wide row and
+    # every project/local row recorded in a checkout of THIS repository — Claude Code may load any of
+    # them — so two of those remain the ambiguity, never a guess.
+    shared = [row for row in devstride_rows if row.get("scope") in {"user", "managed"}]
+    bound = [row for row in devstride_rows if row_bound_to_repo(row, repo)]
+    applicable = shared + bound
     if any(
-        row.get("scope") in {"project", "local"} and not row_bound_to_repo(row, repo)
-        for row in exact_rows
+        row.get("enabled", True) is not True
+        and real(str(row.get("installPath") or "")) == root
+        for row in applicable
     ):
-        raise UpdateProblem("project-install-unbound")
-
-    applicable: list[dict[str, Any]] = []
-    for row in rows:
-        if not is_devstride(row) or row.get("enabled", True) is not True:
-            continue
-        scope = row.get("scope")
-        if scope in {"user", "managed"} or row_bound_to_repo(row, repo):
-            applicable.append(row)
+        raise UpdateProblem("loaded-install-disabled")
+    applicable = [row for row in applicable if row.get("enabled", True) is True]
     if len(applicable) > 1:
-        candidates = sorted(f"{row_id(row)} ({row.get('scope', 'unknown')})" for row in applicable)
+        candidates = sorted(describe_row(row) for row in applicable)
         raise UpdateProblem("multiple-applicable-installs", candidates=candidates)
     if not applicable:
+        if any(row.get("scope") in {"project", "local"} for row in root_rows):
+            raise UpdateProblem("project-install-unbound")
         raise UpdateProblem("loaded-install-not-found")
 
     row = applicable[0]
@@ -337,7 +438,16 @@ def inspect_install(root: str, repo: str) -> dict[str, Any]:
     project_path = row.get("projectPath") if scope in {"project", "local"} else None
     if scope in {"project", "local"} and not row_bound_to_repo(row, repo):
         raise UpdateProblem("project-install-unbound")
-    pin = read_pin(repo)
+    checkouts = [repo]
+    if isinstance(project_path, str) and real(project_path) != repo and os.path.isdir(project_path):
+        checkouts.append(real(project_path))  # a worktree cannot unpin the checkout that owns the copy
+    pin_sources = [
+        {"pin": found, "path": str(Path(checkout, ".claude", "ds-config.json"))}
+        for checkout in checkouts
+        for found in [read_pin(checkout)]
+        if found
+    ]
+    pin = "|".join(sorted({source["pin"] for source in pin_sources})) or None
     fingerprint_input = json.dumps(
         [plugin_id, scope, real(project_path) if isinstance(project_path, str) else None, pin],
         separators=(",", ":"),
@@ -353,8 +463,10 @@ def inspect_install(root: str, repo: str) -> dict[str, Any]:
         "marketplace": plugin_id.split("@", 1)[1],
         "projectPath": real(project_path) if isinstance(project_path, str) else None,
         "repoBound": row_bound_to_repo(row, repo),
+        "bindingExact": isinstance(project_path, str) and real(project_path) == repo,
         "resolution": resolution,
         "pin": pin,
+        "pinSources": pin_sources,
         "fingerprint": hashlib.sha256(fingerprint_input.encode()).hexdigest(),
     }
 
@@ -454,7 +566,103 @@ def newest_release(cwd: str) -> dict[str, str]:
     }
 
 
-def attest_marketplace(row: dict[str, Any], release: dict[str, str], cwd: str) -> None:
+def git_code(location: str, args: list[str], cwd: str, timeout: int = 10) -> tuple[int, bytes]:
+    code, out, _ = run_command(["git", "-C", location, *args], cwd=cwd, timeout=timeout)
+    return code, out
+
+
+def ensure_release_history(location: str, release_commit: str, cwd: str) -> None:
+    """Claude Code clones a marketplace with --depth 1 and only ever pulls, so a copy cloned after
+    the tag can lack the release commit or the history linking HEAD to it. Deepen it once: HEAD and
+    the working tree do not move, and nothing fetched is trusted except by its hash."""
+    code, out = git_code(location, ["rev-parse", "--show-toplevel"], cwd)
+    if code != 0 or real(out.decode("utf-8", "replace").strip()) != location:
+        raise UpdateProblem("marketplace-checkout-invalid")
+
+    def present() -> bool:
+        return git_code(location, ["cat-file", "-e", f"{release_commit}^{{commit}}"], cwd)[0] == 0
+
+    if present() and git_code(
+        location, ["merge-base", "--is-ancestor", release_commit, "HEAD"], cwd
+    )[0] == 0:
+        return
+    code, out = git_code(location, ["rev-parse", "--is-shallow-repository"], cwd)
+    if code == 0 and out.strip() == b"true":
+        code, git_dir = git_code(location, ["rev-parse", "--absolute-git-dir"], cwd)
+        lock = os.path.join(git_dir.decode("utf-8", "replace").strip(), "shallow.lock")
+        if code == 0 and os.path.lexists(lock):
+            raise UpdateProblem("marketplace-shallow-lock", path=lock, retryCommand=None)
+        try:
+            fetch, _ = git_code(
+                location, ["fetch", "--quiet", "--no-tags", "--unshallow", "origin"], cwd, timeout=60
+            )
+        except UpdateProblem as exc:
+            if exc.code not in {"command-timeout", "update-deadline-exceeded"}:
+                raise
+            raise UpdateProblem(
+                "marketplace-deepen-failed",
+                status="failed",
+                reason="timeout",
+                retryCommand="/devstride:update",
+            ) from exc
+        if fetch != 0:
+            raise UpdateProblem(
+                "marketplace-deepen-failed",
+                status="failed",
+                reason="error",
+                retryCommand="/devstride:update",
+            )
+    if not present():
+        raise UpdateProblem("release-commit-unavailable", expectedCommit=release_commit)
+
+
+def release_inert(location: str, release_commit: str, cwd: str) -> Callable[[str], bool]:
+    """A path goes unverified only when this helper AND the release being installed both list it
+    as inert, so older helpers honour a release that narrows the list. A release without the list
+    (older than 3.5.1) makes nothing inert: the strict rule it was built for."""
+    code, out = git_code(
+        location, ["show", f"{release_commit}:skills/update/scripts/update-plugin.py"], cwd
+    )
+    try:
+        files, dirs = parse_inert(out.decode("utf-8")) if code == 0 else (frozenset(), ())
+    except UnicodeDecodeError:
+        files, dirs = frozenset(), ()
+    return lambda path: is_inert(path) and (path in files or path.startswith(dirs))
+
+
+def shipped_changes(
+    location: str, release_commit: str, head: str, cwd: str, inert: Callable[[str], bool]
+) -> Optional[list[str]]:
+    """Shipped paths a later HEAD changes relative to the release, or None when HEAD does not
+    descend from it — a rewritten or diverged history is never 'the release plus maintainer docs'."""
+    code, _ = git_code(location, ["merge-base", "--is-ancestor", release_commit, head], cwd)
+    if code == 1:
+        return None
+    if code != 0:
+        raise UpdateProblem("marketplace-checkout-invalid")
+    # --no-renames: a move out of skills/ must list the shipped path it removes, not only the
+    # inert path it lands on.
+    code, out, _ = run_command(
+        ["git", "-C", location, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z",
+         release_commit, head],
+        cwd=cwd,
+        timeout=10,
+    )
+    if code != 0:
+        raise UpdateProblem("marketplace-checkout-invalid")
+    try:
+        paths = [raw.decode("utf-8") for raw in out.split(b"\0") if raw]
+    except UnicodeDecodeError as exc:
+        raise UpdateProblem("marketplace-checkout-invalid") from exc
+    return sorted(path for path in paths if not inert(path))
+
+
+def attest_marketplace(
+    row: dict[str, Any], release: dict[str, str], cwd: str, inert: Callable[[str], bool]
+) -> str:
+    """Prove the catalogue checkout serves the release: HEAD is the tag's commit, or a descendant
+    that changes only inert files, so what Claude copies from it ships exactly the release. Returns
+    HEAD, which the re-attestation before mutation must see again."""
     location = real(str(row["installLocation"]))
     checks = (
         (["git", "-C", location, "rev-parse", "--show-toplevel"], "root"),
@@ -471,15 +679,25 @@ def attest_marketplace(row: dict[str, Any], release: dict[str, str], cwd: str) -
         raise UpdateProblem("marketplace-checkout-invalid")
     if values["status"]:
         raise UpdateProblem("marketplace-checkout-dirty")
-    if values["head"] != release["commit"]:
-        raise UpdateProblem(
-            "marketplace-checkout-untagged",
-            expectedCommit=release["commit"],
-            actualCommit=values["head"],
-        )
+    head = values["head"]
+    if head != release["commit"]:
+        shipped = shipped_changes(location, release["commit"], head, cwd, inert)
+        if shipped is None or shipped:
+            raise UpdateProblem(
+                "marketplace-checkout-untagged",
+                expectedCommit=release["commit"],
+                actualCommit=head,
+                descendsFromRelease=shipped is not None,
+                shippedChanges=(shipped or [])[:5],
+            )
+    return head
 
 
-def tagged_payload(row: dict[str, Any], release: dict[str, str], cwd: str) -> dict[str, tuple[str, str]]:
+def tagged_payload(
+    row: dict[str, Any], release: dict[str, str], cwd: str, inert: Callable[[str], bool]
+) -> dict[str, tuple[str, str]]:
+    """The release's shipped files. Inert files are left out: the install may carry a later
+    commit's copies of them, and nothing a session runs reads them."""
     location = real(str(row["installLocation"]))
     code, out, _ = run_command(
         ["git", "-C", location, "ls-tree", "-r", "-z", release["commit"]],
@@ -489,6 +707,7 @@ def tagged_payload(row: dict[str, Any], release: dict[str, str], cwd: str) -> di
     if code != 0:
         raise UpdateProblem("marketplace-tree-unreadable")
     entries: dict[str, tuple[str, str]] = {}
+    all_modes: dict[str, str] = {}
     try:
         for record in out.rstrip(b"\0").split(b"\0"):
             if not record:
@@ -504,18 +723,42 @@ def tagged_payload(row: dict[str, Any], release: dict[str, str], cwd: str) -> di
                 or not parts
                 or Path(path).is_absolute()
                 or ".." in parts
-                or path in entries
+                or path in all_modes
             ):
                 raise ValueError
-            entries[path] = (mode, blob)
+            all_modes[path] = mode
+            if not inert(path):
+                entries[path] = (mode, blob)
     except (UnicodeDecodeError, ValueError) as exc:
         raise UpdateProblem("marketplace-tree-invalid") from exc
     if not entries:
         raise UpdateProblem("marketplace-tree-invalid")
+    for path, (mode, blob) in entries.items():
+        if mode != "120000":
+            continue
+        # A shipped link may point only at a shipped regular file of this release — never a
+        # directory (the tree root included), another link, a case variant, or a skipped path.
+        code, target, _ = run_command(
+            ["git", "-C", location, "cat-file", "blob", blob], cwd=cwd, timeout=10
+        )
+        try:
+            text = target.decode("utf-8") if code == 0 else ""
+        except UnicodeDecodeError:
+            text = ""
+        resolved = os.path.normpath(os.path.join(os.path.dirname(path), text)) if text else ""
+        if (
+            not text
+            or os.path.isabs(text)
+            or all_modes.get(resolved) not in {"100644", "100755"}
+            or inert(resolved)
+        ):
+            raise UpdateProblem("marketplace-tree-invalid", path=path)
     return entries
 
 
-def _verify_installed_payload(root: str, entries: dict[str, tuple[str, str]]) -> None:
+def _verify_installed_payload(
+    root: str, entries: dict[str, tuple[str, str]], inert: Callable[[str], bool]
+) -> None:
     root = real(root)
     try:
         root_stat = os.lstat(root)
@@ -614,14 +857,14 @@ def _verify_installed_payload(root: str, entries: dict[str, tuple[str, str]]) ->
             relative_dir = os.path.relpath(directory, root)
             for name in list(dirs):
                 path = name if relative_dir == "." else f"{relative_dir}/{name}"
-                if path == ".in_use":
+                if path == ".in_use" or inert(f"{path}/"):
                     dirs.remove(name)
                 elif os.path.islink(os.path.join(directory, name)):
                     actual.add(path)
                     dirs.remove(name)
             for name in files:
                 path = name if relative_dir == "." else f"{relative_dir}/{name}"
-                if path != ".in_use" and not path.startswith(".in_use/"):
+                if path != ".in_use" and not path.startswith(".in_use/") and not inert(path):
                     actual.add(path)
     except OSError as exc:
         raise UpdateProblem("installed-payload-unreadable") from exc
@@ -713,11 +956,13 @@ def _verify_installed_payload(root: str, entries: dict[str, tuple[str, str]]) ->
         raise UpdateProblem("installed-payload-changed")
 
 
-def verify_installed_payload(root: str, entries: dict[str, tuple[str, str]]) -> None:
+def verify_installed_payload(
+    root: str, entries: dict[str, tuple[str, str]], inert: Callable[[str], bool]
+) -> None:
     last: Optional[UpdateProblem] = None
     for attempt in range(2):
         try:
-            _verify_installed_payload(root, entries)
+            _verify_installed_payload(root, entries, inert)
             return
         except UpdateProblem as exc:
             last = exc
@@ -797,9 +1042,17 @@ def contextual(base: dict[str, Any], function: Any, *args: Any, **kwargs: Any) -
 
 
 def reinstall_commands(info: dict[str, Any]) -> list[str]:
+    # Claude Code resolves a project/local install in the checkout it is recorded in, so the repair
+    # runs there — in a subshell, so the directory change ends with the command instead of moving
+    # the session's shell into another checkout.
+    where = info.get("projectPath") if info.get("scope") in {"project", "local"} else None
+
+    def there(command: str) -> str:
+        return f"(cd {shlex.quote(where)} && {command})" if isinstance(where, str) and where else command
+
     return [
-        f"claude plugin uninstall {info['id']} --scope {info['scope']} --keep-data",
-        f"claude plugin install {info['id']} --scope {info['scope']}",
+        there(f"claude plugin uninstall {info['id']} --scope {info['scope']} --keep-data"),
+        there(f"claude plugin install {info['id']} --scope {info['scope']}"),
         "/devstride:update",
     ]
 
@@ -812,6 +1065,7 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
         "targetVersion": None,
         "id": before["id"],
         "scope": before["scope"],
+        "projectPath": before["projectPath"],
         "marketplace": before["marketplace"],
         "reloadRequired": before["runningVersion"] != before["diskVersion"],
         "safeToReload": False,
@@ -821,7 +1075,9 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
         "retryCommand": "/devstride:update",
     }
     if before["pin"]:
-        raise UpdateProblem("repository-pinned", **base, pin=before["pin"])
+        raise UpdateProblem(
+            "repository-pinned", **base, pin=before["pin"], pinSources=before["pinSources"]
+        )
     if before["scope"] == "managed":
         raise UpdateProblem("managed-install", **base)
 
@@ -843,8 +1099,11 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
             raise UpdateProblem("marketplace-changed-during-update", **base)
 
     release = contextual(base, newest_release, repo)
-    contextual(base, attest_marketplace, second_marketplace, release, repo)
-    payload = contextual(base, tagged_payload, second_marketplace, release, repo)
+    location = real(str(second_marketplace["installLocation"]))
+    contextual(base, ensure_release_history, location, release["commit"], repo)
+    inert = contextual(base, release_inert, location, release["commit"], repo)
+    attested_head = contextual(base, attest_marketplace, second_marketplace, release, repo, inert)
+    payload = contextual(base, tagged_payload, second_marketplace, release, repo, inert)
     target = contextual(
         base, marketplace_target, second_marketplace, before["id"].split("@", 1)[0]
     )
@@ -868,7 +1127,7 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
         )
     if after_refresh["diskVersion"] == target:
         base["repairCommands"] = reinstall_commands(before)
-        contextual(base, verify_installed_payload, after_refresh["installPath"], payload)
+        contextual(base, verify_installed_payload, after_refresh["installPath"], payload, inert)
         base["diskAfter"] = after_refresh["diskVersion"]
         base["reloadRequired"] = before["runningVersion"] != after_refresh["diskVersion"]
         base["safeToReload"] = True
@@ -890,13 +1149,16 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
     for key in ("name", "source", "repo", "ref", "installLocation"):
         if second_marketplace.get(key) != current_marketplace.get(key):
             raise UpdateProblem("marketplace-changed-during-update", **base)
-    contextual(base, attest_marketplace, current_marketplace, release, repo)
+    if contextual(base, attest_marketplace, current_marketplace, release, repo, inert) != attested_head:
+        raise UpdateProblem("marketplace-changed-during-update", **base)
     if contextual(
         base, marketplace_target, current_marketplace, before["id"].split("@", 1)[0]
     ) != target:
         raise UpdateProblem("marketplace-changed-during-update", **base)
+    # From a linked worktree, run the mutation in the repository the install is bound to.
+    update_cwd = before["projectPath"] or repo
     update_code, _, _ = contextual(
-        base, run_command, update, cwd=repo, timeout=60, extra_env=keep_cache
+        base, run_command, update, cwd=update_cwd, timeout=60, extra_env=keep_cache
     )
     try:
         after = inspect_install(root, repo)
@@ -939,7 +1201,7 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
             },
         )
     base["repairCommands"] = reinstall_commands(after)
-    contextual(base, verify_installed_payload, after["installPath"], payload)
+    contextual(base, verify_installed_payload, after["installPath"], payload, inert)
     base["safeToReload"] = True
     base["repairCommands"] = []
     code_name = "updated-with-cli-warning" if update_code != 0 else "updated"
@@ -963,7 +1225,7 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="action", required=True)
     for action in ("inspect", "apply"):
         command = subparsers.add_parser(action)
-        command.add_argument("--root", default=os.environ.get("CLAUDE_PLUGIN_ROOT"))
+        command.add_argument("--root", default=os.environ.get("CLAUDE_PLUGIN_ROOT") or own_root())
         command.add_argument("--repo")
         command.add_argument("--total-timeout", type=float)
     latest = subparsers.add_parser("latest")

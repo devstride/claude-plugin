@@ -62,6 +62,8 @@ setup_case() {
   cp "$ROOT/skills/update/scripts/latest-version.sh" "$PLUGIN/skills/update/scripts/latest-version.sh"
   cp "$ROOT/skills/update/scripts/update-plugin.py" "$MARKET/skills/update/scripts/update-plugin.py"
   cp "$ROOT/skills/update/scripts/latest-version.sh" "$MARKET/skills/update/scripts/latest-version.sh"
+  printf 'readme at release\n' > "$MARKET/README.md"
+  mkdir -p "$MARKET/scripts"; printf 'echo tool\n' > "$MARKET/scripts/tool.sh"
   printf '{"name":"devstride","version":"%s"}' "$VC_NEWEST" > "$MARKET/.claude-plugin/plugin.json"
   printf '{"plugins":[{"name":"devstride","source":"./"},{"name":"ds","source":"./"}]}' \
     > "$MARKET/.claude-plugin/marketplace.json"
@@ -91,6 +93,8 @@ PY
   cp "$MARKET/.claude-plugin/marketplace.json" "$LINEAGE/$POST_VERSION/.claude-plugin/marketplace.json"
   cp "$ROOT/skills/update/scripts/update-plugin.py" "$LINEAGE/$POST_VERSION/skills/update/scripts/update-plugin.py"
   cp "$ROOT/skills/update/scripts/latest-version.sh" "$LINEAGE/$POST_VERSION/skills/update/scripts/latest-version.sh"
+  cp "$MARKET/README.md" "$LINEAGE/$POST_VERSION/README.md"
+  mkdir -p "$LINEAGE/$POST_VERSION/scripts"; cp "$MARKET/scripts/tool.sh" "$LINEAGE/$POST_VERSION/scripts/tool.sh"
   python3 - "$VC_STATE/marketplaces.json" "$MARKET" <<'PY'
 import json,sys
 json.dump([{"name":"devstride","source":"github","repo":"devstride/claude-plugin",
@@ -474,5 +478,51 @@ if grep -q 'echo post-link-writer' "$REPO/.claude/statusline.sh" \
    && [ -z "$LEFTOVERS" ]; then
   ok "(12) post-link target writer → final proof catches it and preserves the edit"
 else bad "(12) out=$OUT target=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null) backup=$(cat "$REPO/.claude/statusline.sh.bak" 2>/dev/null) leftovers=$LEFTOVERS"; fi
+
+# A linked worktree shares its repository's project copy, but never auto-updates it in the
+# background: the checkout the copy is bound to owns that decision.
+setup_case worktree-auto 2.9.0 '{"plugin":{"autoUpdate":true}}' project 2.9.0
+"$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com add -A >/dev/null 2>&1
+"$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -qm base
+"$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
+WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$HOOK" <<< "$(printf '{\"cwd\":\"%s\"}' "$WT")" 2>/dev/null)"
+MAIN_REPO="$REPO"; REPO="$WT"
+if [ -f "$WT/.claude/ds-config.json" ] && result_is shared-checkout-auto-deferred \
+   && printf '%s' "$OUT" | grep -qF '/devstride:update' \
+   && not_called 'plugin marketplace update' && not_called 'plugin update'; then
+  ok "(worktree) autoUpdate on in a linked worktree → deferred to /devstride:update, no mutation"
+else bad "(worktree) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
+REPO="$MAIN_REPO"
+
+# The checkout a copy is recorded in pins it: a worktree session says so instead of handing off to an
+# update the pin will refuse.
+setup_case worktree-pinned 2.9.0 '{"plugin":{"pin":"2.8.0"}}' project 2.9.0
+"$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m base
+"$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
+WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$HOOK" <<< "$(printf '{\"cwd\":\"%s\"}' "$WT")" 2>/dev/null)"
+MAIN_REPO="$REPO"; REPO="$WT"
+OUT2="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$HOOK" <<< "$(printf '{\"cwd\":\"%s\"}' "$WT")" 2>/dev/null)"
+if [ ! -f "$WT/.claude/ds-config.json" ] && result_is bound-checkout-pinned \
+   && printf '%s' "$OUT" | grep -q '/.claude/ds-config.json pins 2.8.0' \
+   && printf '%s' "$OUT" | grep -q 'Remove that pin' && [ -z "$OUT2" ] && not_called 'plugin update'; then
+  ok "(worktree-pinned) owning checkout pins the running version → file named, remove-pin step, said once, no mutation"
+else bad "(worktree-pinned) out=$OUT second=$OUT2 calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
+REPO="$MAIN_REPO"
+
+# The owning checkout's pin names a version this copy is not on: that is drift, reported as drift.
+setup_case worktree-drift 2.9.0 '{"plugin":{"pin":"2.9.0"}}' project 2.9.0
+"$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m base
+"$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
+WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$HOOK" <<< "$(printf '{\"cwd\":\"%s\"}' "$WT")" 2>/dev/null)"
+MAIN_REPO="$REPO"; REPO="$WT"
+if result_is bound-checkout-pin-drift \
+   && printf '%s' "$OUT" | grep -q 'pins 2.9.0, but this copy of devstride@devstride runs 2.8.0' \
+   && not_called 'plugin update'; then
+  ok "(worktree-drift) owning checkout pins another version → reported as drift, no mutation"
+else bad "(worktree-drift) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
+REPO="$MAIN_REPO"
 
 exit $FAIL

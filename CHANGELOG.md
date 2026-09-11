@@ -8,6 +8,56 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.5.1] — 2026-09-11
+
+### Fixed
+
+- **`/devstride:update` runs as written.** A skill's shell command does not receive `CLAUDE_PLUGIN_ROOT` — only hooks do — so the helper stopped every skill run with `plugin-root-missing`. `--root` now falls back to the copy holding the helper, which is the loaded copy when a skill runs it by full path, and the skill passes `--root` explicitly.
+- **A docs-only commit after a release no longer blocks every update.** The helper required the marketplace checkout to sit exactly on the newest tag, while `scripts/check-version-bump.sh` lets a change that ships nothing land without a release — so #25, merged eight minutes after 3.5.0, stopped `/devstride:update` and the session-start auto-update on every machine with `marketplace-checkout-untagged`. A checkout that descends from the tag and changes only inert maintainer files (the root documents and `scripts/`) now serves that release; any other difference still blocks, and the result names the shipped paths. The installed skills, hooks and manifest — everything a session runs — are still proved against the tag, and an install already on the release is no longer flagged for repair because `main` moved on in docs.
+
+- **Project installs work across checkouts and repositories.** `/devstride:update` stopped with `project-install-unbound` whenever another repository had a project install of the same version (installs of one version share one cache folder), and in every linked git worktree. Now another repository's installs are ignored, and a project or local install is bound in every checkout of its repository, in either direction, as Claude Code applies it. Two installs recorded in checkouts of the same repository remain the ambiguity that stops `/devstride:update`, now naming each one's folder. The update, and any repair command (in a subshell, so the session's shell stays put), runs in the checkout the install is recorded in; that checkout's pin holds the copy from a worktree too, and the result names the config that pins it or fails to parse. The session-start check neither auto-updates a copy recorded in another checkout (`shared-checkout-auto-deferred`) nor recommends an update that checkout's pin will refuse (`bound-checkout-pinned`, or `bound-checkout-pin-drift` when the copy is not on that pin), naming the file that pins it.
+
+- **The docs-only rule works on a shallow marketplace copy.** Claude Code clones a marketplace with `--depth 1` and only ever pulls, so a copy cloned after the tag lacked the release commit and was reported as rewritten history. The helper now deepens that copy once — HEAD and the working tree do not move, and nothing fetched is trusted except by its hash — and reports `release-commit-unavailable` if the release still cannot be found. A deepen that fails or runs out of time reports `marketplace-deepen-failed`, a leftover `.git/shallow.lock` is named (`marketplace-shallow-lock`) with the step that clears it instead of a retry that cannot succeed, and a command the helper stops gets SIGTERM before SIGKILL so git can remove its own locks.
+- **A path goes unverified only when the release agrees.** Which files may differ from the tag is read from the release being installed as well as from the running helper; only paths both list as inert are skipped, so an older helper honours a release that narrows the list. A shipped symlink may point only at a shipped regular file of the same release — not a directory, another link, a letter-case variant or an inert path.
+- **The version-bump check reads escaped paths, and the release's own list.** It lists changed paths with `-z`, so a `scripts/` file with an accented name is still maintainer tooling, and it applies the inert list of the release the change follows — the rule the updater will apply.
+
+### Changed
+
+- **Project scope is the recommended install.** Install commands in the README, RELEASING and doctor say `--scope project`, update commands name the scope `claude plugin list` shows, and `/devstride:update`'s advice for a duplicate install keeps the project copy. They say why: a repository's `plugin.autoUpdate` and `plugin.pin` govern only a copy bound to it, a machine-wide copy is shared by every repository on the machine, and a machine-wide copy beside a project copy is the ambiguity that stops `/devstride:update`. A machine-wide install still works. The README also says that a project install writes `enabledPlugins` into the committed `.claude/settings.json` (`--scope local` installs for one person), what `plugin.pin` and `plugin.autoUpdate` really govern, and that a marketplace pin holds every repository on the machine — and its pinning recipe reinstalls every repository's copy. Doctor prints an install line only when no copy is bound to the repository, with the uninstall for a stray machine-wide copy.
+- **One definition of "ships nothing".** `scripts/check-version-bump.sh` (#25) reads the inert-path list from the update helper, so any change outside it — not only `skills/`, `hooks/` and the manifest — needs a version bump, and a skill moved into `scripts/` still counts as shipped.
+
+### Upgrading
+
+- **On 3.1.0–3.5.0, `/devstride:update` can stop with `plugin-root-missing`** on current Claude Code — the defect fixed here. Update once with the README's two native commands (`claude plugin marketplace update devstride`, then `claude plugin update <id> --scope <scope>` with the id and scope `claude plugin list` shows) and reload; from 3.5.1 the skill runs as written. Until most machines run 3.5.1, `main` stays exactly on the newest tag.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.5.0 @ 918fd0c, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.5.0 | tokens@devstride--v3.5.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/build-item/SKILL.md | 36,589 | 12,197 | 36,589 | 12,197 | +0 | 12,200 |
+| skills/plan/SKILL.md | 34,637 | 11,546 | 34,637 | 11,546 | +0 | 11,600 |
+| skills/review/SKILL.md | 34,109 | 11,370 | 34,109 | 11,370 | +0 | 11,400 |
+| skills/setup/SKILL.md | 32,077 | 10,693 | 32,077 | 10,693 | +0 | 10,700 |
+| skills/doctor/SKILL.md | 23,978 | 7,993 | 23,989 | 7,997 | +4 | 8,000 |
+| skills/release/SKILL.md | 23,985 | 7,995 | 23,985 | 7,995 | +0 | 8,000 |
+| skills/rebalance/SKILL.md | 23,936 | 7,979 | 23,936 | 7,979 | +0 | 8,000 |
+| skills/ultracode-build/SKILL.md | 17,326 | 5,776 | 17,326 | 5,776 | +0 | 5,800 |
+| skills/insert-defect/SKILL.md | 14,052 | 4,684 | 14,052 | 4,684 | +0 | 4,700 |
+| skills/insert-story/SKILL.md | 13,370 | 4,457 | 13,370 | 4,457 | +0 | 4,500 |
+| skills/pr/SKILL.md | 13,321 | 4,441 | 13,321 | 4,441 | +0 | 4,500 |
+| skills/rationalize-gantt/SKILL.md | 10,400 | 3,467 | 10,400 | 3,467 | +0 | 3,500 |
+| skills/create-defect/SKILL.md | 10,222 | 3,408 | 10,222 | 3,408 | +0 | 3,500 |
+| skills/branch-hotfix/SKILL.md | 9,015 | 3,005 | 9,015 | 3,005 | +0 | 3,100 |
+| skills/ci-audit/SKILL.md | 7,466 | 2,489 | 7,466 | 2,489 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 7,049 | 2,350 | 7,049 | 2,350 | +0 | 2,400 |
+| skills/comprehend-plan/SKILL.md | 6,459 | 2,153 | 6,459 | 2,153 | +0 | 2,200 |
+| skills/push/SKILL.md | 3,908 | 1,303 | 3,908 | 1,303 | +0 | 1,400 |
+| skills/branch-feature/SKILL.md | 3,185 | 1,062 | 3,185 | 1,062 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,347 | 783 | 2,799 | 933 | +150 | 1,000 |
+| alwaysOn.context (skill listing) | 3,637 | 1,213 | 3,637 | 1,213 | +0 | 1,300 |
+| **total (bodies)** | 327,431 | 109,151 | 327,894 | 109,305 | +154 | |
+
 ## [3.5.0] — 2026-09-11
 
 ### Added
@@ -1425,7 +1475,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.1...HEAD
+[3.5.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.0...devstride--v3.5.1
 [3.5.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.4.2...devstride--v3.5.0
 [3.4.2]: https://github.com/devstride/claude-plugin/compare/devstride--v3.4.1...devstride--v3.4.2
 [3.4.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.4.0...devstride--v3.4.1

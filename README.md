@@ -11,18 +11,42 @@ merge, and release — against your own repository and your own DevStride organi
 
 ## Install
 
+From the root of each repository you use it in:
+
+```bash
+claude plugin marketplace add devstride/claude-plugin
+claude plugin install devstride@devstride --scope project
 ```
-/plugin marketplace add devstride/claude-plugin
-/plugin install devstride@devstride
-```
+
+**Install at project scope — strongly recommended.** It binds the copy to that repository and its
+linked git worktrees:
+
+- **The repository decides when it moves.** `plugin.autoUpdate` in its `.claude/ds-config.json`
+  only ever updates a copy bound to that repository. A machine-wide copy is shared: an update run
+  from any repository moves it for all of them, and `plugin.pin` — which holds this plugin's own
+  updaters in the repository that sets it — cannot stop another repository's update. Neither
+  setting governs Claude Code's own `claude plugin update` or marketplace auto-update.
+- **One copy per repository.** A machine-wide copy *beside* a project copy is two installs that both
+  apply, and `/devstride:update` stops rather than guess which to change.
+- **It is the team rollout.** A project install writes `enabledPlugins` into the repository's
+  committed `.claude/settings.json`, which enables the plugin for everyone who clones it (see
+  *Rolling it out to a team* below). To install for yourself alone in a repository that has not
+  adopted DevStride, use `--scope local`, recorded in your personal
+  `.claude/settings.local.json` instead of the committed file.
+
+A machine-wide install (`--scope user`, the CLI's default) still works. If you have one beside a
+project install, keep the project copy and remove the other with
+`claude plugin uninstall devstride@devstride --scope user --keep-data` (`ds@devstride` if that is the
+id `claude plugin list` shows) — other repositories on the machine then need their own project
+install.
 
 <details>
 <summary>The shorter <code>ds</code> spelling</summary>
 
 The marketplace carries a second entry, `ds`, pointing at the same plugin:
 
-```
-/plugin install ds@devstride
+```bash
+claude plugin install ds@devstride --scope project
 ```
 
 **It is the same plugin** — same skills, same version, one manifest. `devstride` is the canonical
@@ -43,12 +67,12 @@ actually installed under, so a `ds` install updates with:
 
 ```bash
 claude plugin marketplace update devstride
-claude plugin update ds@devstride
+claude plugin update ds@devstride --scope <scope>   # the scope claude plugin list shows
 ```
 
 Running the `devstride@devstride` form against an alias install reports the plugin as not installed —
 which reads like something broke, when in fact you are simply on the other id. `claude plugin list`
-tells you which you have. From plugin 3.1.0, a direct `/devstride:update` resolves the installed
+tells you which you have. From plugin 3.5.1, a direct `/devstride:update` resolves the installed
 alias and scope for you.
 
 </details>
@@ -69,7 +93,7 @@ You can declare the marketplace and enable the plugin for a whole repository by 
 ```
 
 **This registers and enables the plugin — it does not install it.** Each person still runs
-`claude plugin install devstride@devstride` once on their machine. Worth saying out loud in your
+`claude plugin install devstride@devstride --scope project` once, in the repository. Worth saying out loud in your
 onboarding docs, because the failure is silent: the skills simply are not there, with nothing
 explaining why.
 
@@ -377,7 +401,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.5.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.5.1** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added
@@ -387,17 +411,18 @@ bound to that repository; it never gives one repo authority over a shared user o
 *Once, to stop thinking about it:* open `/plugin`, select the devstride marketplace, and choose
 **Enable auto-update**. Claude Code then refreshes the marketplace and its installed plugins for you.
 
-*From version 3.1.0 onward:* invoke `/devstride:update`. It finds the exact copy that loaded the
+*From version 3.5.1 onward:* invoke `/devstride:update` (on 3.1.0–3.5.0 it can stop with
+`plugin-root-missing` on current Claude Code — use the two commands below once). It finds the exact copy that loaded the
 command, verifies the official tag and installed files, and updates that copy. When reload is
 needed, run `/reload-plugins` and confirm it reports no DevStride load error; restart if reload is
 unavailable or fails. Do not invoke another DevStride command first.
 
-*To get 3.1.0 from 3.0.0 or older, or when the skill is unavailable:* use two commands, and
+*On 3.5.0 or older, or when the skill is unavailable:* use two commands, and
 **both** are needed —
 
 ```bash
 claude plugin marketplace update devstride   # refresh the catalog
-claude plugin update devstride@devstride     # upgrade the installed plugin
+claude plugin update devstride@devstride --scope <scope>   # the scope claude plugin list shows
 ```
 
 Then run `/reload-plugins` and confirm it reports no DevStride load error; restart Claude Code if
@@ -407,8 +432,13 @@ reload is unavailable or fails. Two things to watch:
   installed through the [short alias](#install). `claude plugin list` shows which you have, and using
   the wrong one reports the plugin as not installed rather than doing nothing visible; the bare plugin name
   reports "not found".
-- It acts on the **user** scope by default. If you installed with `--scope project`, `local` or
-  `managed`, pass the same `--scope` or it will report the plugin isn't installed and change nothing.
+- It acts on the **user** scope by default, so pass the scope `claude plugin list` shows: `project` for
+  the recommended install, `user` for an older machine-wide one (likewise `local` or `managed`) —
+  otherwise it reports the plugin isn't installed and changes nothing.
+
+If an update reports `marketplace-shallow-lock`, a stopped download left a lock in Claude Code's
+marketplace copy: once no `git` or `claude plugin` process is working there, remove the named file
+and run `/devstride:update` again.
 
 Running only the first command is a common mistake — it refreshes marketplace metadata and reports
 success while leaving your installed copy exactly where it was.
@@ -418,17 +448,22 @@ success while leaving your installed copy exactly where it was.
 New skills, new config keys, and changed skill behavior arrive in MINOR bumps; wording fixes in
 PATCH.
 
-**Pinning.** Append `@<tag>` to the marketplace source to pin to a release. There is no `--ref`
-flag — the ref goes in the source itself.
+**Pinning.** To hold one repository on a release, set `plugin.pin` in its `.claude/ds-config.json`:
+this plugin's own updaters then leave that repository's copy alone (Claude Code's marketplace
+auto-update does not read it). Pinning the marketplace itself holds *every* repository on the
+machine: append `@<tag>` to the marketplace source — there is no `--ref` flag.
 
-> **`marketplace remove` also uninstalls every plugin that came from it.** Re-adding the marketplace
-> does *not* bring the plugin back, so the reinstall line below is required, not optional. Skip it
-> and you are left with a registered marketplace and no skills, and nothing says why.
+> **`marketplace remove` also uninstalls every plugin that came from it, in every repository and
+> scope.** Re-adding the marketplace does *not* bring them back. Note each DevStride row
+> `claude plugin list --json` shows first, then reinstall each one from its own repository with its
+> own scope (a project reinstall writes that repository's committed `.claude/settings.json`) — skip one
+> and that repository is left with no skills, and nothing says why.
 
 ```bash
+claude plugin list --json                 # note every DevStride row: id, scope, projectPath
 claude plugin marketplace remove devstride
 claude plugin marketplace add devstride/claude-plugin@devstride--v<version>
-claude plugin install devstride@devstride
+claude plugin install <id> --scope <scope>   # once per row: its id and scope, from its projectPath
 ```
 
 Every release is tagged, so any version in the [changelog](CHANGELOG.md) is pinnable. To unpin, run

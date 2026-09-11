@@ -14,7 +14,7 @@ remove/re-add a marketplace, or change an administrator-managed install.
 Run exactly:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/skills/update/scripts/update-plugin.py" apply
+python3 "${CLAUDE_PLUGIN_ROOT}/skills/update/scripts/update-plugin.py" apply --root "${CLAUDE_PLUGIN_ROOT}"
 ```
 
 The helper bypasses background-check caches and switches, finds the exact loaded copy, verifies the
@@ -27,7 +27,11 @@ Translate its one JSON result; never paste it raw:
   **Install**, **Result**. Explain user scope as shared on this machine; project/local as this repo
   only. Keep the exact id and scope in parentheses.
 - `blocked`: explain the safety stop. Never bypass a pin, administrator boundary, duplicate, or
-  missing repository binding.
+  missing repository binding. For a user-scope copy beside this repository's project copy, recommend
+  keeping the project one (the recommended scope) and removing the other with
+  `claude plugin uninstall <id> --scope user --keep-data`; other repositories then need their own.
+  For `marketplace-shallow-lock`: once no `git` or `claude plugin` process works in that marketplace
+  folder, the user removes the named file and reruns `/devstride:update`.
 - `failed`: say which stage failed and that success is unproved. If `manualInspectionRequired`,
   give no mutation command: Claude cannot prove which copy is safe to change. If
   `repairRequired`, **do not reload or invoke another DevStride skill**; separately ask permission
@@ -38,4 +42,4 @@ Only for `updated`/`current` with both `safeToReload` and `reloadRequired` true,
 **Run `/reload-plugins` before another DevStride command and confirm it reports no DevStride load
 error. If reload is unavailable or fails, restart Claude Code.** Stop after this handoff.
 
-The skill first exists in 3.1.0. Older copies need the README's two-command bootstrap once.
+It runs as written from 3.5.1; older copies need the README's two-command bootstrap once.
