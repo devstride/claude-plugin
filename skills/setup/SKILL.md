@@ -16,8 +16,7 @@ Optional argument: $ARGUMENTS
 - **`validate`** — skip to Phase G on the config already there; nothing asked or written.
   **Run A1 first even so** — Phase G assumes the repository root.
 - **A detector name** — `ecosystem` (A2–A3), `verify` (A4), `ci-inspect` (A5), `branches` (A6),
-  `engines` (A7) — inspect and report just that part. (`ci-inspect`, not `ci`: the bare word is
-  the write mode; one token means one thing.)
+  `engines` (A7) — inspect and report just that part. (`ci-inspect`, not `ci` — the bare word is the write mode.)
 - **`docs`** — the documentation-hooks mode, the one narrowed run that WRITES: A1 + A8, Phase
   D's three documentation questions plus `release.deployVerification`, then write **only** the
   `docs` block and that key (create-with-just-those-keys or Phase F merge, `release.docsRepo`
@@ -33,8 +32,7 @@ Optional argument: $ARGUMENTS
 - **Nothing** — the full run: inspect, ask, write, scaffold, validate.
 
 **Run each mode's prerequisites silently — A1 always, A2–A3 before A4.** A narrowed run reports
-fewer keys, never worse ones, **stops after Phase B and writes nothing** (a write would fill
-every unexamined key with a default); a full `/devstride:setup` is what writes. **`docs` and
+fewer keys, never worse ones, **stops after Phase B and writes nothing**; a full `/devstride:setup` is what writes. **`docs` and
 `ci` are the exceptions by design** — each writes exactly the keys its own questions answer.
 
 **The write boundary — the whole of it**: `.claude/ds-config.json`; in E2 only, the scaffolded
@@ -45,8 +43,7 @@ mutation, no installs, no DevStride **write** tool. **Phases A–D are strictly 
 
 ## Why detection comes before questions
 
-**Detect before you ask — and never guess**: a wrong detected value arrives wearing the
-authority of evidence. Three outcomes; the third is not a failure:
+**Detect before you ask — and never guess.** Three outcomes; the third is not a failure:
 
 | Status | Meaning | Later |
 |---|---|---|
@@ -54,8 +51,7 @@ authority of evidence. Three outcomes; the third is not a failure:
 | `ambiguous` | Several plausible answers, or one needing confirmation | A question offering the candidates |
 | `unknown` | The repository does not answer this | A question with no prefill |
 
-Every row carries the evidence that produced it — a row without evidence is a guess with a
-status attached.
+Every row carries the evidence that produced it.
 
 ## Ground rules for every detector
 
@@ -75,6 +71,12 @@ Confirm a git work tree (stop if not). `git remote get-url origin` — `origin` 
 delivery skills hardcode it); other remotes only → say which, mark every branch key `ambiguous`.
 Record the forge host — **the delivery half assumes GitHub and GitHub Actions**; say plainly
 when it is anything else.
+
+**A config on a stale branch describes a repository that no longer exists.** When
+`.claude/ds-config.json` is already present and its `baseBranch` resolves on `origin` but HEAD is
+on a different branch, say so and offer to switch **before inspecting anything** — otherwise the
+run detects the stale branch's contents and writes a config describing them over the maintained
+one.
 
 ### A2. Ecosystem and package manager
 
@@ -100,8 +102,8 @@ Scan `scripts` in the root `package.json` and each workspace's. Ranked exact-nam
 
 - **Read what the matched script does** — a body that is a bare `echo`/`exit 1` or runs no tool
   is a placeholder → `unknown`, saying why; never `detected`.
-- **Compose as `<pm> run <script>`, always** — the bare form fails in npm; `run` works in all
-  four. An existing bare-form config is equivalent, not wrong.
+- **Compose as `<pm> run <script>`, always** — `run` works in all four. An existing bare-form
+  config is equivalent, not wrong.
 - **`verify.typecheck` is an array** — one `cd <workspace> && <pm> run <script>` per workspace
   that has one (single package → one-element array); propose **every** such workspace.
 - **`verify.test` / `verify.lint` are single strings** — several candidates → `ambiguous`,
@@ -164,7 +166,11 @@ is then the local gate.
   `review.localCommand` and optional `review.localAssistCommand`; for an engine the user names,
   build one to the contract and confirm it. Found → `ambiguous` until confirmed; carry
   `review.localReviewerName`. Existing base-only/literal-effort commands remain supported but
-  get a migration proposal, never a silent rewrite. **Not found → `unknown`, never detected
+  get a migration proposal carrying the tradeoff, never a silent rewrite: context mode is not
+  strictly better, and a repository extracting structured findings loses them. **Never propose
+  the migration when the effective `maxLocalReviewRounds` is 1** (the profile's value, or
+  `profileOverrides.maxLocalReviewRounds`) — the cumulative ledger context mode exists to carry
+  has nothing to carry. **Not found → `unknown`, never detected
   `null`** — report what was probed.
 - **Cloud reviewers** (`review.automatedReviewers`) — possible when origin is GitHub and
   `gh auth status` succeeds. **An entry is more than a name**: a `requested_reviewer` bot is
@@ -185,7 +191,7 @@ is then the local gate.
   **Capture sections as `{heading, guidance}`** — the text beneath each heading is the
   guidance; an empty one becomes a question, not a blank.
 - **Read `.claude/ds-config.json` if present**; record each key's current value beside the
-  detected one — how a re-run tells a hand-edit from a stale value.
+  detected one.
 - **Documentation hooks** — rows `docs.updateSkill`, `docs.releaseNotesSkill`; detection is
   limited and the row says so. Existing config: a name whose `.claude/skills/<name>/SKILL.md`
   exists → `detected`; missing directory → `ambiguous` with the dangling name; legacy
@@ -200,9 +206,8 @@ is then the local gate.
 Eight rows: `localEnvironment.create`, `.recreate`, `.recreateMode`, `.instanceName`, `.seed`,
 `.migrate`, `.teardown`, `.instanceBoundTo`.
 
-- **`recreateMode` is never `detected`** — `"inPlace"` vs `"newInstance"` is what the command
-  does, and a wrapper does not say; ask whenever `recreate` is non-null and carries `<name>`,
-  explaining both.
+- **`recreateMode` is never `detected`** — ask whenever `recreate` is non-null and carries
+  `<name>`, explaining both `"inPlace"` and `"newInstance"`.
 - **`instanceName` — only when `recreate` resets in place and carries `<name>`**; propose it
   `ambiguous` (a marker file is the usual source), never `detected`.
 - **`recreate` is asked, never inferred** — propose the composition its own
@@ -214,8 +219,7 @@ Eight rows: `localEnvironment.create`, `.recreate`, `.recreateMode`, `.instanceN
 - **`instanceBoundTo` is never detected.** Ask, with `directory` (a second worktree gets its own
   instance; checking out another branch inside it keeps that instance's data), `branch`, `none`
   — saying what each means.
-- Existing config: record the current block, per A8. Nothing found → rows `unknown`, not `null`
-  — only the owner can say "there is none".
+- Existing config: record the current block, per A8. Nothing found → rows `unknown`, not `null`.
 
 ### A10. Deployment stage
 
@@ -226,9 +230,11 @@ cheap, quiet and preferably read a marker. When non-null, always ask `production
 valid. Never confuse this read-only cloud stage with the mutable LOCAL `localEnvironment`. Record
 existing config per A8.
 
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.md` when running A5 or
-A6, when a detector's result is `ambiguous` and the candidates need explaining, or before
-changing a detector.**
+**When a detector's result is `ambiguous`, read
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.digest.md`** — why that detector
+declines to decide, and what evidence would settle it. **Read the full
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.md` before changing a detector**;
+A5 and A6 address their own sections of it above.
 
 ## The prefill summary — the contract
 
@@ -263,8 +269,7 @@ both roles, every item its own release unit, no batching.
 
 **DevStride connection unavailable**: the bundled server contributes no tools until signed in —
 a symptom, not an error; `/mcp` is where sign-in happens. Two paths: continue without it (write
-with `hierarchyRoles` omitted, reported as required follow-up) or stop and resume. **Never guess
-the roles** — absent is visible; wrong silently matches nothing.
+with `hierarchyRoles` omitted, reported as required follow-up) or stop and resume. **Never guess the roles.**
 
 ## Phase D — ask only what is left
 
@@ -282,7 +287,9 @@ Four things no inspection can reach, asked every run — the first one first:
   (`epicIntegrationBranches.autoRelease`, `fastStoryMerges.enabled`,
   `review.pollTimeoutMinutes`); on a re-run the file's `profile` is the prefill. **If
   `prototype`, say the consequence now**: `autoRelease` becomes `true` — a release unit merges
-  to `baseBranch` with no human saying so; name the branch. The profile is never `detected`.
+  to `baseBranch` with no human saying so; name the branch. The user may answer `ask` instead —
+  no profile produces it; the loop then stops and asks the owner once per release unit. The
+  profile is never `detected`.
 - **What does merging to the production branch actually do?** (`release.autoDeployOnMerge`) —
   one plain-English sentence; the release skill quotes it back at the production gate. Nothing
   can detect it; no sensible default exists.
@@ -290,8 +297,7 @@ Four things no inspection can reach, asked every run — the first one first:
   directory here, a sibling checkout (path + branch), a hosted service (URL), or "nowhere" →
   `docs.updateSkill: null`. When it exists, next ask **how it is updated** — publishing branch /
   pull request / tool / person — and capture what makes "publish" concrete. Then separately ask
-  **how release notes are pushed**; "we do not publish" → `docs.releaseNotesSkill: null`, so
-  `--release-notes` reports itself unavailable. Then ask for the skill **names** (defaults
+  **how release notes are pushed**; "we do not publish" → `docs.releaseNotesSkill: null`. Then ask for the skill **names** (defaults
   `update-documentation`, `update-release-notes`) and, separately and optionally,
   **`release.deployVerification`** (exits 0 only when production serves `RELEASE_COMMIT`; explain
   its value; never invent one). Answers go into the E2 scaffolds, not the config; contract:
@@ -299,8 +305,7 @@ Four things no inspection can reach, asked every run — the first one first:
   per release** — no "warranted" policy; the owner passes `--release-notes`.
 - **Whether to write the repository a status line** — one yes/no, every run. It renders
   `Model · Effort · Repo · Checkout · Branch · Stage · PR`; the segment worth naming when asking is
-  **Checkout** (main checkout vs linked worktree — the loop puts epic work in worktrees, so this
-  stops being obvious exactly when it starts to matter). Say it writes `.claude/statusline.sh` and
+  **Checkout** (main checkout vs linked worktree). Say it writes `.claude/statusline.sh` and
   the `statusLine` setting, both the owner's to edit afterwards, and that declining changes nothing
   else. Written in E3.
 - **Where the lessons store lives**, if not the default path. **Never offer to create the file**
@@ -312,39 +317,40 @@ answer needs justifying, or when a re-run (Phase F) proposes removing or migrati
 ## Phase E — write the config
 
 One write, after every confirmation, of the whole document. Values from detection, Phase C, or
-Phase D; else the shipped default — present-with-default is inspectable, absent is invisible.
+Phase D; else the shipped default.
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md` holds every default —
-**read it before writing and copy verbatim**; the delivery skills compare these strings
-literally.
+**read it before writing and copy verbatim**.
 
 | Key | Value |
 |---|---|
 | `baseBranch`, `hotfixBaseBranch`, `protectedBranches` | From A6; `protectedBranches` **always** holds base, production, release-source |
 | `integrationBranch` | `null` — per-release-unit derivation is the default |
 | `profile` | The Phase D answer, the word itself — always written, `standard` included |
-| `epicIntegrationBranches` | Verbatim from the defaults reference; `autoRelease` at the profile's value; `fastStoryMerges.enabled` per below |
+| `epicIntegrationBranches` | Verbatim from the defaults reference; `autoRelease` at the profile's value or an explicit `ask`; `fastStoryMerges.enabled` per below |
 | `verify` | `typecheck` (array), `test`, `lint`, `testSingle`, `testDir`, `skipDuringStoryBuilds: []` |
 | `generated` | Only when detected — omit an empty shape |
 | `review` | The roster + three CI-ordering booleans per the rules; `pollTimeoutMinutes` at the profile's value |
 | `prBodyTemplate`, `commitConventions`, `ci`, `branchNaming` | Verbatim from the defaults reference unless the repository said otherwise — `ci` includes `freezeBaseWhileReleasePrReady: true`, `expectedRunsPerPullRequest: 1` |
+| `defects` | Verbatim from the defaults reference |
+| `session` | Verbatim from the defaults reference |
 | `preShipChecks`, `preCommitWiringChecks` | `[]` — a repository names these for itself |
 | `hierarchyRoles` | Phase C's confirmed mapping |
 | `release` | `productionBranch`, `releaseSource`, `autoDeployOnMerge`, `deployVerification` (`null` unless given). Never `docsRepo` — retired; Phase F migrates |
 | `docs` | `updateSkill`, `releaseNotesSkill` — the names E2 scaffolds, or `null`; `updateOnEpicRelease: false` |
 | `conventionsDoc`, `itemTagFormat`, `lessonsDoc` | From A8, the answers, and the shipped default path |
 | `plugin` | Verbatim — `updateCheck: true`, `autoUpdate: true`, `pin: null`; automatic mutation is project/local-scope only |
-| `stage` | The two A10 keys — `resolve`, `productionStages`. Write the block even when `resolve` is `null`: absent reads as "nobody asked", and most repositories legitimately have no stage |
+| `stage` | The two A10 keys — `resolve`, `productionStages`. Write the block even when `resolve` is `null` — absent reads as "nobody asked" |
 | `localEnvironment` | The eight A9 keys. Write the block even when every command is `null` — absent reads as "nobody asked" |
 
-**The roster must describe what actually exists** — later runs read these keys as fact. No
+**The roster must describe what actually exists.** No
 local CLI detected → **omit `localCommand`** (or `null`). No cloud reviewer →
 **`automatedReviewers: []`**. **`fastStoryMerges.enabled`, precondition by profile**:
 `standard`/`enterprise` → `true` with `verify.test` and `verify.typecheck` set; `prototype` →
 `true` whenever `verify.typecheck` is set (the exact
 rule is in the defaults reference — apply, do not re-derive); unmet → `false`, saying which part
 was missing and, under `prototype`, that the file now contradicts its profile. **`autoRelease`
-and `review.pollTimeoutMinutes` take the profile's values** — `autoRelease: true` for
-`prototype` repeats the consequence at the write, naming `baseBranch`.
+and `review.pollTimeoutMinutes` take the profile's values** unless the owner answered `ask` —
+`autoRelease: true` for `prototype` repeats the consequence at the write, naming `baseBranch`.
 
 Say what was written; go to E2, then E3, then G. **The run is not finished at the write.**
 
@@ -370,33 +376,28 @@ Only when Phase D said yes. Copy
 { "statusLine": { "type": "command", "command": "bash .claude/statusline.sh", "padding": 0 } }
 ```
 
-**Copy it verbatim — nothing is substituted.** It is repo-agnostic and reads the consuming
-repository's config at runtime for `stage.*`, which is what lets one file serve every repository
-and makes re-copying it safe; a `{{PLACEHOLDER}}` edited in is a bug, not a customization.
+**Copy it verbatim — nothing is substituted**: it reads the consuming repository's config at
+runtime for `stage.*`, and a `{{PLACEHOLDER}}` edited in is a bug, not a customization.
 
-**Never overwrite an existing `.claude/statusline.sh`** — the owner may have edited it or written
-their own. Say it is already there and leave it.
+**Never overwrite an existing `.claude/statusline.sh`** — the owner may have edited it. Say it is
+already there and leave it.
 
-Then prove it runs, because a status line fails silently — Claude Code renders nothing and reports
-no error:
+Then prove it runs — a status line fails silently:
 
 ```bash
 printf '{"workspace":{"current_dir":"%s"}}' "$PWD" | bash .claude/statusline.sh; echo
 ```
 
-Non-empty output is the pass. Confirm neither file is gitignored (`git check-ignore` exits 1) — a
-status line only one machine has is the commonest fresh-clone surprise — and say both are the
-owner's to edit.
+Non-empty output is the pass. Confirm neither file is gitignored (`git check-ignore` exits 1) and
+say both are the owner's to edit.
 
 Then **look at which segments that render actually produced**, and ask about the structurally
-absent ones — in practice `stage`, the only blank whose cause is genuinely ambiguous. Answers
+absent ones — in practice `stage`. Answers
 either write config (`stage.resolve`) or record `statusLine.hiddenSegments`; an unanswered question
 writes nothing. The segment table, the transient-versus-structural split and the exact question are
 in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
 
 ## Phase F — re-running on a repository that already has a config
-
-A re-run must never cost someone their hand edits.
 
 1. **Re-detect everything** — Phases A and C, unchanged.
 2. **Diff against the existing file; propose only what would change** — wider than detection:
@@ -443,8 +444,11 @@ phase** — it holds each check's full procedure, its run rules, and the failure
 3. **Declared review engines respond** — only what the config declares. Probe the binary/version
    for `review.localCommand` and `review.localAssistCommand`; validate the contract in
    `references/review-engines.md`, then any catalogued engine extras, from help alone without
-   spending a model call. An uncatalogued engine is held to the contract only, never failed for
-   being unrecognised. Cloud: `gh auth status` + repository read — **saying what that does
+   spending a model call. **Run
+   `${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/check-review-engine.sh` and report its lines
+   verbatim**: a catalogued engine missing its read-only flag is `FAIL` — the reviewer can write to
+   the tree it reviews; an uncatalogued engine is `UNVERIFIABLE`, held to the contract only, never
+   failed for being unrecognised. Cloud: `gh auth status` + repository read — **saying what that does
    not prove**: only a real pull request settles whether a request registers.
 4. **Work types** — every `hierarchyRoles` name still resolves; connection unavailable is
    `UNVERIFIABLE` with Phase C's message.
@@ -461,14 +465,13 @@ phase** — it holds each check's full procedure, its run rules, and the failure
 
 **The verdict is the output**: every check with its outcome, then one line — **loop-ready** only
 with zero failures; skips and unverifiables are fine, named. Say when **the working tree was
-dirty** (the likelier typecheck culprit) and when **the run was offline**.
+dirty** and when **the run was offline**.
 
 IMPORTANT:
 - **The write boundary is `.claude/ds-config.json`, the E2 scaffolds, and — in `setup ci` only,
   on acceptance — the pull-request workflows.** Everything else is read-only in every phase;
   Phase G runs the repository's own verify commands, asking first where a write looks likely.
-- **Never report a guess as `detected`** — the status column is all that stands between a
-  detected value and a fabricated one.
+- **Never report a guess as `detected`.**
 - **Absence is information** — no local CLI, no cloud reviewer, no CI provider are real findings
   with real values, not gaps to fix.
 - **Never write a config that claims an engine the repository does not have** — an aspirational

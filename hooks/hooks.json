@@ -1,11 +1,18 @@
 {
-  "description": "Session-start version check: reports newer releases, safely applies an opted-in repository-scoped update, and gives a verified reload handoff. Silent when current; every operation is bounded.",
+  "description": "Session-start version check (reports newer releases, safely applies an opted-in repository-scoped update, gives a verified reload handoff; silent when current) and a prompt-time session gate (one job class per session: an authoring job and an execution job do not share a session; fails open). Every operation is bounded.",
   "hooks": {
     "SessionStart": [
       {
         "matcher": "startup|resume",
         "hooks": [
           { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/version-check.sh\"" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-gate.sh\"", "timeout": 10 }
         ]
       }
     ]

@@ -1,10 +1,13 @@
+---
+load: tooling
+---
 # Landmine inventory — every hard-won fact the delivery skills encode
 
 **A maintenance instrument for people editing these skills.** Each line below is a fact that was
 learned the expensive way — a rule that exists because its absence caused a failure. When you compress, refactor or re-word a skill, this is how you check that a rule did
 not quietly vanish along with the paragraph that carried it.
 
-**Run it whenever you edit skill text.** The runnable check and the three things it cannot prove are
+**Run it whenever you edit skill text.** The runnable check and the four limits it cannot overcome are
 at the end of this file.
 
 **Count: see the total at the end.** Recount whenever you add one. An earlier revision of this file
@@ -235,6 +238,10 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "delivery-profiles.md" "Delivery profile:" "maxLocalReviewRounds" \
               "reviewerRegistrationWindowMinutes" "fixFloor" "targetAdversarialCycles" \
               "cumulative ledger" "verification receipt" "review-moment:" \
+              "check-review-engine.sh" "MISSING READ-ONLY FLAG" "settled by running it" \
+              "sandbox_mode=read-only" "deferredContainerTitle" "Never auto-select from the deferred container" \
+              "Never splice a below-floor finding" "third legal value" "jobClassGate" "same-session" \
+              "describes a repository that no longer exists" "load: contract" "related-to" \
               "engineering-economy" "CI-last" "localAssistCommand" "review-settled" \
               "task/risk-sized" "effective scope" "fixable occurrence" \
               "sanitized final" "second timeout" "serious P2" "no numeric cap" \
@@ -566,6 +573,17 @@ R5. Exit 0 and matching version text are not proof: attest the canonical tag com
 R6. Direct `/devstride:update` is separate user authority for the exact loaded user/project/local
     install. Pins, managed or ambiguous installs block. Reload only after `safeToReload`; confirm no
     DevStride load error and restart on failure. Never continue a loop with mid-session behavior.
+R7. One job class per session (`hooks/session-gate.sh`, UserPromptSubmit). Every turn re-sends the
+    whole conversation, so an authoring job (setup, plan, doctor, ci-audit, rebalance,
+    rationalize-gantt, comprehend-plan) and an execution job (build-item, pr, review, release,
+    push, create-story, create-defect, insert-story, insert-defect) never share a session; the
+    gate blocks the mixing command with a plain-language reason and `/clear` as the cure. It is
+    NOT one skill per session — build-item's story-after-story loop is one job. Nested
+    invocations never pass through a user prompt, so driven mode needs no exemption.
+R8. The gate fails open: no session id, no git, an unwritable `.git`, malformed JSON → exit 0
+    silently. Escape hatches: `--same-session`, `session.jobClassGate: false`,
+    `DEVSTRIDE_SESSION_GATE=0`. Markers live under `<git-common-dir>/devstride/session/` and are
+    pruned after 7 days.
 
 ## S. CI policy shape and run-once counting
 S1. A convention-only workflow (`opened` plus optionally `converted_to_draft` /
@@ -716,9 +734,43 @@ X4. A matched entry is reported as `mandatory lens <name>: ran (N findings)`; an
 X5. Doctor FAILs a malformed entry and WARNs a glob with no `/` or a bare `*`/`**`; `setup` never
     writes entries.
 
+## Y. Read-only review, session classes, deferred defects (a field run against a consuming repository)
+Y1. The configured local review command is VERIFIED to run read-only, never assumed:
+    `skills/setup/scripts/check-review-engine.sh` parses `review.localCommand` and
+    `review.localAssistCommand` against the catalogue; setup check 3 and doctor §6 run it. A
+    catalogued engine missing its flag is FAIL with the exact fix (MISSING READ-ONLY FLAG); a
+    disabled or widened sandbox is FAIL whatever the engine; an uncatalogued engine is
+    UNVERIFIABLE, held to the contract only. A flagless command inherits the machine default —
+    in the field that was full write access, and a review round wrote a config carrying a live
+    credential into the tree it was reviewing.
+Y2. The read-only flag differs by subcommand: `codex exec` takes `--sandbox read-only`;
+    `codex review` and `codex exec review` refuse `--sandbox` and take `-c sandbox_mode=read-only`.
+    A CLI's behaviour is settled by running it, never by reading its help — `codex review --help`
+    lists a stdin prompt the parser refuses beside `--base`. `scripts/tests/check-review-engine.sh`
+    pins every catalogued template to pass the check.
+Y3. Migrating a base-only `codex review` to `codex exec` context mode is a TRADEOFF, not an
+    upgrade: it loses the structured findings item and, under `maxLocalReviewRounds` 1, the ledger
+    context mode carries has nothing to carry. Setup proposes it with the tradeoff and never at 1.
+Y4. Setup A1 compares HEAD with an existing config's `baseBranch` and offers to switch first: a
+    config on a stale branch describes a repository that no longer exists.
+Y5. `epicIntegrationBranches.autoRelease` has a third legal value, `"ask"`: stop at zero and ask
+    once per release unit; unanswerable → behaves as `false` and says so. No profile produces it.
+Y6. Below-floor DEFECTS are never spliced into the chain under any profile. They are filed by
+    `create-defect`'s deferred placement in the container titled `defects.deferredContainerTitle`
+    directly under the plan root — no `[N]` prefix, no `blocked_by`, a related-to relationship to
+    the item whose review produced them (type read from the `add_relationship` schema, never
+    assumed), no delivery phase. Step 0 never auto-selects there; the container is never a release
+    unit at zero. Discovered SCOPE still splices via `insert-story`.
+Y7. `prBodyTemplate.noAiAttribution` governs the PR body and outranks a harness or session
+    instruction to add attribution; commit trailers follow push's rule.
+Y8. Every flat reference opens with `load:` (contract | rationale | digest | tooling);
+    `measure-cost.sh --check` fails without it and caps a digest at 400 words. Of the nine
+    references at or above 8 KB, seven are contracts and one is tooling — size says nothing
+    about how a file must be read, so contracts are cited by SECTION, never digested.
+
 ---
 
-**Revised total: 55 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 10 (O) + 3 (P) + 2 (Q) + 5 (R) + 4 (S) + 8 (T) + 5 (U) + 10 (V) + 6 (W) + 5 (X) = 143 facts.** (Needles are a SAMPLE, not one per fact; recount their loops after editing.)
+**Revised total: 55 (A–H) + 10 (I) + 13 (J) + 2 (K) + 2 (L) + 1 (M) + 2 (N) + 10 (O) + 3 (P) + 2 (Q) + 7 (R) + 4 (S) + 8 (T) + 5 (U) + 10 (V) + 6 (W) + 5 (X) + 8 (Y) = 153 facts.** (Needles are a SAMPLE, not one per fact; recount their loops after editing.)
 
 > This total is LAST on purpose. Appending a section must take you past it — if you added
 > entries and this number did not change, the count is now wrong. It has been wrong three times.

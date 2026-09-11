@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Mandatory review lenses — a repository forces a finder on its own risk surface
 
 The adversarial fan-out ships five generic lenses and forces exactly one of them, security, on

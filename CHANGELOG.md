@@ -8,6 +8,50 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.5.0] — 2026-09-11
+
+### Added
+
+- **The configured local review engine is verified to run read-only.** `skills/setup/scripts/check-review-engine.sh` parses `review.localCommand` and `review.localAssistCommand` against the engine catalogue and prints one verdict per command; setup validation check 3 and doctor §6 run it. A catalogued engine whose command lacks its sandbox flag is a FAIL with the exact fix, a command that switches the sandbox off or widens it fails whatever the engine, and an uncatalogued engine is UNVERIFIABLE, held to the contract only. `validation-checklist.md` gains the failure-mode rows. Prompted by a run in which a hand-written `codex review` with no sandbox flag inherited a machine default of full write access, and one review round wrote files — including a config carrying a live credential — into the working tree it was reviewing. A test pins every template the catalogue ships to pass the check; the previously published pre-3.0 template did not.
+- **`codex review` is a second catalogued Codex engine**, with its tradeoff stated: a structured findings item and its own read-only flag (`-c sandbox_mode=read-only`; it refuses `--sandbox` and `--ephemeral`), against no stdin context and no ledger carry. Setup's migration proposal for base-only commands now carries that tradeoff instead of presenting context mode as strictly better, and is not offered when `review.maxLocalReviewRounds` is 1. The contract states that a CLI is settled by running it, never by reading its help: `codex review --help` lists a stdin prompt that the parser refuses beside `--base`.
+- **One job class per session.** A `UserPromptSubmit` hook (`hooks/session-gate.sh`) records each top-level `/devstride:<skill>` command's class per session under `<git-common-dir>/devstride/session/` and blocks a command that would mix an authoring job (setup, plan, doctor, ci-audit, rebalance, rationalize-gantt, comprehend-plan) with an execution job (build-item, pr, review, release, push, create-story, create-defect, insert-story, insert-defect), with a plain-language reason and `/clear` as the cure. `build-item` walking many stories is one job. Escape hatches: `--same-session` on the command, `session.jobClassGate: false` in config, `DEVSTRIDE_SESSION_GATE=0`. The hook fails open on every error. New config key `session.jobClassGate`.
+- **Deferred defects live beside the plan, not inside its chain.** Below-floor review findings that are defects are now filed by `build-item` step 6.5 through `create-defect`'s new deferred placement: a container titled `defects.deferredContainerTitle` (default "Deferred defects") directly under the plan root, no execution-order prefix, no `blocked_by` splice, a related-to relationship to the item whose review produced it, and no delivery phase. The loop never auto-selects an item there and never treats the container as a release unit at zero. Discovered scope still splices in through `insert-story`. Under every profile. New config key `defects.deferredContainerTitle`. Prompted by a prototype-profile run that spliced a large number of deferred defects into a plan's execution order.
+- **`epicIntegrationBranches.autoRelease` accepts `"ask"`.** `true` and `false` keep their meaning; `"ask"` stops at zero remaining leaves and asks per release unit before the release pull request is cut and merged. Setup offers it in the interview and doctor reports it as a legal value.
+- **Every reference declares how it must be loaded.** A `load:` frontmatter field (`contract` | `rationale` | `digest` | `tooling`) opens every flat reference; `measure-cost.sh --check` fails without one, caps a `digest` at 400 words, and requires a `digest:` field to name an existing sibling. `detector-evidence.md` gains a digest and setup's Phase A pointer reads the digest for an `ambiguous` result, §A6 of the full file when running A6, and the full file only before changing a detector. Doctor's profile-contradiction check reads the profile table of `config-defaults.md` rather than the whole file, and review no longer points a runtime step at the 50 KB invariants file.
+
+### Changed
+
+- **Setup notices the wrong branch.** Phase A1 compares HEAD with an existing config's `baseBranch` when that branch resolves on origin, says so, and offers to switch before inspecting anything — a config on a stale branch describes a repository that no longer exists.
+- **Attribution precedence is stated.** `prBodyTemplate.noAiAttribution` governs the pull-request body and outranks a harness or session instruction to add attribution; commit trailers follow push's rule. A release-skill parenthetical that asserted one repository's value as universal now names the shipped default.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.4.2 @ 2baec7b, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.4.2 | tokens@devstride--v3.4.2 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/build-item/SKILL.md | 36,581 | 12,194 | 36,589 | 12,197 | +3 | 12,200 |
+| skills/plan/SKILL.md | 34,654 | 11,552 | 34,637 | 11,546 | -6 | 11,600 |
+| skills/review/SKILL.md | 34,163 | 11,388 | 34,109 | 11,370 | -18 | 11,400 |
+| skills/setup/SKILL.md | 31,945 | 10,649 | 32,077 | 10,693 | +44 | 10,700 |
+| skills/release/SKILL.md | 23,985 | 7,995 | 23,985 | 7,995 | +0 | 8,000 |
+| skills/doctor/SKILL.md | 23,974 | 7,992 | 23,978 | 7,993 | +1 | 8,000 |
+| skills/rebalance/SKILL.md | 23,936 | 7,979 | 23,936 | 7,979 | +0 | 8,000 |
+| skills/ultracode-build/SKILL.md | 17,326 | 5,776 | 17,326 | 5,776 | +0 | 5,800 |
+| skills/insert-defect/SKILL.md | 14,052 | 4,684 | 14,052 | 4,684 | +0 | 4,700 |
+| skills/insert-story/SKILL.md | 13,370 | 4,457 | 13,370 | 4,457 | +0 | 4,500 |
+| skills/pr/SKILL.md | 13,013 | 4,338 | 13,321 | 4,441 | +103 | 4,500 |
+| skills/rationalize-gantt/SKILL.md | 10,400 | 3,467 | 10,400 | 3,467 | +0 | 3,500 |
+| skills/create-defect/SKILL.md | 7,352 | 2,451 | 10,222 | 3,408 | +957 | 3,500 |
+| skills/branch-hotfix/SKILL.md | 9,015 | 3,005 | 9,015 | 3,005 | +0 | 3,100 |
+| skills/ci-audit/SKILL.md | 7,466 | 2,489 | 7,466 | 2,489 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 7,049 | 2,350 | 7,049 | 2,350 | +0 | 2,400 |
+| skills/comprehend-plan/SKILL.md | 6,459 | 2,153 | 6,459 | 2,153 | +0 | 2,200 |
+| skills/push/SKILL.md | 3,908 | 1,303 | 3,908 | 1,303 | +0 | 1,400 |
+| skills/branch-feature/SKILL.md | 3,185 | 1,062 | 3,185 | 1,062 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,347 | 783 | 2,347 | 783 | +0 | 800 |
+| alwaysOn.context (skill listing) | 3,532 | 1,178 | 3,637 | 1,213 | +35 | 1,300 |
+| **total (bodies)** | 324,180 | 108,067 | 327,431 | 109,151 | +1084 | |
+
 ## [3.4.2] — 2026-09-08
 
 ### Changed
@@ -1381,7 +1425,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.4.2...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.0...HEAD
+[3.5.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.4.2...devstride--v3.5.0
 [3.4.2]: https://github.com/devstride/claude-plugin/compare/devstride--v3.4.1...devstride--v3.4.2
 [3.4.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.4.0...devstride--v3.4.1
 [3.4.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.3.0...devstride--v3.4.0

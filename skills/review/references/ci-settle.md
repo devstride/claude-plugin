@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # CI settling — the flip race, gate-job semantics, and red-CI classification
 
 The rules live in `review` step 7; this file holds the mechanics and the observed evidence, for

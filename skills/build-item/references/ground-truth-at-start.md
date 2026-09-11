@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Ground truth at the start of a loop — origin before memory
 
 A loop that starts from a memory handoff or a checkout that has sat for a while reasons from a

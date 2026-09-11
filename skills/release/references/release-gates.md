@@ -1,3 +1,6 @@
+---
+load: rationale
+---
 # Release gates — why they are local, and what the head SHAs protect
 
 The rules live in the `release` body; this file holds the reasoning, read when a pre-ship check

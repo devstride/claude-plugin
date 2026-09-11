@@ -289,8 +289,34 @@ focused verification immediately; the initial full adversarial pass runs at the 
 merge boundary; P1/serious-P2 fixes are re-reviewed until clear; and CI waits for that final head. The full contract is
 `skills/plan/references/delivery-profiles.md`.
 
+`epicIntegrationBranches.autoRelease` takes `true`, `false`, or `"ask"` — with `"ask"`, a release
+unit that reaches zero remaining items stops for a yes before its release pull request is cut and
+merged, so no release unit that should stay open (a parking lot, a long-lived theme) is ever
+released by accident.
+
 Picked too heavy a profile and watching the loop take far too long? `/devstride:rebalance <root>
 <profile>` re-slices the not-started part of a live plan in place.
+
+## One job per session
+
+Every turn re-sends the whole conversation, so a session's cost is its turns times its context.
+An **authoring** job (`setup`, `plan`, `doctor`, `ci-audit`, `rebalance`, `rationalize-gantt`,
+`comprehend-plan`) and an **execution** job (`build-item`, `pr`, `review`, `release`, `push`,
+`create-story`, `create-defect`, `insert-story`, `insert-defect`) each carry their own context; run
+both in one session and everything after the switch pays for both. The plugin's prompt-time hook
+blocks the second kind with a one-line reason and the cure (`/clear`, then the same command). It
+is not one *skill* per session: `build-item` walking a plan story after story is one job. To
+continue anyway, add `--same-session` to the command; to turn the gate off for a repository, set
+`"session": {"jobClassGate": false}` in `.claude/ds-config.json`. The hook fails open — it never
+blocks by accident.
+
+## Deferred defects
+
+Review findings below the profile's fix floor are not fixed in the cycle that found them and must
+not vanish. `build-item` files each one as a Defect in a container titled **Deferred defects**
+(configurable as `defects.deferredContainerTitle`) directly under the plan root, related to the
+item whose review produced it, never spliced into the plan's execution order and never selected
+or auto-released by the loop. Build one deliberately by naming it: `/devstride:build-item <number>`.
 
 ## Your first plan
 
@@ -338,9 +364,9 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `pr` | Opens a pull request and runs the review-and-settle loop |
 | `push` | Stages, commits, type-checks, and pushes following the repo's commit conventions |
 | `branch-feature` / `branch-hotfix` | Cuts a working branch from the development or production branch |
-| `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end |
+| `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end; `create-defect deferred <item>` files a deferred defect beside the plan instead |
 | `release` | Promotes the release branch to production with a full gated review; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
-| `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it |
+| `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it — including that the configured local review engine actually runs read-only |
 | `doctor` | Checks git, `gh`, the plugin, DevStride, config, CI gates, docs and personal status-line settings; after the shared replacement is committed and verified, it can separately remove only the personal `statusLine` key you approve while preserving every other setting and script |
 | `update` | Updates the exact loaded copy, verifies its official tag and files, then stops for a checked plugin reload (restart is the fallback) |
 | `ci-audit` | Measures what CI actually costs: executed runs per workflow per pull request (the design is one each), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
@@ -351,7 +377,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.4.2** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.5.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

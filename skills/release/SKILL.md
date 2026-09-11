@@ -71,7 +71,7 @@ IMPORTANT — the DevStride MCP targets PRODUCTION; git/gh act on the real repos
   - 2nd section (fallback `## Technical Description`) — the aggregate technical delta: subsystems touched, notable design changes, any migrations.
   - 3rd section (fallback `## Notable Changes to System Architecture or Behavior`) — user-visible behavior, public-contract, permission, or migration changes across the whole release (this is the section the docs pass mines). "None" only if truly none.
   - 4th section (fallback `## Testing Steps`) — how the release was validated (the gates below) and any manual smoke to run post-deploy.
-  - AI attribution in the body only if `prBodyTemplate.noAiAttribution` is false (this repo: true → none).
+  - AI attribution only if `prBodyTemplate.noAiAttribution` is false (the shipped default is true → none).
   - End the body with the loop marker `<!-- devstride:loop -->`, as `pr` does. It identifies a
     loop-managed PR to the convention-only workflow; it never authorizes bypassing the draft hold.
 - **Never `--delete-branch`** on this PR — its head is `develop`, a protected long-lived branch (`protectedBranches`).

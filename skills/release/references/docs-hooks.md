@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Documentation hooks — the contract between the plugin and a repository's local docs skills
 
 The plugin does not know how any repository documents itself. Documentation systems differ in every

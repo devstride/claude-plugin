@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Status-line segments: what each one needs, and what to do when it is blank
 
 The status line renders `Model · Effort · Repo · Checkout · Branch · Stage · PR`. **A segment with

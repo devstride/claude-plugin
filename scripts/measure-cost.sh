@@ -20,7 +20,10 @@
 #                the number equals `wc -c`, which anyone can cross-check, and the
 #                bias is identical on both sides of every table. Budgeted.
 #   references   every skills/*/references/*.md. Budgeted individually so moving
-#                mandatory text out of a body cannot manufacture a free saving.
+#                mandatory text out of a body cannot manufacture a free saving. Each
+#                must declare `load:` (contract | rationale | digest | tooling) in its
+#                frontmatter; a `digest` is capped at 400 words; a `digest:` field must
+#                name an existing sibling. --check fails on any of those.
 #   paths        a few representative, explicitly listed composed load paths.
 #                Budgeted as the sum of their body/reference files.
 #   scripts      hooks/*.sh, scripts/*.sh, skills/*/scripts/* — bytes only,
@@ -28,7 +31,7 @@
 #   alwaysOn.context   what enters every session's context: the skill listing,
 #                the sum over SKILL.md files of "- devstride:<name>: <description>\n"
 #                from each frontmatter. Budgeted (alwaysOnContext).
-#   alwaysOn.executed  hooks/hooks.json + hooks/version-check.sh +
+#   alwaysOn.executed  hooks/hooks.json + hooks/version-check.sh + hooks/session-gate.sh +
 #                .claude-plugin/plugin.json in bytes — parsed or executed by the
 #                harness, never read as context.
 #
@@ -113,8 +116,32 @@ for p in sorted(glob.glob(os.path.join(ROOT, "skills", "*", "SKILL.md"))):
     b = nbytes(p)
     bodies[name] = {"path": rel(p), "bytes": b, "tokens": tokens(b)}
 refs = {}
+# Every reference declares how it must be loaded, as the first thing an agent reading it sees:
+#   contract   strings are copied literally — read the cited section in full, never a digest
+#   rationale  consulted for one question — a digest may stand in for it
+#   digest     a <= 400-word stand-in for a large rationale/mixed file, named by `digest:`
+#   tooling    read by scripts and maintainers, never at runtime
+LOAD_VALUES = ("contract", "rationale", "digest", "tooling")
+DIGEST_WORDS = 400
+load_problems = []
 for p in sorted(glob.glob(os.path.join(ROOT, "skills", "*", "references", "**", "*.md"), recursive=True)):
     b = nbytes(p); refs[rel(p)] = {"bytes": b, "tokens": tokens(b)}
+    if os.path.dirname(rel(p)).count("/") > 2:
+        continue  # a nested directory holds templates copied into repositories, not rules (AGENTS.md)
+    with open(p, encoding="utf-8") as f: text = f.read()
+    fm = frontmatter(text); load = fm.get("load", "")
+    refs[rel(p)]["load"] = load or None
+    if load not in LOAD_VALUES:
+        load_problems.append("NO-LOAD-FIELD %s (frontmatter `load:` must be one of %s)" % (rel(p), "|".join(LOAD_VALUES)))
+    if load == "digest":
+        body = text.split("---", 2)[2] if text.startswith("---") else text
+        words = len(body.split())
+        if words > DIGEST_WORDS:
+            load_problems.append("DIGEST-TOO-LONG %s %d words > %d" % (rel(p), words, DIGEST_WORDS))
+    if fm.get("digest"):
+        d = os.path.join(os.path.dirname(p), fm["digest"])
+        if not os.path.isfile(d):
+            load_problems.append("DIGEST-MISSING %s names %s, which does not exist" % (rel(p), fm["digest"]))
 scripts = {}
 for pat in ("hooks/*.sh", "scripts/**/*.sh", "skills/*/scripts/**/*"):
     for p in sorted(glob.glob(os.path.join(ROOT, pat), recursive=True)):
@@ -123,17 +150,17 @@ def listed(fm):
     # A skill with `disable-model-invocation: true` is user-invoked only and is left out of the
     # listing the model sees, so it costs nothing per session; its body still costs on invocation.
     return str(fm.get("disable-model-invocation", "")).strip().lower() != "true"
-ctx_bytes, early_problems = 0, []
+ctx_bytes, early_problems = 0, list(load_problems)
 for name, b in bodies.items():
     with open(os.path.join(ROOT, b["path"]), encoding="utf-8") as f:
         fm = frontmatter(f.read())
     if not fm: early_problems.append("NO-FRONTMATTER %s" % b["path"])
     if listed(fm): ctx_bytes += len(listing_line(fm, name).encode("utf-8"))
-EXECUTED = ("hooks/hooks.json", "hooks/version-check.sh", ".claude-plugin/plugin.json")
+EXECUTED = ("hooks/hooks.json", "hooks/version-check.sh", "hooks/session-gate.sh", ".claude-plugin/plugin.json")
 executed_bytes = 0
 for p in EXECUTED:
     if os.path.exists(os.path.join(ROOT, p)): executed_bytes += nbytes(os.path.join(ROOT, p))
-    else: early_problems.append("MISSING %s (alwaysOn.executed is defined as exactly three files)" % p)
+    else: early_problems.append("MISSING %s (alwaysOn.executed is defined as exactly four files)" % p)
 always = {"context": {"bytes": ctx_bytes, "tokens": tokens(ctx_bytes)}, "executed": {"bytes": executed_bytes}}
 
 # --- budgets --------------------------------------------------------------------------------
@@ -309,7 +336,7 @@ for name, path in sorted(composed_paths.items()):
 print("\n%-40s %9s   (executed, not loaded)" % ("script", "bytes"))
 for p, s in sorted(scripts.items()): print("%-40s %9s" % (p, fmt(s["bytes"])))
 print("\nalwaysOn.context   %s bytes / %s tokens  budget %s — the skill listing every session loads; the session-start hook adds at most two lines of stdout, and only when it speaks" % (fmt(ctx_bytes), fmt(always["context"]["tokens"]), fmt(always["context"].get("budget", 0)) if not budget_error else "—"))
-print("alwaysOn.executed  %s bytes — hooks/hooks.json + hooks/version-check.sh + .claude-plugin/plugin.json: parsed or executed by the harness, never read as context" % fmt(executed_bytes))
+print("alwaysOn.executed  %s bytes — hooks/hooks.json + hooks/version-check.sh + hooks/session-gate.sh + .claude-plugin/plugin.json: parsed or executed by the harness, never read as context" % fmt(executed_bytes))
 print("\ntotals: %d bodies %s bytes / %s tokens; %d references %s tokens" % (len(bodies), fmt(sum(b["bytes"] for b in bodies.values())), fmt(sum(b["tokens"] for b in bodies.values())), len(refs), fmt(sum(r["tokens"] for r in refs.values()))))
 for p in problems: print(p)
 sys.exit(1 if problems else 0)

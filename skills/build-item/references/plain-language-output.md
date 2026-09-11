@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Human-facing output — simplest accurate words
 
 Translate before display. Apply this to every user-facing question, update, handoff and final

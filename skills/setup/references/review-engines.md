@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # The local review engine — any capable model, not one vendor
 
 The local CLI reviewer is the second adversarial opinion beside Claude's own pass. **It is not tied
@@ -20,18 +23,27 @@ An engine qualifies when all four hold. Nothing else is assumed:
      blind; the engine gets one cycle.
 3. **It writes its findings to stdout** as text the loop can read back. No schema is imposed.
 4. **It can run read-only.** The reviewer must not edit the tree. Where the CLI has a sandbox or
-   read-only flag, the template sets it.
+   read-only flag, the template sets it. `setup` check 3 and `doctor` §6 verify that flag
+   mechanically by running
+   `${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/check-review-engine.sh`, and a repo test pins every
+   template in the catalogue below to pass that check, so the catalogue can never again publish a
+   command that reviews with write access.
 
 `<effort>` is optional: where present it is substituted with the reasoning tier routed for the
 task. Prefer it over pinning one tier literally, so cheap work is not billed at the top tier.
 
-Two further rules apply whatever the engine:
+Three further rules apply whatever the engine:
 
 - **Disable any agent tooling the CLI would load by default**, the DevStride MCP above all. A
   reviewer that can reach live project data can wedge mid-review and return a clean, empty
   result that reads exactly like "no findings".
 - **Leave model selection to the operator** where the CLI supports it. A template that hardcodes a
   model overrides organizational policy and dates quickly.
+- **A CLI's behaviour is settled by running it, never by reading its help.** `codex review --help`
+  lists a `[PROMPT]` argument and documents `-` as "read from stdin"; the parser then refuses the
+  combination — *the argument '--base <BRANCH>' cannot be used with '[PROMPT]'*. A template built
+  from the help text would have shipped an invocation that cannot run. Run the candidate command
+  once before cataloguing it.
 
 ## Choosing one
 
@@ -68,11 +80,47 @@ Context mode; read-only sandbox; DevStride MCP disabled; `--model` deliberately 
 extras worth checking when this command is configured: `exec` and `--sandbox` exist in `--help`,
 and a literal effort tier in place of `<effort>` is an optimization warning, not a failure.
 
-The pre-3.0 base-mode form remains supported and is migrated, never silently rewritten:
+### Codex `review` — verified
 
 ```json
-"localCommand": "codex exec review --base <base> -c model_reasoning_effort=\"xhigh\" -c mcp_servers.devstride.enabled=false"
+{
+  "review": {
+    "localReviewerName": "Codex",
+    "localCommand": "codex review --base <base> -c sandbox_mode=read-only -c model_reasoning_effort=\"<effort>\" -c mcp_servers.devstride.enabled=false"
+  }
+}
 ```
+
+Base mode, and deliberately nothing more: no `<context>` (the subcommand refuses a `[PROMPT]`
+beside `--base`) and no `--ephemeral` (refused too). Its read-only flag is
+`-c sandbox_mode=read-only` — `--sandbox`/`-s` are refused *after* the subcommand, so the flag that
+makes `codex exec` safe is not a flag here at all. `<effort>` substitutes cleanly because
+it is a `-c` config override rather than an argument the parser polices.
+
+**The tradeoff against context mode**, which is a real trade and not a downgrade: this form emits a
+structured `ExitedReviewMode` item carrying `review_output.findings`, so a repository can extract
+findings instead of parsing prose, and it carries its own sandbox flag. Against that, it cannot be
+fed a prompt on stdin — so the cumulative ledger never reaches it and every round starts cold — and
+it has no `--json`.
+
+The pre-3.0 base-mode form remains supported and is migrated, never silently rewritten. **The
+legacy template as previously published carried no read-only flag**, so on a machine whose
+`~/.codex/config.toml` sets `sandbox_mode = "danger-full-access"` the reviewer ran with full write
+access to the tree it was reviewing. The supported form now carries the flag:
+
+```json
+"localCommand": "codex exec review --base <base> -c sandbox_mode=read-only -c model_reasoning_effort=\"xhigh\" -c mcp_servers.devstride.enabled=false"
+```
+
+`codex exec review` takes `-c sandbox_mode=read-only`, or `-s read-only` placed *before* the
+`review` subcommand; `--sandbox` after it is accepted by no parser in this family.
+
+**The migration proposal carries that tradeoff** rather than presenting context mode as strictly
+better. Where the effective `maxLocalReviewRounds` is 1 — the profile's value, or
+`profileOverrides.maxLocalReviewRounds` — the cumulative ledger context mode exists to carry has
+nothing to carry, so migrating a base-only command buys nothing and should not be proposed; and a
+repository that built findings extraction on the `ExitedReviewMode` item loses it by migrating.
+Replacing a literal effort tier with `<effort>` is worth proposing on its own either way.
 
 ### Any other CLI — the shape to adapt
 

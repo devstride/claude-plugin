@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Post-deploy health check — the contract between `release` and a repository's local check skill
 
 The plugin does not know what "healthy" means for any production system — alarms, dead-letter

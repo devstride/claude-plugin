@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Slow-suite gating — the full applicability procedure
 
 Some repos have a CI suite too slow or too expensive to run on every pull request — a large

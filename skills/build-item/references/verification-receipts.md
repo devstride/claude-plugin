@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Verification receipts — reuse proof only when the tree and commands are identical
 
 Repeated checks add no evidence when neither code nor command changed. A skill that completes a

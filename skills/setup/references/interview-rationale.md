@@ -1,3 +1,6 @@
+---
+load: rationale
+---
 # Interview and merge rationale — Phases C, D, E and F
 
 The rules live in the body; this file holds the reasoning, for justifying an answer to the user
@@ -30,6 +33,16 @@ hand on it — and the owner must hear it from setup, not from a deploy. The les
 single writer because a file created here would be a second writer producing a store with no
 lessons in it; the review skill creates it the first time it has a lesson worth keeping.
 
+The status-line question is asked every run because the segment that matters is **Checkout**, and
+it stops being obvious exactly when it starts to matter: the loop puts release-unit work in linked
+worktrees, and a main-checkout-versus-worktree mistake is invisible without it. The prove-it step
+in E3 exists because a status line fails silently — Claude Code renders nothing and reports no
+error — and the gitignore check exists because a status line only one machine has is the commonest
+fresh-clone surprise. `.claude/statusline.sh` is copied verbatim because it is repo-agnostic and
+reads the consuming repository's config at runtime for `stage.*`: that is what lets one file serve
+every repository and makes re-copying it safe. Of the segments that can render blank, `stage` is
+the only one whose cause is genuinely ambiguous, which is why it is the one asked about.
+
 ## Phase E — why the roster must be literal
 
 Every later run reads the roster keys as fact, so an aspirational config does real damage
@@ -38,11 +51,14 @@ no pull request and no CI of their own — the built-in risk screen and declared
 their immediate gate, while configured engines wait for the release PR. Enabling a command with
 nothing behind it still creates a false gate. The defaults are copied
 verbatim because the delivery skills compare against those strings literally: a default
-paraphrased into something that means the same thing no longer matches.
+paraphrased into something that means the same thing no longer matches. Every key is written even
+when it holds the shipped default, because present-with-default is inspectable and absent is
+invisible — and it is also why a narrowed run writes nothing: a write from a run that examined six
+keys would fill the other forty with defaults nobody looked at.
 
 ## Phase F — why the merge is shaped this way
 
-Setup being re-runnable is the difference between a command people run again and one they run
+**A re-run must never cost someone their hand edits.** Setup being re-runnable is the difference between a command people run again and one they run
 once, and a re-run that cannot tell a hand-edit from a stale value overwrites deliberate work.
 "Propose only what would change" is wider than detection because restricting it to detector
 values silently drops changed interview answers and missing keys — which is how a stale setting

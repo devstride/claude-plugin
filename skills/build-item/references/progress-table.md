@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # The progress table — worked examples and why it exists
 
 The rules live in the body's Progress reporting section; this file holds the two worked tables

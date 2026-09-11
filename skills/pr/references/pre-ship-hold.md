@@ -1,3 +1,6 @@
+---
+load: rationale
+---
 # The pre-ship hold — why the order matters
 
 Order is the whole point: the pre-ship suites must test the same diff the reviewers settled and

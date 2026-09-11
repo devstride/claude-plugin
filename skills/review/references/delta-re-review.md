@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Follow-up review — one effective scope per contextual pass, never a blind rerun
 
 `targetAdversarialCycles` normally allows two useful cycles across Claude, local CLI, cloud,
@@ -51,9 +54,19 @@ changes:
 3. Prompt-only `codex exec -` follows an explicit instruction to inspect
    `git diff <sha>...HEAD`; it can therefore receive both the scope and the ledger.
 4. `--commit` reviews one commit, while a fix delta commonly contains several.
+5. `codex review --base <branch> -` is refused by the parser — "the argument '--base <BRANCH>'
+   cannot be used with '[PROMPT]'" — so a `codex review --base` template is base-only BY
+   CONSTRUCTION: no stdin context is ever passed and the cumulative ledger is not carried.
+6. That same shape refuses `--sandbox`; its read-only flag is `-c sandbox_mode=read-only`.
 
-Two configuration shapes remain supported:
+Three configuration shapes are catalogued:
 
+- **`codex review --base` template** — e.g. `codex review --base <base> -c sandbox_mode=read-only`.
+  Substitute `<base>` as for the legacy template. A contextual follow-up under it runs BASE-ONLY
+  and carries no ledger; the review reports that it ran base-only, treats the follow-up as
+  degraded exactly like the legacy shape, and points to `/devstride:setup review`. Do not try to
+  append `-` or a prompt: the parser rejects the launch outright, which reads as an engine
+  failure rather than a configuration one.
 - **Context-capable template** — `review.localCommand` contains `<context>`. On every contextual
   launch, remove any `review --base <base>` pair, replace `<context>` with `-`, and feed a prompt
   whose first instruction gives the exact three-dot range, followed by the cumulative ledger.

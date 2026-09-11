@@ -1,3 +1,6 @@
+---
+load: rationale
+---
 # The recoverable write order — why 3a→3f is ordered as it is
 
 The rules live in the body's step 3; this file holds the reasoning, read before the first write

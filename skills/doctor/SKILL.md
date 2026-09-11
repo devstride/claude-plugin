@@ -34,9 +34,8 @@ next action. For each failure symptom, read
   Not a repo → the rest is N/A; say so and stop the section.
 - **An `origin` remote** — `git remote get-url origin`, checked **by name** because delivery skills
   hardcode it. Other remotes but no `origin` → say which.
-- **gh present** — `gh --version`. Missing → the whole delivery half is unavailable: no pull
-  requests, no review threads, no ready-flip. Fix: install GitHub CLI (`brew install gh`, or
-  cli.github.com).
+- **gh present** — `gh --version`. Missing → the whole delivery half is unavailable. Fix: install
+  GitHub CLI (`brew install gh`, or cli.github.com).
 - **gh authenticated** — `gh auth status`. Fix: `gh auth login`.
 - **gh scopes, for the ACTIVE account** — read the account marked active (`gh auth status`
   can list several). Minimum `repo` + `read:org`, plus `workflow` if the loop edits workflow
@@ -56,9 +55,8 @@ next action. For each failure symptom, read
   helper (not Releases) and report installed/newest. If behind, tell the user to invoke
   `/devstride:update` separately and stop; Doctor must not invoke this explicit-only command. If the
   skill is unavailable, print exact id/scope bootstrap commands, then reload and check for errors.
-- **`python3` on PATH** — the session-start hook, the reviewer wait script and the cost harness
-  run in python3; without it the wait exits at once with a usage-error `RESULT`. FAIL with a
-  platform install hint.
+- **`python3` on PATH** — the session-start hook and the reviewer wait script need it. FAIL with
+  a platform install hint.
 - **Learned reviewer latency** — from
   `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/reviewer-latency.json`, report each reviewer's
   samples, p50, p95, and derived bound under this repo's `pollTimeoutMinutes`; below the sample
@@ -84,8 +82,8 @@ next action. For each failure symptom, read
   `plugin:devstride:devstride`; a plain `devstride` entry is one you or your project configured.
 - **Not connected.** Say: until sign-in, skills have no DevStride tools and nothing prompts; the
   symptom is missing tools, not an auth error. Fix `/mcp` and browser sign-in.
-- **More than one connected** — FAIL: different namespaces (`mcp__devstride__*` and
-  `mcp__plugin_devstride_devstride__*`) leave calls able to reach either organization. Inspect with
+- **More than one connected** — FAIL: the two tool namespaces leave calls able to reach either
+  organization. Inspect with
   `claude mcp get <name>`; OAuth uses `claude mcp logout <name>`, API-key headers require
   `claude mcp remove <name>`.
 - **Do not call a DevStride tool to test this.** Presence and connection state are enough.
@@ -135,10 +133,15 @@ next action. For each failure symptom, read
   skills read it as absent and fall through to `standard` without a word. Fix: set it to
   `prototype`, `standard` or `enterprise`, or run `/devstride:setup`.
   **Then the contradictions.** Compare `epicIntegrationBranches.autoRelease` and
-  `review.pollTimeoutMinutes` with the profile's values in
-  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md`, and
-  `epicIntegrationBranches.fastStoryMerges.enabled` against `prototype` only, and only when
-  `verify.typecheck` is set. A present key that differs is **informational, not a FAIL** — the
+  `review.pollTimeoutMinutes` with the profile's values in the `| Key | prototype | standard |
+  enterprise |` table at the top of
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md` — **read that table only, not
+  the whole file** — and `epicIntegrationBranches.fastStoryMerges.enabled` against `prototype`
+  only, and only when `verify.typecheck` is set. `autoRelease` has three legal values: `true`,
+  `false`, and `"ask"` — with `"ask"`, at zero remaining leaves `build-item` stops and asks per
+  release unit before merging. Report a present `"ask"` like any other value: never a type error,
+  and a contradiction only where it differs from the profile's.
+  A present key that differs is **informational, not a FAIL** — the
   explicit key wins by contract — but say which key, which value, and what the profile would
   have written (`silent-failures.md` holds why). A present `review.localCommand` under
   `prototype` is NOT a contradiction — it names the engine without scheduling it.
@@ -163,8 +166,7 @@ next action. For each failure symptom, read
 - **`stage`** — absent, or `resolve: null` → **N/A, not a failure**: this repository deploys no
   per-environment infrastructure. Present → run `resolve` ONCE from the
   repository root and report what it printed; empty output is "no stage bound here", never an
-  error. A non-zero exit WITH output, or output spanning several lines, is a FAIL — consumers read
-  one line and treat empty as absent, so a noisy command silently renders the wrong stage. Report
+  error. A non-zero exit WITH output, or output spanning several lines, is a FAIL. Report
   `productionStages`, and WARN when the resolved stage is in it: this checkout points at
   production. **Never infer a stage from the branch name, and never report
   `localEnvironment.instanceName` as one** — different axes; `silent-failures.md` §4 has why.
@@ -215,23 +217,16 @@ draft-gate checks; list it under INFO as present.
 Two separate checks, and **the first is the one everyone misses**:
 
 - **`on.pull_request.types` must carry all four of `opened`, `synchronize`, `reopened`,
-  `ready_for_review`** — GitHub's defaults omit `ready_for_review` (the ready-flip then creates
-  NO run at all), an explicit list REPLACES the defaults (naming one event breaks the rest),
-  and `opened` is required (standalone review on a non-draft PR settles against CI that was
-  never created without it). FAIL with: declare all four. `converted_to_draft` is optional —
+  `ready_for_review`** — GitHub's defaults omit `ready_for_review`, an explicit list REPLACES
+  the defaults, and `opened` is required. FAIL with: declare all four. `converted_to_draft` is optional —
   suggest it when `concurrency` is present. The full evidence:
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.md` §A5.
 - **Jobs gated on the draft condition** — match against `ci.draftGateCondition` (the config names
   the expression; default `github.event.pull_request.draft == false`) and accept equivalent forms
   such as `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated if ANY job it
-  `needs` is gated** — real workflows gate one cheap job and fan the result out, and GitHub's default
-  job condition requires every dependency to *succeed*, so one skipped dependency skips the
-  dependent. Requiring the whole closure to be gated is the wrong test and false-FAILs exactly the
-  layout this rule exists for: a gated job beside an ungated utility job, both feeding the expensive
-  one. The exception is a job that opts out of that default with `if: always()` or similar — it runs
-  regardless, so it is genuinely ungated.
-  Ungated → CI fires on open and again on every review-fix push; nothing errors, you simply pay
-  repeatedly and lose the run-once guarantee.
+  `needs` is gated** — never require the whole closure. The exception is a job that opts out of
+  GitHub's default dependency condition with `if: always()` or similar — it runs regardless, so it
+  is genuinely ungated. Ungated → you pay for CI repeatedly and lose the run-once guarantee.
 - **`ci.gateJobName`** — if set, confirm a job with that **display name** (`name:`) or key exists;
   the loop uses it to prove the flip released CI. Unset → note the fallback to detecting a new run.
 - **The CI-cost mechanics** (`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`),
@@ -276,9 +271,17 @@ The point: **find out whether anything actually checks the code before it merges
   pass remains. Hold every engine to the contract in
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/review-engines.md` — **never fault one for being
   unrecognised**; apply a catalogued engine's extras (Codex: a literal effort tier is an
-  optimization warning). A legacy base-only command may omit placeholders (` --base <value>` is
+  optimization warning). **Run
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/check-review-engine.sh`** and report every line it
+  prints verbatim as that command's `Found:`. A catalogued engine whose command lacks its
+  read-only flag is a **FAIL** — Why it matters: the reviewer can write to the tree it reviews;
+  Fix: the script's `Fix:` line, verbatim. An `UNVERIFIABLE` line (uncatalogued engine, held to
+  the contract only) is reported as itself — never a FAIL, and never a fault for being
+  unrecognised. A legacy base-only command may omit placeholders (` --base <value>` is
   appended), but WARN that contextual follow-ups will be skipped. `/devstride:setup review`
-  migrates.
+  migrates — a tradeoff, not an upgrade: base-only `codex review` keeps a structured findings item
+  that `codex exec` context mode lacks, and under `review.maxLocalReviewRounds` 1 context mode buys
+  nothing.
 - **`review.mandatoryLenses`** — absent or `[]` → N/A. Each entry needs `name`, `paths` (a
   non-empty array) and `question`; anything else → FAIL naming the entry (the skills ignore it
   aloud). WARN a glob with no `/`, or a bare `*`/`**`: it matches every file, so the lens runs on
@@ -319,9 +322,6 @@ repairs, and rerun each Phase 1 check. Name failures not offered. Leave writes u
 and say so. Non-interactive invocation prints the list and repairs nothing.
 
 IMPORTANT:
-- **Never emit a command you have not confirmed exists.** Check flags with `--help` first. A
-  confidently wrong command is worse than no suggestion, because it will be trusted and it wastes
-  the run it was meant to save.
+- **Never emit a command you have not confirmed exists.** Check flags with `--help` first.
 - **Never repair during Phase 1, and never repair what `repairs.md` does not list.** The
-  classification is the safety property. Widening it in the moment — because a fix looks obviously
-  right — is exactly how a diagnostic becomes a thing nobody dares run first.
+  classification is the safety property; never widen it in the moment.

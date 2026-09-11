@@ -103,10 +103,7 @@ bullet. Cover at minimum:
   release unit or its own foundation release unit that fans out to both?"), not just "does this look
   right."
   - **Each release unit must be a self-contained, shippable unit of end-consumer value — a
-    releasable increment, never merely a technical grouping.** It is a MECHANICAL release
-    boundary: the delivery loop batches its stories on its own integration branch and ships it
-    to develop as one reviewed PR when the last leaf lands (automatically only when
-    `epicIntegrationBranches.autoRelease` is enabled; otherwise release-ready, owner-cut).
+    releasable increment, never merely a technical grouping.**
     Prefer **vertical, end-to-end value slices** over horizontal layers; fold a foundation into
     the first value slice that needs it, or mark a genuinely shared one an explicit **internal
     enabler**. Ask the shaping question directly: "if we shipped only this release unit and
@@ -120,9 +117,12 @@ bullet. Cover at minimum:
     never a footnote in a bill), **(c) deploy integrity** (no leaf may reference a resource a
     later leaf creates — that ordering sits inside one release unit). Capture the answers in
     the release-unit spec's **Release-safety** section (step 3, Stage B).
-  - **Provision a deferred-work release unit; never park follow-ups under an active value
-    release unit** — they stop it ever reaching zero remaining leaves. Keep parked items'
-    `blocked_by` edges pointing back at the unit that produced them; a leaf whose theme does
+  - **Provision the deferred-work container; never park follow-ups under an active value
+    release unit** — they stop it ever reaching zero remaining leaves. It sits DIRECTLY under
+    the plan root, titled `defects.deferredContainerTitle` (fallback `Deferred defects`), is
+    NOT a release unit the loop cuts, and its items carry a related-to edge — never
+    `blocked_by`, never an execution-order `[N]` prefix — back to the item that produced them.
+    Discovered SCOPE still splices into the chain via `insert-story`. A leaf whose theme does
     not match its release unit is a rehoming signal.
   - **Read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/release-unit-shaping.md` when
     proposing the release-unit breakdown, or when a user asks why a boundary is wrong.**

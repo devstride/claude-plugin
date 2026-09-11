@@ -1,3 +1,6 @@
+---
+load: contract
+---
 # Engineering economy and agent routing — CANONICAL CONTRACT
 
 Use the smallest complete approach that satisfies the accepted scope and safety boundary. Before
