@@ -87,7 +87,9 @@ depend on, it does not freeze the surface.
    literal lives, and it is the first thing a visitor reads. Every other example deliberately uses a
    `<version>` placeholder so it cannot go stale.
 
-4. **Commit** as `release: v<version>`.
+4. **Commit** as `release: v<version>`, then confirm the release is complete before it leaves
+   your machine: `bash scripts/check-version-bump.sh --base origin/main` checks that the number
+   rose past the newest tag and that the CHANGELOG heading and README line name it.
 
 5. **Push `main` FIRST.** Before tagging, not after: `claude plugin tag --push` pushes only the tag.
    Tag first and a rejected or forgotten branch push leaves an immutable public release tag for a
