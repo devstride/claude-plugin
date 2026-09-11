@@ -17,21 +17,29 @@ for what each version component means here and how a release is cut.
 
 - **A project install works from a linked git worktree.** `/devstride:update` and the session-start auto-update compared the worktree's own folder with the install's repository, so a project-scope install stopped with `project-install-unbound` in every worktree session. A project install is now bound in any linked worktree of its repository — a local install, which lives in one checkout's `settings.local.json`, is not — and the update itself runs in the checkout the install is bound to.
 
+- **The docs-only rule works on a shallow marketplace copy.** Claude Code clones a marketplace with `--depth 1` and only ever pulls, so a copy cloned after the tag lacked the release commit and was reported as rewritten history. The helper now deepens that copy once — HEAD and the working tree do not move, and nothing fetched is trusted except by its hash — and reports `release-commit-unavailable` if the release still cannot be found.
+- **A path goes unverified only when the release agrees.** Which files may differ from the tag is read from the release being installed as well as from the running helper; only paths both list as inert are skipped, so an older helper honours a release that narrows the list. A release that ships a symlink reaching out of its tree, or into an inert path, is refused.
+- **The version-bump check reads escaped paths, and the release's own list.** It lists changed paths with `-z`, so a `scripts/` file with an accented name is still maintainer tooling, and it applies the inert list of the release the change follows — the rule the updater will apply.
+
 ### Changed
 
-- **Project scope is the recommended install.** The README's install, alias, rollout, update and pinning commands, RELEASING's commands, doctor's install line and `/devstride:update`'s advice for a duplicate install now say `--scope project`, and say why: a repository's `plugin.autoUpdate` and `plugin.pin` govern only a copy bound to it, a machine-wide copy is shared by every repository on the machine, and a machine-wide copy beside a project copy is the ambiguity that stops `/devstride:update`. A machine-wide install still works.
+- **Project scope is the recommended install.** The README's install, alias, rollout, update and pinning commands, RELEASING's commands, doctor's install line and `/devstride:update`'s advice for a duplicate install now say `--scope project`, and say why: a repository's `plugin.autoUpdate` and `plugin.pin` govern only a copy bound to it, a machine-wide copy is shared by every repository on the machine, and a machine-wide copy beside a project copy is the ambiguity that stops `/devstride:update`. A machine-wide install still works. The README also says that a project install writes `enabledPlugins` into the committed `.claude/settings.json` (`--scope local` installs for one person), what `plugin.pin` and `plugin.autoUpdate` really govern, and that a marketplace pin holds every repository on the machine — and its pinning recipe reinstalls every repository's copy. Doctor prints an install line only when no copy is bound to the repository, with the uninstall for a stray machine-wide copy.
 - **One definition of "ships nothing".** `scripts/check-version-bump.sh` (#25) reads the inert-path list from the update helper, so any change outside it — not only `skills/`, `hooks/` and the manifest — needs a version bump, and a skill moved into `scripts/` still counts as shipped.
+
+### Upgrading
+
+- **On 3.1.0–3.5.0, `/devstride:update` can stop with `plugin-root-missing`** on current Claude Code — the defect fixed here. Update once with the README's two native commands (`claude plugin marketplace update devstride`, then `claude plugin update <id> --scope <scope>` with the id and scope `claude plugin list` shows) and reload; from 3.5.1 the skill runs as written. Until most machines run 3.5.1, `main` stays exactly on the newest tag.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.5.0 @ 8d5f252, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.5.0 @ c77c13f, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.5.0 | tokens@devstride--v3.5.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/build-item/SKILL.md | 36,589 | 12,197 | 36,589 | 12,197 | +0 | 12,200 |
 | skills/plan/SKILL.md | 34,637 | 11,546 | 34,637 | 11,546 | +0 | 11,600 |
 | skills/review/SKILL.md | 34,109 | 11,370 | 34,109 | 11,370 | +0 | 11,400 |
 | skills/setup/SKILL.md | 32,077 | 10,693 | 32,077 | 10,693 | +0 | 10,700 |
-| skills/doctor/SKILL.md | 23,978 | 7,993 | 23,993 | 7,998 | +5 | 8,000 |
+| skills/doctor/SKILL.md | 23,978 | 7,993 | 23,989 | 7,997 | +4 | 8,000 |
 | skills/release/SKILL.md | 23,985 | 7,995 | 23,985 | 7,995 | +0 | 8,000 |
 | skills/rebalance/SKILL.md | 23,936 | 7,979 | 23,936 | 7,979 | +0 | 8,000 |
 | skills/ultracode-build/SKILL.md | 17,326 | 5,776 | 17,326 | 5,776 | +0 | 5,800 |
@@ -48,7 +56,7 @@ for what each version component means here and how a release is cut.
 | skills/branch-feature/SKILL.md | 3,185 | 1,062 | 3,185 | 1,062 | +0 | 1,100 |
 | skills/update/SKILL.md | 2,347 | 783 | 2,626 | 876 | +93 | 900 |
 | alwaysOn.context (skill listing) | 3,637 | 1,213 | 3,637 | 1,213 | +0 | 1,300 |
-| **total (bodies)** | 327,431 | 109,151 | 327,725 | 109,249 | +98 | |
+| **total (bodies)** | 327,431 | 109,151 | 327,721 | 109,248 | +97 | |
 
 ## [3.5.0] — 2026-09-11
 

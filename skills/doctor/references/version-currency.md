@@ -50,6 +50,12 @@ may mutate only a project/local row bound to that repository. Shared user rows h
 managed rows to their administrator, and unbound/ambiguous rows to Doctor. Exit zero alone proves
 nothing. After native bootstrap, verify with `claude plugin list`, then reload and check for errors.
 
+**Install line (doctor's repo declaration).** No DevStride row bound here in `claude plugin list
+--json`: print `claude plugin install <id> --scope project`, from the repository root (it writes
+`enabledPlugins` into the committed `.claude/settings.json`; `--scope local` is per person). A
+user-scope row too: add `claude plugin uninstall <id> --scope user --keep-data`, or the pair stops
+`/devstride:update`. A bound row needs no install line.
+
 ## What the session-start check records
 
 Two files under `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/`. `newest.json` is shared — the

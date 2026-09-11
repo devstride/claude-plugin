@@ -98,7 +98,12 @@ depend on, it does not freeze the surface.
    Until the tag exists, `/devstride:update` and the session-start auto-update stop on every machine
    (`marketplace-checkout-untagged`), so tag straight away. A later commit that touches only the
    maintainer files `skills/update/scripts/update-plugin.py` lists as inert — the root documents and
-   `scripts/` — needs neither a bump nor a tag: updates still install the release beneath it.
+   `scripts/` — needs neither a bump nor a tag: updates still install the release beneath it. **That
+   holds only on machines already running 3.5.1 or newer**, whose helper knows the rule; a 3.5.0 or
+   older copy still needs `main` exactly on the newest tag. Until most machines have moved, keep
+   `main` on the tag and hold maintainer-only commits for the next release. Narrowing the inert list
+   is a compatibility event: a path is skipped only when both the running helper and the release
+   being installed list it.
 
 6. **Tag.** Use the official tooling rather than tagging by hand. Preview it first:
 
@@ -122,8 +127,9 @@ depend on, it does not freeze the surface.
    claude plugin list          # confirm the reported version is the one you just cut
    ```
 
-8. **Announce it**, including `/devstride:update` for installations already on 3.1.0 or newer and
-   the two native bootstrap commands below. Older copies do not contain the new skill.
+8. **Announce it**, including `/devstride:update` for installations on 3.5.1 or newer and the two
+   native bootstrap commands below for everything older — on 3.1.0–3.5.0 `/devstride:update` can
+   stop with `plugin-root-missing` (fixed in 3.5.1), and older copies do not contain the skill.
 
 ## When your users actually get it
 
@@ -168,14 +174,16 @@ bootstrap commands on an older copy. Say which rather than assuming it propagate
 
 ### Pinning
 
-Users pin by appending `@<tag>` to the marketplace source. There is no `--ref` flag; the ref belongs
-in the source argument. **`marketplace remove` uninstalls every plugin that came from that
-marketplace, and re-adding it does not bring them back** — so the reinstall is a required third step:
+Users hold one repository with `plugin.pin` in its `.claude/ds-config.json`. Pinning the marketplace
+(append `@<tag>` to its source; there is no `--ref` flag) holds every repository on the machine, and
+**`marketplace remove` uninstalls every plugin that came from that marketplace, in every repository
+and scope, and re-adding it does not bring them back** — so note each row first and reinstall each:
 
 ```bash
+claude plugin list --json                 # note every DevStride row: id, scope, projectPath
 claude plugin marketplace remove devstride
 claude plugin marketplace add devstride/claude-plugin@devstride--v<version>
-claude plugin install devstride@devstride --scope project
+claude plugin install devstride@devstride --scope project   # once per row, from its repository
 ```
 
 Unpinning is the same three commands with the bare `devstride/claude-plugin` as the source.

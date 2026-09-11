@@ -62,6 +62,8 @@ setup_case() {
   cp "$ROOT/skills/update/scripts/latest-version.sh" "$PLUGIN/skills/update/scripts/latest-version.sh"
   cp "$ROOT/skills/update/scripts/update-plugin.py" "$MARKET/skills/update/scripts/update-plugin.py"
   cp "$ROOT/skills/update/scripts/latest-version.sh" "$MARKET/skills/update/scripts/latest-version.sh"
+  printf 'readme at release\n' > "$MARKET/README.md"
+  mkdir -p "$MARKET/scripts"; printf 'echo tool\n' > "$MARKET/scripts/tool.sh"
   printf '{"name":"devstride","version":"%s"}' "$VC_NEWEST" > "$MARKET/.claude-plugin/plugin.json"
   printf '{"plugins":[{"name":"devstride","source":"./"},{"name":"ds","source":"./"}]}' \
     > "$MARKET/.claude-plugin/marketplace.json"
@@ -91,6 +93,8 @@ PY
   cp "$MARKET/.claude-plugin/marketplace.json" "$LINEAGE/$POST_VERSION/.claude-plugin/marketplace.json"
   cp "$ROOT/skills/update/scripts/update-plugin.py" "$LINEAGE/$POST_VERSION/skills/update/scripts/update-plugin.py"
   cp "$ROOT/skills/update/scripts/latest-version.sh" "$LINEAGE/$POST_VERSION/skills/update/scripts/latest-version.sh"
+  cp "$MARKET/README.md" "$LINEAGE/$POST_VERSION/README.md"
+  mkdir -p "$LINEAGE/$POST_VERSION/scripts"; cp "$MARKET/scripts/tool.sh" "$LINEAGE/$POST_VERSION/scripts/tool.sh"
   python3 - "$VC_STATE/marketplaces.json" "$MARKET" <<'PY'
 import json,sys
 json.dump([{"name":"devstride","source":"github","repo":"devstride/claude-plugin",

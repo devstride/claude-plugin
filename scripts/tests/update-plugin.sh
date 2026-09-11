@@ -1,6 +1,8 @@
 #!/bin/bash
 # Deterministic tests for `/devstride:update`; every Claude/network call is stubbed.
 set -u
+# The maintainer's own git config (diff.renames and the like) must not decide these results.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 HELPER="$ROOT/skills/update/scripts/update-plugin.py"
 FAIL=0
@@ -39,6 +41,10 @@ if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "list" ]; then
     printf 'changed after attestation\n' > "$MARKET/race.txt"
     "$REAL_GIT" -C "$MARKET" add race.txt
     "$REAL_GIT" -C "$MARKET" commit -qm race
+  fi
+  if [ "${UP_MODE:-ok}" = "swap-inert-before-update" ] && [ "$count" -eq 4 ]; then
+    printf 'docs moved after attestation\n' > "$MARKET/README.md"
+    "$REAL_GIT" -C "$MARKET" commit -qam docs-race
   fi
   if [ -f "$UP_STATE/updated" ]; then cat "$UP_STATE/list-after.json"
   else cat "$UP_STATE/list-before.json"
@@ -117,6 +123,9 @@ PY
   mkdir -p "$MARKET/skills/update/scripts"
   cp "$ROOT/skills/update/scripts/update-plugin.py" "$MARKET/skills/update/scripts/update-plugin.py"
   cp "$ROOT/skills/update/scripts/latest-version.sh" "$MARKET/skills/update/scripts/latest-version.sh"
+  # A real release tree carries maintainer files; the payload proof must be seen skipping them.
+  printf 'readme at release\n' > "$MARKET/README.md"
+  mkdir -p "$MARKET/scripts"; printf 'echo tool\n' > "$MARKET/scripts/tool.sh"
   "$REAL_GIT" -C "$MARKET" init -q
   "$REAL_GIT" -C "$MARKET" config user.name test
   "$REAL_GIT" -C "$MARKET" config user.email test@example.com
@@ -135,6 +144,8 @@ PY
   mkdir -p "$LINEAGE/$AFTER/skills/update/scripts"
   cp "$ROOT/skills/update/scripts/update-plugin.py" "$LINEAGE/$AFTER/skills/update/scripts/update-plugin.py"
   cp "$ROOT/skills/update/scripts/latest-version.sh" "$LINEAGE/$AFTER/skills/update/scripts/latest-version.sh"
+  cp "$MARKET/README.md" "$LINEAGE/$AFTER/README.md"
+  mkdir -p "$LINEAGE/$AFTER/scripts"; cp "$MARKET/scripts/tool.sh" "$LINEAGE/$AFTER/scripts/tool.sh"
 }
 
 run_apply() {
@@ -311,10 +322,9 @@ else bad "(15) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 # 15b. A commit after the tag that touches only inert maintainer files still serves that release,
 # and the inert copies Claude takes from that later commit do not fail the payload proof.
 setup_case inert-after devstride user 3.0.0 3.1.0 3.1.0
-printf 'docs\n' > "$MARKET/README.md"; mkdir -p "$MARKET/scripts"; printf 'echo tool\n' > "$MARKET/scripts/tool.sh"
+printf 'docs\n' > "$MARKET/README.md"; printf 'echo tool v2\n' > "$MARKET/scripts/tool.sh"
 "$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -qm docs
-printf 'docs\n' > "$LINEAGE/3.1.0/README.md"
-mkdir -p "$LINEAGE/3.1.0/scripts"; printf 'echo tool\n' > "$LINEAGE/3.1.0/scripts/tool.sh"
+printf 'docs\n' > "$LINEAGE/3.1.0/README.md"; printf 'echo tool v2\n' > "$LINEAGE/3.1.0/scripts/tool.sh"
 OUT="$(run_apply)"; RC=$?
 if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] && [ "$(field safeToReload)" = True ] \
    && called 'claude:plugin update devstride@devstride --scope user'; then
@@ -354,7 +364,7 @@ else bad "(15e) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
 # 15f. Moving a shipped file into an inert directory removes it from the release: still shipped.
 setup_case moved-inert devstride user 3.0.0 3.1.0 3.1.0
-mkdir -p "$MARKET/scripts"
+"$REAL_GIT" -C "$MARKET" config diff.renames true   # the helper must not depend on rename detection being off
 "$REAL_GIT" -C "$MARKET" mv skills/update/scripts/latest-version.sh scripts/latest-version.sh
 "$REAL_GIT" -C "$MARKET" commit -qm move
 OUT="$(run_apply)"; RC=$?
@@ -363,6 +373,64 @@ if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
    && not_called 'claude:plugin update'; then
   ok "(15f) shipped file moved into scripts/ → blocked, the removed path is named"
 else bad "(15f) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15g. Claude Code clones a marketplace with --depth 1: a copy cloned at a docs-only commit after
+# the tag lacks the release commit. The helper deepens it once and the release installs.
+setup_case shallow devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; "$REAL_GIT" -C "$MARKET" commit -qam docs
+"$REAL_GIT" clone -q --depth 1 "file://$MARKET" "$CASE_DIR/shallow" 2>/dev/null
+python3 - "$UP_STATE/marketplaces.json" "$CASE_DIR/shallow" <<'PY'
+import json, sys
+rows = json.load(open(sys.argv[1])); rows[0]["installLocation"] = sys.argv[2]; json.dump(rows, open(sys.argv[1], "w"))
+PY
+BEFORE_SHALLOW="$("$REAL_GIT" -C "$CASE_DIR/shallow" rev-parse --is-shallow-repository)"
+OUT="$(run_apply)"; RC=$?
+if [ "$BEFORE_SHALLOW" = true ] && [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && [ "$("$REAL_GIT" -C "$CASE_DIR/shallow" rev-parse --is-shallow-repository)" = false ] \
+   && called 'claude:plugin update devstride@devstride --scope user'; then
+  ok "(15g) depth-1 marketplace copy after a docs-only commit → deepened once, release installs"
+else bad "(15g) shallow=$BEFORE_SHALLOW rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15h. A shallow copy that cannot be deepened says so, instead of claiming rewritten history.
+setup_case shallow-offline devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; "$REAL_GIT" -C "$MARKET" commit -qam docs
+"$REAL_GIT" clone -q --depth 1 "file://$MARKET" "$CASE_DIR/shallow" 2>/dev/null
+"$REAL_GIT" -C "$CASE_DIR/shallow" remote set-url origin "file://$CASE_DIR/nowhere"
+python3 - "$UP_STATE/marketplaces.json" "$CASE_DIR/shallow" <<'PY'
+import json, sys
+rows = json.load(open(sys.argv[1])); rows[0]["installLocation"] = sys.argv[2]; json.dump(rows, open(sys.argv[1], "w"))
+PY
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = release-commit-unavailable ] && not_called 'claude:plugin update'; then
+  ok "(15h) shallow copy that cannot be deepened → release-commit-unavailable, no mutation"
+else bad "(15h) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15i. A path counts as inert only when the RELEASE lists it too: a release that narrows the list
+# is honoured by this helper, so a later scripts/ change blocks.
+setup_case narrowed devstride user 3.0.0 3.1.0 3.1.0
+python3 - "$MARKET/skills/update/scripts/update-plugin.py" <<'PY'
+import sys; p = sys.argv[1]; s = open(p).read(); open(p, "w").write(s.replace('INERT_DIRS = ("scripts/",)', "INERT_DIRS = ()"))
+PY
+cp "$MARKET/skills/update/scripts/update-plugin.py" "$LINEAGE/3.1.0/skills/update/scripts/update-plugin.py"
+"$REAL_GIT" -C "$MARKET" commit -qa --amend -m narrowed
+UP_RELEASE_COMMIT="$("$REAL_GIT" -C "$MARKET" rev-parse HEAD)"; export UP_RELEASE_COMMIT
+printf 'echo changed\n' > "$MARKET/scripts/tool.sh"; "$REAL_GIT" -C "$MARKET" commit -qam tool
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
+   && [ "$(field shippedChanges)" = "['scripts/tool.sh']" ] && not_called 'claude:plugin update'; then
+  ok "(15i) release narrows the inert list → the running helper honours it, scripts/ change blocks"
+else bad "(15i) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15j. A shipped symlink into an inert path would run unverified content: the release is refused.
+setup_case linked-inert devstride user 3.0.0 3.1.0 3.1.0
+ln -s ../../scripts/tool.sh "$MARKET/skills/update/tool-link"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -q --amend -m linked
+UP_RELEASE_COMMIT="$("$REAL_GIT" -C "$MARKET" rev-parse HEAD)"; export UP_RELEASE_COMMIT
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-tree-invalid ] && [ "$(field path)" = skills/update/tool-link ] \
+   && not_called 'claude:plugin update'; then
+  ok "(15j) shipped symlink into scripts/ → release refused, no mutation"
+else bad "(15j) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
 # 16. The marketplace name alone grants no trust; its source must be the official repository.
 setup_case wrong-source devstride user 3.0.0 3.1.0 3.1.0
@@ -394,6 +462,16 @@ if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
    && not_called 'claude:plugin update'; then
   ok "(18) checkout changed after attestation → second proof blocks update"
 else bad "(18) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 18b. HEAD moving to ANOTHER docs-only commit between the proof and the mutation still passes the
+# re-attestation itself; the same-HEAD check is what stops it.
+setup_case checkout-inert-race devstride user 3.0.0 3.1.0 3.1.0
+UP_MODE=swap-inert-before-update; export UP_MODE
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-changed-during-update ] \
+   && not_called 'claude:plugin update'; then
+  ok "(18b) docs-only commit lands after attestation → same-HEAD check blocks update"
+else bad "(18b) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
 # 19. A CLI row is not disk proof: the selected cache path must contain a matching safe manifest.
 setup_case missing-payload devstride user 3.0.0 3.1.0 3.1.0
@@ -558,18 +636,49 @@ if [ "$RC" -eq 3 ] && [ "$(field code)" = project-install-unbound ] && not_calle
   ok "(29b) local install from a linked worktree → unbound, no mutation"
 else bad "(29b) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
-# 28. The inert list is only safe while nothing a session runs reads those paths.
-INERT_RE="$(python3 - "$HELPER" <<'PY'
-import importlib.util, re, sys
-spec = importlib.util.spec_from_file_location("h", sys.argv[1])
-h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
-print("|".join([re.escape(n) for n in sorted(h.INERT_FILES)] + [re.escape(d) for d in h.INERT_DIRS]))
+# 28. The inert list is only safe while nothing a session runs reads those paths. Scan every shipped
+# file for the ways a path is built — ${ROOT}/x, quoted literals in code, ../ traversal — check
+# shipped symlinks, and keep the list clear of folders Claude Code loads on its own.
+RUNTIME_REFS="$(python3 - "$ROOT" "$HELPER" <<'PY'
+import importlib.util, os, re, subprocess, sys
+root, helper = sys.argv[1:]
+spec = importlib.util.spec_from_file_location("h", helper); h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
+names = sorted(h.INERT_FILES) + [d.rstrip("/") for d in h.INERT_DIRS]
+if not names:
+    print("inert list unreadable"); sys.exit()
+alt = "|".join(re.escape(n) for n in names)
+rooted = re.compile(r"(PLUGIN_ROOT|ROOT)(:-[^}]*)?\}?\"?/(" + alt + r")(/|\b)")
+quoted = re.compile(r"[\"'](" + alt + r")[\"'/]")
+traversal = re.compile(r"(\.\./)+(" + alt + r")(/|\b)")
+auto = {"commands", "skills", "agents", "hooks", "output-styles", "themes", "monitors", "workflows",
+        "bin", ".mcp.json", ".lsp.json", "settings.json", ".claude-plugin"}
+hits = ["inert name is an auto-loaded component: " + n for n in names if n in auto]
+for line in subprocess.run(["git", "-C", root, "ls-files", "-s"], capture_output=True, text=True).stdout.splitlines():
+    meta, path = line.split("\t", 1)
+    if h.is_inert(path):
+        continue
+    full = os.path.join(root, path)
+    if meta.split()[0] == "120000":
+        target = os.readlink(full)
+        resolved = os.path.normpath(os.path.join(os.path.dirname(path), target))
+        if os.path.isabs(target) or resolved.startswith("..") or h.is_inert(resolved) or h.is_inert(resolved + "/"):
+            hits.append(f"{path}: symlink to {resolved}")
+        continue
+    try:
+        text = open(full, encoding="utf-8").read()
+    except (UnicodeDecodeError, OSError):
+        continue
+    if path == "skills/update/scripts/update-plugin.py":
+        text = re.sub(r"INERT_FILES = frozenset\((.|\n)*?\)\nINERT_DIRS = \([^)]*\)", "", text)
+    code = path.endswith((".sh", ".py", ".json"))
+    for n, ln in enumerate(text.splitlines(), 1):
+        if rooted.search(ln) or (code and (quoted.search(ln) or traversal.search(ln))):
+            hits.append(f"{path}:{n}: {ln.strip()[:120]}")
+print("\n".join(hits))
 PY
 )"
-RUNTIME_REFS="$(grep -rnE "(PLUGIN_ROOT|ROOT)\}?\"?/($INERT_RE)" "$ROOT/skills" "$ROOT/hooks" 2>/dev/null; \
-  grep -nE "\"\./($INERT_RE)" "$ROOT/.claude-plugin/plugin.json" 2>/dev/null)"
-if [ -n "$INERT_RE" ] && [ -z "$RUNTIME_REFS" ]; then
-  ok "(28) no skill, hook or manifest path reads an inert file"
-else bad "(28) inert list unreadable or referenced at runtime: ${RUNTIME_REFS:-no list}"; fi
+if [ -z "$RUNTIME_REFS" ]; then
+  ok "(28) no shipped file, symlink or auto-loaded folder reaches an inert path"
+else bad "(28) inert path reachable at runtime: $RUNTIME_REFS"; fi
 
 exit "$FAIL"

@@ -35,7 +35,7 @@
     "skills/build-item/references/verification-receipts.md": 800,
     "skills/doctor/references/repairs.md": 2700,
     "skills/doctor/references/silent-failures.md": 3300,
-    "skills/doctor/references/version-currency.md": 1700,
+    "skills/doctor/references/version-currency.md": 1900,
     "skills/plan/references/delivery-profiles.md": 4800,
     "skills/plan/references/execution-order-numbering.md": 1100,
     "skills/plan/references/release-unit-shaping.md": 1400,
@@ -127,7 +127,7 @@
       ]
     },
     "manualPluginUpdate": {
-      "budget": 4900,
+      "budget": 5000,
       "files": [
         "skills/update/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

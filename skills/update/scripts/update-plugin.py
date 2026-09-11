@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 from contextlib import contextmanager
 import fcntl
 import functools
@@ -18,7 +19,7 @@ import stat
 import subprocess
 import sys
 import time
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 
 MAX_OUTPUT = 1024 * 1024
@@ -56,6 +57,45 @@ def real(path: str | Path) -> str:
 
 def is_inert(path: str) -> bool:
     return path in INERT_FILES or path.startswith(INERT_DIRS)
+
+
+def parse_inert(source: str) -> tuple[frozenset[str], tuple[str, ...]]:
+    """INERT_FILES / INERT_DIRS as a helper's source text defines them, read with ast and never
+    executed. A missing or malformed list reads as empty: nothing inert, the strict rule."""
+    files: frozenset[str] = frozenset()
+    dirs: tuple[str, ...] = ()
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return files, dirs
+    for node in tree.body:
+        if not (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+        ):
+            continue
+        name, value = node.targets[0].id, node.value
+        try:
+            if (
+                name == "INERT_FILES"
+                and isinstance(value, ast.Call)
+                and getattr(value.func, "id", None) == "frozenset"
+                and len(value.args) == 1
+                and not value.keywords
+            ):
+                parsed = ast.literal_eval(value.args[0])
+                if isinstance(parsed, (set, frozenset)) and all(isinstance(x, str) for x in parsed):
+                    files = frozenset(parsed)
+            elif name == "INERT_DIRS":
+                parsed = ast.literal_eval(value)
+                if isinstance(parsed, tuple) and all(
+                    isinstance(x, str) and x.endswith("/") for x in parsed
+                ):
+                    dirs = parsed
+        except (ValueError, TypeError, SyntaxError):
+            continue
+    return files, dirs
 
 
 def own_root() -> Optional[str]:
@@ -503,16 +543,57 @@ def newest_release(cwd: str) -> dict[str, str]:
     }
 
 
-def shipped_changes(location: str, release_commit: str, head: str, cwd: str) -> Optional[list[str]]:
+def git_code(location: str, args: list[str], cwd: str, timeout: int = 10) -> tuple[int, bytes]:
+    code, out, _ = run_command(["git", "-C", location, *args], cwd=cwd, timeout=timeout)
+    return code, out
+
+
+def ensure_release_history(location: str, release_commit: str, cwd: str) -> None:
+    """Claude Code clones a marketplace with --depth 1 and only ever pulls, so a copy cloned after
+    the tag can lack the release commit or the history linking HEAD to it. Deepen it once: HEAD and
+    the working tree do not move, and nothing fetched is trusted except by its hash."""
+    code, out = git_code(location, ["rev-parse", "--show-toplevel"], cwd)
+    if code != 0 or real(out.decode("utf-8", "replace").strip()) != location:
+        raise UpdateProblem("marketplace-checkout-invalid")
+
+    def present() -> bool:
+        return git_code(location, ["cat-file", "-e", f"{release_commit}^{{commit}}"], cwd)[0] == 0
+
+    if present() and git_code(
+        location, ["merge-base", "--is-ancestor", release_commit, "HEAD"], cwd
+    )[0] == 0:
+        return
+    code, out = git_code(location, ["rev-parse", "--is-shallow-repository"], cwd)
+    if code == 0 and out.strip() == b"true":
+        git_code(location, ["fetch", "--quiet", "--no-tags", "--unshallow", "origin"], cwd, timeout=60)
+    if not present():
+        raise UpdateProblem("release-commit-unavailable", expectedCommit=release_commit)
+
+
+def release_inert(location: str, release_commit: str, cwd: str) -> Callable[[str], bool]:
+    """A path goes unverified only when this helper AND the release being installed both list it
+    as inert, so older helpers honour a release that narrows the list. A release without the list
+    (older than 3.5.1) makes nothing inert: the strict rule it was built for."""
+    code, out = git_code(
+        location, ["show", f"{release_commit}:skills/update/scripts/update-plugin.py"], cwd
+    )
+    try:
+        files, dirs = parse_inert(out.decode("utf-8")) if code == 0 else (frozenset(), ())
+    except UnicodeDecodeError:
+        files, dirs = frozenset(), ()
+    return lambda path: is_inert(path) and (path in files or path.startswith(dirs))
+
+
+def shipped_changes(
+    location: str, release_commit: str, head: str, cwd: str, inert: Callable[[str], bool]
+) -> Optional[list[str]]:
     """Shipped paths a later HEAD changes relative to the release, or None when HEAD does not
     descend from it — a rewritten or diverged history is never 'the release plus maintainer docs'."""
-    code, _, _ = run_command(
-        ["git", "-C", location, "merge-base", "--is-ancestor", release_commit, head],
-        cwd=cwd,
-        timeout=10,
-    )
-    if code != 0:
+    code, _ = git_code(location, ["merge-base", "--is-ancestor", release_commit, head], cwd)
+    if code == 1:
         return None
+    if code != 0:
+        raise UpdateProblem("marketplace-checkout-invalid")
     # --no-renames: a move out of skills/ must list the shipped path it removes, not only the
     # inert path it lands on.
     code, out, _ = run_command(
@@ -527,10 +608,12 @@ def shipped_changes(location: str, release_commit: str, head: str, cwd: str) -> 
         paths = [raw.decode("utf-8") for raw in out.split(b"\0") if raw]
     except UnicodeDecodeError as exc:
         raise UpdateProblem("marketplace-checkout-invalid") from exc
-    return sorted(path for path in paths if not is_inert(path))
+    return sorted(path for path in paths if not inert(path))
 
 
-def attest_marketplace(row: dict[str, Any], release: dict[str, str], cwd: str) -> str:
+def attest_marketplace(
+    row: dict[str, Any], release: dict[str, str], cwd: str, inert: Callable[[str], bool]
+) -> str:
     """Prove the catalogue checkout serves the release: HEAD is the tag's commit, or a descendant
     that changes only inert files, so what Claude copies from it ships exactly the release. Returns
     HEAD, which the re-attestation before mutation must see again."""
@@ -552,7 +635,7 @@ def attest_marketplace(row: dict[str, Any], release: dict[str, str], cwd: str) -
         raise UpdateProblem("marketplace-checkout-dirty")
     head = values["head"]
     if head != release["commit"]:
-        shipped = shipped_changes(location, release["commit"], head, cwd)
+        shipped = shipped_changes(location, release["commit"], head, cwd, inert)
         if shipped is None or shipped:
             raise UpdateProblem(
                 "marketplace-checkout-untagged",
@@ -564,7 +647,9 @@ def attest_marketplace(row: dict[str, Any], release: dict[str, str], cwd: str) -
     return head
 
 
-def tagged_payload(row: dict[str, Any], release: dict[str, str], cwd: str) -> dict[str, tuple[str, str]]:
+def tagged_payload(
+    row: dict[str, Any], release: dict[str, str], cwd: str, inert: Callable[[str], bool]
+) -> dict[str, tuple[str, str]]:
     """The release's shipped files. Inert files are left out: the install may carry a later
     commit's copies of them, and nothing a session runs reads them."""
     location = real(str(row["installLocation"]))
@@ -594,16 +679,39 @@ def tagged_payload(row: dict[str, Any], release: dict[str, str], cwd: str) -> di
                 or path in entries
             ):
                 raise ValueError
-            if not is_inert(path):
+            if not inert(path):
                 entries[path] = (mode, blob)
     except (UnicodeDecodeError, ValueError) as exc:
         raise UpdateProblem("marketplace-tree-invalid") from exc
     if not entries:
         raise UpdateProblem("marketplace-tree-invalid")
+    for path, (mode, blob) in entries.items():
+        if mode != "120000":
+            continue
+        # A shipped link must stay inside the tree and must not reach a path the proof skips.
+        code, target, _ = run_command(
+            ["git", "-C", location, "cat-file", "blob", blob], cwd=cwd, timeout=10
+        )
+        try:
+            text = target.decode("utf-8") if code == 0 else ""
+        except UnicodeDecodeError:
+            text = ""
+        resolved = os.path.normpath(os.path.join(os.path.dirname(path), text)) if text else ""
+        if (
+            not text
+            or os.path.isabs(text)
+            or resolved == ".."
+            or resolved.startswith("../")
+            or inert(resolved)
+            or inert(resolved + "/")
+        ):
+            raise UpdateProblem("marketplace-tree-invalid", path=path)
     return entries
 
 
-def _verify_installed_payload(root: str, entries: dict[str, tuple[str, str]]) -> None:
+def _verify_installed_payload(
+    root: str, entries: dict[str, tuple[str, str]], inert: Callable[[str], bool]
+) -> None:
     root = real(root)
     try:
         root_stat = os.lstat(root)
@@ -702,14 +810,14 @@ def _verify_installed_payload(root: str, entries: dict[str, tuple[str, str]]) ->
             relative_dir = os.path.relpath(directory, root)
             for name in list(dirs):
                 path = name if relative_dir == "." else f"{relative_dir}/{name}"
-                if path == ".in_use" or is_inert(f"{path}/"):
+                if path == ".in_use" or inert(f"{path}/"):
                     dirs.remove(name)
                 elif os.path.islink(os.path.join(directory, name)):
                     actual.add(path)
                     dirs.remove(name)
             for name in files:
                 path = name if relative_dir == "." else f"{relative_dir}/{name}"
-                if path != ".in_use" and not path.startswith(".in_use/") and not is_inert(path):
+                if path != ".in_use" and not path.startswith(".in_use/") and not inert(path):
                     actual.add(path)
     except OSError as exc:
         raise UpdateProblem("installed-payload-unreadable") from exc
@@ -801,11 +909,13 @@ def _verify_installed_payload(root: str, entries: dict[str, tuple[str, str]]) ->
         raise UpdateProblem("installed-payload-changed")
 
 
-def verify_installed_payload(root: str, entries: dict[str, tuple[str, str]]) -> None:
+def verify_installed_payload(
+    root: str, entries: dict[str, tuple[str, str]], inert: Callable[[str], bool]
+) -> None:
     last: Optional[UpdateProblem] = None
     for attempt in range(2):
         try:
-            _verify_installed_payload(root, entries)
+            _verify_installed_payload(root, entries, inert)
             return
         except UpdateProblem as exc:
             last = exc
@@ -931,8 +1041,11 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
             raise UpdateProblem("marketplace-changed-during-update", **base)
 
     release = contextual(base, newest_release, repo)
-    attested_head = contextual(base, attest_marketplace, second_marketplace, release, repo)
-    payload = contextual(base, tagged_payload, second_marketplace, release, repo)
+    location = real(str(second_marketplace["installLocation"]))
+    contextual(base, ensure_release_history, location, release["commit"], repo)
+    inert = contextual(base, release_inert, location, release["commit"], repo)
+    attested_head = contextual(base, attest_marketplace, second_marketplace, release, repo, inert)
+    payload = contextual(base, tagged_payload, second_marketplace, release, repo, inert)
     target = contextual(
         base, marketplace_target, second_marketplace, before["id"].split("@", 1)[0]
     )
@@ -956,7 +1069,7 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
         )
     if after_refresh["diskVersion"] == target:
         base["repairCommands"] = reinstall_commands(before)
-        contextual(base, verify_installed_payload, after_refresh["installPath"], payload)
+        contextual(base, verify_installed_payload, after_refresh["installPath"], payload, inert)
         base["diskAfter"] = after_refresh["diskVersion"]
         base["reloadRequired"] = before["runningVersion"] != after_refresh["diskVersion"]
         base["safeToReload"] = True
@@ -978,7 +1091,7 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
     for key in ("name", "source", "repo", "ref", "installLocation"):
         if second_marketplace.get(key) != current_marketplace.get(key):
             raise UpdateProblem("marketplace-changed-during-update", **base)
-    if contextual(base, attest_marketplace, current_marketplace, release, repo) != attested_head:
+    if contextual(base, attest_marketplace, current_marketplace, release, repo, inert) != attested_head:
         raise UpdateProblem("marketplace-changed-during-update", **base)
     if contextual(
         base, marketplace_target, current_marketplace, before["id"].split("@", 1)[0]
@@ -1030,7 +1143,7 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
             },
         )
     base["repairCommands"] = reinstall_commands(after)
-    contextual(base, verify_installed_payload, after["installPath"], payload)
+    contextual(base, verify_installed_payload, after["installPath"], payload, inert)
     base["safeToReload"] = True
     base["repairCommands"] = []
     code_name = "updated-with-cli-warning" if update_code != 0 else "updated"

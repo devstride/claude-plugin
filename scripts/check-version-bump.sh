@@ -7,11 +7,11 @@
 # base the change will land on (RELEASING.md step 4).
 #
 # Rules, checked against `<base>...<head>`:
-#   1. If any shipped file changed — any path outside the inert maintainer files that
-#      skills/update/scripts/update-plugin.py lists (root documents, scripts/), other than a
-#      version-only edit of .claude-plugin/plugin.json — the head version must be greater than the
-#      base version (numeric semver compare). The updater uses the same list to decide that a later
-#      commit still serves the release beneath it, so "ships nothing" means one thing in both.
+#   1. If any shipped file changed — any path outside the inert maintainer files (root documents,
+#      scripts/) that BOTH this checkout's skills/update/scripts/update-plugin.py and the one at the
+#      merge base list, other than a version-only edit of .claude-plugin/plugin.json — the head
+#      version must be greater than the base version (numeric semver compare). The updater applies
+#      that same intersection to a commit after a release, so "ships nothing" means one thing in both.
 #   2. If the version changed, the head version must not already be a tag
 #      (`devstride--v<version>`), unless HEAD is the commit that tag points at. An unchanged
 #      version is rule 1's business: a change that ships nothing needs no bump.
@@ -60,9 +60,21 @@ base_v, head_v = version_at(MB), version_at(HEAD)
 problems = []
 if semver(head_v) is None:
     problems.append("head version %r is not MAJOR.MINOR.PATCH" % head_v)
-# --no-renames: a skill moved into scripts/ must still list the shipped path it removes.
-changed = [l for l in sh("diff", "--no-renames", "--name-only", MB, HEAD).splitlines() if l]
-shipped = [f for f in changed if not helper.is_inert(f) and f != ".claude-plugin/plugin.json"]
+# The release this change follows decides what is inert, intersected with this checkout's list —
+# exactly what the updater applies to a commit after that release.
+base_files, base_dirs = helper.parse_inert(sh("show", "%s:skills/update/scripts/update-plugin.py" % MB))
+inert = lambda p: helper.is_inert(p) and (p in base_files or p.startswith(base_dirs))
+# -z and --no-renames: an escaped path reads as the path it is, and a skill moved into scripts/
+# still lists the shipped path it removes. An undecodable path counts as shipped.
+raw = subprocess.run(["git", "diff", "--no-renames", "--name-only", "-z", MB, HEAD], capture_output=True).stdout
+changed = []
+for p in raw.split(b"\0"):
+    if p:
+        try:
+            changed.append(p.decode("utf-8"))
+        except UnicodeDecodeError:
+            changed.append("(undecodable) " + p.decode("utf-8", "replace"))
+shipped = [f for f in changed if not inert(f) and f != ".claude-plugin/plugin.json"]
 if ".claude-plugin/plugin.json" in changed:
     # a version-only edit is the bump itself, not a shipped change
     d = sh("diff", MB, HEAD, "--", ".claude-plugin/plugin.json")
