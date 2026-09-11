@@ -30,8 +30,9 @@ claude plugin install devstride@devstride --scope project
 
 A machine-wide install (`--scope user`, the CLI's default) still works. If you have one beside a
 project install, keep the project copy and remove the other with
-`claude plugin uninstall devstride@devstride --scope user --keep-data` — other repositories on the
-machine then need their own project install.
+`claude plugin uninstall devstride@devstride --scope user --keep-data` (`ds@devstride` if that is the
+id `claude plugin list` shows) — other repositories on the machine then need their own project
+install.
 
 <details>
 <summary>The shorter <code>ds</code> spelling</summary>
