@@ -545,10 +545,19 @@ EOF
 INSTALL="$ID $SCOPE" # keep the doctor-facing record stable; the binding bit is internal only
 
 # The checkout this copy is recorded in can pin it even though this checkout does not: say so once,
-# rather than hand off to an update that the pin will refuse.
+# rather than hand off to an update that the pin will refuse. Any pin holds the copy; its value only
+# decides whether the copy is where the pin says (a hold) or somewhere else (drift).
 if [ "$BOUND_PIN" != "-" ] && [ "$PIN" = "-" ]; then
-  RESULT="bound-checkout-pinned"; NOTIFIED="bound-pinned:$ID:$BOUND_PIN:$NEWEST"
-  [ "$PREV_NOTIFIED" != "$NOTIFIED" ] && echo "devstride plugin: $RUNNING running, $NEWEST available, but the checkout this copy of $ID is recorded in pins $BOUND_PIN, so it stays there. Change that pin to move it."
+  PIN_FILE=$(printf '%s' "$INSPECT" | python3 -c 'import json,sys
+try: print(json.load(sys.stdin)["pinSources"][0]["path"])
+except Exception: print("the owning checkout config")' 2>/dev/null)
+  if [ "$BOUND_PIN" = "$RUNNING" ]; then
+    RESULT="bound-checkout-pinned"; NOTIFIED="bound-pinned:$ID:$BOUND_PIN:$NEWEST"
+    [ "$PREV_NOTIFIED" != "$NOTIFIED" ] && echo "devstride plugin: $RUNNING running, $NEWEST available, but $PIN_FILE pins $BOUND_PIN, so this plugin's updaters leave this copy of $ID alone. Remove that pin to let /devstride:update move it."
+  else
+    RESULT="bound-checkout-pin-drift"; NOTIFIED="bound-drift:$ID:$BOUND_PIN:$RUNNING"
+    [ "$PREV_NOTIFIED" != "$NOTIFIED" ] && echo "devstride plugin: $PIN_FILE pins $BOUND_PIN, but this copy of $ID runs $RUNNING. Resolve that in the checkout that file belongs to."
+  fi
   finish
 fi
 

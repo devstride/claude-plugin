@@ -824,7 +824,7 @@ worktree_case wt-repair
 printf '\n# changed payload\n' >> "$LINEAGE/3.1.0/skills/update/scripts/latest-version.sh"
 OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
 if [ "$RC" -eq 4 ] && [ "$(field code)" = installed-payload-mismatch ] && [ "$(field projectPath)" = "$REPO" ] \
-   && printf '%s' "$(field repairCommands)" | grep -qF "cd $REPO && claude plugin uninstall devstride@devstride --scope project"; then
+   && printf '%s' "$(field repairCommands)" | grep -qF "(cd $REPO && claude plugin uninstall devstride@devstride --scope project --keep-data)"; then
   ok "(35) repair offered from a worktree → its commands run in the checkout the install is recorded in"
 else bad "(35) rc=$RC out=$OUT"; fi
 

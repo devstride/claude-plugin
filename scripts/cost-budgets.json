@@ -127,7 +127,7 @@
       ]
     },
     "manualPluginUpdate": {
-      "budget": 5200,
+      "budget": 5300,
       "files": [
         "skills/update/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

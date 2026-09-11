@@ -1043,12 +1043,16 @@ def contextual(base: dict[str, Any], function: Any, *args: Any, **kwargs: Any) -
 
 def reinstall_commands(info: dict[str, Any]) -> list[str]:
     # Claude Code resolves a project/local install in the checkout it is recorded in, so the repair
-    # runs there, not wherever the session happens to be.
+    # runs there — in a subshell, so the directory change ends with the command instead of moving
+    # the session's shell into another checkout.
     where = info.get("projectPath") if info.get("scope") in {"project", "local"} else None
-    prefix = f"cd {shlex.quote(where)} && " if isinstance(where, str) and where else ""
+
+    def there(command: str) -> str:
+        return f"(cd {shlex.quote(where)} && {command})" if isinstance(where, str) and where else command
+
     return [
-        f"{prefix}claude plugin uninstall {info['id']} --scope {info['scope']} --keep-data",
-        f"{prefix}claude plugin install {info['id']} --scope {info['scope']}",
+        there(f"claude plugin uninstall {info['id']} --scope {info['scope']} --keep-data"),
+        there(f"claude plugin install {info['id']} --scope {info['scope']}"),
         "/devstride:update",
     ]
 
