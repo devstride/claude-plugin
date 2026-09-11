@@ -31,8 +31,8 @@ linked git worktrees:
 - **It is the team rollout.** A project install writes `enabledPlugins` into the repository's
   committed `.claude/settings.json`, which enables the plugin for everyone who clones it (see
   *Rolling it out to a team* below). To install for yourself alone in a repository that has not
-  adopted DevStride, use `--scope local`: bound to this checkout, recorded in your personal
-  `.claude/settings.local.json`.
+  adopted DevStride, use `--scope local`, recorded in your personal
+  `.claude/settings.local.json` instead of the committed file.
 
 A machine-wide install (`--scope user`, the CLI's default) still works. If you have one beside a
 project install, keep the project copy and remove the other with
@@ -435,6 +435,10 @@ reload is unavailable or fails. Two things to watch:
 - It acts on the **user** scope by default, so pass the scope `claude plugin list` shows: `project` for
   the recommended install, `user` for an older machine-wide one (likewise `local` or `managed`) —
   otherwise it reports the plugin isn't installed and changes nothing.
+
+If an update reports `marketplace-shallow-lock`, a stopped download left a lock in Claude Code's
+marketplace copy: once no `git` or `claude plugin` process is working there, remove the named file
+and run `/devstride:update` again.
 
 Running only the first command is a common mistake — it refreshes marketplace metadata and reports
 success while leaving your installed copy exactly where it was.

@@ -488,11 +488,25 @@ setup_case worktree-auto 2.9.0 '{"plugin":{"autoUpdate":true}}' project 2.9.0
 WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"
 OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$HOOK" <<< "$(printf '{\"cwd\":\"%s\"}' "$WT")" 2>/dev/null)"
 MAIN_REPO="$REPO"; REPO="$WT"
-if [ -f "$WT/.claude/ds-config.json" ] && result_is worktree-auto-deferred \
+if [ -f "$WT/.claude/ds-config.json" ] && result_is shared-checkout-auto-deferred \
    && printf '%s' "$OUT" | grep -qF '/devstride:update' \
    && not_called 'plugin marketplace update' && not_called 'plugin update'; then
   ok "(worktree) autoUpdate on in a linked worktree → deferred to /devstride:update, no mutation"
 else bad "(worktree) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
+REPO="$MAIN_REPO"
+
+# The checkout a copy is recorded in pins it: a worktree session says so instead of handing off to an
+# update the pin will refuse.
+setup_case worktree-pinned 2.9.0 '{"plugin":{"pin":"2.8.0"}}' project 2.9.0
+"$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m base
+"$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
+WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$HOOK" <<< "$(printf '{\"cwd\":\"%s\"}' "$WT")" 2>/dev/null)"
+MAIN_REPO="$REPO"; REPO="$WT"
+if [ ! -f "$WT/.claude/ds-config.json" ] && result_is bound-checkout-pinned \
+   && printf '%s' "$OUT" | grep -q 'pins 2.8.0' && not_called 'plugin update'; then
+  ok "(worktree-pinned) owning checkout pins → reported once, no update hand-off, no mutation"
+else bad "(worktree-pinned) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
 REPO="$MAIN_REPO"
 
 exit $FAIL

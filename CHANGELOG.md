@@ -15,9 +15,9 @@ for what each version component means here and how a release is cut.
 - **`/devstride:update` runs as written.** A skill's shell command does not receive `CLAUDE_PLUGIN_ROOT` — only hooks do — so the helper stopped every skill run with `plugin-root-missing`. `--root` now falls back to the copy holding the helper, which is the loaded copy when a skill runs it by full path, and the skill passes `--root` explicitly.
 - **A docs-only commit after a release no longer blocks every update.** The helper required the marketplace checkout to sit exactly on the newest tag, while `scripts/check-version-bump.sh` lets a change that ships nothing land without a release — so #25, merged eight minutes after 3.5.0, stopped `/devstride:update` and the session-start auto-update on every machine with `marketplace-checkout-untagged`. A checkout that descends from the tag and changes only inert maintainer files (the root documents and `scripts/`) now serves that release; any other difference still blocks, and the result names the shipped paths. The installed skills, hooks and manifest — everything a session runs — are still proved against the tag, and an install already on the release is no longer flagged for repair because `main` moved on in docs.
 
-- **Project installs work across checkouts and repositories.** `/devstride:update` stopped with `project-install-unbound` whenever another repository had a project install of the same version (installs of one version share one cache folder), and in every linked git worktree. Now only the installs that apply here count; a project install is bound in every checkout of its repository, in either direction (a local install stays with its own checkout); a checkout's own install wins over its repository's; and the update runs in the checkout the install is bound to. A pin in that checkout holds the copy from a worktree too, and the session-start auto-update defers in a worktree (`worktree-auto-deferred`) rather than move a copy another checkout owns.
+- **Project installs work across checkouts and repositories.** `/devstride:update` stopped with `project-install-unbound` whenever another repository had a project install of the same version (installs of one version share one cache folder), and in every linked git worktree. Now another repository's installs are ignored, and a project or local install is bound in every checkout of its repository, in either direction, as Claude Code applies it. Two installs recorded in checkouts of the same repository remain the ambiguity that stops `/devstride:update`, now naming each one's folder. The update, and any repair command, runs in the checkout the install is recorded in; that checkout's pin holds the copy from a worktree too, and the result names the config that pins it or fails to parse. The session-start check neither auto-updates a copy recorded in another checkout (`shared-checkout-auto-deferred`) nor recommends an update that checkout's pin will refuse (`bound-checkout-pinned`).
 
-- **The docs-only rule works on a shallow marketplace copy.** Claude Code clones a marketplace with `--depth 1` and only ever pulls, so a copy cloned after the tag lacked the release commit and was reported as rewritten history. The helper now deepens that copy once — HEAD and the working tree do not move, and nothing fetched is trusted except by its hash — and reports `release-commit-unavailable` if the release still cannot be found. A failed deepen reports `marketplace-deepen-failed`, a leftover `.git/shallow.lock` is named (`marketplace-shallow-lock`) instead of hidden, and a command the helper stops gets SIGTERM before SIGKILL so git can remove its own locks.
+- **The docs-only rule works on a shallow marketplace copy.** Claude Code clones a marketplace with `--depth 1` and only ever pulls, so a copy cloned after the tag lacked the release commit and was reported as rewritten history. The helper now deepens that copy once — HEAD and the working tree do not move, and nothing fetched is trusted except by its hash — and reports `release-commit-unavailable` if the release still cannot be found. A deepen that fails or runs out of time reports `marketplace-deepen-failed`, a leftover `.git/shallow.lock` is named (`marketplace-shallow-lock`) with the step that clears it instead of a retry that cannot succeed, and a command the helper stops gets SIGTERM before SIGKILL so git can remove its own locks.
 - **A path goes unverified only when the release agrees.** Which files may differ from the tag is read from the release being installed as well as from the running helper; only paths both list as inert are skipped, so an older helper honours a release that narrows the list. A shipped symlink may point only at a shipped regular file of the same release — not a directory, another link, a letter-case variant or an inert path.
 - **The version-bump check reads escaped paths, and the release's own list.** It lists changed paths with `-z`, so a `scripts/` file with an accented name is still maintainer tooling, and it applies the inert list of the release the change follows — the rule the updater will apply.
 
@@ -32,7 +32,7 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.5.0 @ 1b448e7, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.5.0 @ 7cd2815, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.5.0 | tokens@devstride--v3.5.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/build-item/SKILL.md | 36,589 | 12,197 | 36,589 | 12,197 | +0 | 12,200 |
@@ -54,9 +54,9 @@ for what each version component means here and how a release is cut.
 | skills/comprehend-plan/SKILL.md | 6,459 | 2,153 | 6,459 | 2,153 | +0 | 2,200 |
 | skills/push/SKILL.md | 3,908 | 1,303 | 3,908 | 1,303 | +0 | 1,400 |
 | skills/branch-feature/SKILL.md | 3,185 | 1,062 | 3,185 | 1,062 | +0 | 1,100 |
-| skills/update/SKILL.md | 2,347 | 783 | 2,624 | 875 | +92 | 900 |
+| skills/update/SKILL.md | 2,347 | 783 | 2,799 | 933 | +150 | 1,000 |
 | alwaysOn.context (skill listing) | 3,637 | 1,213 | 3,637 | 1,213 | +0 | 1,300 |
-| **total (bodies)** | 327,431 | 109,151 | 327,719 | 109,247 | +96 | |
+| **total (bodies)** | 327,431 | 109,151 | 327,894 | 109,305 | +154 | |
 
 ## [3.5.0] — 2026-09-11
 

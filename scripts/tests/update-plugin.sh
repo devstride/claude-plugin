@@ -458,8 +458,9 @@ PY
 OUT="$(run_apply)"; RC=$?
 case "$(field path)" in *"/shallow/.git/shallow.lock") LOCK_NAMED=1 ;; *) LOCK_NAMED=0 ;; esac
 if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-shallow-lock ] && [ "$LOCK_NAMED" = 1 ] \
-   && [ -e "$CASE_DIR/shallow/.git/shallow.lock" ] && not_called 'claude:plugin update'; then
-  ok "(15k) leftover shallow.lock → named in the result, left for the owner, no mutation"
+   && [ -e "$CASE_DIR/shallow/.git/shallow.lock" ] && [ "$(field retryCommand)" = None ] \
+   && not_called 'claude:plugin update'; then
+  ok "(15k) leftover shallow.lock → named, left for the owner, no retry offered, no mutation"
 else bad "(15k) rc=$RC out=$OUT"; fi
 
 # 16. The marketplace name alone grants no trust; its source must be the official repository.
@@ -646,8 +647,8 @@ if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
   ok "(27) no CLAUDE_PLUGIN_ROOT and no --root → the helper's own copy is the loaded copy"
 else bad "(27) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
-# 29. A linked worktree of the bound repository is that repository for a PROJECT install: the
-# update proceeds and runs in the bound checkout. A LOCAL install does not carry into a worktree.
+# 29. A linked worktree of the bound repository is that repository for a project or local install,
+# as Claude Code applies it: the update proceeds and runs in the checkout the install is recorded in.
 setup_case worktree devstride project 3.0.0 3.1.0 3.1.0 1
 "$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m base
 "$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
@@ -662,8 +663,9 @@ setup_case worktree-local devstride local 3.0.0 3.1.0 3.1.0 1
 "$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
 WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"
 OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
-if [ "$RC" -eq 3 ] && [ "$(field code)" = project-install-unbound ] && not_called 'claude:plugin update'; then
-  ok "(29b) local install from a linked worktree → unbound, no mutation"
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called "pwd=$REPO claude:plugin update devstride@devstride --scope local"; then
+  ok "(29b) local install from a linked worktree → bound as Claude Code binds it, updated in its checkout"
 else bad "(29b) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
 # 28. The inert list is only safe while nothing a session runs reads those paths. Scan every shipped
@@ -776,7 +778,8 @@ worktree_case() {
   "$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
   WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"; export WT
 }
-# 32. A checkout's own project install wins over its repository's; no ambiguity between the two.
+# 32. A checkout and its worktree each with a project install: Claude Code may load either, so the
+# helper stops, naming both folders, instead of guessing.
 worktree_case wt-own
 python3 - "$UP_STATE/list-before.json" "$UP_STATE/list-after.json" "$REPO" "$WT" "$PLUGIN" "$LINEAGE" <<'PY'
 import json, os, sys
@@ -786,9 +789,11 @@ json.dump([mk(repo, "3.0.0", root), mk(wt, "3.0.0", root)], open(before, "w"))
 json.dump([mk(repo, "3.0.0", root), mk(wt, "3.1.0", os.path.join(lineage, "3.1.0"))], open(after, "w"))
 PY
 OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
-if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
-   && called "pwd=$WT claude:plugin update devstride@devstride --scope project"; then
-  ok "(32) worktree with its own project install → that one is chosen, updated in the worktree"
+CANDIDATES="$(field candidates)"
+if [ "$RC" -eq 3 ] && [ "$(field code)" = multiple-applicable-installs ] \
+   && printf '%s' "$CANDIDATES" | grep -qF "$REPO)" && printf '%s' "$CANDIDATES" | grep -qF "$WT)" \
+   && not_called 'claude:plugin update'; then
+  ok "(32) a checkout and its worktree each with a project install → stopped, both folders named"
 else bad "(32) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
 # 33. An install made from a linked worktree is bound in the main checkout too (either direction).
@@ -809,8 +814,51 @@ else bad "(33) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 worktree_case wt-pin 3.0.0
 OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
 if [ ! -e "$WT/.claude/ds-config.json" ] && [ "$RC" -eq 3 ] && [ "$(field code)" = repository-pinned ] \
+   && printf '%s' "$(field pinSources)" | grep -qF "$REPO/.claude/ds-config.json" \
    && not_called 'marketplace update'; then
   ok "(34) main checkout pins, update from a worktree → still pinned"
 else bad "(34) rc=$RC out=$OUT"; fi
+
+# 35. A repair offered from a worktree runs in the checkout the install is recorded in.
+worktree_case wt-repair
+printf '\n# changed payload\n' >> "$LINEAGE/3.1.0/skills/update/scripts/latest-version.sh"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 4 ] && [ "$(field code)" = installed-payload-mismatch ] && [ "$(field projectPath)" = "$REPO" ] \
+   && printf '%s' "$(field repairCommands)" | grep -qF "cd $REPO && claude plugin uninstall devstride@devstride --scope project"; then
+  ok "(35) repair offered from a worktree → its commands run in the checkout the install is recorded in"
+else bad "(35) rc=$RC out=$OUT"; fi
+
+# 36. A deepen that runs out of time is a failed deepen, not a bare command-timeout.
+setup_case deepen-timeout devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; "$REAL_GIT" -C "$MARKET" commit -qam docs
+"$REAL_GIT" clone -q --depth 1 "file://$MARKET" "$CASE_DIR/shallow" 2>/dev/null
+T36="$(python3 - "$HELPER" "$CASE_DIR/shallow" "$UP_RELEASE_COMMIT" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("h", sys.argv[1]); h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
+real_git_code = h.git_code
+def stalled(location, args, cwd, timeout=10):
+    if "--unshallow" in args:
+        raise h.UpdateProblem("command-timeout", status="failed", command=["git", "-C", location])
+    return real_git_code(location, args, cwd, timeout)
+h.git_code = stalled
+try:
+    h.ensure_release_history(h.real(sys.argv[2]), sys.argv[3], "/")
+    print("no-error")
+except h.UpdateProblem as exc:
+    print(exc.code, exc.fields.get("reason"))
+PY
+)"
+if [ "$T36" = "marketplace-deepen-failed timeout" ]; then
+  ok "(36) deepen out of time → marketplace-deepen-failed (reason timeout)"
+else bad "(36) got [$T36]"; fi
+
+# 37. A malformed config in the checkout the copy is recorded in names that file.
+worktree_case wt-badcfg
+printf '{not json' > "$REPO/.claude/ds-config.json"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = repository-config-invalid ] \
+   && [ "$(field path)" = "$REPO/.claude/ds-config.json" ] && not_called 'marketplace update'; then
+  ok "(37) malformed config in the owning checkout → the result names that file"
+else bad "(37) rc=$RC out=$OUT"; fi
 
 exit "$FAIL"

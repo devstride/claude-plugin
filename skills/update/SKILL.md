@@ -30,6 +30,8 @@ Translate its one JSON result; never paste it raw:
   missing repository binding. For a user-scope copy beside this repository's project copy, recommend
   keeping the project one (the recommended scope) and removing the other with
   `claude plugin uninstall <id> --scope user --keep-data`; other repositories then need their own.
+  For `marketplace-shallow-lock`: once no `git` or `claude plugin` process works in that marketplace
+  folder, the user removes the named file and reruns `/devstride:update`.
 - `failed`: say which stage failed and that success is unproved. If `manualInspectionRequired`,
   give no mutation command: Claude cannot prove which copy is safe to change. If
   `repairRequired`, **do not reload or invoke another DevStride skill**; separately ask permission

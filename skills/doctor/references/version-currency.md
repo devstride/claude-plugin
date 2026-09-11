@@ -46,16 +46,18 @@ claude plugin update <installed-id> --scope <scope>
 
 Take both placeholders from `claude plugin list --json`; the installed id may be the `ds` alias and
 `update` otherwise defaults to user scope. Repository `autoUpdate` runs only at session start and
-may mutate only a project/local row bound to that checkout; a linked worktree reports
-`worktree-auto-deferred`. Shared user rows hand off to update,
+may mutate only a project/local row recorded in that very checkout. A checkout sharing a row
+recorded in another checkout of the repository reports `shared-checkout-auto-deferred`, and one
+whose owning checkout pins the copy reports `bound-checkout-pinned`. Shared user rows hand off to update,
 managed rows to their administrator, and unbound/ambiguous rows to Doctor. Exit zero alone proves
 nothing. After native bootstrap, verify with `claude plugin list`, then reload and check for errors.
 
-**Install line (doctor's repo declaration).** No DevStride row bound here in `claude plugin list
---json`: print `claude plugin install <id> --scope project`, from the repository root (it writes
+**Install line (doctor's repo declaration).** No DevStride project/local row recorded in any
+checkout of this repository (this one, its main checkout or a linked worktree) in
+`claude plugin list --json`: print `claude plugin install <id> --scope project`, from the repository root (it writes
 `enabledPlugins` into the committed `.claude/settings.json`; `--scope local` is per person). A
 user-scope row too: add `claude plugin uninstall <that row's id> --scope user --keep-data`, or the pair stops
-`/devstride:update`. A bound row needs no install line.
+`/devstride:update`. Such a row needs no install line, not even in a worktree.
 
 ## What the session-start check records
 
@@ -74,7 +76,7 @@ Written on every run:
 | `newest` | Newest tag seen, or `null` when unreachable |
 | `source` | `network` (fetched this run) or `cache` (within the 6-hour TTL) |
 | `mode` | `notify` (default), `auto-update`, `pinned`, or `invalid` when config/runtime could not be trusted |
-| `result` | `current`, `behind`, `behind-pinned`, `pin-drift`, `pinned-ahead`, `running-ahead`, `invalid-config`, `invalid-runtime`, `disk-current-unverified`, `disk-current-verified`, `installed-ahead`, `updated`, `update-failed`, `update-verification-failed`, `shared-scope-auto-refused`, `scope-binding-unverified`, `worktree-auto-deferred`, `lookup-failed`, or `unreachable` |
+| `result` | `current`, `behind`, `behind-pinned`, `pin-drift`, `pinned-ahead`, `running-ahead`, `invalid-config`, `invalid-runtime`, `disk-current-unverified`, `disk-current-verified`, `installed-ahead`, `updated`, `update-failed`, `update-verification-failed`, `shared-scope-auto-refused`, `scope-binding-unverified`, `shared-checkout-auto-deferred`, `bound-checkout-pinned`, `lookup-failed`, or `unreachable` |
 | `install` | The `id scope` identified from the enabled row whose `installPath` is the loaded copy — or `null` |
 | `notifiedFor` | What the pinned/drift line was last printed for; the same situation is said once, not every start |
 | `statusLine` | Independent managed-copy result: `n/a`, `current`, `owner-managed`, `updated:<old>:<new>`, or `update-refused` |

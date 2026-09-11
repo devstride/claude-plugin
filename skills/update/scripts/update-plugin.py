@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import selectors
+import shlex
 import signal
 import stat
 import subprocess
@@ -279,17 +280,20 @@ def read_pin(repo: str) -> Optional[str]:
     path = Path(repo, ".claude", "ds-config.json")
     if not os.path.lexists(path):
         return None
-    data = safe_json_file(path, "repository-config", within=repo)
+    try:
+        data = safe_json_file(path, "repository-config", within=repo)
+    except UpdateProblem as exc:
+        raise UpdateProblem(exc.code, status=exc.status, **{**exc.fields, "path": str(path)}) from exc
     if not isinstance(data, dict):
-        raise UpdateProblem("repository-config-invalid")
+        raise UpdateProblem("repository-config-invalid", path=str(path))
     plugin = data.get("plugin") or {}
     if not isinstance(plugin, dict):
-        raise UpdateProblem("repository-config-invalid")
+        raise UpdateProblem("repository-config-invalid", path=str(path))
     pin = plugin.get("pin")
     if pin is None:
         return None
     if not isinstance(pin, str) or not SEMVER.fullmatch(pin):
-        raise UpdateProblem("repository-pin-invalid")
+        raise UpdateProblem("repository-pin-invalid", path=str(path))
     return pin
 
 
@@ -338,16 +342,20 @@ def repository_key(path: str) -> str:
     return real(path)
 
 
+def describe_row(row: dict[str, Any]) -> str:
+    project = row.get("projectPath")
+    where = f", {real(project)}" if isinstance(project, str) else ""
+    return f"{row_id(row)} ({row.get('scope', 'unknown')}{where})"
+
+
 def row_bound_to_repo(row: dict[str, Any], repo: str) -> bool:
     scope = row.get("scope")
     project = row.get("projectPath")
     if scope not in {"project", "local"} or not isinstance(project, str):
         return False
-    if real(project) == repo:
-        return True
-    # A project install belongs to its repository — the main checkout and every linked worktree,
-    # as Claude Code itself treats it. A local install lives in one checkout's settings.local.json.
-    return scope == "project" and repository_key(real(project)) == repository_key(repo)
+    # Claude Code applies a project or local install to every checkout of its repository — the main
+    # checkout and each linked worktree — so the helper binds it the same way.
+    return real(project) == repo or repository_key(real(project)) == repository_key(repo)
 
 
 def inspect_install(root: str, repo: str) -> dict[str, Any]:
@@ -370,12 +378,12 @@ def inspect_install(root: str, repo: str) -> dict[str, Any]:
         if real(str(row.get("installPath") or "")) == root
     ]
     # One version's installs share one cache folder, so other repositories' project installs can
-    # point at the loaded copy too. Only the rows that apply HERE count: the machine-wide ones, and
-    # this checkout's own project/local install — or, when it has none, its repository's.
+    # point at the loaded copy too; they do not apply here. What applies is every machine-wide row and
+    # every project/local row recorded in a checkout of THIS repository — Claude Code may load any of
+    # them — so two of those remain the ambiguity, never a guess.
     shared = [row for row in devstride_rows if row.get("scope") in {"user", "managed"}]
     bound = [row for row in devstride_rows if row_bound_to_repo(row, repo)]
-    exact = [row for row in bound if real(str(row.get("projectPath") or "")) == repo]
-    applicable = shared + (exact or bound)
+    applicable = shared + bound
     if any(
         row.get("enabled", True) is not True
         and real(str(row.get("installPath") or "")) == root
@@ -384,7 +392,7 @@ def inspect_install(root: str, repo: str) -> dict[str, Any]:
         raise UpdateProblem("loaded-install-disabled")
     applicable = [row for row in applicable if row.get("enabled", True) is True]
     if len(applicable) > 1:
-        candidates = sorted(f"{row_id(row)} ({row.get('scope', 'unknown')})" for row in applicable)
+        candidates = sorted(describe_row(row) for row in applicable)
         raise UpdateProblem("multiple-applicable-installs", candidates=candidates)
     if not applicable:
         if any(row.get("scope") in {"project", "local"} for row in root_rows):
@@ -430,11 +438,16 @@ def inspect_install(root: str, repo: str) -> dict[str, Any]:
     project_path = row.get("projectPath") if scope in {"project", "local"} else None
     if scope in {"project", "local"} and not row_bound_to_repo(row, repo):
         raise UpdateProblem("project-install-unbound")
-    pins = {read_pin(repo)}
+    checkouts = [repo]
     if isinstance(project_path, str) and real(project_path) != repo and os.path.isdir(project_path):
-        pins.add(read_pin(real(project_path)))  # a worktree cannot unpin its main checkout's copy
-    pins.discard(None)
-    pin = "|".join(sorted(p for p in pins if p)) or None
+        checkouts.append(real(project_path))  # a worktree cannot unpin the checkout that owns the copy
+    pin_sources = [
+        {"pin": found, "path": str(Path(checkout, ".claude", "ds-config.json"))}
+        for checkout in checkouts
+        for found in [read_pin(checkout)]
+        if found
+    ]
+    pin = "|".join(sorted({source["pin"] for source in pin_sources})) or None
     fingerprint_input = json.dumps(
         [plugin_id, scope, real(project_path) if isinstance(project_path, str) else None, pin],
         separators=(",", ":"),
@@ -453,6 +466,7 @@ def inspect_install(root: str, repo: str) -> dict[str, Any]:
         "bindingExact": isinstance(project_path, str) and real(project_path) == repo,
         "resolution": resolution,
         "pin": pin,
+        "pinSources": pin_sources,
         "fingerprint": hashlib.sha256(fingerprint_input.encode()).hexdigest(),
     }
 
@@ -577,13 +591,26 @@ def ensure_release_history(location: str, release_commit: str, cwd: str) -> None
         code, git_dir = git_code(location, ["rev-parse", "--absolute-git-dir"], cwd)
         lock = os.path.join(git_dir.decode("utf-8", "replace").strip(), "shallow.lock")
         if code == 0 and os.path.lexists(lock):
-            raise UpdateProblem("marketplace-shallow-lock", path=lock)
-        fetch, _ = git_code(
-            location, ["fetch", "--quiet", "--no-tags", "--unshallow", "origin"], cwd, timeout=60
-        )
+            raise UpdateProblem("marketplace-shallow-lock", path=lock, retryCommand=None)
+        try:
+            fetch, _ = git_code(
+                location, ["fetch", "--quiet", "--no-tags", "--unshallow", "origin"], cwd, timeout=60
+            )
+        except UpdateProblem as exc:
+            if exc.code not in {"command-timeout", "update-deadline-exceeded"}:
+                raise
+            raise UpdateProblem(
+                "marketplace-deepen-failed",
+                status="failed",
+                reason="timeout",
+                retryCommand="/devstride:update",
+            ) from exc
         if fetch != 0:
             raise UpdateProblem(
-                "marketplace-deepen-failed", status="failed", retryCommand="/devstride:update"
+                "marketplace-deepen-failed",
+                status="failed",
+                reason="error",
+                retryCommand="/devstride:update",
             )
     if not present():
         raise UpdateProblem("release-commit-unavailable", expectedCommit=release_commit)
@@ -1015,9 +1042,13 @@ def contextual(base: dict[str, Any], function: Any, *args: Any, **kwargs: Any) -
 
 
 def reinstall_commands(info: dict[str, Any]) -> list[str]:
+    # Claude Code resolves a project/local install in the checkout it is recorded in, so the repair
+    # runs there, not wherever the session happens to be.
+    where = info.get("projectPath") if info.get("scope") in {"project", "local"} else None
+    prefix = f"cd {shlex.quote(where)} && " if isinstance(where, str) and where else ""
     return [
-        f"claude plugin uninstall {info['id']} --scope {info['scope']} --keep-data",
-        f"claude plugin install {info['id']} --scope {info['scope']}",
+        f"{prefix}claude plugin uninstall {info['id']} --scope {info['scope']} --keep-data",
+        f"{prefix}claude plugin install {info['id']} --scope {info['scope']}",
         "/devstride:update",
     ]
 
@@ -1030,6 +1061,7 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
         "targetVersion": None,
         "id": before["id"],
         "scope": before["scope"],
+        "projectPath": before["projectPath"],
         "marketplace": before["marketplace"],
         "reloadRequired": before["runningVersion"] != before["diskVersion"],
         "safeToReload": False,
@@ -1039,7 +1071,9 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
         "retryCommand": "/devstride:update",
     }
     if before["pin"]:
-        raise UpdateProblem("repository-pinned", **base, pin=before["pin"])
+        raise UpdateProblem(
+            "repository-pinned", **base, pin=before["pin"], pinSources=before["pinSources"]
+        )
     if before["scope"] == "managed":
         raise UpdateProblem("managed-install", **base)
 
