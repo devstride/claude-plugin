@@ -415,7 +415,7 @@ unavailable or fails. Do not invoke another DevStride command first.
 
 ```bash
 claude plugin marketplace update devstride   # refresh the catalog
-claude plugin update devstride@devstride --scope project   # the scope you installed at
+claude plugin update devstride@devstride --scope <scope>   # the scope claude plugin list shows
 ```
 
 Then run `/reload-plugins` and confirm it reports no DevStride load error; restart Claude Code if
@@ -425,8 +425,9 @@ reload is unavailable or fails. Two things to watch:
   installed through the [short alias](#install). `claude plugin list` shows which you have, and using
   the wrong one reports the plugin as not installed rather than doing nothing visible; the bare plugin name
   reports "not found".
-- It acts on the **user** scope by default. The recommended project install needs `--scope project`
-  (likewise `local` or `managed`), or it reports the plugin isn't installed and changes nothing.
+- It acts on the **user** scope by default, so pass the scope `claude plugin list` shows: `project` for
+  the recommended install, `user` for an older machine-wide one (likewise `local` or `managed`) —
+  otherwise it reports the plugin isn't installed and changes nothing.
 
 Running only the first command is a common mistake — it refreshes marketplace metadata and reports
 success while leaving your installed copy exactly where it was.

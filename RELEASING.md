@@ -147,7 +147,7 @@ To get 3.1.0 from 3.0.0 or older — or when the skill is unavailable — two co
 
 ```bash
 claude plugin marketplace update devstride   # refresh the catalog
-claude plugin update devstride@devstride --scope project   # the scope you installed at
+claude plugin update devstride@devstride --scope <scope>   # the scope claude plugin list shows
 ```
 
 followed by `/reload-plugins` (confirm no DevStride load error), with restart as the fallback. Three
@@ -158,9 +158,9 @@ traps worth repeating in the announcement:
   did not ship.
 - **`claude plugin update devstride` fails** with "Plugin not found" — the update command needs the
   fully-qualified `devstride@devstride`.
-- **It defaults to the `user` scope.** A project install — the recommended one — needs `--scope
-  project` (likewise local or managed), or the command reports the plugin is not installed and
-  changes nothing.
+- **It defaults to the `user` scope.** Pass the scope `claude plugin list` shows — `project` for the
+  recommended install, `user` for an older machine-wide one (likewise local or managed) — or the
+  command reports the plugin is not installed and changes nothing.
 
 So the answer to "when does my team get the fix" is: when marketplace auto-update next runs, at an
 opted-in repository's next session start, through `/devstride:update` on 3.1.0+, or after the two
