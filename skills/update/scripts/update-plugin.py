@@ -227,15 +227,18 @@ def run_command(
     finally:
         selector.close()
         if process is not None and not completed_normally:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                if process.poll() is None:
-                    process.kill()
-            try:
-                process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                pass
+            # SIGTERM first, so git can remove its own lock files (a SIGKILLed deepen leaves
+            # .git/shallow.lock and wedges every later one), then SIGKILL the whole group.
+            for sig, fallback in ((signal.SIGTERM, process.terminate), (signal.SIGKILL, process.kill)):
+                try:
+                    os.killpg(process.pid, sig)
+                except (ProcessLookupError, PermissionError):
+                    if process.poll() is None:
+                        fallback()
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    pass
         if process is not None:
             if process.stdout is not None:
                 process.stdout.close()
@@ -313,12 +316,12 @@ def is_devstride(row: dict[str, Any]) -> bool:
 
 
 @functools.lru_cache(maxsize=None)
-def repository_identities(repo: str) -> frozenset[str]:
-    """This checkout's root, plus the main worktree's root when it is a linked worktree."""
-    identities = {real(repo)}
+def repository_key(path: str) -> str:
+    """The main worktree's root for any checkout of a repository (via its git common dir), so the
+    main checkout and every linked worktree share one key; the path itself when git cannot say."""
     try:
         result = subprocess.run(
-            ["git", "-C", repo, "rev-parse", "--git-common-dir"],
+            ["git", "-C", path, "rev-parse", "--git-common-dir"],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -329,10 +332,10 @@ def repository_identities(repo: str) -> frozenset[str]:
     except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError):
         common = ""
     if common:
-        common = real(common if os.path.isabs(common) else os.path.join(repo, common))
+        common = real(common if os.path.isabs(common) else os.path.join(path, common))
         if os.path.basename(common) == ".git":
-            identities.add(os.path.dirname(common))
-    return frozenset(identities)
+            return os.path.dirname(common)
+    return real(path)
 
 
 def row_bound_to_repo(row: dict[str, Any], repo: str) -> bool:
@@ -340,10 +343,11 @@ def row_bound_to_repo(row: dict[str, Any], repo: str) -> bool:
     project = row.get("projectPath")
     if scope not in {"project", "local"} or not isinstance(project, str):
         return False
-    # A linked worktree checks out the same committed .claude/settings.json, so a project install
-    # applies there too; a local install lives in one checkout's settings.local.json and does not.
-    roots = repository_identities(repo) if scope == "project" else frozenset({real(repo)})
-    return real(project) in roots
+    if real(project) == repo:
+        return True
+    # A project install belongs to its repository — the main checkout and every linked worktree,
+    # as Claude Code itself treats it. A local install lives in one checkout's settings.local.json.
+    return scope == "project" and repository_key(real(project)) == repository_key(repo)
 
 
 def inspect_install(root: str, repo: str) -> dict[str, Any]:
@@ -365,26 +369,26 @@ def inspect_install(root: str, repo: str) -> dict[str, Any]:
         for row in devstride_rows
         if real(str(row.get("installPath") or "")) == root
     ]
-    if any(row.get("enabled", True) is not True for row in root_rows):
-        raise UpdateProblem("loaded-install-disabled")
-    exact_rows = [row for row in root_rows if row.get("enabled", True) is True]
+    # One version's installs share one cache folder, so other repositories' project installs can
+    # point at the loaded copy too. Only the rows that apply HERE count: the machine-wide ones, and
+    # this checkout's own project/local install — or, when it has none, its repository's.
+    shared = [row for row in devstride_rows if row.get("scope") in {"user", "managed"}]
+    bound = [row for row in devstride_rows if row_bound_to_repo(row, repo)]
+    exact = [row for row in bound if real(str(row.get("projectPath") or "")) == repo]
+    applicable = shared + (exact or bound)
     if any(
-        row.get("scope") in {"project", "local"} and not row_bound_to_repo(row, repo)
-        for row in exact_rows
+        row.get("enabled", True) is not True
+        and real(str(row.get("installPath") or "")) == root
+        for row in applicable
     ):
-        raise UpdateProblem("project-install-unbound")
-
-    applicable: list[dict[str, Any]] = []
-    for row in rows:
-        if not is_devstride(row) or row.get("enabled", True) is not True:
-            continue
-        scope = row.get("scope")
-        if scope in {"user", "managed"} or row_bound_to_repo(row, repo):
-            applicable.append(row)
+        raise UpdateProblem("loaded-install-disabled")
+    applicable = [row for row in applicable if row.get("enabled", True) is True]
     if len(applicable) > 1:
         candidates = sorted(f"{row_id(row)} ({row.get('scope', 'unknown')})" for row in applicable)
         raise UpdateProblem("multiple-applicable-installs", candidates=candidates)
     if not applicable:
+        if any(row.get("scope") in {"project", "local"} for row in root_rows):
+            raise UpdateProblem("project-install-unbound")
         raise UpdateProblem("loaded-install-not-found")
 
     row = applicable[0]
@@ -426,7 +430,11 @@ def inspect_install(root: str, repo: str) -> dict[str, Any]:
     project_path = row.get("projectPath") if scope in {"project", "local"} else None
     if scope in {"project", "local"} and not row_bound_to_repo(row, repo):
         raise UpdateProblem("project-install-unbound")
-    pin = read_pin(repo)
+    pins = {read_pin(repo)}
+    if isinstance(project_path, str) and real(project_path) != repo and os.path.isdir(project_path):
+        pins.add(read_pin(real(project_path)))  # a worktree cannot unpin its main checkout's copy
+    pins.discard(None)
+    pin = "|".join(sorted(p for p in pins if p)) or None
     fingerprint_input = json.dumps(
         [plugin_id, scope, real(project_path) if isinstance(project_path, str) else None, pin],
         separators=(",", ":"),
@@ -442,6 +450,7 @@ def inspect_install(root: str, repo: str) -> dict[str, Any]:
         "marketplace": plugin_id.split("@", 1)[1],
         "projectPath": real(project_path) if isinstance(project_path, str) else None,
         "repoBound": row_bound_to_repo(row, repo),
+        "bindingExact": isinstance(project_path, str) and real(project_path) == repo,
         "resolution": resolution,
         "pin": pin,
         "fingerprint": hashlib.sha256(fingerprint_input.encode()).hexdigest(),
@@ -565,7 +574,17 @@ def ensure_release_history(location: str, release_commit: str, cwd: str) -> None
         return
     code, out = git_code(location, ["rev-parse", "--is-shallow-repository"], cwd)
     if code == 0 and out.strip() == b"true":
-        git_code(location, ["fetch", "--quiet", "--no-tags", "--unshallow", "origin"], cwd, timeout=60)
+        code, git_dir = git_code(location, ["rev-parse", "--absolute-git-dir"], cwd)
+        lock = os.path.join(git_dir.decode("utf-8", "replace").strip(), "shallow.lock")
+        if code == 0 and os.path.lexists(lock):
+            raise UpdateProblem("marketplace-shallow-lock", path=lock)
+        fetch, _ = git_code(
+            location, ["fetch", "--quiet", "--no-tags", "--unshallow", "origin"], cwd, timeout=60
+        )
+        if fetch != 0:
+            raise UpdateProblem(
+                "marketplace-deepen-failed", status="failed", retryCommand="/devstride:update"
+            )
     if not present():
         raise UpdateProblem("release-commit-unavailable", expectedCommit=release_commit)
 
@@ -661,6 +680,7 @@ def tagged_payload(
     if code != 0:
         raise UpdateProblem("marketplace-tree-unreadable")
     entries: dict[str, tuple[str, str]] = {}
+    all_modes: dict[str, str] = {}
     try:
         for record in out.rstrip(b"\0").split(b"\0"):
             if not record:
@@ -676,9 +696,10 @@ def tagged_payload(
                 or not parts
                 or Path(path).is_absolute()
                 or ".." in parts
-                or path in entries
+                or path in all_modes
             ):
                 raise ValueError
+            all_modes[path] = mode
             if not inert(path):
                 entries[path] = (mode, blob)
     except (UnicodeDecodeError, ValueError) as exc:
@@ -688,7 +709,8 @@ def tagged_payload(
     for path, (mode, blob) in entries.items():
         if mode != "120000":
             continue
-        # A shipped link must stay inside the tree and must not reach a path the proof skips.
+        # A shipped link may point only at a shipped regular file of this release — never a
+        # directory (the tree root included), another link, a case variant, or a skipped path.
         code, target, _ = run_command(
             ["git", "-C", location, "cat-file", "blob", blob], cwd=cwd, timeout=10
         )
@@ -700,10 +722,8 @@ def tagged_payload(
         if (
             not text
             or os.path.isabs(text)
-            or resolved == ".."
-            or resolved.startswith("../")
+            or all_modes.get(resolved) not in {"100644", "100755"}
             or inert(resolved)
-            or inert(resolved + "/")
         ):
             raise UpdateProblem("marketplace-tree-invalid", path=path)
     return entries

@@ -401,8 +401,8 @@ import json, sys
 rows = json.load(open(sys.argv[1])); rows[0]["installLocation"] = sys.argv[2]; json.dump(rows, open(sys.argv[1], "w"))
 PY
 OUT="$(run_apply)"; RC=$?
-if [ "$RC" -eq 3 ] && [ "$(field code)" = release-commit-unavailable ] && not_called 'claude:plugin update'; then
-  ok "(15h) shallow copy that cannot be deepened → release-commit-unavailable, no mutation"
+if [ "$RC" -eq 4 ] && [ "$(field code)" = marketplace-deepen-failed ] && not_called 'claude:plugin update'; then
+  ok "(15h) shallow copy that cannot be deepened → marketplace-deepen-failed, no mutation"
 else bad "(15h) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
 # 15i. A path counts as inert only when the RELEASE lists it too: a release that narrows the list
@@ -421,16 +421,46 @@ if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
   ok "(15i) release narrows the inert list → the running helper honours it, scripts/ change blocks"
 else bad "(15i) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
-# 15j. A shipped symlink into an inert path would run unverified content: the release is refused.
-setup_case linked-inert devstride user 3.0.0 3.1.0 3.1.0
-ln -s ../../scripts/tool.sh "$MARKET/skills/update/tool-link"
+# 15j. A shipped link may point only at a shipped regular file of the same release. Into scripts/,
+# at the tree root, at a letter-case variant, or at another link: the release is refused.
+for spec in "tool-link:../../scripts/tool.sh" "root-link:../.." "case-link:../../SCRIPTS/tool.sh" "chain-link:plain-link"; do
+  name="${spec%%:*}"; target="${spec#*:}"
+  setup_case "linked-$name" devstride user 3.0.0 3.1.0 3.1.0
+  ln -s scripts/latest-version.sh "$MARKET/skills/update/plain-link"
+  ln -s "$target" "$MARKET/skills/update/$name"
+  "$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -q --amend -m linked
+  UP_RELEASE_COMMIT="$("$REAL_GIT" -C "$MARKET" rev-parse HEAD)"; export UP_RELEASE_COMMIT
+  OUT="$(run_apply)"; RC=$?
+  if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-tree-invalid ] \
+     && [ "$(field path)" = "skills/update/$name" ] && not_called 'claude:plugin update'; then
+    ok "(15j) shipped symlink $name → $target → release refused, no mutation"
+  else bad "(15j) $name rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+done
+setup_case linked-file devstride user 3.0.0 3.1.0 3.1.0
+ln -s scripts/latest-version.sh "$MARKET/skills/update/plain-link"
+ln -s scripts/latest-version.sh "$LINEAGE/3.1.0/skills/update/plain-link"
 "$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -q --amend -m linked
 UP_RELEASE_COMMIT="$("$REAL_GIT" -C "$MARKET" rev-parse HEAD)"; export UP_RELEASE_COMMIT
 OUT="$(run_apply)"; RC=$?
-if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-tree-invalid ] && [ "$(field path)" = skills/update/tool-link ] \
-   && not_called 'claude:plugin update'; then
-  ok "(15j) shipped symlink into scripts/ → release refused, no mutation"
-else bad "(15j) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ]; then
+  ok "(15j) a link to a shipped regular file → allowed and verified"
+else bad "(15j) plain-link rc=$RC out=$OUT"; fi
+
+# 15k. A leftover .git/shallow.lock (a deepen killed without cleanup) is named, never hidden.
+setup_case shallow-lock devstride user 3.0.0 3.1.0 3.1.0
+printf 'docs\n' > "$MARKET/README.md"; "$REAL_GIT" -C "$MARKET" commit -qam docs
+"$REAL_GIT" clone -q --depth 1 "file://$MARKET" "$CASE_DIR/shallow" 2>/dev/null
+python3 - "$UP_STATE/marketplaces.json" "$CASE_DIR/shallow" <<'PY'
+import json, sys
+rows = json.load(open(sys.argv[1])); rows[0]["installLocation"] = sys.argv[2]; json.dump(rows, open(sys.argv[1], "w"))
+PY
+: > "$CASE_DIR/shallow/.git/shallow.lock"
+OUT="$(run_apply)"; RC=$?
+case "$(field path)" in *"/shallow/.git/shallow.lock") LOCK_NAMED=1 ;; *) LOCK_NAMED=0 ;; esac
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-shallow-lock ] && [ "$LOCK_NAMED" = 1 ] \
+   && [ -e "$CASE_DIR/shallow/.git/shallow.lock" ] && not_called 'claude:plugin update'; then
+  ok "(15k) leftover shallow.lock → named in the result, left for the owner, no mutation"
+else bad "(15k) rc=$RC out=$OUT"; fi
 
 # 16. The marketplace name alone grants no trust; its source must be the official repository.
 setup_case wrong-source devstride user 3.0.0 3.1.0 3.1.0
@@ -639,7 +669,8 @@ else bad "(29b) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 # 28. The inert list is only safe while nothing a session runs reads those paths. Scan every shipped
 # file for the ways a path is built — ${ROOT}/x, quoted literals in code, ../ traversal — check
 # shipped symlinks, and keep the list clear of folders Claude Code loads on its own.
-RUNTIME_REFS="$(python3 - "$ROOT" "$HELPER" <<'PY'
+runtime_refs() {  # runtime_refs ROOT HELPER — prints each hit; empty output means clean
+python3 - "$1" "$2" <<'PY'
 import importlib.util, os, re, subprocess, sys
 root, helper = sys.argv[1:]
 spec = importlib.util.spec_from_file_location("h", helper); h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
@@ -653,12 +684,26 @@ traversal = re.compile(r"(\.\./)+(" + alt + r")(/|\b)")
 auto = {"commands", "skills", "agents", "hooks", "output-styles", "themes", "monitors", "workflows",
         "bin", ".mcp.json", ".lsp.json", "settings.json", ".claude-plugin"}
 hits = ["inert name is an auto-loaded component: " + n for n in names if n in auto]
-for line in subprocess.run(["git", "-C", root, "ls-files", "-s"], capture_output=True, text=True).stdout.splitlines():
-    meta, path = line.split("\t", 1)
+top = subprocess.run(["git", "-C", root, "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+files = []
+if top.returncode == 0 and os.path.realpath(top.stdout.strip()) == os.path.realpath(root):
+    for line in subprocess.run(["git", "-C", root, "ls-files", "-s"], capture_output=True, text=True).stdout.splitlines():
+        meta, path = line.split("\t", 1)
+        files.append((meta.split()[0], path))
+if not files:  # not a checkout of its own (an export, a tarball): walk the files instead
+    for d, dirs, fs in os.walk(root):
+        dirs[:] = [x for x in dirs if x not in (".git", ".claude")]  # local state, never shipped
+        for x in dirs + fs:
+            full = os.path.join(d, x)
+            if os.path.islink(full) or os.path.isfile(full):
+                files.append(("120000" if os.path.islink(full) else "100644", os.path.relpath(full, root)))
+if not files:
+    print("no shipped files found to scan"); sys.exit()
+for mode, path in files:
     if h.is_inert(path):
         continue
     full = os.path.join(root, path)
-    if meta.split()[0] == "120000":
+    if mode == "120000":
         target = os.readlink(full)
         resolved = os.path.normpath(os.path.join(os.path.dirname(path), target))
         if os.path.isabs(target) or resolved.startswith("..") or h.is_inert(resolved) or h.is_inert(resolved + "/"):
@@ -676,9 +721,96 @@ for line in subprocess.run(["git", "-C", root, "ls-files", "-s"], capture_output
             hits.append(f"{path}:{n}: {ln.strip()[:120]}")
 print("\n".join(hits))
 PY
-)"
+}
+RUNTIME_REFS="$(runtime_refs "$ROOT" "$HELPER")"
 if [ -z "$RUNTIME_REFS" ]; then
   ok "(28) no shipped file, symlink or auto-loaded folder reaches an inert path"
 else bad "(28) inert path reachable at runtime: $RUNTIME_REFS"; fi
+
+# 28b. Outside a git checkout the scan walks the files, and still finds a planted read.
+NOGIT="$WORK/nogit"; mkdir -p "$NOGIT"; (cd "$ROOT" && tar --exclude=.git --exclude=.claude -cf - .) | (cd "$NOGIT" && tar -xf -)
+CLEAN="$(runtime_refs "$NOGIT" "$NOGIT/skills/update/scripts/update-plugin.py")"
+printf '\n_NOTES = Path(ROOT, "README.md")\n' >> "$NOGIT/skills/doctor/scripts/statusline-override.py"
+PLANTED="$(runtime_refs "$NOGIT" "$NOGIT/skills/update/scripts/update-plugin.py")"
+if [ -z "$CLEAN" ] && printf '%s' "$PLANTED" | grep -q "statusline-override.py"; then
+  ok "(28b) without .git the scan walks the files: clean tree clean, planted read found"
+else bad "(28b) clean=[$CLEAN] planted=[$PLANTED]"; fi
+
+# 30. A timed-out command gets SIGTERM before SIGKILL, so git can remove its own lock files.
+MARKER="$WORK/term-marker"
+T30="$(python3 - "$HELPER" "$MARKER" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("h", sys.argv[1]); h = importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
+try:
+    h.run_command(["bash", "-c", 'trap "touch %s; exit 0" TERM; sleep 30 & wait' % sys.argv[2]], cwd="/", timeout=1)
+    print("no-timeout")
+except h.UpdateProblem as exc:
+    print(exc.code)
+PY
+)"
+if [ "$T30" = command-timeout ] && [ -e "$MARKER" ]; then
+  ok "(30) timed-out command → SIGTERM delivered first (its cleanup ran), then the group is killed"
+else bad "(30) result=$T30 marker=$([ -e "$MARKER" ] && echo yes || echo no)"; fi
+
+# 31. Another repository's project install of the same version shares the cache folder; it no
+# longer blocks this repository's update.
+setup_case two-repos devstride project 3.0.0 3.1.0 3.1.0 1
+OTHER="$CASE_DIR/other-repo"; mkdir -p "$OTHER"; "$REAL_GIT" -C "$OTHER" init -q
+python3 - "$UP_STATE/list-before.json" "$UP_STATE/list-after.json" "$OTHER" "$PLUGIN" <<'PY'
+import json, sys
+before, after, other, root = sys.argv[1:]
+row = {"id": "devstride@devstride", "version": "3.0.0", "scope": "project", "enabled": True, "installPath": root, "projectPath": other}
+for f in (before, after):
+    rows = json.load(open(f)); rows.append(dict(row)); json.dump(rows, open(f, "w"))
+PY
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called "pwd=$REPO claude:plugin update devstride@devstride --scope project"; then
+  ok "(31) another repository's project install at the same version → this one still updates"
+else bad "(31) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# worktree_case NAME [PIN] — a project install bound to REPO, plus a linked worktree WT.
+worktree_case() {
+  setup_case "$1" devstride project 3.0.0 3.1.0 3.1.0 1 "${2:--}"
+  "$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m base
+  "$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
+  WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"; export WT
+}
+# 32. A checkout's own project install wins over its repository's; no ambiguity between the two.
+worktree_case wt-own
+python3 - "$UP_STATE/list-before.json" "$UP_STATE/list-after.json" "$REPO" "$WT" "$PLUGIN" "$LINEAGE" <<'PY'
+import json, os, sys
+before, after, repo, wt, root, lineage = sys.argv[1:]
+mk = lambda project, version, path: {"id": "devstride@devstride", "version": version, "scope": "project", "enabled": True, "installPath": path, "projectPath": project}
+json.dump([mk(repo, "3.0.0", root), mk(wt, "3.0.0", root)], open(before, "w"))
+json.dump([mk(repo, "3.0.0", root), mk(wt, "3.1.0", os.path.join(lineage, "3.1.0"))], open(after, "w"))
+PY
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called "pwd=$WT claude:plugin update devstride@devstride --scope project"; then
+  ok "(32) worktree with its own project install → that one is chosen, updated in the worktree"
+else bad "(32) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 33. An install made from a linked worktree is bound in the main checkout too (either direction).
+worktree_case wt-made
+python3 - "$UP_STATE/list-before.json" "$UP_STATE/list-after.json" "$WT" <<'PY'
+import json, sys
+for f in sys.argv[1:3]:
+    rows = json.load(open(f)); rows[0]["projectPath"] = sys.argv[3]; json.dump(rows, open(f, "w"))
+PY
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called "pwd=$WT claude:plugin update devstride@devstride --scope project"; then
+  ok "(33) install made in a worktree, updated from the main checkout → bound, runs in the worktree"
+else bad "(33) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 34. The checkout a copy is bound to pins it even when the update runs from a worktree whose own
+# (uncommitted-config) checkout sets no pin.
+worktree_case wt-pin 3.0.0
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" python3 "$HELPER" apply --root "$PLUGIN" --repo "$WT" 2>/dev/null)"; RC=$?
+if [ ! -e "$WT/.claude/ds-config.json" ] && [ "$RC" -eq 3 ] && [ "$(field code)" = repository-pinned ] \
+   && not_called 'marketplace update'; then
+  ok "(34) main checkout pins, update from a worktree → still pinned"
+else bad "(34) rc=$RC out=$OUT"; fi
 
 exit "$FAIL"

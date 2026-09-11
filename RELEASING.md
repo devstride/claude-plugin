@@ -101,9 +101,10 @@ depend on, it does not freeze the surface.
    `scripts/` — needs neither a bump nor a tag: updates still install the release beneath it. **That
    holds only on machines already running 3.5.1 or newer**, whose helper knows the rule; a 3.5.0 or
    older copy still needs `main` exactly on the newest tag. Until most machines have moved, keep
-   `main` on the tag and hold maintainer-only commits for the next release. Narrowing the inert list
-   is a compatibility event: a path is skipped only when both the running helper and the release
-   being installed list it.
+   `main` on the tag and hold maintainer-only commits for the next release. Widening the inert list is
+   the compatibility event: helpers older than the release that widened it still treat the new paths
+   as shipped, so hold `main` on the tag after a widening too. Narrowing is safe — a path is skipped
+   only when both the running helper and the release being installed list it.
 
 6. **Tag.** Use the official tooling rather than tagging by hand. Preview it first:
 
@@ -145,11 +146,11 @@ devstride marketplace → **Enable auto-update**) gets releases without doing an
 stays on their installed version indefinitely — verified on Claude Code 2.1.233, where starting a
 fresh session with a newer version available left the installed plugin untouched.
 
-From 3.1.0 onward, `/devstride:update` resolves the loaded copy, attests the canonical tag and
+From 3.5.1 onward (3.1.0–3.5.0 can stop with `plugin-root-missing`), `/devstride:update` resolves the loaded copy, attests the canonical tag and
 installed files, then stops. Run `/reload-plugins` and confirm no DevStride load error; restart if
 reload is unavailable or fails. Repository-driven automatic updates remain session-start-only.
 
-To get 3.1.0 from 3.0.0 or older — or when the skill is unavailable — two commands are required:
+On 3.5.0 or older — or when the skill is unavailable — two commands are required:
 
 ```bash
 claude plugin marketplace update devstride   # refresh the catalog
@@ -169,7 +170,7 @@ traps worth repeating in the announcement:
   command reports the plugin is not installed and changes nothing.
 
 So the answer to "when does my team get the fix" is: when marketplace auto-update next runs, at an
-opted-in repository's next session start, through `/devstride:update` on 3.1.0+, or after the two
+opted-in repository's next session start, through `/devstride:update` on 3.5.1+, or after the two
 bootstrap commands on an older copy. Say which rather than assuming it propagates.
 
 ### Pinning
@@ -183,7 +184,7 @@ and scope, and re-adding it does not bring them back** — so note each row firs
 claude plugin list --json                 # note every DevStride row: id, scope, projectPath
 claude plugin marketplace remove devstride
 claude plugin marketplace add devstride/claude-plugin@devstride--v<version>
-claude plugin install devstride@devstride --scope project   # once per row, from its repository
+claude plugin install <id> --scope <scope>   # once per row: its id and scope, from its projectPath
 ```
 
 Unpinning is the same three commands with the bare `devstride/claude-plugin` as the source.

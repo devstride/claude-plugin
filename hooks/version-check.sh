@@ -531,7 +531,7 @@ INSPECT=$(python3 "$UPDATE_HELPER" inspect --root "$ROOT" --repo "$REPO" 2>/dev/
 INSTALL=$(printf '%s' "$INSPECT" | python3 -c 'import json,sys
 try:
   d=json.load(sys.stdin)
-  if d.get("status") == "ok": print(d["id"], d["scope"], "1" if d.get("repoBound") else "0", d["diskVersion"])
+  if d.get("status") == "ok": print(d["id"], d["scope"], "1" if d.get("repoBound") else "0", d["diskVersion"], "1" if d.get("bindingExact") else "0")
 except Exception: pass' 2>/dev/null)
 
 if [ -z "$INSTALL" ]; then
@@ -539,7 +539,7 @@ if [ -z "$INSTALL" ]; then
   echo "devstride plugin: $RUNNING running, $NEWEST available, but the active install is ambiguous or unsafe. Run /devstride:doctor; do not guess an update id or scope."
   finish
 fi
-read -r ID SCOPE REPO_BOUND DISK_VERSION <<EOF
+read -r ID SCOPE REPO_BOUND DISK_VERSION BINDING_EXACT <<EOF
 $INSTALL
 EOF
 INSTALL="$ID $SCOPE" # keep the doctor-facing record stable; the binding bit is internal only
@@ -571,6 +571,13 @@ if [ "$AUTO" = "1" ]; then
         echo "devstride plugin: $RUNNING running, $NEWEST available. Repository auto-update cannot change shared $SCOPE install $ID. Run /devstride:update to update and verify that exact install."
       fi
     fi
+    finish
+  fi
+  # A linked worktree shares its repository's project copy, but that copy answers to the checkout
+  # it is bound to: this checkout's own autoUpdate/pin must not move it in the background.
+  if [ "$REPO_BOUND" = "1" ] && [ "$BINDING_EXACT" != "1" ]; then
+    RESULT="worktree-auto-deferred"; NOTIFIED="worktree:$ID:$SCOPE:$RUNNING:$NEWEST"
+    [ "$PREV_NOTIFIED" != "$NOTIFIED" ] && echo "devstride plugin: $RUNNING running, $NEWEST available. This checkout shares the $ID project copy bound to another checkout of this repository, so repository auto-update applies only there. Run /devstride:update to update and verify it now."
     finish
   fi
   if [ "$REPO_BOUND" != "1" ] || { [ "$SCOPE" != "project" ] && [ "$SCOPE" != "local" ]; }; then

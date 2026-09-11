@@ -479,4 +479,20 @@ if grep -q 'echo post-link-writer' "$REPO/.claude/statusline.sh" \
   ok "(12) post-link target writer → final proof catches it and preserves the edit"
 else bad "(12) out=$OUT target=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null) backup=$(cat "$REPO/.claude/statusline.sh.bak" 2>/dev/null) leftovers=$LEFTOVERS"; fi
 
+# A linked worktree shares its repository's project copy, but never auto-updates it in the
+# background: the checkout the copy is bound to owns that decision.
+setup_case worktree-auto 2.9.0 '{"plugin":{"autoUpdate":true}}' project 2.9.0
+"$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com add -A >/dev/null 2>&1
+"$REAL_GIT" -C "$REPO" -c user.name=t -c user.email=t@example.com commit -qm base
+"$REAL_GIT" -C "$REPO" worktree add -q "$CASE_DIR/wt" 2>/dev/null
+WT="$("$REAL_GIT" -C "$CASE_DIR/wt" rev-parse --show-toplevel)"
+OUT="$(CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$HOOK" <<< "$(printf '{\"cwd\":\"%s\"}' "$WT")" 2>/dev/null)"
+MAIN_REPO="$REPO"; REPO="$WT"
+if [ -f "$WT/.claude/ds-config.json" ] && result_is worktree-auto-deferred \
+   && printf '%s' "$OUT" | grep -qF '/devstride:update' \
+   && not_called 'plugin marketplace update' && not_called 'plugin update'; then
+  ok "(worktree) autoUpdate on in a linked worktree → deferred to /devstride:update, no mutation"
+else bad "(worktree) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
+REPO="$MAIN_REPO"
+
 exit $FAIL

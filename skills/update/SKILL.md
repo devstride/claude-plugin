@@ -40,4 +40,4 @@ Only for `updated`/`current` with both `safeToReload` and `reloadRequired` true,
 **Run `/reload-plugins` before another DevStride command and confirm it reports no DevStride load
 error. If reload is unavailable or fails, restart Claude Code.** Stop after this handoff.
 
-The skill first exists in 3.1.0. Older copies need the README's two-command bootstrap once.
+It runs as written from 3.5.1; older copies need the README's two-command bootstrap once.

@@ -67,12 +67,12 @@ actually installed under, so a `ds` install updates with:
 
 ```bash
 claude plugin marketplace update devstride
-claude plugin update ds@devstride --scope project
+claude plugin update ds@devstride --scope <scope>   # the scope claude plugin list shows
 ```
 
 Running the `devstride@devstride` form against an alias install reports the plugin as not installed —
 which reads like something broke, when in fact you are simply on the other id. `claude plugin list`
-tells you which you have. From plugin 3.1.0, a direct `/devstride:update` resolves the installed
+tells you which you have. From plugin 3.5.1, a direct `/devstride:update` resolves the installed
 alias and scope for you.
 
 </details>
@@ -452,13 +452,14 @@ machine: append `@<tag>` to the marketplace source — there is no `--ref` flag.
 > **`marketplace remove` also uninstalls every plugin that came from it, in every repository and
 > scope.** Re-adding the marketplace does *not* bring them back. Note each DevStride row
 > `claude plugin list --json` shows first, then reinstall each one from its own repository with its
-> own scope — skip one and that repository is left with no skills, and nothing says why.
+> own scope (a project reinstall writes that repository's committed `.claude/settings.json`) — skip one
+> and that repository is left with no skills, and nothing says why.
 
 ```bash
 claude plugin list --json                 # note every DevStride row: id, scope, projectPath
 claude plugin marketplace remove devstride
 claude plugin marketplace add devstride/claude-plugin@devstride--v<version>
-claude plugin install devstride@devstride --scope project   # once per row, from its repository
+claude plugin install <id> --scope <scope>   # once per row: its id and scope, from its projectPath
 ```
 
 Every release is tagged, so any version in the [changelog](CHANGELOG.md) is pinnable. To unpin, run
