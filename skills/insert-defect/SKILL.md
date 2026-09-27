@@ -5,78 +5,32 @@ description: Insert a new Defect into a live DevStride roadmap, spliced into the
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
-Insert a NEW Defect (the one-day leaf role — this org's Defect type) into a live DevStride roadmap — spliced into the dependency chain and dated so the `/devstride:build-item` loop picks it up NEXT. Its POSITION in the sequence looks native to the plan; its DESCRIPTION stays an honest repro/root-cause of the real bug (see the IMPORTANT note below — this is a splice/date operation, not a fabricated history). This is also the canonical capture path that `build-item` step 6.5 and `ultracode-build` use to turn a newly-discovered defect into tracked, dependency-ordered work.
+**Goal.** Insert a NEW Defect (the one-day leaf role — this org's Defect type) into a live DevStride roadmap, spliced into the dependency chain and dated so the `/devstride:build-item` loop picks it up NEXT. Its POSITION looks native to the plan; its DESCRIPTION stays an honest repro/root-cause of the real bug. This is also the canonical capture path `build-item` step 6.5 and `ultracode-build` use to turn a newly-discovered defect into tracked, dependency-ordered work.
 
-Argument — free text describing the defect, optionally prefixed/suffixed with a parent item number
-(any grouping level of your org's hierarchy, e.g. this org's Module/Capability/Epic — as in
-`I20100 webhook retries duplicate on 429` or just `webhook retries duplicate on 429`): $ARGUMENTS
+Argument — free text describing the defect, optionally with a parent item number at any grouping level (this org: Module/Capability/Epic — e.g. `I20100 webhook retries duplicate on 429`, or just `webhook retries duplicate on 429`): $ARGUMENTS
 
-IMPORTANT — the DevStride MCP targets PRODUCTION (`api.devstride.com`). Every create/update here is a real, user-visible change to the live plan.
+## Rules that must hold
 
-IMPORTANT — this is a Gantt-grooming skill: it changes DevStride data only, never the repo. If the user also wants code changes, that's a separate `/devstride:build-item` run AFTER this item exists.
+- **The procedure is `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/splice-mechanics.md`**, steps 0–5 in order, with `<leaf>` = Defect. The steps below carry only what is Defect-specific.
+- **DevStride MCP writes are PRODUCTION, immediately** — every `create_item` / `update_item` / `add_relationship` / `remove_relationship` is a real, user-visible change to the live plan. There is no draft mode.
+- **Item numbers are looked up, never composed.** Use only numbers read back from the API — the one `create_item` returns for the new defect, and the parent/neighbour numbers you fetched.
+- **Name the fields your logic reads.** `search_items` and default projections omit `relationships` and `description`; request them (`view:"full"`, `fields:[...]`) and never read their absence as "none".
+- **The organization-wide auto-scheduler must be OFF before any date or edge write** — read `enableStaticMode` first, never flip it, omit `staticMode` from every write: `${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/references/auto-scheduler-off.md` (steps 4 and 5).
+- **The consuming repo's `.claude/ds-config.json` wins** over any inline default here for `hierarchyRoles` and branch settings; work-type NAMES come from the org at runtime (`get_work_type_hierarchy`), `hierarchyRoles` only disambiguating.
+- Gantt grooming only: DevStride data, never the repo. Code changes are a separate `/devstride:build-item` run AFTER the item exists.
 
-## 0. Resolve the parent and read the plan
+## Steps (Defect-specific parts)
 
-- **First, require enough to act on.** If `$ARGUMENTS` carries no real description of the bug (just an item number, or an empty/vague invocation), STOP and ask the user for the repro and expected-vs-actual behavior before creating or splicing anything — do NOT invent one.
-- If `$ARGUMENTS` contains an item number (`I#####`), that is the anchor — `get_item(view:"full")` it, and resolve the org's REAL container/leaf work type names via `get_work_type_hierarchy` to classify it (never assume the literal Capability/Epic/Defect names). If it's a top-level container (this org's Module), you'll need to find/create a housing container at the level below (step 2). If it's already a lower-level container (this org's Capability or Epic), it IS the direct parent.
-- If no item number is given, ask the user which parent item (any grouping level — this org:
-  Module/Capability/Epic) this defect belongs to — do NOT guess at a plan to insert into.
-- Pull the full descendant tree under the resolved anchor with `search_items` (hierarchy=[anchor], itemType=workitem, no `isDone` filter, limit 200) to see the current shape: which children are containers and which are executable leaves (this org: Capabilities/Epics vs Stories/Defects), their lanes, and their dates.
-- For each candidate container in that tree, fetch its `blocked_by`/`blocks` relationships (`get_item(view:"full", fields:["number","relationships"])`) — for a big tree, fan this out with a `Workflow` (chunks of ~10 items/agent) rather than serial reads.
+0. **Resolve + read.** Require a real description of the bug; a bare item number or vague invocation → STOP and ask for the repro and expected-vs-actual behavior. No parent given → ask which one; never guess.
+1. **Where the loop is.** `NEXT` per `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`. **Queue jump:** a defect often warrants jumping ahead of already-planned stories (it blocks something real). If so, say so explicitly and CONFIRM with the user before splicing it earlier than a plain "next" insertion — never silently reprioritize. When it jumps, the item it must precede takes `NEXT`'s place in the splice.
+2. **Housing container.** A defect often belongs under whichever container owns the broken behavior, even if that container is otherwise "done" — reopening its slot is fine. Otherwise reuse a genuinely matching container or create one (splice-mechanics step 2).
+3. **Create the defect.** workType = the org's defect-flavored leaf type via `get_work_type_hierarchy` (this org: `Defect`); description = an honest one-paragraph repro/root-cause spec — capture repro steps and expected-vs-actual if the user supplied enough, otherwise ask. Priority at least `NEXT`'s — and, when it jumps the queue, above the sibling it must precede; priority alone cannot beat an earlier-dated open container (`next-unblocked.md`).
+4. **Splice** per splice-mechanics step 4, auto-scheduler check first.
+4.5. **Number** per `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/execution-order-numbering.md` — its queue-JUMP case applies to a defect that must precede the current `NEXT`; read the neighbours' prefixes; never renumber them; unnumbered plan → no prefix, say so.
+5. **Verify + report** per splice-mechanics step 5, including the re-derived next pick (`next-unblocked.md`) and the Enable Link Mode warning (`auto-scheduler-off.md`).
 
-## 1. Understand where the loop currently is
+## Hard floors
 
-- Identify the item `/devstride:build-item` would pick up NEXT — the **next-unblocked story** per the canonical rule in `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` (apply it, projection warning included). Call it `NEXT`.
-- Identify what is currently In Progress or most-recently-Done — this is the upstream anchor the new defect will attach after.
-- A defect often warrants jumping the queue ahead of already-planned stories (it's blocking something real). If so, say so explicitly and confirm with the user before splicing it earlier than a plain "next" insertion would — do not silently reprioritize.
-- If the tree is ambiguous (multiple parallel unblocked candidates, or no clear critical path), summarize what you found and ask the user which slot to insert before, rather than guessing.
-
-## 2. Find or create the housing container (this org: Capability/Epic)
-
-- If the resolved anchor from step 0 is already a suitable lower-level container (this org's Capability or Epic), use it directly — skip to step 3.
-- Otherwise (anchor is a top-level container, or no anchor was resolvable to a suitable container), look for an existing housing container under the root whose theme genuinely matches the defect (read titles/descriptions — don't force a mismatched fit). When creating one, create EVERY intermediate container level the org's `parentWorkTypeId` chain requires between the anchor and the leaf — the backend rejects skipped tiers. A defect often belongs under whichever container owns the broken behavior, even if that container is otherwise "done" — reopening its slot is fine.
-- If none fits, create one: `create_item` with the container workType sibling containers already use under this root — resolved from the org's real type names via `get_work_type_hierarchy` (this org: `Capability` or `Epic`); ask if genuinely unclear — as the LAST child of the root, with `startDate` and `dueDate` both set to **today**. Give it a title that describes the surgical scope, not a generic placeholder.
-- This new container becomes the direct parent for the defect.
-
-## 3. Create the defect
-
-- `create_item` — workType = the org's defect-flavored leaf type resolved via `get_work_type_hierarchy` (this org: `Defect`), `parentNumber` = the container resolved/created in step 2, `title`/`description` from `$ARGUMENTS` (write a real one-paragraph repro/root-cause spec, not just the raw argument text — this is what `ultracode-build` will validate against later). Capture repro steps and expected-vs-actual behavior if the user supplied enough detail; otherwise ask. Create the title WITHOUT its execution-order prefix for now — the prefix depends on the `UPSTREAM`/`NEXT` neighbours pinned in step 4, so it is assigned there.
-- Set `startDate` = today, `dueDate` = today as a placeholder. (A single insert is not a full cascade; if the plan's dates should be re-compressed around the new item, run `/devstride:rationalize-gantt` on the plan root afterward — see step 5.)
-- **Set the new defect's priority to at least `NEXT`'s priority** (and, if it must jump the queue per step 1, above the sibling it should precede). Priority is an org-specific `priorityId`, not a comparable string — resolve the org's priority collection/rank order with `get_workspace_context` first (the same non-canonical-config caveat `plan` step 0 calls out), then pick a `priorityId` ranked at or above the target. This matters for candidates OTHER than `NEXT` itself: within the SAME open container, or against any other still-open container dated no later than this one, a default-priority insert can lose a tie it should win. It does NOT need to out-rank `NEXT` — the relationship splice in step 4 removes `NEXT` from eligibility outright, independent of priority.
-- **Priority alone cannot beat an EARLIER-dated open container** — see the worked consequence in `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`. Step 5 verifies this explicitly — don't assume the priority bump alone guarantees "picked up NEXT."
-
-## 4. Splice it into the dependency chain (insert-before, chain intact)
-
-- **Before wiring any edge, confirm the organization-wide dependency auto-scheduler is OFF** — apply the canonical Enable Link Mode rule in `${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/references/auto-scheduler-off.md` now (check, probe-date verification when needed, never change the setting automatically).
-- Let `NEXT` = the item identified in step 1 as what `/devstride:build-item` would currently pick up next (if the loop currently has nothing unblocked/open, `NEXT` is undefined — skip straight to attaching only the upstream side below).
-- Let `UPSTREAM` = whatever `NEXT` was `blocked_by` before this insertion (the last-completed/in-progress item on that path). If `NEXT` had no upstream dependency (it was the true root of the chain), `UPSTREAM` is undefined.
-  - **If `NEXT` itself is undefined, FIRST establish why** — an undefined `NEXT` does NOT by itself mean the plan is finished. The canonical selector also returns nothing when every open leaf is blocked (a dependency cycle, or a chain whose head never cleared) or when the remaining candidates are all gated on a human/infra decision. **Count the open leaves.**
-    - **Zero open leaves — a genuinely completed plan being extended:** fall back to the **most-recently-Done item step 1 already identified** as the upstream anchor and attach the new defect after it. This is the ONLY case where `UPSTREAM` comes from step 1 rather than from `NEXT`'s edges.
-    - **Open leaves exist but none is selectable — STOP and surface it.** Do not apply the fallback: wiring the new defect to an unrelated Done item would make it independently eligible and quietly paper over a blocked or cyclic plan, which is a problem the operator needs told about, not routed around. Report what is blocking (and run `/devstride:rationalize-gantt` on the root if it looks like a cycle), then ask where this defect belongs.
-  - **Why this matters, and why it fails quietly:** skipping the fallback drops through to the "neither exists" branch below and creates a defect with ZERO dependency edges. Nothing errors. But an item with no `[N]` prefix AND no `blocked_by`/`blocks` edges is exactly what `build-item`'s one-off heuristic matches, so the loop classifies the new defect as an unplanned one-off and ships it STRAIGHT TO THE BASE BRANCH, bypassing the plan's integration branch entirely. It also cannot be numbered relative to the previous final item, because it has no neighbour to number against.
-  - *Worked example:* a plan whose items `[1]`-`[8]` are all Done. `NEXT` is undefined; step 1 identified `[8]` as the most-recently-Done item. Wire `blocked_by` from the new defect to `[8]`, and number it **`[8.1]`** — the canonical convention's "after the LAST item with no `NEXT`" case. It stays a DOTTED sub-number, not `[9]`: the integer sequence is reserved for `/devstride:plan`'s extend-path authoring, so taking `[9]` here would collide with the next item that pass mints, and dotted prefixes are what mark an item as spliced in rather than planned.
-- Wire relationships with `add_relationship` / `remove_relationship` (or `bulk_update_items` `workItemRelationships` for multiple edges at once), omitting `staticMode` from every write per `${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/references/auto-scheduler-off.md`.
-  - If `UPSTREAM` exists: add `blocked_by` from the NEW defect → `UPSTREAM`.
-  - If `NEXT` exists: remove the old `UPSTREAM → NEXT` edge (if any) and add `blocked_by` from `NEXT` → the NEW defect. This makes the new defect sit immediately upstream of `NEXT`, preserving the rest of the chain.
-  - If neither `UPSTREAM` nor `NEXT` exists — which after the fallback above means a genuinely EMPTY plan, with no Done items either — no relationship wiring is needed; the new defect simply IS the next thing. A plan that merely has nothing OPEN does not reach this branch.
-- Do NOT touch dates/relationships on anything outside this immediate splice point — this skill inserts one item, it does not re-rationalize the whole plan (`rationalize-gantt` is the tool for that).
-
-## 4.5 Assign the execution-order number
-
-- Per the CANONICAL NUMBERING CONVENTION — `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/execution-order-numbering.md` — assign the new defect a dotted sub-number using that file's splice arithmetic (worked cases included, the queue-JUMP case among them for a defect that must precede the current `NEXT` per step 1): read the current prefixes off the neighbours' titles, do NOT recompute the whole plan, and NEVER renumber the neighbours.
-- Apply it by prefixing the title via `update_item` (`title`), leaving the rest of the title from step 3 intact.
-- **If the plan is UNNUMBERED** (the neighbours have no bracketed prefixes), apply that file's unnumbered-plan handling: skip the prefix and say so in the report.
-
-## 5. Verify + report
-
-- `get_item` the new defect back and confirm: correct parent, execution-order prefix sorts between its neighbours (step 4.5), `blocked_by`/`blocks` edges match the splice, dates = today/today, lane = default (not started).
-- **Re-derive what `/devstride:build-item` would actually pick next** — re-apply the canonical next-unblocked rule (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`, worked consequence included) against the current plan state (including the new item) rather than assuming the splice worked. If the re-derivation picks some OTHER story than the new insert, tell the user plainly (don't silently claim success); they may want to raise this container's dates or accept the new item lands later in the queue than "immediately next."
-- If the organization-wide Enable Link Mode is ON, dependents may have been forward-rescheduled once the new `blocked_by` edge landed (mechanism: `${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/references/auto-scheduler-off.md`) — warn the user to disable it in Settings → Organization if the new item's dependents got pushed out unexpectedly.
-- Report: the new item number/title (including its assigned execution-order prefix, or a note that
-  the plan is unnumbered), its parent item (created or reused), the upstream/downstream splice, and
-  whether `/devstride:build-item next` will actually pick it up next (per the re-derivation above).
-
-IMPORTANT:
-- Never invent a parent item for the plan — if step 0 can't resolve one, ask.
-- Never fabricate a fake historical context in the description (no "this was always planned" language) — write the real, honest repro/root-cause.
-- This skill does not run any of the build loop — it only inserts the item. Hand off to `/devstride:build-item` (or `/devstride:build-item <new-item-number>`) separately to actually build it.
+- Never invent a parent item; if step 0 cannot resolve one, ask.
+- Never fabricate historical context (no "this was always planned") — write the real, honest repro/root-cause.
+- This skill only inserts. Build it separately with `/devstride:build-item <new-item-number>`.

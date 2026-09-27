@@ -52,7 +52,7 @@ the ready-set lets a HUMAN fan the waves out deliberately; the loop itself stays
 
 - `build-item` SKILL.md step 0 (canonical owner — selection) and the "Serial by design" rule
   (the ready-set-is-shape reasoning)
-- `insert-story` SKILL.md steps 1, 3, 5
-- `insert-defect` SKILL.md steps 1, 3, 5
-- `comprehend-plan` SKILL.md step 3
-- `plan` SKILL.md step 6.5 (the execution-order walk)
+- `plan/references/splice-mechanics.md` (where a splice lands), and through it `insert-story` and
+  `insert-defect`
+- `comprehend-plan` SKILL.md (the next-unblocked read)
+- `plan` SKILL.md (the execution-order walk)

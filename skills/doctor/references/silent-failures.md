@@ -57,7 +57,7 @@ moment it is made — at zero remaining leaves `build-item` stops and asks, per 
 merging. So doctor treats a present `"ask"` exactly as it treats a present `true` or `false`: a
 legal explicit value that wins over the profile, informational when it differs from what the
 profile would have written, never a type error. The comparison itself needs only the
-`| Key | prototype | standard | enterprise |` table at the top of
+`| Key | prototype | standard | extended | enterprise |` table at the top of
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md`; the rest of that file is the
 shipped JSON and its commentary, and reading all 27KB of it to compare three keys is load the
 report never uses.

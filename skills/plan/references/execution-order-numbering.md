@@ -49,8 +49,9 @@ wants it. Do not partially number a plan — never mix numbered and unnumbered i
 
 ## Cited by
 
-- `plan` SKILL.md step 6.5 (canonical owner — stamps the numbers at authoring) and IMPORTANT
+- `plan` SKILL.md step 6.5 (canonical owner — stamps the numbers at authoring) and Hard floors
 - `insert-story` SKILL.md step 4.5
 - `insert-defect` SKILL.md step 4.5
+- `splice-mechanics.md` step 4.5
 - `rationalize-gantt` SKILL.md ("Re-date ONLY — never renumber")
 - `build-item` SKILL.md step 7 (close-out report)

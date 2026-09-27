@@ -5,128 +5,80 @@ description: Create a new hotfix branch off a fresh copy of the production branc
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
-Create a new hotfix branch off a fresh copy of the production branch. Use for urgent fixes that
-must branch from production code rather than from the development branch — a hotfix cut from the
-development branch would drag every unreleased change along with it.
+**Goal:** a correctly named hotfix branch cut from a freshly pulled production branch and pushed,
+with the local environment brought back in step with production code — never carrying the
+development branch's unreleased work. Branch name argument: $ARGUMENTS (none → ask for one).
 
-Branch name argument: $ARGUMENTS
+## Rules
 
-**Repo config.** The production branch this hotfix cuts from, the protected-branch list, and the branch-naming prefix/date live in **`.claude/ds-config.json`** at the repo root (`hotfixBaseBranch`, `protectedBranches`, `branchNaming`). Load it first and treat it as authoritative: wherever a step below names `master` as the production/base branch, substitute `hotfixBaseBranch`; derive the branch prefix and date format from `branchNaming` (the hotfix pattern keeps its own `/hotfix/` infix). The literals shown inline are the plugin's shipped defaults, kept for readability — **if the file disagrees, the file wins**. If the file is absent, fall back to the inline literals and say so.
-
-## Pre-flight (verify BEFORE touching anything)
-
-1. **Working tree must be clean** — run `git status --porcelain`. If there are
-   uncommitted changes, STOP and ask whether to stash or commit first. Do NOT
-   carry changes onto the production branch.
-2. **Recommend stopping any running dev server BEFORE the branch switch.** Moving the checkout
-   from the development branch back to production code underneath a running server, or a
-   database migrated to the development branch's schema, is a common source of confusing
-   failures. You cannot stop it for the user — it runs in their terminal — so remind them now,
-   while there is still time to act on it.
-3. If no branch name argument is provided, ask the user for one.
+- **Config wins.** Load `.claude/ds-config.json` first: `hotfixBaseBranch` (shipped default
+  `master`) is the base wherever `master` appears below; `protectedBranches`; `branchNaming`;
+  `localEnvironment`; `stage`. Inline literals are defaults — **if the file disagrees, the file
+  wins**; no file → defaults, said so.
+- **Clean tree first.** `git status --porcelain` dirty → STOP and ask whether to stash or commit;
+  never carry changes onto the production branch.
+- **Recommend stopping any running dev server BEFORE the switch** — production code under a server
+  or a database migrated to the development schema causes confusing failures. It runs in the user's
+  terminal, so remind them now; you cannot stop it.
+- **Name**: `<user-prefix>/hotfix/<date>/<branch-name>` — the `/hotfix/` infix is fixed; the prefix
+  and the date format come from `branchNaming` (`branchNaming.dateFormat`, shipped default
+  `MM-DD-YY`, today). `<user-prefix>` = first name from `git config user.name`, lowercased
+  ("Jane Doe" → `jane/hotfix/01-23-26/fix-login-crash`); empty or ambiguous → ask.
+- **Never delete the previous branch** — keep it until the hotfix merges.
+- **No PR here** — a new branch has nothing ahead of production. When the fix is ready open it to
+  the production branch with **`/devstride:pr`** for the draft-first, review-before-CI treatment (a
+  review-fix push on a non-draft PR restarts CI). By hand: `gh pr create --base <hotfixBaseBranch>`
+  with `--draft` iff the repo holds CI on drafts (`review.openPullRequestsAsDraft`, default true),
+  never `--fill`.
+- **On failure** name the failed step and its output, say which branch the checkout is on now (a
+  failure in step 1, or in step 2 before the branch exists, leaves it ON the production branch —
+  easy to overlook), and ask before changing anything else.
 
 ## Steps
 
-1. `git checkout master`
-2. `git pull` to get the latest production code.
-3. Create the hotfix branch off the production branch with the naming convention:
-   - Format: `<user-prefix>/hotfix/<MM-DD-YY>/<branch-name>`
-   - Derive `<user-prefix>` from the local git identity: first name from
-     `git config user.name`, lowercased (e.g. "Jane Doe" → `jane`). If
-     empty or ambiguous, ask the user what prefix they want.
-   - Use today's date in MM-DD-YY format.
-   - Use the provided argument as the branch-name suffix.
-   - Example: "Jane Doe" → `jane/hotfix/01-23-26/fix-login-crash`
-4. Push the new branch and set upstream: `git push -u origin <new-branch-name>`
+1. `git checkout <hotfixBaseBranch>`, then `git pull`.
+2. `git checkout -b <hotfix-branch>`, then `git push -u origin <hotfix-branch>`.
+3. Bring the local environment in step with production code (below).
+4. Confirm the current branch (`git rev-parse --abbrev-ref HEAD`) and the push; report the full
+   branch name, what happened at each step, and which environment case was taken.
 
-**Local environment.** Now that the branch exists, bring the local environment back into step with
-production code. Read `localEnvironment` from `.claude/ds-config.json`.
+## The local environment — a BACKWARD transition
 
-**Say which stage this checkout is pointed at before touching anything**, when the repository has
-a `stage` block: run `stage.resolve` and name the result. A hotfix is the one flow that both
-resets a database and runs against production code, so "this checkout deploys to `<stage>`" is
-the sentence that makes the confirmation below meaningful. If the resolved stage is in
-`stage.productionStages`, **STOP and ask before any environment command** — a `recreate` aimed at
-a production stack is the worst outcome this skill can produce, and no config value authorizes it
-in advance. No `stage` block, or an empty result → carry on; this adds a warning, never a gate
-the repository did not ask for.
+**Name the stage first**, when the repo has a `stage` block: run `stage.resolve` and say "this
+checkout deploys to `<stage>`". A result in `stage.productionStages` → **STOP and ask before any
+environment command** — a `recreate` aimed at production is the worst outcome here and no config
+value pre-authorizes it. No block or an empty result → carry on (a warning, never a new gate).
 
-**This is a BACKWARD transition, and that decides which commands to run.** A hotfix branches from
-the production branch, which is OLDER than whatever the instance has been living on. `migrate` and
-`seed` almost always only go forward — migrations do not un-apply, and a seed rewrites rows, not
-schema — so running them here leaves the instance schema-AHEAD of the code it is now running, and
-the hotfix can validate against a schema production does not have, or fail for reasons that have
-nothing to do with the fix.
+The production branch is OLDER than what the instance has been running. `migrate` and `seed` only go
+forward, so running them leaves the instance schema-AHEAD of the code — the hotfix then validates
+against a schema production does not have. **An ABSENT `localEnvironment` member is the shipped
+`null`** (every config written before `recreate` existed omits it) — read every missing member as
+`null` throughout. Three cases:
 
-**An ABSENT key is the shipped `null`** — every config written before `recreate` existed omits it
-entirely, which is the commonest shape you will meet, not a rare one. Read a missing member as
-`null` throughout.
+1. **`recreate` set** → run it after substituting its placeholders — **never pass one through to a
+   shell** (`<base>` unexpanded is input redirection and reads as a broken environment). `<base>` =
+   the fetched `hotfixBaseBranch` ref (a stale tracking ref rebuilds old production); `<branch>` =
+   the new hotfix branch; **`<name>` per `localEnvironment.recreateMode`, the ONLY thing that says
+   what the command does — never inferred from the command text** (a wrapper is opaque, and both
+   wrong guesses do damage):
+   - `"newInstance"` → a NEW name (the hotfix item number is an obvious one); then move the session
+     into the instance it creates;
+   - `"inPlace"` → the instance the session is ALREADY in, named by running
+     `localEnvironment.instanceName`; null or failing → **STOP and ask** (a directory-name guess
+     silently resets someone else's instance);
+   - mode absent/`null` while `recreate` contains `<name>` → **STOP and ask**, explaining both
+     values; never pick. (No `<name>` → no mode needed.)
 
-Three cases, and the third is the one that matters:
+   The session must end in a WORKING instance — never in a directory whose instance was torn down,
+   or on a detached HEAD the rebuilt instance no longer belongs to.
+2. **`recreate` absent/`null` and you can say WHY the schema has not diverged** (the instance stayed
+   on the production line, or there is no schema) → `migrate` then `seed`, in that order (a seed
+   against a stale schema fails or lies).
+3. **`recreate` absent/`null` and the schema HAS diverged or you cannot tell** → **STOP and ask.**
+   Never migrate forward and carry on. Name the missing `localEnvironment.recreate`, offer the manual
+   route (a fresh instance from the hotfix base), and continue only once the user confirms a rebuild
+   or says to proceed anyway.
 
-1. **`recreate` set** → run it. **Substitute the placeholders the contract allows before running
-   it, and never pass one through to a shell** — `<base>` reaching `sh` unexpanded is parsed as
-   input redirection, and the command fails in a way that reads like a broken environment rather
-   than a broken invocation. Bind `<base>` to the hotfix base ref (`hotfixBaseBranch`, fetched —
-   a stale tracking ref rebuilds from an old production commit), `<branch>` to the hotfix branch
-   just created, and **`<name>` per `localEnvironment.recreateMode`, which is the
-   ONLY thing that says what the command does.** Do not infer it from the command text: an opaque
-   wrapper (`./scripts/recreate <name> <base>`) reveals nothing, and both wrong guesses are bad —
-   treating an in-place command as second-instance leaves the session on the schema-ahead
-   database, and the reverse resets an instance somebody is using.
-   - `"newInstance"` → bind `<name>` to a NEW name (the hotfix item number makes an obvious one),
-     then move the session into the instance it creates.
-   - `"inPlace"` → bind `<name>` to the instance the session is ALREADY in, whose name comes from
-     running `localEnvironment.instanceName`. If that is null or fails, **STOP and ask** — a guess
-     from a directory name resets a different instance, silently, and on a shared machine that is
-     somebody else's data.
-   - **absent or `null` while `recreate` contains `<name>` → STOP and ask.** Say that
-     `recreateMode` is unset and what the two values mean. Never pick one.
-   (A `recreate` with no `<name>` needs no mode: there is nothing to bind.)
-
-   **What matters is not how many instances exist afterwards, but that the session is still in a
-   working one.** Do not leave the session in a directory whose instance was torn down, or on a
-   detached HEAD in a checkout the rebuilt instance no longer belongs to: a config command cannot
-   move the caller, so the skill would then check its own postcondition from the wrong place. An
-   in-place rebuild of the current instance's database satisfies this and is usually the simplest
-   thing a repository can offer.
-2. **`recreate` absent or `null`, and you can say WHY the schema has not diverged** (the instance
-   has been on the production line all along, or the environment has no schema) → `migrate` then
-   `seed`, in that order, since a seed against a stale schema fails or lies.
-3. **`recreate` absent or `null`, and the schema HAS diverged or you cannot tell** → **STOP and
-   ask.** Do not run migrate+seed, and do not restart the server and carry on: that is precisely
-   how a hotfix comes to be validated against a schema production does not have. Say what is
-   missing (`localEnvironment.recreate`), offer the manual route — a fresh instance from the
-   hotfix base — and continue only once the user confirms the environment was rebuilt or tells
-   you to proceed anyway.
-
-**Say which case you took and why.** "The environment was reset" reads identically for all three
-and only two of them are sound. Then restart the dev server pre-flight step 2 asked the user to
-stop.
-
-When the block is absent, or every command is `null`, the procedure is repo-specific and lives
-with the repo, not in this skill: say so and ask rather than guessing, and never invent a reset
-command.
-
-A PR is NOT opened here — a freshly-created branch has no commits ahead of the
-production branch, so there is nothing to compare. A hotfix merges back to the
-production branch, not the development branch — open the PR to production with **`/devstride:pr`**
-when the fix is ready, so it gets the standard draft-first, review-before-CI treatment — a
-review-fix push on a non-draft PR would restart CI, which is exactly what the
-draft hold exists to prevent.
-If you open it by hand, use `gh pr create --base master` with `--draft` iff the repo holds CI
-on drafts (`review.openPullRequestsAsDraft`, true by default) — never `--fill`.
-
-## After
-
-- Confirm you're on the new hotfix branch (`git rev-parse --abbrev-ref HEAD`).
-- Confirm the branch was created and pushed; report the full new branch name and
-  what happened at each step.
-
-## On failure
-
-- If any step fails, do NOT strand the user — and note that steps 1-2 leave the checkout ON the
-  production branch, so a failure there is especially easy to overlook. Report exactly which step
-  failed and its output, say which branch the checkout is on now, and ask how to proceed before
-  making further changes.
-- The previous branch is NOT deleted — keep it until the hotfix is merged.
+**Say which case you took and why** — "the environment was reset" reads the same for all three and
+only two are sound. Then restart the dev server you asked the user to stop. Block absent, or every
+command `null` → the procedure is repo-specific: say so and ask; never invent a reset command.

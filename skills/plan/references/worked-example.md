@@ -55,5 +55,5 @@ That's the depth bar: container (Capability) = one paragraph; release unit (Epic
 
 ## Cited by
 
-- `skills/plan/SKILL.md` — step 3's pointer ("Read … when you calibrate spec depth in step 3,
-  before opening the Workflow").
+- `skills/plan/SKILL.md` — step 3's pointer ("Read … to calibrate depth before opening the
+  Workflow").

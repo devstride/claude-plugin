@@ -3,7 +3,7 @@ load: contract
 ---
 # The progress table — worked examples and why it exists
 
-The rules live in the body's Progress reporting section; this file holds the two worked tables
+The rules live in the body's Progress table section; this file holds the two worked tables
 and the reasoning, for the first render in a session or a resume after a compaction.
 
 ## Why the table exists
@@ -69,5 +69,5 @@ Without the deferred rows, "no Copilot row" is indistinguishable from "Copilot w
 
 ## Cited by
 
-- `skills/build-item/SKILL.md` — the Progress reporting pointer ("Read … when you render the
-  table for the first time in a session, or when resuming after a compaction").
+- `skills/build-item/SKILL.md` — the Progress table pointer ("Read … at the first render in a
+  session or after a compaction") and the skill-freshness floor (the observed cost).

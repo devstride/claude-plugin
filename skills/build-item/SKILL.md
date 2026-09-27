@@ -5,497 +5,330 @@ description: "Orchestrate one DevStride work item end-to-end: select, branch, bu
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
-Orchestrate ONE DevStride one-day leaf item (this org's Story or Defect types) end-to-end: select → In Progress → branch → build →
-review → PR → merge → completion ritual → sync → next. This is the ORCHESTRATOR. It composes
-the other delivery skills and owns ONLY the DevStride glue (selection, lane transitions, the
-completion ritual). **Invoke them by name; do not re-spell what they do.**
+**Goal:** ONE DevStride one-day leaf item (this org's Story or Defect types) delivered end-to-end —
+select → In Progress → branch → build → review → merge → ritual → sync → next. This ORCHESTRATOR
+owns ONLY the DevStride glue (selection, lane moves, the completion ritual); it composes the other
+delivery skills — **invoke them by name; never re-spell what they do.**
 
-Argument — an item number, or `next`/empty for the next unblocked item. It may also SCOPE selection
-to one plan by naming its ROOT (a parent item at any grouping level of the org's hierarchy,
-e.g. this org's Module/Capability/Epic): `next under I20100`, or **`I20100`
-alone, meaning "the next unblocked item under this root"** — a bare root is a SCOPE, never a story
-to build, so resolve it as the plan root and then select within it. A specific item that is not
-part of a sequenced plan is auto-detected as a one-off: $ARGUMENTS
+Argument — an item number, or `next`/empty for the next unblocked item; `next under I20100`, or
+**`I20100` alone, means "the next unblocked item under this root"** — a bare plan root (any grouping
+level) is a SCOPE, never a story to build. An item outside a sequenced plan is auto-detected as a
+one-off: $ARGUMENTS
 
-## Ground rules
+## Hard floors — no profile, override or shortcut removes these
 
-- **Full-auto through merge.** Run the whole loop without pausing between steps. PAUSE only at a
-  genuine fork: work gated on a human/infra decision that is the user's (AWS/DNS/SES/Stripe/
-  secrets/provisioning), an ambiguous or unverifiable review finding, or a destructive /
-  outward-facing action. Record every deferral explicitly rather than silently skipping it.
-- **The DevStride MCP targets PRODUCTION.** Lane moves and the completion ritual are real,
-  user-visible changes to live items. The MCP cannot exercise branch code.
-- **Config**: `.claude/ds-config.json` — re-read it EVERY iteration; it wins over any literal here.
-- **Skill freshness.** The on-disk skills and config are the only source of truth, and they evolve
-  mid-initiative. Skill text you remember from an earlier iteration — especially through a
-  context compaction — is EXPIRED. Re-invoke each composed skill at the iteration that needs it
-  (the observed cost of not doing so: `references/progress-table.md`).
-- **The plan is a HYPOTHESIS.** Validate the story's spec against the ACTUAL codebase before
-  building — paths move, dependencies ship early, stated approaches turn out wrong. Correct the
-  item's description rather than faithfully building the wrong thing, and keep it current *as the
-  work firms up*, not only at the end. The item is the durable source of truth; the PR is not.
+- **The DevStride MCP targets PRODUCTION.** Lane moves, comments and the ritual write live items
+  immediately; the MCP cannot exercise branch code.
+- **`.claude/ds-config.json` wins over every literal here**; re-read it EVERY iteration. Commands
+  (verify/test/lint, regen, local-environment, any pool or secrets CLI a repo documents) come from
+  config or `conventionsDoc`, never from memory.
+- **Skill freshness.** Skill text remembered from an earlier iteration or across a compaction is
+  EXPIRED; re-invoke each composed skill when needed (cost: `references/progress-table.md`).
+- **Name the fields you read.** Default projections and `search_items` OMIT `relationships` and
+  `description`; read them with `get_item(view: 'full')`. Absence is never data.
+- **Never compose an item number.** Every `I#####` in a comment, commit or PR body is
+  `get_item`-verified; work needing an item gets it created BEFORE any text cites it.
+- **Dates only with the auto-scheduler OFF** — step 6's date write applies
+  `${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/references/auto-scheduler-off.md` first.
+- **Review first, CI once.** A loop PR stays a draft (`review.openPullRequestsAsDraft`, every
+  profile) until every configured engine settles; `review` step 7's ready-flip releases CI once, on
+  the final review-settled SHA. Never flip it yourself; a `skipping` or absent check never passes.
+- **Safety continuation.** A verified P1 or serious P2 is fixed before merge under every profile,
+  re-checked with the cumulative ledger and no numeric cap; no patch change, no progress or an
+  unavailable required reviewer while one remains STOPS for human help.
+- **Deploy safety travels with the diff.** Migrations are idempotent and rolling-deploy safe (old
+  and new revisions side by side); reshaped durable events stay readable by both. `ultracode-build`'s
+  focused verifier on auth, migration, irreversible-state or deployed-runtime changes fires from the
+  DIFF, not the plan's theme, under every profile — `extended` included — as does each matching
+  `review.mandatoryLenses` finder. Neither is skippable.
+- **Production merges are the owner's.** This loop merges only into the working base or
+  `epicIntegrationBranches.releaseTarget`; it surfaces `/devstride:release`, which merges to
+  `release.productionBranch` only on the owner's explicit yes.
+- **Checkout pool — lease, never mint.** When the repo's `conventionsDoc` or config declares a fixed
+  checkout pool, work only in a member held under a lease — a file in that checkout's OWN git
+  directory, created under `noclobber` so one session wins. Never create a worktree or instance
+  unless the owner asks in this conversation; never delete another session's lease. Pool, lease
+  name and hand-back come from the repo, never hard-coded; protocol in `ground-truth-at-start.md`.
+- **Serial by design.** "Parallel waves" are SHAPE: `branch-feature` aborts on a dirty tree; tests
+  share infrastructure `localEnvironment.instanceBoundTo: directory` does NOT isolate; the MCP writes
+  production. `localEnvironment` never makes the loop concurrent; a human fans out the ready-set
+  (why: `references/next-unblocked.md`).
+- **Full-auto through merge.** PAUSE only at a genuine fork: a user's human/infra decision
+  (AWS/DNS/SES/Stripe/secrets/provisioning), an ambiguous or unverifiable finding, a destructive or
+  outward-facing action. Record every deferral; never skip silently.
+- **The plan is a HYPOTHESIS.** Validate the spec against the ACTUAL code and correct the item's
+  description as the work firms up — the item, not the PR, is the durable source of truth.
+- **Develop only receives a COMPLETE release unit** — refreshed, fully reviewed, every applicable
+  gate green — or a one-off that settled the same gates. Out-of-scope findings become items (6.5).
 
-## Delivery profile — resolve it ONCE per iteration, and say where it came from
+## Delivery profile — resolve once per story, announce with its source
 
-The delivery profile is the one user-facing choice that sets how much rigor the loop spends per
-story. Its knobs, its floors, its resolution order and its root marker are defined ONLY in
-`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` — read that file; never
-restate its table. This skill resolves the profile for the run and honours `perStoryPullRequest`
-(step 4), `storyVerify` (step 4a), `autoRelease` and `releaseCiOrdering` (step 8). The composed
-skills honour their own routing/cycle knobs, but they must not each re-resolve the
-profile — a story built under one profile and reviewed under another is worse than either — so
-**pass the resolved profile EXPLICITLY, by name, in the invocation text** of `ultracode-build`
-(step 3), `review` (steps 4a and 4b) and `pr` (steps 4b and 8).
+Knobs, floors, resolution order and root marker live ONLY in
+`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` — never restate its table. This
+skill honours `perStoryPullRequest` (4), `storyVerify` (4a), `autoRelease` and `releaseCiOrdering` (8).
 
-Resolve it in step 0, once the plan root is known, by **the contract's resolution order** —
-cite it, never restate it — with two build-item specifics: the root-marker step reads the
-description with **`get_item(view: 'full')`** (the summary projection omits `description`), and
-a ONE-OFF skips only the marker step, never the explicit-argument step (`I20110 enterprise`
-still wins; else config `profile`, else `standard`). **Announce the result WITH ITS SOURCE** —
-`profile: prototype — from the plan root I20100` — and carry it in the progress table's
-`Profile` row; the next session inherits it from handoff memory (step 7).
+- **Resolve once the story is SELECTED**, by the contract's order: explicit word in `$ARGUMENTS`
+  (`prototype`/`standard`/`extended`/`enterprise`) → root marker → config `profile` → `standard`.
+  The marker walks the story's ancestors (`hierarchy` for the chain, `get_item` with
+  `view: 'full'` each) and takes the NEAREST marker. A one-off skips only the marker step
+  (`I20110 extended` still wins). Never carried over from the previous story.
+- **Announce it WITH ITS SOURCE** — `profile: extended — from the plan root I20100` — in the
+  `Profile` row and handoff memory; pass it **by name**, `profile: <name>`, to `ultracode-build` (3),
+  `review` (4a, 4b) and `pr` (4b, 8), which never re-resolve it.
+- **Branch on EFFECTIVE knobs, never the name**: profile default → `profileOverrides` → a PRESENT
+  dedicated key, resolved before any decision reads them. A present
+  `epicIntegrationBranches.autoRelease` or `fastStoryMerges.enabled` wins, its contradiction with
+  the profile reported aloud; unknown overrides are reported and ignored; none lowers a floor.
+- **The three `review.*` CI-ordering booleans describe what the workflows SUPPORT**: every profile
+  uses the supported hold; PR workflows without one are a setup fault.
 
-**A config key that is PRESENT wins over the profile's default** for
-`epicIntegrationBranches.autoRelease` and `epicIntegrationBranches.fastStoryMerges.enabled` —
-the profile fills only an
-ABSENT key, and a present key that contradicts the profile is honoured AND reported ("profile
-prototype, but `autoRelease` is false in config — stopping at release-ready as configured").
-**The three `review.*` CI-ordering booleans are different**: they describe what the workflows
-SUPPORT. Every profile uses a supported hold for story and release PRs; PR workflows without
-one are a setup fault, not a profile speed option.
+## Progress table — at every step transition
 
-**`profileOverrides` pins individual knobs**: apply it to the four knobs this skill owns after
-resolving the profile and BEFORE any decision reads them (a PRESENT dedicated key still wins
-over it; unknown names are reported and ignored; no override lowers a floor). Skipping this is
-how a `prototype` plan with `profileOverrides.autoRelease: false` auto-releases anyway.
-**Every decision below branches on the EFFECTIVE value of a knob, never on the profile's
-NAME** — resolve the four knobs once (profile default → override → present dedicated key) and
-read only those values in steps 4, 4a, 5a and 8; "under `prototype`" always means "when the
-effective knob says so".
+One row per NUMBERED step in this skill's names (CI release/settle belong to `review` step 7), the
+`Profile` row with its source, every configured engine its own row and an unconfigured one an
+explicit "not configured" row, each matched `mandatory lens <name>: ran (N findings)`, step 8 `n/a`
+on a one-off. **EVIDENCE, not intent**: "request registered in timeline", never "requested";
+"non-applicable (no path match, base develop, no label)", never a bare "skipped"; a missing CI
+check says `skipping` or never ran, and why. The fast path shows 4a/5a with the deferred cloud rows
+visible. A render, never a gate. **Read
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/progress-table.md` at the first render in a
+session or after a compaction.**
 
-## Progress reporting — emit the table at every step transition
+## Working base — epic integration branches
 
-Render the table at each step transition, updating rows in place: **one row per NUMBERED step,
-in this skill's own names** (CI release/settle belong to `review` step 7, never a row of their
-own), the `Profile` row naming the profile AND its source, **every CONFIGURED engine its own
-row and an unconfigured one an explicit "not configured" row**, and step 8 `n/a` on a one-off
-rather than dropped. **State EVIDENCE, not intent** — "request registered in timeline", never
-"requested"; "non-applicable (no path match, base develop, no label)", never a bare "skipped".
-**A missing CI check is not a passing one** — say whether it is `skipping` or never ran, and
-why. On the fast path, rows 4/5 take their 4a/5a forms and the deferred cloud rows stay
-visible. It is a status render, not a gate — never let it delay the step it describes. **Read
-`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/progress-table.md` when you render the
-table for the first time in a session, or when resuming after a compaction**.
+Read "the working base" wherever a step says develop; re-derive it per RELEASE UNIT. Precedence:
 
-## Working base — epic integration branches (the default)
+1. An explicit branch in `$ARGUMENTS`, or config `integrationBranch` non-null.
+2. **A release-unit ancestor AND `epicIntegrationBranches.enabled`** → its integration branch. Walk
+   `parentNumber` up, typing each ancestor with `get_item`, matching `hierarchyRoles.releaseUnit`
+   (`hierarchy` lists `{itemNumber, title}`, never types); never inspect only the direct parent. With
+   `hierarchyRoles` absent, resolve BOTH roles via `get_work_type_hierarchy` (leaf = the bottom
+   childless levels; release unit = the level above, spelling included — never assume "Epic"); that
+   backs every `hierarchyRoles.leaf` read here. A CONFIGURED `releaseUnit` no ancestor matches is
+   checked against `get_work_type_hierarchy` — a renamed type or typo STOPS with a question. Name per
+   `epicIntegrationBranches.pattern` / `slugRule`, dated at CREATION, never re-minted. Resolve:
+   handoff memory → `git ls-remote --heads origin "*/<epicNumber>-*"` (one → reuse, several → ask) →
+   create off a fresh `baseBranch` and push. Cache per epic; **announce reused or created.**
+3. **No release-unit ancestor, or `enabled` false** → `baseBranch`. A disabled flag genuinely falls
+   back.
 
-An "epic integration branch" is the integration branch of the story's **release-unit ancestor** —
-the container role (this org's Epic type) whose completion cuts a release, mapped by
-`hierarchyRoles` in `.claude/ds-config.json`. Derived automatically in step 0, in precedence order:
-
-1. Explicit override — a branch in `$ARGUMENTS`, or config `integrationBranch` non-null.
-2. **Release-unit ancestor found AND `epicIntegrationBranches.enabled`** → that release unit's
-   integration branch. Resolve the ancestor by **walking `parentNumber` up and fetching each
-   ancestor's work type explicitly** (`get_item` returns a resolved `workType`), matching
-   against `hierarchyRoles.releaseUnit` when set; absent/null → resolve BOTH roles at runtime
-   via `get_work_type_hierarchy` (leaf = the bottom childless levels; release unit = the level
-   directly above, spelling included — never assume the literal "Epic"). That runtime
-   resolution backs every other `hierarchyRoles.leaf` read in this skill (one-off
-   classification, selection, step 7 counting). **NO ancestor matches a CONFIGURED
-   `releaseUnit` → validate the configured type exists in `get_work_type_hierarchy` before
-   concluding "no release unit"** — a renamed type or config typo STOPS with a question, never
-   silently routes to `baseBranch`. **`hierarchy` gives the ancestor CHAIN, not work types**
-   (entries are `{itemNumber, title}` only) — a match against it silently finds nothing and
-   ships the story outside its epic branch; use `hierarchy` to enumerate, `get_item` to type,
-   and never inspect only the direct parent. Named per `epicIntegrationBranches.pattern`, slug
-   per `epicIntegrationBranches.slugRule` when set (so two runs name the same epic the same
-   way). Resolve: (a) handoff memory's branch for this epic; (b)
-   `git ls-remote --heads origin "*/<epicNumber>-*"` (one → reuse, several → ask); (c) none →
-   create off fresh `baseBranch` and push. The date in the name is the branch's CREATION date,
-   never re-minted. Cache per epic per session. **Announce which branch was reused or
-   created.**
-3. **No release-unit ancestor** (one-off, or a plan with no release-unit tier), **or
-   `epicIntegrationBranches.enabled` is false** →
-   `baseBranch` (develop). Disabling the flag must genuinely fall back; never route a story
-   through a branch mode the operator turned off.
-
-Read "the working base" wherever a step says develop. Stories merge into it (why:
-`references/epic-release.md`), and story-level runs SKIP `verify.skipDuringStoryBuilds`
-suites. When the release unit's last leaf merges, **step 8 runs automatically**. The working base is
-per-RELEASE-UNIT, not per-session — re-derive when the loop walks into the next release unit.
-
-**The working base also selects the review path** (step 4), together with the delivery profile's
-`perStoryPullRequest`. Epic integration branch → **fast
-develop mode** (always under `prototype`; per `fastStoryMerges.enabled` otherwise — step 4 has
-the rule): no per-story PR, the local roster (≥ 1 engine — see step 4a's floor) + green
-local suites, local merge, with
-the cloud roster and CI deferred to the epic release PR. `baseBranch` → the full per-story PR
-ritual. Announce which path the story is on when you announce the branch.
+Stories merge into it (why: `references/epic-release.md`), skipping `verify.skipDuringStoryBuilds`
+suites; the last leaf's merge triggers step 8. **The working base and the effective
+`perStoryPullRequest` pick the path** — integration branch → fast develop mode (4a), `baseBranch` →
+the full PR ritual (4b); announce it with the branch.
 
 ## One-off / no-plan single-shot mode
 
-Detect AUTOMATICALLY before step 0's plan-root resolution. **A bare plan ROOT is not a
-candidate** — but a bare root is SYNTACTICALLY IDENTICAL to a specific item, so TEST, never
-assume: **fetch the work type and apply the one-off heuristic only to executable leaf types
-(`hierarchyRoles.leaf`)** — a container type is a root, resolved as the plan scope. Fetch as
-`get_item(view: 'full', fields: ['number','title','workType','relationships'])` — **the default
-summary projection OMITS `relationships`**, so a plan item whose only signal is a dependency
-edge would look like a one-off. Classify: **no `[N]` title prefix AND no `blocked_by`/`blocks`
-edges → one-off** (a plan item always has one or the other); both present → plan mode; exactly
-one, unusually → default to plan mode if a root resolves, else state your read and ask.
+Detect before plan-root resolution. A bare root LOOKS like an item, so TEST:
+`get_item(view: 'full', fields: ['number','title','workType','relationships'])`, and apply the
+heuristic only to `hierarchyRoles.leaf` types (a container is the plan scope). **No `[N]` prefix AND
+no `blocked_by`/`blocks` edge → one-off**; both → plan mode; exactly one → plan mode if a root
+resolves, else state your read and ask. **Steps 1–6 run VERBATIM.** Deltas:
 
-Deltas — **steps 1–6 run VERBATIM**, because the point is that the inner build loop is identical:
-
-- **Step 0** — the item is given: skip plan-root resolution, ready-set and selection. **SKIP
-  THE EPIC-BRANCH DERIVATION TOO — the working base is `baseBranch`, unconditionally** — never
-  reason from "a one-off has no release-unit ancestor"; a one-off filed under an Epic parent
-  DOES have one, and without this bypass it would strand on that epic's branch (the full
-  reasoning: `references/epic-release.md`). A one-off ships straight to develop. Still run the
-  gating/scope check and spec validation. The root-marker step is skipped: an explicit profile
-  in `$ARGUMENTS` wins, else config `profile`, else `standard` — announced with that source. A
-  one-off always takes step **4b** — the full PR ritual — **under every profile**: its own PR
-  is the only cloud gate it will ever have. **Read
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` before changing the
+- **Step 0** — no root, ready-set or selection. **SKIP THE EPIC-BRANCH DERIVATION TOO — the working
+  base is `baseBranch`, unconditionally** — never reason "a one-off has no release-unit ancestor".
+  Gating, scope and spec checks still run; the profile skips only the marker. **Always 4b, under
+  every profile** — its PR is its only cloud gate.
+  **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` before changing the
   one-off classification or its step-0 delta.**
-- **Step 6.5** — no plan chain to splice into. Capture follow-ups as their own one-off items
-  (`/devstride:create-story` / `/devstride:create-defect`); never `insert-*` into a nonexistent
-  plan. Below-floor defects still take the DEFERRED placement, in a
-  `defects.deferredContainerTitle` container under the root this item resolves to.
-- **Step 7** — do not loop or persist a plan root. Sync, assert a clean tree, emit the close-out
-  for the single item, TERMINATE. Skip the release countdown — a one-off is its own release.
+- **Step 6.5** — follow-ups become their own one-offs (`/devstride:create-story` /
+  `/devstride:create-defect`), never `insert-*`; below-floor defects keep the DEFERRED placement
+  under the root this item resolves to.
+- **Step 7** — no loop, no persisted root: sync, clean tree, close out, TERMINATE; no release
+  countdown.
 
 ## 0. Select the story
 
-- **Ground truth first.** `git fetch --prune origin`, then read what OTHER authors landed on the
-  base branch (and the epic branch, once resolved) since the handoff; say explicitly when another
-  session appears active. Read
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md` at this step.
-- **Resolve the plan root first**: `$ARGUMENTS`, else the handoff project memory. If neither
-  yields ONE unambiguous root and several plans are open, STOP and ask — a wrong root silently
-  executes the wrong plan.
-- A specific story number IS the story (still run the checks below). Otherwise apply the
-  canonical next-unblocked rule — see
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` — in full, including its
-  projection warning: fetch each candidate's `relationships` explicitly before computing the
-  ready-set. **Never auto-select from the deferred container.**
-- **Surface the ready-set** (all unblocked, non-gated candidates), not just the pick — it shows
-  where the parallel waves are.
-- **DRY-CHAIN / TERMINAL:** zero not-Done, non-gated, unblocked candidates → DONE. Exit
-  cleanly; never loop back to re-ask. Report which: plan complete / N blocked by X, Y / N gated
-  on human-infra decisions. Suggest `/devstride:plan <root>` to extend when the chain simply ran
-  out (not when work is merely blocked or gated); never invoke it automatically.
-- **GATING CHECK** — depends on a human/infra decision that is the user's? Flag it and move to the
-  next candidate. **SCOPE CHECK** — what is buildable now vs deferred; record deferrals.
-  **VALIDATE THE SPEC** — re-fetch with `view: 'full'` (the default omits `description`) and
-  confirm its paths/symbols/assumptions against the codebase.
-- **Resolve the delivery profile once the story is SELECTED**, not when the root is. The
-  marker step walks the story's ancestor chain (`hierarchy` for the chain, `get_item` with
-  `view: 'full'` per ancestor) and takes the NEAREST container's marker, else the root's.
-  Announce `profile: <name> — from <source>`; fill the `Profile` row. Once per
-  iteration — never carried over from the previous story.
-- Report the item, title, ready-set, the profile with its source, and the
-  buildable-now-vs-deferred line.
+- **Ground truth first.** Hold your checkout under the pool rule, `git fetch --prune origin`, and read
+  what OTHER authors landed on the base (and epic) branch since the handoff — say so when another
+  session appears active. Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`.
+- **Plan root**: `$ARGUMENTS`, else handoff memory; not ONE unambiguous root while several plans are
+  open → STOP and ask.
+- A given story number IS the story. Otherwise apply
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full, projection warning
+  included. **Never auto-select from the deferred container.** Surface the whole ready-set.
+- **DRY-CHAIN / TERMINAL:** no not-Done, non-gated, unblocked candidate → exit cleanly, never
+  re-ask, saying which: plan complete / N blocked by X, Y / N gated. Suggest `/devstride:plan <root>`
+  only when the chain ran out; never invoke it.
+- **GATING CHECK** (a decision that is the user's → flag, next candidate), **SCOPE CHECK**
+  (buildable now vs deferred, recorded), **VALIDATE THE SPEC** (re-fetch with `view: 'full'`; confirm
+  paths, symbols and assumptions against the code).
+- Resolve the profile; report item, title, ready-set, profile with source, buildable-now line.
 
 ## 1. Mark In Progress
 
-`update_item` → In Progress lane, resolving the lane id from the item's work-type lane collection
-via `get_workspace_context` if needed. Confirm it moved before branching.
+`update_item` → In Progress (lane id from the work type's lane collection via
+`get_workspace_context`); confirm it moved before branching.
 
 ## 2. Branch
 
-Invoke **`branch-feature`** with `I<number>-<short-slug>`, and pass it the working base
-explicitly so it overrides its own config resolution.
+Invoke **`branch-feature`** with `I<number>-<short-slug>`, passing the working base explicitly.
 
 ## 3. Build
 
 Invoke **`ultracode-build`** as `I<number> <goal> profile: <name> review-moment:
-<release-deferred|pr-boundary>` — `release-deferred` for fast mode, `pr-boundary` for 4b. The
-engine parses those clauses, honours its own routing and must not re-resolve them. It returns:
-the item/summary, the risk-screen or deferred-review report, a verification receipt keyed to the
-final tree, the **deferral line**, **deviations list**, **untracked-deferral list**, and
-**dismissed-findings list**. Carry the receipt and all four lists forward —
-deferrals + deviations to the PR body (step 4) and the as-built reconciliation (step 6);
-untracked deferrals to step 6.5; dismissed findings to the PR body (4b) or the merge-commit
-body (5a). Step 6 does not reconcile dismissals — a dismissal is a review disposition, not a
-spec divergence.
+<release-deferred|pr-boundary>` (4a vs 4b). It returns the risk-check report and story review
+ledger, a verification receipt keyed to the final tree, and four lists — deferrals, deviations,
+untracked deferrals, dismissed findings. Deferrals + deviations → PR body (4b) and step 6;
+untracked → 6.5; dismissed → PR body (4b) or merge-commit body (5a), never step 6 (a review
+disposition is not a spec divergence).
 
-## 4. Review — fast mode on an epic branch, full PR ritual on develop
+## 4. Review — the working base picks the path, never the diff
 
-**Which path you are on is decided by the WORKING BASE step 0 resolved and the profile's
-`perStoryPullRequest`, not by the diff, the item, or how the run feels.** Epic integration branch:
-under **`prototype`** → **4a** whenever `fastStoryMerges.enabled` is ABSENT or `true` — fast mode
-is the profile's default and the build-time risk screen + green gate meet the local floor; a
-PRESENT `false` wins, routes the story to 4b, and is reported as a contradiction. Under
-**`standard` / `enterprise`** →
-**4a** iff `epicIntegrationBranches.fastStoryMerges.enabled`, exactly as before; the profile
-supplies no value while that key is present. Working base is `baseBranch` → **4b**, under every
-profile. Never mix them: the paths differ in where the
-CLOUD gate sits, and a story that takes 4a while heading for develop reaches production having
-never been cloud-reviewed.
+Integration branch → **4a** when `fastStoryMerges.enabled` is `true`, or ABSENT under `prototype` (a
+present `false` wins, routes to 4b and is reported). `baseBranch` → **4b**, every profile. Never
+mix: 4a toward develop reaches production never cloud-reviewed.
 
-### 4a. FAST DEVELOP MODE — no per-story PR (epic-branch stories)
+### 4a. FAST DEVELOP MODE — epic-branch stories, no per-story PR
 
-The cloud half (cloud reviewers,
-CI, thread bookkeeping) and the full adversarial pass are **deferred to the epic release PR**. The
-story settles with the routed local risk screen and green verification gate.
+Cloud reviewers, CI and the full adversarial pass move to the epic release PR. **THE FLOOR:** no
+completed `ultracode-build` risk check (immediate-risk verifiers and matched lenses included) or no
+valid verification receipt → **4b**, saying why.
 
-**THE FLOOR:** no completed `ultracode-build` risk screen or no valid verification receipt →
-route through **4b** and say why. A configured local CLI is not a routine story tax; an optional
-read-only support call is already recorded when ambiguity or critical risk required it.
-
-- Invoke **`review` in LOCAL-ONLY mode** with the epic base, profile and caller ledger. It launches
-  no routine second engine; it owns finding triage, fixes and the lessons write. Skipping it
-  because there is nothing new to launch silently drops those settle-time steps.
-- **Fix every finding `review` hands back as fix-in-story before merging** — its `fixFloor`
-  triage decides which confirmed findings those are under the profile, and a finding it deferred
-  with a rationale is not re-imposed here — committed per
-  `commitConventions.reviewFixFormat` (fallback: `fix(<scope>): <summary> [<itemNumber> review]`).
-  Out-of-scope and deferred-below-floor findings with no tracked home go on the
-  untracked-deferral list for step 6.5, exactly as on 4b.
-- **Local suites are the gate** (`fastStoryMerges.requireLocalVerifyGreen`). The gate's WIDTH is
-  the profile's `storyVerify` — take it from
-  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`, not from memory of a fixed
-  suite list. Validate the receipt by
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/verification-receipts.md`; unchanged tree +
-  exact command set means REUSE, not rerun. Review fixes invalidate it and rerun only affected
-  checks plus the required gate. Record commands/counts in the merge-commit body. Red is a STOP.
-- **No PR, no draft, no cloud-review request, no CI poll.** An absent check here is not pending
-  and not skipped — nothing was asked to run. Never open a PR "for the record"; the epic release
-  PR is the record and lists the constituent stories.
-
-Then go to **step 5 (fast merge)**.
+- **`review` in LOCAL-ONLY mode** with the epic base, profile and caller ledger: no routine second
+  engine (a configured local CLI is no story tax), but it still owns triage, fixes and lessons.
+- **Fix every fix-in-story finding it returns** (its `fixFloor` triage; a reasoned deferral is not
+  re-imposed) per `commitConventions.reviewFixFormat` (fallback
+  `fix(<scope>): <summary> [<itemNumber> review]`); homeless out-of-scope or below-floor findings →
+  the untracked-deferral list.
+- **Local suites are the gate** (`fastStoryMerges.requireLocalVerifyGreen`), width = the effective
+  `storyVerify`. Per `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/verification-receipts.md`,
+  an unchanged tree + command set is REUSED; fixes rerun affected checks plus the required gate.
+  Commands and counts go in the merge-commit body. Red is a STOP.
+- **No PR, no draft, no cloud request, no CI poll** — an absent check is neither pending nor
+  skipped. Never open a PR "for the record".
 
 ### 4b. FULL PR RITUAL — develop-base stories and one-offs
 
-Invoke **`pr`** in autonomous (driven-by-`build-item`) mode — say so explicitly, pass the
-working base as the pre-answered base **and the resolved profile by name** (it hands the profile
-on to `review`, which owns the normal cycle target, P1/serious-P2 safety continuation and fix floor), and note that this loop owns PR-to-item
-linking (step 6), not `pr`.
-
-It opens the PR — as a draft when the repo holds CI on drafts (`review.openPullRequestsAsDraft`)
-**under every profile, `prototype` included**. This PR is the story's sole merge gate — every
-configured cloud reviewer requested
-in the same call, then the review-and-settle loop via `review`. **Review first, CI last**;
-never flip a PR ready yourself to start CI early. Step 3 deferred the full pass to this
-boundary; `review` runs it once.
-
-Ensure every deferral, deviation and dismissed finding (with its rationale) is in the PR body.
-`review` returns its triage; out-of-scope
-findings with no tracked home come back on the untracked-deferral list for step 6.5.
-
-**The push/ready-flip race is `review` step 7's to prevent** (the sequencing and post-flip
-verification live there): flip-with-push means CI never runs while every job reports `skipping`. `review` returns the verified outcome; step 5 must not treat a
-skipped board as green.
+Invoke **`pr`** in autonomous (driven-by-`build-item`) mode with the working base pre-answered and the
+profile by name — `review` owns the cycle target, P1/serious-P2 continuation and fix floor; this loop
+owns PR-to-item linking (6). It opens a draft wherever the repo holds CI on drafts, `prototype`
+included, requests every configured cloud reviewer in the same call and settles through `review`,
+which runs the full pass step 3 deferred. Deferrals, deviations and dismissals (with rationale) go
+in the PR body. The push/ready-flip race is `review` step 7's: flip-with-push leaves every job
+`skipping`, which step 5 never reads as green.
 
 ## 5. Merge
 
-### 5a. Fast merge (came from 4a)
+### 5a. Fast merge (from 4a)
 
-No PR to merge — integrate locally, then push the epic branch:
+- Clean tree, every 4a fix committed. `git checkout <epic branch> && git pull --ff-only`; merge the
+  story `--no-ff` per `commitConventions.epicMergeFormat` (fallback
+  `merge: <itemNumber> [<N>] <short scope> into <epic-slug> integration`), the BODY listing each
+  dismissed finding (steps 3 and 4a) with its rationale.
+- Base moved → merge the refreshed epic INTO the story, re-run the gate, merge back; unresolvable →
+  fork.
+- Push. **Only once that push SUCCEEDS** delete the story branch locally AND remotely (why:
+  `references/epic-release.md`). Then step 6.
 
-- Confirm the tree is clean and every 4a finding fixed and committed.
-- `git checkout <epic branch> && git pull --ff-only`, then merge the story branch `--no-ff`.
-  Message: `commitConventions.epicMergeFormat` (fallback:
-  `merge: <itemNumber> [<N>] <short scope> into <epic-slug> integration`); its BODY carries the
-  dismissed-findings list from step 3 PLUS any 4a dismissals, each with its rationale — the
-  only place a reader sees what was judged and let go.
-- Base moved while building → merge the refreshed epic branch INTO the story branch first,
-  re-run the local suites, then merge back; unresolvable conflict → genuine fork.
-- Push the epic branch. **Only once that push SUCCEEDS**, delete the story branch **locally AND
-  on the remote** (why: `references/epic-release.md`).
-- **Skip the rest of step 5** — the CI rules below describe a PR that does not exist here. Go
-  to step 6.
+### 5b. PR merge (from 4b)
 
-### 5b. PR merge (came from 4b)
-
-- **The rebase already happened** in `review` step 7, before the ready-flip. Do NOT redo it by
-  reflex; just CHECK whether the base moved since — only then rebase, push via
-  `/devstride:push`, and accept the re-run (unresolvable conflict → genuine fork). **A re-push
-  may change the reviewed patch**: compare pre-/post-rebase patches, and if CHANGED, return to
-  `review` with its cumulative ledger, normal target and safety-trigger state — never open a fresh
-  budget. A tree-identical change keeps its receipt; otherwise affected checks rerun.
-  **Non-empty `verify.skipDuringStoryBuilds` → RECOMPUTE
-  applicability from the new SHA before judging CI** — a rebase can change the path set, and a
-  check that just became mandatory would sit absent.
-- **A `skipping` check is not a passing check.** Confirm the applicable jobs actually RAN — see
-  step 4's push/flip warning. Reading a skipped board as green is how a PR reaches merge with zero
-  CI behind it.
-- **Observe greenness, don't assume it.** Verify the PR is non-draft (a draft means CI never ran — unsettled, not green) and every
-  applicable check is successful at the CURRENT head SHA. Re-poll only if you re-pushed. Use the
-  same self-terminating background poll as `review` step 7 — never `gh pr checks --watch`.
-- **Red CI:** failed to TRIGGER → `review` step 7.3's escalation (close+reopen, then one empty
-  commit). Flaky/infra → `gh run rerun <id> --failed`, ~2
-  tries. Real → reproduce, fix, push, re-poll. Never merge red; never give up after one failure.
-- Per-story PRs into an epic branch do not wait on `verify.skipDuringStoryBuilds` checks. On a
-  develop-base PR, a listed suite is evaluated per its configured applicability; empty list →
-  nothing to evaluate, an absent check is settled. **Read the config before concluding
-  either** — an absent check for a suite the config DOES list is a gate that never ran.
-- **Re-check zero unresolved review threads immediately before merging** (the paginated query
-  from `review`'s references) — a comment in the settle-to-merge gap would otherwise merge
-  silently unaddressed. Non-zero → back through `review` steps 3–6 first.
-- **Merge guard — only when `ci.freezeBaseWhileReleasePrReady` is `true`, THE DEFAULT when the
-  key is absent** (only an explicit `false` disables it; the merge then proceeds with one line
-  saying so): before ANY merge whose TARGET is
-  `release.releaseSource` — here, and the epic release at step 8 — look for an open, NON-DRAFT
-  PR with head `release.releaseSource` and base `release.productionBranch`. One exists → a
-  release is in its CI window; do not merge beneath it — say which PR holds the base, wait
-  (bounded by `review.pollTimeoutMinutes`), then merge. A still-draft release PR holds
-  nothing.
-- Merge: `gh pr merge <n> --merge --delete-branch`. **NEVER `--delete-branch` on a PR whose head
-  is `develop` or `master`.** The epic release PR is step 8's business.
+- **The rebase already happened** in `review` step 7; rebase again only if the base moved, via
+  `/devstride:push` (conflict → fork). Compare patches: CHANGED returns to `review` with its
+  cumulative ledger, target and safety state, never a fresh budget; tree-identical keeps its
+  receipt, else affected checks rerun. Then RECOMPUTE `verify.skipDuringStoryBuilds` applicability
+  from the new SHA.
+- **Observe greenness**: non-draft, and every applicable check succeeded — actually RAN — at the
+  CURRENT head SHA. Re-poll only after a re-push, with `review` step 7's background poll; never
+  `gh pr checks --watch`.
+- **Red CI**: failed to TRIGGER → `review` step 7.3 (close+reopen, then one empty commit);
+  flaky/infra → `gh run rerun <id> --failed`, ~2 tries; real → reproduce, fix, push, re-poll. Never
+  merge red; never quit after one failure.
+- Slow suites (`verify.skipDuringStoryBuilds`): story PRs into an epic branch never wait on them; on
+  develop each follows its applicability; an empty list settles an absent check. **Read the config
+  before concluding either.**
+- **Zero unresolved threads immediately before merging** (`review`'s paginated query); else back
+  through `review` steps 3–6.
+- **Merge guard** — on unless `ci.freezeBaseWhileReleasePrReady` is explicitly `false` (then say so).
+  Before ANY merge into `release.releaseSource` (here and step 8), an open NON-DRAFT PR from it into
+  `release.productionBranch` holds the base: name it, wait (≤ `review.pollTimeoutMinutes`), then
+  merge. A draft release PR holds nothing.
+- `gh pr merge <n> --merge --delete-branch` — **never `--delete-branch` on a head in
+  `protectedBranches`.**
 
 ## 6. Completion ritual
 
-- `update_item` → **Done** lane (works on and off board, unlike `mark_done`).
-- `update_item` → `startDate`/`dueDate` = the branch-creation → merge window.
-- Confirm the PR auto-linked; else `link_pull_request`. **Fast-mode stories have no PR to link** —
-  `add_comment` the story's merge commit SHA and its epic branch instead, and link the epic
-  release PR at step 8. Do not leave the item with no pointer to its code, and do not invent a PR
-  number for it.
-- **Never compose an item number.** Any `I#####` in a comment, commit or PR body must be
-  `get_item`-verified first. Work needing an item gets the item created BEFORE any text cites it.
-- **Reconcile the spec (as-built)** on any material deviation:
-  1. Re-fetch the description with `view: 'full'`; `add_comment` it verbatim under "📋 Original
-     spec (as planned) — superseded by the description below" (both fields are HTML: pass
-     `{ html }`, never Markdown).
-  2. `update_item` the description to the as-built spec: an italic as-built note naming what it
-     shipped in, a **Deviations** list with one-line rationales, an **As shipped** summary.
-     **Cite the artifact that EXISTS for this path**: a 4b story cites its PR; a 4a story has
-     NONE — cite its merge SHA and integration branch and let step 8 add the release PR link.
-     Never write a PR number on the fast path.
-  - No material deviations → skip; note "shipped as specified".
-- The deviations recorded here MUST be the same ones from steps 3 and 4. Never let one ship
-  undocumented on the item.
-- **Report** the item (with its `[N]` prefix), lane, dates, **the PR link (4b) or the merge SHA +
-  integration branch (4a — a fast-mode story has no PR to link)**, **the profile it was built
-  under with its source**, and whether the spec was reconciled.
+- `update_item` → **Done** (works off-board, unlike `mark_done`); `startDate`/`dueDate` = branch
+  creation → merge.
+- **The item points at its code**: 4b — confirm the PR auto-linked, else `link_pull_request`; 4a —
+  `add_comment` the merge SHA and epic branch (the release PR follows at step 8). Never invent a PR
+  number.
+- **Reconcile as-built** on a material deviation: `add_comment` the `view: 'full'` description
+  verbatim under "📋 Original spec (as planned) — superseded by the description below" (HTML: pass
+  `{ html }`, never Markdown), then rewrite it: an italic as-built note naming what it shipped in, a
+  **Deviations** list with one-line rationales, an **As shipped** summary — citing the artifact that
+  EXISTS (4b its PR; 4a its merge SHA + branch). None → "shipped as specified". These are exactly
+  step 3/4's deviations.
+- **Report** item + `[N]`, lane, dates, PR link or SHA + branch, profile + source, reconciled y/n.
 
 ## 6.5 Capture untracked findings as tracked items
 
-For each entry on the untracked-deferral list:
-
-- **A below-floor defect → `/devstride:create-defect` in its DEFERRED placement**: parent = the
-  container titled `defects.deferredContainerTitle`, directly under the current plan root,
-  resolved or created there; no `blocked_by` splice, no execution-order prefix, delivery phase
-  skipped; plus a relationship of the type the `add_relationship` schema exposes for related-to,
-  pointing at the item whose review produced the finding — the story or defect under build, or the
-  RELEASE UNIT for a step-8 release review. **Never splice a below-floor finding into the chain**
-  under any profile (why: `references/epic-release.md`).
-- **Discovered scope → `/devstride:insert-story`** under the current plan root, spliced into the
-  dependency chain so step 0's selection actually reaches it.
-
-A deferral belonging to an EXISTING downstream item goes on that item instead — capture-as-new is
-only for work with no home. Report what was captured and where it went.
+- **Below-floor defect → `/devstride:create-defect` DEFERRED**: parent = the
+  `defects.deferredContainerTitle` container directly under the plan root (resolved or created), no
+  `blocked_by`, no prefix, no delivery, plus the `add_relationship` related-to edge to the item whose
+  review produced it (the RELEASE UNIT for a step-8 review). **Never splice a below-floor finding into
+  the chain**, under any profile (why: `references/epic-release.md`).
+- **Discovered scope → `/devstride:insert-story`**, spliced so selection reaches it.
+- A deferral owned by an EXISTING item goes on that item. Report what went where.
 
 ## 7. Sync and proceed
 
-- `git checkout <working base> && git pull --ff-only`.
-- **Assert a clean tree** (`git status --porcelain`) — `branch-feature` aborts on a dirty tree,
-  so stray files silently wedge the loop. Dirty → surface exactly what drifted and STOP. Never
-  auto-reset or `git add .`.
-- Update handoff memory: story shipped, remaining work, **the resolved plan root WITH the
-  delivery profile and its source** (never the profile alone — a resumed session re-resolves it
-  from the root), and **the epic's integration branch keyed to its epic number** (or "develop —
-  no epic").
-- **Human recap.** After 6.5, use the matching format. After a direct pull-request merge (5b), lead
-  with `Merged / Released`: item/effect, destination/live state, checks/CI, risk and next action.
-  Otherwise lead with `Built / Checked / Next`: outcomes, checks run or skipped, destination/link
-  or SHA, CI, profile, remaining counts and next action.
-  Count not-Done leaf descendants (`hierarchyRoles.leaf` types) of
-  **the SAME release-unit ancestor step 0 resolved to derive the working base** — never merely the direct parent, which
-  excludes sibling subtrees and can read zero while the release unit still has open work,
-  publishing a PARTIALLY COMPLETE release unit. Also count the whole plan root. **Items under the
-  deferred container are in NEITHER count** — parked, not remaining — and that container is never a
-  release unit: step 8 never cuts a release for it. Unnumbered plan
-  (no `[N]` prefixes — convention:
-  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/execution-order-numbering.md`) → emit the
-  summary with bare numbers and note `/devstride:plan <root>` would add numbering. Release unit
-  at **zero** with the working base its integration branch → say so and **run step 8 now**.
-- Return to **step 0** (after step 8 when it ran). On the DRY-CHAIN condition, EXIT and report.
+- `git checkout <working base> && git pull --ff-only`; **assert a clean tree** — dirty → name the
+  drift and STOP; never auto-reset or `git add .`.
+- **Handoff memory**: what shipped, what remains, the plan root WITH profile and source (never the
+  profile alone), the epic's integration branch keyed to its number (or "develop — no epic").
+- **Counts**: not-Done `hierarchyRoles.leaf` descendants of **the SAME
+  release-unit ancestor step 0 resolved** — never the direct parent, which can read zero while siblings are open and publish a
+  PARTIALLY COMPLETE unit — plus the whole plan root. **The deferred container counts in NEITHER**
+  and is never a release unit. Unnumbered plan
+  (`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/execution-order-numbering.md`) → bare numbers, noting
+  `/devstride:plan <root>` would number it.
+- **Human recap.** After a direct pull-request merge (5b), lead with `Merged / Released`: item and
+  effect, destination and live state, checks/CI, risk, next action. Otherwise
+  `Built / Checked / Next`: outcomes, checks run or skipped, link or SHA, CI, profile, remaining counts, next action.
+- Release unit at **zero** on its integration branch → **run step 8 now**; then step 0. DRY-CHAIN →
+  exit and report.
 
 ## 8. EPIC RELEASE — epic branch → develop, fully reviewed
 
-Runs when step 7 finds the release unit at zero remaining leaves, the working base is its
-integration branch, **and auto-release is on** — `epicIntegrationBranches.autoRelease` whenever
-that key is PRESENT in config, the profile's default ONLY when it is ABSENT; a present key wins
-whatever the profile says, and the contradiction is reported ("profile prototype, but
-`autoRelease` is false in config — stopping at release-ready as configured"). Auto-release off →
-do NOT cut or merge: report the epic release-ready and stop for an explicit manual release
-(why the present key must win: `references/epic-release.md`). **`"ask"` is a third legal value**:
-at zero, ASK the owner — once per release unit — before cutting or merging, and cut nothing until
-they answer; an ask nobody can answer behaves as `false`, stops release-ready, and SAYS the ask
-went unanswered. **Read
-`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` when step 7 reports the
-release unit at zero and before cutting the release PR.** The whole batch lands on develop as
-ONE reviewed PR.
+**Gate**: zero remaining leaves, working base the unit's integration branch, **auto-release on** —
+`epicIntegrationBranches.autoRelease` when PRESENT, the profile default only when ABSENT. Off →
+cut nothing; report release-ready and stop. **`"ask"` is a third legal value**: ask the owner once
+per unit and cut nothing until answered; unanswerable → `false`, SAYING so. **Read
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` when step 7 reports the release
+unit at zero and before cutting the release PR.** The batch lands as ONE reviewed PR.
 
-- **Refresh from develop**: pull the epic branch, fetch `baseBranch`, capture the fetched tip as
-  `<baseOid>`, and **merge that exact OID** — merge, NOT rebase; story SHAs on a shared branch must
-  not be rewritten. Resolve conflicts in-loop if safe and mechanical; otherwise STOP. Push.
-- **Build one final verification plan for the merged tree.** Aggregate story receipts, then
-  invalidate only what the develop refresh/conflict resolution or combined tree changed. Inspect
-  the configured PR workflows: when the exact `verify.typecheck` / `verify.test` / `verify.lint`
-  gate runs there, do not run it locally too — draft-held CI is its single release-boundary run.
-  A required command absent from CI becomes a caller-declared pre-ship check for the PR below and
-  runs once on the final reviewed head. `preShipChecks` remain local-only. A non-empty
-  `verify.skipDuringStoryBuilds` entry whose applicability fires remains cloud-only. Record the
-  resulting command/location map and receipts; never infer coverage from a job name.
-- **Cut via `/devstride:pr`** in autonomous mode, head = epic branch, base =
-  `epicIntegrationBranches.releaseTarget`, flagged as an
-  **EPIC RELEASE PR** so the body leads with the epic and lists the constituent stories, **with
-  the resolved profile named in the invocation** (it reaches `review` through `pr`), the
-  verification plan/pre-ship commands, and the aggregate story risk-screen ledger. Every profile
-  uses the supported draft hold: full review → uncovered local pre-ship checks → ready flip → CI.
-- **Review-and-settle — CHECK WHICH SCOPE APPLIES, because fast mode changes it.**
-  - **Fast mode was used** (`fastStoryMerges.epicReleaseIsFirstCloudPass`, the default path):
-    **this PR is the FIRST cloud-side pass over ANY of this code — review the FULL diff**,
-    every story in the batch, using the aggregate ledgers to avoid re-raising settled risk-screen
-    findings (why this is the one place fast mode's quality is defended:
-    `references/epic-release.md`).
-  - **Stories took the full 4b ritual**: each was already reviewed at its own PR — point the
-    review at what per-story review COULD NOT see: pass a computed scope manifest of cross-story
-    contracts, combined behavior and develop-merge conflict resolutions rather than a blind full
-    local reread. Cloud reviewers may still cover the whole PR.
-  - Either way: any suite in `verify.skipDuringStoryBuilds` is decided by its configured
-    applicability — a suite that fires is mandatory, with no story-level exemption. With the list
-    empty, no slow cloud suite gates the release; local pre-ship suites remain the
-    callers' own step-2b responsibility.
-- **Merge** `gh pr merge <n> --merge` once green and settled — after the step-4b merge guard
-  (no ready release PR is holding the base) — then delete the epic branch —
-  **only if `epicIntegrationBranches.deleteBranchAfterRelease`**. It is a destructive remote
-  cleanup, so a false value must actually retain the branch.
-- **Documentation — opt-in, and it STAGES, never publishes.** With `docs.updateOnEpicRelease`
-  absent or `false` → nothing, silently. With it `true`: `docs.updateSkill` `null` → say docs
-  were skipped because no docs skill is registered; a name whose `.claude/skills/<name>/SKILL.md`
-  is MISSING → report a dangling hook with the fix (`/devstride:setup docs`) and continue — the
-  same rule the production release applies; a name that resolves → build the delta payload for
-  this epic (`kind: "epic-release"`, the release PR, the merge commit, every constituent leaf with
-  a plain-English `summary` and a `userFacing` judgement, and **`live: false`** — shape in
-  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`) and invoke that skill in
-  mode `update`; translate its result and preserve exact links. `live: false` is not optional.
-  **Never release notes here**, under any setting (why both: `references/epic-release.md`).
-- **Close out**: `add_comment` on the RELEASE-UNIT item (release PR link, list of shipped leaves,
-  date), move it to Done if the org tracks lanes at that level, update handoff memory, sync local
-  develop.
-- **Link the release PR onto each constituent leaf whose as-built note deferred it** —
-  `link_pull_request` (or `add_comment`) on every leaf in the batch; this is where step 6's
-  fast-mode promise is kept.
-- **Human recap.** After the release PR merges, lead with `Merged / Released`: list every included
-  item and its effect, where it landed, validation/review/CI, documentation, whether it is live,
-  and the remaining production-promotion action.
-- Surface — never perform — the follow-on owner-cut `develop → master` promotion (`/devstride:release`).
-- Out-of-scope findings from this review go through step 6.5 like any other.
+- **Refresh**: pull the epic branch, fetch `baseBranch`, merge its captured tip `<baseOid>` — merge,
+  NEVER rebase shared story SHAs; non-mechanical conflicts STOP. Push.
+- **One verification plan for the merged tree**: aggregate story receipts, invalidating only what the
+  refresh or combined tree changed. A `verify.typecheck`/`test`/`lint` command the PR workflows run
+  exactly is not run locally (draft-held CI is its one run); a required command CI lacks runs once as
+  a pre-ship check on the final reviewed head; `preShipChecks` stay local; a firing
+  `verify.skipDuringStoryBuilds` entry stays cloud-only. Record where each runs; never infer coverage
+  from a job name.
+- **Cut via `/devstride:pr`** autonomously: head = epic branch, base =
+  `epicIntegrationBranches.releaseTarget`, flagged **EPIC RELEASE PR** (body leads with the epic and
+  lists its stories), with the profile, the verification plan and the aggregate risk-check ledger.
+  Full review → uncovered pre-ship checks → ready flip → CI.
+- **Review scope.** Fast mode used (`fastStoryMerges.epicReleaseIsFirstCloudPass`) → the FIRST cloud
+  pass over ANY of this code: **review the FULL diff**, every story, ledgers only preventing re-raised
+  settled findings. Stories took 4b → a computed manifest of cross-story contracts, combined
+  behaviour and develop-merge resolutions; cloud may still cover the whole PR. A firing
+  `verify.skipDuringStoryBuilds` suite is mandatory, with no story exemption; with the list empty,
+  local pre-ship suites remain the callers' step-2b responsibility.
+- **Merge** `gh pr merge <n> --merge` once green and settled, after the 5b merge guard; delete the
+  epic branch **only if `epicIntegrationBranches.deleteBranchAfterRelease`** — false retains it.
+- **Docs STAGE, never publish** — only when `docs.updateOnEpicRelease` is true (else silent):
+  `docs.updateSkill` null → say none is registered; a name with no `.claude/skills/<name>/SKILL.md`
+  → report the dangling hook and its fix (`/devstride:setup docs`), continue; otherwise invoke it in
+  mode `update` with the epic payload (`kind: "epic-release"`, release PR, merge commit, each leaf's
+  plain-English `summary` and `userFacing` judgement, **`live: false`**, never optional — shape:
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`), keeping its links exact. **Never
+  release notes here.**
+- **Close out**: `add_comment` on the RELEASE-UNIT item (release PR, leaves, date), Done if lanes are
+  tracked there, update handoff memory, sync develop, and **link the release PR onto every leaf**
+  whose as-built note deferred it (`link_pull_request` or `add_comment`).
+- **Human recap.** Lead with `Merged / Released`: every item and its effect, where it landed,
+  validation/review/CI, docs, whether live, the remaining production action. Surface — never
+  perform — the owner-cut promotion (`/devstride:release`). New findings → step 6.5.
 
-IMPORTANT:
-- Empty `$ARGUMENTS` means `next`.
-- **Serial by design.** The plan's "parallel waves" describe SHAPE, not an instruction to run
-  concurrent builds. Three constraints hold whatever the repository's local tooling looks like:
-  `branch-feature` aborts on a dirty tree; test execution is serial against SHARED test
-  infrastructure, which `localEnvironment.instanceBoundTo: directory` does NOT isolate; and the
-  MCP writes to production. The `localEnvironment` block tells the loop whether an isolated
-  instance exists at all; it never makes the loop concurrent. Surface the ready-set for a human
-  to fan out manually; keep the loop serial (why: `references/next-unblocked.md`).
-- **Injection is part of the loop.** Never let a real out-of-scope finding ship as PR prose only.
-- **The release-unit container (this org's Epic) is exactly that — the release unit.** Develop
-  only receives a COMPLETE, refreshed, fully-reviewed release unit with every applicable gate
-  green — or a one-off that settled the same gate set.

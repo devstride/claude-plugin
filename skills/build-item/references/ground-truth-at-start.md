@@ -1,12 +1,40 @@
 ---
 load: contract
 ---
-# Ground truth at the start of a loop — origin before memory
+# Ground truth at the start of a loop — the checkout, then origin before memory
 
 A loop that starts from a memory handoff or a checkout that has sat for a while reasons from a
 copy of the repository that no longer exists. Nothing on disk detects this: the stale copy is the
 one in the conversation, and every command run against it succeeds. So the first act of a loop is
 to refresh from the remote and to re-derive every remembered fact from what is there now.
+
+## Take the checkout first — the lease protocol
+
+A clean tree does not mean a checkout is free: a release can hold one detached for hours, another
+session can be running tests or a dev server in it, and two sessions can both see "clean" before
+either switches branch. So when the repository's `conventionsDoc` or config declares a fixed pool of
+checkouts, a session works only in a pool member it holds under a LEASE, and never creates another
+worktree or local instance (`localEnvironment.create`, `git worktree add`, a worktree-isolated
+agent) unless the owner asks for one in the current conversation — a busy pool means asking the
+holder or the owner, not minting a new copy. Which checkouts form the pool, the lease file's name
+and the hand-back ref are the repository's to state; read them from its conventions, never assume
+them.
+
+- **Take it atomically.** The lease is a file inside that checkout's OWN git directory
+  (`git -C <dir> rev-parse --absolute-git-dir`), so it never dirties the tree, created under
+  `set -o noclobber` so the create fails if the file exists and exactly one session wins. It
+  records who holds it, for what, and since when.
+- **Won the lease, then check the tree.** Dirty, or checked out on any branch but the base (detached
+  is fine) → a session from before the lease rule may be mid-flight there: remove your lease and take another
+  member. A lease that already exists is BUSY: read who holds it and pick another member or ask
+  them. Never delete someone else's lease; a stale one is the owner's call.
+- **Hold it across branch switches** — the lease, not the branch, makes the checkout yours.
+- **Hand it back** when the work merges or is handed over: stop every process you started there
+  (test runs, dev servers, watchers), leave it clean and detached at a freshly fetched base, then
+  remove the lease. An owner-approved extra worktree is removed by the session that made it when
+  its approved purpose ends.
+
+Without a declared pool, the current checkout is the only environment and no lease is taken.
 
 ## The procedure
 
@@ -53,5 +81,6 @@ one whose session-start fetch is stale.
 
 ## Cited by
 
-- `skills/build-item/SKILL.md` — step 0, before selecting the story.
+- `skills/build-item/SKILL.md` — step 0, before selecting the story, and the checkout-pool floor
+  (the lease protocol).
 - `skills/release/SKILL.md` — step 0, alongside the branch sync.
