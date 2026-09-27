@@ -5,33 +5,35 @@ description: Create a new feature branch off develop with proper naming conventi
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
-Create a new feature branch with the following workflow:
+**Goal:** a correctly named feature branch, cut from a freshly pulled working base and pushed with
+its upstream set. Branch name argument: $ARGUMENTS (none → ask for one).
 
-Branch name argument: $ARGUMENTS
+## Rules
 
-**Repo config.** The base branch, branch-naming pattern, and protected-branch list this skill uses live in **`.claude/ds-config.json`** at the repo root (`baseBranch`, `integrationBranch`, `branchNaming`, `protectedBranches`). Load it first and treat it as authoritative: wherever a step below names a concrete branch or naming rule, substitute the matching config value. The literals shown inline are the plugin's shipped defaults, kept for readability — **if the file disagrees, the file wins**. If the file is absent, fall back to the inline literals and say so.
+- **Config wins.** Load `.claude/ds-config.json` first (`baseBranch`, `integrationBranch`,
+  `branchNaming`, `protectedBranches`); every literal below is a shipped default kept for
+  readability — **if the file disagrees, the file wins**. No file → use the defaults and say so.
+- **Working base**, in precedence: (1) the base the CALLER passed — `build-item` derives it (the
+  story's epic integration branch, or `baseBranch` when the item has no release unit) and says
+  "branch off `<name>`"; (2) config `integrationBranch` when non-null; (3) `baseBranch`. An
+  integration branch must already exist on the remote (`build-item` step 0 creates the epic
+  branch); if checking it out fails, STOP and tell the caller to create it off `baseBranch` — never
+  fall back to develop silently.
+- **Stay in the checkout you hold.** Branch inside the current checkout (under `build-item`'s
+  checkout-pool lease when the repo declares a pool); this skill never creates a worktree or
+  instance.
+- **Never carry changes.** `git status --porcelain` dirty → STOP and ask whether to stash or commit.
+- **Name**: `branchNaming` in config; default `<user-prefix>/<date>/<branch-name>` with the date in
+  `branchNaming.dateFormat` (shipped default `MM-DD-YY`, today) and `<user-prefix>` the first name
+  from `git config user.name`, lowercased ("Jane Doe" → `jane/03-14-26/new-feature`); empty or
+  ambiguous → ask for the prefix.
+- **Never delete the previous branch automatically** — keep it until its PR merges. Only on an
+  explicit request: `git branch -d <previous>` (`-D` only once confirmed), and never a branch in
+  `protectedBranches` or an active `integrationBranch`.
 
-**Working base.** Resolve the branch to base off of in this precedence: (1) an explicit base the CALLER passed you — the `build-item` loop derives a working base (by default the story's **epic integration branch**, `<prefix>/<MM-DD-YY>/<epic-number>-<epic-title-slug>`; plain develop when the item has no Epic) and tells you to "branch off `<name>`"; that wins over config. (2) Otherwise `integrationBranch` if it is set (non-null) in the config. (3) Otherwise `baseBranch`. When the working base is an integration branch (epic-derived or explicit — see the config's `_integrationBranch_readme`), it must already exist on the remote (`build-item` step 0 creates the epic branch before invoking this skill); if `git checkout` of it fails, STOP and tell the caller to create it off `baseBranch` first rather than silently falling back to `develop`. Everywhere a step below says "develop", read "the working base".
+## Steps
 
-1. Check for uncommitted changes with `git status --porcelain`. If the tree is
-   dirty, STOP and ask whether to stash or commit first — do not carry changes
-   onto the working base.
-2. Save the current branch name (`git rev-parse --abbrev-ref HEAD`) for reference.
-3. Run `git checkout <working base>` then `git pull` to sync with remote.
-4. Create a new branch with the naming convention:
-   - Format: `<user-prefix>/<MM-DD-YY>/<branch-name>`
-   - Derive `<user-prefix>` from the local git identity: first name from
-     `git config user.name`, lowercased (e.g. "Jane Doe" → `jane`). If
-     empty or ambiguous, ask the user what prefix they want.
-   - Use today's date in MM-DD-YY format.
-   - Use the provided argument as the branch-name suffix.
-   - Example: "Jane Doe" → `jane/03-14-26/new-feature`
-5. Push the new branch and set upstream: `git push -u origin <new-branch-name>`
-
-IMPORTANT:
-- If no branch name argument is provided, ask the user for one.
-- The previous branch is NOT deleted automatically — keep it until its PR merges.
-  If the user explicitly asks, delete it with `git branch -d <previous-branch>`
-  (offer `-D` only if they confirm, and never delete develop/master or an active
-  `integrationBranch`).
-- Confirm the branch was created and pushed; report the full new branch name.
+1. Check the tree is clean; note the current branch (`git rev-parse --abbrev-ref HEAD`).
+2. `git checkout <working base>` then `git pull`.
+3. `git checkout -b <new-branch>` then `git push -u origin <new-branch>`.
+4. Confirm it was created and pushed; report the full branch name.

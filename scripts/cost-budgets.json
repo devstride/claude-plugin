@@ -2,12 +2,12 @@
   "_method": "tokens = ceil(utf8_bytes / 3); bytes as `wc -c`",
   "_generatedBy": "scripts/measure-cost.sh --write-budgets at 3.5.1 on 2026-09-27",
   "_rounding": "measured tokens rounded UP to the next multiple of 100",
-  "_readme": "A RATCHET over bodies, references, and representative composed paths. Hard body ceilings live in measure-cost.sh: 8,000 normally, with four frozen grandfathered caps. Lower freely; raise a ratchet only with the text that needs it. Changing _method re-baselines every entry.",
+  "_readme": "A RATCHET over bodies, references, and representative composed paths. Hard body ceilings live in measure-cost.sh: 8,000 normally, with three frozen grandfathered caps. Lower freely; raise a ratchet only with the text that needs it. Changing _method re-baselines every entry.",
   "alwaysOnContext": 1300,
   "bodies": {
-    "branch-feature": 1100,
+    "branch-feature": 900,
     "branch-hotfix": 3100,
-    "build-item": 12200,
+    "build-item": 8000,
     "ci-audit": 2500,
     "comprehend-plan": 1500,
     "create-defect": 2400,
@@ -23,12 +23,12 @@
     "release": 8000,
     "review": 11400,
     "setup": 10700,
-    "ultracode-build": 5900,
+    "ultracode-build": 4800,
     "update": 1000
   },
   "references": {
     "skills/build-item/references/epic-release.md": 2000,
-    "skills/build-item/references/ground-truth-at-start.md": 1100,
+    "skills/build-item/references/ground-truth-at-start.md": 1800,
     "skills/build-item/references/next-unblocked.md": 1200,
     "skills/build-item/references/plain-language-output.md": 2300,
     "skills/build-item/references/progress-table.md": 1300,
@@ -74,7 +74,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 71900,
+      "budget": 68500,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -103,7 +103,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 64300,
+      "budget": 59500,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -137,7 +137,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 60600,
+      "budget": 61400,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

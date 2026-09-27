@@ -659,7 +659,7 @@ U3. References are flat under `skills/<name>/references/` — the corpus globs h
     deep, so a nested directory is invisible to every check in this file.
 U4. Every `skills/*/SKILL.md` body has a committed budget row enforced at release
     (`measure-cost.sh --check`, RELEASING.md step 0) plus an immutable ceiling: ordinary skills
-    never exceed 8,000 tokens; the four 2.5.0-grandfathered bodies never exceed their recorded
+    never exceed 8,000 tokens; the three 2.5.0-grandfathered bodies never exceed their recorded
     ceilings and only move down. Reference/path budgets prevent moving mandatory text from
     manufacturing a false body saving.
 U5. The needle count never goes DOWN across a compression epic — needles are re-pointed at
