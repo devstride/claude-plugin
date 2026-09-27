@@ -8,6 +8,65 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.6.0] — 2026-09-27
+
+### Added
+
+- **A fourth delivery profile, `extended`,** for coarser, multi-hour stories. It sits beside `prototype`, `standard` and `enterprise`, and only the size-shaped knobs move: story grain of about one release-unit-day, uncapped spec depth, up to four understand readers, and review breadth that may reach HIGH-RISK. Every safety knob and every floor is exactly `standard`'s. `plan`, `rebalance` and `build-item` accept the word, and `setup` offers it. The grain order is now stated: enterprise < standard < prototype < extended. `rebalance` sizes successors to the target profile's grain.
+
+### Changed
+
+- **Every loop skill now reads as a goal, the rules that must hold, and its hard floors, instead of a numbered script.** This covers `plan`, `comprehend-plan`, `rationalize-gantt`, `rebalance`, `build-item`, `ultracode-build`, `branch-feature`, `review`, `pr`, `push`, `release` and `branch-hotfix`. Nothing a skill guarantees has moved:
+  - review settles before CI, and CI runs once;
+  - an owner says yes before production;
+  - the checkout-pool lease is taken;
+  - auth and migration diffs get their immediate verifier;
+  - named-field reads, looked-up item numbers, the auto-scheduler-off rule, and "MCP writes are production" hold.
+- **Callers need no changes.** `review`'s step numbers (6, 6.5, 7, 7.1, 7.1b, 7.3) and mode names (DRIVEN, LOCAL-ONLY, PRE-SHIP HOLD, PRE-SHIP RESUME) are unchanged.
+- **`build-item` and `review` fit under the ordinary 8,000-token ceiling** and leave the grandfathered list; only `plan` and `setup` remain on it. Every composed path costs 4,200–4,700 fewer tokens:
+  - epic release gate: 68,500 → 64,300;
+  - fast story loop: 59,500 → 54,900;
+  - production release gate: 61,400 → 56,700.
+- **Shared references replace restated steps.**
+  - `insert-story` and `insert-defect` now share `skills/plan/references/splice-mechanics.md`.
+  - `create-story` and `create-defect` share `skills/create-story/references/one-off-handoff.md`.
+  - The checkout-pool lease protocol lives in `build-item/references/ground-truth-at-start.md`.
+- **`review` (LOCAL-ONLY mode) and `pr` name the hand-off `build-item` passes them:** story review ledger, verification receipt, dismissed findings, deferrals, deviations and the untracked-deferral list. `pr` now puts deferrals, deviations and dismissals in the body, as `build-item` always said it would.
+- **`branch-feature` and `branch-hotfix` take their date from `branchNaming.dateFormat`.** `branch-hotfix` previously hard-coded `MM-DD-YY`.
+- **`delivery-loop-invariants.md` is one themed rules document** instead of round-by-round sections: 134 rules and 6 editing disciplines, with 20 near-duplicates merged and every clause kept. The needle-check block is byte-identical.
+
+### Upgrading
+
+- **Nothing to change in `.claude/ds-config.json`.** No key was added, removed or redefined, and `extended` is a new value for the existing `profile` key.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.5.1 @ e8cff12, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.5.1 | tokens@devstride--v3.5.1 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,077 | 10,693 | 32,092 | 10,698 | +5 | 10,700 |
+| skills/doctor/SKILL.md | 23,989 | 7,997 | 23,925 | 7,975 | -22 | 8,000 |
+| skills/build-item/SKILL.md | 36,589 | 12,197 | 23,902 | 7,968 | -4229 | 8,000 |
+| skills/plan/SKILL.md | 34,637 | 11,546 | 23,813 | 7,938 | -3608 | 8,000 |
+| skills/review/SKILL.md | 34,109 | 11,370 | 23,685 | 7,895 | -3475 | 7,900 |
+| skills/release/SKILL.md | 23,985 | 7,995 | 18,900 | 6,300 | -1695 | 6,300 |
+| skills/rebalance/SKILL.md | 23,936 | 7,979 | 17,062 | 5,688 | -2291 | 5,700 |
+| skills/ultracode-build/SKILL.md | 17,326 | 5,776 | 14,333 | 4,778 | -998 | 4,800 |
+| skills/pr/SKILL.md | 13,321 | 4,441 | 10,893 | 3,631 | -810 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 10,400 | 3,467 | 7,755 | 2,585 | -882 | 2,600 |
+| skills/ci-audit/SKILL.md | 7,466 | 2,489 | 7,466 | 2,489 | +0 | 2,500 |
+| skills/create-defect/SKILL.md | 10,222 | 3,408 | 7,174 | 2,392 | -1016 | 2,400 |
+| skills/branch-hotfix/SKILL.md | 9,015 | 3,005 | 5,846 | 1,949 | -1056 | 2,000 |
+| skills/insert-defect/SKILL.md | 14,052 | 4,684 | 4,730 | 1,577 | -3107 | 1,600 |
+| skills/comprehend-plan/SKILL.md | 6,459 | 2,153 | 4,468 | 1,490 | -663 | 1,500 |
+| skills/insert-story/SKILL.md | 13,370 | 4,457 | 4,025 | 1,342 | -3115 | 1,400 |
+| skills/create-story/SKILL.md | 7,049 | 2,350 | 3,887 | 1,296 | -1054 | 1,300 |
+| skills/push/SKILL.md | 3,908 | 1,303 | 2,875 | 959 | -344 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/branch-feature/SKILL.md | 3,185 | 1,062 | 2,447 | 816 | -246 | 900 |
+| alwaysOn.context (skill listing) | 3,637 | 1,213 | 3,666 | 1,222 | +9 | 1,300 |
+| **total (bodies)** | 327,894 | 109,305 | 242,077 | 80,699 | -28606 | |
+
 ## [3.5.1] — 2026-09-11
 
 ### Fixed
@@ -1475,7 +1534,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.1...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.6.0...HEAD
+[3.6.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.1...devstride--v3.6.0
 [3.5.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.0...devstride--v3.5.1
 [3.5.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.4.2...devstride--v3.5.0
 [3.4.2]: https://github.com/devstride/claude-plugin/compare/devstride--v3.4.1...devstride--v3.4.2
