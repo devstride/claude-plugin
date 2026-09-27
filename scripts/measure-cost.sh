@@ -78,7 +78,6 @@ DEFAULT_HARD_BODY_CEILING = 8000
 # caps are code constants, not editable budget rows: they may shrink, never grow.
 GRANDFATHERED_HARD_BODY_CEILINGS = {
     "plan": 11800,
-    "review": 11450,
     "setup": 10700,
 }
 
@@ -189,7 +188,7 @@ if MODE == "write-budgets":
         "_method": METHOD,
         "_generatedBy": "scripts/measure-cost.sh --write-budgets at %s on %s" % (version, datetime.date.today().isoformat()),
         "_rounding": "measured tokens rounded UP to the next multiple of 100",
-        "_readme": "A RATCHET over bodies, references, and representative composed paths. Hard body ceilings live in measure-cost.sh: 8,000 normally, with three frozen grandfathered caps. Lower freely; raise a ratchet only with the text that needs it. Changing _method re-baselines every entry.",
+        "_readme": "A RATCHET over bodies, references, and representative composed paths. Hard body ceilings live in measure-cost.sh: 8,000 normally, with two frozen grandfathered caps. Lower freely; raise a ratchet only with the text that needs it. Changing _method re-baselines every entry.",
         "alwaysOnContext": round_up_100(always["context"]["tokens"]),
         "bodies": {n: round_up_100(b["tokens"]) for n, b in sorted(bodies.items())},
         "references": {p: round_up_100(r["tokens"]) for p, r in sorted(refs.items())},

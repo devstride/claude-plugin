@@ -26,16 +26,37 @@ out. That asymmetry is what makes it the flip assertion: any other job's `skippi
 ambiguous (path filter? draft gate?), the gate job's is not. With `ci.gateJobName` null, the
 presence of a NEW workflow run for the head SHA is the substitute evidence.
 
-## The escalation ladder's evidence
+## The escalation ladder — exact steps and evidence
 
-`reopened` is in the loop's trigger list, so close+reopen re-evaluates the draft condition —
-the cheapest re-trigger. The empty commit exists for the repo-wide mergeability stall
-(`github-review-api.md`, "The mergeability stall"): a new head forces a per-PR mergeability
-recompute where existing heads stay stalled. Its three preconditions each have a failure behind
-them — a dirty index silently commits staged work; a wrong HEAD pushes one branch onto another;
-a changed tree means the "empty" commit was not empty. The production cost of the no-op commit
-is why it is bounded to one per settle and named in the step-8 report, and "still nothing" is a
-GitHub-side incident to surface, never to loop on.
+Bounded, in order, when the flip produced no run within ~60 s:
+
+1. Read `gh api repos/{owner}/{repo}/pulls/<n> --jq '[.mergeable_state,.merge_commit_sha]'`.
+2. **Close+reopen.** `reopened` is in the loop's trigger list, so it re-evaluates the draft
+   condition — the cheapest re-trigger, and the fix for the flip race.
+3. **~60 s later still `unknown`/null → ONE empty commit on the PR's OWN head.** Three
+   preconditions, each with a failure behind it: the index is CLEAN (`git diff --cached --quiet` —
+   a dirty index silently commits staged work); local `HEAD` IS that PR's head
+   (`gh pr view <n> --json headRefName,headRefOid` — a wrong HEAD pushes one branch onto another);
+   and after `git commit --allow-empty -m "ci: re-trigger — GitHub did not build this pull request's merge ref"`
+   the new `HEAD^{tree}` EQUALS `HEAD~1^{tree}` (else the "empty" commit was not empty — reset and
+   STOP). Push with `git push origin HEAD:<headRefName>` — a fast-forward, which the protected-head
+   rule permits (it forbids rewriting); branch protection may still refuse → STOP and surface.
+4. **At most one empty commit per settle.** Still nothing is a GitHub-side incident: STOP and
+   surface, never loop.
+
+The empty commit exists for the repo-wide mergeability stall (`github-review-api.md`, "The
+mergeability stall"): a new head forces a per-PR mergeability recompute where existing heads stay
+stalled. It is keyed on "no run + `mergeable_state: unknown`". The production cost of the no-op
+commit is why it is bounded and named in the step-8 report.
+
+## Counting runs — the run-once number
+
+Count executed workflow runs attributed to THIS pull request — by `pull_requests[].number` on the
+runs API, falling back to head repository + branch bounded to the PR's lifetime (never branch name
+alone) — across the workflows matching `ci.workflowGlobs`, resolved to `workflow_id` (the same
+method as `ci-audit`). A run counts when any job beyond the gate/detect job finished other than
+`skipped`; an all-skipped run is 0. Count per workflow, one line each; the expected figure is
+`ci.expectedRunsPerPullRequest` per workflow.
 
 ## Classifying red CI
 
@@ -55,4 +76,5 @@ review-before-CI ordering.
 ## Cited by
 
 - `skills/review/SKILL.md` — the pointer at the top of step 7 ("Read … when the flip produces no
-  run, a check reads `skipping`, or CI is red").
+  run, a check reads `skipping`, or CI is red"), step 7.3's escalation ladder, and step 8's run
+  count.

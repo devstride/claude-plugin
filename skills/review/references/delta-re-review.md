@@ -3,10 +3,8 @@ load: contract
 ---
 # Follow-up review — one effective scope per contextual pass, never a blind rerun
 
-`targetAdversarialCycles` normally allows two useful cycles across Claude, local CLI, cloud,
-rebase, pre-ship and code-changing CI repair rechecks. Past that target, only a verified P1 or
-serious P2 opens another safety cycle; repeat until the next pass finds none. Those continuations
-also override `maxLocalReviewRounds`. No event resets the count.
+Cycle accounting is at the end; the cumulative context every pass receives is defined once, in
+`review-ledger.md`. This file owns the scope decision and the local-CLI launch forms.
 
 ## One scope decision for every stream
 
@@ -34,15 +32,12 @@ reason, file/line/byte counts, new files, threshold and both SHAs. Report its fa
 
 ## Cumulative context is mandatory
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/review-ledger.md`. Every follow-up Claude
-task and every local-CLI launch receives the compact ledger: earlier finding ids, fixes,
-dismissal rationales, reviewed heads, requested range, normal target and safety status. The orchestrator
-distills it; raw reviewer output is never pasted. A finding with a terminal disposition is not
-re-raised without new evidence.
-
-Before a cloud re-request, update the one `<!-- devstride:review-context -->` pull-request
-comment from that same ledger. Record the SHA of the returned review; a request alone proves no
-head was reviewed.
+Every follow-up Claude task and every local-CLI launch receives the compact ledger rendered per
+`${CLAUDE_PLUGIN_ROOT}/skills/review/references/review-ledger.md` ("What every later pass
+receives"), distilled by the orchestrator — raw reviewer output is never pasted. A finding with a
+terminal disposition is not re-raised without new evidence. A cloud re-request follows the update of
+the one `<!-- devstride:review-context -->` comment; record the SHA of the returned review — a
+request alone proves no head was reviewed.
 
 ## Local-CLI launch forms
 
@@ -84,12 +79,15 @@ on empty stdin. A CLI that rejects its configured contextual form is this-run de
 
 ## Cycle accounting
 
-The first wave spends cycle 1; each concurrent contextual wave spends one more. `none` spends
-nothing. Rebase, pre-ship and real-CI repairs share the count. At the normal target, lower findings
-get their `fixFloor` disposition, affected checks and one main-agent ledger inspection. A verified
-P1/serious P2 instead requires another contextual cycle after its fix; repeat with no numeric cap
-until a pass finds none. While one remains, no patch change, no progress or unavailable required review is a human
-gate. A clean cycle may finish early. This prevents routine ping-pong without capping release safety.
+`targetAdversarialCycles` normally allows two useful cycles across Claude, local CLI, cloud, rebase,
+pre-ship and code-changing CI repair rechecks; no event resets the count. The first wave spends
+cycle 1; each concurrent contextual wave spends one more; `none` spends nothing. At the normal
+target, lower findings get their `fixFloor` disposition, affected checks and one main-agent ledger
+inspection. A verified P1/serious P2 instead requires another contextual cycle after its fix; repeat
+with no numeric cap until a pass finds none — these safety continuations also override
+`maxLocalReviewRounds`. While one remains, no patch change, no progress or unavailable required
+review is a human gate. A clean cycle may finish early. This prevents routine ping-pong without
+capping release safety.
 
 ## Cited by
 
