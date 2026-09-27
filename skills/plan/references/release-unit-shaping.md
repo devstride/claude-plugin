@@ -57,5 +57,5 @@ rehoming signal, not a naming problem.
 
 ## Cited by
 
-- `skills/plan/SKILL.md` — step 2's pointer ("Read … when proposing the release-unit breakdown,
-  or when a user asks why a boundary is wrong").
+- `skills/plan/SKILL.md` — step 2's pointer ("read it when proposing the breakdown, or when a
+  user asks why a boundary is wrong").

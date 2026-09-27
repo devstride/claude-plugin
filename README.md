@@ -303,9 +303,10 @@ and which gates a story passes before it merges:
 |---|---|---|
 | `prototype` | A small team validating an idea; no production users yet | One story per user-visible slice; light specs; bounded story risk screen; touched tests; no per-story PR; full review when the release unit auto-releases |
 | `standard` (default) | A working product | Stories of an hour or two; capped specs; targeted story checks; contained review with configured engines once at the merge boundary; full suite at release |
+| `extended` | A working product built as fewer, larger stories | Stories of about a release-unit-day; uncapped specs; wider build-time reading and merge review; every safety knob as `standard` |
 | `enterprise` | Regulated, revenue-bearing, or shared-platform code | Fine stories; full specs; full story gate; widest merge review; two-cycle normal target |
 
-`/devstride:setup` asks which one and writes `"profile"` into `.claude/ds-config.json`; a plan can
+`/devstride:setup` asks which of the four and writes `"profile"` into `.claude/ds-config.json`; a plan can
 carry its own choice as a `Delivery profile:` line in its root item's description; an explicit
 profile word in a skill's arguments wins over both. Floors hold under every profile: each story
 gets a risk screen and green local gate; authentication, migrations and deployed contracts get

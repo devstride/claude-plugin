@@ -30,11 +30,11 @@ itself, and the profile's values for the three knobs that also exist as their ow
 three rows are copied from the contract's table; the fast-merge row's rule is spelled out in the
 next section:
 
-| Key | `prototype` | `standard` | `enterprise` |
-|---|---|---|---|
-| `epicIntegrationBranches.autoRelease` | `true` | `false` | `false` |
-| `epicIntegrationBranches.fastStoryMerges.enabled` | `true` whenever `verify.typecheck` is set — the built-in risk screen is the local review floor | the existing rule, below | the existing rule, below |
-| `review.pollTimeoutMinutes` | `5` | `10` | `20` |
+| Key | `prototype` | `standard` | `extended` | `enterprise` |
+|---|---|---|---|---|
+| `epicIntegrationBranches.autoRelease` | `true` | `false` | `false` | `false` |
+| `epicIntegrationBranches.fastStoryMerges.enabled` | `true` whenever `verify.typecheck` is set — the built-in risk screen is the local review floor | the existing rule, below | the existing rule, below | the existing rule, below |
+| `review.pollTimeoutMinutes` | `5` | `10` | `10` | `20` |
 
 Under every profile `fastStoryMerges.enabled` still turns on the repository's own commands and
 roster — the profile decides which precondition applies, never whether one does.
@@ -86,13 +86,13 @@ deliberately not a copyable value** — writing `true` from this file would enab
 repository that cannot safely use them — and `autoRelease` is the profile's, shown here at its
 `standard` value:
 
-- **`autoRelease: false`** under `standard` and `enterprise` — a release unit merging to the base
+- **`autoRelease: false`** under `standard`, `extended` and `enterprise` — a release unit merging to the base
   branch without a human saying so is something an owner should switch on after watching the loop
   run, not inherit on day one. **`prototype` writes `true`**, and setup says so out loud at the
   write, naming the base branch: where that branch is production, or is promoted to it without a
   gate, this is a release with nobody's hand on it, and the owner must hear that from setup rather
   than discover it from a deploy.
-- **`fastStoryMerges.enabled`** — under `standard` and `enterprise`, write `true` when
+- **`fastStoryMerges.enabled`** — under `standard`, `extended` and `enterprise`, write `true` when
   `verify.test` and `verify.typecheck` are set; the full suite is available for the epic boundary,
   while story gates use the profile's narrower width. Under `prototype`, `verify.typecheck` is
   enough. Every fast story still gets the built-in risk screen and exact-tree verification

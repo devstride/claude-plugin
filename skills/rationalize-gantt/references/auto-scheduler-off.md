@@ -41,7 +41,7 @@ the disabled organization setting remains authoritative.
 
 ## Cited by
 
-- `rationalize-gantt` SKILL.md steps 1 (canonical owner) and 6
-- `plan` SKILL.md steps 2 (sign-off) and 5
-- `insert-story` SKILL.md steps 4 and 5
-- `insert-defect` SKILL.md steps 4 and 5
+- `rationalize-gantt` SKILL.md (canonical owner — its step 1)
+- `plan` SKILL.md (sign-off and the date pass)
+- `plan/references/splice-mechanics.md` (every splice), and through it `insert-story` and `insert-defect`
+- `create-story` and `create-defect` SKILL.md (the date/edge rule)

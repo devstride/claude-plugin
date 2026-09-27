@@ -86,6 +86,8 @@ The cap bounds every branch of that triage:
 - **≤ 2 readers** (`standard`): readers only for the angles the spec or grounding refresh does
   not pin — the grounding-refresh branch as written, applied to every non-trivial story. A
   fully pinned spec gets none.
+- **≤ 4 readers** (`extended`): as `standard`, plus readers for the cross-contract angles a
+  subsystem-sized story touches beyond what its spec pins.
 - **Up to the six this phase defines** (`enterprise`): the triage exactly as written.
 
 Announce the count you actually provisioned against the cap.

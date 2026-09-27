@@ -281,14 +281,15 @@ never re-applied.
 
 Four things no inspection can reach, asked every run — the first one first:
 
-- **Which delivery profile?** (`profile`) — three options captioned from the contract's table
+- **Which delivery profile?** (`profile`) — four options from the contract's table
   (`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` — read it before
-  asking): `prototype`, `standard` (default, first), `enterprise`; say what the answer moves
+  asking): `prototype`, `standard` (default, first), `extended` (fewer, larger stories;
+  every safety knob `standard`'s), `enterprise`; say what the answer moves
   (`epicIntegrationBranches.autoRelease`, `fastStoryMerges.enabled`,
-  `review.pollTimeoutMinutes`); on a re-run the file's `profile` is the prefill. **If
+  `review.pollTimeoutMinutes`); a re-run prefills the file's `profile`. **If
   `prototype`, say the consequence now**: `autoRelease` becomes `true` — a release unit merges
-  to `baseBranch` with no human saying so; name the branch. The user may answer `ask` instead —
-  no profile produces it; the loop then stops and asks the owner once per release unit. The
+  to `baseBranch` unasked; name the branch. The user may answer `ask` (no profile
+  produces it): the loop then asks the owner once per release unit. The
   profile is never `detected`.
 - **What does merging to the production branch actually do?** (`release.autoDeployOnMerge`) —
   one plain-English sentence; the release skill quotes it back at the production gate. Nothing
@@ -345,9 +346,9 @@ Phase D; else the shipped default.
 **The roster must describe what actually exists.** No
 local CLI detected → **omit `localCommand`** (or `null`). No cloud reviewer →
 **`automatedReviewers: []`**. **`fastStoryMerges.enabled`, precondition by profile**:
-`standard`/`enterprise` → `true` with `verify.test` and `verify.typecheck` set; `prototype` →
-`true` whenever `verify.typecheck` is set (the exact
-rule is in the defaults reference — apply, do not re-derive); unmet → `false`, saying which part
+`standard`/`extended`/`enterprise` → `true` with `verify.test` and `verify.typecheck` set; `prototype` →
+`true` whenever `verify.typecheck` is set (exact rule: the
+defaults reference — apply, never re-derive); unmet → `false`, saying which part
 was missing and, under `prototype`, that the file now contradicts its profile. **`autoRelease`
 and `review.pollTimeoutMinutes` take the profile's values** unless the owner answered `ask` —
 `autoRelease: true` for `prototype` repeats the consequence at the write, naming `baseBranch`.

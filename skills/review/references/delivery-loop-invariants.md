@@ -503,8 +503,9 @@ N2. A config flag's behaviour is asserted in MORE PLACES than the skill that rea
     flag's claims when you change how it is honoured.
 
 ## O. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
-O1. ONE profile word — `prototype` / `standard` / `enterprise` — moves every rigor knob together;
-    the knobs are coupled (coarse stories + enterprise review is the worst combination), so no
+O1. ONE profile word — `prototype` / `standard` / `extended` / `enterprise` — moves every rigor knob together;
+    the knobs are coupled (coarse stories under enterprise's fix-every-finding floor and extra
+    rounds is the worst combination — `extended` pairs its coarse grain with standard's), so no
     skill exposes them as independent primary settings.
 O2. Resolution order, every skill, first match wins, ANNOUNCED with its source: bare word in the
     arguments → the plan root's `Delivery profile:` marker → `profile` in config → `standard`.

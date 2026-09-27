@@ -50,7 +50,7 @@ profile — a story built under one profile and reviewed under another is worse 
 Resolve it in step 0, once the plan root is known, by **the contract's resolution order** —
 cite it, never restate it — with two build-item specifics: the root-marker step reads the
 description with **`get_item(view: 'full')`** (the summary projection omits `description`), and
-a ONE-OFF skips only the marker step, never the explicit-argument step (`I20110 enterprise`
+a ONE-OFF skips only the marker step, never the explicit-argument step (`I20110 extended`
 still wins; else config `profile`, else `standard`). **Announce the result WITH ITS SOURCE** —
 `profile: prototype — from the plan root I20100` — and carry it in the progress table's
 `Profile` row; the next session inherits it from handoff memory (step 7).
@@ -222,12 +222,12 @@ spec divergence.
 ## 4. Review — fast mode on an epic branch, full PR ritual on develop
 
 **Which path you are on is decided by the WORKING BASE step 0 resolved and the profile's
-`perStoryPullRequest`, not by the diff, the item, or how the run feels.** Epic integration branch:
+`perStoryPullRequest`, not by the diff or the item.** Epic integration branch:
 under **`prototype`** → **4a** whenever `fastStoryMerges.enabled` is ABSENT or `true` — fast mode
 is the profile's default and the build-time risk screen + green gate meet the local floor; a
 PRESENT `false` wins, routes the story to 4b, and is reported as a contradiction. Under
-**`standard` / `enterprise`** →
-**4a** iff `epicIntegrationBranches.fastStoryMerges.enabled`, exactly as before; the profile
+**`standard` / `extended` / `enterprise`** →
+**4a** iff `epicIntegrationBranches.fastStoryMerges.enabled`; the profile
 supplies no value while that key is present. Working base is `baseBranch` → **4b**, under every
 profile. Never mix them: the paths differ in where the
 CLOUD gate sits, and a story that takes 4a while heading for develop reaches production having
