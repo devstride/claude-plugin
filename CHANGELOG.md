@@ -8,6 +8,8 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.7.0] — 2026-09-28
+
 ### Added
 
 - **A cloud reviewer can be limited to pull requests into chosen branches.** A new optional `baseBranches` list on a `review.automatedReviewers` entry means the reviewer is requested only when a pull request's base is exactly one of those branches. For example, `["main"]` keeps a per-use reviewer such as Copilot on production releases and hotfixes, while the local engines cover every other pull request. Without the key, nothing changes: the reviewer is requested on every pull request.
@@ -15,6 +17,34 @@ for what each version component means here and how a release is cut.
   - One safety rule: if the local review engine fails on a pull request where every cloud reviewer was left out, no independent engine has reviewed it. `review` then stops for a human review, exactly as when every configured engine fails.
   - The match is against the pull request's own base branch on GitHub, re-read on every review run, so a retargeted pull request is re-scoped. A value that is not a list of names is treated as absent: a typo costs money, never coverage.
   - `doctor` reports each reviewer's scope and warns when the list is empty, which would mean the reviewer never runs. `setup` never writes the key.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.6.0 @ 8c5f11c, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.6.0 | tokens@devstride--v3.6.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,092 | 10,698 | 32,092 | 10,698 | +0 | 10,700 |
+| skills/review/SKILL.md | 23,685 | 7,895 | 23,987 | 7,996 | +101 | 8,000 |
+| skills/doctor/SKILL.md | 23,925 | 7,975 | 23,984 | 7,995 | +20 | 8,000 |
+| skills/build-item/SKILL.md | 23,902 | 7,968 | 23,909 | 7,970 | +2 | 8,000 |
+| skills/plan/SKILL.md | 23,813 | 7,938 | 23,813 | 7,938 | +0 | 8,000 |
+| skills/release/SKILL.md | 18,900 | 6,300 | 18,909 | 6,303 | +3 | 6,400 |
+| skills/rebalance/SKILL.md | 17,062 | 5,688 | 17,062 | 5,688 | +0 | 5,700 |
+| skills/ultracode-build/SKILL.md | 14,333 | 4,778 | 14,333 | 4,778 | +0 | 4,800 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,991 | 3,664 | +33 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 7,755 | 2,585 | 7,755 | 2,585 | +0 | 2,600 |
+| skills/ci-audit/SKILL.md | 7,466 | 2,489 | 7,466 | 2,489 | +0 | 2,500 |
+| skills/create-defect/SKILL.md | 7,174 | 2,392 | 7,174 | 2,392 | +0 | 2,400 |
+| skills/branch-hotfix/SKILL.md | 5,846 | 1,949 | 5,846 | 1,949 | +0 | 2,000 |
+| skills/insert-defect/SKILL.md | 4,730 | 1,577 | 4,730 | 1,577 | +0 | 1,600 |
+| skills/comprehend-plan/SKILL.md | 4,468 | 1,490 | 4,468 | 1,490 | +0 | 1,500 |
+| skills/insert-story/SKILL.md | 4,025 | 1,342 | 4,025 | 1,342 | +0 | 1,400 |
+| skills/create-story/SKILL.md | 3,887 | 1,296 | 3,887 | 1,296 | +0 | 1,300 |
+| skills/push/SKILL.md | 2,875 | 959 | 2,875 | 959 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/branch-feature/SKILL.md | 2,447 | 816 | 2,447 | 816 | +0 | 900 |
+| alwaysOn.context (skill listing) | 3,666 | 1,222 | 3,666 | 1,222 | +0 | 1,300 |
+| **total (bodies)** | 242,077 | 80,699 | 242,552 | 80,858 | +159 | |
 
 ## [3.6.0] — 2026-09-27
 
@@ -1542,7 +1572,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.6.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.7.0...HEAD
+[3.7.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.6.0...devstride--v3.7.0
 [3.6.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.1...devstride--v3.6.0
 [3.5.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.0...devstride--v3.5.1
 [3.5.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.4.2...devstride--v3.5.0
