@@ -21,6 +21,15 @@ screen; the epic release is its first full adversarial pass. Step 1 therefore re
 moment and reviewed-head ledger instead of assuming that any earlier Claude work covered this
 scope.
 
+## Why a cloud reviewer can be scoped by base branch
+
+Cloud reviewers are often billed per review and re-requested after every fix round, so on a busy
+repository they can cost more than CI. `baseBranches` keeps one where it matters most — typically
+the production release. Scoped out is a configuration fact, like an empty list, so it is never
+degradation; but a failed local CLI then leaves no independent engine, which is exactly what the
+Claude-only stop exists for. Under fast develop mode such a reviewer first sees epic work at the
+next pull request whose base it admits.
+
 ## Why `localCommand` names the engine but does not schedule it
 
 A present `localCommand` puts the engine on the roster for every PR-boundary review under every

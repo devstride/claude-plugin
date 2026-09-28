@@ -74,7 +74,8 @@ number): $ARGUMENTS
 <file>` with `--draft` iff step 0 resolved the hold (every job then gates on `ci.draftGateCondition`
 — here `github.event.pull_request.draft == false` — so no runner burns on a diff about to change);
 then request **each entry in `review.automatedReviewers`, per its `how`** (the shipped default is
-Copilot via GraphQL `requestReviews`). Never hardcode one reviewer; an EMPTY list is legal — request
+Copilot via GraphQL `requestReviews`) — except one whose `baseBranches` omits `<base>`: skip it and
+hand it to `review` as scoped out. Never hardcode one reviewer; an EMPTY list is legal — request
 nothing and note no cloud wave. A no-CI repo opens non-draft and reports `no pull-request CI`, not
 `CI held`.
 

@@ -455,6 +455,16 @@ Two traps worth carrying into the config rather than rediscovering:
 - **The review bot is not the coding agent.** They are different bots with different node ids, and
   requesting the coding agent is accepted while creating no review request at all.
 
+**Optional scope — `baseBranches`.** A list of exact branch names (no globs, no `origin/`), matched
+against the pull request's own base branch on GitHub (`baseRefName`), re-read on every review run so
+a retargeted PR is re-scoped. Present, the reviewer is requested only on pull requests into one of
+them — e.g. `["main"]` keeps a per-use cloud reviewer on production releases (and on hotfixes, when
+`hotfixBaseBranch` is also `main`) while the local engines cover every other PR. Absent means every
+pull request; a value that is not a list of names is treated as absent, so a typo costs money, never
+coverage. `setup` never writes it: it trades review coverage for cost, so it
+is the operator's decision. A PR the scope excludes announces the reviewer as not requested; the
+review skill never counts that as a failed engine.
+
 Any other cloud reviewer must be described the same way — a name the user recognizes, a `how` the
 review flow understands, and whatever identifier that `how` needs. If the user names a reviewer that
 is not in this catalog, ask for those fields rather than inventing them.

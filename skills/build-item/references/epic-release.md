@@ -13,7 +13,11 @@ epic release PR is the FIRST pass by the cloud roster or CI over ANY of that cod
 were locally reviewed, so expect fewer findings than a cold diff would draw, but the cloud gate
 has genuinely not run yet, and treating the release as a re-review would let an entire epic
 reach develop having never been cloud-reviewed. That is the one way fast mode could actually
-cost quality, and the full-diff scope at step 8 is where it is prevented — nowhere else. When
+cost quality, and the full-diff scope at step 8 is where it is prevented — nowhere else. A cloud
+reviewer whose `baseBranches` exclude the epic's release target is not part of this pass; the
+full-diff scope still binds every engine that is, and that reviewer first sees the code at the
+first pull request whose base it admits — typically the production release, where cloud
+reviewers cover the whole PR. When
 the stories took the full 4b ritual instead, each was already cloud-reviewed at its own PR, so
 the release review points at what per-story review could not see: the cross-story integration
 surface and the develop-merge conflict resolutions.
