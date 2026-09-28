@@ -20,14 +20,14 @@
     "push": 1000,
     "rationalize-gantt": 2600,
     "rebalance": 5700,
-    "release": 6300,
-    "review": 7900,
+    "release": 6400,
+    "review": 8000,
     "setup": 10700,
     "ultracode-build": 4800,
     "update": 1000
   },
   "references": {
-    "skills/build-item/references/epic-release.md": 2000,
+    "skills/build-item/references/epic-release.md": 2100,
     "skills/build-item/references/ground-truth-at-start.md": 1800,
     "skills/build-item/references/next-unblocked.md": 1200,
     "skills/build-item/references/plain-language-output.md": 2300,
@@ -50,16 +50,16 @@
     "skills/release/references/post-deploy-check.md": 1100,
     "skills/release/references/release-gates.md": 1100,
     "skills/review/references/ci-settle.md": 1700,
-    "skills/review/references/delivery-loop-invariants.md": 18100,
+    "skills/review/references/delivery-loop-invariants.md": 18300,
     "skills/review/references/delta-re-review.md": 2000,
     "skills/review/references/github-review-api.md": 4700,
     "skills/review/references/lessons-format.md": 3000,
     "skills/review/references/review-ledger.md": 1700,
     "skills/review/references/reviewer-latency.md": 3000,
-    "skills/review/references/roster-and-modes.md": 1800,
+    "skills/review/references/roster-and-modes.md": 2000,
     "skills/review/references/slow-suite-gating.md": 1700,
     "skills/setup/references/ci-cost-patterns.md": 4400,
-    "skills/setup/references/config-defaults.md": 10500,
+    "skills/setup/references/config-defaults.md": 10800,
     "skills/setup/references/detector-evidence.digest.md": 900,
     "skills/setup/references/detector-evidence.md": 4300,
     "skills/setup/references/docs-skill-templates/update-documentation.md": 1400,
@@ -74,7 +74,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 64300,
+      "budget": 64700,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -103,7 +103,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 54900,
+      "budget": 55200,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -137,7 +137,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 56700,
+      "budget": 57000,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

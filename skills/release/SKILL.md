@@ -109,8 +109,8 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   plan root, so per `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`: a bare
   profile word in `$ARGUMENTS`, else config `profile`, else `standard` — announced with its source.
   It sets the review's normal cycle target and fix floor and never loosens this step: a production
-  release is a PR-path review under every profile, so the configured CLI engine and every cloud
-  reviewer run.
+  release is a PR-path review under every profile, so the configured CLI engine and every in-scope
+  cloud reviewer run.
 - Invoke **`review`** on the release PR, **declaring it DRIVEN** — undeclared, its standalone
   ask-gates and notifications pause an autonomous release. Pass `review-moment: production-release`,
   critical merge-gate routing, and a scope manifest from step 0: files/symbols where epics interact,

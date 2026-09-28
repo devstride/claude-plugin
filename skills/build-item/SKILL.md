@@ -181,7 +181,7 @@ mix: 4a toward develop reaches production never cloud-reviewed.
 
 ### 4a. FAST DEVELOP MODE — epic-branch stories, no per-story PR
 
-Cloud reviewers, CI and the full adversarial pass move to the epic release PR. **THE FLOOR:** no
+In-scope cloud reviewers, CI and the full adversarial pass move to the epic release PR. **THE FLOOR:** no
 completed `ultracode-build` risk check (immediate-risk verifiers and matched lenses included) or no
 valid verification receipt → **4b**, saying why.
 
@@ -203,7 +203,7 @@ valid verification receipt → **4b**, saying why.
 Invoke **`pr`** in autonomous (driven-by-`build-item`) mode with the working base pre-answered and the
 profile by name — `review` owns the cycle target, P1/serious-P2 continuation and fix floor; this loop
 owns PR-to-item linking (6). It opens a draft wherever the repo holds CI on drafts, `prototype`
-included, requests every configured cloud reviewer in the same call and settles through `review`,
+included, requests every in-scope cloud reviewer in the same call and settles through `review`,
 which runs the full pass step 3 deferred. Deferrals, deviations and dismissals (with rationale) go
 in the PR body. The push/ready-flip race is `review` step 7's: flip-with-push leaves every job
 `skipping`, which step 5 never reads as green.

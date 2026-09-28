@@ -39,7 +39,7 @@ count per page (`0 1 0 0 0 1 0`), not a total — and the numeric comparison the
 multi-page timeline. Note `--slurp` is NOT accepted together with `--jq`; slurp the pages and
 pipe to a standalone `jq`:
 
-**Count PER REVIEWER, not in aggregate.** Now that the skills iterate every configured reviewer,
+**Count PER REVIEWER, not in aggregate.** Now that the skills iterate every in-scope reviewer,
 an aggregate count is wrong: one request landing while another silently no-ops still increments
 the total, so the failed entry would be marked REGISTERED. Filter on
 `requested_reviewer.node_id` against that entry's own `graphqlBotId` — the timeline event exposes
@@ -55,7 +55,7 @@ count_requests() {
 before=$(count_requests "$BOT_ID")
 # ... run the mutation for THAT entry ...
 after=$(count_requests "$BOT_ID")
-# that entry registered only if: after > before   (repeat per configured reviewer)
+# that entry registered only if: after > before   (repeat per in-scope reviewer)
 ```
 
 (Verified against a real PR with `per_page=1`: the `--jq` form printed seven per-page counts, the

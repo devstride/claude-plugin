@@ -34,12 +34,15 @@ A4. Proof of registration = a NEW `review_requested` timeline event; count befor
     aggregate count marks a silently no-op'd entry as REGISTERED once any other lands.
 A5. `reviewRequests` is empty both while queued and after the review posts — proves nothing.
 A6. Measured latency once registered: ~3 min (the seed observation; the wait learns its own).
-A7. Request EVERY entry in `review.automatedReviewers` per its `how`; never hardcode one reviewer.
+A7. Request EVERY in-scope entry in `review.automatedReviewers` (A9) per its `how`; never hardcode one reviewer.
     Mark as requested only those that registered. This holds on review's OWN cloud-request path
     too — fixing it in `pr` alone leaves the standalone path broken.
 A8. A cloud reviewer not PROVEN registered within `reviewerRegistrationWindowMinutes` is dropped
     for the run and reported, never waited out; `pollTimeoutMinutes` bounds only a REGISTERED
     reviewer. Registration proof overlaps local review instead of delaying it.
+A9. An entry's optional `baseBranches` scopes it to PRs whose base EXACTLY matches one name; absent
+    = every PR. Scoped out = not requested, not waited on, announced, never degradation — but a
+    failed local CLI with every cloud entry scoped out still triggers the Claude-only STOP (F10).
 
 ## B. Waiting for reviewers
 B1. The wait for a cloud reviewer is the shipped script — ONE background call, a 20→90 s backoff,
@@ -557,6 +560,8 @@ skills/build-item/SKILL.md|hierarchyRoles
 skills/review/SKILL.md|LAUNCH ANOTHER
 skills/review/references/github-review-api.md|requested_reviewer.node_id
 skills/review/SKILL.md|automatedReviewers
+skills/review/SKILL.md|baseBranches
+skills/pr/SKILL.md|baseBranches
 skills/pr/SKILL.md|source and destination
 skills/release/SKILL.md|DRIVEN
 skills/build-item/SKILL.md|profile: <name>

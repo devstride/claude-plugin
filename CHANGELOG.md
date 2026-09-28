@@ -8,6 +8,14 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **A cloud reviewer can be limited to pull requests into chosen branches.** A new optional `baseBranches` list on a `review.automatedReviewers` entry means the reviewer is requested only when a pull request's base is exactly one of those branches. For example, `["main"]` keeps a per-use reviewer such as Copilot on production releases and hotfixes, while the local engines cover every other pull request. Without the key, nothing changes: the reviewer is requested on every pull request.
+  - A reviewer the scope leaves out is announced as not requested. It is never requested or waited on, and it is never reported as a failed engine.
+  - One safety rule: if the local review engine fails on a pull request where every cloud reviewer was left out, no independent engine has reviewed it. `review` then stops for a human review, exactly as when every configured engine fails.
+  - The match is against the pull request's own base branch on GitHub, re-read on every review run, so a retargeted pull request is re-scoped. A value that is not a list of names is treated as absent: a typo costs money, never coverage.
+  - `doctor` reports each reviewer's scope and warns when the list is empty, which would mean the reviewer never runs. `setup` never writes the key.
+
 ## [3.6.0] — 2026-09-27
 
 ### Added

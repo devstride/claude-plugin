@@ -69,7 +69,9 @@ workflows SUPPORT** — no profile bypasses a supported hold.
   AND its first token resolves (`command -v`). `null` is legal. Present, it reviews every
   PR-boundary run under every profile (release, one-off, hotfix); fast stories defer it with the
   rest of the roster.
-- **Cloud** — exactly `review.automatedReviewers`; `[]` is legal (absent reviews are correct).
+- **Cloud** — exactly `review.automatedReviewers`; `[]` is legal (absent reviews are correct). An
+  entry's `baseBranches` (absent or malformed → every base) admits only a PR whose LIVE `baseRefName`
+  matches EXACTLY, re-read every run; else SCOPED OUT: announced, never requested, not degradation.
 - **Draft hold** — `review.openPullRequestsAsDraft` / `readyForReviewReleasesCi` /
   `ciHeldUntilReviewSettled`: all true → one CI release after review and pre-ship; mixed → strictest
   safe behaviour, repair reported; all false with PR workflows → ungated (CI may already be running), report
@@ -128,18 +130,19 @@ reports. In one turn:
   the launch head. **Background, long timeout.** Unavailable → degradation. It spends cycle 1 and
   local round 1; ordinary relaunches respect `maxLocalReviewRounds` (under
   `targetAdversarialCycles`); safety cycles override both.
-- **Cloud** — none configured → no request, no step 2 (step 6 still runs for human threads). A
+- **Cloud** — none configured or in scope → no request, no step 2 (step 6 still runs for human threads). A
   caller that requested at PR-open (`pr` does) hands over per-reviewer baseline, request time and
-  outcome; request any entry without one. **Request EACH `review.automatedReviewers` entry per its
-  `how`** — a bot via GraphQL with its `graphqlBotId` (REST rejects bots) — **then confirm a NEW
-  `review_requested` event for THAT reviewer**; the mutation reports success even when it creates
+  outcome; request any entry without one. **Request EACH in-scope `review.automatedReviewers` entry
+  per its `how`** — a bot via GraphQL with its `graphqlBotId` (REST rejects bots) — **then confirm a
+  NEW `review_requested` event for THAT reviewer**; the mutation reports success even when it creates
   nothing. A draft does not block an explicit request; never flip to "unblock" one. Hard error →
   drop. **Unproven within `reviewerRegistrationWindowMinutes` (2 minutes, every profile;
   re-count on a short interval) → DROPPED for the run**, never waited out. Track the REGISTERED
   set with each event's `created_at`.
 - **Roster fell to Claude-only on a PR path:** configured-but-FAILED (cloud never
   registered/responded AND the local engine failed) → **STOP for a human GitHub-UI review before
-  releasing CI**, driven too; configured-EMPTY → the repo's choice, proceed announced.
+  releasing CI**, driven too; configured-EMPTY → the repo's choice, proceed announced. Failed local
+  CLI with every cloud entry scoped out → FAILED → STOP.
 
 ## 2. Wait for the cloud reviewer
 

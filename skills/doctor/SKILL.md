@@ -266,8 +266,9 @@ The point: **find out whether anything actually checks the code before it merges
   flipping the flag changes nothing. Say which case applies: set the verify commands, or clear
   `integrationBranch` **and** disable epic branches.
 - **Review roster** — report `review.localCommand`, optional `review.localAssistCommand`, and
-  `review.automatedReviewers`. An empty configured roster is legal: the built-in merge-boundary
-  pass remains. Hold every engine to the contract in
+  `review.automatedReviewers` with each `baseBranches` (absent: every PR; empty:
+  warn). An empty configured roster is legal: the built-in merge-boundary pass remains. Hold every
+  engine to the contract in
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/review-engines.md` — **never fault one for being
   unrecognised**; apply a catalogued engine's extras (Codex: a literal effort tier is an
   optimization warning). **Run
