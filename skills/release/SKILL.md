@@ -204,8 +204,9 @@ decision (a 2b waiver), never a silent return.
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md` (resolution, payload, modes).
 `docs.updateSkill` null → note none; a name with no skill → report `/devstride:setup docs` and
 continue without docs; a legacy `release.docsRepo` → report the same migration. Honour `no docs`.
-Build the `production-release` payload from step 0 with `mergeCommit`/`mergedAt` unset and
-`live: false`. Never invoke it before step 5 confirms the deploy.
+Build the `production-release` payload from step 0's delta, recomputed over
+`origin/<productionBranch>..<reviewedHead>` so release-branch fixes are in it, with
+`mergeCommit`/`mergedAt` unset and `live: false`. Never invoke it before step 5 confirms the deploy.
 
 ## 4. Owner go-ahead → merge to production
 

@@ -106,8 +106,8 @@ Read "the working base" wherever a step says develop; re-derive it per RELEASE U
    backs every `hierarchyRoles.leaf` read here. A CONFIGURED `releaseUnit` no ancestor matches is
    checked against `get_work_type_hierarchy` — a renamed type or typo STOPS with a question. Name
    per `epicIntegrationBranches.pattern` / `slugRule`, dated at CREATION, never re-minted. Resolve:
-   handoff memory → `git ls-remote --heads origin`, kept by an anchored match of that pattern with
-   `<epic-number>` filled in and every other token a wildcard (one → reuse, several → ask; none →
+   handoff memory → `git ls-remote --heads origin`, kept by an anchored match of that pattern,
+   `<epic-number>` (else the slug) filled in, others wildcards (one → reuse, several → ask; none →
    the legacy `*/<epic-number>-*`, a hit → ask) → create off a fresh `baseBranch` and push. Cache
    per epic; **announce reused or created.**
 3. **A one-off AND `supportTrain.branch` set** → the train, unless `support-train.md` routes it to

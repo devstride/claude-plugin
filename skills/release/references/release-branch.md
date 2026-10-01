@@ -27,9 +27,9 @@ support-train pull request records its range in a body marker,
 never the live train, is what closes items later.
 
 **Finding support-train pull requests.** Query `gh pr list --base <releaseSource> --state <state>
---search 'in:title "Support train:"' --json number,title,body,mergedAt --limit 20`, then keep only
-titles starting `Support train:` whose body carries the marker; for merged ones take the latest
-`mergedAt`. Never trust search order or a body match alone.
+--search 'in:title "Support train:" sort:created-desc' --json number,title,body,mergedAt --limit
+50`, then keep only titles starting `Support train:` whose body carries the marker; for merged ones
+take the latest `mergedAt`. Never trust best-match ranking or a body match alone.
 
 1. **Finish an interrupted earlier run first**, every time: for the latest merged support-train
    pull request, apply step 6 to its marker's range. Step 6 skips any item already Done or already
@@ -37,8 +37,10 @@ titles starting `Support train:` whose body carries the marker; for merged ones 
    item is never closed again.
 2. **An open support-train pull request is ADOPTED** before anything is cut: read `<sourceBefore>`
    and `<trainSnapshot>` from its marker (no marker → STOP and name it; never guess a range), skip
-   steps 3–4, and run `pr` steps 2–2c on it — pre-ship selection, hold, `review` with the step-4
-   declarations, discharge — then continue at step 5.
+   steps 3–4, check out its head (`gh pr checkout <n>`, then confirm `HEAD` equals the pull
+   request's `headRefOid`, so the local engine and pre-ship suites see that tree), and run `pr`
+   steps 2–2c on it, driven — pre-ship selection, hold, `review` with the step-4 declarations,
+   discharge — then continue at step 5.
 3. `git fetch origin <releaseSource> <train>`. No one-off on the train beyond the source
    (`git log --no-merges --oneline origin/<releaseSource>..origin/<train>` is empty — merges of the
    source alone are not work) → report "support train: nothing to ship" and stop here. Otherwise
@@ -63,17 +65,17 @@ titles starting `Support train:` whose body carries the marker; for merged ones 
    --delete-branch` (the snapshot is disposable). **Never a direct push to `releaseSource`**: its
    own required checks run on the pull request. A verified P1 or serious P2 that is not fixed STOPS
    the release.
-6. **Close every one-off it carried.** Candidates are the item numbers in the subjects of
-   `git log --first-parent --merges --format=%s <sourceBefore>..<trainSnapshot>` — the marker's
-   range, never the live train — matched with the word-bounded expression `\bI[0-9]+\b` (the branch
-   name in a pull-request merge subject, or the item number that leads a fast merge's subject);
-   merges of `releaseSource` itself are skipped. **Each is LOOKED UP with `get_item` before any
-   write**; keep only a `hierarchyRoles.leaf` type that is not Done and has no "reached …" comment
-   for this pull request, and report every skipped candidate, and every merge subject with no item
-   number, as "not marked Done: <subject>" — never guess. For each kept item: `update_item` → Done
-   with `dueDate` today, then `add_comment` "reached <releaseSource> with release <name> (support
-   train pull request #<n>)". Nothing was recorded on the items beforehand; the git history is the
-   record.
+6. **Close every one-off it carried.** Candidates come from the subjects of `git log --first-parent
+   --merges --format=%s <sourceBefore>..<trainSnapshot>` — the marker's range, never the live train
+   — and ONLY the number that identifies each merge: the item number leading a fast merge's subject
+   (`^merge: (I[0-9]+)\b`), or the one starting the branch name in a pull-request merge subject
+   (`from [^ ]+/(I[0-9]+)-`). Any other number a subject cites is reported, never closed; merges of
+   `releaseSource` itself are skipped. **Each is LOOKED UP with `get_item` before any write**; keep
+   only a `hierarchyRoles.leaf` type that is not Done and has no "reached …" comment for this pull
+   request, and report every skipped candidate, and every merge subject with no item number, as "not
+   marked Done: <subject>" — never guess. For each kept item: `update_item` → Done with `dueDate`
+   today, then `add_comment` "reached <releaseSource> with release <name> (support train pull
+   request #<n>)". Nothing was recorded on the items beforehand; the git history is the record.
 7. **Bring the live train up to date now**, not at close-out: `git fetch origin <releaseSource>
    <train>` first (the merge happened on GitHub, so local refs are stale), then
    `git merge-base --is-ancestor origin/<train> origin/<releaseSource>` → fast-forward it

@@ -44,9 +44,11 @@ What `review` does with one at step 7.1 when the base has advanced:
 
 - **A release branch** (the caller declared `release-branch: true`) → hand back to `release`, whose
   hotfix rule merges the production branch in and re-enters review.
-- **The support train, or a declared merge-only head** → no refresh: continue to 7.1b. GitHub
-  tests the pull request's merge with its base, so CI still covers the combination; a merge
-  conflict STOPS for the operator, never auto-resolved.
+- **The support train's snapshot, or a declared merge-only head** → merge the base in
+  (`git merge --no-ff origin/<base>`, never a rebase; a conflict STOPS for the operator, never
+  auto-resolved), push, and treat it as a head advance under step 5's rule — receipts for the old
+  tree are void — so local pre-ship suites test the combination that will merge. Then continue to
+  7.1b.
 - **Any other protected head** → STOP; the owner decides.
 
 **On a release-branch head, or a head whose caller declared `fix-exclusions: true` (the support
