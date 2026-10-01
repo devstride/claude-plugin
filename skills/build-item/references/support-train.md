@@ -14,10 +14,13 @@ request's base.
 
 ## Routing (step 0)
 
-- **One-off AND `supportTrain.branch` set → the working base is the train.** Resolve it with
-  `git ls-remote --exit-code --heads origin <train>`: present → reuse; absent → create it off a
-  freshly fetched `origin/<baseBranch>` and push. Announce "support train <name>: reused" or
-  "created".
+- **A train that never ships strands its one-offs.** With `release.mergeTrainBeforeCut` not `true`,
+  nothing ever merges the train into `baseBranch`, so route the one-off to `baseBranch` instead and
+  announce why ("support train set, but releases do not merge it").
+- **One-off AND `supportTrain.branch` set (and the train ships) → the working base is the train.**
+  Resolve it with `git ls-remote --exit-code --heads origin <train>`: present → reuse; absent →
+  create it off a freshly fetched `origin/<baseBranch>` and push. Announce "support train <name>:
+  reused" or "created".
 - **Deploy configuration and migrations never ride the train.** A one-off whose change touches a
   path matching an entry of `release.releaseBranchFixExclusions` (absent → nothing is excluded;
   matching per `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`) ships to

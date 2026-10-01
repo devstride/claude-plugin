@@ -119,10 +119,10 @@ never precedes the suites. Never hold on a non-empty config alone; nothing selec
 `${CLAUDE_PLUGIN_ROOT}/skills/pr/references/pre-ship-hold.md` when you declare a PRE-SHIP HOLD.
 
 Invoke **`review`** on the PR, saying driven or standalone and **passing the resolved profile**
-(with its source), the reviewer hand-off from step 1, and any caller ledger or receipt. It owns the
-engine: registration proof concurrent with local review, every configured pass, triage, fixes,
-reply-then-resolve and — when CI is held — the ready-flip and settlement. Driven, carry its
-untracked-deferral list back to `build-item`.
+(with its source), the reviewer hand-off from step 1, any caller ledger or receipt, and any caller
+declaration (`merge-only`, `release-branch`). It owns the engine: registration proof concurrent with
+local review, every configured pass, triage, fixes, reply-then-resolve and — when CI is held — the
+ready-flip and settlement. Driven, carry its untracked-deferral list back to `build-item`.
 
 ## 2b. Pre-ship checks — the repo's local suites against the final diff
 

@@ -35,8 +35,8 @@ type-checked, and pushed — never a pull request (those open separately, not on
   nothing is tolerated. Fix one by re-running `generated.regenCommand`, never by hand-editing.
 - **Any other type error → do NOT push**; report the errors and ask.
 - **Push**: `git push`. Rejected as non-fast-forward because this branch's history was rewritten →
-  `git push --force-with-lease`, never `--force`. **Never force-push a branch matching
-  `protectedBranches`** (names or anchored patterns, per
+  `git push --force-with-lease`, never `--force`. **Never force-push a protected branch**
+  (`protectedBranches`, the release pattern and the support train, per
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`) — nor main/master when the
   key is absent.
 

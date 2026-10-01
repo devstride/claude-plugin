@@ -17,10 +17,10 @@
     "insert-story": 1400,
     "plan": 8000,
     "pr": 3800,
-    "push": 1000,
+    "push": 1100,
     "rationalize-gantt": 2600,
     "rebalance": 5700,
-    "release": 7100,
+    "release": 7200,
     "review": 8000,
     "setup": 10700,
     "ultracode-build": 4800,
@@ -32,7 +32,7 @@
     "skills/build-item/references/next-unblocked.md": 1200,
     "skills/build-item/references/plain-language-output.md": 2300,
     "skills/build-item/references/progress-table.md": 1300,
-    "skills/build-item/references/support-train.md": 1200,
+    "skills/build-item/references/support-train.md": 1300,
     "skills/build-item/references/verification-receipts.md": 800,
     "skills/create-story/references/one-off-handoff.md": 1700,
     "skills/doctor/references/repairs.md": 2700,
@@ -47,13 +47,13 @@
     "skills/pr/references/pre-ship-hold.md": 300,
     "skills/rationalize-gantt/references/auto-scheduler-off.md": 900,
     "skills/rebalance/references/recoverable-write-order.md": 1000,
-    "skills/release/references/branch-patterns.md": 1000,
+    "skills/release/references/branch-patterns.md": 1500,
     "skills/release/references/docs-hooks.md": 2700,
     "skills/release/references/post-deploy-check.md": 1100,
-    "skills/release/references/release-branch.md": 2500,
+    "skills/release/references/release-branch.md": 2800,
     "skills/release/references/release-gates.md": 1300,
     "skills/review/references/ci-settle.md": 1800,
-    "skills/review/references/delivery-loop-invariants.md": 19500,
+    "skills/review/references/delivery-loop-invariants.md": 19600,
     "skills/review/references/delta-re-review.md": 2000,
     "skills/review/references/final-head-request.md": 900,
     "skills/review/references/github-review-api.md": 4700,
@@ -78,7 +78,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 65000,
+      "budget": 65100,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -107,7 +107,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 55400,
+      "budget": 55500,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -141,7 +141,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 58000,
+      "budget": 58100,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

@@ -8,19 +8,21 @@ the source keeps receiving merges while the release is reviewed, and — when co
 support train's one-offs merged into the source first so they ship with it.
 
 Every key here is optional. `release.releaseBranchPattern` absent → no release branch: the release
-pull request's head is `release.releaseSource`, as before, and sections 2–6 do not run.
-`release.mergeTrainBeforeCut` absent or `false`, or `supportTrain.branch` absent → section 1 does
-not run. Names are tested with the anchored rule in
+pull request's head is `release.releaseSource`, as before, and sections 2–4 and 5.1–5.2 do not run.
+§5.3 runs whenever `supportTrain.branch` is set. `release.mergeTrainBeforeCut` absent or `false`, or
+`supportTrain.branch` absent → section 1 does not run. Names are tested with the anchored rule in
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`, never a substring.
 
 ## 1. Merge the support train (step 0b)
 
 Runs only when ALL hold: `release.mergeTrainBeforeCut` is `true`; step 0 adopted no open release
 pull request (an adopted release was cut earlier, so the train would not ship with it);
-`supportTrain.branch` exists on origin; and, after `git fetch origin <releaseSource> <train>`,
-`git rev-list --count origin/<releaseSource>..origin/<train>` is above zero. Otherwise a no-op,
-reported in one line ("support train: nothing to ship", "not configured", or "skipped — adopted
-release").
+`supportTrain.branch` exists on origin; and, after `git fetch origin <releaseSource> <train>`, `git
+rev-list --count origin/<releaseSource>..origin/<train>` is above zero. Otherwise a no-op, reported
+in one line ("support train: nothing to ship", "not configured", or "skipped — adopted release"). On
+"nothing to ship", still finish an interrupted run: for the most recently merged pull request from
+the train (`gh pr list --head <train> --base <releaseSource> --state merged --limit 1`), apply step
+6 below with that merge commit's first parent as `<sourceBefore>` (it skips items already Done).
 
 1. Record `<sourceBefore>` — the `origin/<releaseSource>` SHA now.
 2. An open pull request `<train> → <releaseSource>` is ADOPTED. Otherwise open one through the same
@@ -55,7 +57,9 @@ release").
   pattern is ADOPTED by step 0 instead of cutting; a second one open at once is a STOP that names
   both.
 - `git switch -c <name> origin/<releaseSource> && git push -u origin <name>`. `<sourceHead>` is that
-  SHA; on an adopted branch derive it as `git merge-base origin/<name> origin/<releaseSource>`.
+  SHA, recorded in the release pull request's marker `<!-- devstride:release-branch <name> cut <sha>
+  -->`; on an adopted branch read it back from that marker (only with no marker, fall back to `git
+  merge-base origin/<name> origin/<releaseSource>` and say so).
 
 ## 3. The branch is protected — fix commits only
 
@@ -79,8 +83,10 @@ release").
 `git fetch origin <productionBranch>`; when `origin/<productionBranch>` is not an ancestor of
 `origin/<name>`: `git switch <name> && git merge --no-ff origin/<productionBranch>` (a conflict
 STOPS with the files), push, then re-enter `review` on the new head — a head advance is a full gated
-pass over what the merge brought in and how it was resolved. Never rebase. `review` hands back here
-when its step 7.1 finds the production branch advanced under a release-branch head.
+pass over what the merge brought in and how it was resolved. A merge that leaves the tree unchanged
+(history only, e.g. production's own earlier release merge) needs no re-review; say so. Never
+rebase. `review` hands back here when its step 7.1 finds the production branch advanced under a
+release-branch head.
 
 ## 5. Close out (step 6)
 
@@ -88,10 +94,12 @@ when its step 7.1 finds the production branch advanced under a release-branch he
    `releaseSource`. Already `git merge-base --is-ancestor origin/<productionBranch>
    origin/<releaseSource>` → nothing to do. Otherwise branch per `branchNaming` (slug
    `sync-<productionBranch>-into-<releaseSource>`) from `origin/<releaseSource>`, `git merge --no-ff
-   origin/<productionBranch>` (a conflict STOPS with the files), push, and invoke **`pr` driven**
-   with a scope manifest naming only the merge's conflict resolutions — none when the merge was
-   clean, since every other line was reviewed on the release pull request. It settles CI; merge it
-   `--merge --delete-branch` (the sync branch is disposable).
+   origin/<productionBranch>` (a conflict STOPS with the files), push, and invoke **`pr` driven**,
+   declaring `merge-only: true` (its merge commit is the point — never rebased), with a scope
+   manifest naming only the merge's conflict resolutions — none when the merge was clean, since
+   every other line was reviewed on the release pull request. It settles CI; merge it `--merge
+   --delete-branch` (the sync branch is disposable). Then `git fetch origin <productionBranch>
+   <releaseSource> <train>` so 2 and 3 read the merged state.
 2. **Delete the release branch — the one place the loop deletes a protected branch, and it says
    so.** Only when the name matches the pattern AND it is an ancestor of both
    `origin/<productionBranch>` and `origin/<releaseSource>` (`git merge-base --is-ancestor`):

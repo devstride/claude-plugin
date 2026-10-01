@@ -242,6 +242,10 @@ K5. A release branch (`release.releaseBranchPattern`) takes new commits only —
     amended or force-pushed; a production-branch advance (a hotfix) is MERGED into it and
     re-reviewed. It is deleted only by `release`'s close-out, and only once both the production
     branch and the release source contain it — the one place the loop deletes a protected branch.
+    The release pattern and `supportTrain.branch` protect by the key alone — a review that relied
+    on `protectedBranches` listing them rebased a release branch onto a hotfix. Merge-only heads
+    (the train, the production→source sync) are never rebased; a moved base under one is not
+    refreshed, since the pull request's merge with its base is what CI tests.
 K6. Infra-touching fixes never land on a release branch: a commit staging any path matching
     `release.releaseBranchFixExclusions` is refused (merge it to the source, abandon, re-cut), and
     the same check runs over an adopted branch's commits, since a hand-pushed one bypasses the
@@ -728,6 +732,8 @@ skills/pr/SKILL.md|releaseBranchPattern
 skills/build-item/SKILL.md|supportTrain.branch
 skills/build-item/references/support-train.md|NOT Done
 skills/push/SKILL.md|branch-patterns.md
+skills/release/references/branch-patterns.md|protected by the key
+skills/review/SKILL.md|merge-only
 PAIRS
 
 # DEAD-REFERENCE check: every reference must be REACHABLE from a root an agent actually reads

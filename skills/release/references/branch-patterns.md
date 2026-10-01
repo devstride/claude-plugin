@@ -30,6 +30,29 @@ pattern to an anchored regular expression — `*` → `[^/]+`, `**` → `.+`, `<
 `[0-9]{2}-[0-9]{2}-[0-9]{2}`, `[-n]` → `(-[0-9]+)?`, every other character escaped — and test
 with `grep -Eq '^<regex>$'`.
 
+## Protected and merge-only heads
+
+**Protected** — never rebased, amended or force-pushed, never `--delete-branch`ed by a pull-request
+merge, and never written onto by the lessons store: `release.releaseSource`,
+`release.productionBranch`, any name matching a `protectedBranches` entry, any name matching
+`release.releaseBranchPattern`, and `supportTrain.branch`. The last two are protected by the key
+alone, whether or not `protectedBranches` lists them. **Merge-only** — a protected head, or a head
+the caller declared `merge-only: true` (the sync of production into the source): its merge commits
+are the record, so a rebase would destroy them.
+
+What `review` does with one at step 7.1 when the base has advanced:
+
+- **A release branch** (the caller declared `release-branch: true`) → hand back to `release`, whose
+  hotfix rule merges the production branch in and re-enters review.
+- **The support train, or a declared merge-only head** → no refresh: continue to 7.1b. GitHub
+  tests the pull request's merge with its base, so CI still covers the combination; a merge
+  conflict STOPS for the operator, never auto-resolved.
+- **Any other protected head** → STOP; the owner decides.
+
+**On a release-branch head, every fix commit first passes the fix-exclusion check**
+(`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` §3) — in `review` step 5 as
+much as in `release`; a match is refused and handed back to `release`.
+
 ## Fixtures
 
 | Pattern | Matches | Does not match |
@@ -43,7 +66,7 @@ with `grep -Eq '^<regex>$'`.
 
 - `skills/release/SKILL.md` — the protected-head and fix-exclusion rules.
 - `skills/release/references/release-branch.md` — the cut, the fix-commit check and the deletion.
-- `skills/review/SKILL.md` — the protected-head test (lessons write and step 7.1).
+- `skills/review/SKILL.md` — the protected-head test (step 5, the lessons write and step 7.1).
 - `skills/build-item/SKILL.md` — `--delete-branch` and the support-train exclusion.
 - `skills/push/SKILL.md` — never force-push a protected branch.
 - `skills/branch-feature/SKILL.md` — never delete a protected branch.

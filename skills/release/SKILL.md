@@ -111,17 +111,17 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   captures each baseline/request hand-off while local review starts); `review` step 7 flips it
   ready. `preShipChecks` suites are NOT in CI — they run in 2b.
 - **Release-flavored body** — `prBodyTemplate.sections` in order (the file wins over the fallback),
-  flavor by POSITION: 1st (fallback `## Simple Description`) — what consumers get in this deploy,
-  in plain language, then the constituent epics/items (`I##### — title`); 2nd (`## Technical
+  flavor by POSITION: 1st (fallback `## Simple Description`) — what consumers get in this deploy, in
+  plain language, then the constituent epics/items (`I##### — title`); 2nd (`## Technical
   Description`) — the aggregate technical delta (subsystems, design changes, migrations); 3rd (`##
   Notable Changes to System Architecture or Behavior`) — user-visible behaviour, public contract,
-  permission and migration changes across the release (the docs pass mines it; "None" only if
-  truly none); 4th (`## Testing Steps`) — how the release was validated and any post-deploy
-  smoke. AI
+  permission and migration changes across the release (the docs pass mines it; "None" only if truly
+  none); 4th (`## Testing Steps`) — how the release was validated and any post-deploy smoke. AI
   attribution only when `prBodyTemplate.noAiAttribution` is false (shipped default true → none). End
   with `<!-- devstride:loop -->`, as `pr` does — it identifies a loop-managed PR to the
   convention-only workflow and never authorizes bypassing the draft hold — and, on a release branch,
-  a second marker line `<!-- devstride:release-branch <name> -->`.
+  a second marker line `<!-- devstride:release-branch <name> cut <sha> -->` (the cut point, read
+  back on adoption).
 - **Never `--delete-branch`** on a PR headed by `develop` or by a name matching `protectedBranches`
   — a release branch is deleted only by step 6. Report the PR number and URL.
 
@@ -218,14 +218,15 @@ Build the `production-release` payload from step 0 with `mergeCommit`/`mergedAt`
     not the deploy target).
   - Never let the owner infer CI covered a pre-ship suite; the true answer is "the local run in
     step 2b".
+- **On a release branch, before merging**: a hotfix that reached `productionBranch` meanwhile →
+  `release-branch.md` §4, then back to step 2.
 - **On the yes**, confirm: the head equals `<reviewedHead>` (the only tolerated advance is `review`
-  7.3's same-tree empty re-trigger commit; anything else → back to step 2); CI is green at that head;
-  in a draft-hold repo the PR is non-draft (still draft means CI never ran — do NOT merge; a
+  7.3's same-tree empty re-trigger commit; anything else → back to step 2); CI is green at that
+  head; in a draft-hold repo the PR is non-draft (still draft means CI never ran — do NOT merge; a
   CI-on-draft repo needs only green at the final SHA); every 2b check passed or was waived; the
   paginated **zero-unresolved-threads** check still reads zero (a late comment is replied-to AND
   resolved via `review` step 6 first, never merged over). Then `gh pr merge <n> --merge` — a merge
-  commit, never `--delete-branch`. A hotfix that reached `productionBranch` meanwhile →
-  `release-branch.md` §4, then back to step 2.
+  commit, never `--delete-branch`.
 - The deploy then runs on its own: note it is in flight and that the owner watches their own
   dashboard. Never trigger or gate it yourself.
 
@@ -272,9 +273,9 @@ requested".
 
 ## 6. Close out
 
-- Sync: `git checkout master && git pull --ff-only`, and `develop` likewise. With a release branch,
-  then `release-branch.md` §5: production synced into `releaseSource` by its own PR, the release
-  branch deleted only once both contain it (said so), the support train fast-forwarded.
+- Sync: `git checkout master && git pull --ff-only`, and `develop` likewise. Then `release-branch.md`
+  §5: with a release branch, production synced into `releaseSource` by its own PR and the branch
+  deleted only once both contain it (said so); with a support train, the train fast-forwarded.
 - **Human recap.** Lead with `Merged / Released`: every included item and its effect, the PR and
   merge commit, where it landed, whether the deploy is confirmed live, the post-deploy health result,
   documentation and release-note results, and any remaining owner action — including work a docs

@@ -107,11 +107,12 @@ Read "the working base" wherever a step says develop; re-derive it per RELEASE U
    checked against `get_work_type_hierarchy` — a renamed type or typo STOPS with a question. Name
    per `epicIntegrationBranches.pattern` / `slugRule`, dated at CREATION, never re-minted. Resolve:
    handoff memory → `git ls-remote --heads origin`, kept by an anchored match of that pattern with
-   `<epic-number>` filled in and every other token a wildcard (one → reuse, several → ask) → create
-   off a fresh `baseBranch` and push. Cache per epic; **announce reused or created.**
-3. **A one-off AND `supportTrain.branch` set** → the support train, except a one-off touching
-   `release.releaseBranchFixExclusions` paths (`baseBranch`, announced).
-4. **Otherwise** → `baseBranch`. A disabled `enabled` flag genuinely falls back.
+   `<epic-number>` filled in and every other token a wildcard (one → reuse, several → ask; none →
+   the legacy `*/<epic-number>-*`, a hit → ask) → create off a fresh `baseBranch` and push. Cache
+   per epic; **announce reused or created.**
+3. **A one-off AND `supportTrain.branch` set** → the train, unless `support-train.md` routes it to
+   `baseBranch` (announced).
+4. **Otherwise** → `baseBranch`. A disabled flag falls back.
 
 Stories merge into it (why: `references/epic-release.md`), skipping `verify.skipDuringStoryBuilds`
 suites; the last leaf's merge triggers step 8. **The working base and the effective

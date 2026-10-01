@@ -130,13 +130,13 @@ reports. In one turn:
   `targetAdversarialCycles`); safety cycles override both.
 - **Cloud** — none configured or in scope → no request, no step 2 (step 6 still runs for human
   threads). A caller that requested at PR-open (`pr` does; never a `final-head` entry) hands over
-  per-reviewer baseline, request time and outcome; request any entry without one. **Request EACH
-  in-scope `every-round` entry per its `how`** — a bot via GraphQL with its `graphqlBotId` (REST
-  rejects bots) — **then confirm a NEW `review_requested` event for THAT reviewer**; the mutation
-  reports success even when it creates nothing. A draft does not block an explicit request; never
-  flip to "unblock" one. Hard error → drop. **Unproven within `reviewerRegistrationWindowMinutes` (2
-  minutes, every profile; re-count on a short interval) → DROPPED for the run**, never waited out.
-  Track the REGISTERED set with each event's `created_at`.
+  per-reviewer baseline, request time and outcome; request any `every-round` entry without one.
+  **Request EACH in-scope `every-round` entry per its `how`** — a bot via GraphQL with its
+  `graphqlBotId` (REST rejects bots) — **then confirm a NEW `review_requested` event for THAT
+  reviewer**; the mutation reports success even when it creates nothing. A draft does not block an
+  explicit request; never flip to "unblock" one. Hard error → drop. **Unproven within
+  `reviewerRegistrationWindowMinutes` (2 minutes, every profile; re-count on a short interval) →
+  DROPPED for the run**, never waited out. Track the REGISTERED set with each event's `created_at`.
 - **Roster fell to Claude-only on a PR path:** configured-but-FAILED (cloud never
   registered/responded AND the local engine failed) → **STOP for a human GitHub-UI review before
   releasing CI**, driven too; configured-EMPTY → the repo's choice, proceed announced. Failed local
@@ -189,10 +189,11 @@ L-NNN** (step 6.5 takes marks as authoritative); REFUTED never bumps. One bucket
 
 ## 5. Fix, push, follow up
 
-On a non-draft PR run `gh pr ready --undo` before the push, then settle through 7.1–7.3. Follow
-`conventionsDoc`; keep `verify.*` green; regenerate API artifacts in their own commit; commit per
-`commitConventions.reviewFixFormat` (fallback `fix(<scope>): <summary> [<itemNumber> review]`);
-push via `/devstride:push` with any exact-head receipt it may legally reuse.
+On a non-draft PR run `gh pr ready --undo` before the push, then settle through 7.1–7.3. A fix on a
+protected head obeys `branch-patterns.md` first. Follow `conventionsDoc`; keep `verify.*` green;
+regenerate API artifacts in their own commit; commit per `commitConventions.reviewFixFormat`
+(fallback `fix(<scope>): <summary> [<itemNumber> review]`); push via `/devstride:push` with any
+exact-head receipt it may legally reuse.
 
 **One contextual follow-up at a time**: ONE scope per `delta-re-review.md` — explicit `full`, else
 `rereview-scope.sh` from the prior cycle anchor (`none` spends nothing); freeze the next anchor;
@@ -232,9 +233,8 @@ distills lessons (conflict resolution may apply the collision policy, never mint
 - **At most once per cycle**, after every finding is terminal and fixed; input CONFIRMED/PLAUSIBLE
   (captured/deferred qualify). A red-CI loop-back distills only NEW fixed-and-pushed findings. **A
   reply/resolve-only re-entry writes NOTHING** — its commit would invalidate the verified green SHA.
-- **NEVER write onto a protected head** (`headRefName` is the release source or matches a
-  `protectedBranches` entry per `branch-patterns.md`) — skip, say so. Read-only checkout → skip with
-  a note, never a STOP.
+- **NEVER write onto a protected head** (`headRefName` protected per `branch-patterns.md`) — skip,
+  say so. Read-only checkout → skip with a note, never a STOP.
 - **Curate, merge or mint strictly per `lessons-format.md`** — read it first, never from memory (bar,
   `conventionsDoc` check, schema, caps, eviction, file creation, ID collisions). Writing NOTHING is
   the common, correct outcome. **Recurrence of L-NNN** marks bump as-is; only unmarked loop-back
@@ -257,14 +257,15 @@ repeats it. All three draft-hold booleans false → skip only 7.3's flip mechani
 `${CLAUDE_PLUGIN_ROOT}/skills/review/references/ci-settle.md` when the flip produces no run, a check
 reads `skipping`, or CI is red.**
 
-1. **Refresh against the base — disposable heads only.** **NEVER rebase or force-push a PROTECTED
-   head** (the release source or a `protectedBranches` match): base advanced → hand back to a
-   `release-branch: true` caller (its hotfix rule merges it in), else STOP; otherwise **continue to
-   7.1b, NOT the flip** — a release PR always takes this path. Disposable: fetch, rebase, push via
-   `/devstride:push` (`--force-with-lease`); unresolvable conflict → STOP.
-   **If the rebase CHANGED the patch**, compare pre/post patches: identical → carry receipt and ledger; different → step 5's
-   target/safety rule (past the target, noncritical change gets affected checks, main-agent
-   inspection and human review; P1/serious-P2 fixes continue). A rebase never resets the count.
+1. **Refresh against the base — disposable heads only.** **NEVER rebase or force-push a protected or
+   merge-only head** — base advanced under one → do what
+   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md` "Protected and merge-only
+   heads" says; otherwise **continue to 7.1b, NOT the flip** — a release PR always takes this path.
+   Disposable: fetch, rebase, push via `/devstride:push` (`--force-with-lease`); unresolvable
+   conflict → STOP. **If the rebase CHANGED the patch**, compare pre/post patches: identical → carry
+   receipt and ledger; different → step 5's target/safety rule (past the target, noncritical change
+   gets affected checks, main-agent inspection and human review; P1/serious-P2 fixes continue). A
+   rebase never resets the count.
 
    **7.1b. PRE-SHIP HOLD** — caller-declared (`pr`/`release` step 2b): **STOP HERE and hand back**
    (review settled, head current, still draft, pre-ship outstanding) — even with no CI or CI on
