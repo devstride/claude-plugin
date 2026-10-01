@@ -1,6 +1,6 @@
 {
   "_method": "tokens = ceil(utf8_bytes / 3); bytes as `wc -c`",
-  "_generatedBy": "scripts/measure-cost.sh --write-budgets at 3.7.0 on 2026-10-01",
+  "_generatedBy": "scripts/measure-cost.sh --write-budgets at 3.8.0 on 2026-10-01",
   "_rounding": "measured tokens rounded UP to the next multiple of 100",
   "_readme": "A RATCHET over bodies, references, and representative composed paths. Hard body ceilings live in measure-cost.sh: 8,000 normally, with two frozen grandfathered caps. Lower freely; raise a ratchet only with the text that needs it. Changing _method re-baselines every entry.",
   "alwaysOnContext": 1300,
