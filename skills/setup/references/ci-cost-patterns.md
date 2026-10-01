@@ -199,11 +199,12 @@ runs the mistaken open started in the other workflows.
 - **CI last is a profile floor, not a rigor knob.** Every profile holds expensive workflows until
   review and matched pre-ship checks have settled at the final HEAD. Cloud-review registration
   happens alongside local review; waiting for proof must not delay useful local work.
-- **Freeze the release source while a release pull request is ready**
-  (`ci.freezeBaseWhileReleasePrReady`, default `true`): `release` refuses to flip while another
-  pull request into the release source is mergeable, and `build-item` does not merge to the base
-  branch while a ready release pull request exists. Every merge beneath a ready release pull
-  request re-runs its merge preview.
+- **Release from a release branch** (`release.releaseBranchPattern`, opt-in): a merge beneath a
+  ready release pull request re-runs its merge preview, and with the release source itself as the
+  head every merge into it lands beneath the release. A release branch cut from the source takes
+  the release pull request off the source entirely, so the source keeps receiving merges at no CI
+  cost to the release. There is no freeze any more; a repository without a release branch pays one
+  more review pass when something merges beneath its release.
 - **Expected executed runs per workflow per pull request** (`ci.expectedRunsPerPullRequest`,
   default `1`): `review` step 8 counts executed runs PER WORKFLOW under `ci.workflowGlobs` on the
   pull request it just settled — a full-stack pull request runs several workflows once each — and

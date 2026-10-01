@@ -58,6 +58,10 @@ method as `ci-audit`). A run counts when any job beyond the gate/detect job fini
 `skipped`; an all-skipped run is 0. Count per workflow, one line each; the expected figure is
 `ci.expectedRunsPerPullRequest` per workflow.
 
+An excess is a SECOND executed run of the SAME workflow, and the report names its cause: a push
+after the flip, a moved base, a pull request opened non-draft, or 7.3's empty re-trigger commit
+(only when that workflow had already executed on the earlier head).
+
 ## Classifying red CI
 
 A pending check gets at most two bounded poll instances. The first timeout may be ordinary queue

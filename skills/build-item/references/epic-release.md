@@ -78,12 +78,15 @@ flag — the operator believes they disabled auto-release while the loop merges 
 
 ## Why a one-off under an Epic parent still bypasses the epic branch
 
-`create-story` and `create-defect` both offer a release-unit item as a parent, so a one-off
-CAN have a release-unit ancestor — and without the explicit bypass, the general derivation
-rule would route it onto that epic's integration branch and strand it there until an unrelated
-epic releases. A one-off ships straight to develop, and because nothing comes after it, its own
-PR is the only place the cloud roster and CI will ever see the code — which is why it takes the
-full 4b ritual under every profile, and why fast mode is never available to it.
+`create-story` and `create-defect` both offer a release-unit item as a parent, so a one-off CAN have
+a release-unit ancestor — and without the explicit bypass, the general derivation rule would route
+it onto that epic's integration branch and strand it there until an unrelated epic releases. A
+one-off ships straight to develop, and because nothing comes after it, its own PR is the only place
+the cloud roster and CI will ever see the code — which is why it takes the full 4b ritual under
+every profile, and why fast mode is never available to it. The one exception is a configured support
+train (`support-train.md`): there something DOES come after it — the train's own pull request into
+develop, a full-diff review with CI — so with `supportTrain.fastMerges` a one-off on the train may
+take fast mode, exactly as an epic story does.
 
 ## Cited by
 

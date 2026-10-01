@@ -106,10 +106,14 @@ next action. For each failure symptom, read
   | hotfix base | `hotfixBaseBranch` | `master` |
 
   Require every value on `origin`; require effective base, release source, and production in
-  `protectedBranches`. Explicit valid names win without heuristic warnings. Only when an absent
-  key's fallback is missing, match whole remote-head names: production = `main`, `master`,
-  `production`, `prod`; development = `develop`, `development`, `staging`, `stage`, `canary`,
-  `test`, `testing`, `qa`; `trunk` may be a single trunk.
+  `protectedBranches`. `release.releaseBranchPattern` set and no `protectedBranches` entry matching
+  the names it produces (anchored:
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`) → WARN (unprotected);
+  `supportTrain.branch` absent on `origin` → INFO, created on first use. Explicit valid names win
+  without heuristic warnings. Only when an absent key's fallback is missing, match whole remote-head
+  names: production = `main`, `master`, `production`, `prod`; development = `develop`,
+  `development`, `staging`, `stage`, `canary`, `test`, `testing`, `qa`; `trunk` may be a single
+  trunk.
 
   - One development + one production candidate: print the four-key mapping (base/release source on
     development; production/hotfix on production).
@@ -137,8 +141,7 @@ next action. For each failure symptom, read
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md` — **read that table only, not
   the whole file** — and `epicIntegrationBranches.fastStoryMerges.enabled` against `prototype`
   only, and only when `verify.typecheck` is set. `autoRelease` has three legal values: `true`,
-  `false`, and `"ask"` — with `"ask"`, at zero remaining leaves `build-item` stops and asks per
-  release unit before merging. Report a present `"ask"` like any other value: never a type error,
+  `false`, and `"ask"`. Report a present `"ask"` like any other value: never a type error,
   and a contradiction only where it differs from the profile's.
   A present key that differs is **informational, not a FAIL** — the
   explicit key wins by contract — but say which key, which value, and what the profile would
@@ -152,15 +155,14 @@ next action. For each failure symptom, read
   Check against the published [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference),
   **not** by grepping skill prose — several real keys are descriptive and appear in no skill.
   Where a key is one edit away from a real one, offer that as a possibility, not a verdict.
-  `profile` and `profileOverrides` are recognized keys whether or not the published reference
-  lists them yet.
+  `profile`, `profileOverrides`, `supportTrain` and `config-defaults.md`'s `release.*` keys are
+  recognized even if unpublished.
 - **`localEnvironment`** — report the block. Absent → the shipped default is in force (every
   command `null`, `instanceBoundTo: none`): `branch-hotfix` asks before touching a database.
   Present → report `instanceBoundTo` and each command's resolution per the rule below.
   WARNINGS: `instanceBoundTo: directory` with a `null` `create` (claims isolated instances,
   gives no way to make one); and under `directory`, a null **or absent** `recreate` beside a
-  non-null `migrate` (those commands go forward — `branch-hotfix` then has no backward path
-  and will migrate forward only where safe, else STOP and ask; reasoning in `config-defaults.md`). **Never warn under
+  non-null `migrate` (`branch-hotfix` then has no backward path; why: `config-defaults.md`). **Never warn under
   `branch` binding** — no backward transition happens there.
 - **`stage`** — absent, or `resolve: null` → **N/A, not a failure**: this repository deploys no
   per-environment infrastructure. Present → run `resolve` ONCE from the
@@ -267,7 +269,7 @@ The point: **find out whether anything actually checks the code before it merges
   `integrationBranch` **and** disable epic branches.
 - **Review roster** — report `review.localCommand`, optional `review.localAssistCommand`, and
   `review.automatedReviewers` with each `baseBranches` (absent: every PR; empty:
-  warn). An empty configured roster is legal: the built-in merge-boundary pass remains. Hold every
+  warn) and `requestPolicy` (absent: every round). An empty configured roster is legal: the built-in merge-boundary pass remains. Hold every
   engine to the contract in
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/review-engines.md` — **never fault one for being
   unrecognised**; apply a catalogued engine's extras (Codex: a literal effort tier is an
@@ -279,9 +281,7 @@ The point: **find out whether anything actually checks the code before it merges
   the contract only) is reported as itself — never a FAIL, and never a fault for being
   unrecognised. A legacy base-only command may omit placeholders (` --base <value>` is
   appended), but WARN that contextual follow-ups will be skipped. `/devstride:setup review`
-  migrates — a tradeoff, not an upgrade: base-only `codex review` keeps a structured findings item
-  that `codex exec` context mode lacks, and under `review.maxLocalReviewRounds` 1 context mode buys
-  nothing.
+  migrates — a tradeoff, not an upgrade (`silent-failures.md` says why).
 - **`review.mandatoryLenses`** — absent or `[]` → N/A. Each entry needs `name`, `paths` (a
   non-empty array) and `question`; anything else → FAIL naming the entry (the skills ignore it
   aloud). WARN a glob with no `/`, or a bare `*`/`**`: it matches every file, so the lens runs on

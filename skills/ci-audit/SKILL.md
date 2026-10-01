@@ -115,7 +115,8 @@ fix. Then print the supporting evidence for the window:
    - premature / non-draft / pre-ready repair run → `/devstride:setup ci` applies the complete
      draft gate; the PR/release loop must keep every profile draft through pre-ship settlement;
    - second PR workflow run → pattern B concurrency plus post-flip discipline;
-   - release-preview rerun → `ci.freezeBaseWhileReleasePrReady`;
+   - release-preview rerun (a base advancing under a ready release PR) → cut releases as a release
+     branch (`release.releaseBranchPattern`), where it cannot happen;
    - identical production push → pattern C tree skip;
    - human non-draft open → pattern D policy check.
    Patterns are in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`.

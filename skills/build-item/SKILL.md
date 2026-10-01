@@ -1,6 +1,6 @@
 ---
 name: build-item
-description: "Orchestrate one DevStride work item end-to-end: select, branch, build, review, merge, and completion ritual — epic stories batch onto the epic's integration branch in fast develop mode (local engines, no per-story PR) and the fully-reviewed epic release PR carries them to develop; one-off items ship straight to develop with the full per-story PR ritual"
+description: "Orchestrate one DevStride work item end-to-end: select, branch, build, review, merge, and completion ritual — epic stories batch onto the epic's integration branch in fast develop mode (local engines, no per-story PR) and the fully-reviewed epic release PR carries them to develop; one-off items ship to develop with the full per-story PR ritual, or batch on a configured support train"
 ---
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
@@ -36,26 +36,25 @@ one-off: $ARGUMENTS
 - **Safety continuation.** A verified P1 or serious P2 is fixed before merge under every profile,
   re-checked with the cumulative ledger and no numeric cap; no patch change, no progress or an
   unavailable required reviewer while one remains STOPS for human help.
-- **Deploy safety travels with the diff.** Migrations are idempotent and rolling-deploy safe (old
-  and new revisions side by side); reshaped durable events stay readable by both. `ultracode-build`'s
-  focused verifier on auth, migration, irreversible-state or deployed-runtime changes fires from the
-  DIFF, not the plan's theme, under every profile — `extended` included — as does each matching
-  `review.mandatoryLenses` finder. Neither is skippable.
+- **Deploy safety travels with the diff.** Migrations are idempotent and rolling-deploy safe;
+  reshaped durable events stay readable by both. `ultracode-build`'s focused verifier on auth,
+  migration, irreversible-state or deployed-runtime changes fires from the DIFF, not the plan's
+  theme, under every profile — `extended` included — as does each matching `review.mandatoryLenses`
+  finder. Neither is skippable.
 - **Production merges are the owner's.** This loop merges only into the working base or
   `epicIntegrationBranches.releaseTarget`; it surfaces `/devstride:release`, which merges to
   `release.productionBranch` only on the owner's explicit yes.
 - **Checkout pool — lease, never mint.** When the repo's `conventionsDoc` or config declares a fixed
-  checkout pool, work only in a member held under a lease — a file in that checkout's OWN git
-  directory, created under `noclobber` so one session wins. Never create a worktree or instance
-  unless the owner asks in this conversation; never delete another session's lease. Pool, lease
-  name and hand-back come from the repo, never hard-coded; protocol in `ground-truth-at-start.md`.
+  checkout pool, work only in a member held under a lease. Never create a worktree or instance
+  unless the owner asks in this conversation; never delete another session's lease. Pool, lease name
+  and hand-back come from the repo, never hard-coded; protocol in `ground-truth-at-start.md`.
 - **Serial by design.** "Parallel waves" are SHAPE: `branch-feature` aborts on a dirty tree; tests
-  share infrastructure `localEnvironment.instanceBoundTo: directory` does NOT isolate; the MCP writes
-  production. `localEnvironment` never makes the loop concurrent; a human fans out the ready-set
-  (why: `references/next-unblocked.md`).
-- **Full-auto through merge.** PAUSE only at a genuine fork: a user's human/infra decision
-  (AWS/DNS/SES/Stripe/secrets/provisioning), an ambiguous or unverifiable finding, a destructive or
-  outward-facing action. Record every deferral; never skip silently.
+  share infrastructure `localEnvironment.instanceBoundTo: directory` does NOT isolate; the MCP
+  writes production. `localEnvironment` never makes the loop concurrent; a human fans out the
+  ready-set.
+- **Full-auto through merge.** PAUSE only at a genuine fork: a user's human/infra decision, an
+  ambiguous or unverifiable finding, a destructive or outward-facing action. Record every deferral;
+  never skip silently.
 - **The plan is a HYPOTHESIS.** Validate the spec against the ACTUAL code and correct the item's
   description as the work firms up — the item, not the PR, is the durable source of truth.
 - **Develop only receives a COMPLETE release unit** — refreshed, fully reviewed, every applicable
@@ -69,9 +68,9 @@ skill honours `perStoryPullRequest` (4), `storyVerify` (4a), `autoRelease` and `
 
 - **Resolve once the story is SELECTED**, by the contract's order: explicit word in `$ARGUMENTS`
   (`prototype`/`standard`/`extended`/`enterprise`) → root marker → config `profile` → `standard`.
-  The marker walks the story's ancestors (`hierarchy` for the chain, `get_item` with
-  `view: 'full'` each) and takes the NEAREST marker. A one-off skips only the marker step
-  (`I20110 extended` still wins). Never carried over from the previous story.
+  The marker walks the story's ancestors (`hierarchy` for the chain, `get_item` with `view: 'full'`
+  each) and takes the NEAREST marker. A one-off skips only the marker step. Never carried over from
+  the previous story.
 - **Announce it WITH ITS SOURCE** — `profile: extended — from the plan root I20100` — in the
   `Profile` row and handoff memory; pass it **by name**, `profile: <name>`, to `ultracode-build` (3),
   `review` (4a, 4b) and `pr` (4b, 8), which never re-resolve it.
@@ -101,21 +100,26 @@ Read "the working base" wherever a step says develop; re-derive it per RELEASE U
 1. An explicit branch in `$ARGUMENTS`, or config `integrationBranch` non-null.
 2. **A release-unit ancestor AND `epicIntegrationBranches.enabled`** → its integration branch. Walk
    `parentNumber` up, typing each ancestor with `get_item`, matching `hierarchyRoles.releaseUnit`
-   (`hierarchy` lists `{itemNumber, title}`, never types); never inspect only the direct parent. With
-   `hierarchyRoles` absent, resolve BOTH roles via `get_work_type_hierarchy` (leaf = the bottom
+   (`hierarchy` lists `{itemNumber, title}`, never types); never inspect only the direct parent.
+   With `hierarchyRoles` absent, resolve BOTH roles via `get_work_type_hierarchy` (leaf = the bottom
    childless levels; release unit = the level above, spelling included — never assume "Epic"); that
    backs every `hierarchyRoles.leaf` read here. A CONFIGURED `releaseUnit` no ancestor matches is
-   checked against `get_work_type_hierarchy` — a renamed type or typo STOPS with a question. Name per
-   `epicIntegrationBranches.pattern` / `slugRule`, dated at CREATION, never re-minted. Resolve:
-   handoff memory → `git ls-remote --heads origin "*/<epicNumber>-*"` (one → reuse, several → ask) →
-   create off a fresh `baseBranch` and push. Cache per epic; **announce reused or created.**
-3. **No release-unit ancestor, or `enabled` false** → `baseBranch`. A disabled flag genuinely falls
-   back.
+   checked against `get_work_type_hierarchy` — a renamed type or typo STOPS with a question. Name
+   per `epicIntegrationBranches.pattern` / `slugRule`, dated at CREATION, never re-minted. Resolve:
+   handoff memory → `git ls-remote --heads origin`, kept by an anchored match of that pattern,
+   `<epic-number>` (else the slug) filled in, others wildcards (one → reuse, several → ask; none →
+   the legacy `*/<epic-number>-*`, a hit → ask) → create off a fresh `baseBranch` and push. Cache
+   per epic; **announce reused or created.**
+3. **A one-off AND `supportTrain.branch` set** → the train, unless `support-train.md` routes it to
+   `baseBranch` (announced).
+4. **Otherwise** → `baseBranch`. A disabled flag falls back.
 
 Stories merge into it (why: `references/epic-release.md`), skipping `verify.skipDuringStoryBuilds`
 suites; the last leaf's merge triggers step 8. **The working base and the effective
-`perStoryPullRequest` pick the path** — integration branch → fast develop mode (4a), `baseBranch` →
-the full PR ritual (4b); announce it with the branch.
+`perStoryPullRequest` pick the path** — integration branch → fast develop mode (4a), the train → 4a
+only when `supportTrain.fastMerges` is true, `baseBranch` → the full PR ritual (4b); announce it.
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/support-train.md` when
+`supportTrain.branch` is set.**
 
 ## One-off / no-plan single-shot mode
 
@@ -126,11 +130,12 @@ no `blocked_by`/`blocks` edge → one-off**; both → plan mode; exactly one →
 resolves, else state your read and ask. **Steps 1–6 run VERBATIM.** Deltas:
 
 - **Step 0** — no root, ready-set or selection. **SKIP THE EPIC-BRANCH DERIVATION TOO — the working
-  base is `baseBranch`, unconditionally** — never reason "a one-off has no release-unit ancestor".
-  Gating, scope and spec checks still run; the profile skips only the marker. **Always 4b, under
-  every profile** — its PR is its only cloud gate.
-  **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` before changing the
-  one-off classification or its step-0 delta.**
+  base is the support train when configured (precedence 3), else `baseBranch`** — never reason "a
+  one-off has no release-unit ancestor". Gating, scope and spec checks still run; the profile skips
+  only the marker. **4b under every profile**, its PR its only cloud gate — except 4a on a train
+  with `supportTrain.fastMerges` true, whose PR into develop is the full pass. **Read
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` before changing the one-off
+  classification or its step-0 delta.**
 - **Step 6.5** — follow-ups become their own one-offs (`/devstride:create-story` /
   `/devstride:create-defect`), never `insert-*`; below-floor defects keep the DEFERRED placement
   under the root this item resolves to.
@@ -169,15 +174,14 @@ Invoke **`branch-feature`** with `I<number>-<short-slug>`, passing the working b
 Invoke **`ultracode-build`** as `I<number> <goal> profile: <name> review-moment:
 <release-deferred|pr-boundary>` (4a vs 4b). It returns the risk-check report and story review
 ledger, a verification receipt keyed to the final tree, and four lists — deferrals, deviations,
-untracked deferrals, dismissed findings. Deferrals + deviations → PR body (4b) and step 6;
-untracked → 6.5; dismissed → PR body (4b) or merge-commit body (5a), never step 6 (a review
-disposition is not a spec divergence).
+untracked deferrals, dismissed findings. Deferrals + deviations → PR body (4b) and step 6; untracked
+→ 6.5; dismissed → PR body (4b) or merge-commit body (5a), never step 6.
 
 ## 4. Review — the working base picks the path, never the diff
 
 Integration branch → **4a** when `fastStoryMerges.enabled` is `true`, or ABSENT under `prototype` (a
-present `false` wins, routes to 4b and is reported). `baseBranch` → **4b**, every profile. Never
-mix: 4a toward develop reaches production never cloud-reviewed.
+present `false` wins, routes to 4b and is reported). `baseBranch` → **4b**, every profile; the train
+per `supportTrain.fastMerges`. Never mix: 4a toward develop reaches production never cloud-reviewed.
 
 ### 4a. FAST DEVELOP MODE — epic-branch stories, no per-story PR
 
@@ -239,17 +243,14 @@ in the PR body. The push/ready-flip race is `review` step 7's: flip-with-push le
   before concluding either.**
 - **Zero unresolved threads immediately before merging** (`review`'s paginated query); else back
   through `review` steps 3–6.
-- **Merge guard** — on unless `ci.freezeBaseWhileReleasePrReady` is explicitly `false` (then say so).
-  Before ANY merge into `release.releaseSource` (here and step 8), an open NON-DRAFT PR from it into
-  `release.productionBranch` holds the base: name it, wait (≤ `review.pollTimeoutMinutes`), then
-  merge. A draft release PR holds nothing.
-- `gh pr merge <n> --merge --delete-branch` — **never `--delete-branch` on a head in
-  `protectedBranches`.**
+- `gh pr merge <n> --merge --delete-branch` — **never `--delete-branch` on a head matching
+  `protectedBranches`** (anchored: `branch-patterns.md`).
 
 ## 6. Completion ritual
 
 - `update_item` → **Done** (works off-board, unlike `mark_done`); `startDate`/`dueDate` = branch
-  creation → merge.
+  creation → merge. **A one-off merged onto the support train is NOT Done** — comment and leave it
+  (`support-train.md`); `release` closes it.
 - **The item points at its code**: 4b — confirm the PR auto-linked, else `link_pull_request`; 4a —
   `add_comment` the merge SHA and epic branch (the release PR follows at step 8). Never invent a PR
   number.
@@ -316,7 +317,7 @@ unit at zero and before cutting the release PR.** The batch lands as ONE reviewe
   behaviour and develop-merge resolutions; cloud may still cover the whole PR. A firing
   `verify.skipDuringStoryBuilds` suite is mandatory, with no story exemption; with the list empty,
   local pre-ship suites remain the callers' step-2b responsibility.
-- **Merge** `gh pr merge <n> --merge` once green and settled, after the 5b merge guard; delete the
+- **Merge** `gh pr merge <n> --merge` once green and settled; delete the
   epic branch **only if `epicIntegrationBranches.deleteBranchAfterRelease`** — false retains it.
 - **Docs STAGE, never publish** — only when `docs.updateOnEpicRelease` is true (else silent):
   `docs.updateSkill` null → say none is registered; a name with no `.claude/skills/<name>/SKILL.md`

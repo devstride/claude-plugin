@@ -8,6 +8,99 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.8.0] — 2026-10-01
+
+### Upgrading
+
+- **The release freeze is gone, whatever your configuration says.** Earlier versions froze the
+  release source while a release pull request was ready: `release` settled or parked every open
+  pull request into it before cutting, and `build-item` waited to merge until the release shipped.
+  From 3.8.0 nothing is frozen and `ci.freezeBaseWhileReleasePrReady` is ignored. Without a release
+  branch, a merge beneath a ready release pull request now advances its head, and the release's
+  head check sends the review round again before the owner is asked. To keep merges from touching
+  the release at all, set `release.releaseBranchPattern` (below). This is released as a MINOR
+  rather than a MAJOR, deliberately: the key is not renamed or redefined, and the behaviour it
+  guarded is replaced by an opt-in that removes its cause. Every other new behaviour is off until
+  its key is set.
+
+### Added
+
+- **Releases can be cut as their own protected branch.** With `release.releaseBranchPattern` (for
+  example `"release/<YY-MM-DD>[-n]"`), `release` cuts a branch from the release source and opens
+  the production pull request from it, so the source keeps receiving merges while the release is
+  reviewed; those merges ship in the next release. Without the key, the release pull request's head
+  is the release source, as before.
+  - The branch is protected: fixes are new commits, never a rebase, amend or force-push. A hotfix
+    that reaches production meanwhile is merged into it and re-reviewed.
+  - `release.releaseBranchFixExclusions` lists paths a fix on a release branch may not touch
+    (deploy configuration, migrations). Such a fix is refused: merge it to the source normally,
+    abandon the release branch and re-cut (`-2`, `-3` …).
+  - After the release, `release` syncs production back into the source by pull request — without
+    it, fixes made on the release branch would never reach the source — then deletes the release
+    branch once both contain it.
+- **One-off work can ride a support train.** With `supportTrain.branch`, an item with no release
+  unit above it lands on one long-lived branch instead of the base branch; `supportTrain.fastMerges`
+  lets it merge there after the local risk check and gate, without a pull request of its own. With
+  `release.mergeTrainBeforeCut`, every release first takes a snapshot of the train (merged with the
+  source), opens its pull request into the source, runs the full review, the pre-ship checks and CI
+  once, merges it and marks each one-off it carried Done; the live train is then brought up to
+  date. One-offs that land on the train meanwhile ship in the next release. A one-off is Done only
+  when the train reaches the source. One-offs touching the fix-exclusion paths keep the base
+  branch, and a train configured without `release.mergeTrainBeforeCut` is bypassed rather than
+  stranding work.
+- **`protectedBranches` entries may be patterns** (`release/*`). One anchored matching rule — `*`
+  within a path segment, `**` across segments, a date token, an optional `-<n>` — is used for
+  protected branches, the release pattern and the fix exclusions.
+- `doctor` warns when a release pattern has no matching protected-branch entry, reports a support
+  train missing on the remote as created on first use, and reports each cloud reviewer's
+  `requestPolicy`.
+
+### Changed
+
+- **A cloud reviewer can be asked once, at the final head.** With `requestPolicy: "final-head"` on
+  a `review.automatedReviewers` entry, the reviewer is not requested when the pull request opens or
+  on fix rounds; it is requested once, when every other finding is settled, on the head about to
+  release CI — and once more only after a fix commit that answered one of its own findings (a
+  verified P1 or serious P2 keeps the no-cap safety rule). Without the key, every round, as before.
+- `build-item` finds an existing epic integration branch by matching `epicIntegrationBranches.pattern`
+  (anchored) instead of a fixed shape, so a pattern that marks epic branches (for example
+  `epic-<epic-number>-…`) still resolves. A branch found only by the old `*/<epic-number>-*` shape
+  makes the loop ask rather than reuse it silently.
+- `setup` no longer writes `ci.freezeBaseWhileReleasePrReady`; `ci-audit` points release-preview
+  reruns at release branches instead.
+
+### Removed
+
+- The release freeze and `build-item`'s merge guard (see Upgrading).
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.7.0 @ cccb8a6, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.7.0 | tokens@devstride--v3.7.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,092 | 10,698 | 32,012 | 10,671 | -27 | 10,700 |
+| skills/review/SKILL.md | 23,987 | 7,996 | 24,000 | 8,000 | +4 | 8,000 |
+| skills/build-item/SKILL.md | 23,909 | 7,970 | 23,996 | 7,999 | +29 | 8,000 |
+| skills/doctor/SKILL.md | 23,984 | 7,995 | 23,987 | 7,996 | +1 | 8,000 |
+| skills/plan/SKILL.md | 23,813 | 7,938 | 23,813 | 7,938 | +0 | 8,000 |
+| skills/release/SKILL.md | 18,909 | 6,303 | 21,726 | 7,242 | +939 | 7,300 |
+| skills/rebalance/SKILL.md | 17,062 | 5,688 | 17,062 | 5,688 | +0 | 5,700 |
+| skills/ultracode-build/SKILL.md | 14,333 | 4,778 | 14,333 | 4,778 | +0 | 4,800 |
+| skills/pr/SKILL.md | 10,991 | 3,664 | 11,291 | 3,764 | +100 | 3,800 |
+| skills/rationalize-gantt/SKILL.md | 7,755 | 2,585 | 7,755 | 2,585 | +0 | 2,600 |
+| skills/ci-audit/SKILL.md | 7,466 | 2,489 | 7,570 | 2,524 | +35 | 2,600 |
+| skills/create-defect/SKILL.md | 7,174 | 2,392 | 7,288 | 2,430 | +38 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 5,846 | 1,949 | 6,034 | 2,012 | +63 | 2,100 |
+| skills/insert-defect/SKILL.md | 4,730 | 1,577 | 4,730 | 1,577 | +0 | 1,600 |
+| skills/comprehend-plan/SKILL.md | 4,468 | 1,490 | 4,468 | 1,490 | +0 | 1,500 |
+| skills/insert-story/SKILL.md | 4,025 | 1,342 | 4,025 | 1,342 | +0 | 1,400 |
+| skills/create-story/SKILL.md | 3,887 | 1,296 | 3,999 | 1,333 | +37 | 1,400 |
+| skills/push/SKILL.md | 2,875 | 959 | 3,005 | 1,002 | +43 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/branch-feature/SKILL.md | 2,447 | 816 | 2,577 | 859 | +43 | 900 |
+| alwaysOn.context (skill listing) | 3,666 | 1,222 | 3,697 | 1,233 | +11 | 1,300 |
+| **total (bodies)** | 242,552 | 80,858 | 246,470 | 82,163 | +1305 | |
+
 ## [3.7.0] — 2026-09-28
 
 ### Added
@@ -1572,7 +1665,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.7.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.8.0...HEAD
+[3.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.7.0...devstride--v3.8.0
 [3.7.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.6.0...devstride--v3.7.0
 [3.6.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.1...devstride--v3.6.0
 [3.5.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.0...devstride--v3.5.1

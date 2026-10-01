@@ -55,8 +55,10 @@ any sequenced plan. Work that belongs in a plan's dependency chain goes through 
 
 - Invoke `/devstride:build-item <item#>`. It **auto-detects** the one-off (no `[N]` prefix and no
   `blocked_by`/`blocks` edges — its "One-off / no-plan single-shot mode" section) and runs
-  single-shot: no plan root, base off `baseBranch` from the repo's `.claude/ds-config.json`
-  (develop by default), one item, no loop, no next-item selection. No flag is needed.
+  single-shot: no plan root, base off the working base `build-item` resolves — `baseBranch` from the
+  repo's `.claude/ds-config.json` (develop by default), or the support train when
+  `supportTrain.branch` is configured — one item, no loop, no next-item selection. No flag is
+  needed.
 - `build-item` runs the identical loop — mark In Progress → `branch-feature` → `ultracode-build` →
   `pr` (+ `review`) → merge → completion ritual → sync the base — and TERMINATES after this one
   item. Do not re-spell those phases; `build-item` and its sub-skills own them.

@@ -29,7 +29,9 @@ development branch's unreleased work. Branch name argument: $ARGUMENTS (none →
   the production branch with **`/devstride:pr`** for the draft-first, review-before-CI treatment (a
   review-fix push on a non-draft PR restarts CI). By hand: `gh pr create --base <hotfixBaseBranch>`
   with `--draft` iff the repo holds CI on drafts (`review.openPullRequestsAsDraft`, default true),
-  never `--fill`.
+  never `--fill`. Once it merges, an open release branch (`release.releaseBranchPattern`) must take
+  it too: `release` merges the production branch into that branch and re-reviews it — never a
+  rebase.
 - **On failure** name the failed step and its output, say which branch the checkout is on now (a
   failure in step 1, or in step 2 before the branch exists, leaves it ON the production branch —
   easy to overlook), and ask before changing anything else.
