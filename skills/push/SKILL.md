@@ -34,8 +34,10 @@ type-checked, and pushed — never a pull request (those open separately, not on
   `generated.paths` AND its text matches `generated.toleratedTypeErrors`. Neither configured →
   nothing is tolerated. Fix one by re-running `generated.regenCommand`, never by hand-editing.
 - **Any other type error → do NOT push**; report the errors and ask.
-- **Push**: `git push`. Rejected as non-fast-forward because this branch's history was rewritten
-  → `git push --force-with-lease`, never `--force`. **Never force-push a branch in
-  `protectedBranches`** — nor main/master when the key is absent.
+- **Push**: `git push`. Rejected as non-fast-forward because this branch's history was rewritten →
+  `git push --force-with-lease`, never `--force`. **Never force-push a branch matching
+  `protectedBranches`** (names or anchored patterns, per
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`) — nor main/master when the
+  key is absent.
 
 Recap on success: the commit, branch, push result, and which checks passed or did not run.

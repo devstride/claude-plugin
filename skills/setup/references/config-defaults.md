@@ -193,16 +193,11 @@ A8 covers where those templates live and how to capture them.
     "workflowGlobs": [".github/workflows/*.yaml", ".github/workflows/*.yml"],
     "draftGateCondition": "github.event.pull_request.draft == false",
     "gateJobName": null,
-    "freezeBaseWhileReleasePrReady": true,
     "expectedRunsPerPullRequest": 1
   }
 }
 ```
 
-`freezeBaseWhileReleasePrReady` is the loop rule behind run-once at the release: while a release
-pull request is ready, `build-item` does not merge anything into the base branch and `release`
-refuses to flip while another pull request into the release source is mergeable — every merge
-beneath a ready release pull request re-runs its merge preview and stales the reviewed diff.
 `expectedRunsPerPullRequest` is the number `review` step 8 reports against: `1` per workflow
 under `ci.workflowGlobs` on the pull request it settled — several workflows executing once each
 is the design; a SECOND executed run of the same workflow is named with its cause. The workflow mechanics
@@ -213,6 +208,42 @@ draft-convention check) are in `ci-cost-patterns.md`, applied by `setup ci`.
 `null` because nothing can guess it; the loop falls back to detecting a new run, which works and is
 merely slower to be sure of. On a repository with no CI at all, still write the block — the keys
 being present and inert is what makes them findable later.
+
+## Release branches and the support train
+
+All optional, and `setup` writes none of them: each changes how releases are cut or where one-off
+work lands, which is the operator's decision. Absent, the loop behaves as before.
+
+| Key | Shape | Absent means |
+| --- | --- | --- |
+| `release.releaseBranchPattern` | a pattern, e.g. `"release/<YY-MM-DD>[-n]"` | the release pull request's head is `release.releaseSource` |
+| `release.releaseBranchFixExclusions` | an array of path patterns, e.g. `["infra/**", "db/migrations/**"]` | no fix commit is refused on a release branch |
+| `release.mergeTrainBeforeCut` | boolean | `false`: nothing is merged into the source before the cut |
+| `supportTrain.branch` | a branch name, e.g. `"train/support"` | one-offs use `baseBranch` |
+| `supportTrain.fastMerges` | boolean | `false`: a one-off on the train takes the full per-story pull-request ritual, into the train |
+| `protectedBranches` entries | exact names or patterns, e.g. `"release/*"` | exact names only |
+
+Patterns follow one anchored rule (`*` within a path segment, `**` across segments, `<YY-MM-DD>`,
+a trailing `[-n]`): `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`.
+
+- **`release.releaseBranchPattern`** — `release` cuts each production release as a protected
+  branch from `release.releaseSource` (`-2`, `-3` … on a re-cut) and opens the release pull request
+  from it, so the source keeps receiving merges while the release is reviewed. Fixes are new
+  commits on that branch; a hotfix merges into it; after the release `release` syncs the production
+  branch back into the source by pull request and deletes the release branch. **Add a matching
+  entry to `protectedBranches`** (doctor warns when none matches).
+- **`release.releaseBranchFixExclusions`** — paths a fix commit on a release branch may not touch
+  (deploy configuration, database migrations). Such a fix goes to the source by a normal pull
+  request; the release branch is abandoned and re-cut. The same list keeps one-offs that touch
+  those paths off the support train.
+- **`release.mergeTrainBeforeCut` and `supportTrain.*`** — one-off work batches on one long-lived
+  branch (with `fastMerges`, merged there without a pull request of its own after the local risk
+  check and gate). Before each cut `release` opens the train's pull request into the source, runs
+  the full review and CI once, merges it, and marks each one-off it carried Done; after the release
+  it fast-forwards the train. A one-off is Done only when the train reaches the source.
+- **The release freeze is gone.** Versions before 3.8.0 froze the release source while a release
+  pull request was ready, under a `ci` switch; that switch is now ignored whatever its value, and
+  setup no longer writes it.
 
 ## Lists a repository fills in for itself
 
@@ -464,6 +495,14 @@ pull request; a value that is not a list of names is treated as absent, so a typ
 coverage. `setup` never writes it: it trades review coverage for cost, so it
 is the operator's decision. A PR the scope excludes announces the reviewer as not requested; the
 review skill never counts that as a failed engine.
+
+**Optional timing — `requestPolicy`.** `"every-round"` (the meaning when absent, or for any other
+value) requests the reviewer when the pull request opens and again on every follow-up cycle.
+`"final-head"` requests it once, when every other finding is settled, on the head about to release
+CI — and once more only after a fix commit that answered one of its own findings (a verified P1 or
+serious P2 keeps the no-cap safety rule). Contract:
+`${CLAUDE_PLUGIN_ROOT}/skills/review/references/final-head-request.md`. `setup` never writes it: it
+trades review coverage for cost, so it is the operator's decision.
 
 Any other cloud reviewer must be described the same way — a name the user recognizes, a `how` the
 review flow understands, and whatever identifier that `how` needs. If the user names a reviewer that

@@ -4,7 +4,8 @@ load: rationale
 # Release gates — why they are local, and what the head SHAs protect
 
 The rules live in the `release` body; this file holds the reasoning, read when a pre-ship check
-is red, when the head no longer equals `<sourceHead>`, or before waiving a check.
+is red, when the head advanced by anything other than this run's fix commits or a hotfix merge, or
+before waiving a check.
 
 ## Why pre-ship suites are local and never in CI
 
@@ -21,25 +22,28 @@ runs twice.
 
 ## Why `<sourceHead>` and `<reviewedHead>` are immutable SHAs
 
-The release PR's head IS the release-source branch, so the tip and "the PR head" move together
-— comparing them to each other proves nothing. Every integrity check therefore compares against
-a value captured once: `<sourceHead>` (the SHA the delta was computed from) and
-`<reviewedHead>` (the SHA the review settled on). While the PR is a draft, nothing holds the
-source (the merge guard keys on a READY release PR), so a human merge or direct push can
-advance it mid-review — and a review that settled on a head that no longer exists describes a
-diff nobody is about to merge. The one tolerated advance is `review` 7.3's single empty
+The release PR's head IS a branch — the release source, or a release branch cut from it — so the
+tip and "the PR head" move together; comparing them to each other proves nothing. Every integrity
+check therefore compares against a value captured once: `<sourceHead>` (the SHA the delta was
+computed from, a release branch's cut point) and `<reviewedHead>` (the SHA the review settled on).
+Nothing holds the head still, so a human merge or direct push can advance it mid-review — and a
+review that settled on a head that no longer exists describes a diff nobody is about to merge. On a
+release branch two advances are expected and each is re-reviewed before it counts: this run's own
+fix commits and a hotfix merge of the production branch. The one tolerated advance is `review` 7.3's single empty
 re-trigger commit: its tree equals the settled tree, so the review still describes the merged
 code. Anything else means the reviewed diff is stale and CI re-ran on a diff nobody reviewed —
 back through step 2, never merged over.
 
-## Why the freeze holds from flip to merge
+## Why there is no freeze
 
-From the ready-flip on, a merge into the release source re-runs the release PR's merge preview
-(one more full CI run) and stales its reviewed diff — the exact double-spend the run-once
-design exists to remove. `build-item`'s merge guard enforces the same freeze from the other
-side; step 0's settle-before-cutting is the same rule applied before the fact, deciding every
-open non-draft PR into the source NOW (merge it into the release, or park it) instead of
-letting one land mid-review.
+Earlier versions froze the release source from the ready-flip to the merge, because with the
+source itself as the head every merge beneath a ready release PR re-ran its CI and staled its
+reviewed diff. The freeze stopped all other work for the length of a release, and it still let a
+merge slip in before the flip. A release branch removes the cause instead: merges into the source
+no longer touch the release PR at all, and they ship in the next release. A repository that keeps
+releasing from the source itself gets no freeze either — a merge beneath its release PR advances
+the head, and the head check sends the review round again, which costs one more pass rather than
+blocking everyone.
 
 ## Why the review scopes to the release surface
 
@@ -52,4 +56,5 @@ review scope turns out to be.
 ## Cited by
 
 - `skills/release/SKILL.md` — step 2's pointer ("Read … when a pre-ship check is red, when the
-  head no longer equals `<sourceHead>`, or before waiving a check").
+  head advanced by anything other than this run's fix commits or a hotfix merge, or before waiving
+  a check").

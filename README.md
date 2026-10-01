@@ -238,9 +238,12 @@ repository's real branch names rather than copying those two values:
 |---|---|
 | `baseBranch` | The branch work merges into and branches are cut from. |
 | `hotfixBaseBranch` | The production-safe branch an urgent fix starts from. |
-| `protectedBranches` | Branches never rebased, force-pushed, or deleted. |
+| `protectedBranches` | Branches never rebased, force-pushed, or deleted. Exact names or patterns (`release/*`). |
 | `release.releaseSource` | The branch promoted during a production release, normally the same as `baseBranch`. |
 | `release.productionBranch` | The production release target. |
+| `release.releaseBranchPattern` | Optional. Cut each release as its own protected branch (e.g. `release/<YY-MM-DD>[-n]`) so the source keeps receiving merges while the release is reviewed. Absent: the release pull request's head is `release.releaseSource`. |
+| `release.releaseBranchFixExclusions` | Optional. Paths a fix on a release branch may not touch (deploy configuration, migrations): such a fix goes through the source and the release is re-cut. |
+| `supportTrain.branch` | Optional. A long-lived branch one-off work batches on; with `release.mergeTrainBeforeCut` it ships with every release through its own reviewed pull request. Absent: one-offs go to `baseBranch`. |
 | `conventionsDoc` | Your coding-standards file. The build skill reads it and obeys it — this is how the loop writes code that looks like yours. |
 | `verify.typecheck` | Type checks; unchanged-tree receipts prevent identical reruns. |
 | `verify.test` | Your test suite. Green is a gate, not a suggestion. |
@@ -248,7 +251,7 @@ repository's real branch names rather than copying those two values:
 | `verify.lint` | Linter, run when the diff touches the paths it covers. |
 | `review.localCommand` | A local CLI for PR/release merge-boundary review. Context-first templates receive the cumulative ledger; `<effort>` is routed by risk. |
 | `review.localAssistCommand` | Optional read-only support for ambiguous cross-module work, critical boundaries, or stubborn diagnosis; never a routine story call. |
-| `review.automatedReviewers` | Cloud reviewers to request on each pull request. `[]` means none; nothing is requested or waited on. |
+| `review.automatedReviewers` | Cloud reviewers to request on each pull request. `[]` means none; nothing is requested or waited on. An entry's optional `requestPolicy: "final-head"` asks it once, at the final reviewed head, instead of every round. |
 | `review.openPullRequestsAsDraft` | Open pull requests as drafts so review and pre-ship checks settle before CI runs once. With PR workflows, disabling the hold makes the optimized loop not ready. |
 | `review.adaptiveReviewerWait` | Absent means on: the wait for a cloud reviewer is bounded by that reviewer's learned latency (p95 + slack) instead of the full timeout. `false` pins the fixed bound. |
 | `review.localReReviewScope` | Legacy-named shared follow-up scope. Absent means computed delta/full; `"full"` pins every stream to the whole diff. |
@@ -265,8 +268,9 @@ guarantees it. What the hold does not cover is the rest of the bill: superseded 
 production-branch push re-testing the tree the base branch just tested, a release pull request
 re-run every time something merges beneath it. `/devstride:ci-audit` measures all of it;
 `/devstride:setup ci` applies the workflow mechanics that remove it (as reviewed diffs); the loop
-rules — freeze the release source while a release is ready, report executed runs per workflow
-per pull request — are on by default (`ci.freezeBaseWhileReleasePrReady`, `ci.expectedRunsPerPullRequest`).
+reports executed runs per workflow per pull request by default (`ci.expectedRunsPerPullRequest`),
+and cutting releases from a release branch (`release.releaseBranchPattern`) stops merges into the
+source from re-running the release's CI.
 
 **Documentation and release notes.** The plugin never edits your documentation itself. `setup` asks
 where your docs live, how they are updated, and how release notes are pushed, then scaffolds two
@@ -402,7 +406,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.7.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.8.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

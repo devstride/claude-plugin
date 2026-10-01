@@ -25,8 +25,7 @@ Optional argument: $ARGUMENTS
   touches a workflow file: A1 + A5; detect which of the four mechanics in
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md` each pull-request
   workflow carries; show the **exact diff** per mechanic missing OR present-but-inert; apply
-  only accepted diffs — nothing else rewritten. Write `ci.freezeBaseWhileReleasePrReady` and
-  `ci.expectedRunsPerPullRequest` if absent. **Draft-gate diffs accepted while the three
+  only accepted diffs — nothing else rewritten. Write `ci.expectedRunsPerPullRequest` if absent. **Draft-gate diffs accepted while the three
   `review.*` CI-ordering booleans are `false` → propose flipping them `true` in the same
   change.** Run Phase G's CI checks. Offer `/devstride:ci-audit` first for numbers.
 - **Nothing** — the full run: inspect, ask, write, scaffold, validate.
@@ -331,7 +330,7 @@ Phase D; else the shipped default.
 | `verify` | `typecheck` (array), `test`, `lint`, `testSingle`, `testDir`, `skipDuringStoryBuilds: []` |
 | `generated` | Only when detected — omit an empty shape |
 | `review` | The roster + three CI-ordering booleans per the rules; `pollTimeoutMinutes` at the profile's value |
-| `prBodyTemplate`, `commitConventions`, `ci`, `branchNaming` | Verbatim from the defaults reference unless the repository said otherwise — `ci` includes `freezeBaseWhileReleasePrReady: true`, `expectedRunsPerPullRequest: 1` |
+| `prBodyTemplate`, `commitConventions`, `ci`, `branchNaming` | Verbatim from the defaults reference unless the repository said otherwise — `ci` includes `expectedRunsPerPullRequest: 1` |
 | `defects` | Verbatim from the defaults reference |
 | `session` | Verbatim from the defaults reference |
 | `preShipChecks`, `preCommitWiringChecks` | `[]` — a repository names these for itself |
