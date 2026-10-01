@@ -37,8 +37,8 @@ merge, and never written onto by the lessons store: `release.releaseSource`,
 `release.productionBranch`, any name matching a `protectedBranches` entry, any name matching
 `release.releaseBranchPattern`, and `supportTrain.branch`. The last two are protected by the key
 alone, whether or not `protectedBranches` lists them. **Merge-only** — a protected head, or a head
-the caller declared `merge-only: true` (the sync of production into the source): its merge commits
-are the record, so a rebase would destroy them.
+the caller declared `merge-only: true` (the sync of production into the source, the support train's
+snapshot): its merge commits are the record, so a rebase would destroy them.
 
 What `review` does with one at step 7.1 when the base has advanced:
 
@@ -49,7 +49,8 @@ What `review` does with one at step 7.1 when the base has advanced:
   conflict STOPS for the operator, never auto-resolved.
 - **Any other protected head** → STOP; the owner decides.
 
-**On a release-branch head, every fix commit first passes the fix-exclusion check**
+**On a release-branch head, or a head whose caller declared `fix-exclusions: true` (the support
+train's snapshot), every fix commit first passes the fix-exclusion check**
 (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` §3) — in `review` step 5 as
 much as in `release`; a match is refused and handed back to `release`.
 

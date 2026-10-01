@@ -81,9 +81,9 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   release") against `origin`/`gh` first —
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`.
 - **0b. Merge the support train** when `release.mergeTrainBeforeCut` is `true` and no release BRANCH
-  was adopted (else nothing merges first): its own draft PR into `releaseSource`, fully reviewed, CI
-  once, merged, and every one-off it carried closed — `release-branch.md` §1. Nothing ahead → a
-  reported no-op.
+  was adopted (else nothing merges first): a snapshot of the train (the live train keeps moving) in
+  its own draft PR into `releaseSource`, fully reviewed, CI once, merged, and every one-off it
+  carried closed — `release-branch.md` §1. Nothing ahead → a reported no-op.
 - `git fetch origin master develop`; `origin/develop` not ahead of `origin/master` → STOP, nothing to
   release.
 - **No freeze.** Open PRs into `releaseSource` are neither settled, parked nor waited for: the
@@ -276,9 +276,10 @@ requested".
 
 ## 6. Close out
 
-- Sync: `git checkout master && git pull --ff-only`, and `develop` likewise. Then `release-branch.md`
-  §5: with a release branch, production synced into `releaseSource` by its own PR and the branch
-  deleted only once both contain it (said so); with a support train, the train fast-forwarded.
+- Sync: `git checkout master && git pull --ff-only`, and `develop` likewise. Then
+  `release-branch.md` §5: with a release branch, production synced into `releaseSource` by its own
+  PR and the branch deleted only once both contain it (said so); with a support train, the train
+  brought up to date.
 - **Human recap.** Lead with `Merged / Released`: every included item and its effect, the PR and
   merge commit, where it landed, whether the deploy is confirmed live, the post-deploy health result,
   documentation and release-note results, and any remaining owner action — including work a docs

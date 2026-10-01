@@ -20,7 +20,7 @@
     "push": 1100,
     "rationalize-gantt": 2600,
     "rebalance": 5700,
-    "release": 7200,
+    "release": 7300,
     "review": 8000,
     "setup": 10700,
     "ultracode-build": 4800,
@@ -47,10 +47,10 @@
     "skills/pr/references/pre-ship-hold.md": 300,
     "skills/rationalize-gantt/references/auto-scheduler-off.md": 900,
     "skills/rebalance/references/recoverable-write-order.md": 1000,
-    "skills/release/references/branch-patterns.md": 1500,
+    "skills/release/references/branch-patterns.md": 1600,
     "skills/release/references/docs-hooks.md": 2700,
     "skills/release/references/post-deploy-check.md": 1100,
-    "skills/release/references/release-branch.md": 3300,
+    "skills/release/references/release-branch.md": 3700,
     "skills/release/references/release-gates.md": 1300,
     "skills/review/references/ci-settle.md": 1800,
     "skills/review/references/delivery-loop-invariants.md": 19700,
@@ -141,7 +141,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 58100,
+      "budget": 58200,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

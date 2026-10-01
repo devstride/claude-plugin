@@ -400,7 +400,9 @@ Q2. `release.postDeployCheckSkill` names a LOCAL skill invoked once, after the d
     configured** are different facts and never collapse into each other.
 Q3. Doctor checks that a configured `postDeployCheckSkill` names an existing local skill; `setup`
     never writes the key.
-Q4. The support train reaches the release source only through its own reviewed pull request —
+Q4. The support train reaches the release source only through its own reviewed pull request,
+    opened from a SNAPSHOT branch only the release run writes to — reviewing the live train let a
+    one-off merged mid-review ride in unreviewed and let a moving ref mark unshipped items Done —
     never a direct push, which would bypass the source's required checks — and a conflict STOPS
     for the operator, never auto-resolved.
 Q5. There is no release freeze from 3.8.0: the old `ci` freeze switch is ignored whatever its value.
