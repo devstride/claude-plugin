@@ -15,9 +15,12 @@ not run. Names are tested with the anchored rule in
 
 ## 1. Merge the support train (step 0b)
 
-Runs only when ALL hold: `release.mergeTrainBeforeCut` is `true`; `supportTrain.branch` exists on
-origin; `git rev-list --count origin/<releaseSource>..origin/<train>` is above zero. Otherwise a
-no-op, reported in one line ("support train: nothing to ship", or "not configured").
+Runs only when ALL hold: `release.mergeTrainBeforeCut` is `true`; step 0 adopted no open release
+pull request (an adopted release was cut earlier, so the train would not ship with it);
+`supportTrain.branch` exists on origin; and, after `git fetch origin <releaseSource> <train>`,
+`git rev-list --count origin/<releaseSource>..origin/<train>` is above zero. Otherwise a no-op,
+reported in one line ("support train: nothing to ship", "not configured", or "skipped — adopted
+release").
 
 1. Record `<sourceBefore>` — the `origin/<releaseSource>` SHA now.
 2. An open pull request `<train> → <releaseSource>` is ADOPTED. Otherwise open one through the same

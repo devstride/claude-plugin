@@ -80,9 +80,10 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   session appears active, and verify every remembered fact (open PRs, "nothing merges under this
   release") against `origin`/`gh` first —
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`.
-- **0b. Merge the support train** when `release.mergeTrainBeforeCut` is `true` (absent or `false` →
-  nothing merges first): its own draft PR into `releaseSource`, fully reviewed, CI once, merged, and
-  every one-off it carried closed — `release-branch.md` §1. Nothing ahead → a reported no-op.
+- **0b. Merge the support train** when `release.mergeTrainBeforeCut` is `true` and no release PR was
+  adopted (else nothing merges first): its own draft PR into `releaseSource`, fully reviewed, CI
+  once, merged, and every one-off it carried closed — `release-branch.md` §1. Nothing ahead → a
+  reported no-op.
 - `git fetch origin master develop`; `origin/develop` not ahead of `origin/master` → STOP, nothing to
   release.
 - **No freeze.** Open PRs into `releaseSource` are neither settled, parked nor waited for: the
