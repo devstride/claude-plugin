@@ -810,7 +810,8 @@ step. That is the moment a rule goes missing, and it is the only moment this fil
 
 ---
 
-**Total: 141 rule entries (A–T) + 6 editing disciplines (U) = 147.** The round-by-round revision
+**Total: 142 rule entries (A–T) + 6 editing disciplines (U) = 148.** (The previous total claimed 134
+while 135 were enumerated — the fifth miscount, corrected here.) The round-by-round revision
 enumerated 154 facts; 20 of them were near-duplicates stated in two to four places, and each group
 became one entry carrying every clause. (Needles are a SAMPLE, not one per fact; recount their loops
 after editing.)

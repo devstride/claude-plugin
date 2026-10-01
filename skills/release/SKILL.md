@@ -80,16 +80,17 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   session appears active, and verify every remembered fact (open PRs, "nothing merges under this
   release") against `origin`/`gh` first —
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`.
-- **0b. Merge the support train** when `release.mergeTrainBeforeCut` is `true` and no release PR was
-  adopted (else nothing merges first): its own draft PR into `releaseSource`, fully reviewed, CI
+- **0b. Merge the support train** when `release.mergeTrainBeforeCut` is `true` and no release BRANCH
+  was adopted (else nothing merges first): its own draft PR into `releaseSource`, fully reviewed, CI
   once, merged, and every one-off it carried closed — `release-branch.md` §1. Nothing ahead → a
   reported no-op.
 - `git fetch origin master develop`; `origin/develop` not ahead of `origin/master` → STOP, nothing to
   release.
 - **No freeze.** Open PRs into `releaseSource` are neither settled, parked nor waited for: the
-  release freeze is gone, and a leftover freeze switch under `ci` is ignored whatever its value —
-  the one change a repository without the new keys sees. With a release branch a later merge ships
-  in the next release; without one it advances this PR's head and step 2's head check re-reviews.
+  release freeze is gone, and a leftover freeze switch under `ci` is ignored whatever its value (say
+  so when it is present) — the one change a repository without the new keys sees. With a release
+  branch a later merge ships in the next release; without one it advances this PR's head and step
+  2's head check re-reviews.
 - **Record `<sourceHead>`** — the SHA the delta is computed from: an adopted release branch's cut
   point, else the `origin/<releaseSource>` tip (where 0c cuts). Every later integrity check compares
   against this immutable value, never the branch tip (the PR head IS the branch, so tip and head
@@ -165,7 +166,9 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   one it must still equal `<sourceHead>`. Anything else → recompute the delta and restart step 2 on
   the new head with the same ledger, target and safety triggers. Record the SHA that finally settles
   as `<reviewedHead>` (after `review` 7.3's one empty re-trigger commit when that fired — same
-  tree). Nothing is frozen: an advance after the flip goes back through step 2, never merged over.
+  tree). Nothing is frozen: an advance after the flip goes back through step 2 — a ready PR is first
+  returned to draft (`gh pr ready --undo`), so CI waits — never merged over; any return to step 2
+  voids an owner yes already given.
 - Only genuinely ambiguous/risky findings stall — surface them with a recommendation; out-of-scope real findings are captured (into the
   plan via `insert-*` when a root is known, else noted for the owner). **Do NOT merge here** — hold
   at green-and-settled for step 4.

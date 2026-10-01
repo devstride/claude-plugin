@@ -76,15 +76,15 @@ workflows SUPPORT** — no profile bypasses a supported hold.
   safe behaviour, repair reported; all false with PR workflows → ungated (CI may already be running), report
   `/devstride:setup ci`; no PR workflows → N/A.
 
-Announce by name ("engines this run: Claude + Codex + Copilot"). **Configured-but-failing is NOT
-not-configured**: a failed probe or silent configured reviewer is this-run degradation, reported; an
-unconfigured engine is silent by design. A missing engine narrows the roster, never a hard stop —
-except a fast story merge needs a completed local risk screen (`build-item` step 4). **No config
-file → CLAUDE-ONLY**, said. Substitute `<effort>` from the task/risk route; a legacy Codex
-template's literal `model_reasoning_effort` is replaced per invocation (stale config never pins
-every task to `xhigh`; never pick its model). **Read
-`${CLAUDE_PLUGIN_ROOT}/skills/review/references/roster-and-modes.md` when a roster resolves to fewer
-engines than the config declares, or before changing a mode definition or a deferral route.**
+Announce the roster by name. **Configured-but-failing is NOT not-configured**: a failed probe or
+silent configured reviewer is this-run degradation, reported; an unconfigured engine is silent by
+design. A missing engine narrows the roster, never a hard stop — except a fast story merge needs a
+completed local risk screen (`build-item` step 4). **No config file → CLAUDE-ONLY**, said.
+Substitute `<effort>` from the task/risk route; a legacy Codex template's literal
+`model_reasoning_effort` is replaced per invocation (stale config never pins every task to `xhigh`;
+never pick its model). **Read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/roster-and-modes.md`
+when a roster resolves to fewer engines than the config declares, or before changing a mode
+definition or a deferral route.**
 
 ## Modes — callers name them
 
@@ -249,11 +249,12 @@ distills lessons (conflict resolution may apply the collision policy, never mint
 ## 7. Release CI (ready-flip) and settle green
 
 **Enter only when every finding is fixed, pushed, replied-to and resolved** — fetch reviews above
-the high-water mark first; late body-only findings return through 3–6.5. After 7.1, request each
-in-scope `final-head` entry on that head and settle it through 2–6.5 before 7.1b or the flip. Run
-the **paginated zero-unresolved check before the flip** (query: `github-review-api.md`); step 8
-repeats it. All three draft-hold booleans false → skip only 7.3's flip mechanics; the rest runs and
-7.4 settles at the FINAL head SHA, reported as ungated, never as CI-last or run-once. **Read
+the high-water mark first; late body-only findings return through 3–6.5. After 7.1, request a
+`final-head` entry only as `final-head-request.md` allows (once; again after its own fix) and settle
+it through 2–6.5 before 7.1b or the flip. Run the **paginated zero-unresolved check before the
+flip** (query: `github-review-api.md`); step 8 repeats it. All three draft-hold booleans false →
+skip only 7.3's flip mechanics; the rest runs and 7.4 settles at the FINAL head SHA, reported as
+ungated, never as CI-last or run-once. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/review/references/ci-settle.md` when the flip produces no run, a check
 reads `skipping`, or CI is red.**
 

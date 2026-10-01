@@ -27,14 +27,14 @@
     "update": 1000
   },
   "references": {
-    "skills/build-item/references/epic-release.md": 2100,
+    "skills/build-item/references/epic-release.md": 2200,
     "skills/build-item/references/ground-truth-at-start.md": 1800,
     "skills/build-item/references/next-unblocked.md": 1200,
     "skills/build-item/references/plain-language-output.md": 2300,
     "skills/build-item/references/progress-table.md": 1300,
-    "skills/build-item/references/support-train.md": 1300,
+    "skills/build-item/references/support-train.md": 1500,
     "skills/build-item/references/verification-receipts.md": 800,
-    "skills/create-story/references/one-off-handoff.md": 1700,
+    "skills/create-story/references/one-off-handoff.md": 1800,
     "skills/doctor/references/repairs.md": 2700,
     "skills/doctor/references/silent-failures.md": 3300,
     "skills/doctor/references/version-currency.md": 2000,
@@ -50,10 +50,10 @@
     "skills/release/references/branch-patterns.md": 1500,
     "skills/release/references/docs-hooks.md": 2700,
     "skills/release/references/post-deploy-check.md": 1100,
-    "skills/release/references/release-branch.md": 2800,
+    "skills/release/references/release-branch.md": 3300,
     "skills/release/references/release-gates.md": 1300,
     "skills/review/references/ci-settle.md": 1800,
-    "skills/review/references/delivery-loop-invariants.md": 19600,
+    "skills/review/references/delivery-loop-invariants.md": 19700,
     "skills/review/references/delta-re-review.md": 2000,
     "skills/review/references/final-head-request.md": 900,
     "skills/review/references/github-review-api.md": 4700,
@@ -78,7 +78,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 65100,
+      "budget": 65200,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",

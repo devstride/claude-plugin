@@ -244,6 +244,8 @@ repository's real branch names rather than copying those two values:
 | `release.releaseBranchPattern` | Optional. Cut each release as its own protected branch (e.g. `release/<YY-MM-DD>[-n]`) so the source keeps receiving merges while the release is reviewed. Absent: the release pull request's head is `release.releaseSource`. |
 | `release.releaseBranchFixExclusions` | Optional. Paths a fix on a release branch may not touch (deploy configuration, migrations): such a fix goes through the source and the release is re-cut. |
 | `supportTrain.branch` | Optional. A long-lived branch one-off work batches on; with `release.mergeTrainBeforeCut` it ships with every release through its own reviewed pull request. Absent: one-offs go to `baseBranch`. |
+| `supportTrain.fastMerges` | Optional. A one-off on the train merges there after its local risk check and gate, without a pull request of its own; the train's pull request is its full review. Absent: a pull request into the train. |
+| `release.mergeTrainBeforeCut` | Optional. Each release first merges the support train into the source through its own reviewed pull request. Without it a configured train is bypassed, so one-offs go to `baseBranch`. |
 | `conventionsDoc` | Your coding-standards file. The build skill reads it and obeys it — this is how the loop writes code that looks like yours. |
 | `verify.typecheck` | Type checks; unchanged-tree receipts prevent identical reruns. |
 | `verify.test` | Your test suite. Green is a gate, not a suggestion. |
