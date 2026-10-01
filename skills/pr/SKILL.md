@@ -37,9 +37,10 @@ number): $ARGUMENTS
 
 ## Two shapes that are NOT this flow
 
-- **PRODUCTION RELEASE** — base == `release.productionBranch` and head == `release.releaseSource`
-  (`release.releaseSource` → `release.productionBranch`): the production cut, carrying the docs
-  hooks and an owner-gated merge. **Invoke `/devstride:release` instead.** A `hotfix → master` PR is
+- **PRODUCTION RELEASE** — base == `release.productionBranch` and head == `release.releaseSource`,
+  or a head matching `release.releaseBranchPattern` when set (anchored, per
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`): the production cut,
+  carrying the docs hooks and an owner-gated merge. **Invoke `/devstride:release` instead.** A `hotfix → master` PR is
   a single fix, not a promotion, and stays here.
 - **EPIC RELEASE PR** (the caller says so; `build-item` step 8): head = the epic integration
   branch, base = `baseBranch`. The body's FIRST configured section (fallback `## Simple
@@ -75,7 +76,8 @@ number): $ARGUMENTS
 — here `github.event.pull_request.draft == false` — so no runner burns on a diff about to change);
 then request **each entry in `review.automatedReviewers`, per its `how`** (the shipped default is
 Copilot via GraphQL `requestReviews`) — except one whose `baseBranches` omits `<base>`: skip it and
-hand it to `review` as scoped out. Never hardcode one reviewer; an EMPTY list is legal — request
+hand it to `review` as scoped out; and one with `requestPolicy` `"final-head"` (absent →
+`"every-round"`, requested here): skip it and hand it to `review` as deferred to the final head. Never hardcode one reviewer; an EMPTY list is legal — request
 nothing and note no cloud wave. A no-CI repo opens non-draft and reports `no pull-request CI`, not
 `CI held`.
 
