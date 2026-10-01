@@ -21,51 +21,65 @@ train would not ship with it). Otherwise a no-op, reported in one line ("support
 configured", or "skipped — adopted release").
 
 The live train keeps receiving one-offs from other sessions while this runs, so the release never
-reviews or merges the live branch: it reviews a SNAPSHOT that only this run writes to.
+reviews or merges the live branch: it reviews a SNAPSHOT that only this run writes to. Every
+support-train pull request records its range in a body marker,
+`<!-- devstride:support-train source <sourceBefore> snapshot <trainSnapshot> -->`; that marker,
+never the live train, is what closes items later.
 
-1. **Finish an interrupted earlier run first**, every time: for the most recently merged
-   support-train pull request (`gh pr list --base <releaseSource> --state merged --search
-   "Support train" --limit 1`), apply step 6 to its own range, `<merge>^1..<merge>^2`. Step 6 skips
-   any item already Done or already carrying this pull request's "reached …" comment, so a finished
-   run is a no-op and a re-opened item is never closed again.
-2. `git fetch origin <releaseSource> <train>`. Nothing on the train beyond the source
-   (`git rev-list --count origin/<releaseSource>..origin/<train>` is zero) → report "support train:
-   nothing to ship" and stop here. Otherwise record `<sourceBefore>` (the `origin/<releaseSource>`
-   SHA) and `<trainSnapshot>` (the `origin/<train>` SHA).
-3. **Cut the snapshot**: a branch named per `branchNaming` (slug `support-train-<date>`) at
-   `<trainSnapshot>`, then `git merge --no-ff origin/<releaseSource>` into it so review and the
-   pre-ship checks see the combined tree (a conflict STOPS with the files — never auto-resolved),
-   then push. One-offs that land on the live train from now on ship in the next release.
+**Finding support-train pull requests.** Query `gh pr list --base <releaseSource> --state <state>
+--search 'in:title "Support train:"' --json number,title,body,mergedAt --limit 20`, then keep only
+titles starting `Support train:` whose body carries the marker; for merged ones take the latest
+`mergedAt`. Never trust search order or a body match alone.
+
+1. **Finish an interrupted earlier run first**, every time: for the latest merged support-train
+   pull request, apply step 6 to its marker's range. Step 6 skips any item already Done or already
+   carrying that pull request's "reached …" comment, so a finished run is a no-op and a re-opened
+   item is never closed again.
+2. **An open support-train pull request is ADOPTED** before anything is cut: read `<sourceBefore>`
+   and `<trainSnapshot>` from its marker (no marker → STOP and name it; never guess a range), skip
+   steps 3–4, and run `pr` steps 2–2c on it — pre-ship selection, hold, `review` with the step-4
+   declarations, discharge — then continue at step 5.
+3. `git fetch origin <releaseSource> <train>`. No one-off on the train beyond the source
+   (`git log --no-merges --oneline origin/<releaseSource>..origin/<train>` is empty — merges of the
+   source alone are not work) → report "support train: nothing to ship" and stop here. Otherwise
+   record `<sourceBefore>` (the `origin/<releaseSource>` SHA) and `<trainSnapshot>` (the
+   `origin/<train>` SHA), and **cut the snapshot**: a branch named per `branchNaming` (slug
+   `support-train-<date>`, `-2` … when taken) at `<trainSnapshot>`, then
+   `git merge --no-ff origin/<releaseSource>` into it so review and the pre-ship checks see the
+   combined tree (a conflict STOPS with the files — never auto-resolved), then push. One-offs that
+   land on the live train from now on ship in the next release.
 4. **Open it through `pr` in driven mode** — base `<releaseSource>`, title `Support train: <n>
-   one-off(s) for release <date>`, the body listing each one-off — flagged as a release-unit pull
-   request exactly as `build-item` step 8 flags an epic release, so `review` takes the FULL diff (a
-   one-off merged fast onto the train had no full review yet — this is its first and only full
-   review before production), and declaring `merge-only: true` and `fix-exclusions: true`. `pr` owns
-   the draft hold, the pre-ship checks its step 2 selects and the ready-flip that releases CI once.
-   Fixes are committed on the snapshot, each passing §3's fix-exclusion check first (a migration or
-   deploy-configuration fix leaves the train: merge it to the source by its own pull request). An
-   open support-train pull request is ADOPTED: hand it to `review` with the same declarations.
-5. **Merge** — first run §3's exclusion check over `git diff --name-only
-   <sourceBefore>...<reviewedHead>` (a match STOPS: such a change must not ride the train); then
-   `gh pr merge <n> --merge --match-head-commit <reviewedHead> --delete-branch` (the snapshot is
-   disposable). **Never a direct push to `releaseSource`**: its own required checks run on the pull
-   request. A verified P1 or serious P2 that is not fixed STOPS the release.
+   one-off(s) for release <date>`, the body listing each one-off and carrying the range marker —
+   flagged as a release-unit pull request exactly as `build-item` step 8 flags an epic release, so
+   `review` takes the FULL diff (a one-off merged fast onto the train had no full review yet — this
+   is its first and only full review before production), and declaring `merge-only: true` and
+   `fix-exclusions: true`. `pr` owns the draft hold, the pre-ship checks its step 2 selects and the
+   ready-flip that releases CI once. Fixes are committed on the snapshot, each passing §3's
+   fix-exclusion check first (a migration or deploy-configuration fix leaves the train: merge it to
+   the source by its own pull request).
+5. **Merge** — first run §3's exclusion check over
+   `git diff --name-only --no-renames <sourceBefore>...<reviewedHead>` (a match STOPS: such a change
+   must not ride the train); then `gh pr merge <n> --merge --match-head-commit <reviewedHead>
+   --delete-branch` (the snapshot is disposable). **Never a direct push to `releaseSource`**: its
+   own required checks run on the pull request. A verified P1 or serious P2 that is not fixed STOPS
+   the release.
 6. **Close every one-off it carried.** Candidates are the item numbers in the subjects of
-   `git log --first-parent --merges --format=%s <sourceBefore>..<trainSnapshot>` — the snapshot's
-   own range, never the live train — matched with the word-bounded expression `\bI[0-9]+\b` (the
-   branch name in a pull-request merge subject, or the item number that leads a fast merge's
-   subject); merges of `releaseSource` itself are skipped. **Each is LOOKED UP with `get_item`
-   before any write**; keep only a `hierarchyRoles.leaf` type that is not Done and has no
-   "reached …" comment for this pull request, and report every skipped candidate, and every merge
-   subject with no item number, as "not marked Done: <subject>" — never guess. For each kept item:
-   `update_item` → Done with `dueDate` today, then `add_comment` "reached <releaseSource> with
-   release <name> (support train pull request #<n>)". Nothing was recorded on the items
-   beforehand; the git history is the record.
-7. **Bring the live train up to date now**, not at close-out: `git merge-base --is-ancestor
-   origin/<train> origin/<releaseSource>` → fast-forward it (`git push origin
-   origin/<releaseSource>:refs/heads/<train>`, never `--force`); otherwise one-offs landed meanwhile —
-   merge `origin/<releaseSource>` into the train (`git merge --no-ff`, a conflict STOPS) and push, so
-   the train never falls behind the source.
+   `git log --first-parent --merges --format=%s <sourceBefore>..<trainSnapshot>` — the marker's
+   range, never the live train — matched with the word-bounded expression `\bI[0-9]+\b` (the branch
+   name in a pull-request merge subject, or the item number that leads a fast merge's subject);
+   merges of `releaseSource` itself are skipped. **Each is LOOKED UP with `get_item` before any
+   write**; keep only a `hierarchyRoles.leaf` type that is not Done and has no "reached …" comment
+   for this pull request, and report every skipped candidate, and every merge subject with no item
+   number, as "not marked Done: <subject>" — never guess. For each kept item: `update_item` → Done
+   with `dueDate` today, then `add_comment` "reached <releaseSource> with release <name> (support
+   train pull request #<n>)". Nothing was recorded on the items beforehand; the git history is the
+   record.
+7. **Bring the live train up to date now**, not at close-out: `git fetch origin <releaseSource>
+   <train>` first (the merge happened on GitHub, so local refs are stale), then
+   `git merge-base --is-ancestor origin/<train> origin/<releaseSource>` → fast-forward it
+   (`git push origin origin/<releaseSource>:refs/heads/<train>`, never `--force`); otherwise
+   one-offs landed meanwhile — merge `origin/<releaseSource>` into the train (`git merge --no-ff`, a
+   conflict STOPS) and push, so the train never falls behind the source.
 
 ## 2. Cut the release branch (step 0c)
 
@@ -89,15 +103,16 @@ reviews or merges the live branch: it reviews a SNAPSHOT that only this run writ
   request it heads. Develop-side merges never reach it: they ship in the NEXT release.
 - **Fix-exclusion check before EVERY commit** made on it (review fixes, pre-ship fixes; §4's merge
   of the production branch is exempt — a hotfix is already in production): list the staged files
-  (`git diff --name-only --cached`). Any match for an entry of `release.releaseBranchFixExclusions`
-  (absent → nothing is refused) → **REFUSE**: commit nothing, name the matching files, and tell the
-  operator in plain words: "this fix touches deploy configuration or database migrations; merge it
-  to <releaseSource> through a normal pull request then abandon this release branch and re-cut."
-- **The same check at adoption**, over every file changed by
-  `git log --first-parent --no-merges --name-only --format= <sourceHead>..origin/<name>`, plus, for
-  each merge commit on that first-parent line that is not a merge of `productionBranch` (§4), the
-  files it changed against its first parent (`git diff --name-only <merge>^1 <merge>`) — a commit
-  pushed or merged in by hand is caught on a resumed run.
+  (`git diff --name-only --no-renames --cached`, so a rename reports both paths). Any match for an
+  entry of `release.releaseBranchFixExclusions` (absent → nothing is refused) → **REFUSE**: commit
+  nothing, name the matching files, and tell the operator in plain words: "this fix touches deploy
+  configuration or database migrations; merge it to <releaseSource> through a normal pull request
+  then abandon this release branch and re-cut."
+- **The same check at adoption**, over every file changed by `git log --first-parent --no-merges
+  --no-renames --name-only --format= <sourceHead>..origin/<name>`, plus, for each merge commit on
+  that first-parent line that is not a merge of `productionBranch` (§4), the files it changed
+  against its first parent (`git diff --name-only --no-renames <merge>^1 <merge>`) — a commit pushed
+  or merged in by hand is caught on a resumed run.
 - **Abandon and re-cut**: `gh pr close <n> --comment "<reason>; abandoned for a re-cut"`; leave the
   branch for the owner to delete (never delete it unasked); re-run `/devstride:release`, which cuts
   the next `-n`.
@@ -133,7 +148,8 @@ advanced under a release-branch head.
    `origin/<productionBranch>` and `origin/<releaseSource>` (`git merge-base --is-ancestor`):
    `git push origin --delete <name>`, then `git branch -D <name>`. Either check failing → keep it
    and report why. Never delete `releaseSource` or `productionBranch`.
-3. **Bring the support train up to date** when `supportTrain.branch` is set, by §1 step 7's rule
+3. **Bring the support train up to date** when `supportTrain.branch` is set and exists on origin (a
+   train not yet created is skipped, said so; leave it out of the fetch above), by §1 step 7's rule
    (fast-forward when it is an ancestor of the source, else merge the source into it), so the
    release's own fixes reach it too; report how many unreleased one-offs it carries.
 

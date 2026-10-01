@@ -25,7 +25,7 @@ request's base.
   path matching an entry of `release.releaseBranchFixExclusions` (absent → nothing is excluded;
   matching per `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`) ships to
   `baseBranch` by the full 4b ritual instead, announced with the matching paths. Decide it at step 0
-  from the validated spec, and check it again on the real diff (`git diff --name-only
+  from the validated spec, and check it again on the real diff (`git diff --name-only --no-renames
   origin/<train>...HEAD`) immediately before anything merges onto the train — the 5a merge, or the
   4b pull request's merge — since a review fix can add such a path. A story branch that turns out to
   touch one is moved with `git rebase --onto origin/<baseBranch> origin/<train>` (a disposable story
