@@ -402,13 +402,30 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `update` | Updates the exact loaded copy, verifies its official tag and files, then stops for a checked plugin reload (restart is the fallback) |
 | `ci-audit` | Measures what CI actually costs: executed runs per workflow per pull request (the design is one each), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
 
+### Agents that do not run these skills
+
+Codex, a script or a person can follow the same routing without Claude. `skills/build-item/scripts/routing.py`
+is the loop's rule for where an item lands and what its branches are called, as one dependency-free
+Python 3 file: JSON in on stdin, JSON out. `target` answers "which branch does this item land on"
+(its epic's integration branch, the support train, or the base branch), `branch-name` names the
+feature branch, `match` applies the branch-pattern rule, and `excluded` lists changed files that may
+not ride the support train. Pass `oneOff: true` for an item delivered outside a plan, and `roles`
+when your config has no `hierarchyRoles`. `routing-fixtures.json` beside it holds the canonical examples; if your
+repository implements the rule itself, run those examples against your implementation in its tests.
+
+```bash
+jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], prefix: "jane", date: "26-10-02",
+  chain: [{number: "I201", title: "A story", workType: "Story"}, {number: "I200", title: "Release trains", workType: "Epic"}]}' \
+  | python3 skills/build-item/scripts/routing.py target
+```
+
 ## Versioning & updates
 
 2.5.0 loads roughly a quarter less skill text per invocation than 2.4.0 — every body sits
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.8.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.9.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added
