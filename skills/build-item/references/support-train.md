@@ -33,6 +33,9 @@ request's base.
   the local gate on the new tree), and it continues by 4b into `baseBranch` as a `pr-boundary`
   review.
 
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/routing.py` implements this routing: `target`
+(with `changedFiles` for the exclusion rule) at step 0, `excluded` for the check before a merge.
+
 ## Delivery path
 
 - **`supportTrain.fastMerges` true → fast mode (4a, then 5a) exactly as for an epic branch, with the

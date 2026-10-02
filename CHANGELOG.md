@@ -8,6 +8,63 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.9.0] — 2026-10-02
+
+### Added
+
+- **The routing rule is now one runnable file.** `skills/build-item/scripts/routing.py` decides
+  where an item lands — its nearest epic's integration branch, the support train, or the base
+  branch — and names its branches, with JSON in and out and no dependencies beyond Python 3.
+  `build-item` follows its answer instead of re-deriving the rule from prose, and Codex, scripts or
+  people can run the same file and get the same answer. `routing-fixtures.json` beside it holds the
+  canonical examples, so a repository that implements the rule in its own tooling can test that
+  implementation against them and fail when the two drift.
+  The caller says whether the item is a one-off (`oneOff`: a one-off filed under an Epic never
+  uses that epic's branch) and, when the config has no `hierarchyRoles`, passes the roles it
+  resolved from the organization's work-type hierarchy (`roles`); without either source of roles
+  the helper stops with an error rather than guessing. `epicSlug` carries the epic's slug under a
+  repository's own `epicIntegrationBranches.slugRule`.
+
+### Fixed
+
+- **An epic's integration branch cut under an earlier naming is found again.** The fallback
+  lookup `*/<epic-number>-*` matched only two-segment names, so a dated branch such as
+  `jane/26-10-01/I200-release-trains` was missed and the loop could cut a second integration branch
+  for the same epic. Any branch on origin whose last path segment starts with the epic's number
+  (with or without an `epic-` marker) now stops the loop with a question instead.
+- **A pattern without `<epic-number>` is matched on the epic's title slug**, as the working-base
+  text always said, instead of matching every integration branch.
+- **A branch named explicitly as the working base is refused** when it is the release source or
+  matches `release.releaseBranchPattern`, not only when `protectedBranches` lists it.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.8.0 @ 66f8fef, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.8.0 | tokens@devstride--v3.8.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,012 | 10,671 | 32,012 | 10,671 | +0 | 10,700 |
+| skills/review/SKILL.md | 24,000 | 8,000 | 24,000 | 8,000 | +0 | 8,000 |
+| skills/doctor/SKILL.md | 23,987 | 7,996 | 23,987 | 7,996 | +0 | 8,000 |
+| skills/build-item/SKILL.md | 23,996 | 7,999 | 23,987 | 7,996 | -3 | 8,000 |
+| skills/plan/SKILL.md | 23,813 | 7,938 | 23,813 | 7,938 | +0 | 8,000 |
+| skills/release/SKILL.md | 21,726 | 7,242 | 21,726 | 7,242 | +0 | 7,300 |
+| skills/rebalance/SKILL.md | 17,062 | 5,688 | 17,062 | 5,688 | +0 | 5,700 |
+| skills/ultracode-build/SKILL.md | 14,333 | 4,778 | 14,333 | 4,778 | +0 | 4,800 |
+| skills/pr/SKILL.md | 11,291 | 3,764 | 11,291 | 3,764 | +0 | 3,800 |
+| skills/rationalize-gantt/SKILL.md | 7,755 | 2,585 | 7,755 | 2,585 | +0 | 2,600 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 7,288 | 2,430 | 7,288 | 2,430 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,034 | 2,012 | 6,034 | 2,012 | +0 | 2,100 |
+| skills/insert-defect/SKILL.md | 4,730 | 1,577 | 4,730 | 1,577 | +0 | 1,600 |
+| skills/comprehend-plan/SKILL.md | 4,468 | 1,490 | 4,468 | 1,490 | +0 | 1,500 |
+| skills/insert-story/SKILL.md | 4,025 | 1,342 | 4,025 | 1,342 | +0 | 1,400 |
+| skills/create-story/SKILL.md | 3,999 | 1,333 | 3,999 | 1,333 | +0 | 1,400 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| alwaysOn.context (skill listing) | 3,697 | 1,233 | 3,697 | 1,233 | +0 | 1,300 |
+| **total (bodies)** | 246,470 | 82,163 | 246,461 | 82,160 | -3 | |
+
 ## [3.8.0] — 2026-10-01
 
 ### Upgrading
@@ -1665,7 +1722,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.8.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.9.0...HEAD
+[3.9.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.8.0...devstride--v3.9.0
 [3.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.7.0...devstride--v3.8.0
 [3.7.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.6.0...devstride--v3.7.0
 [3.6.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.5.1...devstride--v3.6.0

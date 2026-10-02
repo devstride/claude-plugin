@@ -1,0 +1,1198 @@
+{
+  "_readme": "Canonical examples of the routing and naming rule that skills/build-item/scripts/routing.py implements. scripts/tests/routing.sh runs every case through the helper. A repository with its own implementation of the rule should vendor this file and run every case through that implementation, so the two can never silently disagree. A target case's `config` is deep-merged over the top-level `config` (a null replaces); `expect` is the helper's output without its `reason`. A case with `error: true` must be refused as malformed (the helper exits 2), which is different from `kind: refuse`, a valid answer. A case marked `inputValidation: true` tests only the helper's JSON input checks; an implementation whose types already rule that input out may skip it.",
+  "config": {
+    "baseBranch": "develop",
+    "integrationBranch": null,
+    "protectedBranches": [
+      "develop",
+      "master",
+      "release/*"
+    ],
+    "branchNaming": {
+      "pattern": "<prefix>/<YY-MM-DD>/<I#####>-<slug>",
+      "dateFormat": "YY-MM-DD"
+    },
+    "epicIntegrationBranches": {
+      "enabled": true,
+      "pattern": "<prefix>/<YY-MM-DD>/epic-<epic-number>-<epic-title-slug>"
+    },
+    "hierarchyRoles": {
+      "releaseUnit": "Epic",
+      "leaf": [
+        "Story",
+        "Defect"
+      ]
+    },
+    "supportTrain": {
+      "branch": "train/support",
+      "fastMerges": true
+    },
+    "release": {
+      "productionBranch": "master",
+      "mergeTrainBeforeCut": true,
+      "releaseBranchFixExclusions": [
+        "stacks/**",
+        "sst.config.ts",
+        "db/migrations/**"
+      ],
+      "releaseSource": "develop",
+      "releaseBranchPattern": "release/<YY-MM-DD>[-n]"
+    }
+  },
+  "match": [
+    {
+      "name": "jane/26-10-01/epic-I700-checkout-redesign",
+      "patterns": [
+        "*/*/epic-I*-*"
+      ],
+      "pattern": "*/*/epic-I*-*"
+    },
+    {
+      "name": "jane/26-10-01/I700-checkout-redesign",
+      "patterns": [
+        "*/*/epic-I*-*"
+      ],
+      "pattern": null
+    },
+    {
+      "name": "jane/epic-I700-checkout-redesign",
+      "patterns": [
+        "*/*/epic-I*-*"
+      ],
+      "pattern": null
+    },
+    {
+      "name": "release/26-10-02",
+      "patterns": [
+        "release/<YY-MM-DD>[-n]"
+      ],
+      "pattern": "release/<YY-MM-DD>[-n]"
+    },
+    {
+      "name": "release/26-10-02-2",
+      "patterns": [
+        "release/<YY-MM-DD>[-n]"
+      ],
+      "pattern": "release/<YY-MM-DD>[-n]"
+    },
+    {
+      "name": "release/26-10-02-x",
+      "patterns": [
+        "release/<YY-MM-DD>[-n]"
+      ],
+      "pattern": null
+    },
+    {
+      "name": "release/2026-10-02",
+      "patterns": [
+        "release/<YY-MM-DD>[-n]"
+      ],
+      "pattern": null
+    },
+    {
+      "name": "release/26-10-02",
+      "patterns": [
+        "release/*"
+      ],
+      "pattern": "release/*"
+    },
+    {
+      "name": "release/26-10-02/extra",
+      "patterns": [
+        "release/*"
+      ],
+      "pattern": null
+    },
+    {
+      "name": "jane/hotfix/26-10-02/I701-fix",
+      "patterns": [
+        "*/hotfix/**"
+      ],
+      "pattern": "*/hotfix/**"
+    },
+    {
+      "name": "jane/hotfix",
+      "patterns": [
+        "*/hotfix/**"
+      ],
+      "pattern": null
+    },
+    {
+      "name": "train/support",
+      "patterns": [
+        "train/support"
+      ],
+      "pattern": "train/support"
+    },
+    {
+      "name": "train/support2",
+      "patterns": [
+        "train/support"
+      ],
+      "pattern": null
+    },
+    {
+      "name": "a/b",
+      "patterns": [
+        "*"
+      ],
+      "pattern": null
+    },
+    {
+      "name": "a/b",
+      "patterns": [
+        "**"
+      ],
+      "pattern": "**"
+    },
+    {
+      "name": "aXb",
+      "patterns": [
+        "a.b"
+      ],
+      "pattern": null
+    },
+    {
+      "name": "a+b",
+      "patterns": [
+        "a+b"
+      ],
+      "pattern": "a+b"
+    },
+    {
+      "name": "jane/26-10-02/sync-master-into-develop-2",
+      "patterns": [
+        "*/*/sync-master-into-develop",
+        "*/*/sync-master-into-develop-*"
+      ],
+      "pattern": "*/*/sync-master-into-develop-*"
+    },
+    {
+      "name": "develop",
+      "patterns": [
+        "develop",
+        "master",
+        "release/*"
+      ],
+      "pattern": "develop"
+    }
+  ],
+  "prefix": [
+    {
+      "userName": "Alex Smith",
+      "prefix": "alex"
+    },
+    {
+      "userName": "  Jane   Doe ",
+      "prefix": "jane"
+    },
+    {
+      "userName": "O'Brien Pat",
+      "prefix": "obrien"
+    },
+    {
+      "userName": "",
+      "error": true
+    }
+  ],
+  "slug": [
+    {
+      "title": "[23.1] Fix the Thing: now!",
+      "slug": "fix-the-thing-now"
+    },
+    {
+      "title": "Checkout redesign for mobile and tablet users",
+      "slug": "checkout-redesign-for-mobile-and-tablet"
+    },
+    {
+      "title": "Checkout redesign for mobile and tablet",
+      "words": 3,
+      "slug": "checkout-redesign-for"
+    },
+    {
+      "title": "Ünïcode café",
+      "slug": "n-code-caf"
+    },
+    {
+      "title": "[4] !!!",
+      "error": true
+    },
+    {
+      "title": "Checkout redesign",
+      "words": "x",
+      "error": true,
+      "inputValidation": true
+    }
+  ],
+  "branchName": [
+    {
+      "item": "I702",
+      "title": "[3] Show totals on the invoice page",
+      "prefix": "jane",
+      "date": "26-10-02",
+      "branch": "jane/26-10-02/I702-show-totals-on-the-invoice-page"
+    },
+    {
+      "item": "I702",
+      "slug": "totals",
+      "prefix": "jane",
+      "date": "26-10-02",
+      "branch": "jane/26-10-02/I702-totals"
+    }
+  ],
+  "excluded": [
+    {
+      "files": [
+        "stacks/api.ts",
+        "sst.config.ts",
+        "db/migrations/0001_x.sql",
+        "src/app.ts",
+        "stacksx/a.ts",
+        "docs/sst.config.ts"
+      ],
+      "excluded": [
+        "stacks/api.ts",
+        "sst.config.ts",
+        "db/migrations/0001_x.sql"
+      ]
+    }
+  ],
+  "target": [
+    {
+      "name": "a story under an epic whose integration branch exists reuses it",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop",
+        "jane/26-10-01/epic-I200-checkout-redesign"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "jane/26-10-01/epic-I200-checkout-redesign",
+        "create": false
+      }
+    },
+    {
+      "name": "a story under an epic with no integration branch creates one, named for today",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "[2] Checkout redesign for mobile and tablet",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "jane/26-10-02/epic-I200-checkout-redesign-for-mobile-and-tablet",
+        "create": true
+      }
+    },
+    {
+      "name": "several integration branches for one epic: ask, never guess",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "jane/26-10-03/epic-I200-b",
+        "jane/26-10-01/epic-I200-a"
+      ],
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "jane/26-10-01/epic-I200-a",
+          "jane/26-10-03/epic-I200-b"
+        ]
+      }
+    },
+    {
+      "name": "an integration branch in the older naming (no epic- marker): ask, never cut a second",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop",
+        "jane/26-10-01/I200-checkout-redesign"
+      ],
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "jane/26-10-01/I200-checkout-redesign"
+        ]
+      }
+    },
+    {
+      "name": "an integration branch in an undated older naming is found too",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "jane/I200-checkout-redesign"
+      ],
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "jane/I200-checkout-redesign"
+        ]
+      }
+    },
+    {
+      "name": "another epic whose number merely starts the same is not a match",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "jane/26-10-01/epic-I2000-other",
+        "jane/26-10-01/I2000-other"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "jane/26-10-02/epic-I200-checkout-redesign",
+        "create": true
+      }
+    },
+    {
+      "name": "the NEAREST epic above the item wins",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A defect",
+          "workType": "Defect"
+        },
+        {
+          "number": "I300",
+          "title": "Inner",
+          "workType": "Epic"
+        },
+        {
+          "number": "I100",
+          "title": "A capability",
+          "workType": "Capability"
+        },
+        {
+          "number": "I200",
+          "title": "Outer",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "jane/26-10-01/epic-I200-outer",
+        "jane/26-10-01/epic-I300-inner"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "jane/26-10-01/epic-I300-inner",
+        "create": false
+      }
+    },
+    {
+      "name": "a one-off (no epic above it) rides the support train",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        },
+        {
+          "number": "F900",
+          "title": "Support"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "train",
+        "branch": "train/support",
+        "create": false
+      }
+    },
+    {
+      "name": "the support train is created when it is not on origin",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "expect": {
+        "kind": "train",
+        "branch": "train/support",
+        "create": true
+      }
+    },
+    {
+      "name": "a one-off touching deploy configuration or migrations ships to the base branch by its own pull request",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "changedFiles": [
+        "src/app.ts",
+        "stacks/api.ts"
+      ],
+      "expect": {
+        "kind": "base",
+        "branch": "develop",
+        "create": false
+      }
+    },
+    {
+      "name": "a one-off whose changes miss every exclusion still rides the train",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "changedFiles": [
+        "src/app.ts",
+        "docs/sst.config.ts"
+      ],
+      "expect": {
+        "kind": "train",
+        "branch": "train/support",
+        "create": false
+      }
+    },
+    {
+      "name": "a train that releases never merge is not used: the base branch",
+      "config": {
+        "release": {
+          "mergeTrainBeforeCut": false
+        }
+      },
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "base",
+        "branch": "develop",
+        "create": false
+      }
+    },
+    {
+      "name": "no support train configured: the base branch",
+      "config": {
+        "supportTrain": null
+      },
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "expect": {
+        "kind": "base",
+        "branch": "develop",
+        "create": false
+      }
+    },
+    {
+      "name": "epic integration branches switched off: an epic story takes the base branch (it is not a one-off)",
+      "config": {
+        "epicIntegrationBranches": {
+          "enabled": false
+        }
+      },
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support",
+        "jane/26-10-01/epic-I200-checkout-redesign"
+      ],
+      "expect": {
+        "kind": "base",
+        "branch": "develop",
+        "create": false
+      }
+    },
+    {
+      "name": "integrationBranch set: everything lands there",
+      "config": {
+        "integrationBranch": "next"
+      },
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop",
+        "next"
+      ],
+      "expect": {
+        "kind": "integration",
+        "branch": "next",
+        "create": false
+      }
+    },
+    {
+      "name": "an explicit branch on origin is used as given",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop",
+        "jane/26-09-01/I200-checkout-redesign"
+      ],
+      "explicit": "jane/26-09-01/I200-checkout-redesign",
+      "expect": {
+        "kind": "explicit",
+        "branch": "jane/26-09-01/I200-checkout-redesign",
+        "create": false
+      }
+    },
+    {
+      "name": "an explicit protected branch is refused",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop",
+        "release/26-10-02"
+      ],
+      "explicit": "release/26-10-02",
+      "expect": {
+        "kind": "refuse"
+      }
+    },
+    {
+      "name": "the base branch named explicitly is refused when it is protected",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "explicit": "develop",
+      "expect": {
+        "kind": "refuse"
+      }
+    },
+    {
+      "name": "an explicit branch missing from origin is refused",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "explicit": "jane/26-10-02/epic-I999-nothing",
+      "expect": {
+        "kind": "refuse"
+      }
+    },
+    {
+      "name": "a container is never started, even with an explicit branch",
+      "chain": [
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "explicit": "train/support",
+      "expect": {
+        "kind": "refuse"
+      }
+    },
+    {
+      "name": "a workstream is never started",
+      "chain": [
+        {
+          "number": "F900",
+          "title": "Support"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "expect": {
+        "kind": "refuse"
+      }
+    },
+    {
+      "name": "the plugin's shipped defaults (month-first date, no epic- marker) name and find branches in that shape",
+      "config": {
+        "epicIntegrationBranches": {
+          "pattern": "<prefix>/<MM-DD-YY>/<epic-number>-<epic-title-slug>"
+        },
+        "branchNaming": {
+          "pattern": "<prefix>/<MM-DD-YY>/<I#####>-<slug>",
+          "dateFormat": "MM-DD-YY"
+        },
+        "supportTrain": null
+      },
+      "prefix": "jane",
+      "date": "10-02-26",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "jane/10-02-26/I200-checkout-redesign",
+        "create": true
+      }
+    },
+    {
+      "name": "under the shipped defaults an existing branch in that shape is reused",
+      "config": {
+        "epicIntegrationBranches": {
+          "pattern": "<prefix>/<MM-DD-YY>/<epic-number>-<epic-title-slug>"
+        }
+      },
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "jane/10-01-26/I200-checkout-redesign"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "jane/10-01-26/I200-checkout-redesign",
+        "create": false
+      }
+    },
+    {
+      "name": "under the shipped defaults a marked branch alone is asked about",
+      "config": {
+        "epicIntegrationBranches": {
+          "pattern": "<prefix>/<MM-DD-YY>/<epic-number>-<epic-title-slug>"
+        }
+      },
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "jane/26-10-01/epic-I200-checkout-redesign"
+      ],
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "jane/26-10-01/epic-I200-checkout-redesign"
+        ]
+      }
+    },
+    {
+      "name": "a pattern without <epic-number> finds the epic's branch by its title slug",
+      "config": {
+        "epicIntegrationBranches": {
+          "pattern": "epic/<epic-title-slug>"
+        }
+      },
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "epic/other-epic",
+        "epic/checkout-redesign"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "epic/checkout-redesign",
+        "create": false
+      }
+    },
+    {
+      "name": "a one-off filed under an Epic never uses that epic's branch",
+      "chain": [
+        {
+          "number": "I500",
+          "title": "A one-off defect",
+          "workType": "Defect"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support",
+        "jane/26-10-01/epic-I200-checkout-redesign"
+      ],
+      "oneOff": true,
+      "expect": {
+        "kind": "train",
+        "branch": "train/support",
+        "create": false
+      }
+    },
+    {
+      "name": "a plan story with no epic above it, marked not a one-off, takes the base branch",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "oneOff": false,
+      "expect": {
+        "kind": "base",
+        "branch": "develop",
+        "create": false
+      }
+    },
+    {
+      "name": "no hierarchyRoles in config: roles resolved by the caller are used",
+      "config": {
+        "hierarchyRoles": null
+      },
+      "roles": {
+        "leaf": [
+          "Story",
+          "Defect"
+        ],
+        "releaseUnit": "Epic"
+      },
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "jane/26-10-01/epic-I200-checkout-redesign"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "jane/26-10-01/epic-I200-checkout-redesign",
+        "create": false
+      }
+    },
+    {
+      "name": "no hierarchyRoles and no roles passed: malformed, never a guess",
+      "config": {
+        "hierarchyRoles": null
+      },
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "error": true
+    },
+    {
+      "name": "an explicit branch matching the release-branch pattern is refused even when protectedBranches omits it",
+      "config": {
+        "protectedBranches": [
+          "master"
+        ]
+      },
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop",
+        "release/26-10-02"
+      ],
+      "explicit": "release/26-10-02",
+      "expect": {
+        "kind": "refuse"
+      }
+    },
+    {
+      "name": "the release source named explicitly is refused even when protectedBranches omits it",
+      "config": {
+        "protectedBranches": [
+          "master"
+        ]
+      },
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "explicit": "develop",
+      "expect": {
+        "kind": "refuse"
+      }
+    },
+    {
+      "name": "a chain entry that is not an object is malformed",
+      "chain": [
+        "I201"
+      ],
+      "heads": [
+        "develop"
+      ],
+      "error": true,
+      "inputValidation": true
+    },
+    {
+      "name": "a caller-resolved epic slug (the repository's slugRule) is used for lookup and creation",
+      "config": {
+        "epicIntegrationBranches": {
+          "pattern": "epic/<epic-title-slug>"
+        }
+      },
+      "epicSlug": "checkout-redesign-for",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign for mobile and tablet",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "epic/checkout-redesign-for"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "epic/checkout-redesign-for",
+        "create": false
+      }
+    },
+    {
+      "name": "an epic title with no usable slug still reuses its number-keyed branch",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "日本語",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "jane/26-10-01/epic-I200-checkout"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "jane/26-10-01/epic-I200-checkout",
+        "create": false
+      }
+    },
+    {
+      "name": "changedFiles given as one string is malformed, never checked letter by letter",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "changedFiles": "stacks/api.ts",
+      "error": true,
+      "inputValidation": true
+    },
+    {
+      "name": "a oneOff that is not true or false is malformed",
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "oneOff": "true",
+      "error": true,
+      "inputValidation": true
+    },
+    {
+      "name": "configured hierarchyRoles win over roles passed by the caller",
+      "roles": {
+        "leaf": [
+          "Task"
+        ],
+        "releaseUnit": "Feature"
+      },
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "Checkout redesign",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "jane/26-10-01/epic-I200-checkout-redesign"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "jane/26-10-01/epic-I200-checkout-redesign",
+        "create": false
+      }
+    },
+    {
+      "name": "naming the support train explicitly does not let deploy configuration ride it",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "explicit": "train/support",
+      "changedFiles": [
+        "stacks/api.ts"
+      ],
+      "expect": {
+        "kind": "base",
+        "branch": "develop",
+        "create": false
+      }
+    },
+    {
+      "name": "a number-only epic pattern creates a branch even when the title has no usable slug",
+      "config": {
+        "epicIntegrationBranches": {
+          "pattern": "epic/<epic-number>"
+        }
+      },
+      "chain": [
+        {
+          "number": "I201",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I200",
+          "title": "日本語",
+          "workType": "Epic"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "expect": {
+        "kind": "epic",
+        "branch": "epic/I200",
+        "create": true
+      }
+    }
+  ],
+  "targetDefaults": {
+    "prefix": "jane",
+    "date": "26-10-02"
+  }
+}

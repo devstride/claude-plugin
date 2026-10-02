@@ -28,7 +28,7 @@ silent over-match, and here an over-match either protects nothing or refuses a h
 A shell `case` statement or `[[ == ]]` is NOT this rule (its `*` crosses `/`); translate the
 pattern to an anchored regular expression — `*` → `[^/]+`, `**` → `.+`, `<YY-MM-DD>` →
 `[0-9]{2}-[0-9]{2}-[0-9]{2}`, `[-n]` → `(-[0-9]+)?`, every other character escaped — and test
-with `grep -Eq '^<regex>$'`.
+with `grep -Eq '^<regex>$'`. Or run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/routing.py match`.
 
 ## Protected and merge-only heads
 
