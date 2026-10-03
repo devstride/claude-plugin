@@ -8,6 +8,12 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Documentation
+
+- **The README now opens with how the loop works and why**: five ideas (a walkable plan,
+  release units, fast mode, review before CI, and profiles with human decisions kept human). It
+  links to the full explanation on docs.devstride.com.
+
 ## [3.9.0] — 2026-10-02
 
 ### Added
