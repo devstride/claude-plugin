@@ -39,7 +39,8 @@ empty → ask which plan to rationalize: $ARGUMENTS
 Resolve the root (or ask). `search_items` (hierarchy=[root], itemType=workitem, no `isDone` filter,
 limit 200) gives the nodes with `number`/`title`/`parentNumber`/`lane`/dates. Confirm, since each
 changes the output: (a) the root; (b) re-date completed items too, or only not-done (default:
-everything, for one clean cascade — callers extending a live plan ask for not-done only); (c) the
+everything, for one clean cascade — callers extending a live plan ask for not-done only; a landed
+leaf, built but awaiting its epic's release, counts as done); (c) the
 1-day-per-story assumption.
 
 ## 1. Disable the organization-wide dependency auto-scheduler FIRST — non-negotiable

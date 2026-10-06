@@ -8,6 +8,73 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.10.0] — 2026-10-06
+
+### Fixed
+
+- **An epic's stories are Done when the epic reaches its release target, not when they merge onto
+  its integration branch.** `build-item` marked every story Done at its merge onto the epic's
+  branch, so a board showed whole epics as finished while their release pull request was still a
+  draft and none of that code had been fully reviewed or reached the base branch. A story merged
+  onto its epic's branch is now *landed*: it moves to a "merged, awaiting release" status (below),
+  gets a comment naming the branch and merge commit, and step 8 marks every landed story Done, with
+  the date and a comment linking the release pull request, right after that pull request merges.
+  This is the shape a one-off on the support train already had.
+  - **Blocking follows.** A blocker that has landed on the same epic's branch now satisfies the
+    story it blocks, so an epic still runs story after story; a blocker in a different epic is
+    satisfied only when Done, so the next epic waits until the previous one has shipped.
+  - **The record is the git history the loop already writes** — the integration branch's
+    first-parent merge subjects, read the way `release` reads the support train — so nothing new
+    is stored on the items.
+  - A story in that status whose merge the git history does not show is never picked up again
+    or counted as finished; the loop reports it and asks.
+  - The remaining-story count that triggers the epic release ignores landed stories, so an epic
+    still releases at zero. A landed story whose release merged before the close-out ran is
+    finished, never rebuilt.
+  - `comprehend-plan` reports landed stories separately; `insert-story`/`insert-defect` treat them
+    as not open when splicing; `rationalize-gantt` counts them as done when re-dating only open
+    work; `rebalance` does not mistake one for a running loop.
+
+### Added
+
+- **`epicIntegrationBranches.mergedStatusName`** (default `"Review"`) names the status a landed
+  story moves to. It is matched by name in each work type's status collection, so one setting
+  works in any organization; `null`, or an organization with no status of that name, leaves the
+  story's status as it is, with the comment and the git history as the record.
+
+### Upgrading
+
+- Stories already marked Done by an earlier version stay Done and keep satisfying their
+  dependents. Only stories merged from this version on wait for their epic's release.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.9.0 @ 525de01, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.9.0 | tokens@devstride--v3.9.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,012 | 10,671 | 32,012 | 10,671 | +0 | 10,700 |
+| skills/review/SKILL.md | 24,000 | 8,000 | 24,000 | 8,000 | +0 | 8,000 |
+| skills/build-item/SKILL.md | 23,987 | 7,996 | 23,994 | 7,998 | +2 | 8,000 |
+| skills/doctor/SKILL.md | 23,987 | 7,996 | 23,987 | 7,996 | +0 | 8,000 |
+| skills/plan/SKILL.md | 23,813 | 7,938 | 23,813 | 7,938 | +0 | 8,000 |
+| skills/release/SKILL.md | 21,726 | 7,242 | 21,726 | 7,242 | +0 | 7,300 |
+| skills/rebalance/SKILL.md | 17,062 | 5,688 | 17,175 | 5,725 | +37 | 5,800 |
+| skills/ultracode-build/SKILL.md | 14,333 | 4,778 | 14,333 | 4,778 | +0 | 4,800 |
+| skills/pr/SKILL.md | 11,291 | 3,764 | 11,291 | 3,764 | +0 | 3,800 |
+| skills/rationalize-gantt/SKILL.md | 7,755 | 2,585 | 7,825 | 2,609 | +24 | 2,700 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 7,288 | 2,430 | 7,288 | 2,430 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,034 | 2,012 | 6,034 | 2,012 | +0 | 2,100 |
+| skills/insert-defect/SKILL.md | 4,730 | 1,577 | 4,730 | 1,577 | +0 | 1,600 |
+| skills/comprehend-plan/SKILL.md | 4,468 | 1,490 | 4,577 | 1,526 | +36 | 1,600 |
+| skills/insert-story/SKILL.md | 4,025 | 1,342 | 4,025 | 1,342 | +0 | 1,400 |
+| skills/create-story/SKILL.md | 3,999 | 1,333 | 3,999 | 1,333 | +0 | 1,400 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| alwaysOn.context (skill listing) | 3,697 | 1,233 | 3,697 | 1,233 | +0 | 1,300 |
+| **total (bodies)** | 246,461 | 82,160 | 246,760 | 82,259 | +99 | |
+
 ## [3.9.0] — 2026-10-02
 
 ### Added
@@ -1722,7 +1789,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.9.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.10.0...HEAD
+[3.10.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.9.0...devstride--v3.10.0
 [3.9.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.8.0...devstride--v3.9.0
 [3.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.7.0...devstride--v3.8.0
 [3.7.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.6.0...devstride--v3.7.0

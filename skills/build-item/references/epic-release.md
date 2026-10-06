@@ -30,6 +30,25 @@ unit is complete and reviewed as one PR. Each story goes in with `--no-ff` becau
 commit is the legible first-parent unit the release PR body and the close-out counts are read
 off — a fast-forward would dissolve the batch into indistinguishable commits.
 
+## Why an epic story is not Done until its epic reaches the release target
+
+Done is read by people as "this is in the product", and by the loop as "nothing more to do here".
+A story merged onto its integration branch is neither: it has not been through the release
+pull request's full review or CI, and it is not on the base branch. Marking it Done at that merge
+shows whole epics as finished while their release pull request is still a draft. So the story is *landed* until the release merges, and step 8 closes every landed story
+at once — the same shape as a one-off on the support train, which `release` closes when the
+train arrives.
+
+Blocking must follow, or every epic would stall after its first story: a later story in the
+same epic is blocked by an earlier one that will not be Done until the whole epic ships. A
+landed blocker therefore satisfies a dependent in the SAME release unit, which builds on the very
+branch that already holds it. Across release units it does not: the next epic still waits for the
+previous one to reach its release target, which is exactly what a cross-epic edge means.
+
+The count step 7 uses to trigger step 8 is the release unit, never the direct parent: an
+intermediate grouping item can read zero while sibling stories elsewhere in the unit are still
+open, and would publish a partially complete unit.
+
 ## Why the story branch is deleted only after the epic push succeeds
 
 A rejected push of the integration branch means the story's merge exists only locally. Deleting
@@ -63,8 +82,9 @@ release's business, and only on the owner's explicit `--release-notes`.
 
 ## Why the release PR is linked back onto every leaf
 
-A fast-mode story has no PR, so its completion ritual cites its merge SHA and integration
-branch and promises that the release PR link follows at step 8. Step 8's link-back is where
+A fast-mode story has no PR, so its landed comment cites its merge SHA and integration
+branch and promises that the release PR link follows at step 8, where the close-out comment
+names it. Step 8's link-back is where
 that promise is kept; skipping it leaves every fast-mode story in the batch pointing at a link
 that never arrives, and an item with no pointer to its shipped code fails the ritual's whole
 purpose.
@@ -95,5 +115,5 @@ take fast mode, exactly as an epic story does.
   classification or its step-0 delta").
 - `skills/build-item/SKILL.md` — the working-base note on why stories merge into the integration
   branch, step 5a's story-branch deletion and step 6.5's below-floor defect placement, each citing
-  this file with "(why: …)"; step 8's auto-release gate, `live: false` and no-release-notes rules
-  are covered by the step-8 pointer above.
+  this file with "(why: …)", as does step 7's release-unit count; step 8's auto-release gate,
+  `live: false` and no-release-notes rules are covered by the step-8 pointer above.

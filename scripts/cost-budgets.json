@@ -9,7 +9,7 @@
     "branch-hotfix": 2100,
     "build-item": 8000,
     "ci-audit": 2600,
-    "comprehend-plan": 1500,
+    "comprehend-plan": 1600,
     "create-defect": 2500,
     "create-story": 1400,
     "doctor": 8000,
@@ -18,8 +18,8 @@
     "plan": 8000,
     "pr": 3800,
     "push": 1100,
-    "rationalize-gantt": 2600,
-    "rebalance": 5700,
+    "rationalize-gantt": 2700,
+    "rebalance": 5800,
     "release": 7300,
     "review": 8000,
     "setup": 10700,
@@ -27,9 +27,9 @@
     "update": 1000
   },
   "references": {
-    "skills/build-item/references/epic-release.md": 2200,
+    "skills/build-item/references/epic-release.md": 2700,
     "skills/build-item/references/ground-truth-at-start.md": 1800,
-    "skills/build-item/references/next-unblocked.md": 1200,
+    "skills/build-item/references/next-unblocked.md": 2300,
     "skills/build-item/references/plain-language-output.md": 2300,
     "skills/build-item/references/progress-table.md": 1300,
     "skills/build-item/references/support-train.md": 1500,
@@ -41,7 +41,7 @@
     "skills/plan/references/delivery-profiles.md": 4800,
     "skills/plan/references/execution-order-numbering.md": 1100,
     "skills/plan/references/release-unit-shaping.md": 1400,
-    "skills/plan/references/splice-mechanics.md": 2900,
+    "skills/plan/references/splice-mechanics.md": 3000,
     "skills/plan/references/worked-example.md": 1500,
     "skills/pr/references/body-conventions.md": 700,
     "skills/pr/references/pre-ship-hold.md": 300,
@@ -53,7 +53,7 @@
     "skills/release/references/release-branch.md": 4200,
     "skills/release/references/release-gates.md": 1300,
     "skills/review/references/ci-settle.md": 1800,
-    "skills/review/references/delivery-loop-invariants.md": 19700,
+    "skills/review/references/delivery-loop-invariants.md": 20100,
     "skills/review/references/delta-re-review.md": 2000,
     "skills/review/references/final-head-request.md": 900,
     "skills/review/references/github-review-api.md": 4700,
@@ -63,7 +63,7 @@
     "skills/review/references/roster-and-modes.md": 2000,
     "skills/review/references/slow-suite-gating.md": 1700,
     "skills/setup/references/ci-cost-patterns.md": 4500,
-    "skills/setup/references/config-defaults.md": 11800,
+    "skills/setup/references/config-defaults.md": 12100,
     "skills/setup/references/detector-evidence.digest.md": 900,
     "skills/setup/references/detector-evidence.md": 4300,
     "skills/setup/references/docs-skill-templates/update-documentation.md": 1400,
@@ -78,10 +78,11 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 65200,
+      "budget": 67900,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
+        "skills/build-item/references/next-unblocked.md",
         "skills/build-item/references/plain-language-output.md",
         "skills/build-item/references/verification-receipts.md",
         "skills/plan/references/delivery-profiles.md",
@@ -107,7 +108,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 55500,
+      "budget": 56600,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",

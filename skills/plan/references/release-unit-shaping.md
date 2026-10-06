@@ -13,8 +13,8 @@ loop gives each release unit its own integration branch, batches its story merge
 when the last story lands cuts the branch → develop release PR through the full review loop
 (automatically only when `epicIntegrationBranches.autoRelease` is enabled; otherwise it stops at
 release-ready and an owner cuts it). So
-when a release unit's leaves are all Done it SHIPS as one reviewed increment — which is why it
-must deliver real, end-user-visible value ON ITS OWN (a develop merge of "nothing usable yet"
+when a release unit's leaves have all landed on its branch it SHIPS as one reviewed increment —
+which is why it must deliver real, end-user-visible value ON ITS OWN (a develop merge of "nothing usable yet"
 is a pointless release). Every release unit costs a full review: too many micro release units
 create release overhead, a mega one becomes a long-lived branch drifting from develop.
 Horizontal technical layers each ship nothing usable alone; a foundation that genuinely must

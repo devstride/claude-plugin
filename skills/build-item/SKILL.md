@@ -153,8 +153,7 @@ resolves, else state your read and ask. **Steps 1–6 run VERBATIM.** Deltas:
 - A given story number IS the story. Otherwise apply
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full, projection warning
   included. **Never auto-select from the deferred container.** Surface the whole ready-set.
-- **DRY-CHAIN / TERMINAL:** no not-Done, non-gated, unblocked candidate → exit cleanly, never
-  re-ask, saying which: plan complete / N blocked by X, Y / N gated. Suggest `/devstride:plan <root>`
+- **DRY-CHAIN / TERMINAL:** no selectable candidate → exit cleanly, never re-ask, saying which: plan complete / N blocked by X, Y / N gated. Suggest `/devstride:plan <root>`
   only when the chain ran out; never invoke it.
 - **GATING CHECK** (a decision that is the user's → flag, next candidate), **SCOPE CHECK**
   (buildable now vs deferred, recorded), **VALIDATE THE SPEC** (re-fetch with `view: 'full'`; confirm
@@ -250,11 +249,11 @@ in the PR body. The push/ready-flip race is `review` step 7's: flip-with-push le
 ## 6. Completion ritual
 
 - `update_item` → **Done** (works off-board, unlike `mark_done`); `startDate`/`dueDate` = branch
-  creation → merge. **A one-off merged onto the support train is NOT Done** — comment and leave it
-  (`support-train.md`); `release` closes it.
+  creation → merge. **A merge onto an epic branch or the support train is NOT Done** —
+  LANDED: merged status + comment (`next-unblocked.md`; train: `support-train.md`); step 8 or
+  `release` closes it.
 - **The item points at its code**: 4b — confirm the PR auto-linked, else `link_pull_request`; 4a —
-  `add_comment` the merge SHA and epic branch (the release PR follows at step 8). Never invent a PR
-  number.
+  the landed comment. Never invent a PR number.
 - **Reconcile as-built** on a material deviation: `add_comment` the `view: 'full'` description
   verbatim under "📋 Original spec (as planned) — superseded by the description below" (HTML: pass
   `{ html }`, never Markdown), then rewrite it: an italic as-built note naming what it shipped in, a
@@ -279,10 +278,10 @@ in the PR body. The push/ready-flip race is `review` step 7's: flip-with-push le
   drift and STOP; never auto-reset or `git add .`.
 - **Handoff memory**: what shipped, what remains, the plan root WITH profile and source (never the
   profile alone), the epic's integration branch keyed to its number (or "develop — no epic").
-- **Counts**: not-Done `hierarchyRoles.leaf` descendants of **the SAME
-  release-unit ancestor step 0 resolved** — never the direct parent, which can read zero while siblings are open and publish a
-  PARTIALLY COMPLETE unit — plus the whole plan root. **The deferred container counts in NEITHER**
-  and is never a release unit. Unnumbered plan
+- **Counts**: `hierarchyRoles.leaf` descendants neither Done nor landed, of **the SAME
+  release-unit ancestor step 0 resolved** — never the direct parent (why:
+  `references/epic-release.md`) — plus the whole plan root. **The deferred container counts in
+  NEITHER** and is never a release unit. Unnumbered plan
   (`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/execution-order-numbering.md`) → bare numbers, noting
   `/devstride:plan <root>` would number it.
 - **Human recap.** After a direct pull-request merge (5b), lead with `Merged / Released`: item and
@@ -318,7 +317,8 @@ unit at zero and before cutting the release PR.** The batch lands as ONE reviewe
   behaviour and develop-merge resolutions; cloud may still cover the whole PR. A firing
   `verify.skipDuringStoryBuilds` suite is mandatory, with no story exemption; with the list empty,
   local pre-ship suites remain the callers' step-2b responsibility.
-- **Merge** `gh pr merge <n> --merge` once green and settled; delete the
+- **Merge** `gh pr merge <n> --merge` once green and settled (landed set captured first), then
+  **landed leaves → Done** (`next-unblocked.md`); delete the
   epic branch **only if `epicIntegrationBranches.deleteBranchAfterRelease`** — false retains it.
 - **Docs STAGE, never publish** — only when `docs.updateOnEpicRelease` is true (else silent):
   `docs.updateSkill` null → say none is registered; a name with no `.claude/skills/<name>/SKILL.md`
@@ -329,7 +329,7 @@ unit at zero and before cutting the release PR.** The batch lands as ONE reviewe
   release notes here.**
 - **Close out**: `add_comment` on the RELEASE-UNIT item (release PR, leaves, date), Done if lanes are
   tracked there, update handoff memory, sync develop, and **link the release PR onto every leaf**
-  whose as-built note deferred it (`link_pull_request` or `add_comment`).
+  (the close-out comment, or `link_pull_request`).
 - **Human recap.** Lead with `Merged / Released`: every item and its effect, where it landed,
   validation/review/CI, docs, whether live, the remaining production action. Surface — never
   perform — the owner-cut promotion (`/devstride:release`). New findings → step 6.5.
