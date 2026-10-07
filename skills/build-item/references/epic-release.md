@@ -22,6 +22,16 @@ the stories took the full 4b ritual instead, each was already cloud-reviewed at 
 the release review points at what per-story review could not see: the cross-story integration
 surface and the develop-merge conflict resolutions.
 
+A command the pull-request workflows run exactly is not repeated locally: the draft-held CI run
+is its one run.
+
+## Why the epic release pull request is merge-only
+
+Its first-parent story merges are the landed record the close-out reads, and its story commits are
+shared — later stories were built on them. A rebase would rewrite both, so the cut declares
+`merge-only: true`, and `review` refreshes the head by merging the base in (`branch-patterns.md`,
+"Protected and merge-only heads"), as step 8's own refresh does.
+
 ## Why stories merge into the integration branch, and why `--no-ff`
 
 A story that merged straight to the base branch would put half a release unit on the shared dev
@@ -57,15 +67,13 @@ waits on a push that actually succeeded — local and remote together, never the
 
 ## Why deferred defects live beside the plan, not inside its chain
 
-An out-of-scope or postponed finding that is both likely and material, and lives only in a PR
-body, is invisible to every later selection, so it has to become a tracked item; any other is
-dismissed with its reason, since filing it parks work nobody builds. WHERE a filed finding is
-tracked decides whether it is also execution order. A deferred defect spliced into the
-dependency chain with `blocked_by` edges is
-work the loop must build before the plan can reach zero: the plan never finishes, and the finding
-that was explicitly deferred is not deferred at all. Under a light profile, where the fix floor
-defers more of what review confirms, that turns one plan into an open-ended queue of defects
-nobody chose to schedule.
+An out-of-scope or postponed finding worth filing — a P1, a security finding, or one both likely
+and material — that lives only in a PR body is invisible to every later selection, so it has to
+become a tracked item; any other is dismissed with its reason, since filing it parks work nobody
+builds. WHERE a filed finding is tracked decides whether it is also execution order. A deferred
+defect spliced into the dependency chain with `blocked_by` edges is work the loop must build
+before the plan can reach zero: the plan never finishes, and the finding that was explicitly
+deferred is not deferred at all.
 
 So deferred defects go into a container of their own directly under the plan root, related to the
 item whose review produced them and blocked by nothing. The container is deliberately NOT a
@@ -99,6 +107,9 @@ flag — the operator believes they disabled auto-release while the loop merges 
 — so a present key wins whatever the profile says, and the contradiction is reported aloud.
 
 ## Why a one-off under an Epic parent still bypasses the epic branch
+
+A bare plan root looks exactly like an item number, so the detector tests the work type first: a
+container is the plan's scope, never a one-off.
 
 `create-story` and `create-defect` both offer a release-unit item as a parent, so a one-off CAN have
 a release-unit ancestor — and without the explicit bypass, the general derivation rule would route

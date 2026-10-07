@@ -78,10 +78,11 @@ reason.
 
 An unfixed finding that vanishes without a posted rationale is indistinguishable from a finding
 nobody ever looked at: the next reviewer re-raises it, or nobody does. A posted dismissal is that
-trace; only a likely, material finding also becomes an item, as filing minor ones parks work
-nobody builds. The same applies
-to an out-of-scope capture — left as PR prose it is invisible to the loop forever, because
-nothing downstream reads a PR comment looking for work.
+trace; only a finding worth filing (step 4: a P1, a security finding, or one both likely and
+material) also becomes an item, as filing minor ones parks work nobody builds. Discovered scope
+is always captured — missing scope has no likelihood to weigh. The same applies to an
+out-of-scope capture — left as PR prose it is invisible to the loop forever, because nothing
+downstream reads a PR comment looking for work.
 
 The route differs by what the finding IS. A defect goes to `create-defect` in DEFERRED
 placement, which parks it in a container directly under the plan root and records a related-to

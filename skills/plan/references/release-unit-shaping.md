@@ -24,6 +24,15 @@ internal enabler, a deliberate exception rather than the norm. Hence the shaping
 we shipped only this release unit and stopped, what can the end consumer now do?" — "nothing
 yet" means the boundary is wrong.
 
+## Why edges between two release units run one way
+
+A leaf landed on its release unit's integration branch satisfies dependents in that unit only;
+across units a blocker counts once its unit has released
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`). If a leaf of unit A
+waits on a leaf of unit B while a leaf of B waits on a leaf of A, each release waits on the other
+and neither ever ships. So cross-unit edges point one way — from the unit that ships first to the
+one after it — and a leaf spliced next to landed work joins that work's unit.
+
 ## Why production-safety questions belong in planning
 
 Where promotion of the release source to production is frequent (daily or on demand), there is
@@ -58,4 +67,4 @@ rehoming signal, not a naming problem.
 ## Cited by
 
 - `skills/plan/SKILL.md` — step 2's pointer ("read it when proposing the breakdown, or when a
-  user asks why a boundary is wrong").
+  user asks why a boundary is wrong") and step 5's one-way rule for edges between release units.

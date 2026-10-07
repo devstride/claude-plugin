@@ -83,11 +83,11 @@ $ARGUMENTS
 
 - Invoke **comprehend-plan** on the root — never hand-roll the tree read; deferrals, "as-built"
   comments and design decisions live in its descriptions-and-comments traversal.
-- Partition every leaf into exactly one set: **Done** and **In Progress**, landed leaves (built,
-  awaiting their epic's release) counted with In Progress (both UNTOUCHABLE; their edges are read,
-  never rewritten) and **Not started** (the only candidates). Dates are not frozen:
-  3f re-dates every not-Done item, In Progress included, and build-item's ritual stamps the real
-  completion date when it ships.
+- Partition every leaf into exactly one set: **Done** and **In Progress**, landed leaves (merged
+  status or a "merged onto" comment, awaiting their epic's release) counted with In Progress (both
+  UNTOUCHABLE; their edges are read, never rewritten) and **Not started** (the only candidates).
+  Dates are not frozen: 3f re-dates every not-Done item but a landed one, In Progress included, and
+  build-item's ritual stamps the real dates when it merges.
 - **Current profile** — the nearest EFFECTIVE marker per the contract: the item's own, else the
   closest ancestor's (walk `hierarchy` up with `get_item(view:"full")`), else config `profile`,
   else `standard`. On a whole-root run check every release unit for its OWN marker (it wins for its

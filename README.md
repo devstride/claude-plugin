@@ -370,13 +370,14 @@ blocks by accident.
 
 ## Deferred defects
 
-A review finding left unfixed never vanishes. One that is not both likely to happen and material
-is dismissed with a one-line reason in the pull request or merge commit, and nothing is filed for
-it. One that is both, but deliberately postponed, `build-item` files as a Defect in a container
-titled **Deferred defects**
-(configurable as `defects.deferredContainerTitle`) directly under the plan root, related to the
-item whose review produced it, never spliced into the plan's execution order and never selected
-or auto-released by the loop. Build one deliberately by naming it: `/devstride:build-item <number>`.
+A review finding left unfixed never vanishes. A minor one — not a P1, not a security finding, and
+not both likely to happen and material — is dismissed with a one-line reason in the pull request
+or merge commit, and nothing is filed for it. Any other, deliberately postponed, `build-item`
+files as a Defect in a container titled **Deferred defects** (configurable as
+`defects.deferredContainerTitle`) directly under the plan root, related to the item whose review
+produced it, never spliced into the plan's execution order and never selected or auto-released by
+the loop. Build one deliberately by naming it: `/devstride:build-item <number>`. Missing scope a
+review uncovers is never dismissed: it becomes a story spliced into the plan.
 
 ## Your first plan
 

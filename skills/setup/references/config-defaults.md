@@ -113,7 +113,8 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   integration branch. Until then it is *landed*
   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`): it satisfies blockers
   only inside its own release unit, and `build-item` step 8 marks it Done once the release pull
-  request merges.
+  request merges — with `autoRelease` off, the next `/devstride:build-item <root>` run after the
+  owner merges it does.
 - **`mergedStatusName`** is the status a landed story moves to, matched by NAME in each work type's
   status collection (never an id, so one config serves every organization). Absent → `"Review"`;
   `null` → the story keeps its status. An organization with no status of that name keeps the
@@ -130,9 +131,9 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
 ```
 
 - **`deferredContainerTitle`** is the title of the container `build-item` resolves — or creates —
-  **directly under the plan root** to hold review findings that are both likely and material but
-  postponed; any other finding is dismissed with its reason, never filed. It is a parking lot beside
-  the plan, not a stage of it.
+  **directly under the plan root** to hold postponed review findings worth filing (a P1, a
+  security finding, or one both likely and material); any other is dismissed with its reason, never
+  filed. It is a parking lot beside the plan, not a stage of it.
 - Items in that container are **never spliced into the execution chain** (no `blocked_by` edges,
   no execution-order prefix), **never auto-selected** by `build-item` step 0, and the container is
   **never treated as a release unit** — reaching zero there cuts no release. An item there that a

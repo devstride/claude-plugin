@@ -148,9 +148,8 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   scope. Consume its findings summary and untracked-deferral list before step 4.
 - **Declare a PRE-SHIP HOLD in that same invocation whenever step 2b has an entry to run** (`when`
   ∈ {`releaseOnly`, `always`}): `review` settles, STOPS at its **7.1b** and hands back; run 2b, then
-  discharge at 2c. Flipping first would let a pre-ship fix reach production past no reviewer. The
-  release head is protected so `review`'s 7.1 never rebases it — the hold still fires. Nothing to
-  run → no hold, skip 2c.
+  discharge at 2c. The release head is protected so `review`'s 7.1 never rebases it — the hold
+  still fires. Nothing to run → no hold, skip 2c.
 - **Order**: merge-gate Claude + local CLI + cloud review concurrently (every finding
   verified/triaged/fixed/replied/resolved) → the pre-ship checks (2b) → the ready-flip releases CI,
   once, on the final reviewed diff.
@@ -169,9 +168,11 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   tree). Nothing is frozen: an advance after the flip goes back through step 2 — a ready PR is first
   returned to draft (`gh pr ready --undo`), so CI waits — never merged over; any return to step 2
   voids an owner yes already given.
-- Only genuinely ambiguous/risky findings stall — surface them with a recommendation; out-of-scope real findings are captured (into the
-  plan via `insert-*` when a root is known, else noted for the owner). **Do NOT merge here** — hold
-  at green-and-settled for step 4.
+- Only genuinely ambiguous/risky findings stall — surface them with a recommendation. A dismissed
+  finding stays dismissed; each entry on this release's or the step-0b train pull request's
+  untracked-deferral list → `/devstride:create-defect deferred <item#>` (the item it concerns;
+  discovered scope: `insert-story`) when a plan root is known, else noted for the owner — never
+  spliced. **Do NOT merge here** — hold at green-and-settled for step 4.
 
 ## 2b. Pre-ship checks — the release's mandatory local gates
 

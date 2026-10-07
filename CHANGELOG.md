@@ -17,41 +17,65 @@ for what each version component means here and how a release is cut.
   branch, so a board showed whole epics as finished while their release pull request was still a
   draft and none of that code had been fully reviewed or reached the base branch. A story merged
   onto its epic's branch is now *landed*: it moves to a "merged, awaiting release" status (below),
-  gets a comment naming the branch and merge commit, and step 8 marks every landed story Done, with
-  the date and a comment linking the release pull request, right after that pull request merges.
-  This is the shape a one-off on the support train already had.
-  - **Blocking follows.** A blocker that has landed on the same epic's branch now satisfies the
-    story it blocks, so an epic still runs story after story; a blocker in a different epic is
-    satisfied only when Done, so the next epic waits until the previous one has shipped.
+  always gets a comment naming the branch and merge commit, and keeps the dates of that merge.
+  Right after the epic's release pull request merges, step 8 marks every landed story Done with a
+  comment linking that pull request. It writes no dates, so it needs no scheduler check and leaves
+  the plan's chart as it was. A one-off on the support train keeps its own shape: a comment, its
+  status unchanged, Done when `release` ships the train.
+  - **Blocking follows.** A blocker the integration branch's git history shows as landed satisfies
+    a story in the same epic, so an epic still runs story after story. The merged status alone
+    never does, since a column of that name often holds an open code review. A blocker in a
+    different epic is satisfied only when Done, so the next epic waits until the previous one has
+    shipped.
+  - **Edges between epics run one way.** Two epics each waiting on the other could never release.
+    The loop reports such a wait as a release-unit cycle naming the edge to repoint, instead of a
+    plain "blocked"; `insert-story` and `insert-defect` put a story spliced next to landed work in
+    that work's epic; and `plan` wires edges between epics one way only.
   - **The record is the git history the loop already writes** — the integration branch's
     first-parent merge subjects, read the way `release` reads the support train — so nothing new
-    is stored on the items.
-  - A story in that status whose merge the git history does not show is never picked up again
-    or counted as finished; the loop reports it and asks.
-  - The remaining-story count that triggers the epic release ignores landed stories, so an epic
-    still releases at zero. A landed story whose release merged before the close-out ran is
-    finished, never rebuilt.
-  - `comprehend-plan` reports landed stories separately; `insert-story`/`insert-defect` treat them
-    as not open when splicing; `rationalize-gantt` counts them as done when re-dating only open
-    work; `rebalance` does not mistake one for a running loop.
+    is stored on the items. A story pull request merged into an integration branch sets GitHub's
+    default merge subject explicitly, so a repository that names merge commits after the pull
+    request title still leaves the story's number to read. The epic's release pull request is cut
+    merge-only: when its base moves during review the base is merged in, never rebased, so the
+    story merges it is read from stay intact.
+  - **A release nobody closed out is finished by the next run.** When an owner merges the release
+    (auto-release off), or a run stops right after the merge, the next `/devstride:build-item
+    <root>` finds the stories' landed comments, sees their merges on the release target, reads the
+    stories from the release merge commit and marks them Done before choosing what to build. This
+    keys on the comment, never the status, which may be switched off or missing. A landed story is
+    never built again; one whose merge the git history does not show is reported, and the loop
+    asks.
+  - **A run that finds an epic with every story landed reports "N landed, awaiting their
+    release"**, not "plan complete", and with auto-release on it cuts that epic's release. The
+    remaining-story count that triggers the epic release ignores landed stories, so an epic still
+    releases at zero.
+  - **Skills that read DevStride but not git** — `comprehend-plan`, `insert-story`/`insert-defect`,
+    `rationalize-gantt` and `rebalance` — count a story as landed when it is in the merged status or
+    carries the landed comment. `comprehend-plan` reports landed stories separately; a splice
+    treats them as not open; `rationalize-gantt` counts them as done when re-dating only open work;
+    `rebalance` leaves them untouched and does not mistake one for a running loop.
 
 ### Changed
 
 - **A minor review finding is dismissed with its reason, not filed as deferred work.** A finding
-  left unfixed — below the profile's fix floor, or outside the story's scope — that is not both
-  likely to happen and material is now dismissed with a one-line reason in the pull request or
-  merge commit, and nothing is filed for it. Only a finding that is both, and deliberately
-  postponed, still becomes a deferred defect beside the plan. Before, `build-item` filed every
-  such finding as a deferred defect, which filled deferred containers with work nobody would
-  build. Under `prototype`, a likely and material finding outside its P1-and-security floor is
-  still deferred; anything less is dismissed.
+  left unfixed — below the profile's fix floor, or outside the story's scope — that is minor (not a
+  P1, not a security finding, and not both likely to happen and material) is now dismissed with a
+  one-line reason in the pull request or merge commit, and nothing is filed for it. Only a finding
+  worth filing, and deliberately postponed, still becomes a deferred defect beside the plan; scope
+  a review finds missing is always spliced in as a story. Before, `build-item` filed every such
+  finding as a deferred defect, which filled deferred containers with work nobody would build.
+  `review` defines "worth filing" once, at its triage step, and every other skill uses that
+  definition. `release` files the deferrals its own review and the support train's pull request
+  hand back the same way — a deferred defect beside the plan, never spliced into its order — and
+  leaves a dismissed finding dismissed.
 
 ### Added
 
 - **`epicIntegrationBranches.mergedStatusName`** (default `"Review"`) names the status a landed
   story moves to. It is matched by name in each work type's status collection, so one setting
   works in any organization; `null`, or an organization with no status of that name, leaves the
-  story's status as it is, with the comment and the git history as the record.
+  story's status as it is, with the comment and the git history as the record. The status is only
+  the visible signal: the build loop decides from the git history and the comment.
 
 ### Documentation
 
@@ -66,31 +90,31 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.9.0 @ 525de01, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.9.0 @ 49d7633, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.9.0 | tokens@devstride--v3.9.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,012 | 10,671 | 32,012 | 10,671 | +0 | 10,700 |
-| skills/review/SKILL.md | 24,000 | 8,000 | 24,000 | 8,000 | +0 | 8,000 |
-| skills/build-item/SKILL.md | 23,987 | 7,996 | 23,994 | 7,998 | +2 | 8,000 |
 | skills/doctor/SKILL.md | 23,987 | 7,996 | 23,987 | 7,996 | +0 | 8,000 |
-| skills/plan/SKILL.md | 23,813 | 7,938 | 23,813 | 7,938 | +0 | 8,000 |
-| skills/release/SKILL.md | 21,726 | 7,242 | 21,726 | 7,242 | +0 | 7,300 |
-| skills/rebalance/SKILL.md | 17,062 | 5,688 | 17,175 | 5,725 | +37 | 5,800 |
-| skills/ultracode-build/SKILL.md | 14,333 | 4,778 | 14,333 | 4,778 | +0 | 4,800 |
-| skills/pr/SKILL.md | 11,291 | 3,764 | 11,291 | 3,764 | +0 | 3,800 |
-| skills/rationalize-gantt/SKILL.md | 7,755 | 2,585 | 7,825 | 2,609 | +24 | 2,700 |
+| skills/build-item/SKILL.md | 23,987 | 7,996 | 23,970 | 7,990 | -6 | 8,000 |
+| skills/plan/SKILL.md | 23,813 | 7,938 | 23,922 | 7,974 | +36 | 8,000 |
+| skills/review/SKILL.md | 24,000 | 8,000 | 23,900 | 7,967 | -33 | 8,000 |
+| skills/release/SKILL.md | 21,726 | 7,242 | 21,836 | 7,279 | +37 | 7,300 |
+| skills/rebalance/SKILL.md | 17,062 | 5,688 | 17,218 | 5,740 | +52 | 5,800 |
+| skills/ultracode-build/SKILL.md | 14,333 | 4,778 | 14,398 | 4,800 | +22 | 4,800 |
+| skills/pr/SKILL.md | 11,291 | 3,764 | 11,289 | 3,763 | -1 | 3,800 |
+| skills/rationalize-gantt/SKILL.md | 7,755 | 2,585 | 7,936 | 2,646 | +61 | 2,700 |
 | skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
-| skills/create-defect/SKILL.md | 7,288 | 2,430 | 7,288 | 2,430 | +0 | 2,500 |
+| skills/create-defect/SKILL.md | 7,288 | 2,430 | 7,481 | 2,494 | +64 | 2,500 |
 | skills/branch-hotfix/SKILL.md | 6,034 | 2,012 | 6,034 | 2,012 | +0 | 2,100 |
-| skills/insert-defect/SKILL.md | 4,730 | 1,577 | 4,730 | 1,577 | +0 | 1,600 |
-| skills/comprehend-plan/SKILL.md | 4,468 | 1,490 | 4,577 | 1,526 | +36 | 1,600 |
-| skills/insert-story/SKILL.md | 4,025 | 1,342 | 4,025 | 1,342 | +0 | 1,400 |
+| skills/insert-defect/SKILL.md | 4,730 | 1,577 | 4,714 | 1,572 | -5 | 1,600 |
+| skills/comprehend-plan/SKILL.md | 4,468 | 1,490 | 4,575 | 1,525 | +35 | 1,600 |
+| skills/insert-story/SKILL.md | 4,025 | 1,342 | 4,037 | 1,346 | +4 | 1,400 |
 | skills/create-story/SKILL.md | 3,999 | 1,333 | 3,999 | 1,333 | +0 | 1,400 |
 | skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
 | skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
 | skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
 | alwaysOn.context (skill listing) | 3,697 | 1,233 | 3,697 | 1,233 | +0 | 1,300 |
-| **total (bodies)** | 246,461 | 82,160 | 246,760 | 82,259 | +99 | |
+| **total (bodies)** | 246,461 | 82,160 | 247,259 | 82,426 | +266 | |
 
 ## [3.9.0] — 2026-10-02
 

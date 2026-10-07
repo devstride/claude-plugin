@@ -29,13 +29,17 @@ Numbering is NOT restated here — it lives in `execution-order-numbering.md`.
 - `NEXT` = the next-unblocked item per `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`
   (projection warning included).
 - The In Progress, most recently landed or most-recently-Done item is the upstream anchor the
-  `<leaf>` attaches after (landed: merged onto its integration branch, not yet Done —
-  `next-unblocked.md`).
+  `<leaf>` attaches after (landed: in the merged status or carrying the landed comment, not yet
+  Done — `next-unblocked.md`).
 - Ambiguous tree (several parallel unblocked candidates, no clear critical path) → summarize what
   you found and ask which slot to insert before.
 
 ## Step 2 — find or create the housing container (this org: Capability/Epic)
 
+- **`NEXT`'s release unit already holds landed leaves → house the `<leaf>` in THAT release unit**,
+  whatever the theme or step 0's anchor (the user named another → say why and ask). Housed
+  elsewhere, between a landed leaf and `NEXT`, it waits on that unit's release while the unit waits
+  on it: a release-unit cycle (`next-unblocked.md`).
 - A suitable lower-level anchor from step 0 is used directly.
 - Otherwise look for an existing container under the root whose theme GENUINELY matches (read
   titles/descriptions — never force a mismatched fit).

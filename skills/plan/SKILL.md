@@ -249,6 +249,8 @@ miscalibration.
   subsystem), convergent stories fan in (several `blocked_by`), gate stories sit on the serial spine,
   marked in title/description, with few precise edges (chokepoints, not hubs), and genuinely
   independent branches stay parallel. The goal is dependency ACCURACY, not one serial thread.
+- **Edges between two release units run one way**, never both (why:
+  `references/release-unit-shaping.md`).
 - **Hard gate**: every new leaf has ≥ 1 `blocked_by` OR `blocks` edge, verified with `search_items`
   plus `get_item(view:"full", fields:["number","relationships"])` (a large batch: fan this
   read-only check out on `haiku`/`low`). An orphan is a wiring bug — give a parallel branch a
