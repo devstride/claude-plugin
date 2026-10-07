@@ -42,6 +42,12 @@ for what each version component means here and how a release is cut.
   works in any organization; `null`, or an organization with no status of that name, leaves the
   story's status as it is, with the comment and the git history as the record.
 
+### Documentation
+
+- **The README now opens with how the loop works and why**: five ideas (a walkable plan,
+  release units, fast mode, review before CI, and profiles with human decisions kept human). It
+  links to the full explanation on docs.devstride.com.
+
 ### Upgrading
 
 - Stories already marked Done by an earlier version stay Done and keep satisfying their

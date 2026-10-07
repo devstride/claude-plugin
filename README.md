@@ -9,6 +9,33 @@ merge, and release — against your own repository and your own DevStride organi
 > sign in once. `/devstride:setup` then configures the plugin for your repository and proves the
 > config by running it.
 
+## How it works, and why
+
+A coding agent can already write a good change. The hard part is everything around it: knowing
+what to build next, keeping half-finished features away from users, making sure review findings
+don't vanish, and not paying for the same CI run five times. This plugin handles that surrounding
+work, on five ideas:
+
+- **A plan an agent can walk.** Work is a tree of DevStride items joined by dependency links, so the
+  next item is *worked out*, never chosen. The agent builds one item at a time and rewrites each
+  item's description to match what actually shipped. The plan is a hypothesis; the tracker is the
+  memory.
+- **Release units keep half-built work off your shared branch.** Leaves collect on their release
+  unit's own integration branch (usually an Epic's), where they may be unfinished. Only the complete
+  unit reaches your base branch, in one fully reviewed pull request. That unit is both what you
+  release and what you check for safety.
+- **Fast mode moves the review gate; it never removes it.** Each leaf gets a bounded risk check, a
+  focused verifier when its diff touches auth, migrations, irreversible state or a deployed
+  contract, and green local checks. The full review and CI then run once, over the whole unit.
+- **Review first, CI once.** Pull requests open as drafts. CI runs only after every reviewer has
+  settled, once, on the code that was actually reviewed.
+- **One word sets the rigor, and people keep the decisions that are theirs.** A delivery profile
+  moves the coupled settings together above floors no profile removes. Production merges,
+  billable infrastructure and ambiguous findings always come back to a person.
+
+The full explanation, with the reason behind each choice, is
+[The idea behind the loop](https://docs.devstride.com/developer-experience/agentic-skills/the-idea-behind-the-loop).
+
 ## Install
 
 From the root of each repository you use it in:
