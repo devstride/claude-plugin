@@ -29,7 +29,7 @@
   "references": {
     "skills/build-item/references/epic-release.md": 2900,
     "skills/build-item/references/ground-truth-at-start.md": 1800,
-    "skills/build-item/references/next-unblocked.md": 2900,
+    "skills/build-item/references/next-unblocked.md": 3200,
     "skills/build-item/references/plain-language-output.md": 2300,
     "skills/build-item/references/progress-table.md": 1300,
     "skills/build-item/references/support-train.md": 1500,
@@ -53,7 +53,7 @@
     "skills/release/references/release-branch.md": 4200,
     "skills/release/references/release-gates.md": 1300,
     "skills/review/references/ci-settle.md": 1800,
-    "skills/review/references/delivery-loop-invariants.md": 20800,
+    "skills/review/references/delivery-loop-invariants.md": 21000,
     "skills/review/references/delta-re-review.md": 2000,
     "skills/review/references/final-head-request.md": 900,
     "skills/review/references/github-review-api.md": 4700,
@@ -78,7 +78,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 68700,
+      "budget": 69000,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -108,7 +108,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 57300,
+      "budget": 57500,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",

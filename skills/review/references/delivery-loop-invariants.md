@@ -339,19 +339,23 @@ M16. A story merged onto its release unit's integration branch is LANDED, not Do
      `build-item` step 8's close-out from the landed set captured BEFORE that merge (the git range
      is empty after it), or — for a release merged with no close-out, such as an owner's merge
      with auto-release off — by the next run's recovery, reading the set from the release merge
-     commit. A blocker in the git landed set satisfies a dependent only in the SAME release unit —
-     across units only Done does, and the merged STATUS alone never does (that column often holds
+     commit. Either way the close-out closes the release-unit item first (its comment, Done where
+     it tracks a status) and the leaves last, every part idempotent, so a partial run leaves an open
+     leaf to re-arm recovery. A blocker in the git landed set satisfies a dependent only in the
+     SAME release unit — across units only Done does, and the merged STATUS alone never does (that column often holds
      an open code review) — or every epic stalls after its first story, or the next epic starts on
      work that never shipped. So cross-unit edges run one way, a splice beside landed work stays in
      its unit, and a two-unit wait is reported as a release-unit cycle. Step 7's zero count
      excludes landed leaves, or step 8 never fires; a fresh run at a unit's zero reports "N landed,
      awaiting their release", never "plan complete". Recovery and the never-rebuild guard key on
-     the landed COMMENT step 6 always writes, never on the status. A landed leaf moves to the status
-     named `epicIntegrationBranches.mergedStatusName` (absent → "Review"), resolved by NAME per
-     work type, never a shipped id; that status is the visible signal, the git landed set the
-     record. The epic release pull request is cut `merge-only` (its first-parent story merges ARE
-     the record); a story pull request merged into an integration branch passes GitHub's default
-     merge subject with `--subject`; the close-out writes no dates, keeping step 6's.
+     the landed COMMENT step 6 always writes, never on the status, and a story named by number
+     skips selection but never that guard: Done, landed or on the support train, it never reaches
+     step 1. A landed leaf moves to the status named `epicIntegrationBranches.mergedStatusName`
+     (absent → "Review"), resolved by NAME per work type, never a shipped id; that status is the
+     visible signal, the git landed set the record. The epic release pull request is cut `merge-only` (its first-parent story merges ARE
+     the record); a story pull request merged into an integration branch or the support train
+     passes GitHub's default merge subject with `--subject`; the close-out writes no dates, keeping
+     step 6's.
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
 N1. ONE profile word — `prototype` / `standard` / `extended` / `enterprise` — moves every rigor knob
@@ -771,6 +775,10 @@ skills/plan/references/splice-mechanics.md|already holds landed leaves
 skills/build-item/SKILL.md|awaiting their release
 skills/build-item/SKILL.md|merge-only: true
 skills/build-item/SKILL.md|Merge pull request #<n> from <owner>/<head branch>
+skills/build-item/SKILL.md|integration-branch or train base
+skills/build-item/SKILL.md|never step 1
+skills/build-item/references/next-unblocked.md|A story named by number
+skills/build-item/references/next-unblocked.md|The release unit first
 skills/release/SKILL.md|create-defect deferred
 skills/push/SKILL.md|branch-patterns.md
 skills/release/references/branch-patterns.md|protected by the key

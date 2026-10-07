@@ -60,8 +60,9 @@ carries the landed comment.
   `release` reads the train (`release-branch.md` §1 step 6); merges of the base branch carry no
   number. **A leaf is landed when its number is in that landed set.** The merged status is only
   the visible signal and never stands in for the set. A pull-request merge subject names the
-  branch only because `build-item` 5b passes GitHub's default subject with `--subject`: a
-  repository set to use the pull-request title as the merge subject would leave no number to read.
+  branch only because `build-item` 5b passes GitHub's default subject with `--subject` (into an
+  integration branch or the train): a repository set to use the pull-request title as the merge
+  subject would leave no number for this read, or for `release`'s read of the train.
 - **Recovery — keyed on the landed comment, never the status** (it may be `null`, missing, or a
   failed move). Before selecting a candidate, read its comments: a not-Done leaf carrying the
   landed comment but absent from the landed set is never auto-selected, never rebuilt, and still
@@ -69,19 +70,25 @@ carries the landed comment.
   `origin/<release target>` (`git merge-base --is-ancestor`) → the release merged without a
   close-out: run the close-out below now and compute the ready-set again after it — never select
   from one computed before. Otherwise report the mismatch and ask.
+- **A story named by number** (`build-item` step 0, a one-off too) skips selection, never this
+  guard: it is never rebuilt and stops before step 1. Done → report it; in the landed set → report
+  "landed, awaiting its release"; the landed comment outside the set → the recovery above; the
+  support-train comment ("merged to the support train …") → report it ships with the next release.
 - **Close-out (`build-item` step 8, first thing after the release pull request merges; or
   recovery).** Capture the landed set BEFORE the merge — when step 7 reports the unit at zero, and
   again right before step 8 merges (the range is empty after it). A release already merged, by
   anyone, gives that unit's set from its merge commit `<merge>` — the release pull request's
   `mergeCommit`, from
   `gh pr list --head <integration branch> --base <release target> --state merged --json number,mergeCommit`:
-  `git log --first-parent --merges --format=%s <merge>^1..<merge>^2`.
-  For each number: `get_item`; keep only a not-Done `hierarchyRoles.leaf` under this release unit;
-  `update_item` → Done (it works off-board; `mark_done` does not), writing NO dates — they stay
-  step 6's, so no auto-scheduler check — then `add_comment` "reached <release target> with the
-  <release unit> release pull request #<n>". Skip one already Done or carrying that comment, so a
-  re-run is a no-op; report every leaf of the unit left open as "not marked Done: <item>" — never
-  guess.
+  `git log --first-parent --merges --format=%s <merge>^1..<merge>^2`. **The release unit first**
+  (step 8's `add_comment` and Done), **then its leaves**, last, so an open leaf keeps recovery armed
+  until the whole close-out is done. For each number: `get_item`; keep only a not-Done
+  `hierarchyRoles.leaf` under this release unit; `update_item` → Done (it works off-board;
+  `mark_done` does not), writing NO dates — they stay step 6's, so no auto-scheduler check — then
+  `add_comment` "reached <release target> with the <release unit> release pull request #<n>". Every
+  part skips what is done already (a unit comment naming this pull request, a Done unit, a leaf
+  Done or carrying its comment), so a re-run after any partial run finishes only what is missing;
+  report every leaf of the unit left open as "not marked Done: <item>" — never guess.
 
 ## Projection warning — fetch relationships EXPLICITLY
 
@@ -110,8 +117,9 @@ the ready-set lets a HUMAN fan the waves out deliberately; the loop itself stays
 
 ## Cited by
 
-- `build-item` SKILL.md step 0 (canonical owner — selection and recovery) and the "Serial by
-  design" rule (the ready-set-is-shape reasoning); steps 6, 7 and 8 (landed leaves, close-out)
+- `build-item` SKILL.md step 0 (canonical owner — selection, recovery, a story named by number)
+  and the "Serial by design" rule (the ready-set-is-shape reasoning); steps 6, 7 and 8 (landed
+  leaves, the close-out)
 - `plan/references/splice-mechanics.md` (where a splice lands, and which release unit houses it),
   and through it `insert-story` and `insert-defect`
 - `comprehend-plan` SKILL.md (the next-unblocked read and the landed count)

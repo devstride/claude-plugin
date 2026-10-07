@@ -129,10 +129,11 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
 
 - **Step 0** — no root, ready-set or selection. **SKIP THE EPIC-BRANCH DERIVATION TOO — the working
   base is the support train when configured (precedence 3), else `baseBranch`** — never reason "a
-  one-off has no release-unit ancestor". Gating, scope and spec checks still run; the profile skips
-  only the marker. **4b under every profile** — except 4a on a train with `supportTrain.fastMerges`
-  true. **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` before changing
-  the one-off classification or its step-0 delta.**
+  one-off has no release-unit ancestor". The merged-or-Done guard, gating, scope and spec checks
+  still run; the profile skips only the marker. **4b under every profile** — except 4a on a train
+  with `supportTrain.fastMerges` true. **Read
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` before changing the one-off
+  classification or its step-0 delta.**
 - **Step 6.5** — follow-ups become their own one-offs (`/devstride:create-story` /
   `/devstride:create-defect`), never `insert-*`; a deferred defect keeps the DEFERRED placement
   under the root this item resolves to.
@@ -146,9 +147,10 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   session appears active. Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`.
 - **Plan root**: `$ARGUMENTS`, else handoff memory; not ONE unambiguous root while several plans are
   open → STOP and ask.
-- A given story number IS the story. Otherwise apply
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full, projection warning
-  included. **Never auto-select from the deferred container.** Surface the whole ready-set.
+- A given story number IS the story; merged or Done → never step 1 (`next-unblocked.md`).
+  Otherwise apply `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full,
+  projection warning included. **Never auto-select from the deferred container.** Surface the
+  whole ready-set.
 - **DRY-CHAIN / TERMINAL:** no selectable candidate → exit cleanly, never re-ask, saying which:
   plan complete / N landed, awaiting their release (gate on → step 8 for it, then step 0) / N
   blocked by X, Y / N gated. Suggest `/devstride:plan <root>` only when the chain ran out; never
@@ -183,9 +185,8 @@ per `supportTrain.fastMerges`. Never mix: 4a toward develop reaches production n
 
 ### 4a. FAST DEVELOP MODE — epic-branch stories, no per-story PR
 
-In-scope cloud reviewers, CI and the full adversarial pass move to the epic release PR. **THE FLOOR:** no
-completed `ultracode-build` risk check (immediate-risk verifiers and matched lenses included) or no
-valid verification receipt → **4b**, saying why.
+**THE FLOOR:** no completed `ultracode-build` risk check (immediate-risk verifiers and matched
+lenses included) or no valid verification receipt → **4b**, saying why.
 
 - **`review` in LOCAL-ONLY mode** with the epic base, profile and caller ledger: no routine second
   engine (a configured local CLI is no story tax), but it still owns triage, fixes and lessons.
@@ -240,7 +241,7 @@ is `review` step 7's; step 5 never reads `skipping` as green.
   before concluding either.**
 - **Zero unresolved threads immediately before merging** (`review`'s paginated query); else back
   through `review` steps 3–6.
-- `gh pr merge <n> --merge --delete-branch` (integration-branch base:
+- `gh pr merge <n> --merge --delete-branch` (integration-branch or train base:
   `--subject "Merge pull request #<n> from <owner>/<head branch>"`) — **never `--delete-branch` on
   a head matching `protectedBranches`** (anchored: `branch-patterns.md`).
 
@@ -317,8 +318,10 @@ unit at zero and before cutting the release PR.**
   `verify.skipDuringStoryBuilds` suite is mandatory, with no story exemption; with the list empty,
   local pre-ship suites remain the callers' step-2b responsibility.
 - **Merge** `gh pr merge <n> --merge` once green and settled (landed set captured first), then
-  **landed leaves → Done** (`next-unblocked.md`); delete the
-  epic branch **only if `epicIntegrationBranches.deleteBranchAfterRelease`** — false retains it.
+  **close out** (`next-unblocked.md`): `add_comment` on the RELEASE-UNIT item (release PR, leaves,
+  date), Done if lanes are tracked there, THEN landed leaves → Done, **linking the release PR onto
+  every leaf** (the close-out comment, or `link_pull_request`). Delete the epic branch **only if
+  `epicIntegrationBranches.deleteBranchAfterRelease`** — false retains it.
 - **Docs STAGE, never publish** — only when `docs.updateOnEpicRelease` is true (else silent):
   `docs.updateSkill` null → say none is registered; a name with no `.claude/skills/<name>/SKILL.md`
   → report the dangling hook and its fix (`/devstride:setup docs`), continue; otherwise invoke it in
@@ -326,9 +329,7 @@ unit at zero and before cutting the release PR.**
   plain-English `summary` and `userFacing` judgement, **`live: false`**, never optional — shape:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`), keeping its links exact. **Never
   release notes here.**
-- **Close out**: `add_comment` on the RELEASE-UNIT item (release PR, leaves, date), Done if lanes are
-  tracked there, update handoff memory, sync develop, and **link the release PR onto every leaf**
-  (the close-out comment, or `link_pull_request`).
+- Update handoff memory and sync develop.
 - **Human recap.** Lead with `Merged / Released`: every item and its effect, where it landed,
   validation/review/CI, docs, whether live, the remaining production action. Surface — never
   perform — the owner-cut promotion (`/devstride:release`). New findings → step 6.5.

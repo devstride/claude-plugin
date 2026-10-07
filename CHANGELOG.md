@@ -18,10 +18,11 @@ for what each version component means here and how a release is cut.
   draft and none of that code had been fully reviewed or reached the base branch. A story merged
   onto its epic's branch is now *landed*: it moves to a "merged, awaiting release" status (below),
   always gets a comment naming the branch and merge commit, and keeps the dates of that merge.
-  Right after the epic's release pull request merges, step 8 marks every landed story Done with a
-  comment linking that pull request. It writes no dates, so it needs no scheduler check and leaves
-  the plan's chart as it was. A one-off on the support train keeps its own shape: a comment, its
-  status unchanged, Done when `release` ships the train.
+  Right after the epic's release pull request merges, step 8 closes out the epic itself — a comment
+  naming that pull request, and Done where the epic tracks a status — and then marks every landed
+  story Done with a comment linking that pull request. It writes no dates, so it needs no scheduler
+  check and leaves the plan's chart as it was. A one-off on the support train keeps its own shape:
+  a comment, its status unchanged, Done when `release` ships the train.
   - **Blocking follows.** A blocker the integration branch's git history shows as landed satisfies
     a story in the same epic, so an epic still runs story after story. The merged status alone
     never does, since a column of that name often holds an open code review. A blocker in a
@@ -33,18 +34,24 @@ for what each version component means here and how a release is cut.
     that work's epic; and `plan` wires edges between epics one way only.
   - **The record is the git history the loop already writes** — the integration branch's
     first-parent merge subjects, read the way `release` reads the support train — so nothing new
-    is stored on the items. A story pull request merged into an integration branch sets GitHub's
-    default merge subject explicitly, so a repository that names merge commits after the pull
-    request title still leaves the story's number to read. The epic's release pull request is cut
+    is stored on the items. A story pull request merged into an integration branch, or into the
+    support train, sets GitHub's default merge subject explicitly, so a repository that names merge
+    commits after the pull request title still leaves the story's number to read, for the epic's
+    close-out and for `release` closing the train's one-offs. The epic's release pull request is cut
     merge-only: when its base moves during review the base is merged in, never rebased, so the
     story merges it is read from stay intact.
   - **A release nobody closed out is finished by the next run.** When an owner merges the release
     (auto-release off), or a run stops right after the merge, the next `/devstride:build-item
     <root>` finds the stories' landed comments, sees their merges on the release target, reads the
-    stories from the release merge commit and marks them Done before choosing what to build. This
-    keys on the comment, never the status, which may be switched off or missing. A landed story is
-    never built again; one whose merge the git history does not show is reported, and the loop
-    asks.
+    stories from the release merge commit, closes out the epic and marks the stories Done, before
+    choosing what to build. The epic is closed out before its stories and every part skips what is
+    already done, so a run that stops part-way leaves a story open for the next run to finish from.
+    This keys on the comment, never the status, which may be switched off or missing. A landed
+    story whose merge the git history does not show is reported, and the loop asks.
+  - **A story is never built twice, even when named by number.** `/devstride:build-item <story>` on
+    a story that is Done, landed or waiting on the support train reports where it stands and stops
+    before marking it In Progress; a landed one whose release has merged is closed out first.
+    Before, a story named by number was built again whatever its state.
   - **A run that finds an epic with every story landed reports "N landed, awaiting their
     release"**, not "plan complete", and with auto-release on it cuts that epic's release. The
     remaining-story count that triggers the epic release ignores landed stories, so an epic still
