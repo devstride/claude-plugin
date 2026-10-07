@@ -97,12 +97,12 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.9.0 @ 3a4aef9, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.9.0 @ 1f8a34f, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.9.0 | tokens@devstride--v3.9.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,012 | 10,671 | 32,012 | 10,671 | +0 | 10,700 |
 | skills/doctor/SKILL.md | 23,987 | 7,996 | 23,987 | 7,996 | +0 | 8,000 |
-| skills/build-item/SKILL.md | 23,987 | 7,996 | 23,970 | 7,990 | -6 | 8,000 |
+| skills/build-item/SKILL.md | 23,987 | 7,996 | 23,979 | 7,993 | -3 | 8,000 |
 | skills/plan/SKILL.md | 23,813 | 7,938 | 23,922 | 7,974 | +36 | 8,000 |
 | skills/review/SKILL.md | 24,000 | 8,000 | 23,900 | 7,967 | -33 | 8,000 |
 | skills/release/SKILL.md | 21,726 | 7,242 | 21,836 | 7,279 | +37 | 7,300 |
@@ -121,7 +121,7 @@ for what each version component means here and how a release is cut.
 | skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
 | skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
 | alwaysOn.context (skill listing) | 3,697 | 1,233 | 3,697 | 1,233 | +0 | 1,300 |
-| **total (bodies)** | 246,461 | 82,160 | 247,259 | 82,426 | +266 | |
+| **total (bodies)** | 246,461 | 82,160 | 247,268 | 82,429 | +269 | |
 
 ## [3.9.0] — 2026-10-02
 
