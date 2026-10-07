@@ -370,11 +370,14 @@ blocks by accident.
 
 ## Deferred defects
 
-Review findings below the profile's fix floor are not fixed in the cycle that found them and must
-not vanish. `build-item` files each one as a Defect in a container titled **Deferred defects**
-(configurable as `defects.deferredContainerTitle`) directly under the plan root, related to the
-item whose review produced it, never spliced into the plan's execution order and never selected
-or auto-released by the loop. Build one deliberately by naming it: `/devstride:build-item <number>`.
+A review finding left unfixed never vanishes. A minor one — not a P1, not a security finding, and
+not both likely to happen and material — is dismissed with a one-line reason in the pull request
+or merge commit, and nothing is filed for it. Any other, deliberately postponed, `build-item`
+files as a Defect in a container titled **Deferred defects** (configurable as
+`defects.deferredContainerTitle`) directly under the plan root, related to the item whose review
+produced it, never spliced into the plan's execution order and never selected or auto-released by
+the loop. Build one deliberately by naming it: `/devstride:build-item <number>`. Missing scope a
+review uncovers is never dismissed: it becomes a story spliced into the plan.
 
 ## Your first plan
 
@@ -452,7 +455,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.9.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.10.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

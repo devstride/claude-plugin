@@ -57,8 +57,9 @@ Organize by the tree's own hierarchy (root → grouping items → leaves), not a
 
 - **What the plan is for** — intent from descriptions reconciled against comments; a comment that
   contradicts or supersedes its description is a live discrepancy to surface, never silently resolved.
-- **Where it stands** — lane distribution (Done / In Progress / open), the critical path, and the
-  item `/devstride:build-item` would pick next per the canonical rule in
+- **Where it stands** — lane distribution (Done / landed / In Progress / open; landed = in the
+  merged status or carrying a "merged onto" comment, awaiting its epic's release), the critical
+  path, and the item `/devstride:build-item` would pick next per the canonical rule in
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`.
 - **Deferrals and known gaps** — anything flagged deferred, blocked on a human, or a known compromise.
 - **Sub-plan shape** — which grouping items and release units exist (this org: Capabilities/Epics)

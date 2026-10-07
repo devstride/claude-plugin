@@ -30,8 +30,8 @@ $ARGUMENTS
   write nothing. DevStride data only, never the repo.
 - **NEVER `delete_item`; never delete anything.** Absorbed originals are archived, after their
   pointer comment, only once their successor exists with edges live.
-- **Done and In Progress leaves are untouchable** — never merged, split, re-numbered, re-parented
-  or archived, whatever the target grain says (dates alone are `rationalize-gantt`'s).
+- **Done, In Progress and landed leaves are untouchable** — never merged, split, re-numbered,
+  re-parented or archived, whatever the target grain says (dates alone are `rationalize-gantt`'s).
 - **Serial with the build loop** — step 0's gate, re-checked right before writing.
 - **Interactive judgment stays in the main conversation** (which leaves merge, where a leaf splits,
   whether a grouping still delivers a vertical slice, the sign-off), exactly as `plan` enforces. A
@@ -70,7 +70,7 @@ $ARGUMENTS
   (`get_item_branches`, or `git ls-remote --heads origin "*/I<number>-*"` when the repo is known),
   or handoff project memory naming this root (or an ancestor/descendant) as mid-iteration. Report
   what tripped and stop — never wait it out, never move an In Progress item to clear it. An In
-  Progress leaf with NO branch is not a loop but stays untouchable.
+  Progress leaf with NO branch (a landed one included) is not a loop but stays untouchable.
 - **Auto-scheduler OFF** — apply `${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/references/auto-scheduler-off.md`:
   its READ-ONLY check now (read the organization setting; if on, have the user disable it — never
   change it automatically) and `staticMode` omitted from every write. Its probe-date verification
@@ -83,10 +83,11 @@ $ARGUMENTS
 
 - Invoke **comprehend-plan** on the root — never hand-roll the tree read; deferrals, "as-built"
   comments and design decisions live in its descriptions-and-comments traversal.
-- Partition every leaf into exactly one set: **Done** and **In Progress** (both UNTOUCHABLE; their
-  edges are read, never rewritten) and **Not started** (the only candidates). Dates are not frozen:
-  3f re-dates every not-Done item, In Progress included, and build-item's ritual stamps the real
-  completion date when it ships.
+- Partition every leaf into exactly one set: **Done** and **In Progress**, landed leaves (merged
+  status or a "merged onto" comment, awaiting their epic's release) counted with In Progress (both
+  UNTOUCHABLE; their edges are read, never rewritten) and **Not started** (the only candidates).
+  Dates are not frozen: 3f re-dates every not-Done item but a landed one, In Progress included, and
+  build-item's ritual stamps the real dates when it merges.
 - **Current profile** — the nearest EFFECTIVE marker per the contract: the item's own, else the
   closest ancestor's (walk `hierarchy` up with `get_item(view:"full")`), else config `profile`,
   else `standard`. On a whole-root run check every release unit for its OWN marker (it wins for its

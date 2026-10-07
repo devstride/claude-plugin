@@ -13,8 +13,8 @@ loop gives each release unit its own integration branch, batches its story merge
 when the last story lands cuts the branch → develop release PR through the full review loop
 (automatically only when `epicIntegrationBranches.autoRelease` is enabled; otherwise it stops at
 release-ready and an owner cuts it). So
-when a release unit's leaves are all Done it SHIPS as one reviewed increment — which is why it
-must deliver real, end-user-visible value ON ITS OWN (a develop merge of "nothing usable yet"
+when a release unit's leaves have all landed on its branch it SHIPS as one reviewed increment —
+which is why it must deliver real, end-user-visible value ON ITS OWN (a develop merge of "nothing usable yet"
 is a pointless release). Every release unit costs a full review: too many micro release units
 create release overhead, a mega one becomes a long-lived branch drifting from develop.
 Horizontal technical layers each ship nothing usable alone; a foundation that genuinely must
@@ -23,6 +23,15 @@ early stories — and one that truly fans out to several release units is marked
 internal enabler, a deliberate exception rather than the norm. Hence the shaping question: "if
 we shipped only this release unit and stopped, what can the end consumer now do?" — "nothing
 yet" means the boundary is wrong.
+
+## Why edges between two release units run one way
+
+A leaf landed on its release unit's integration branch satisfies dependents in that unit only;
+across units a blocker counts once its unit has released
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`). If a leaf of unit A
+waits on a leaf of unit B while a leaf of B waits on a leaf of A, each release waits on the other
+and neither ever ships. So cross-unit edges point one way — from the unit that ships first to the
+one after it — and a leaf spliced next to landed work joins that work's unit.
 
 ## Why production-safety questions belong in planning
 
@@ -58,4 +67,4 @@ rehoming signal, not a naming problem.
 ## Cited by
 
 - `skills/plan/SKILL.md` — step 2's pointer ("read it when proposing the breakdown, or when a
-  user asks why a boundary is wrong").
+  user asks why a boundary is wrong") and step 5's one-way rule for edges between release units.

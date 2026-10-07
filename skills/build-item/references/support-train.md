@@ -51,8 +51,9 @@ request's base.
 ## Completion ritual (step 6) for a one-off on the train
 
 - **It is NOT Done yet.** `add_comment` "merged to the support train <name> (<pull request link,
-  or merge SHA>); ships with the next release". Leave its status as it is, set `startDate`, set no
-  `dueDate`. `release` marks it Done when the train's pull request reaches `baseBranch`.
+  or merge SHA>); ships with the next release". Leave its status as it is — the train is not an
+  epic branch, so no merged status — set `startDate`, set no `dueDate`. `release` marks it Done
+  when the train's pull request reaches `baseBranch`.
 - The pull request link (4b) and the as-built reconciliation run as usual.
 - Step 7 terminates as for any one-off; the recap says it is on the support train and becomes Done
   when the next release ships it.

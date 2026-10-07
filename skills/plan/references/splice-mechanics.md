@@ -28,12 +28,18 @@ Numbering is NOT restated here — it lives in `execution-order-numbering.md`.
 
 - `NEXT` = the next-unblocked item per `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`
   (projection warning included).
-- The In Progress or most-recently-Done item is the upstream anchor the `<leaf>` attaches after.
+- The In Progress, most recently landed or most-recently-Done item is the upstream anchor the
+  `<leaf>` attaches after (landed: in the merged status or carrying the landed comment, not yet
+  Done — `next-unblocked.md`).
 - Ambiguous tree (several parallel unblocked candidates, no clear critical path) → summarize what
   you found and ask which slot to insert before.
 
 ## Step 2 — find or create the housing container (this org: Capability/Epic)
 
+- **`NEXT`'s release unit already holds landed leaves → house the `<leaf>` in THAT release unit**,
+  whatever the theme or step 0's anchor (the user named another → say why and ask). Housed
+  elsewhere, between a landed leaf and `NEXT`, it waits on that unit's release while the unit waits
+  on it: a release-unit cycle (`next-unblocked.md`).
 - A suitable lower-level anchor from step 0 is used directly.
 - Otherwise look for an existing container under the root whose theme GENUINELY matches (read
   titles/descriptions — never force a mismatched fit).
@@ -69,9 +75,11 @@ Numbering is NOT restated here — it lives in `execution-order-numbering.md`.
   root of the chain.
 - **`NEXT` undefined — FIRST establish why.** It does not by itself mean the plan is finished: the
   selector also returns nothing when every open leaf is blocked (a cycle, or a head that never
-  cleared) or gated on a human/infra decision. **Count the open leaves.**
-  - **Zero open leaves** (a completed plan being extended): `UPSTREAM` = the most-recently-Done
-    item step 1 identified. The ONLY case where `UPSTREAM` comes from step 1, not `NEXT`'s edges.
+  cleared) or gated on a human/infra decision. **Count the open leaves** — neither Done nor
+  landed.
+  - **Zero open leaves** (a completed plan being extended): `UPSTREAM` = the most recently landed
+    or Done item step 1 identified. The ONLY case where `UPSTREAM` comes from step 1, not
+    `NEXT`'s edges.
   - **Open leaves exist but none is selectable — STOP and surface it.** Never apply the fallback:
     wiring to an unrelated Done item makes the `<leaf>` independently eligible and papers over a
     blocked or cyclic plan. Report what blocks (run `/devstride:rationalize-gantt` on the root if

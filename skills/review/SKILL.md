@@ -89,7 +89,7 @@ definition or a deferral route.**
 ## Modes — callers name them
 
 - **Driven** (the caller says so): on poll timeout proceed; never notify; return the findings
-  summary + untracked-deferral list; CAPTURE out-of-scope findings, never ask. **Standalone**: keep
+  summary + untracked-deferral list; capture per step 4, never ask. **Standalone**: keep
   the ask-gates; notify per `review.notifyWhenSettled`.
 - **LOCAL-ONLY** (fast develop mode, `build-item` step 4a; a base REF, no PR): no routine second
   review. Consume the hand-off — story review ledger and risk-check findings, SHA-keyed verification
@@ -154,8 +154,7 @@ kept for step 8. Standalone may ask to keep waiting. Details:
 
 ## 3. Collect findings — BOTH halves, this cycle only
 
-- **By `pull_request_review_id` above the high-water mark, never login** — Copilot has three logins;
-  a login filter returns zero rows, read as "no findings".
+- **By `pull_request_review_id` above the high-water mark, never login.**
 - **Inline threads AND the review body**, including a collapsed *"Comments suppressed due to low
   confidence"* block — real findings. Zero inline ≠ zero findings.
 - **Caller story findings are inputs, not an engine result**: namespace imported ids
@@ -180,11 +179,11 @@ L-NNN** (step 6.5 takes marks as authoritative); REFUTED never bumps. One bucket
   now, every profile.
 - **Other in scope, at or above `fixFloor`** (`p1-security` / `likely-important` /
   `all-confirmed`, from each verdict's likelihood and impact; security is material) → fix now.
-- **In scope, BELOW the floor** → defer with a POSTED one-line rationale — to its owning item, else
-  the untracked-deferral list (driven) or an offer of `/devstride:create-defect deferred <item#>`
-  (standalone; the item under review) — or dismiss where the contract says so.
-- **Out of scope, untracked** → CAPTURE (driven: untracked-deferral list; standalone: the same
-  deferred-defect offer, or `insert-story` for scope).
+- **In scope BELOW the floor, or out of scope and untracked** → dismiss with a POSTED one-line
+  rationale; one **worth filing** (a P1, a security finding, or one both likely and material) is
+  CAPTURED instead — to its owning item, else the untracked-deferral list (driven) or an offer of
+  `/devstride:create-defect deferred <item#>` (standalone; the item under review) — and discovered
+  scope ALWAYS through `insert-story`.
 - **Ambiguous / risky / unverifiable** → ask — the only bucket that stalls a run.
 
 ## 5. Fix, push, follow up

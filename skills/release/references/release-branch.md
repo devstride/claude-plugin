@@ -56,7 +56,8 @@ take the latest `mergedAt`. Never trust best-match ranking or a body match alone
    `review` takes the FULL diff (a one-off merged fast onto the train had no full review yet — this
    is its first and only full review before production), and declaring `merge-only: true` and
    `fix-exclusions: true`. `pr` owns the draft hold, the pre-ship checks its step 2 selects and the
-   ready-flip that releases CI once. Fixes are committed on the snapshot, each passing §3's
+   ready-flip that releases CI once; the untracked-deferral list it returns (an adopted run's too)
+   goes to `release` step 2, never spliced. Fixes are committed on the snapshot, each passing §3's
    fix-exclusion check first (a migration or deploy-configuration fix leaves the train: merge it to
    the source by its own pull request).
 5. **Merge** — first run §3's exclusion check over

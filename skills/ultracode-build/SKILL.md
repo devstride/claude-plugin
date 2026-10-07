@@ -159,16 +159,16 @@ the missing caller context — never guess that a full review happened.
   affected checks rerun, and a focused verifier re-run with the cumulative story ledger until a
   pass finds none — no numeric cap. No patch change, no progress or an unavailable verifier while
   one remains STOPS for human help. Then the profile's `fixFloor`: **`p1-security`**
-  (`prototype`) — P1 correctness and any security finding, everything else deferred with a one-line
-  rationale; **`likely-important`** (`standard`, `extended`) — findings both likely and material (a
+  (`prototype`) — P1 correctness and any security finding, the rest routed by the next
+  bullet; **`likely-important`** (`standard`, `extended`) — findings both likely and material (a
   security finding is material by definition), the rest dismissed with a one-line rationale;
   **`all-confirmed`** (`enterprise`) — **fix every CONFIRMED and PLAUSIBLE.**
-- **Nothing is silently dropped**: an unfixed finding is DEFERRED — with a home (a tracked
-  downstream item or this story's intentional seam: rationale + owning item) or, with no home,
-  on the **untracked-deferral list** for `build-item` step 6.5, since PR prose is invisible to the
-  loop — or DISMISSED with its reason. Drop REFUTED. Commit fixes per
-  `commitConventions.reviewFixFormat` (fallback `fix(<scope>): <summary> [<itemNumber> review]`),
-  regenerating artifacts if routes changed. A genuinely ambiguous risky finding is asked about,
+- **Nothing is silently dropped**: an unfixed finding worth filing (a P1, a security finding, or
+  one both likely and material) is DEFERRED — with a home (a tracked downstream item or this
+  story's intentional seam: rationale + owning item) or, with no home, on the **untracked-deferral
+  list** for `build-item` step 6.5; any other is DISMISSED with its reason, never filed. Drop
+  REFUTED. Commit fixes per `commitConventions.reviewFixFormat` (fallback
+  `fix(<scope>): <summary> [<itemNumber> review]`), regenerating artifacts if routes changed. A genuinely ambiguous risky finding is asked about,
   with a recommendation.
 - **Story review ledger**: item-number namespace, base/head SHA, risk and files, each finding's
   id/fingerprint/anchors/claim/verdict/disposition, checks rerun, any local-assist conclusion. The
@@ -190,9 +190,10 @@ and story review ledger, and four lists — each stated as empty when empty, nev
 
 - **buildable-now-vs-deferred scope line** — build and review deferrals, each tagged has-a-home or
   untracked;
-- **untracked-deferral list** — load-bearing: step 6.5 turns each into a tracked item;
-- **dismissed-findings list** — every verified finding the `fixFloor` left unfixed and undeferred,
-  with its rationale, so the PR body shows what was judged rather than missed (normally empty under
+- **untracked-deferral list** — each homeless finding worth filing; load-bearing: step 6.5 turns
+  each into a tracked item;
+- **dismissed-findings list** — every verified finding left unfixed and not worth filing, with its
+  rationale, so the PR body shows what was judged rather than missed (normally empty under
   `all-confirmed`);
 - **deviations list** — every material divergence from the written spec: a different approach, a
   false spec assumption (a dependency already shipped, a missing field, an existing component),

@@ -22,6 +22,16 @@ the stories took the full 4b ritual instead, each was already cloud-reviewed at 
 the release review points at what per-story review could not see: the cross-story integration
 surface and the develop-merge conflict resolutions.
 
+A command the pull-request workflows run exactly is not repeated locally: the draft-held CI run
+is its one run.
+
+## Why the epic release pull request is merge-only
+
+Its first-parent story merges are the landed record the close-out reads, and its story commits are
+shared — later stories were built on them. A rebase would rewrite both, so the cut declares
+`merge-only: true`, and `review` refreshes the head by merging the base in (`branch-patterns.md`,
+"Protected and merge-only heads"), as step 8's own refresh does.
+
 ## Why stories merge into the integration branch, and why `--no-ff`
 
 A story that merged straight to the base branch would put half a release unit on the shared dev
@@ -29,6 +39,25 @@ stage; batching onto the release unit's integration branch leaves that stage unt
 unit is complete and reviewed as one PR. Each story goes in with `--no-ff` because the merge
 commit is the legible first-parent unit the release PR body and the close-out counts are read
 off — a fast-forward would dissolve the batch into indistinguishable commits.
+
+## Why an epic story is not Done until its epic reaches the release target
+
+Done is read by people as "this is in the product", and by the loop as "nothing more to do here".
+A story merged onto its integration branch is neither: it has not been through the release
+pull request's full review or CI, and it is not on the base branch. Marking it Done at that merge
+shows whole epics as finished while their release pull request is still a draft. So the story is *landed* until the release merges, and step 8 closes every landed story
+at once — the same shape as a one-off on the support train, which `release` closes when the
+train arrives.
+
+Blocking must follow, or every epic would stall after its first story: a later story in the
+same epic is blocked by an earlier one that will not be Done until the whole epic ships. A
+landed blocker therefore satisfies a dependent in the SAME release unit, which builds on the very
+branch that already holds it. Across release units it does not: the next epic still waits for the
+previous one to reach its release target, which is exactly what a cross-epic edge means.
+
+The count step 7 uses to trigger step 8 is the release unit, never the direct parent: an
+intermediate grouping item can read zero while sibling stories elsewhere in the unit are still
+open, and would publish a partially complete unit.
 
 ## Why the story branch is deleted only after the epic push succeeds
 
@@ -38,13 +67,13 @@ waits on a push that actually succeeded — local and remote together, never the
 
 ## Why deferred defects live beside the plan, not inside its chain
 
-An out-of-scope or below-floor finding that lives only in a PR body is invisible to every later
-selection, so it has to become a tracked item. But WHERE it is tracked decides whether it is also
-execution order. A below-floor defect spliced into the dependency chain with `blocked_by` edges is
-work the loop must build before the plan can reach zero: the plan never finishes, and the finding
-that was explicitly deferred is not deferred at all. Under a light profile, where the fix floor
-defers most of what review confirms, that turns one plan into an open-ended queue of defects
-nobody chose to schedule.
+An out-of-scope or postponed finding worth filing — a P1, a security finding, or one both likely
+and material — that lives only in a PR body is invisible to every later selection, so it has to
+become a tracked item; any other is dismissed with its reason, since filing it parks work nobody
+builds. WHERE a filed finding is tracked decides whether it is also execution order. A deferred
+defect spliced into the dependency chain with `blocked_by` edges is work the loop must build
+before the plan can reach zero: the plan never finishes, and the finding that was explicitly
+deferred is not deferred at all.
 
 So deferred defects go into a container of their own directly under the plan root, related to the
 item whose review produced them and blocked by nothing. The container is deliberately NOT a
@@ -63,8 +92,9 @@ release's business, and only on the owner's explicit `--release-notes`.
 
 ## Why the release PR is linked back onto every leaf
 
-A fast-mode story has no PR, so its completion ritual cites its merge SHA and integration
-branch and promises that the release PR link follows at step 8. Step 8's link-back is where
+A fast-mode story has no PR, so its landed comment cites its merge SHA and integration
+branch and promises that the release PR link follows at step 8, where the close-out comment
+names it. Step 8's link-back is where
 that promise is kept; skipping it leaves every fast-mode story in the batch pointing at a link
 that never arrives, and an item with no pointer to its shipped code fails the ritual's whole
 purpose.
@@ -77,6 +107,9 @@ flag — the operator believes they disabled auto-release while the loop merges 
 — so a present key wins whatever the profile says, and the contradiction is reported aloud.
 
 ## Why a one-off under an Epic parent still bypasses the epic branch
+
+A bare plan root looks exactly like an item number, so the detector tests the work type first: a
+container is the plan's scope, never a one-off.
 
 `create-story` and `create-defect` both offer a release-unit item as a parent, so a one-off CAN have
 a release-unit ancestor — and without the explicit bypass, the general derivation rule would route
@@ -94,6 +127,6 @@ take fast mode, exactly as an epic story does.
   unit at zero") and the one-off section's pointer ("Read … before changing the one-off
   classification or its step-0 delta").
 - `skills/build-item/SKILL.md` — the working-base note on why stories merge into the integration
-  branch, step 5a's story-branch deletion and step 6.5's below-floor defect placement, each citing
-  this file with "(why: …)"; step 8's auto-release gate, `live: false` and no-release-notes rules
-  are covered by the step-8 pointer above.
+  branch, step 5a's story-branch deletion and step 6.5's deferred defect placement, each citing
+  this file with "(why: …)", as does step 7's release-unit count; step 8's auto-release gate,
+  `live: false` and no-release-notes rules are covered by the step-8 pointer above.

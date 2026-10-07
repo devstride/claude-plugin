@@ -15,7 +15,7 @@ one document grouped by theme; every entry from the round-by-round sections surv
 two entries stated the same rule (the merged entry keeps every clause of both). Entry ids are stable
 within this revision only — cite the rule's words, not its id, from anywhere else.
 
-**Count: see the total at the end.** Recount whenever you add one. The count has been wrong four
+**Count: see the total at the end.** Recount whenever you add one. The count has been wrong six
 times — among them an early revision that claimed 56 for the first eight sections when they
 enumerated 53, and the round-by-round revision that claimed 153 when it enumerated 154. The miscount is recorded rather than
 quietly fixed because it is the instructive part: the checklist was being cited as proof that no
@@ -271,7 +271,9 @@ L4. Parallelize independent read-only research/review only; writes and shared-st
     "one working tree" reads worktrees as a licence for parallel builds.
 L5. The DevStride MCP writes PRODUCTION.
 L6. A dirty tree wedges the loop (branch-feature aborts on it).
-L7. Untracked out-of-scope findings must become real items or they are invisible forever.
+L7. Untracked out-of-scope findings worth filing (a P1, a security finding, or one both likely
+    and material) must become real items or they are invisible forever; any other is dismissed
+    with a posted rationale (M6).
 L8. Config file wins over any literal inline in a skill — and a config flag's behaviour is asserted
     in MORE PLACES than the skill that reads it: `.claude/ds-config.json`'s own readme and sibling
     skills restate it. Honouring `autoRelease` in build-item while `.claude/ds-config.json` still
@@ -308,12 +310,16 @@ M5. Every `epicIntegrationBranches` flag is honoured, each by its own instructio
     false STOPS at release-ready rather than cutting and merging the epic release PR anyway.
     `autoRelease` has a third legal value, `"ask"`: stop at zero and ask once per release unit;
     unanswerable → behaves as `false` and says so. No profile produces it.
-M6. Below-floor DEFECTS are never spliced into the chain under any profile. They are filed by
+M6. A review finding left unfixed — below the fix floor or out of scope — that is MINOR (not a
+    P1, not security, and not both likely and material) is DISMISSED with its posted one-line
+    rationale, never filed; only one worth filing is filed for later, `review` step 4 defining both
+    once. Deferred DEFECTS are never spliced into the chain under any profile. They are filed by
     `create-defect`'s deferred placement in the container titled `defects.deferredContainerTitle`
     directly under the plan root — no `[N]` prefix, no `blocked_by`, a related-to relationship to
     the item whose review produced them (type read from the `add_relationship` schema, never
     assumed), no delivery phase. Step 0 never auto-selects there; the container is never a release
-    unit at zero. Discovered SCOPE still splices via `insert-story`.
+    unit at zero. Discovered SCOPE is always captured, whatever its likelihood, and splices via
+    `insert-story`; `release` files its release's deferrals the same way, never with `insert-*`.
 M7. Resolve the In Progress lane id from the work-type lane collection when needed.
 M8. Step 6 ends with a report line: item + [N], lane, dates, PR link, spec-reconciled y/n.
 M9. Unnumbered plan → still emit the close-out, and note /plan would add numbering.
@@ -328,6 +334,28 @@ M15. A one-off merged onto the support train (`supportTrain.branch`) is NOT Done
      from looked-up item numbers in the train's merge subjects — never a guessed number. With
      `supportTrain.fastMerges` the train's pull request is the one-offs' first full review, so it is
      a FULL-diff review, as an epic release pull request is.
+M16. A story merged onto its release unit's integration branch is LANDED, not Done: it is Done only
+     when the release unit's release pull request reaches the release target, marked by
+     `build-item` step 8's close-out from the landed set captured BEFORE that merge (the git range
+     is empty after it), or — for a release merged with no close-out, such as an owner's merge
+     with auto-release off — by the next run's recovery, reading the set from the release merge
+     commit. Either way the close-out closes the release-unit item first (its comment, Done where
+     it tracks a status) and the leaves last, every part idempotent, so a partial run leaves an open
+     leaf to re-arm recovery. A blocker in the git landed set satisfies a dependent only in the
+     SAME release unit — across units only Done does, and the merged STATUS alone never does (that column often holds
+     an open code review) — or every epic stalls after its first story, or the next epic starts on
+     work that never shipped. So cross-unit edges run one way, a splice beside landed work stays in
+     its unit, and a two-unit wait is reported as a release-unit cycle. Step 7's zero count
+     excludes landed leaves, or step 8 never fires; a fresh run at a unit's zero reports "N landed,
+     awaiting their release", never "plan complete". Recovery and the never-rebuild guard key on
+     the landed COMMENT step 6 always writes, never on the status, and a story named by number
+     skips selection but never that guard: Done, landed or on the support train, it never reaches
+     step 1. A landed leaf moves to the status named `epicIntegrationBranches.mergedStatusName`
+     (absent → "Review"), resolved by NAME per work type, never a shipped id; that status is the
+     visible signal, the git landed set the record. The epic release pull request is cut `merge-only` (its first-parent story merges ARE
+     the record); a story pull request merged into an integration branch or the support train
+     passes GitHub's default merge subject with `--subject`; the close-out writes no dates, keeping
+     step 6's.
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
 N1. ONE profile word — `prototype` / `standard` / `extended` / `enterprise` — moves every rigor knob
@@ -347,8 +375,9 @@ N5. A present `autoRelease`, `fastStoryMerges.enabled` or `pollTimeoutMinutes` k
     never schedules it; the three CI-ordering booleans describe workflow SUPPORT and no profile
     bypasses a supported hold.
 N6. `rebalance` never deletes: absorbed originals are ARCHIVED with a comment naming the successor,
-    after the successor exists with the absorbed specs embedded and its edges re-wired; Done and In
-    Progress leaves are untouchable; it refuses to run while a build loop is active on the plan.
+    after the successor exists with the absorbed specs embedded and its edges re-wired; Done, In
+    Progress and landed leaves are untouchable; it refuses to run while a build loop is active on
+    the plan.
 N7. `plan` never rewrites a live marker — a changed profile on an existing plan is `rebalance`'s
     job, because re-gating existing leaves without re-slicing them is a silent rigor change.
 N8. Verification proof is reusable only when tree SHA, relevant config hash and exact ordered
@@ -563,7 +592,7 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "cumulative ledger" "verification receipt" "review-moment:" \
               "check-review-engine.sh" "MISSING READ-ONLY FLAG" "settled by running it" \
               "sandbox_mode=read-only" "deferredContainerTitle" "Never auto-select from the deferred container" \
-              "Never splice a below-floor finding" "third legal value" "jobClassGate" "same-session" \
+              "Never splice a deferred finding" "third legal value" "jobClassGate" "same-session" \
               "describes a repository that no longer exists" "load: contract" "related-to" \
               "engineering-economy" "CI-last" "localAssistCommand" "review-settled" \
               "task/risk-sized" "effective scope" "fixable occurrence" \
@@ -733,6 +762,24 @@ skills/pr/SKILL.md|requestPolicy
 skills/pr/SKILL.md|releaseBranchPattern
 skills/build-item/SKILL.md|supportTrain.branch
 skills/build-item/references/support-train.md|NOT Done
+skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor
+skills/build-item/references/next-unblocked.md|landed set BEFORE the merge
+skills/build-item/SKILL.md|neither Done nor landed
+skills/build-item/SKILL.md|any other is dismissed, never filed
+skills/review/SKILL.md|one both likely and
+skills/review/SKILL.md|worth filing
+skills/build-item/references/next-unblocked.md|merged status alone never satisfies
+skills/build-item/references/next-unblocked.md|keyed on the landed comment
+skills/build-item/references/next-unblocked.md|release-unit cycle
+skills/plan/references/splice-mechanics.md|already holds landed leaves
+skills/build-item/SKILL.md|awaiting their release
+skills/build-item/SKILL.md|merge-only: true
+skills/build-item/SKILL.md|Merge pull request #<n> from <owner>/<head branch>
+skills/build-item/SKILL.md|integration-branch or train base
+skills/build-item/SKILL.md|never step 1
+skills/build-item/references/next-unblocked.md|A story named by number
+skills/build-item/references/next-unblocked.md|The release unit first
+skills/release/SKILL.md|create-defect deferred
 skills/push/SKILL.md|branch-patterns.md
 skills/release/references/branch-patterns.md|protected by the key
 skills/review/SKILL.md|merge-only
@@ -812,11 +859,11 @@ step. That is the moment a rule goes missing, and it is the only moment this fil
 
 ---
 
-**Total: 142 rule entries (A–T) + 6 editing disciplines (U) = 148.** (The previous total claimed 134
-while 135 were enumerated — the fifth miscount, corrected here.) The round-by-round revision
-enumerated 154 facts; 20 of them were near-duplicates stated in two to four places, and each group
-became one entry carrying every clause. (Needles are a SAMPLE, not one per fact; recount their loops
+**Total: 143 rule entries (A–T) + 6 editing disciplines (U) = 149.** (The previous total claimed 142
+while 143 were enumerated — M16 was added without a recount: the sixth miscount, corrected here.)
+The round-by-round revision enumerated 154 facts; 20 of them were near-duplicates stated in two to
+four places, and each group became one entry carrying every clause. (Needles are a SAMPLE, not one per fact; recount their loops
 after editing.)
 
 > This total is LAST on purpose. Appending an entry must take you past it — if you added entries
-> and this number did not change, the count is now wrong. It has been wrong four times.
+> and this number did not change, the count is now wrong. It has been wrong six times.

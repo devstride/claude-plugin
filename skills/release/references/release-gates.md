@@ -18,7 +18,8 @@ advisory, why entries run unconditionally at the release boundary (path argument
 what the rule overrides), and why "covered by CI" is the one false assurance never to give an
 owner. If a cloud job is ever restored for such a suite, its `verify.skipDuringStoryBuilds`
 entry and workflow job are added together and the `preShipChecks` entry dropped — otherwise it
-runs twice.
+runs twice. Step 2 declares the pre-ship hold because the order matters too: flipping the pull
+request ready first would let a pre-ship fix reach production past no reviewer.
 
 ## Why `<sourceHead>` and `<reviewedHead>` are immutable SHAs
 

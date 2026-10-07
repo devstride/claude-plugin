@@ -8,7 +8,7 @@ description: Create a Defect (inbound bug report / ad-hoc fix not in a sequenced
 **Goal.** Create a NEW Defect (the one-day leaf role — this org's Defect type) outside any sequenced `/devstride:plan` roadmap, in one of two PLACEMENT modes — decide the mode FIRST:
 
 - **ONE-OFF** (default, steps 0–2): an inbound bug report or ad-hoc fix — file it in the map, put it on a board, assign it, then deliver it with the SAME build loop `/devstride:build-item` runs, exactly ONCE.
-- **DEFERRED** (section D, replacing steps 0–2 entirely): park a review's below-floor finding under the plan root, relate it back, and STOP — never built.
+- **DEFERRED** (section D, replacing steps 0–2 entirely): park a postponed review finding under the plan root, relate it back, and STOP — never built. Its callers (`review` step 4, `build-item` 6.5) dismiss a finding not worth filing (not a P1, not security, not both likely and material); a person's explicit `deferred` request is filed as asked.
 
 Use **`/devstride:insert-defect`** instead when the fix belongs in a sequenced plan — it splices into the dependency chain, numbers it, and lets the loop pick it up in order.
 
