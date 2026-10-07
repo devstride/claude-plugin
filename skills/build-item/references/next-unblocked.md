@@ -23,7 +23,7 @@ release unit is satisfied only when Done, so the next release unit waits until t
 reaches its release target.
 
 **Exclude everything under the deferred-defect container** — the container titled
-`defects.deferredContainerTitle` that sits directly under the plan root and holds below-floor
+`defects.deferredContainerTitle` that sits directly under the plan root and holds postponed
 review findings. Those items are tracked, not queued: they are never auto-selected, they never
 count toward a remaining-leaf total, and the container is never a release unit. An item there
 that the USER names explicitly by number is still built, as a one-off.

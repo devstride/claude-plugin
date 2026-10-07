@@ -370,8 +370,10 @@ blocks by accident.
 
 ## Deferred defects
 
-Review findings below the profile's fix floor are not fixed in the cycle that found them and must
-not vanish. `build-item` files each one as a Defect in a container titled **Deferred defects**
+A review finding left unfixed never vanishes. One that is not both likely to happen and material
+is dismissed with a one-line reason in the pull request or merge commit, and nothing is filed for
+it. One that is both, but deliberately postponed, `build-item` files as a Defect in a container
+titled **Deferred defects**
 (configurable as `defects.deferredContainerTitle`) directly under the plan root, related to the
 item whose review produced it, never spliced into the plan's execution order and never selected
 or auto-released by the loop. Build one deliberately by naming it: `/devstride:build-item <number>`.

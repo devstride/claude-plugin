@@ -130,7 +130,8 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
 ```
 
 - **`deferredContainerTitle`** is the title of the container `build-item` resolves — or creates —
-  **directly under the plan root** to hold below-floor review findings. It is a parking lot beside
+  **directly under the plan root** to hold review findings that are both likely and material but
+  postponed; any other finding is dismissed with its reason, never filed. It is a parking lot beside
   the plan, not a stage of it.
 - Items in that container are **never spliced into the execution chain** (no `blocked_by` edges,
   no execution-order prefix), **never auto-selected** by `build-item` step 0, and the container is

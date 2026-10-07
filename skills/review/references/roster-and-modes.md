@@ -76,8 +76,10 @@ reason.
 
 ## Why a deferral must leave a trace, and where it goes
 
-A below-floor finding that vanishes without a posted rationale is indistinguishable from a
-finding nobody ever looked at: the next reviewer re-raises it, or nobody does. The same applies
+An unfixed finding that vanishes without a posted rationale is indistinguishable from a finding
+nobody ever looked at: the next reviewer re-raises it, or nobody does. A posted dismissal is that
+trace; only a likely, material finding also becomes an item, as filing minor ones parks work
+nobody builds. The same applies
 to an out-of-scope capture — left as PR prose it is invisible to the loop forever, because
 nothing downstream reads a PR comment looking for work.
 

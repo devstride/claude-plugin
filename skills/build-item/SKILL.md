@@ -48,10 +48,8 @@ one-off: $ARGUMENTS
   checkout pool, work only in a member held under a lease. Never create a worktree or instance
   unless the owner asks in this conversation; never delete another session's lease. Pool, lease name
   and hand-back come from the repo, never hard-coded; protocol in `ground-truth-at-start.md`.
-- **Serial by design.** "Parallel waves" are SHAPE: `branch-feature` aborts on a dirty tree; tests
-  share infrastructure `localEnvironment.instanceBoundTo: directory` does NOT isolate; the MCP
-  writes production. `localEnvironment` never makes the loop concurrent; a human fans out the
-  ready-set.
+- **Serial by design.** "Parallel waves" are SHAPE (why: `references/next-unblocked.md`):
+  `localEnvironment` never makes the loop concurrent; a human fans out the ready-set.
 - **Full-auto through merge.** PAUSE only at a genuine fork: a user's human/infra decision, an
   ambiguous or unverifiable finding, a destructive or outward-facing action. Record every deferral;
   never skip silently.
@@ -138,7 +136,7 @@ resolves, else state your read and ask. **Steps 1–6 run VERBATIM.** Deltas:
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` before changing the one-off
   classification or its step-0 delta.**
 - **Step 6.5** — follow-ups become their own one-offs (`/devstride:create-story` /
-  `/devstride:create-defect`), never `insert-*`; below-floor defects keep the DEFERRED placement
+  `/devstride:create-defect`), never `insert-*`; a deferred defect keeps the DEFERRED placement
   under the root this item resolves to.
 - **Step 7** — no loop, no persisted root: sync, clean tree, close out, TERMINATE; no release
   countdown.
@@ -193,8 +191,8 @@ valid verification receipt → **4b**, saying why.
   engine (a configured local CLI is no story tax), but it still owns triage, fixes and lessons.
 - **Fix every fix-in-story finding it returns** (its `fixFloor` triage; a reasoned deferral is not
   re-imposed) per `commitConventions.reviewFixFormat` (fallback
-  `fix(<scope>): <summary> [<itemNumber> review]`); homeless out-of-scope or below-floor findings →
-  the untracked-deferral list.
+  `fix(<scope>): <summary> [<itemNumber> review]`); a homeless unfixed finding both likely and
+  material → the untracked-deferral list, any other → dismissed (5a's body).
 - **Local suites are the gate** (`fastStoryMerges.requireLocalVerifyGreen`), width = the effective
   `storyVerify`. Per `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/verification-receipts.md`,
   an unchanged tree + command set is REUSED; fixes rerun affected checks plus the required gate.
@@ -264,11 +262,12 @@ in the PR body. The push/ready-flip race is `review` step 7's: flip-with-push le
 
 ## 6.5 Capture untracked findings as tracked items
 
-- **Below-floor defect → `/devstride:create-defect` DEFERRED**: parent = the
-  `defects.deferredContainerTitle` container directly under the plan root (resolved or created), no
-  `blocked_by`, no prefix, no delivery, plus the `add_relationship` related-to edge to the item whose
-  review produced it (the RELEASE UNIT for a step-8 review). **Never splice a below-floor finding into
-  the chain**, under any profile (why: `references/epic-release.md`).
+- **A deferred defect** (both likely and material; any other is dismissed, never filed) **→
+  `/devstride:create-defect` DEFERRED**: parent = the `defects.deferredContainerTitle` container
+  directly under the plan root (resolved or created), no `blocked_by`, no prefix, no delivery, plus
+  the `add_relationship` related-to edge to the item whose review produced it (the RELEASE UNIT for
+  a step-8 review). **Never splice a deferred finding into the chain**, under any profile (why:
+  `references/epic-release.md`).
 - **Discovered scope → `/devstride:insert-story`**, spliced so selection reaches it.
 - A deferral owned by an EXISTING item goes on that item. Report what went where.
 

@@ -308,7 +308,9 @@ M5. Every `epicIntegrationBranches` flag is honoured, each by its own instructio
     false STOPS at release-ready rather than cutting and merging the epic release PR anyway.
     `autoRelease` has a third legal value, `"ask"`: stop at zero and ask once per release unit;
     unanswerable → behaves as `false` and says so. No profile produces it.
-M6. Below-floor DEFECTS are never spliced into the chain under any profile. They are filed by
+M6. Only a review finding both likely and material is filed for later; any other left unfixed —
+    below the fix floor or out of scope — is DISMISSED with its posted one-line rationale, never
+    filed. Deferred DEFECTS are never spliced into the chain under any profile. They are filed by
     `create-defect`'s deferred placement in the container titled `defects.deferredContainerTitle`
     directly under the plan root — no `[N]` prefix, no `blocked_by`, a related-to relationship to
     the item whose review produced them (type read from the `add_relationship` schema, never
@@ -572,7 +574,7 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "cumulative ledger" "verification receipt" "review-moment:" \
               "check-review-engine.sh" "MISSING READ-ONLY FLAG" "settled by running it" \
               "sandbox_mode=read-only" "deferredContainerTitle" "Never auto-select from the deferred container" \
-              "Never splice a below-floor finding" "third legal value" "jobClassGate" "same-session" \
+              "Never splice a deferred finding" "third legal value" "jobClassGate" "same-session" \
               "describes a repository that no longer exists" "load: contract" "related-to" \
               "engineering-economy" "CI-last" "localAssistCommand" "review-settled" \
               "task/risk-sized" "effective scope" "fixable occurrence" \
@@ -745,6 +747,8 @@ skills/build-item/references/support-train.md|NOT Done
 skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor
 skills/build-item/references/next-unblocked.md|landed set BEFORE the merge
 skills/build-item/SKILL.md|neither Done nor landed
+skills/build-item/SKILL.md|any other is dismissed, never filed
+skills/review/SKILL.md|one both likely and
 skills/push/SKILL.md|branch-patterns.md
 skills/release/references/branch-patterns.md|protected by the key
 skills/review/SKILL.md|merge-only

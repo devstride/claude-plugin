@@ -35,6 +35,17 @@ for what each version component means here and how a release is cut.
     as not open when splicing; `rationalize-gantt` counts them as done when re-dating only open
     work; `rebalance` does not mistake one for a running loop.
 
+### Changed
+
+- **A minor review finding is dismissed with its reason, not filed as deferred work.** A finding
+  left unfixed — below the profile's fix floor, or outside the story's scope — that is not both
+  likely to happen and material is now dismissed with a one-line reason in the pull request or
+  merge commit, and nothing is filed for it. Only a finding that is both, and deliberately
+  postponed, still becomes a deferred defect beside the plan. Before, `build-item` filed every
+  such finding as a deferred defect, which filled deferred containers with work nobody would
+  build. Under `prototype`, a likely and material finding outside its P1-and-security floor is
+  still deferred; anything less is dismissed.
+
 ### Added
 
 - **`epicIntegrationBranches.mergedStatusName`** (default `"Review"`) names the status a landed

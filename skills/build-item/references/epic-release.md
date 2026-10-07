@@ -57,12 +57,14 @@ waits on a push that actually succeeded — local and remote together, never the
 
 ## Why deferred defects live beside the plan, not inside its chain
 
-An out-of-scope or below-floor finding that lives only in a PR body is invisible to every later
-selection, so it has to become a tracked item. But WHERE it is tracked decides whether it is also
-execution order. A below-floor defect spliced into the dependency chain with `blocked_by` edges is
+An out-of-scope or postponed finding that is both likely and material, and lives only in a PR
+body, is invisible to every later selection, so it has to become a tracked item; any other is
+dismissed with its reason, since filing it parks work nobody builds. WHERE a filed finding is
+tracked decides whether it is also execution order. A deferred defect spliced into the
+dependency chain with `blocked_by` edges is
 work the loop must build before the plan can reach zero: the plan never finishes, and the finding
 that was explicitly deferred is not deferred at all. Under a light profile, where the fix floor
-defers most of what review confirms, that turns one plan into an open-ended queue of defects
+defers more of what review confirms, that turns one plan into an open-ended queue of defects
 nobody chose to schedule.
 
 So deferred defects go into a container of their own directly under the plan root, related to the
@@ -114,6 +116,6 @@ take fast mode, exactly as an epic story does.
   unit at zero") and the one-off section's pointer ("Read … before changing the one-off
   classification or its step-0 delta").
 - `skills/build-item/SKILL.md` — the working-base note on why stories merge into the integration
-  branch, step 5a's story-branch deletion and step 6.5's below-floor defect placement, each citing
+  branch, step 5a's story-branch deletion and step 6.5's deferred defect placement, each citing
   this file with "(why: …)", as does step 7's release-unit count; step 8's auto-release gate,
   `live: false` and no-release-notes rules are covered by the step-8 pointer above.
