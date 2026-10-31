@@ -8,6 +8,8 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.17.0] — 2026-10-31
+
 ### Added
 
 - **The status line says when this session runs an older plugin than it could.** A session keeps
@@ -28,6 +30,34 @@ for what each version component means here and how a release is cut.
   and for any repository tooling that wants it; a `/reload-plugins` after the record was written
   reads as `current` until the next prompt, so a successful reload never shows a false warning.
   python3 and the standard library only; every failure exits 0 silently.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.16.0 @ ad4bff9, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.16.0 | tokens@devstride--v3.16.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,096 | 10,699 | 32,096 | 10,699 | +0 | 10,700 |
+| skills/build-item/SKILL.md | 23,999 | 8,000 | 23,999 | 8,000 | +0 | 8,000 |
+| skills/release/SKILL.md | 23,994 | 7,998 | 23,994 | 7,998 | +0 | 8,000 |
+| skills/review/SKILL.md | 23,987 | 7,996 | 23,987 | 7,996 | +0 | 8,000 |
+| skills/doctor/SKILL.md | 23,962 | 7,988 | 23,962 | 7,988 | +0 | 8,000 |
+| skills/plan/SKILL.md | 23,891 | 7,964 | 23,891 | 7,964 | +0 | 8,000 |
+| skills/rebalance/SKILL.md | 17,409 | 5,803 | 17,409 | 5,803 | +0 | 5,900 |
+| skills/ultracode-build/SKILL.md | 14,470 | 4,824 | 14,470 | 4,824 | +0 | 4,900 |
+| skills/pr/SKILL.md | 11,289 | 3,763 | 11,289 | 3,763 | +0 | 3,800 |
+| skills/rationalize-gantt/SKILL.md | 7,902 | 2,634 | 7,902 | 2,634 | +0 | 2,700 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 7,483 | 2,495 | 7,483 | 2,495 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,200 |
+| skills/insert-defect/SKILL.md | 4,714 | 1,572 | 4,714 | 1,572 | +0 | 1,600 |
+| skills/comprehend-plan/SKILL.md | 4,583 | 1,528 | 4,583 | 1,528 | +0 | 1,600 |
+| skills/insert-story/SKILL.md | 4,037 | 1,346 | 4,037 | 1,346 | +0 | 1,400 |
+| skills/create-story/SKILL.md | 3,999 | 1,333 | 3,999 | 1,333 | +0 | 1,400 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| alwaysOn.context (skill listing) | 3,697 | 1,233 | 3,697 | 1,233 | +0 | 1,300 |
+| **total (bodies)** | 250,087 | 83,368 | 250,087 | 83,368 | +0 | |
 
 ## [3.16.0] — 2026-10-31
 
@@ -2249,7 +2279,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.16.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.17.0...HEAD
+[3.17.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.16.0...devstride--v3.17.0
 [3.16.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.15.1...devstride--v3.16.0
 [3.15.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.15.0...devstride--v3.15.1
 [3.15.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.14.0...devstride--v3.15.0
