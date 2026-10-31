@@ -1,5 +1,5 @@
 #!/bin/bash
-# ds-statusline: managed v3.16.0 — installed and kept up to date by the devstride
+# ds-statusline: managed v3.17.0 — installed and kept up to date by the devstride
 # plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
 # replaces a file that still carries it, and never touches one that does not.
 #
@@ -7,6 +7,10 @@
 #
 #   Model: Opus 5 · Effort: high · Repo: acme · Checkout: ⑂ i123-widget ·
 #   Branch: phil/08-28-26/widget · Stage: phil-mac · PR: #412 draft · Release: release/26-10-17 · alice · ci
+#
+# and, only while this session runs an older devstride plugin than it could,
+#   Plugin: 3.15.0 → 3.16.0 · /reload-plugins      (red: the newer copy is installed, not loaded)
+#   Plugin: 3.16.0 (3.16.1 out · /devstride:update) (yellow: a newer release is published)
 #
 # `setup` copies this into the consuming repository as `.claude/statusline.sh`
 # and points `statusLine.command` at it. It is deliberately repo-AGNOSTIC: every
@@ -74,6 +78,48 @@ emit("SL_PROD_STAGES", " ".join(stage.get("productionStages") or []))
 sl = cfg.get("statusLine") or {}
 emit("SL_HIDDEN", " ".join(str(x) for x in (sl.get("hiddenSegments") or [])))
 
+# The installed copies of this plugin, from the Claude Code plugin registry (a status line runs
+# outside any skill, so it cannot assume a plugin root). Read once; both lookups below use it.
+def installed_roots():
+    roots = [os.environ.get("CLAUDE_PLUGIN_ROOT") or ""]
+    try:
+        registry = os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"),
+                                "plugins", "installed_plugins.json")
+        with open(registry) as fh:
+            rows = (json.load(fh).get("plugins") or {})
+        for key in ("devstride@devstride", "ds@devstride"):
+            for row in rows.get(key) or []:
+                roots.append(row.get("installPath") or "")
+    except Exception:
+        pass
+    return [root for root in roots if root]
+roots = installed_roots()
+
+# The plugin THIS session runs, against the install that applies here and the newest release:
+# hooks/session-runtime.py (whose hooks, run by the loaded copy, record what was loaded; its check owns the
+# rule) is imported in-process, so the verdict costs no second python start. "reload|A|B" or
+# "update|A|B"; nothing for current, unknown, no session id or no helper.
+plugin_state = ""
+if d.get("session_id"):
+    for root in roots:
+        helper = os.path.join(root, "hooks", "session-runtime.py")
+        if not os.path.isfile(helper):
+            continue
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("ds_session_runtime", helper)
+            runtime = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(runtime)
+            verdict = runtime.check(d.get("session_id"), cwd or None)
+            if verdict.get("verdict") == "reload":
+                plugin_state = "reload|%s|%s" % (verdict["running"], verdict["installed"])
+            elif verdict.get("verdict") == "update":
+                plugin_state = "update|%s|%s" % (verdict["running"], verdict["newest"])
+        except Exception:
+            plugin_state = ""
+        break
+emit("SL_PLUGIN", plugin_state)
+
 # Release clearance (release.clearance): the command whose `status --short` names the
 # release in flight, or nothing when the block is null. A repo-supplied provider is its
 # own `commands.status`; the built-in one is the clearance-github.sh the plugin ships, found
@@ -89,19 +135,7 @@ if isinstance(clearance, dict) and clearance:
     elif clearance.get("provider") == "github":
         rel = "skills/release/scripts/clearance-github.sh"
         candidates = [os.environ.get("DEVSTRIDE_CLEARANCE_PROVIDER") or ""]
-        if os.environ.get("CLAUDE_PLUGIN_ROOT"):
-            candidates.append(os.path.join(os.environ["CLAUDE_PLUGIN_ROOT"], rel))
-        try:
-            registry = os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"),
-                                    "plugins", "installed_plugins.json")
-            with open(registry) as fh:
-                rows = (json.load(fh).get("plugins") or {})
-            for key in ("devstride@devstride", "ds@devstride"):
-                for row in rows.get(key) or []:
-                    if row.get("installPath"):
-                        candidates.append(os.path.join(row["installPath"], rel))
-        except Exception:
-            pass
+        candidates += [os.path.join(root, rel) for root in roots]
         for candidate in candidates:
             if candidate and os.path.isfile(candidate):
                 clearance_cmd = "bash " + shlex.quote(candidate) + " status --short"
@@ -175,6 +209,18 @@ if [ -n "$effort" ]; then
     *)         ec=$DIM ;;
   esac
   seg effort "Effort" "$effort" "${ec}${effort}${RESET}"
+fi
+
+# --- plugin: this session runs an older devstride plugin than it could ------
+# Red when a newer copy is INSTALLED but this session has not loaded it (/reload-plugins fixes it);
+# yellow when this session runs the installed copy and a newer release is published. Silent
+# otherwise, and silent whenever the running version cannot be read.
+if [ -n "$SL_PLUGIN" ]; then
+  IFS='|' read -r pverdict pfrom pto <<<"$SL_PLUGIN"
+  case "$pverdict" in
+    reload) seg plugin "Plugin" "$pfrom" "${RED}${pfrom} → ${pto} · /reload-plugins${RESET}" ;;
+    update) seg plugin "Plugin" "$pfrom" "${YELLOW}${pfrom} (${pto} out · /devstride:update)${RESET}" ;;
+  esac
 fi
 
 toplevel=$(git rev-parse --show-toplevel 2>/dev/null)

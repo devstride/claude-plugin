@@ -29,6 +29,10 @@ disagree. The version-check hook runs *from the loaded copy*, so it reads
 and reports that. `doctor`, which runs as a skill inside the session, reports what
 `claude plugin list` says and labels it as disk.
 
+**Per-session record (3.17.0+)** — the running-version signal outside the session: the loaded copy's
+hooks write `sessions/<session_id>.json` (`running`, `at`, …) under the cache directory below, and
+`hooks/session-runtime.py check --session <id>` owns the `reload`/`update` verdict; callers run it.
+
 ## Updating — explicit skill or native bootstrap
 
 From 3.5.1 (3.1.0–3.5.0 can stop with `plugin-root-missing`), `/devstride:update` resolves the loaded copy, requires the canonical marketplace at the
@@ -93,3 +97,4 @@ or `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` is set. That is what `doctor` reports.
   schema and for explaining every `result` value.
 - `skills/setup/references/config-defaults.md` — the update-check keys point here for the recipe.
 - `hooks/version-check.sh` — its header names this file as the recipe for "newest release".
+- `hooks/session-runtime.py` — the per-session record and its verdict (the paragraph above).
