@@ -1,5 +1,5 @@
 #!/bin/bash
-# ds-statusline: managed v3.13.0 — installed and kept up to date by the devstride
+# ds-statusline: managed v3.16.0 — installed and kept up to date by the devstride
 # plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
 # replaces a file that still carries it, and never touches one that does not.
 #
@@ -308,7 +308,8 @@ fi
 # --- release clearance (cached, refreshed in the background) ----------------
 # The release in flight for this repository, from the clearance provider's
 # `status --short` (release.clearance): one line such as
-# `release/26-10-17 · alice · ci`, or nothing when no release holds clearance.
+# `release/26-10-17 · alice · ci`, a `close-out owed · …` line while this machine
+# owes close-out work after a hand-back, or nothing.
 # Network, so the same cache-and-refresh shape as the PR segment; a provider
 # that fails prints nothing, and nothing renders — never an error in the bar.
 if [ -n "$SL_CLEARANCE_CMD" ]; then
@@ -331,8 +332,9 @@ if [ -n "$SL_CLEARANCE_CMD" ]; then
     : >"$rcache"; rspawn
   fi
   if [ -n "$rel" ]; then
-    # A stale clearance is the one worth noticing: its session may be gone.
-    case "$rel" in *STALE*) rc=$RED ;; *) rc=$MAGENTA ;; esac
+    # A stale clearance (its session may be gone) or a stuck one (alive, not moving) is the
+    # one worth noticing.
+    case "$rel" in *STALE*|*STUCK*) rc=$RED ;; *) rc=$MAGENTA ;; esac
     seg release "Release" "$rel" "${rc}${rel}${RESET}"
   fi
 fi

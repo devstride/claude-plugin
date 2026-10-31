@@ -13,11 +13,15 @@
 # exit codes, first lines, the local record — is skills/release/references/clearance.md, which a
 # repository-supplied provider follows too.
 #
-#   claim     [--wait] [--purpose <text>]      0 CLEARED · 2 BUSY · 3 STALE (pull request open) · 1 error
+#   claim     [--wait [--ignore-stuck]] [--purpose <text>]
+#                                              0 CLEARED · 2 BUSY · 3 STALE (pull request open) ·
+#                                              5 STUCK (--wait only) · 1 error
 #   status    [--short] [--json]               0 when the ref was read (CLEAR or held) · 1 unreadable
 #   heartbeat <phase> [--branch b] [--pr n]    0 · 4 NOT HOLDER
-#   release   [--force]                        0 · 4 NOT HOLDER
-#   adopt     --yes                            0 ADOPTED · 2 not stale · 4 nothing to adopt
+#   release   [--force] [--owed <item>]...     0 · 4 NOT HOLDER
+#   adopt     --yes [--original-stopped]       0 ADOPTED · 2 not stale (or stuck and not confirmed stopped) · 4 nothing to adopt
+#   owed      [--done <item>]... [--clear] [--release <name>]
+#                                              0 — the close-out work still owed after a hand-back
 #   keeper    (internal)                       the detached heartbeat a claim starts; see below
 #
 # LIVENESS. A clearance is stale when its heartbeat is older than staleMinutes (default 20). A
@@ -28,14 +32,26 @@
 # its keeper with it, and the clearance goes stale on schedule. The skill's own `heartbeat
 # <phase>` calls record progress; they are not what keeps the clearance alive.
 #
+# PROGRESS. Alive is not the same as moving. A heartbeat that changes the phase stamps
+# phaseStartedAt; a phase with a budget (release.clearance.phaseBudgetMinutes over the defaults
+# below) that runs past it is STUCK — shown by status and in every BUSY line, never taken over:
+# adopting a stuck clearance that is still alive needs --original-stopped, the owner's word that
+# the original session has stopped. The provider cannot prove that, so it never decides it.
+#
+# CLOSE-OUT OWED. A release hands clearance back before the work nothing else waits on (its
+# documentation, owed messages, local clean-up). `release --owed <item>` records that work in a
+# local file beside the record (<record>.owed.json), status shows it, and `owed --done <item>`
+# clears it, so a session that dies after the hand-back leaves a visible trace.
+#
 # Configuration comes from the nearest `.claude/ds-config.json` above the working directory:
-# release.clearance.{ref, staleMinutes, waitMinutes}, release.productionBranch,
+# release.clearance.{ref, staleMinutes, waitMinutes, phaseBudgetMinutes}, release.productionBranch,
 # release.releaseSource, release.releaseBranchPattern and releaseTower.hotfixPattern. Environment
 # overrides exist for tests and for a wrapper: CLEARANCE_REF, CLEARANCE_STALE_MINUTES,
 # CLEARANCE_WAIT_MINUTES, CLEARANCE_POLL_SECONDS (default 60), CLEARANCE_RECORD (the local record
 # path), CLEARANCE_REPO (owner/name), CLEARANCE_REMOTE (default origin),
 # CLEARANCE_PRODUCTION_BRANCH, CLEARANCE_RELEASE_PATTERN, CLEARANCE_HOTFIX_PATTERN, CLEARANCE_NOW
-# (an ISO instant, tests only), CLEARANCE_NO_KEEPER=1, CLEARANCE_OWNER_PID, CLEARANCE_KEEPER_SECONDS.
+# (an ISO instant, tests only), CLEARANCE_NO_KEEPER=1, CLEARANCE_OWNER_PID, CLEARANCE_KEEPER_SECONDS,
+# CLEARANCE_PHASE_BUDGETS (a JSON object over the configured budgets), CLEARANCE_OWED_RECORD.
 #
 # Runs under macOS /bin/bash 3.2: bash only hands over to python3, the toolchain the plugin's
 # hooks already assume. Needs a checkout with the remote (`origin`) that the repository's pushes
@@ -54,6 +70,9 @@ DEFAULT_REF = "refs/clearance/release"
 DEFAULT_STALE_MINUTES = 20
 DEFAULT_WAIT_MINUTES = 180
 DEFAULT_HOTFIX_PATTERN = "*/hotfix/**"
+# Minutes a phase may run before status calls it STUCK. Only phases that should finish in a
+# bounded time have one: review and train wait on people and CI, so they have none by default.
+DEFAULT_PHASE_BUDGETS = {"pre-ship": 120, "deploy": 60, "close-out": 45}
 PR_LIMIT = 200  # a list this long is reported as truncated rather than trusted
 SHELLS = {"sh", "bash", "zsh", "dash", "fish", "ksh", "python3", "python", "perl", "env", "timeout",
           "nohup", "script", "sandbox-exec", "caffeinate", "sudo", "su", "login", "tmux", "screen"}
@@ -173,6 +192,40 @@ RELEASE_SOURCE = RELEASE.get("releaseSource") or "develop"
 RELEASE_PATTERN = setting("CLEARANCE_RELEASE_PATTERN", RELEASE.get("releaseBranchPattern"), "")
 HOTFIX_PATTERN = setting("CLEARANCE_HOTFIX_PATTERN", TOWER.get("hotfixPattern"), DEFAULT_HOTFIX_PATTERN)
 CACHE_DIR = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+
+
+def phase_budgets():
+    """The defaults, then release.clearance.phaseBudgetMinutes, then CLEARANCE_PHASE_BUDGETS. A
+    value that is not a positive number (0, null, "off") switches that phase's alarm off."""
+    budgets = dict(DEFAULT_PHASE_BUDGETS)
+    layers = [CLEARANCE.get("phaseBudgetMinutes")]
+    raw = os.environ.get("CLEARANCE_PHASE_BUDGETS")
+    if raw:
+        try:
+            layers.append(json.loads(raw))
+        except ValueError:
+            fail("CLEARANCE_PHASE_BUDGETS is not a JSON object")
+    for layer in layers:
+        if layer is None:
+            continue
+        if not isinstance(layer, dict):
+            fail("release.clearance.phaseBudgetMinutes must be an object of phase → minutes")
+        for phase, minutes in layer.items():
+            budgets[str(phase)] = minutes
+    out = {}
+    for phase, minutes in budgets.items():
+        if isinstance(minutes, bool):
+            continue
+        try:
+            value = int(minutes)
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            out[phase] = value
+    return out
+
+
+PHASE_BUDGETS = phase_budgets()
 
 
 def record_path():
@@ -354,6 +407,24 @@ def is_stale(record, at):
     return beat is None or (at - beat).total_seconds() > STALE_MINUTES * 60
 
 
+def phase_minutes(record, at):
+    """Whole minutes the record has been in its current phase, or None when it does not say (a
+    record written before phaseStartedAt existed)."""
+    start = parse_iso(record.get("phaseStartedAt"))
+    if start is None:
+        return None
+    return max(0, int((at - start).total_seconds()) // 60)
+
+
+def is_stuck(record, at):
+    """Alive is not moving: the current phase has a budget and has run past it."""
+    if not record or unreadable(record):
+        return False
+    budget = PHASE_BUDGETS.get(record.get("phase") or "")
+    minutes = phase_minutes(record, at)
+    return bool(budget) and minutes is not None and minutes > budget
+
+
 def pr_state(number):
     try:
         return gh(["pr", "view", str(number), "--repo", repo(), "--json", "state", "--jq", ".state"]).strip().upper()
@@ -362,6 +433,60 @@ def pr_state(number):
 
 
 # ── the local record (what a hook reads to answer "does THIS session hold clearance?") ──
+def owed_path():
+    """The close-out-owed file beside the local record: the record itself means "this session holds
+    clearance" to a hook, so work owed after the hand-back cannot live in it."""
+    forced = os.environ.get("CLEARANCE_OWED_RECORD")
+    if forced:
+        return forced
+    base = record_path()
+    return (base[:-5] if base.endswith(".json") else base) + ".owed.json"
+
+
+def read_owed():
+    """Entries for this repository, oldest first; never raises (status must not fail on it)."""
+    try:
+        with open(owed_path()) as handle:
+            value = json.load(handle)
+    except (OSError, ValueError):
+        return []
+    entries = value.get("entries") if isinstance(value, dict) else None
+    if not isinstance(entries, list):
+        return []
+    try:
+        here = repo()
+    except SystemExit:
+        here = None
+    return [e for e in entries if isinstance(e, dict) and e.get("repo") in (None, here)
+            and isinstance(e.get("owed"), list) and e["owed"]]
+
+
+def write_owed(entries):
+    directory = os.path.dirname(owed_path())
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    if not entries:
+        try:
+            os.remove(owed_path())
+        except OSError:
+            pass
+        return
+    tmp = owed_path() + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as handle:
+        json.dump({"entries": entries}, handle)
+    os.replace(tmp, owed_path())
+
+
+def owed_line(entry, at):
+    where = entry.get("release") or "release"
+    if entry.get("pr"):
+        where += " #%s" % entry["pr"]
+    return "%s — %s (handed back %s by %s on %s, session %s)" % (
+        where, ", ".join(str(i) for i in entry["owed"]), age_text(parse_iso(entry.get("releasedAt")), at),
+        entry.get("user") or "?", entry.get("machine") or "?", entry.get("holder") or "?")
+
+
 def read_local():
     try:
         with open(record_path()) as handle:
@@ -509,6 +634,10 @@ def describe(record, at):
         line += " — " + " ".join(where)
     if is_stale(record, at):
         line += " — STALE"
+    if is_stuck(record, at):
+        line += " — STUCK in %s for %d min (budget %d min), session %s on %s" % (
+            record.get("phase"), phase_minutes(record, at), PHASE_BUDGETS[record.get("phase")],
+            record.get("holder") or "?", record.get("machine") or "?")
     return line
 
 
@@ -552,6 +681,7 @@ def keeper_for(me):
 
 def cmd_claim(args):
     wait = "--wait" in args
+    stop_on_stuck = wait and "--ignore-stuck" not in args
     purpose = option(args, "--purpose") or "release"
     me, print_token = holder()
     if print_token:
@@ -590,7 +720,7 @@ def cmd_claim(args):
             record = {
                 "v": RECORD_VERSION, "repo": repo(), "holder": me, "user": user, "machine": socket.gethostname(),
                 "purpose": purpose, "phase": "claimed", "branch": None, "pr": None,
-                "takenAt": iso(at), "heartbeatAt": iso(at),
+                "takenAt": iso(at), "heartbeatAt": iso(at), "phaseStartedAt": iso(at),
             }
             try:
                 # Absent → the lease expects no ref; stale → the lease expects exactly the stale
@@ -619,6 +749,11 @@ def cmd_claim(args):
         if not wait or time.monotonic() >= deadline:
             print(line)
             return 2
+        if stop_on_stuck and is_stuck(current, at):
+            # Alive but not moving: end the wait once so the waiting session can tell the owner;
+            # it waits again with --ignore-stuck. Nothing is taken over.
+            print("STUCK " + describe(current, at))
+            return 5
         progress(line)
         time.sleep(POLL_SECONDS)
 
@@ -680,16 +815,24 @@ def cmd_status(args):
             print("UNKNOWN (%s)" % describe(record, at))
         return 1
     stale = bool(record) and is_stale(record, at)
+    stuck = is_stuck(record, at)
+    owed = read_owed()
     if "--short" in args:
         if record:
             what = record.get("branch") or record.get("purpose") or "release"
-            print("%s · %s · %s%s" % (what, record.get("user") or "?", record.get("phase") or "?", " · STALE" if stale else ""))
+            print("%s · %s · %s%s%s" % (what, record.get("user") or "?", record.get("phase") or "?",
+                                        " · STALE" if stale else "", " · STUCK" if stuck else ""))
+        elif owed:
+            latest = owed[-1]
+            print("close-out owed · %s · %s" % (latest.get("release") or "release", ", ".join(str(i) for i in latest["owed"])))
         return 0
     facts = derive(record, at)
     if "--json" in args:
         clean = {k: v for k, v in (record or {}).items() if not k.startswith("_")} if record else None
         print(json.dumps({
             "state": "held" if record else "clear", "stale": stale, "staleMinutes": STALE_MINUTES,
+            "stuck": stuck, "phaseMinutes": phase_minutes(record, at) if record else None,
+            "phaseBudgetMinutes": PHASE_BUDGETS, "closeOutOwed": owed,
             "now": iso(at), "ref": REF, "repo": repo(), "productionBranch": PRODUCTION, "record": clean, **facts,
         }, sort_keys=True))
         return 0
@@ -703,6 +846,8 @@ def cmd_status(args):
         print("Hotfix landed: #%s %s %s" % (h["number"], h["head"], h["mergedAt"]))
     if not facts["derived"]:
         print("(pull requests into %s could not be listed)" % PRODUCTION)
+    for entry in owed:
+        print("Close-out owed: " + owed_line(entry, at))
     return 0
 
 
@@ -721,6 +866,8 @@ def cmd_heartbeat(args):
         print("NOT HOLDER: " + describe(record, at))
         lost_holding(me)
         return 4
+    if record.get("phase") != phase or not record.get("phaseStartedAt"):
+        record["phaseStartedAt"] = iso(at)
     record["phase"] = phase
     branch = option(args, "--branch")
     number = option(args, "--pr")
@@ -751,13 +898,41 @@ def cmd_heartbeat(args):
     return 0
 
 
+def options(args, name):
+    values = []
+    for i, arg in enumerate(args):
+        if arg == name:
+            if i + 1 >= len(args) or args[i + 1].startswith("--"):
+                fail("%s needs a value" % name, 1)
+            values.append(args[i + 1])
+    return values
+
+
+def record_owed(items, record, me, at):
+    """Append (or replace) this release's close-out-owed entry. Prints the second line."""
+    if not items:
+        return
+    local = read_local() or {}
+    source = record if record and not unreadable(record) else local
+    name = source.get("branch") or source.get("purpose") or "release"
+    entry = {"repo": repo(), "release": name, "pr": source.get("pr"), "holder": me,
+             "user": source.get("user") if source.get("holder") == me else gh_user(),
+             "machine": socket.gethostname(), "releasedAt": iso(at), "owed": list(dict.fromkeys(items))}
+    entries = [e for e in read_owed() if e.get("release") != name]
+    entries.append(entry)
+    write_owed(entries)
+    print("Close-out owed: " + ", ".join(entry["owed"]))
+
+
 def cmd_release(args):
     force = "--force" in args
+    owed_items = options(args, "--owed")
     me, _ = holder()
     at = now()
     record = read_record()
     if record is None:
         print("CLEAR (nothing to release)")
+        record_owed(owed_items, None, me, at)
         remove_local(None if force else me)
         return 0
     if (unreadable(record) or record.get("holder") != me) and not force:
@@ -786,6 +961,37 @@ def cmd_release(args):
             record["_sha"] = current["_sha"]
     remove_local(None if force else me)
     print("RELEASED %s" % (record.get("branch") or record.get("purpose") or "release"))
+    record_owed(owed_items, record, me, at)
+    return 0
+
+
+def cmd_owed(args):
+    """List, settle or clear the close-out work owed after a hand-back. Local, advisory, never
+    fails: any session on this machine may settle it (the one that owed it may be gone)."""
+    at = now()
+    entries = read_owed()
+    done = options(args, "--done")
+    name = option(args, "--release")
+    if done or "--clear" in args:
+        target = [e for e in entries if e.get("release") == name] if name else entries[-1:]
+        if not target:
+            print("NONE (nothing owed%s)" % (" for " + name if name else ""))
+            return 0
+        entry = target[-1]
+        if "--clear" in args:
+            entry["owed"] = []
+        else:
+            missing = [i for i in done if i not in entry["owed"]]
+            if missing:
+                progress("not owed: " + ", ".join(missing))
+            entry["owed"] = [i for i in entry["owed"] if i not in done]
+        entries = [e for e in entries if e["owed"]]
+        write_owed(entries)
+    if not entries:
+        print("NONE")
+        return 0
+    for entry in entries:
+        print("OWED " + owed_line(entry, at))
     return 0
 
 
@@ -811,11 +1017,20 @@ def cmd_adopt(args):
             print("NOT HOLDER: no clearance to adopt (claim instead)")
             return 4
     if not is_stale(record, at):
-        print("BUSY " + describe(record, at) + " — not stale, nothing to adopt")
-        return 2
+        if not is_stuck(record, at):
+            print("BUSY " + describe(record, at) + " — not stale, nothing to adopt")
+            return 2
+        if "--original-stopped" not in args:
+            # Alive but not moving. The provider cannot prove the original session has stopped,
+            # and two live sessions closing out one release send everything twice.
+            print("BUSY " + describe(record, at) + " — stuck but alive: adopt only on the owner's yes, once the "
+                  "original session has stopped (adopt --yes --original-stopped)")
+            return 2
+        progress("adopting a stuck clearance whose session was confirmed stopped: " + describe(record, at))
     if print_token:
         progress("holder token %s — export it as DEVSTRIDE_LEASE_TOKEN for heartbeat and release" % me)
-    record.update({"holder": me, "user": gh_user(), "machine": socket.gethostname(), "heartbeatAt": iso(at)})
+    record.update({"holder": me, "user": gh_user(), "machine": socket.gethostname(), "heartbeatAt": iso(at),
+                   "phaseStartedAt": iso(at)})
     try:
         push_ref(write_tag(record), record["_sha"])
     except ToolError as error:
@@ -832,13 +1047,14 @@ def cmd_adopt(args):
 
 
 COMMANDS = {"claim": cmd_claim, "status": cmd_status, "heartbeat": cmd_heartbeat, "release": cmd_release,
-            "adopt": cmd_adopt, "keeper": cmd_keeper}
+            "adopt": cmd_adopt, "owed": cmd_owed, "keeper": cmd_keeper}
 
 
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
-        print("usage: clearance-github.sh <claim [--wait] [--purpose t] | status [--short] [--json] | "
-              "heartbeat <phase> [--branch b] [--pr n] | release [--force] | adopt --yes>")
+        print("usage: clearance-github.sh <claim [--wait [--ignore-stuck]] [--purpose t] | status [--short] [--json] | "
+              "heartbeat <phase> [--branch b] [--pr n] | release [--force] [--owed item]... | "
+              "adopt --yes [--original-stopped] | owed [--done item]... [--clear] [--release name]>")
         return 0 if argv else 1
     command = COMMANDS.get(argv[0])
     if command is None:
