@@ -20,7 +20,7 @@
 #   heartbeat <phase> [--branch b] [--pr n]    0 · 4 NOT HOLDER
 #   release   [--force] [--owed <item>]...     0 · 4 NOT HOLDER
 #   adopt     --yes [--original-stopped]       0 ADOPTED · 2 not stale (or stuck and not confirmed stopped) · 4 nothing to adopt
-#   owed      [--done <item>]... [--clear] [--release <name>]
+#   owed      [--done <item>]... [--clear] [--release <name>] [--pr <n>]
 #                                              0 — the close-out work still owed after a hand-back
 #   keeper    (internal)                       the detached heartbeat a claim starts; see below
 #
@@ -991,10 +991,21 @@ def cmd_owed(args):
     entries = read_owed()
     done = options(args, "--done")
     name = option(args, "--release")
+    number = option(args, "--pr")
     if done or "--clear" in args:
-        target = [e for e in entries if e.get("release") == name] if name else entries[-1:]
+        # The entry to settle: the one named (by release and/or pull request); else this session's
+        # newest, so a session still finishing its own close-out never settles a later release's
+        # entry; else (the session that owed it is gone) the newest.
+        target = entries
+        if name:
+            target = [e for e in target if e.get("release") == name]
+        if number:
+            target = [e for e in target if str(e.get("pr")) == str(pr_number(number))]
+        if not name and not number:
+            me, _ = holder()
+            target = [e for e in entries if e.get("holder") == me] or entries
         if not target:
-            print("NONE (nothing owed%s)" % (" for " + name if name else ""))
+            print("NONE (nothing owed%s)" % (" for " + " ".join(x for x in (name, number) if x) if (name or number) else ""))
             return 0
         entry = target[-1]
         if "--clear" in args:
@@ -1073,7 +1084,7 @@ def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print("usage: clearance-github.sh <claim [--wait [--ignore-stuck]] [--purpose t] | status [--short] [--json] | "
               "heartbeat <phase> [--branch b] [--pr n] | release [--force] [--owed item]... | "
-              "adopt --yes [--original-stopped] | owed [--done item]... [--clear] [--release name]>")
+              "adopt --yes [--original-stopped] | owed [--done item]... [--clear] [--release name] [--pr n]>")
         return 0 if argv else 1
     command = COMMANDS.get(argv[0])
     if command is None:

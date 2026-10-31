@@ -144,7 +144,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 66000,
+      "budget": 66100,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

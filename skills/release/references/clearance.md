@@ -51,7 +51,7 @@ reads the exit code and quotes the line; it never parses further.
 | `heartbeat <phase> [--branch <b>] [--pr <n>]` | `HEARTBEAT <phase> <at>` | `4` NOT HOLDER: another session owns the clearance now — STOP |
 | `release [--force] [--owed <item>]…` | `RELEASED <branch>`, or `CLEAR (nothing to release)`; with `--owed`, a second line `Close-out owed: <items>` | `4` NOT HOLDER (`--force` releases anyway, prints the record first, and is the owner's command) |
 | `adopt --yes [--original-stopped]` | `ADOPTED <branch> #<pr>` then `Resume: branch …, pull request …, phase …` | `2` not stale (nothing to adopt), or STUCK and still alive without `--original-stopped` · `4` nothing held |
-| `owed [--done <item>]… [--clear] [--release <name>]` | `OWED <release> #<pr> — <items> (…)` per entry, or `NONE` | never fails: the file is local and advisory |
+| `owed [--done <item>]… [--clear] [--release <name>] [--pr <n>]` | `OWED <release> #<pr> — <items> (…)` per entry, or `NONE` | never fails: the file is local and advisory |
 
 - **`claim --wait`** polls every 60 s up to `waitMinutes`, printing the BUSY line each poll on
   stderr, and exits 0 the moment it wins. A STALE result ends the wait with exit 3: the skill asks
@@ -104,8 +104,8 @@ reads the exit code and quotes the line; it never parses further.
   (repeatable) in `<local record path minus .json>.owed.json` — `{ entries: [{ repo, release, pr,
   holder, user, machine, releasedAt, owed }] }`, 0600, one entry per release — beside the record,
   never in it (the record means "this session holds clearance"). `owed --done <item>` settles an
-  item of the newest entry (or `--release <name>`; the last one removes it), `--clear` drops one
-  whole; any session on the machine may do so. Entries are keyed by release name AND pull request.
+  item of this session's newest entry (else the newest; or the one `--release`/`--pr` name; the
+  last item removes it), `--clear` drops one whole; any session on the machine may do so. Entries are keyed by release name AND pull request.
   **A repository provider without `commands.owed` gets plain `release` (never `--owed`) and no
   `owed` calls**; the recap names the owed work instead.
 - **Hotfix facts are DERIVED, never recorded.** `status` lists hotfix landings from GitHub's merged

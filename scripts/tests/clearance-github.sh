@@ -513,11 +513,17 @@ run claim; run heartbeat close-out --branch release/26-10-18-2; run release --ow
 run claim; run heartbeat close-out --pr 4001; run release --owed docs
 run claim; run heartbeat close-out --pr 4002; run release --owed notes; run owed; K="$(printf '%s\n' "$OUT" | grep -c '^OWED release #400[12] ')"
 run owed --clear; run owed --clear
+# an older release (session me-1) settling its own item after a newer one (me-2) handed back
+run claim; run heartbeat close-out --pr 4003; run release --owed docs
+CLAUDE_CODE_SESSION_ID=me-2 bash "$P" claim >/dev/null 2>&1; CLAUDE_CODE_SESSION_ID=me-2 bash "$P" heartbeat close-out --pr 4004 >/dev/null 2>&1
+CLAUDE_CODE_SESSION_ID=me-2 bash "$P" release --owed docs >/dev/null 2>&1
+run owed --done docs; M="$(printf '%s\n' "$OUT" | grep -c '^OWED release #4004 ')$(printf '%s\n' "$OUT" | grep -c '#4003')"
+run owed --done docs --pr 4004; N="$OUT"
 if [ "${A%%:*}" -eq 0 ] && printf '%s' "$A" | grep -q '^0:OWED release/26-10-18 #3990 — docs, close-out' \
    && printf '%s' "$B" | grep -q 'not owed: nonsense' && printf '%s' "$B" | grep -q '^OWED release/26-10-18 #3990 — close-out (' \
-   && [ "$C" = "0:NONE" ] && [ "$LEFT" = 0 ] && [ -z "$D" ] && [ "$E" = "0:NONE" ] && [ "$K" = 2 ]; then
-  ok "(31) owed → OWED lines; --done settles items one by one (unknown ones noted); the last removes the file; --clear --release drops an entry"
-else bad "(31) a=$A b=$B c=$C left=$LEFT d=$D e=$E k=$K"; fi
+   && [ "$C" = "0:NONE" ] && [ "$LEFT" = 0 ] && [ -z "$D" ] && [ "$E" = "0:NONE" ] && [ "$K" = 2 ] && [ "$M" = 10 ] && [ "$N" = NONE ]; then
+  ok "(31) owed → OWED lines; --done settles items one by one (unknown ones noted), this session's entry first, --pr names one; the last removes the file; --clear --release drops an entry"
+else bad "(31) a=$A b=$B c=$C left=$LEFT d=$D e=$E k=$K m=$M n=$N"; fi
 
 # (30b) with gh down and no repository override, --short still prints the held line: the owed
 #       lookup never asks gh unless an owed file exists, and swallows the failure when it does
