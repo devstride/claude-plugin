@@ -1,5 +1,5 @@
 {
-  "description": "Session-start version check (reports newer releases, safely applies an opted-in repository-scoped update, gives a verified reload handoff; silent when current) and a prompt-time session gate (one job class per session: an authoring job and an execution job do not share a session; fails open). Every operation is bounded.",
+  "description": "Session-start version check (reports newer releases, safely applies an opted-in repository-scoped update, gives a verified reload handoff; silent when current), a per-session record of the plugin version this session has loaded (written at every session start and every prompt, read by the status line; silent, fails open) and a prompt-time session gate (one job class per session: an authoring job and an execution job do not share a session; fails open). Every operation is bounded.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,12 +7,18 @@
         "hooks": [
           { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/version-check.sh\"" }
         ]
+      },
+      {
+        "hooks": [
+          { "type": "command", "command": "command -v python3 >/dev/null 2>&1 && python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/session-runtime.py\" record; exit 0", "timeout": 5 }
+        ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-gate.sh\"", "timeout": 10 }
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-gate.sh\"", "timeout": 10 },
+          { "type": "command", "command": "command -v python3 >/dev/null 2>&1 && python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/session-runtime.py\" record; exit 0", "timeout": 5 }
         ]
       }
     ]

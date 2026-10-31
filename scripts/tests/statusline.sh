@@ -181,4 +181,27 @@ if ! printf '%s' "$O" | grep -q 'Release:' && no_dangling "$O" && [ -n "$O" ]; t
   ok "(18) provider github with no installed provider → the segment is simply absent"
 else bad "(18) got: $O"; fi
 
+# (19) the Plugin segment: the session-runtime record against the install that applies here. Red
+#      "A → B · /reload-plugins" when the installed copy is newer than the loaded one, yellow
+#      "A (B out · /devstride:update)" when a newer release is published, nothing when current or
+#      when the session has no record, and hidden by hiddenSegments like any other segment.
+export XDG_CACHE_HOME="$WORK/xdg" CLAUDE_CONFIG_DIR="$WORK/claude"; mkdir -p "$CLAUDE_CONFIG_DIR/plugins"
+PL="$(mkrepo pluginrepo '{}')"; PH="$(mkrepo pluginhidden '{"statusLine":{"hiddenSegments":["plugin"]}}')"
+mkdir -p "$WORK/loaded/.claude-plugin"; printf '{"name":"devstride","version":"3.15.0"}' > "$WORK/loaded/.claude-plugin/plugin.json"
+printf '{"session_id":"sl1","hook_event_name":"SessionStart"}' | CLAUDE_PLUGIN_ROOT="$WORK/loaded" python3 "$ROOT/hooks/session-runtime.py" record
+printf '{"version":2,"plugins":{"devstride@devstride":[{"scope":"project","projectPath":"%s","installPath":"%s","version":"3.16.0"},{"scope":"project","projectPath":"%s","installPath":"%s","version":"3.16.0"}]}}' \
+  "$PL" "$ROOT" "$PH" "$ROOT" > "$CLAUDE_CONFIG_DIR/plugins/installed_plugins.json"
+O="$(render "$PL" ',"session_id":"sl1"')"; OH="$(render "$PH" ',"session_id":"sl1"')"; ON="$(render "$PL" ',"session_id":"nosuch"')"
+printf '{"session_id":"sl1","hook_event_name":"UserPromptSubmit"}' | CLAUDE_PLUGIN_ROOT="$WORK/loaded" python3 "$ROOT/hooks/session-runtime.py" record
+sed -i.bak 's/"version":"3.16.0"/"version":"3.15.0"/g' "$CLAUDE_CONFIG_DIR/plugins/installed_plugins.json"
+python3 -c 'import json,time; print(json.dumps({"schema":2,"source":"https://github.com/devstride/claude-plugin","newest":"3.16.1","fetchedAt":int(time.time())}))' > "$XDG_CACHE_HOME/devstride-plugin/newest.json"
+OU="$(render "$PL" ',"session_id":"sl1"')"
+rm -f "$XDG_CACHE_HOME/devstride-plugin/newest.json"; OC="$(render "$PL" ',"session_id":"sl1"')"
+if printf '%s' "$O" | grep -q 'Plugin: 3.15.0 → 3.16.0 · /reload-plugins' && ! printf '%s' "$OH" | grep -q 'Plugin' \
+   && ! printf '%s' "$ON" | grep -q 'Plugin' && printf '%s' "$OU" | grep -q 'Plugin: 3.15.0 (3.16.1 out · /devstride:update)' \
+   && ! printf '%s' "$OC" | grep -q 'Plugin' && no_dangling "$O" && no_dangling "$OU"; then
+  ok "(19) Plugin segment: reload (red) and update (yellow) render; current, no record and hiddenSegments render none"
+else bad "(19) got: $O | $OH | $ON | $OU | $OC"; fi
+unset XDG_CACHE_HOME CLAUDE_CONFIG_DIR
+
 exit $FAIL

@@ -8,6 +8,27 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **The status line says when this session runs an older plugin than it could.** A session keeps
+  the plugin copy it loaded until `/reload-plugins` or a restart, so after an update on disk
+  nothing in the session said it was still on the old one. A new `Plugin` segment now shows, in
+  red, `3.15.0 → 3.16.0 · /reload-plugins` when a newer copy is installed than this session
+  loaded, and, in yellow, `3.16.0 (3.16.1 out · /devstride:update)` when this session runs the
+  installed copy and a newer release is published (not while the repository pins the plugin or
+  switches `plugin.updateCheck` off). Nothing renders otherwise, and nothing renders whenever the
+  running version cannot be read. `statusLine.hiddenSegments` hides it like any other segment
+  (key `plugin`). The managed status line moves to `v3.17.0`.
+- **A per-session record of the loaded plugin.** New `hooks/session-runtime.py`, registered on
+  every SessionStart (no matcher: startup, resume, clear and compact) and every prompt, writes
+  `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/sessions/<session_id>.json` with the version the
+  loaded copy carries; it is rewritten on every prompt, so the first prompt after a reload records
+  what was actually loaded, and records older than 7 days are pruned. Its `check --session <id>
+  [--repo <dir>]` prints the verdict (`reload`, `update`, `current`, `unknown`) for the status line
+  and for any repository tooling that wants it; a `/reload-plugins` after the record was written
+  reads as `current` until the next prompt, so a successful reload never shows a false warning.
+  python3 and the standard library only; every failure exits 0 silently.
+
 ## [3.16.0] — 2026-10-31
 
 ### Changed
