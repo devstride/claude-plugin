@@ -323,12 +323,12 @@ sleep 300 & OWNER=$!
 export CLEARANCE_OWNER_PID=$OWNER CLEARANCE_KEEPER_SECONDS=1
 run claim
 KPID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["keeperPid"])' "$CLEARANCE_RECORD" 2>/dev/null)"
-T0="$(record heartbeatAt)"; sleep 3; T1="$(record heartbeatAt)"
+T0="$(record heartbeatAt)"; P0="$(record phaseStartedAt)"; sleep 3; T1="$(record heartbeatAt)"; P1="$(record phaseStartedAt)"
 kill "$OWNER" 2>/dev/null; wait "$OWNER" 2>/dev/null; sleep 3
 kill -0 "$KPID" 2>/dev/null && KALIVE=1 || KALIVE=0
-if [ "$RC" -eq 0 ] && [ -n "$KPID" ] && [ "$T1" != "$T0" ] && [ "$KALIVE" = 0 ]; then
-  ok "(22) claim starts a keeper (pid $KPID) that re-stamps the heartbeat; it exits once the owning process is gone"
-else bad "(22) rc=$RC keeper=$KPID t0=$T0 t1=$T1 alive=$KALIVE"; fi
+if [ "$RC" -eq 0 ] && [ -n "$KPID" ] && [ "$T1" != "$T0" ] && [ "$KALIVE" = 0 ] && [ -n "$P0" ] && [ "$P1" = "$P0" ]; then
+  ok "(22) claim starts a keeper (pid $KPID) that re-stamps the heartbeat, never phaseStartedAt; it exits once the owning process is gone"
+else bad "(22) rc=$RC keeper=$KPID t0=$T0 t1=$T1 p0=$P0 p1=$P1 alive=$KALIVE"; fi
 fresh keeper2; sleep 300 & OWNER=$!; export CLEARANCE_OWNER_PID=$OWNER
 run claim; KPID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["keeperPid"])' "$CLEARANCE_RECORD" 2>/dev/null)"
 run release; sleep 1; kill -0 "$KPID" 2>/dev/null && KALIVE=1 || KALIVE=0; kill "$OWNER" 2>/dev/null; wait "$OWNER" 2>/dev/null
@@ -409,7 +409,7 @@ export CLEARANCE_NO_KEEPER=1; unset CLEARANCE_OWNER_PID
 
 
 # (25) phaseStartedAt: a claim starts it at takenAt; a heartbeat that CHANGES the phase restamps it;
-#      one that repeats the phase (or only names a branch) keeps it; the keeper never touches it
+#      one that repeats the phase (or only names a pull request) keeps it (the keeper: case 22)
 fresh phase; run claim
 A="$(record phaseStartedAt)"
 export CLEARANCE_NOW=2026-10-18T10:15:00Z; run heartbeat deploy; B="$(record phaseStartedAt)"
@@ -428,18 +428,21 @@ J="$( bash "$P" status --json 2>/dev/null | python3 -c 'import json,sys; d=json.
 held claude:other deploy release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T09:20:00Z; run status --short; C="$OUT"
 held claude:other review release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T05:00:00Z; run status --short; D="$OUT"
 held claude:other deploy release/26-10-18 3990 2026-10-18T10:04:00Z; run status --short; E="$OUT"
+held claude:other deploy release/26-10-18 3990 2026-10-18T09:30:00Z 2026-10-18T08:55:00Z; run status --short; G="$OUT"
 if printf '%s' "$A" | grep -q '^0:Clearance: held by bob on m9 .* — STUCK in deploy for 70 min (budget 60 min), session claude:other on m9$' \
    && [ "$B" = "release/26-10-18 · bob · deploy · STUCK" ] && [ "$J" = "True False 70 60 120 45 False" ] \
-   && [ "$C" = "release/26-10-18 · bob · deploy" ] && [ "$D" = "release/26-10-18 · bob · review" ] && [ "$E" = "release/26-10-18 · bob · deploy" ]; then
-  ok "(26) past budget → STUCK in <phase> for <n> min (budget <b>), session + machine; --short '· STUCK'; --json stuck/phaseMinutes/budgets; under budget, unbudgeted or unstamped → not STUCK"
-else bad "(26) a=$A b=$B j=$J c=$C d=$D e=$E"; fi
+   && [ "$C" = "release/26-10-18 · bob · deploy" ] && [ "$D" = "release/26-10-18 · bob · review" ] && [ "$E" = "release/26-10-18 · bob · deploy" ] \
+   && [ "$G" = "release/26-10-18 · bob · deploy · STALE" ]; then
+  ok "(26) past budget → STUCK in <phase> for <n> min (budget <b>), session + machine; --short '· STUCK'; --json stuck/phaseMinutes/budgets; under budget, unbudgeted, unstamped or STALE (not alive) → not STUCK"
+else bad "(26) a=$A b=$B j=$J c=$C d=$D e=$E g=$G"; fi
 
 # (27) release.clearance.phaseBudgetMinutes overrides the defaults per phase; 0 switches one off
 fresh budgets; mkdir -p .claude
-printf '{"release":{"clearance":{"provider":"github","phaseBudgetMinutes":{"deploy":90,"review":30,"pre-ship":0}}}}' > .claude/ds-config.json
+printf '{"release":{"clearance":{"provider":"github","phaseBudgetMinutes":{"deploy":90,"review":30,"pre-ship":0,"close-out":"45m"}}}}' > .claude/ds-config.json
 held claude:other deploy release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T08:55:00Z; run status --short; A="$OUT"
 held claude:other review release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T09:30:00Z; run status --short; B="$OUT"
 held claude:other pre-ship release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T02:00:00Z; run status --short; C="$OUT"
+held claude:other close-out release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T09:00:00Z; run status; H="$OUT"
 printf '{"release":{"clearance":{"provider":"github","phaseBudgetMinutes":[5]}}}' > .claude/ds-config.json
 held claude:other deploy release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T08:55:00Z; run status; D="$RC:$OUT"
 fresh budgets2; run claim; run heartbeat deploy; mkdir -p .claude
@@ -448,15 +451,16 @@ run heartbeat close-out; E="$RC:$OUT"; run release; F="$RC:$OUT"
 rm -rf .claude
 if [ "$A" = "release/26-10-18 · bob · deploy" ] && [ "$B" = "release/26-10-18 · bob · review · STUCK" ] && [ "$C" = "release/26-10-18 · bob · pre-ship" ] \
    && [ "${D%%:*}" -eq 0 ] && printf '%s' "$D" | grep -q 'STUCK in deploy for 70 min (budget 60 min)' && printf '%s' "$D" | grep -q '^(release.clearance.phaseBudgetMinutes ignored: it must be an object' \
-   && [ "${E%%:*}" -eq 0 ] && [ "${F%%:*}" -eq 0 ] && printf '%s' "$F" | grep -q '^0:RELEASED'; then
+   && [ "${E%%:*}" -eq 0 ] && [ "${F%%:*}" -eq 0 ] && printf '%s' "$F" | grep -q '^0:RELEASED' \
+   && printf '%s' "$H" | grep -q 'STUCK in close-out for 65 min (budget 45 min)' && printf '%s' "$H" | grep -q "^(release.clearance.phaseBudgetMinutes.close-out ignored"; then
   ok "(27) phaseBudgetMinutes: deploy raised to 90, review given 30, pre-ship 0 = off; a non-object is ignored with a warning (defaults apply) and never blocks heartbeat or release"
-else bad "(27) a=$A b=$B c=$C d=$D e=$E f=$F"; fi
+else bad "(27) a=$A b=$B c=$C d=$D e=$E f=$F h=$H"; fi
 
 # (28) claim --wait ends at the first STUCK poll with exit 5 and a STUCK line, so the waiting session
 #      can tell the owner; --ignore-stuck keeps waiting (to waitMinutes here: BUSY, exit 2); a claim
 #      without --wait is a plain BUSY carrying the STUCK note; nothing is taken over either way
 fresh waitstuck; held claude:other deploy release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T08:55:00Z; BEFORE="$(refsha)"
-run claim --wait; A="$RC:$OUT"
+export CLEARANCE_WAIT_MINUTES=0; run claim --wait; A="$RC:$OUT"; export CLEARANCE_WAIT_MINUTES=1
 run claim; B="$RC:$OUT"
 export CLEARANCE_WAIT_MINUTES=0; run claim --wait --ignore-stuck; C="$RC:$OUT"; export CLEARANCE_WAIT_MINUTES=1
 if [ "${A%%:*}" -eq 5 ] && printf '%s' "${A#*:}" | head -n 1 | grep -q '^STUCK held by bob .* — STUCK in deploy for 70 min' \
@@ -506,11 +510,14 @@ run owed --done docs --done nonsense; B="$RC:$OUT"
 run owed --done close-out; C="$RC:$OUT"; [ -f "$F" ] && LEFT=1 || LEFT=0
 run status --short; D="$OUT"
 run claim; run heartbeat close-out --branch release/26-10-18-2; run release --owed docs; run owed --clear --release release/26-10-18-2; E="$RC:$OUT"
+run claim; run heartbeat close-out --pr 4001; run release --owed docs
+run claim; run heartbeat close-out --pr 4002; run release --owed notes; run owed; K="$(printf '%s\n' "$OUT" | grep -c '^OWED release #400[12] ')"
+run owed --clear; run owed --clear
 if [ "${A%%:*}" -eq 0 ] && printf '%s' "$A" | grep -q '^0:OWED release/26-10-18 #3990 — docs, close-out' \
    && printf '%s' "$B" | grep -q 'not owed: nonsense' && printf '%s' "$B" | grep -q '^OWED release/26-10-18 #3990 — close-out (' \
-   && [ "$C" = "0:NONE" ] && [ "$LEFT" = 0 ] && [ -z "$D" ] && [ "$E" = "0:NONE" ]; then
+   && [ "$C" = "0:NONE" ] && [ "$LEFT" = 0 ] && [ -z "$D" ] && [ "$E" = "0:NONE" ] && [ "$K" = 2 ]; then
   ok "(31) owed → OWED lines; --done settles items one by one (unknown ones noted); the last removes the file; --clear --release drops an entry"
-else bad "(31) a=$A b=$B c=$C left=$LEFT d=$D e=$E"; fi
+else bad "(31) a=$A b=$B c=$C left=$LEFT d=$D e=$E k=$K"; fi
 
 # (30b) with gh down and no repository override, --short still prints the held line: the owed
 #       lookup never asks gh unless an owed file exists, and swallows the failure when it does

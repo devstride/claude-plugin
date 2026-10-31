@@ -682,8 +682,9 @@ is live. There is deliberately no "when a note is warranted" key: the loop does 
 
 The plugin does not know what "healthy" means for a production system, so — as with
 documentation — it holds one fact: the name of a LOCAL skill that checks production after a
-deploy. `release` invokes it once the deploy is confirmed and before documentation, release notes
-and the close-out; `PASS` continues, `FAIL` stops for a rollback decision, `NOT RUN` is reported as
+deploy. `release` invokes it with `check` once the deploy is confirmed, before the clearance
+hand-back, documentation and release notes (and once more with `close-out` after documentation,
+only when `check` printed `CLOSE-OUT OWED`); `PASS` continues, `FAIL` stops for a rollback decision, `NOT RUN` is reported as
 degradation and asked about, and `null` reports **not configured**. `setup` does not write it; a
 repository adds it by hand once such a skill exists. The contract is
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/post-deploy-check.md`.

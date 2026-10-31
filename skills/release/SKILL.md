@@ -280,11 +280,12 @@ adopted (`clearance.md`).
 
 ### 5b. Close out inside the clearance, then hand it back
 
-`git checkout master && git pull --ff-only`, `develop` likewise; then `release-branch.md` §5 steps
-1–3 (production synced into `releaseSource`, the release branch deleted once both contain it, the
+`git checkout <productionBranch> && git pull --ff-only`, `<releaseSource>` likewise; then
+`release-branch.md` §5 steps 1–3 (source synced, release branch deleted once both contain it,
 train level). With clearance: `heartbeat close-out` first, then `release --owed <item>` per later
-step that will run (`docs`, `close-out` after `CLOSE-OUT OWED`, `release-notes`). A FAIL, an
-unanswered NOT RUN or a stop before here KEEPS clearance.
+step that will run (`docs`, `close-out` after `CLOSE-OUT OWED`, `release-notes`; a provider
+without `commands.owed`: plain `release`, no `owed` calls). A FAIL, an unanswered NOT RUN or a
+stop before here KEEPS clearance.
 
 ### 5c. Documentation update — default on when registered
 

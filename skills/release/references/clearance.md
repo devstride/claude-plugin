@@ -27,8 +27,8 @@ nothing is shown, and `release` runs exactly as before.** Nothing ever blocks a 
   `180`, how long `claim --wait` polls), `"phaseBudgetMinutes"` (an object of phase → minutes over
   the defaults `{ "pre-ship": 120, "deploy": 60, "close-out": 45 }`; `0` or `null` switches a
   phase's alarm off, a phase not named has none — `review` and `train` wait on people and CI; a
-  value that is not an object is ignored with a `status` warning, never an error that could stop a
-  heartbeat or a hand-back).
+  block that is not an object, or a value that is not a number, is ignored with a `status` warning
+  (the default stands), never an error that could stop a heartbeat or a hand-back).
 - **`{ "commands": { "claim": "…", "status": "…", "heartbeat": "…", "release": "…", "adopt": "…" } }`**
   — a provider the repository supplies (a shell command per verb, run from the repository root;
   the verb's own arguments, `--wait`, `--short`, `<phase> --branch b --pr n`, `--force`, `--yes`,
@@ -105,8 +105,9 @@ reads the exit code and quotes the line; it never parses further.
   holder, user, machine, releasedAt, owed }] }`, 0600, one entry per release — beside the record,
   never in it (the record means "this session holds clearance"). `owed --done <item>` settles an
   item of the newest entry (or `--release <name>`; the last one removes it), `--clear` drops one
-  whole; any session on the machine may do so. A repository provider without `commands.owed`
-  skips this, and the recap names the owed work.
+  whole; any session on the machine may do so. Entries are keyed by release name AND pull request.
+  **A repository provider without `commands.owed` gets plain `release` (never `--owed`) and no
+  `owed` calls**; the recap names the owed work instead.
 - **Hotfix facts are DERIVED, never recorded.** `status` lists hotfix landings from GitHub's merged
   pull requests; the record holds only clearance state (holder, user, machine, purpose, phase,
   phaseStartedAt, branch, pr, takenAt, heartbeatAt).

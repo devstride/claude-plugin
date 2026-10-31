@@ -217,18 +217,14 @@ def phase_budgets():
             BUDGET_WARNINGS.append("%s ignored: it must be an object of phase → minutes" % name)
             continue
         for phase, minutes in layer.items():
-            budgets[str(phase)] = minutes
-    out = {}
-    for phase, minutes in budgets.items():
-        if isinstance(minutes, bool):
-            continue
-        try:
-            value = int(minutes)
-        except (TypeError, ValueError):
-            continue
-        if value > 0:
-            out[phase] = value
-    return out
+            phase = str(phase)
+            if minutes is None or (isinstance(minutes, (int, float)) and not isinstance(minutes, bool) and minutes <= 0):
+                budgets.pop(phase, None)  # an explicit 0 or null switches the alarm off
+            elif isinstance(minutes, (int, float)) and not isinstance(minutes, bool):
+                budgets[phase] = int(minutes)
+            else:
+                BUDGET_WARNINGS.append("%s.%s ignored: %r is not a number of minutes" % (name, phase, minutes))
+    return budgets
 
 
 PHASE_BUDGETS = phase_budgets()
@@ -424,8 +420,8 @@ def phase_minutes(record, at):
 
 def is_stuck(record, at):
     """Alive is not moving: the current phase has a budget and has run past it."""
-    if not record or unreadable(record):
-        return False
+    if not record or unreadable(record) or is_stale(record, at):
+        return False  # a stale clearance is not alive, so it cannot be stuck
     budget = PHASE_BUDGETS.get(record.get("phase") or "")
     minutes = phase_minutes(record, at)
     return bool(budget) and minutes is not None and minutes > budget
@@ -490,7 +486,7 @@ def write_owed(entries):
         except OSError:
             pass
         return
-    tmp = owed_path() + ".tmp"
+    tmp = "%s.%d.tmp" % (owed_path(), os.getpid())
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as handle:
         json.dump({"entries": entries}, handle)
@@ -765,14 +761,14 @@ def cmd_claim(args):
             print("CLEARED %s %s (already held by this session; heartbeat renewed)" % (me, current.get("takenAt")))
             return 0
         line = "BUSY " + describe(current, at)
-        if not wait or time.monotonic() >= deadline:
-            print(line)
-            return 2
         if stop_on_stuck and is_stuck(current, at):
             # Alive but not moving: end the wait once so the waiting session can tell the owner;
             # it waits again with --ignore-stuck. Nothing is taken over.
             print("STUCK " + describe(current, at))
             return 5
+        if not wait or time.monotonic() >= deadline:
+            print(line)
+            return 2
         progress(line)
         time.sleep(POLL_SECONDS)
 
@@ -939,7 +935,9 @@ def record_owed(items, record, me, at):
     entry = {"repo": repo(), "release": name, "pr": source.get("pr"), "holder": me,
              "user": source.get("user") if source.get("holder") == me else gh_user(),
              "machine": socket.gethostname(), "releasedAt": iso(at), "owed": list(dict.fromkeys(items))}
-    entries = [e for e in read_owed() if e.get("release") != name]
+    # One entry per release: the name repeats when no release branch is cut ("release"), so the
+    # pull request tells two releases apart.
+    entries = [e for e in read_owed() if (e.get("release"), e.get("pr")) != (name, entry["pr"])]
     entries.append(entry)
     write_owed(entries)
     print("Close-out owed: " + ", ".join(entry["owed"]))
