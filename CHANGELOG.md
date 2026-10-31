@@ -8,6 +8,82 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.16.0] — 2026-10-31
+
+### Changed
+
+- **A release hands its clearance back as soon as the next release could safely start.** With
+  `release.clearance` set, the release used to hold clearance through documentation, release notes
+  and the whole close-out, so every other session waited on work no release depends on. It now
+  hands back at the new step **5b**: once the post-deploy check has passed (including anything the
+  check must publish before the next release), production is synced into the release source, the
+  release branch is deleted and the support train is level. Documentation (now **5c**), the
+  post-deploy check's own close-out (**5d**, below) and release notes (now **5e**) run after the
+  hand-back, in the same session, one at a time. A failed check, or a 5b that stops early, still
+  keeps clearance for the retry. Step 6 is now the recap. The `docs` heartbeat phase is gone.
+- **One release session, never two.** The release skill now says plainly that steps 5a–6 run in
+  order in one session, and that a release session that may still be running is never resumed,
+  re-invoked or messaged in a way that starts a second copy — two copies close out twice.
+
+### Added
+
+- **Close-out owed.** `release --owed <item>` (repeatable) records the work still owed after the
+  hand-back in a local file beside the clearance record; `status` shows it (`Close-out owed: …`,
+  `closeOutOwed` in `--json`, and a `close-out owed · …` short line while nothing is held), and the
+  new `owed [--done <item>] [--clear] [--release <name>] [--pr <n>]` command settles it (this
+  session's own entry first), so a session that
+  dies after the hand-back leaves a visible trace. A repository-supplied provider may add
+  `commands.owed`; without it the recap names the owed work.
+- **Stuck-phase alarm.** The clearance record now carries `phaseStartedAt`, stamped when a
+  heartbeat changes the phase. `release.clearance.phaseBudgetMinutes` (new; defaults `pre-ship`
+  120, `deploy` 60, `close-out` 45 minutes; `0` switches a phase off) marks a live release whose
+  phase has run past its budget as STUCK: `status`, every BUSY line, `--json` (`stuck`,
+  `phaseMinutes`, `phaseBudgetMinutes`) and the status line (red) show it with the holder's session
+  and machine. `claim --wait` ends once with exit `5` when it finds the holder stuck, so the waiting
+  session tells the owner, then waits on with `--ignore-stuck`. STUCK never takes over: adopting a
+  stuck clearance that is still alive needs `adopt --yes --original-stopped`, the owner's word that
+  the original session has stopped.
+- **`close-out` mode for the post-deploy check.** A `release.postDeployCheckSkill` that also owns
+  work nothing else waits on (messages owed once a release is live, local clean-up) prints
+  `CLOSE-OUT OWED: <list>` after its evidence; the release then invokes it once more with
+  `close-out` after documentation, outside the clearance. A skill that prints no such line is never
+  invoked that way.
+
+### Upgrading
+
+- Nothing to change for the hand-back. A repository whose post-deploy check does long work after
+  health (clean-up, sending messages) should move it into the new `close-out` mode, so it no longer
+  holds the clearance. A repository that wraps the provider's commands can pass `--owed` through
+  `release` and expose `owed`.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.15.1 @ 49cfac1, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.15.1 | tokens@devstride--v3.15.1 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,096 | 10,699 | 32,096 | 10,699 | +0 | 10,700 |
+| skills/build-item/SKILL.md | 23,999 | 8,000 | 23,999 | 8,000 | +0 | 8,000 |
+| skills/release/SKILL.md | 23,957 | 7,986 | 23,994 | 7,998 | +12 | 8,000 |
+| skills/review/SKILL.md | 23,987 | 7,996 | 23,987 | 7,996 | +0 | 8,000 |
+| skills/doctor/SKILL.md | 23,962 | 7,988 | 23,962 | 7,988 | +0 | 8,000 |
+| skills/plan/SKILL.md | 23,891 | 7,964 | 23,891 | 7,964 | +0 | 8,000 |
+| skills/rebalance/SKILL.md | 17,409 | 5,803 | 17,409 | 5,803 | +0 | 5,900 |
+| skills/ultracode-build/SKILL.md | 14,470 | 4,824 | 14,470 | 4,824 | +0 | 4,900 |
+| skills/pr/SKILL.md | 11,289 | 3,763 | 11,289 | 3,763 | +0 | 3,800 |
+| skills/rationalize-gantt/SKILL.md | 7,902 | 2,634 | 7,902 | 2,634 | +0 | 2,700 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 7,483 | 2,495 | 7,483 | 2,495 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,200 |
+| skills/insert-defect/SKILL.md | 4,714 | 1,572 | 4,714 | 1,572 | +0 | 1,600 |
+| skills/comprehend-plan/SKILL.md | 4,583 | 1,528 | 4,583 | 1,528 | +0 | 1,600 |
+| skills/insert-story/SKILL.md | 4,037 | 1,346 | 4,037 | 1,346 | +0 | 1,400 |
+| skills/create-story/SKILL.md | 3,999 | 1,333 | 3,999 | 1,333 | +0 | 1,400 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| alwaysOn.context (skill listing) | 3,697 | 1,233 | 3,697 | 1,233 | +0 | 1,300 |
+| **total (bodies)** | 250,050 | 83,356 | 250,087 | 83,368 | +12 | |
+
 ## [3.15.1] — 2026-10-30
 
 ### Fixed
@@ -2152,7 +2228,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.15.1...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.16.0...HEAD
+[3.16.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.15.1...devstride--v3.16.0
 [3.15.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.15.0...devstride--v3.15.1
 [3.15.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.14.0...devstride--v3.15.0
 [3.14.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.13.0...devstride--v3.14.0

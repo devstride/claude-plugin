@@ -261,9 +261,13 @@ K7. One matching rule for `protectedBranches`, `releaseBranchPattern` and
     `stacks/**` never matches `docs/stacks/x`. Contract:
     `skills/release/references/branch-patterns.md`.
 K8. With `release.clearance` set, `release` CLAIMS clearance before the train or the cut (step 0a),
-    heartbeats each phase (exit 4 = another session owns the release: STOP), and hands it back as
-    the LAST act of close-out — after the sync pull request and the branch deletion — so a failed
-    post-deploy check keeps it for the retry. Every move of the clearance ref is a compare-and-swap
+    heartbeats each phase (exit 4 = another session owns the release: STOP), and hands it back at
+    5b — after a passing post-deploy check, the sync into the source, the branch deletion and the
+    train update, BEFORE docs, the check's close-out and notes, which are recorded as owed
+    (`release --owed`) and run serially by the same session, never by a second copy — so a failed
+    post-deploy check keeps it for the retry. A phase past its budget is STUCK (an alarm, never a
+    takeover); a STUCK clearance still alive is adopted only on the owner's yes AND their word the
+    original session stopped (`--original-stopped`). Every move of the clearance ref is a compare-and-swap
     (`git push --force-with-lease`), never a look-then-act — the claim, the heartbeat, the stale
     takeover and the release alike; liveness is a detached keeper's, tied to the claiming agent
     process; a stale clearance whose pull request is open, or merged but not closed out, is
@@ -436,8 +440,8 @@ P2. Assert what you are measuring: scope DOM/API queries to the live container a
 Q1. `release` must declare DRIVEN mode when invoking `review`, or the release pauses on standalone
     ask-gates.
 Q2. `release.postDeployCheckSkill` names a LOCAL skill invoked once, after the deploy is confirmed
-    and before docs/release notes/close-out, with `check` + `{productionBranch, mergeCommit,
-    deployConfirmedAt}`. Its first line is `POST-DEPLOY HEALTH: PASS|FAIL|NOT RUN`, evidence lines
+    and before the hand-back/docs/release notes, with `check` + `{productionBranch, mergeCommit,
+    deployConfirmedAt}`; a `CLOSE-OUT OWED` line asks for one `close-out` invocation after docs. Its first line is `POST-DEPLOY HEALTH: PASS|FAIL|NOT RUN`, evidence lines
     name their commands. `FAIL` STOPS for a rollback decision — never on to 5b/5c/6 alone; `NOT RUN`
     is degradation and asked about; absent key reports **not configured**. `NOT RUN` and **not
     configured** are different facts and never collapse into each other.
@@ -620,7 +624,7 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "mandatoryLenses" "mandatory lens" "mandatory-lenses.md" \
               "release.releaseBranchPattern" "releaseBranchFixExclusions" "requestPolicy" \
               "supportTrain.branch" "final-head" "branch-patterns.md" \
-              "release.clearance" "clearance.md" "release-tower" "never claims" "handed back last"; do
+              "release.clearance" "clearance.md" "release-tower" "never claims" "handed back at 5b"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
 
@@ -758,6 +762,10 @@ skills/build-item/references/plain-language-output.md|labelled **unverified**
 skills/build-item/references/plain-language-output.md|Steps you must do yourself
 skills/release/SKILL.md|postDeployCheckSkill
 skills/release/SKILL.md|never proceed to 5b, 5c or 6
+skills/release/SKILL.md|second copy
+skills/release/SKILL.md|release --owed
+skills/release/references/clearance.md|original-stopped
+skills/release/references/clearance.md|phaseStartedAt
 skills/release/references/post-deploy-check.md|POST-DEPLOY HEALTH: NOT RUN
 skills/doctor/SKILL.md|postDeployCheckSkill
 hooks/version-check.sh|fetchOnSessionStart

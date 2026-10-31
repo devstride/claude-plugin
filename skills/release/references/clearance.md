@@ -6,7 +6,9 @@ load: contract
 **Goal:** when releases are cut from more than one machine, or by more than one person or agent,
 only one is in flight. A session asks for CLEARANCE before it touches anything a release touches
 (the support train, the cut, the release pull request), keeps a heartbeat while it works, and hands
-clearance back as the last act of its close-out. A second session is told who holds it and waits;
+clearance back as soon as nothing the next release depends on is left: after the post-deploy check
+and the source sync, before documentation and the rest of the close-out. A second session is told
+who holds it and waits;
 because a release ships everything on the release source at the cut, the next cleared release
 carries that session's work, so there is never a reason for two.
 
@@ -22,7 +24,11 @@ nothing is shown, and `release` runs exactly as before.** Nothing ever blocks a 
 
 - **`{ "provider": "github" }`** — the built-in provider below. Optional: `"ref"`
   (default `refs/clearance/release`), `"staleMinutes"` (default `20`), `"waitMinutes"` (default
-  `180`, how long `claim --wait` polls).
+  `180`, how long `claim --wait` polls), `"phaseBudgetMinutes"` (an object of phase → minutes over
+  the defaults `{ "pre-ship": 120, "deploy": 60, "close-out": 45 }`; `0` or `null` switches a
+  phase's alarm off, a phase not named has none — `review` and `train` wait on people and CI; a
+  block that is not an object, or a value that is not a number, is ignored with a `status` warning
+  (the default stands), never an error that could stop a heartbeat or a hand-back).
 - **`{ "commands": { "claim": "…", "status": "…", "heartbeat": "…", "release": "…", "adopt": "…" } }`**
   — a provider the repository supplies (a shell command per verb, run from the repository root;
   the verb's own arguments, `--wait`, `--short`, `<phase> --branch b --pr n`, `--force`, `--yes`,
@@ -33,18 +39,19 @@ nothing is shown, and `release` runs exactly as before.** Nothing ever blocks a 
   heads (the branch-patterns rule, `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`).
   Absent → those defaults.
 
-## The provider contract — five commands, four exit codes
+## The provider contract — six commands, five exit codes
 
 Every provider prints its verdict as the FIRST line of stdout and exits as follows. The skill
 reads the exit code and quotes the line; it never parses further.
 
 | Command | Exit 0 | Other exits |
 | --- | --- | --- |
-| `claim [--wait] [--purpose <text>]` | `CLEARED <holder> <takenAt>` | `2` BUSY: `BUSY held by <user> on <machine> since <takenAt>, phase <phase>, heartbeat <age> — <branch> #<pr>` · `3` STALE with a pull request still open, or merged but never closed out: `STALE … pull request #<n> still open — adopt or wait` · `1` error, a killed call included (never proceed uncleared) |
-| `status [--short] [--json]` | the clearance line (or `CLEAR`), then `On final: #<n> <head>` for the oldest open release pull request into the production branch, `Waiting: #<n> <head>` for each later one, `Hotfix landed: #<n> <head> <mergedAt>` for each hotfix merged into production since `takenAt` | `1` the ref could not be read: `UNKNOWN (gh: …)` — never shown as clear |
+| `claim [--wait [--ignore-stuck]] [--purpose <text>]` | `CLEARED <holder> <takenAt>` | `2` BUSY: `BUSY held by <user> on <machine> since <takenAt>, phase <phase>, heartbeat <age> — <branch> #<pr>` (plus `— STUCK …` when it is) · `3` STALE with a pull request still open, or merged but never closed out: `STALE … pull request #<n> still open — adopt or wait` · `5` STUCK (`--wait` only, ended at the first poll that finds the holder stuck): `STUCK <the BUSY line>` · `1` error, a killed call included (never proceed uncleared) |
+| `status [--short] [--json]` | the clearance line (or `CLEAR`), then `On final: #<n> <head>` for the oldest open release pull request into the production branch, `Waiting: #<n> <head>` for each later one, `Hotfix landed: #<n> <head> <mergedAt>` for each hotfix merged into production since `takenAt`, `Close-out owed: <release> #<pr> — <items> (handed back <age> by <user> on <machine>, session <holder>)` for each entry in this machine's owed file | `1` the ref could not be read: `UNKNOWN (gh: …)` — never shown as clear |
 | `heartbeat <phase> [--branch <b>] [--pr <n>]` | `HEARTBEAT <phase> <at>` | `4` NOT HOLDER: another session owns the clearance now — STOP |
-| `release [--force]` | `RELEASED <branch>`, or `CLEAR (nothing to release)` | `4` NOT HOLDER (`--force` releases anyway, prints the record first, and is the owner's command) |
-| `adopt --yes` | `ADOPTED <branch> #<pr>` then `Resume: branch …, pull request …, phase …` | `2` not stale (nothing to adopt) · `4` nothing held |
+| `release [--force] [--owed <item>]…` | `RELEASED <branch>`, or `CLEAR (nothing to release)`; with `--owed`, a second line `Close-out owed: <items>` | `4` NOT HOLDER (`--force` releases anyway, prints the record first, and is the owner's command) |
+| `adopt --yes [--original-stopped]` | `ADOPTED <branch> #<pr>` then `Resume: branch …, pull request …, phase …` | `2` not stale (nothing to adopt), or STUCK and still alive without `--original-stopped` · `4` nothing held |
+| `owed [--done <item>]… [--clear] [--release <name>] [--pr <n>]` | `OWED <release> #<pr> — <items> (…)` per entry, or `NONE` | never fails: the file is local and advisory |
 
 - **`claim --wait`** polls every 60 s up to `waitMinutes`, printing the BUSY line each poll on
   stderr, and exits 0 the moment it wins. A STALE result ends the wait with exit 3: the skill asks
@@ -53,8 +60,10 @@ reads the exit code and quotes the line; it never parses further.
   Progress lines (polls, a generated token, a takeover note) go to stderr; stdout's first line is
   the verdict.
 - **`status --short`** prints one token line for the status line — `release/26-10-17 · alice · ci`,
-  with `· STALE` appended past the stale threshold — or nothing when clear. `--json` prints
-  `{ state: clear|held|unknown, stale, record, onFinal, waiting, hotfixesLanded, staleMinutes }`.
+  with `· STALE` past the stale threshold and `· STUCK` past the phase budget — or, when clear,
+  `close-out owed · <release> · <items>` while this machine owes close-out work, else nothing.
+  `--json` prints `{ state: clear|held|unknown, stale, stuck, phaseMinutes, phaseBudgetMinutes,
+  record, onFinal, waiting, hotfixesLanded, closeOutOwed, warnings, staleMinutes }`.
 - **Stale** = heartbeat older than `staleMinutes`. A stale clearance that never opened a pull
   request, or whose pull request was CLOSED unmerged, is taken over by the next `claim` on its own
   (one compare-and-swap on the stale object, so two takers cannot both win). A stale one whose
@@ -63,6 +72,14 @@ reads the exit code and quotes the line; it never parses further.
   ADOPTED (`adopt --yes`, after the owner's yes) and the release resumes on the skill's existing
   adopted-release-branch path — at close-out, for a merged one. A pull-request state that cannot be
   read is an error (`1`), never a `3`.
+- **Stuck = alive but not moving.** A `heartbeat` that CHANGES the phase stamps `phaseStartedAt`
+  (a claim at `takenAt`, an adoption restarts it; the keeper never touches it). Past its phase's
+  budget the clearance is STUCK: `status` and every BUSY line append `— STUCK in <phase> for <n>
+  min (budget <b> min), session <holder> on <machine>`. STUCK alarms; it never takes over. **A
+  STUCK clearance that is still alive is adopted only on the owner's yes AND their word that the
+  original session has stopped** (`adopt --yes --original-stopped`): the provider cannot prove it,
+  the old keeper learns of the loss only at its next stamp, and two live sessions closing out one
+  release do everything twice.
 - **Liveness is the keeper's job.** `claim` and `adopt` start a detached keeper that re-stamps the
   heartbeat every `staleMinutes/3` for as long as the agent process that claimed is alive and the
   local record still names this holder; `release` stops it. So a release whose review or deploy
@@ -83,9 +100,17 @@ reads the exit code and quotes the line; it never parses further.
   session that lost the clearance is not still vouched for. A hook answers "does THIS session hold clearance for THIS repository?" from
   that file alone, with no network; it is an observation, refreshed by every provider call, not
   proof against the ref itself. The path and shape are part of this contract.
+- **Close-out owed.** Work that runs after the hand-back is recorded by `release --owed <item>`
+  (repeatable) in `<local record path minus .json>.owed.json` — `{ entries: [{ repo, release, pr,
+  holder, user, machine, releasedAt, owed }] }`, 0600, one entry per release — beside the record,
+  never in it (the record means "this session holds clearance"). `owed --done <item>` settles an
+  item of this session's newest entry (else the newest; or the one `--release`/`--pr` name; the
+  last item removes it), `--clear` drops one whole; any session on the machine may do so. Entries are keyed by release name AND pull request.
+  **A repository provider without `commands.owed` gets plain `release` (never `--owed`) and no
+  `owed` calls**; the recap names the owed work instead.
 - **Hotfix facts are DERIVED, never recorded.** `status` lists hotfix landings from GitHub's merged
   pull requests; the record holds only clearance state (holder, user, machine, purpose, phase,
-  branch, pr, takenAt, heartbeatAt).
+  phaseStartedAt, branch, pr, takenAt, heartbeatAt).
 
 ## The built-in provider: `${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/clearance-github.sh`
 
@@ -117,18 +142,23 @@ Only when `release.clearance` is set. **0a** `claim --wait --purpose release` be
 else, in the background with a long timeout: `0` continue (say who was waiting when stderr said
 so); `3` ask the owner once — adopt `<branch>` / `#<n>`, or keep waiting — and on adopt run
 `adopt --yes` and enter the adopted path (0b skips the train, 0c skips the cut, step 2 reviews the
-open pull request; a merged one resumes at step 5a's confirmation and close-out); `1` STOP as a
-release blocker. **`heartbeat <phase>` at the START of each phase**, before its first mutation —
-`train` before 0b merges anything, `cut --branch <b>` before 0c pushes, `pr --pr <n>` after step 1
-opens it, `review` before 2, `pre-ship` before 2b, `merging` on the owner's yes BEFORE the merge,
-`deploy` before 5a, `docs` before 5b, `close-out` before 6 — so a lost clearance (exit 4) stops
-the release before it touches anything, never after. **Step 4** appends `status` to the
+open pull request; a merged one resumes at step 5a's confirmation and close-out); `5` tell the
+owner ONCE (a push notification where there is one) the line's phase, minutes, machine and
+session, then `claim --wait --ignore-stuck`; on their yes AND word that session stopped, `adopt
+--yes --original-stopped` and the adopted path; `1` STOP as a release blocker. **`heartbeat <phase>` at the START of
+each phase**, before its first mutation — `train` before 0b merges anything, `cut --branch <b>`
+before 0c pushes, `pr --pr <n>` after step 1 opens it, `review` before 2, `pre-ship` before 2b,
+`merging` on the owner's yes BEFORE the merge, `deploy` before 5a, `close-out` before 5b — so a
+lost clearance (exit 4) stops the release before it touches anything, never after. **Step 4** appends `status` to the
 go-ahead: a `Hotfix landed` line goes to `release-branch.md` §4 first; a `Waiting` line names who
 is next; and on the yes, the release pull request must be the one `On final` — otherwise STOP
-(the check on GitHub is a snapshot; this is the ordering at the moment of merge). **Close-out:**
-`release` is the LAST act, after the sync pull request merged and the release branch is deleted;
-a failed post-deploy check or an unfinished close-out KEEPS clearance for the retry, and the recap
-says so. **`branch-hotfix` and the hotfix path never claim**, and a hotfix pull request into the
+(the check on GitHub is a snapshot; this is the ordering at the moment of merge). **Hand-back (5b):**
+`release` once the post-deploy check passed (including anything the next release needs it to
+publish), production is synced into the source, the release branch deleted and the train level
+(`release-branch.md` §5 steps 1–3) — BEFORE documentation, the check's close-out and release
+notes, each passed as `--owed <item>` and settled by `owed --done <item>`, run by the same session
+one after another. A failed check, or a 5b that stops early, KEEPS clearance for the retry, and
+the recap says so. **`branch-hotfix` and the hotfix path never claim**, and a hotfix pull request into the
 production branch merges with no clearance step.
 
 ## The floor: the `release-tower` check
@@ -154,7 +184,7 @@ request — then even an administrator cannot land a second release beside the f
 
 ## Cited by
 
-- `skills/release/SKILL.md` — the clearance floor, steps 0a, 4 and 6.
+- `skills/release/SKILL.md` — the clearance floor, steps 0a, 4, 5b and 6.
 - `skills/setup/SKILL.md` and `references/ci-cost-patterns.md` §E — the `setup ci` template.
 - `skills/doctor/SKILL.md` — the config audit of `release.clearance` and `releaseTower`.
 - `skills/setup/references/statusline-segments.md` — the `release` segment.

@@ -274,19 +274,23 @@ machines, the operator's decision. Absent, nothing is claimed and nothing is sho
 
 | Key | Shape | Absent means |
 | --- | --- | --- |
-| `release.clearance` | `null`, `{ "provider": "github" }` (optional `ref`, `staleMinutes`, `waitMinutes`), or `{ "commands": { "claim", "status", "heartbeat", "release", "adopt" } }` | no clearance: `release` runs as before, the `release` status-line segment never renders |
+| `release.clearance` | `null`, `{ "provider": "github" }` (optional `ref`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), or `{ "commands": { "claim", "status", "heartbeat", "release", "adopt", "owed"? } }` | no clearance: `release` runs as before, the `release` status-line segment never renders |
 | `releaseTower` | `{ "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" }` | those two defaults |
 
 - **`release.clearance`** — one cleared release at a time, for every machine and account that
   releases this repository. `release` claims clearance before it touches the support train or
   cuts anything, waits and says who holds it when denied, heartbeats each phase, and hands it
-  back as the last act of close-out; a stale clearance (heartbeat older than `staleMinutes`,
-  default 20) whose pull request is still open is adopted with the owner's yes, never deleted.
+  back once the post-deploy check passed and the source, release branch and train are settled —
+  before docs, notes and the check's own close-out, which it records as owed; a stale clearance
+  (heartbeat older than `staleMinutes`, default 20) whose pull request is still open is adopted
+  with the owner's yes, never deleted. `phaseBudgetMinutes` (defaults `pre-ship` 120, `deploy` 60,
+  `close-out` 45; `0` switches one off) marks a live release STUCK past its phase's budget — an
+  alarm, never a takeover.
   The built-in `github` provider keeps the clearance in the custom ref `refs/clearance/release`
   (every move a compare-and-swap through `git push --force-with-lease`; neither a branch nor a
   tag) and needs only git and `gh`; a claim starts a detached keeper that heartbeats while the
   claiming agent lives. A repository may supply
-  its own five commands instead. **A block with both `provider` and `commands`, or a `provider`
+  its own five commands instead (a sixth, `owed`, is optional). **A block with both `provider` and `commands`, or a `provider`
   other than `github`, is a config error.** Nothing ever blocks a hotfix. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`.
 - **`releaseTower`** — read by the `release-tower` GitHub check that `setup ci` offers once
@@ -678,8 +682,9 @@ is live. There is deliberately no "when a note is warranted" key: the loop does 
 
 The plugin does not know what "healthy" means for a production system, so — as with
 documentation — it holds one fact: the name of a LOCAL skill that checks production after a
-deploy. `release` invokes it once the deploy is confirmed and before documentation, release notes
-and the close-out; `PASS` continues, `FAIL` stops for a rollback decision, `NOT RUN` is reported as
+deploy. `release` invokes it with `check` once the deploy is confirmed, before the clearance
+hand-back, documentation and release notes (and once more with `close-out` after documentation,
+only when `check` printed `CLOSE-OUT OWED`); `PASS` continues, `FAIL` stops for a rollback decision, `NOT RUN` is reported as
 degradation and asked about, and `null` reports **not configured**. `setup` does not write it; a
 repository adds it by hand once such a skill exists. The contract is
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/post-deploy-check.md`.

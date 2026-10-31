@@ -150,7 +150,11 @@ settles CI there without a review cycle. Any return to step 2 voids an owner yes
 4 asks again. Never rebase. `review` hands back here when its step 7.1 finds the production branch
 advanced under a release-branch head.
 
-## 5. Close out (step 6)
+## 5. Close out inside the clearance (step 5b)
+
+Runs right after 5a's post-deploy check passes, BEFORE documentation (5c), the post-deploy
+check's own close-out (5d) and release notes (5e): these steps are what the next release depends
+on, so they finish while this release still holds clearance, and nothing else does.
 
 1. **Sync production into the source.** Without it the release branch's fix commits never reach
    `releaseSource`. Already `git merge-base --is-ancestor origin/<productionBranch>
@@ -174,12 +178,14 @@ advanced under a release-branch head.
    train not yet created is skipped, said so; leave it out of the fetch above), by §1 step 7's rule
    (fast-forward when it is an ancestor of the source, else merge the source into it), so the
    release's own fixes reach it too; report how many unreleased one-offs it carries.
-4. **Hand clearance back last** (`release.clearance` set): the provider's `release`, only now —
-   after 1–3 — so a session that waits on `claim --wait` starts from a synced source and a
-   level train. A close-out that stops before this point keeps clearance for the retry
-   (`clearance.md`).
+4. **Hand clearance back** (`release.clearance` set): the provider's `release --owed <item>` for
+   each later step still to run (`docs`, `close-out`, `release-notes` — only those that will run),
+   only now — after 1–3, never before — so a session that waits on `claim --wait` starts from a
+   synced source and a level train (the next release's step 0 checks only that the source is
+   ahead of production, and its train merge writes the same train branch). A 5b that stops before
+   this point keeps clearance for the retry (`clearance.md`).
 
 ## Cited by
 
-- `skills/release/SKILL.md` — steps 0b, 0c, the protected-branch floor, the hotfix rule and step 6.
+- `skills/release/SKILL.md` — steps 0b, 0c, the protected-branch floor, the hotfix rule and step 5b.
 - `skills/review/SKILL.md` — step 7.1's hand-back on a release-branch head.

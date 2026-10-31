@@ -23,7 +23,7 @@ is not?**
 | `branch` | Branch | `git branch --show-current`, else `<sha> (detached)` | A repository with no commit yet — **transient** |
 | `stage` | Stage | stdout of `stage.resolve`, cached ~10s | **Structural** — no `stage` block, or a `resolve` that prints nothing |
 | `pr` | PR | `gh pr view` for the current branch, cached ~45s | This branch has no pull request (**transient**), or `gh` is missing/unauthenticated (an §1 finding) |
-| `release` | Release | the clearance provider's `status --short` (`release.clearance`), cached ~45s: `release/26-10-17 · alice · ci`, `· STALE` past the stale threshold | No release holds clearance (**transient**), `release.clearance` is null (by design, never asked), or no provider could be found (`doctor` config reports a `provider: github` with no installed plugin) |
+| `release` | Release | the clearance provider's `status --short` (`release.clearance`), cached ~45s: `release/26-10-17 · alice · ci`, `· STALE` past the stale threshold, `· STUCK` past the phase budget (both red); with nothing held, `close-out owed · <release> · <items>` while this machine owes close-out work | No release holds clearance (**transient**), `release.clearance` is null (by design, never asked), or no provider could be found (`doctor` config reports a `provider: github` with no installed plugin) |
 
 ## Which blanks are worth asking about
 

@@ -332,8 +332,10 @@ When releases are cut from more than one machine, or by more than one person or 
 `"release": { "clearance": { "provider": "github" } }`. The release skill then claims clearance
 before it touches the support train or cuts a release branch, waits and tells you who holds it
 when another session is releasing, keeps a heartbeat so a crashed session cannot hold the runway
-forever, can adopt a release a dead session left half-done (with your yes), and hands clearance back
-as the last act of its close-out. The clearance is a custom git ref in your repository, moved
+forever, flags a live release whose phase has run past its time budget as stuck, can adopt a
+release a dead or stopped session left half-done (with your yes), and hands clearance back as soon
+as production is healthy and the branches are settled, before documentation and the rest of its
+close-out. The clearance is a custom git ref in your repository, moved
 only by compare-and-swap pushes, kept alive by a keeper tied to the claiming agent, and needing
 nothing but git and `gh`; the status line shows the release in flight. A hotfix is never
 held. For a hard floor, `/devstride:setup ci` offers a `release-tower` GitHub check that passes only
@@ -469,7 +471,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.15.1** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.16.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added
