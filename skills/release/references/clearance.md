@@ -26,7 +26,9 @@ nothing is shown, and `release` runs exactly as before.** Nothing ever blocks a 
   (default `refs/clearance/release`), `"staleMinutes"` (default `20`), `"waitMinutes"` (default
   `180`, how long `claim --wait` polls), `"phaseBudgetMinutes"` (an object of phase → minutes over
   the defaults `{ "pre-ship": 120, "deploy": 60, "close-out": 45 }`; `0` or `null` switches a
-  phase's alarm off, a phase not named has none — `review` and `train` wait on people and CI).
+  phase's alarm off, a phase not named has none — `review` and `train` wait on people and CI; a
+  value that is not an object is ignored with a `status` warning, never an error that could stop a
+  heartbeat or a hand-back).
 - **`{ "commands": { "claim": "…", "status": "…", "heartbeat": "…", "release": "…", "adopt": "…" } }`**
   — a provider the repository supplies (a shell command per verb, run from the repository root;
   the verb's own arguments, `--wait`, `--short`, `<phase> --branch b --pr n`, `--force`, `--yes`,
@@ -61,7 +63,7 @@ reads the exit code and quotes the line; it never parses further.
   with `· STALE` past the stale threshold and `· STUCK` past the phase budget — or, when clear,
   `close-out owed · <release> · <items>` while this machine owes close-out work, else nothing.
   `--json` prints `{ state: clear|held|unknown, stale, stuck, phaseMinutes, phaseBudgetMinutes,
-  record, onFinal, waiting, hotfixesLanded, closeOutOwed, staleMinutes }`.
+  record, onFinal, waiting, hotfixesLanded, closeOutOwed, warnings, staleMinutes }`.
 - **Stale** = heartbeat older than `staleMinutes`. A stale clearance that never opened a pull
   request, or whose pull request was CLOSED unmerged, is taken over by the next `claim` on its own
   (one compare-and-swap on the stale object, so two takers cannot both win). A stale one whose

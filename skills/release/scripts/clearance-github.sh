@@ -194,22 +194,28 @@ HOTFIX_PATTERN = setting("CLEARANCE_HOTFIX_PATTERN", TOWER.get("hotfixPattern"),
 CACHE_DIR = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
 
 
+BUDGET_WARNINGS = []
+
+
 def phase_budgets():
     """The defaults, then release.clearance.phaseBudgetMinutes, then CLEARANCE_PHASE_BUDGETS. A
-    value that is not a positive number (0, null, "off") switches that phase's alarm off."""
+    value that is not a positive number (0, null, "off") switches that phase's alarm off. A layer
+    that is not an object is IGNORED with a warning, never an error: an alarm's settings must not
+    stop a release from heartbeating or handing its clearance back."""
     budgets = dict(DEFAULT_PHASE_BUDGETS)
-    layers = [CLEARANCE.get("phaseBudgetMinutes")]
+    layers = [("release.clearance.phaseBudgetMinutes", CLEARANCE.get("phaseBudgetMinutes"))]
     raw = os.environ.get("CLEARANCE_PHASE_BUDGETS")
     if raw:
         try:
-            layers.append(json.loads(raw))
+            layers.append(("CLEARANCE_PHASE_BUDGETS", json.loads(raw)))
         except ValueError:
-            fail("CLEARANCE_PHASE_BUDGETS is not a JSON object")
-    for layer in layers:
+            layers.append(("CLEARANCE_PHASE_BUDGETS", raw))
+    for name, layer in layers:
         if layer is None:
             continue
         if not isinstance(layer, dict):
-            fail("release.clearance.phaseBudgetMinutes must be an object of phase → minutes")
+            BUDGET_WARNINGS.append("%s ignored: it must be an object of phase → minutes" % name)
+            continue
         for phase, minutes in layer.items():
             budgets[str(phase)] = minutes
     out = {}
@@ -444,9 +450,22 @@ def owed_path():
 
 
 def read_owed():
-    """Entries for this repository, oldest first; never raises (status must not fail on it)."""
+    """Entries for this repository, oldest first; never raises (status must not fail on it, and
+    --short must keep working with gh down, so the repository is asked for only when some owed
+    file exists at all)."""
+    if not os.environ.get("CLEARANCE_OWED_RECORD") and not os.environ.get("CLEARANCE_RECORD"):
+        directory = os.path.join(CACHE_DIR, "devstride", "release-clearance")
+        try:
+            if not any(name.endswith(".owed.json") for name in os.listdir(directory)):
+                return []
+        except OSError:
+            return []
     try:
-        with open(owed_path()) as handle:
+        path = owed_path()
+    except (ToolError, SystemExit):
+        return []
+    try:
+        with open(path) as handle:
             value = json.load(handle)
     except (OSError, ValueError):
         return []
@@ -455,7 +474,7 @@ def read_owed():
         return []
     try:
         here = repo()
-    except SystemExit:
+    except (ToolError, SystemExit):
         here = None
     return [e for e in entries if isinstance(e, dict) and e.get("repo") in (None, here)
             and isinstance(e.get("owed"), list) and e["owed"]]
@@ -832,7 +851,7 @@ def cmd_status(args):
         print(json.dumps({
             "state": "held" if record else "clear", "stale": stale, "staleMinutes": STALE_MINUTES,
             "stuck": stuck, "phaseMinutes": phase_minutes(record, at) if record else None,
-            "phaseBudgetMinutes": PHASE_BUDGETS, "closeOutOwed": owed,
+            "phaseBudgetMinutes": PHASE_BUDGETS, "closeOutOwed": owed, "warnings": BUDGET_WARNINGS,
             "now": iso(at), "ref": REF, "repo": repo(), "productionBranch": PRODUCTION, "record": clean, **facts,
         }, sort_keys=True))
         return 0
@@ -848,6 +867,8 @@ def cmd_status(args):
         print("(pull requests into %s could not be listed)" % PRODUCTION)
     for entry in owed:
         print("Close-out owed: " + owed_line(entry, at))
+    for warning in BUDGET_WARNINGS:
+        print("(%s)" % warning)
     return 0
 
 

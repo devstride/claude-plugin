@@ -440,12 +440,17 @@ printf '{"release":{"clearance":{"provider":"github","phaseBudgetMinutes":{"depl
 held claude:other deploy release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T08:55:00Z; run status --short; A="$OUT"
 held claude:other review release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T09:30:00Z; run status --short; B="$OUT"
 held claude:other pre-ship release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T02:00:00Z; run status --short; C="$OUT"
-printf '{"release":{"clearance":{"provider":"github","phaseBudgetMinutes":[5]}}}' > .claude/ds-config.json; run status; D="$RC:$OUT"
+printf '{"release":{"clearance":{"provider":"github","phaseBudgetMinutes":[5]}}}' > .claude/ds-config.json
+held claude:other deploy release/26-10-18 3990 2026-10-18T10:04:00Z 2026-10-18T08:55:00Z; run status; D="$RC:$OUT"
+fresh budgets2; run claim; run heartbeat deploy; mkdir -p .claude
+printf '{"release":{"clearance":{"provider":"github","phaseBudgetMinutes":"soon"}}}' > .claude/ds-config.json
+run heartbeat close-out; E="$RC:$OUT"; run release; F="$RC:$OUT"
 rm -rf .claude
 if [ "$A" = "release/26-10-18 · bob · deploy" ] && [ "$B" = "release/26-10-18 · bob · review · STUCK" ] && [ "$C" = "release/26-10-18 · bob · pre-ship" ] \
-   && [ "${D%%:*}" -eq 1 ] && printf '%s' "$D" | grep -q 'phaseBudgetMinutes must be an object'; then
-  ok "(27) phaseBudgetMinutes: deploy raised to 90 (70 min not stuck), review given 30 (35 min stuck), pre-ship 0 = off; a non-object is an error"
-else bad "(27) a=$A b=$B c=$C d=$D"; fi
+   && [ "${D%%:*}" -eq 0 ] && printf '%s' "$D" | grep -q 'STUCK in deploy for 70 min (budget 60 min)' && printf '%s' "$D" | grep -q '^(release.clearance.phaseBudgetMinutes ignored: it must be an object' \
+   && [ "${E%%:*}" -eq 0 ] && [ "${F%%:*}" -eq 0 ] && printf '%s' "$F" | grep -q '^0:RELEASED'; then
+  ok "(27) phaseBudgetMinutes: deploy raised to 90, review given 30, pre-ship 0 = off; a non-object is ignored with a warning (defaults apply) and never blocks heartbeat or release"
+else bad "(27) a=$A b=$B c=$C d=$D e=$E f=$F"; fi
 
 # (28) claim --wait ends at the first STUCK poll with exit 5 and a STUCK line, so the waiting session
 #      can tell the owner; --ignore-stuck keeps waiting (to waitMinutes here: BUSY, exit 2); a claim
@@ -506,5 +511,17 @@ if [ "${A%%:*}" -eq 0 ] && printf '%s' "$A" | grep -q '^0:OWED release/26-10-18 
    && [ "$C" = "0:NONE" ] && [ "$LEFT" = 0 ] && [ -z "$D" ] && [ "$E" = "0:NONE" ]; then
   ok "(31) owed → OWED lines; --done settles items one by one (unknown ones noted); the last removes the file; --clear --release drops an entry"
 else bad "(31) a=$A b=$B c=$C left=$LEFT d=$D e=$E"; fi
+
+# (30b) with gh down and no repository override, --short still prints the held line: the owed
+#       lookup never asks gh unless an owed file exists, and swallows the failure when it does
+fresh ghdown; held claude:other deploy release/26-10-18 3990
+mkdir -p "$WORK/xdg"; : > "$STATE/gh-down"
+A="$(env -u CLEARANCE_REPO -u CLEARANCE_RECORD XDG_CACHE_HOME="$WORK/xdg" bash "$P" status --short 2>/dev/null)"; RA=$?
+mkdir -p "$WORK/xdg/devstride/release-clearance"; printf '{"entries":[{"repo":"o/r","release":"x","owed":["docs"]}]}' > "$WORK/xdg/devstride/release-clearance/o__r.owed.json"
+B="$(env -u CLEARANCE_REPO -u CLEARANCE_RECORD XDG_CACHE_HOME="$WORK/xdg" bash "$P" status --short 2>/dev/null)"; RB=$?
+rm -f "$STATE/gh-down"; rm -rf "$WORK/xdg"
+if [ "$RA" -eq 0 ] && [ "$A" = "release/26-10-18 · bob · deploy" ] && [ "$RB" -eq 0 ] && [ "$B" = "release/26-10-18 · bob · deploy" ] ; then
+  ok "(30b) gh down → status --short still renders the held line, with or without an owed file present"
+else bad "(30b) ra=$RA a=$A rb=$RB b=$B"; fi
 
 exit $FAIL
