@@ -589,6 +589,31 @@ if [ "$RC" -eq 4 ] && [ "$(field code)" = installed-payload-unsafe ] \
   ok "(23e) linked live-session directory → integrity failure, no reload"
 else bad "(23e) rc=$RC out=$OUT"; fi
 
+# 23f. Python's compiled-copy cache written into the install (a 3.17.0 status line imported
+# hooks/session-runtime.py on every refresh) is not payload; any other extra file still is.
+setup_case pycache devstride user 3.0.0 3.0.0 3.0.0
+mkdir -p "$PLUGIN/hooks/__pycache__" "$PLUGIN/skills/__pycache__"
+printf 'bytecode' > "$PLUGIN/hooks/__pycache__/session-runtime.cpython-312.pyc"
+printf 'bytecode' > "$PLUGIN/skills/__pycache__/other.cpython-313.pyc"
+OUT="$(run_apply)"; RC=$?
+setup_case pycache-plus-extra devstride user 3.0.0 3.0.0 3.0.0
+mkdir -p "$PLUGIN/hooks/__pycache__"
+printf 'bytecode' > "$PLUGIN/hooks/__pycache__/session-runtime.cpython-312.pyc"
+printf 'extra' > "$PLUGIN/hooks/planted.sh"
+SECOND="$(run_apply)"; SECOND_RC=$?
+setup_case pycache-not-only-bytecode devstride user 3.0.0 3.0.0 3.0.0
+mkdir -p "$PLUGIN/hooks/__pycache__"
+printf 'x' > "$PLUGIN/hooks/__pycache__/session-runtime.cpython-312.pyc"
+printf 'x' > "$PLUGIN/hooks/__pycache__/payload.sh"
+THIRD="$(run_apply)"; THIRD_RC=$?
+THIRD_CODE="$(printf '%s' "$THIRD" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("code"))')"
+SECOND_CODE="$(printf '%s' "$SECOND" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("code"))')"
+if [ "$RC" -eq 0 ] && [ "$(field status)" = current ] \
+   && [ "$SECOND_RC" -eq 4 ] && [ "$SECOND_CODE" = installed-payload-mismatch ] \
+   && [ "$THIRD_RC" -eq 4 ] && [ "$THIRD_CODE" = installed-payload-mismatch ]; then
+  ok "(23f) Python cache folders in the install are ignored; a planted file, in one or beside it, still fails"
+else bad "(23f) rc=$RC out=$OUT second_rc=$SECOND_RC second=$SECOND third_rc=$THIRD_RC third=$THIRD"; fi
+
 # 24. Command output is killed at its hard cap instead of filling memory or temporary storage.
 setup_case output-cap devstride user 3.0.0 3.1.0 3.1.0
 UP_MODE=large-output; export UP_MODE

@@ -52,8 +52,8 @@ next action. For each failure symptom, read
   `claude plugin marketplace add devstride/claude-plugin`.
 - **Version currency** — run
   `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/version-currency.md`: use its strict shared tag
-  helper (not Releases) and report installed/newest. If behind, tell the user to invoke
-  `/devstride:update` separately and stop; Doctor must not invoke this explicit-only command. If the
+  helper (not Releases) and report installed/newest. If behind, record `/devstride:update`
+  as the first next action (Doctor never runs it) and continue with every remaining section. If the
   skill is unavailable, print exact id/scope bootstrap commands, then reload and check for errors.
 - **`python3` on PATH** — the session-start hook and the reviewer wait script need it. FAIL,
   a platform install hint.
@@ -150,7 +150,7 @@ next action. For each failure symptom, read
   `profileOverrides`: report as a WARNING any name that is not a knob in the contract's table;
   nothing else.
 - **Unrecognized keys — a WARNING, not a typo accusation.** List them and let the user judge. **Exclude by convention**: any key whose leaf name starts with
-  `_` (the `_*_readme` documentation convention, used pervasively in real configs) and `$schema`.
+  `_` (the `_*_readme` documentation convention) and `$schema`.
   Check against the published [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference),
   **not** by grepping skill prose — several real keys are descriptive and appear in no skill.
   Where a key is one edit away from a real one, offer that as a possibility, not a verdict.
@@ -193,8 +193,7 @@ next action. For each failure symptom, read
   skip shell builtins (`cd backend && pnpm test` starts with `cd`, which always resolves). A
   single-word command that does not resolve may be a shell alias or function — report "not on
   PATH (may be an alias)", not a flat FAIL.
-- **`conventionsDoc` exists** — set → the file must be present; the build engine reads it, and a
-  missing one quietly costs that.
+- **`conventionsDoc` exists** — set → the file must be present; the build engine reads it.
 
 ## 5. The CI draft gate (`ci`)
 
@@ -242,9 +241,10 @@ Two separate checks, and **the first is the one everyone misses**:
   - a draft-convention check that fails a non-draft pull request opened by a person (INFO, not a
     warning — it is a courtesy to humans, not a gate).
   Fix for all three: `/devstride:setup ci`, which shows each change as a diff.
-- **Run-once in practice.** Run the last seven days through the `ci-audit` skill's method and
-  report `Σ executed PR runs ÷ Σ distinct workflows that executed per pull request` — `1.0` is
-  the design; above it, name the pull requests, workflows, causes. Measured, never assumed.
+- **Run-once in practice — only on `doctor ci --audit`.** Run the last seven days through the
+  `ci-audit` method; report `Σ executed PR runs ÷ Σ distinct workflows that executed per pull request`
+  — `1.0` is the design; above it, name the pull requests, workflows, causes. Otherwise one INFO
+  line: `run-once not measured here; run /devstride:ci-audit`.
 
 ## 6. Merge gates (`gates`)
 

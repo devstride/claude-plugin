@@ -2,7 +2,7 @@
 # hooks/session-gate.sh — one job class per session. A UserPromptSubmit hook.
 #
 # Why: every turn re-sends the whole conversation, so a session's cost is turns × context. An
-# AUTHORING job (setup, plan, doctor, …) and an EXECUTION job (build-item, pr, review, …) each
+# AUTHORING job (setup, plan, …) and an EXECUTION job (build-item, pr, review, …) each
 # carry their own context; run in one session, everything after the switch pays for both. The
 # rule is NOT one skill per session — build-item walking story after story is one job and is
 # never blocked — it is that the two classes do not share a session.
@@ -17,7 +17,10 @@
 #     verification receipts already use. Markers older than 7 days are pruned on write.
 #   - Blocks (exit 2, one plain-language reason on stderr — that is what the user sees; the
 #     prompt is discarded) only when a job of the OTHER class is already recorded in this
-#     session. /clear gives a new session_id, which is exactly the cure the message names.
+#     session. The message offers `--same-session` first, then /clear (a new session_id), and
+#     warns that /clear gives up whatever the session holds, such as a checkout lease.
+#   - doctor (read-only, run first and after any config change) and update are NEUTRAL: they
+#     never arm or trip the gate, so `doctor` then `build-item` runs in one session.
 #   - Escape hatches: `--same-session` anywhere in the prompt; `"session": {"jobClassGate":
 #     false}` in .claude/ds-config.json; DEVSTRIDE_SESSION_GATE=0 in the environment.
 #   - FAILS OPEN. No python3, no git, no session id, an unwritable .git, malformed JSON — every
@@ -31,7 +34,7 @@ export SG_STDIN="$STDIN_JSON"
 python3 - <<'PY'
 import json, os, re, subprocess, sys, time
 
-AUTHORING = {"setup", "plan", "doctor", "ci-audit", "rebalance", "rationalize-gantt", "comprehend-plan"}
+AUTHORING = {"setup", "plan", "ci-audit", "rebalance", "rationalize-gantt", "comprehend-plan"}
 EXECUTION = {"build-item", "pr", "review", "release", "push", "create-story", "create-defect",
              "insert-story", "insert-defect"}
 TTL = 7 * 24 * 3600
@@ -89,8 +92,9 @@ def main():
             sys.stderr.write(
                 "devstride: this session already ran /devstride:%s, an %s job. /devstride:%s is an %s job. "
                 "Every turn re-sends the whole conversation, so mixing the two multiplies the cost of everything "
-                "after this point. Start it in a new session (/clear, then the same command), or add "
-                "--same-session to continue here.\n" % (first, other, skill, cls))
+                "after this point. Add --same-session to run it here anyway, or start it in a new session "
+                "(/clear, then the same command); /clear ends this session, so anything it holds, such as a "
+                "checkout lease, is given up.\n" % (first, other, skill, cls))
             return 2
     now = int(time.time())
     jobs.append({"skill": skill, "class": cls, "at": now})

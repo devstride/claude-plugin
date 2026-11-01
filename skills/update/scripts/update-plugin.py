@@ -756,6 +756,21 @@ def tagged_payload(
     return entries
 
 
+def python_cache(parent: str, name: str) -> bool:
+    """A `__pycache__` folder Python wrote: a real directory holding only regular `.pyc` files."""
+    path = os.path.join(parent, name)
+    if name != "__pycache__" or os.path.islink(path) or not os.path.isdir(path):
+        return False
+    try:
+        with os.scandir(path) as entries:
+            return all(
+                entry.name.endswith(".pyc") and entry.is_file(follow_symlinks=False)
+                for entry in entries
+            )
+    except OSError:
+        return False
+
+
 def _verify_installed_payload(
     root: str, entries: dict[str, tuple[str, str]], inert: Callable[[str], bool]
 ) -> None:
@@ -857,7 +872,10 @@ def _verify_installed_payload(
             relative_dir = os.path.relpath(directory, root)
             for name in list(dirs):
                 path = name if relative_dir == "." else f"{relative_dir}/{name}"
-                if path == ".in_use" or inert(f"{path}/"):
+                if path == ".in_use" or inert(f"{path}/") or python_cache(directory, name):
+                    # Python's compiled-copy cache is written beside any helper a process imports
+                    # (a 3.17.0 status line did, every refresh): never shipped, so never payload.
+                    # Only a real folder of plain .pyc files counts; anything else in one is checked.
                     dirs.remove(name)
                 elif os.path.islink(os.path.join(directory, name)):
                     actual.add(path)

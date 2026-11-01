@@ -91,6 +91,8 @@ every copy in the field.
 - **`autoUpdate`** (default `true`) — whether the session-start hook may refresh
   `.claude/statusline.sh` when the plugin ships a newer one. It replaces the file **only** while it
   still carries the shipped `# ds-statusline: managed v<x.y.z>` marker on line 2, keeps the
-  previous copy as `.claude/statusline.sh.bak`, and never creates a status line that is not already
-  there. **Deleting the marker line is how an owner takes the file over permanently** — that is the
+  previous copy as `devstride/statusline.bak` in the repository's git directory, and never creates
+  a status line that is not already there. A committed copy that is only behind is left alone when
+  the branch's upstream (or `origin/<baseBranch>`) already carries the newer one, and on a
+  detached checkout or a base, production or protected branch. **Deleting the marker line is how an owner takes the file over permanently** — that is the
   supported way to hand-edit it, and it is what the marker's own text says.

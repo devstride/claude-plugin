@@ -374,11 +374,11 @@ Picked too heavy a profile and watching the loop take far too long? `/devstride:
 ## One job per session
 
 Every turn re-sends the whole conversation, so a session's cost is its turns times its context.
-An **authoring** job (`setup`, `plan`, `doctor`, `ci-audit`, `rebalance`, `rationalize-gantt`,
+An **authoring** job (`setup`, `plan`, `ci-audit`, `rebalance`, `rationalize-gantt`,
 `comprehend-plan`) and an **execution** job (`build-item`, `pr`, `review`, `release`, `push`,
 `create-story`, `create-defect`, `insert-story`, `insert-defect`) each carry their own context; run
 both in one session and everything after the switch pays for both. The plugin's prompt-time hook
-blocks the second kind with a one-line reason and the cure (`/clear`, then the same command). It
+blocks the second kind with a one-line reason; the cure is a new session (`/clear`, then the same command — `/clear` ends the session, giving up anything it holds, such as a checkout lease). `doctor` and `update` are neutral and never block either kind. It
 is not one *skill* per session: `build-item` walking a plan story after story is one job. To
 continue anyway, add `--same-session` to the command; to turn the gate off for a repository, set
 `"session": {"jobClassGate": false}` in `.claude/ds-config.json`. The hook fails open — it never
@@ -471,7 +471,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.17.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.18.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added
