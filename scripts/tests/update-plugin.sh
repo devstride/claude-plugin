@@ -601,11 +601,18 @@ mkdir -p "$PLUGIN/hooks/__pycache__"
 printf 'bytecode' > "$PLUGIN/hooks/__pycache__/session-runtime.cpython-312.pyc"
 printf 'extra' > "$PLUGIN/hooks/planted.sh"
 SECOND="$(run_apply)"; SECOND_RC=$?
+setup_case pycache-not-only-bytecode devstride user 3.0.0 3.0.0 3.0.0
+mkdir -p "$PLUGIN/hooks/__pycache__"
+printf 'x' > "$PLUGIN/hooks/__pycache__/session-runtime.cpython-312.pyc"
+printf 'x' > "$PLUGIN/hooks/__pycache__/payload.sh"
+THIRD="$(run_apply)"; THIRD_RC=$?
+THIRD_CODE="$(printf '%s' "$THIRD" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("code"))')"
 SECOND_CODE="$(printf '%s' "$SECOND" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("code"))')"
 if [ "$RC" -eq 0 ] && [ "$(field status)" = current ] \
-   && [ "$SECOND_RC" -eq 4 ] && [ "$SECOND_CODE" = installed-payload-mismatch ]; then
-  ok "(23f) Python cache folders in the install are ignored; a planted file still fails"
-else bad "(23f) rc=$RC out=$OUT second_rc=$SECOND_RC second=$SECOND"; fi
+   && [ "$SECOND_RC" -eq 4 ] && [ "$SECOND_CODE" = installed-payload-mismatch ] \
+   && [ "$THIRD_RC" -eq 4 ] && [ "$THIRD_CODE" = installed-payload-mismatch ]; then
+  ok "(23f) Python cache folders in the install are ignored; a planted file, in one or beside it, still fails"
+else bad "(23f) rc=$RC out=$OUT second_rc=$SECOND_RC second=$SECOND third_rc=$THIRD_RC third=$THIRD"; fi
 
 # 24. Command output is killed at its hard cap instead of filling memory or temporary storage.
 setup_case output-cap devstride user 3.0.0 3.1.0 3.1.0

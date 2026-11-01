@@ -82,7 +82,7 @@ if pin is not None and (not isinstance(pin,str) or not re.fullmatch(r"[0-9]+\.[0
   valid=False; pin=None
 # Branch roles only steer the status-line refresh; a bad value is ignored, never "invalid config".
 def name(v,glob=False):
-  ok=isinstance(v,str) and ".." not in v and re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._/*-]{0,199}" if glob else r"[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}",v)
+  ok=isinstance(v,str) and ".." not in v and re.fullmatch(r"[A-Za-z0-9_*?\[][A-Za-z0-9._/*?\[\]-]{0,199}" if glob else r"[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}",v)
   return v if ok else None
 r=d.get("release") if isinstance(d.get("release"),dict) else {}
 base=name(d.get("baseBranch")) or name(r.get("releaseSource")) or "develop"
