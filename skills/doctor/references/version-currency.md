@@ -84,7 +84,7 @@ Written on every run:
 | `result` | `current`, `behind`, `behind-pinned`, `pin-drift`, `pinned-ahead`, `running-ahead`, `invalid-config`, `invalid-runtime`, `disk-current-unverified`, `disk-current-verified`, `installed-ahead`, `updated`, `update-failed`, `update-verification-failed`, `shared-scope-auto-refused`, `scope-binding-unverified`, `shared-checkout-auto-deferred`, `bound-checkout-pinned`, `bound-checkout-pin-drift`, `lookup-failed`, or `unreachable` |
 | `install` | The `id scope` identified from the enabled row whose `installPath` is the loaded copy — or `null` |
 | `notifiedFor` | What the pinned/drift line was last printed for; the same situation is said once, not every start |
-| `statusLine` | Independent managed-copy result: `n/a`, `current`, `owner-managed`, `updated:<old>:<new>`, or `update-refused` |
+| `statusLine` | Independent managed-copy result: `n/a`, `current`, `owner-managed`, `updated:<old>:<new>`, `on-upstream:<old>:<new>:<ref>` (upstream has it), `held:<old>:<new>` (detached or protected branch), or `update-refused` |
 
 Absent per-repo file → the check has never run for this repository on this machine: the plugin predates it, hooks are disabled,
 or `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` is set. That is what `doctor` reports.

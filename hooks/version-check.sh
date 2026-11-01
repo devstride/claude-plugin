@@ -21,8 +21,12 @@
 #     payload must match before reload is allowed.
 #   - It also refreshes the repository's COPY of the status line, which no plugin update can
 #     reach on its own. Only a file still carrying the shipped `ds-statusline: managed v<x.y.z>`
-#     marker is ever replaced, the previous one is kept as .bak, and a repo without a status
-#     line never gets one created here — that needs consent, which is setup's and doctor's job.
+#     marker is ever replaced, and a repo without a status line never gets one created here —
+#     that needs consent, which is setup's and doctor's job. A COMMITTED copy is never rewritten
+#     when the checkout's upstream (or origin/<baseBranch>) already carries the new one — the
+#     checkout is only behind, so it says "pull" — nor on a detached HEAD or a base/production/
+#     protected branch, where a dirty tree blocks tooling and nobody commits. The previous copy
+#     goes to <git-common-dir>/devstride/statusline.bak, never into the work tree.
 #   - Recipe for "newest release": skills/doctor/references/version-currency.md — TAGS not
 #     GitHub Releases; accept only the exact `devstride--v<semver>` prefix; compare numerically.
 # DEVSTRIDE_PLUGIN_UPDATE_CHECK=0 disables only the plugin check; status-line refresh remains an
@@ -42,7 +46,7 @@ CWD="${CWD:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 # The repository root, so a session launched from packages/web still finds the repo's config.
 REPO=$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null); REPO="${REPO:-$CWD}"
 
-read -r CHECK AUTO SLAUTO FETCH PIN CONFIG_VALID <<EOF
+read -r CHECK AUTO SLAUTO FETCH PIN CONFIG_VALID SL_BASE SL_PROTECTED <<EOF
 $(python3 -c 'import json,os,re,stat,sys
 path=os.path.join(sys.argv[1],".claude","ds-config.json"); valid=True
 if os.path.lexists(path):
@@ -76,9 +80,18 @@ def flag(obj,key,default):
 pin=p.get("pin")
 if pin is not None and (not isinstance(pin,str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+",pin)):
   valid=False; pin=None
+# Branch roles only steer the status-line refresh; a bad value is ignored, never "invalid config".
+def name(v,glob=False):
+  ok=isinstance(v,str) and ".." not in v and re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._/*-]{0,199}" if glob else r"[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}",v)
+  return v if ok else None
+r=d.get("release") if isinstance(d.get("release"),dict) else {}
+base=name(d.get("baseBranch")) or name(r.get("releaseSource")) or "develop"
+held=[base,name(r.get("releaseSource")) or "develop",name(r.get("productionBranch")) or "master",name(d.get("hotfixBaseBranch")) or "master"]
+pb=d.get("protectedBranches")
+held+=[x for x in (name(v,True) for v in (pb if isinstance(pb,list) else [])) if x]
 print("1" if flag(p,"updateCheck",True) else "0", "1" if flag(p,"autoUpdate",False) else "0",
       "1" if flag(s,"autoUpdate",True) else "0", "1" if flag(l,"fetchOnSessionStart",False) else "0",
-      pin or "-", "1" if valid else "0")' "$REPO" 2>/dev/null || echo "0 0 0 0 - 0")
+      pin or "-", "1" if valid else "0", base, ",".join(dict.fromkeys(held)))' "$REPO" 2>/dev/null || echo "0 0 0 0 - 0 - -")
 EOF
 [ "$CONFIG_VALID" = "1" ] || { CHECK=1; AUTO=0; SLAUTO=0; FETCH=0; PIN="-"; }
 
@@ -92,17 +105,38 @@ except Exception: raise SystemExit(1)' "$1" "$2"; } # newer A B: B > A
 # session-start pass as the version check — and it is a local file compare, no network.
 #
 # Replaced ONLY while it still carries the shipped marker; deleting that line is how an owner
-# takes the file over for good. The previous copy is kept as .bak so even a clobbered edit is
+# takes the file over for good. The previous copy is kept as a backup so even a clobbered edit is
 # recoverable, and this never CREATES a status line: a repo without one has not asked for one.
+#
+# A COMMITTED copy is the repository's, so the work tree is left alone when (1) the upstream, or
+# origin/<baseBranch> without one, already carries a marker at least the shipped one — the
+# checkout is behind and a pull fixes it — or (2) HEAD is detached or on a base, production or
+# protectedBranches branch: a dirty tree there blocks checkout tooling and nobody commits it. Local
+# refs only: this never fetches. The backup lives in <git-common-dir>/devstride/, never the tree.
 SL_RESULT="n/a"
 SL_REPO="$REPO/.claude/statusline.sh"; SL_SHIPPED="$ROOT/skills/setup/references/statusline.sh"
 if [ "$SLAUTO" = "1" ] && { [ -e "$SL_REPO" ] || [ -L "$SL_REPO" ]; } \
    && { [ -e "$SL_SHIPPED" ] || [ -L "$SL_SHIPPED" ]; }; then
-  SL_RESULT=$(python3 - "$SL_REPO" "$SL_SHIPPED" <<'PY' 2>/dev/null || echo update-refused
-import fcntl, hashlib, os, re, secrets, stat, sys
+  SL_RESULT=$(python3 - "$SL_REPO" "$SL_SHIPPED" "$REPO" "$SL_BASE" "$SL_PROTECTED" <<'PY' 2>/dev/null || echo update-refused
+import fcntl, fnmatch, hashlib, os, re, secrets, stat, subprocess, sys
 
-target, source = sys.argv[1:]
+target, source, repo, base, protected = sys.argv[1:]
 limit = 1024 * 1024
+RELATIVE = ".claude/statusline.sh"
+GIT_ENV = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0", GIT_NO_LAZY_FETCH="1")
+
+def git(*args):
+    # Local reads only, each bounded; any failure reads as "no answer".
+    try:
+        done = subprocess.run(["git", "-C", repo] + list(args), stdin=subprocess.DEVNULL,
+                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=GIT_ENV,
+                              timeout=5)
+        return done.returncode, done.stdout
+    except Exception:
+        return None, b""
+
+def version(value):
+    return tuple(map(int, value.split(".")))
 
 def identity(value):
     return (value.st_dev, value.st_ino, value.st_mode, value.st_uid,
@@ -184,10 +218,32 @@ def temp_write(directory_fd, stem, data, mode):
     finally:
         if descriptor >= 0: os.close(descriptor)
 
-def link_no_replace(directory_fd, source_name, destination_name):
+def link_no_replace(directory_fd, source_name, destination_name, destination_fd=None):
     # Unlike os.replace, link(2) fails when a last-second writer already owns the destination.
     os.link(source_name, destination_name, src_dir_fd=directory_fd,
-            dst_dir_fd=directory_fd, follow_symlinks=False)
+            dst_dir_fd=directory_fd if destination_fd is None else destination_fd,
+            follow_symlinks=False)
+
+def backup_directory(common):
+    # <git-common-dir>/devstride, created owner-only; never a symlink, never someone else's.
+    parent = os.open(common, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        if os.fstat(parent).st_uid != os.geteuid():
+            raise ValueError("git directory has another owner")
+        try:
+            os.mkdir("devstride", 0o700, dir_fd=parent)
+        except FileExistsError:
+            pass
+        before = os.stat("devstride", dir_fd=parent, follow_symlinks=False)
+        if not stat.S_ISDIR(before.st_mode) or before.st_uid != os.geteuid():
+            raise ValueError("backup directory is not a real owner-owned directory")
+        descriptor = os.open("devstride", os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) |
+                             getattr(os, "O_NOFOLLOW", 0), dir_fd=parent)
+        if identity(before) != identity(os.fstat(descriptor)):
+            os.close(descriptor); raise ValueError("backup directory changed while opening")
+        return descriptor
+    finally:
+        os.close(parent)
 
 def restore_no_replace(directory_fd, held_name, destination_name):
     try:
@@ -206,19 +262,60 @@ def move_into_hold(directory_fd, source_name, stem):
         raise
     return held_name
 
+def decide(have, want):
+    """(skip-result, git-common-dir, feature-branch) for a copy behind the shipped one."""
+    code, out = git("rev-parse", "--is-inside-work-tree")
+    if code != 0 or out.strip() != b"true":
+        return None, None, False          # not a repository: the backup stays beside the file
+    code, out = git("symbolic-ref", "-q", "--short", "HEAD")
+    branch = out.decode("utf-8", "replace").strip() if code == 0 else ""
+    patterns = [value for value in protected.split(",") if value and value != "-"]
+    held = not branch or any(fnmatch.fnmatchcase(branch, value) for value in patterns)
+    if git("ls-files", "--error-unmatch", "--", RELATIVE)[0] == 0:
+        refs = []
+        if branch:
+            code, out = git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+            upstream = out.decode("utf-8", "replace").strip() if code == 0 else ""
+            if upstream and not upstream.startswith("-"):
+                refs.append((upstream, upstream))
+        if not refs and base and base != "-":
+            refs.append(("refs/remotes/origin/" + base, "origin/" + base))
+        for ref, label in refs:
+            code, out = git("cat-file", "blob", ref + ":" + RELATIVE)
+            there = marker(out[:limit]) if code == 0 else ""
+            if there and version(there) >= version(want):
+                return "on-upstream:%s:%s:%s" % (have, there, label), None, False
+        if held:
+            return "held:%s:%s" % (have, want), None, False
+    code, out = git("rev-parse", "--git-common-dir")
+    common = out.decode("utf-8", "replace").strip() if code == 0 else ""
+    if not common:
+        raise ValueError("git directory not found")
+    feature = not held and git("check-ignore", "-q", "--", RELATIVE)[0] == 1
+    return None, os.path.join(repo, common), feature
+
 try:
     target_data, target_stat = safe_read(target, "repository status line")
     source_data, source_stat = safe_read(source, "shipped status line")
     have, want = marker(target_data), marker(source_data)
     if not have:
         print("owner-managed")
-    elif not want or tuple(map(int, want.split("."))) <= tuple(map(int, have.split("."))):
+    elif not want or version(want) <= version(have):
         print("current")
     else:
+        skipped, common, feature = decide(have, want)
+        if skipped:
+            print(skipped); raise SystemExit(0)
         parent_fd = safe_parent(target, "repository status line")
         fcntl.flock(parent_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         target_name = os.path.basename(target)
-        backup = target_name + ".bak"
+        backup_fd = parent_fd; backup = target_name + ".bak"
+        if common:
+            try:
+                backup_fd = backup_directory(common)
+            except Exception:
+                os.close(parent_fd); raise
+            backup = "statusline.bak"
         backup_hold = target_hold = target_temp = ""
         backup_hold_expected = target_hold_expected = backup_committed = False
         try:
@@ -230,7 +327,7 @@ try:
 
             backup_data = backup_stat = None
             try:
-                backup_data, backup_stat = safe_read_at(parent_fd, backup, "status-line backup")
+                backup_data, backup_stat = safe_read_at(backup_fd, backup, "status-line backup")
             except FileNotFoundError:
                 pass
 
@@ -243,10 +340,10 @@ try:
             # inspection, the moved file fails the identity check and is restored without
             # overwriting whatever another writer put there.
             if backup_stat is not None:
-                backup_hold = move_into_hold(parent_fd, backup, backup + ".hold")
-                moved_data, moved_stat = safe_read_at(parent_fd, backup_hold, "status-line backup")
+                backup_hold = move_into_hold(backup_fd, backup, backup + ".hold")
+                moved_data, moved_stat = safe_read_at(backup_fd, backup_hold, "status-line backup")
                 if moved_data != backup_data or moved_identity(moved_stat) != moved_identity(backup_stat):
-                    if restore_no_replace(parent_fd, backup_hold, backup):
+                    if restore_no_replace(backup_fd, backup_hold, backup):
                         backup_hold = ""
                     raise ValueError("status-line backup changed before refresh")
                 backup_hold_expected = True
@@ -261,9 +358,9 @@ try:
                 raise ValueError("repository status line changed while preparing refresh")
             target_hold_expected = True
 
-            link_no_replace(parent_fd, target_hold, backup)
+            link_no_replace(parent_fd, target_hold, backup, backup_fd)
             backup_committed = True
-            os.fsync(parent_fd)
+            os.fsync(backup_fd)
             link_no_replace(parent_fd, target_temp, target_name)
             os.unlink(target_temp, dir_fd=parent_fd)
             target_temp = ""
@@ -275,9 +372,10 @@ try:
             os.unlink(target_hold, dir_fd=parent_fd)
             target_hold = ""
             if backup_hold:
-                os.unlink(backup_hold, dir_fd=parent_fd)
+                os.unlink(backup_hold, dir_fd=backup_fd)
                 backup_hold = ""
             os.fsync(parent_fd)
+            if backup_fd != parent_fd: os.fsync(backup_fd)
         except Exception:
             if target_hold:
                 if target_hold_expected and backup_committed:
@@ -287,35 +385,48 @@ try:
                     target_hold = ""
                 elif target_hold_expected:
                     try:
-                        link_no_replace(parent_fd, target_hold, backup)
+                        link_no_replace(parent_fd, target_hold, backup, backup_fd)
                         os.unlink(target_hold, dir_fd=parent_fd)
                         target_hold = ""
                     except FileExistsError:
                         pass
             if backup_hold:
-                if restore_no_replace(parent_fd, backup_hold, backup):
+                if restore_no_replace(backup_fd, backup_hold, backup):
                     backup_hold = ""
                 elif backup_hold_expected:
-                    # Another writer now owns .bak; the superseded plugin backup can retire.
-                    os.unlink(backup_hold, dir_fd=parent_fd)
+                    # Another writer now owns the backup; the superseded plugin backup can retire.
+                    os.unlink(backup_hold, dir_fd=backup_fd)
                     backup_hold = ""
             os.fsync(parent_fd)
+            if backup_fd != parent_fd: os.fsync(backup_fd)
             raise
         finally:
             for temporary in (target_temp,):
                 if temporary:
                     try: os.unlink(temporary, dir_fd=parent_fd)
                     except FileNotFoundError: pass
+            if backup_fd != parent_fd: os.close(backup_fd)
             os.close(parent_fd)
-        print("updated:" + have + ":" + want)
+        print("updated:" + have + ":" + want + (":commit" if feature else ":git" if common else ""))
+except SystemExit:
+    raise
 except Exception:
     print("update-refused")
 PY
 )
+  SL_HAVE=$(printf '%s' "$SL_RESULT" | cut -d: -f2); SL_WANT=$(printf '%s' "$SL_RESULT" | cut -d: -f3)
   case "$SL_RESULT" in
+    updated:*:commit|updated:*:git)
+      SL_NEXT=""; case "$SL_RESULT" in *:commit) SL_NEXT=" Commit it so every clone gets it." ;; esac
+      SL_GITDIR=$(cd "$REPO" 2>/dev/null && cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && pwd)
+      SL_RESULT="updated:$SL_HAVE:$SL_WANT"
+      echo "devstride status line: updated $SL_HAVE → $SL_WANT (.claude/statusline.sh; previous copy kept as ${SL_GITDIR:-the git directory}/devstride/statusline.bak). Live now — no restart needed.$SL_NEXT"
+      ;;
     updated:*)
-      SL_HAVE=$(printf '%s' "$SL_RESULT" | cut -d: -f2); SL_WANT=$(printf '%s' "$SL_RESULT" | cut -d: -f3)
-      echo "devstride status line: updated $SL_HAVE → $SL_WANT (.claude/statusline.sh; previous kept as .bak). Live now — no restart needed. Commit it so every clone gets it."
+      echo "devstride status line: updated $SL_HAVE → $SL_WANT (.claude/statusline.sh; previous kept as .bak). Live now — no restart needed."
+      ;;
+    on-upstream:*)
+      echo "devstride status line: v$SL_WANT is already on $(printf '%s' "$SL_RESULT" | cut -d: -f4-); pull to get it."
       ;;
   esac
 fi

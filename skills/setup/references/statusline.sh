@@ -1,5 +1,5 @@
 #!/bin/bash
-# ds-statusline: managed v3.17.0 — installed and kept up to date by the devstride
+# ds-statusline: managed v3.18.0 — installed and kept up to date by the devstride
 # plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
 # replaces a file that still carries it, and never touches one that does not.
 #
@@ -106,10 +106,14 @@ if d.get("session_id"):
         if not os.path.isfile(helper):
             continue
         try:
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("ds_session_runtime", helper)
-            runtime = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(runtime)
+            # Compiled from its source, never imported: an import would save a compiled copy
+            # (hooks/__pycache__) inside the installed plugin, which the update check then counts
+            # as a foreign file, and would read back any such copy found there.
+            import types
+            runtime = types.ModuleType("ds_session_runtime")
+            runtime.__file__ = helper
+            with open(helper, "rb") as source:
+                exec(compile(source.read(), helper, "exec"), runtime.__dict__)
             verdict = runtime.check(d.get("session_id"), cwd or None)
             if verdict.get("verdict") == "reload":
                 plugin_state = "reload|%s|%s" % (verdict["running"], verdict["installed"])

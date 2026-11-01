@@ -238,7 +238,7 @@ printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/s
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
 OUT="$(run_hook)"
 if result_is invalid-config && [ -z "$OUT" ] && grep -q 'echo old' "$REPO/.claude/statusline.sh" \
-   && [ ! -e "$REPO/.claude/statusline.sh.bak" ] && not_called '^claude:' \
+   && [ ! -e "$REPO/.git/devstride/statusline.bak" ] && [ ! -e "$REPO/.claude/statusline.sh.bak" ] && not_called '^claude:' \
    && not_called '^git:ls-remote'; then
   ok "(6b) non-boolean mutation flags → invalid config, no plugin/status-line change"
 else bad "(6b) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
@@ -296,7 +296,7 @@ printf '# ds-statusline: managed v2.8.0 — marker\necho outside\n' > "$CASE_DIR
 ln -s "$CASE_DIR/outside-target" "$REPO/.claude/statusline.sh"
 OUT="$(run_hook)"
 if [ -L "$REPO/.claude/statusline.sh" ] && grep -q 'echo outside' "$CASE_DIR/outside-target" \
-   && [ ! -e "$REPO/.claude/statusline.sh.bak" ] && [ -z "$OUT" ]; then
+   && [ ! -e "$REPO/.git/devstride/statusline.bak" ] && [ ! -e "$REPO/.claude/statusline.sh.bak" ] && [ -z "$OUT" ]; then
   ok "(8a) symlinked repository status line → refused without touching its target"
 else bad "(8a) out=$OUT target=$(cat "$CASE_DIR/outside-target")"; fi
 
@@ -307,7 +307,7 @@ printf '# ds-statusline: managed v2.8.0 — marker\necho hard-target\n' > "$CASE
 ln "$CASE_DIR/outside-target" "$REPO/.claude/statusline.sh"
 OUT="$(run_hook)"
 if grep -q 'echo hard-target' "$CASE_DIR/outside-target" \
-   && [ ! -e "$REPO/.claude/statusline.sh.bak" ] && [ -z "$OUT" ]; then
+   && [ ! -e "$REPO/.git/devstride/statusline.bak" ] && [ ! -e "$REPO/.claude/statusline.sh.bak" ] && [ -z "$OUT" ]; then
   ok "(8b) hardlinked repository status line → refused without touching either link"
 else bad "(8b) out=$OUT target=$(cat "$CASE_DIR/outside-target")"; fi
 
@@ -315,10 +315,10 @@ setup_case status-backup-link 2.9.0 '{"plugin":{"updateCheck":false},"statusLine
 mkdir -p "$PLUGIN/skills/setup/references"
 printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline.sh"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
-printf 'outside-backup\n' > "$CASE_DIR/outside-backup"; ln -s "$CASE_DIR/outside-backup" "$REPO/.claude/statusline.sh.bak"
+printf 'outside-backup\n' > "$CASE_DIR/outside-backup"; mkdir -p "$REPO/.git/devstride"; ln -s "$CASE_DIR/outside-backup" "$REPO/.git/devstride/statusline.bak"
 OUT="$(run_hook)"
 if grep -q 'echo old' "$REPO/.claude/statusline.sh" && grep -q outside-backup "$CASE_DIR/outside-backup" \
-   && [ -L "$REPO/.claude/statusline.sh.bak" ] && [ -z "$OUT" ]; then
+   && [ -L "$REPO/.git/devstride/statusline.bak" ] && [ -z "$OUT" ]; then
   ok "(8c) unsafe preexisting backup link → refresh refused without overwriting it"
 else bad "(8c) out=$OUT target=$(cat "$REPO/.claude/statusline.sh")"; fi
 
@@ -326,7 +326,7 @@ setup_case status-backup-hardlink 2.9.0 '{"plugin":{"updateCheck":false},"status
 mkdir -p "$PLUGIN/skills/setup/references"
 printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline.sh"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
-printf 'outside-hard-backup\n' > "$CASE_DIR/outside-backup"; ln "$CASE_DIR/outside-backup" "$REPO/.claude/statusline.sh.bak"
+printf 'outside-hard-backup\n' > "$CASE_DIR/outside-backup"; mkdir -p "$REPO/.git/devstride"; ln "$CASE_DIR/outside-backup" "$REPO/.git/devstride/statusline.bak"
 OUT="$(run_hook)"
 if grep -q 'echo old' "$REPO/.claude/statusline.sh" && grep -q outside-hard-backup "$CASE_DIR/outside-backup" \
    && [ -z "$OUT" ]; then
@@ -339,7 +339,7 @@ printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude
 printf '# ds-statusline: managed v2.9.0 — marker\necho linked-source\n' > "$CASE_DIR/outside-source"
 ln -s "$CASE_DIR/outside-source" "$PLUGIN/skills/setup/references/statusline.sh"
 OUT="$(run_hook)"
-if grep -q 'echo old' "$REPO/.claude/statusline.sh" && [ ! -e "$REPO/.claude/statusline.sh.bak" ] \
+if grep -q 'echo old' "$REPO/.claude/statusline.sh" && [ ! -e "$REPO/.git/devstride/statusline.bak" ] && [ ! -e "$REPO/.claude/statusline.sh.bak" ] \
    && [ -z "$OUT" ]; then
   ok "(8e) symlinked shipped source → refresh refused"
 else bad "(8e) out=$OUT target=$(cat "$REPO/.claude/statusline.sh")"; fi
@@ -350,7 +350,7 @@ printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude
 printf '# ds-statusline: managed v2.9.0 — marker\necho hard-source\n' > "$CASE_DIR/outside-source"
 ln "$CASE_DIR/outside-source" "$PLUGIN/skills/setup/references/statusline.sh"
 OUT="$(run_hook)"
-if grep -q 'echo old' "$REPO/.claude/statusline.sh" && [ ! -e "$REPO/.claude/statusline.sh.bak" ] \
+if grep -q 'echo old' "$REPO/.claude/statusline.sh" && [ ! -e "$REPO/.git/devstride/statusline.bak" ] && [ ! -e "$REPO/.claude/statusline.sh.bak" ] \
    && [ -z "$OUT" ]; then
   ok "(8f) hardlinked shipped source → refresh refused"
 else bad "(8f) out=$OUT target=$(cat "$REPO/.claude/statusline.sh")"; fi
@@ -369,11 +369,11 @@ printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude
   printf '\necho shipped\n'
 } > "$PLUGIN/skills/setup/references/statusline.sh"
 (
-  while [ ! -e "$REPO/.claude/statusline.sh.bak" ]; do :; done
+  while [ ! -e "$REPO/.git/devstride/statusline.bak" ]; do :; done
   printf '# owner concurrent edit\necho newer\n' > "$REPO/.claude/statusline.sh"
 ) & WRITER=$!
 OUT="$(run_hook)"; wait "$WRITER"
-LEFTOVERS="$(find "$REPO/.claude" -maxdepth 1 -type f -name '.statusline.sh.*' -print)"
+LEFTOVERS="$(find "$REPO/.claude" "$REPO/.git/devstride" -maxdepth 1 -type f -name '.statusline.*' -print 2>/dev/null)"
 if grep -q 'echo newer' "$REPO/.claude/statusline.sh" && [ -z "$OUT" ] && [ -z "$LEFTOVERS" ]; then
   ok "(9) concurrent owner edit → preserved, refresh refused, temporary files cleaned"
 else bad "(9) out=$OUT target=$(cat "$REPO/.claude/statusline.sh") leftovers=$LEFTOVERS"; fi
@@ -388,13 +388,15 @@ import os
 real_link = os.link
 mode = os.environ.get("VC_STATUSLINE_RACE", "")
 target = os.environ.get("VC_STATUSLINE_TARGET", "")
+# The hook keeps its backup in <git-common-dir>/devstride, never beside the target.
+backup = os.path.join(os.path.dirname(os.path.dirname(target)), ".git", "devstride", "statusline.bak")
 race_log = os.environ.get("VC_STATUSLINE_RACE_LOG", "")
 fired = False
 
 def racing_link(source, destination, *args, **kwargs):
     global fired
     destination_name = os.fspath(destination)
-    wanted = os.path.basename(target) + (".bak" if mode == "backup" else "")
+    wanted = os.path.basename(backup if mode == "backup" else target)
     if not fired and mode == "post-target" and destination_name == wanted:
         result = real_link(source, destination, *args, **kwargs)
         temporary = target + ".concurrent"
@@ -409,7 +411,7 @@ def racing_link(source, destination, *args, **kwargs):
         fired = True
         return result
     if not fired and mode in ("backup", "target") and destination_name == wanted:
-        raced_path = target + (".bak" if mode == "backup" else "")
+        raced_path = backup if mode == "backup" else target
         descriptor = os.open(raced_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         try:
             content = ("# concurrent backup\necho other-backup\n" if mode == "backup"
@@ -437,12 +439,12 @@ install_statusline_race_injector
 RACE_LOG="$CASE_DIR/race-fired"
 OUT="$(VC_STATUSLINE_RACE=backup VC_STATUSLINE_TARGET="$REPO/.claude/statusline.sh" \
   VC_STATUSLINE_RACE_LOG="$RACE_LOG" PYTHONPATH="$RACE_PY" run_hook)"
-LEFTOVERS="$(find "$REPO/.claude" -maxdepth 1 -type f -name '.statusline.sh.*' -print)"
+LEFTOVERS="$(find "$REPO/.claude" "$REPO/.git/devstride" -maxdepth 1 -type f -name '.statusline.*' -print 2>/dev/null)"
 if grep -q 'echo old' "$REPO/.claude/statusline.sh" \
-   && grep -q 'echo other-backup' "$REPO/.claude/statusline.sh.bak" \
+   && grep -q 'echo other-backup' "$REPO/.git/devstride/statusline.bak" \
    && [ "$(cat "$RACE_LOG" 2>/dev/null)" = backup ] && [ -z "$OUT" ] && [ -z "$LEFTOVERS" ]; then
   ok "(10) last-second .bak creator → preserved; refresh rolls back without temp files"
-else bad "(10) out=$OUT target=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null) backup=$(cat "$REPO/.claude/statusline.sh.bak" 2>/dev/null) leftovers=$LEFTOVERS"; fi
+else bad "(10) out=$OUT target=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null) backup=$(cat "$REPO/.git/devstride/statusline.bak" 2>/dev/null) leftovers=$LEFTOVERS"; fi
 
 # (11) A target writer landing after the old target was moved aside wins the final path.
 setup_case status-final-target-race 2.9.0 \
@@ -454,12 +456,12 @@ install_statusline_race_injector
 RACE_LOG="$CASE_DIR/race-fired"
 OUT="$(VC_STATUSLINE_RACE=target VC_STATUSLINE_TARGET="$REPO/.claude/statusline.sh" \
   VC_STATUSLINE_RACE_LOG="$RACE_LOG" PYTHONPATH="$RACE_PY" run_hook)"
-LEFTOVERS="$(find "$REPO/.claude" -maxdepth 1 -type f -name '.statusline.sh.*' -print)"
+LEFTOVERS="$(find "$REPO/.claude" "$REPO/.git/devstride" -maxdepth 1 -type f -name '.statusline.*' -print 2>/dev/null)"
 if grep -q 'echo final-writer' "$REPO/.claude/statusline.sh" \
-   && grep -q 'echo old' "$REPO/.claude/statusline.sh.bak" \
+   && grep -q 'echo old' "$REPO/.git/devstride/statusline.bak" \
    && [ "$(cat "$RACE_LOG" 2>/dev/null)" = target ] && [ -z "$OUT" ] && [ -z "$LEFTOVERS" ]; then
   ok "(11) final-gap target writer → preserved; shipped copy never clobbers it"
-else bad "(11) out=$OUT target=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null) backup=$(cat "$REPO/.claude/statusline.sh.bak" 2>/dev/null) leftovers=$LEFTOVERS"; fi
+else bad "(11) out=$OUT target=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null) backup=$(cat "$REPO/.git/devstride/statusline.bak" 2>/dev/null) leftovers=$LEFTOVERS"; fi
 
 # (12) A writer replacing the just-linked target before the final proof also wins.
 setup_case status-post-link-race 2.9.0 \
@@ -471,13 +473,13 @@ install_statusline_race_injector
 RACE_LOG="$CASE_DIR/race-fired"
 OUT="$(VC_STATUSLINE_RACE=post-target VC_STATUSLINE_TARGET="$REPO/.claude/statusline.sh" \
   VC_STATUSLINE_RACE_LOG="$RACE_LOG" PYTHONPATH="$RACE_PY" run_hook)"
-LEFTOVERS="$(find "$REPO/.claude" -maxdepth 1 -type f -name '.statusline.sh.*' -print)"
+LEFTOVERS="$(find "$REPO/.claude" "$REPO/.git/devstride" -maxdepth 1 -type f -name '.statusline.*' -print 2>/dev/null)"
 if grep -q 'echo post-link-writer' "$REPO/.claude/statusline.sh" \
-   && grep -q 'echo old' "$REPO/.claude/statusline.sh.bak" \
+   && grep -q 'echo old' "$REPO/.git/devstride/statusline.bak" \
    && [ "$(cat "$RACE_LOG" 2>/dev/null)" = post-target ] && [ -z "$OUT" ] \
    && [ -z "$LEFTOVERS" ]; then
   ok "(12) post-link target writer → final proof catches it and preserves the edit"
-else bad "(12) out=$OUT target=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null) backup=$(cat "$REPO/.claude/statusline.sh.bak" 2>/dev/null) leftovers=$LEFTOVERS"; fi
+else bad "(12) out=$OUT target=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null) backup=$(cat "$REPO/.git/devstride/statusline.bak" 2>/dev/null) leftovers=$LEFTOVERS"; fi
 
 # A linked worktree shares its repository's project copy, but never auto-updates it in the
 # background: the checkout the copy is bound to owns that decision.

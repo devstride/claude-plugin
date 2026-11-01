@@ -509,7 +509,7 @@ The script is repo-agnostic and identical everywhere — it reads the consuming 
 at runtime, so copying it needs no substitution and re-copying it is always safe. It is the
 owner's to edit afterwards; `setup` never overwrites a `.claude/statusline.sh` it did not write.
 Line 2 carries a `# ds-statusline: managed v<x.y.z>` marker, which is what lets the session-start
-hook bring an older copy forward (keeping the previous one as `.bak`); **deleting that line is the
+hook bring an older copy forward (backup in the git directory; see `statusline-segments.md`); **deleting that line is the
 supported way to take the file over**, and nothing replaces it afterwards.
 
 ## Known cloud reviewers

@@ -857,14 +857,17 @@ def _verify_installed_payload(
             relative_dir = os.path.relpath(directory, root)
             for name in list(dirs):
                 path = name if relative_dir == "." else f"{relative_dir}/{name}"
-                if path == ".in_use" or inert(f"{path}/"):
+                if path == ".in_use" or name == "__pycache__" or inert(f"{path}/"):
+                    # Python's compiled-copy cache is written beside any helper a process imports
+                    # (a 3.17.0 status line did, every refresh): never shipped, so never payload.
                     dirs.remove(name)
                 elif os.path.islink(os.path.join(directory, name)):
                     actual.add(path)
                     dirs.remove(name)
             for name in files:
                 path = name if relative_dir == "." else f"{relative_dir}/{name}"
-                if path != ".in_use" and not path.startswith(".in_use/") and not inert(path):
+                if path != ".in_use" and not path.startswith(".in_use/") and not inert(path) \
+                        and not (name.endswith(".pyc") and path not in entries):
                     actual.add(path)
     except OSError as exc:
         raise UpdateProblem("installed-payload-unreadable") from exc

@@ -15,8 +15,9 @@ R="$(mkrepo a)"
 OUT="$(run "$R" s1 '/devstride:setup')"; RC1=$?
 OUT2="$(run "$R" s1 '/devstride:build-item I123')"; RC2=$?
 if [ $RC1 -eq 0 ] && [ -z "$OUT" ] && [ $RC2 -eq 2 ] && printf '%s' "$OUT2" | grep -q 'already ran /devstride:setup, an authoring job' \
-   && printf '%s' "$OUT2" | grep -q -- '--same-session' && printf '%s' "$OUT2" | grep -q '/clear'; then
-  ok "(1) setup then build-item → blocked with the reason, the cure and the escape hatch"; else bad "(1) rc=$RC1/$RC2 out=$OUT|$OUT2"; fi
+   && printf '%s' "$OUT2" | grep -q -- 'Add --same-session to run it here anyway, or start it in a new session (/clear' \
+   && printf '%s' "$OUT2" | grep -q 'checkout lease, is given up'; then
+  ok "(1) setup then build-item → blocked; --same-session offered before /clear, which warns about leases"; else bad "(1) rc=$RC1/$RC2 out=$OUT|$OUT2"; fi
 # (2) the blocked job was not recorded; --same-session lets it through and records it
 if ! marker "$R" s1 | grep -q build-item; then ok "(2) a blocked job leaves no record"; else bad "(2) $(marker "$R" s1)"; fi
 OUT="$(run "$R" s1 '/devstride:build-item I123 --same-session')"; RC=$?
@@ -36,6 +37,15 @@ if [ $RC -eq 2 ] && printf '%s' "$OUT" | grep -q 'already ran /devstride:build-i
 OUT="$(run "$R" s3 '/devstride:update')"; OUT2="$(run "$R" s3 '/devstride:setup')"; RC=$?
 OUT3="$(run "$R" s3 '/devstride:branch-feature x')"; RC3=$?
 if [ $RC -eq 0 ] && [ $RC3 -eq 0 ]; then ok "(6) neutral skills (update, branch-feature) neither block nor arm"; else bad "(6) rc=$RC/$RC3 $OUT2 $OUT3"; fi
+# (6b) doctor is neutral: the documented "doctor first, then build-item" runs in one session,
+# and doctor after an execution job is not blocked either
+OUT="$(run "$R" s6 '/devstride:doctor')"; RC=$?
+OUT2="$(run "$R" s6 '/devstride:build-item I1')"; RC2=$?
+OUT3="$(run "$R" s6 '/devstride:doctor ci')"; RC3=$?
+if [ $RC -eq 0 ] && [ $RC2 -eq 0 ] && [ $RC3 -eq 0 ] && [ -z "$OUT$OUT2$OUT3" ] \
+   && marker "$R" s6 | grep -q '"skill": "doctor", "class": "neutral"'; then
+  ok "(6b) doctor → build-item → doctor in one session, never blocked; doctor recorded as neutral"
+else bad "(6b) rc=$RC/$RC2/$RC3 $OUT $OUT2 $OUT3 $(marker "$R" s6)"; fi
 # (7) ordinary prompts, even ones mentioning a command, are untouched
 OUT="$(run "$R" s3 'what does /devstride:build-item do?')"; RC=$?
 if [ $RC -eq 0 ] && [ -z "$OUT" ] && ! marker "$R" s3 | grep -q build-item; then ok "(7) a prompt that merely mentions a command is ignored"; else bad "(7) rc=$RC $OUT"; fi
@@ -62,7 +72,7 @@ chmod 700 "$R3/.git/devstride"
 # (11) a worktree shares the main repository's session markers (git-common-dir)
 git -C "$R" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q --allow-empty -m init 2>/dev/null
 git -C "$R" worktree add -q "$WORK/a-wt" -b wt 2>/dev/null
-OUT="$(run "$WORK/a-wt" s2 '/devstride:doctor')"; RC=$?
+OUT="$(run "$WORK/a-wt" s2 '/devstride:plan I1')"; RC=$?
 [ $RC -eq 2 ] && ok "(11) a worktree sees the main repository's session record" || bad "(11) rc=$RC $OUT"
 # (12) stale markers are pruned on write
 touch -t 202001010000 "$R/.git/devstride/session/s1.json"; run "$R" s5 '/devstride:push' >/dev/null

@@ -8,6 +8,49 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **`/devstride:doctor` no longer blocks the build that follows it.** Doctor is a read-only
+  check that people are told to run first, so running `/devstride:doctor` and then
+  `/devstride:build-item` in one session used to be refused with "start it in a new session".
+  Doctor is now neutral in the one-job-class-per-session gate, like `/devstride:update`. When the
+  gate does block a command, its message now offers `--same-session` first and warns that `/clear`
+  ends the session, giving up anything it holds, such as a checkout lease.
+- **Doctor reads the whole checkout in one run.** When the plugin is behind, doctor now records
+  `/devstride:update` as the first next action and carries on through every remaining section,
+  instead of stopping there and needing a second run after the update.
+- **Doctor's seven-day CI measurement is opt-in.** The run-once audit, the slowest network-bound
+  part of a full run, now runs only on `/devstride:doctor ci --audit`. A plain run prints one
+  line pointing to `/devstride:ci-audit`, which measures the same thing.
+
+### Fixed
+
+- **The session-start hook no longer leaves committed status lines modified.** It used to rewrite
+  `.claude/statusline.sh` in every checkout whenever the plugin shipped a newer copy, even where
+  the repository's own branch already had that copy, leaving trees dirty with content they were
+  about to receive anyway and blocking tooling that refuses a dirty tree. For a committed status
+  line it now leaves the work tree alone when the branch's upstream (or `origin/<baseBranch>`)
+  already carries the newer copy, and prints one line instead:
+  `status line v<x> is already on <ref>; pull to get it`. It also leaves it alone, silently, on a detached checkout and on the
+  base, production or any `protectedBranches` branch. On a feature branch it still refreshes the
+  file and asks you to commit it; that advice is no longer printed anywhere else. The session
+  record's `statusLine` gains two values, `on-upstream:<old>:<new>:<ref>` and `held:<old>:<new>`.
+- **The status line's backup no longer lands in the work tree.** The previous copy is now kept as
+  `devstride/statusline.bak` in the repository's git directory
+  (`git rev-parse --git-common-dir`), so a refresh no longer leaves an untracked `.claude/statusline.sh.bak`
+  behind. A `.bak` left by an earlier version is not touched; delete it when you no longer need it.
+  A folder that is not a git repository keeps the backup beside the file, as before.
+- **The plugin's update check no longer fails while the status line is running.** The status line
+  loaded one of the plugin's Python helpers on every refresh, and Python saved a compiled copy of it
+  (`hooks/__pycache__/`) inside the installed plugin. The update check counted that copy as a
+  foreign file and refused with `installed-payload-mismatch`; deleting it did not help, because the
+  next refresh wrote it again. The status line now compiles the helper from its source, so nothing
+  is written into the plugin, and the update check ignores Python cache folders and compiled files
+  that are not part of the release. The managed status line's marker moves to v3.18.0, so every
+  repository's copy picks up the change. **A machine still on 3.17.0 runs the old check**, so update
+  it once with the native commands: `claude plugin marketplace update devstride`, then
+  `claude plugin update devstride@devstride --scope project`, then restart sessions.
+
 ## [3.17.0] — 2026-10-31
 
 ### Added
