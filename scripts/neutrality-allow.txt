@@ -1,0 +1,5 @@
+# scripts/neutrality-allow.txt — exact-substring exemptions for scripts/check-neutrality.sh.
+# One `<substring><TAB><reason>` per line; `#` starts a comment. A line exempts exactly its
+# substring wherever it occurs, and only that. Item numbers the shipped text uses as examples are
+# not listed here: the check reads them from scripts/public-hygiene.allow, the one list of them.
+# Never loosen a pattern in the denylist to fit a hit: reword the text, or add a line with a reason.

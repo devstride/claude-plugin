@@ -1,0 +1,16 @@
+# scripts/neutrality-denylist.txt — what a customer-neutral plugin never ships, read by
+# scripts/check-neutrality.sh. One `<label><TAB><pattern>` per line; `#` starts a comment.
+# Patterns are extended regular expressions in Python's `re` dialect (no POSIX [[:classes:]]),
+# matched against one line at a time. The plugin serves every repository, so the names of one
+# repository's own tooling, data and checkouts do not belong in it: a seam is named for what it
+# does generically. DevStride product names, the MCP tool names, the `devstride` clearance
+# provider, the `devstride:` skill namespace and product-prefixed variables are allowed — nothing
+# here matches them. Item numbers are checked by the script itself against
+# scripts/public-hygiene.allow. Exceptions go in scripts/neutrality-allow.txt with a reason.
+launcher	(^|[^A-Za-z0-9_./-])\./ds\b
+command-family	\bds (pool|tower|verify|golden|work|fleet|machine|stage|migrations|worktree|agent|neon|secrets)\b
+golden	(?i)\bgolden\b
+neon	\bNeon\b
+checkout-name	\bwt[0-9]+\b
+deploy-workflow	\bdeploy-prod\b|\bDeploy Prod\b
+pool-lease	(^|[^-])\bpool lease\b
