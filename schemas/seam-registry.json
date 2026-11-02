@@ -529,7 +529,7 @@
       "key": "repoLocalKeys",
       "type": "string[]",
       "description": "dotted prefixes of keys the repository's own local skills read; keys at or under one are never reported as unknown",
-      "since": "unreleased"
+      "since": "3.19.0"
     },
     {
       "key": "branchNaming",

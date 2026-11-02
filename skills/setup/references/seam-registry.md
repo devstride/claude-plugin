@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.18.1.
+`.claude/ds-config.json` against. Schema version: 3.19.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -68,7 +68,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `conventionsDoc` | string, null | — | — | the coding-standards file the build engine obeys | pre-registry |
 | `lessonsDoc` | string | — | .claude/ds-lessons.md | the lessons store the review skill writes | pre-registry |
 | `itemTagFormat` | string | — | [I#####] | the item tag commit messages carry | pre-registry |
-| `repoLocalKeys` | string[] | — | — | dotted prefixes of keys the repository's own local skills read; keys at or under one are never reported as unknown | unreleased |
+| `repoLocalKeys` | string[] | — | — | dotted prefixes of keys the repository's own local skills read; keys at or under one are never reported as unknown | 3.19.0 |
 | `branchNaming` | object | — | — | how branches are named | pre-registry |
 | `branchNaming.pattern` | string | — | <prefix>/<MM-DD-YY>/<slug> | the branch name pattern | pre-registry |
 | `branchNaming.prefixSource` | string | — | — | prose the branch skills follow to choose the prefix | pre-registry |
