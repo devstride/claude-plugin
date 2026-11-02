@@ -17,7 +17,8 @@ It reads README.md, CONTRIBUTING.md, skills/**/SKILL.md and skills/**/references
      Array steps (`[]`) in registered keys are ignored for this match;
   4. walks every ```json fenced block in a references file that parses as an object, and requires
      each key path under a registered top-level key to resolve to a registered key or to an object
-     that holds one (keys starting with `_` skipped; a path under a key registered as `any` or an untyped `array` is not walked).
+     that holds one, and — in a fence with at least one registered top-level key, i.e. a config —
+     every top-level key to be registered or on the ignore list (keys starting with `_` skipped; a path under a key registered as `any` or an untyped `array` is not walked).
 
 Output: `CONFIG KEYS: ok (<n> tokens)`, or one `UNREGISTERED <file>:<line>: <token>` line per miss.
 Usage: check-config-keys.py [--root <dir>]
@@ -133,8 +134,19 @@ def main(argv):
                 continue
             start = text.count("\n", 0, m.start(1)) + 1
             block = m.group(1).split("\n")
+            config_like = any(k in tops for k in obj)
             for path, leaf in fence_paths(obj):
-                if path.split(".")[0] not in tops or "." not in path:
+                if "." not in path:
+                    # a top-level key: checked only in a fence that is a config (one registered
+                    # top-level key or more), where an unregistered one would be read by nothing
+                    if not config_like:
+                        continue
+                    count += 1
+                    if path not in tops and path not in ignore:
+                        offset = next((i for i, l in enumerate(block) if '"%s"' % leaf in l), 0)
+                        misses.append((rel, start + offset, path))
+                    continue
+                if path.split(".")[0] not in tops:
                     continue
                 count += 1
                 if path in keys or opaque(path, keys) or \

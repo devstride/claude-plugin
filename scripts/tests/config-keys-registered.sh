@@ -51,13 +51,12 @@ Example:
 {
   "review": { "localCommand": "codex exec", "_why": "skipped" },
   "release": { "clearance": { "phaseBudgetMinutes": { "anyKnob": 5 } } },
-  "preShipChecks": [{ "command": "make check" }],
-  "unrelatedTool": { "nested": 1 }
+  "preShipChecks": [{ "command": "make check" }]
 }
 ```
 MD
 scan
-[ "$RC" = 0 ] && ok "(7) a JSON fence of registered keys passes (_ keys, opaque values, foreign tops skipped)" || bad "(7) exit $RC: $OUT"
+[ "$RC" = 0 ] && ok "(7) a JSON fence of registered keys passes (_ keys and opaque values skipped)" || bad "(7) exit $RC: $OUT"
 
 corpus; cat >> "$WORK/r/skills/demo/references/notes.md" <<'MD'
 ```json
@@ -75,6 +74,30 @@ scan
 
 corpus; printf '```json\n{ "review": { "localComand": 1 } }\n```\n' >> "$WORK/r/skills/demo/SKILL.md"; scan
 [ "$RC" = 0 ] && ok "(9) JSON fences are walked in references only, not in a SKILL.md body" || bad "(9) exit $RC: $OUT"
+
+corpus; cat >> "$WORK/r/skills/demo/references/notes.md" <<'MD'
+```json
+{
+  "review": { "localCommand": "codex exec" },
+  "reviewers": ["codex"]
+}
+```
+MD
+scan
+[ "$RC" = 1 ] && printf '%s' "$OUT" | grep -qx "UNREGISTERED skills/demo/references/notes.md:5: reviewers" \
+  && ok "(9a) in a config fence, an unregistered top-level key fails at its line" || bad "(9a) exit $RC: $OUT"
+
+corpus; cat >> "$WORK/r/skills/demo/references/notes.md" <<'MD'
+```json
+{ "release": { "clearance": null }, "user": { "login": "x" }, "_readme": "skipped", "$schema": "x" }
+```
+```json
+{ "hooks": { "SessionStart": [] }, "permissions": { "allow": [] } }
+```
+MD
+printf 'user   a foreign top-level key in a fence, listed on purpose\n' >> "$WORK/r/scripts/config-key-scan.ignore"
+scan
+[ "$RC" = 0 ] && ok "(9b) an ignore-listed top-level key, _ keys and \$schema pass; a fence that is not a config is not checked" || bad "(9b) exit $RC: $OUT"
 
 corpus; rm "$WORK/r/schemas/seam-registry.json"; scan
 [ "$RC" = 2 ] && ok "(10) a missing registry is exit 2" || bad "(10) exit $RC: $OUT"
