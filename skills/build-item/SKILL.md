@@ -45,9 +45,11 @@ one-off: $ARGUMENTS
   `epicIntegrationBranches.releaseTarget`; it surfaces `/devstride:release`, which merges to
   `release.productionBranch` only on the owner's explicit yes.
 - **Checkout pool — lease, never mint.** When the repo's `conventionsDoc` or config declares a fixed
-  checkout pool, work only in a member held under a lease. Never create a worktree or instance
-  unless the owner asks in this conversation; never delete another session's lease. Pool, lease name
-  and hand-back come from the repo, never hard-coded; protocol in `ground-truth-at-start.md`.
+  checkout pool, work only in a member held under a lease — with `pool.checkout` set, taken by
+  **`lease-checkout`** and handed back by **`return-checkout`**; otherwise pool, lease name and
+  hand-back come from the repo, never hard-coded (`ground-truth-at-start.md`). Never create a
+  worktree or instance unless the owner asks in this conversation; never delete another session's
+  lease.
 - **Serial by design.** "Parallel waves" are SHAPE (why: `references/next-unblocked.md`):
   `localEnvironment` never makes the loop concurrent; a human fans out the ready-set.
 - **Full-auto through merge.** PAUSE only at a genuine fork: a user's human/infra decision, an
@@ -322,13 +324,12 @@ unit at zero and before cutting the release PR.**
   date), Done if its status is tracked, THEN landed leaves → Done, **linking the release PR onto
   every leaf** (the close-out comment, or `link_pull_request`). Delete the epic branch **only if
   `epicIntegrationBranches.deleteBranchAfterRelease`** — false retains it.
-- **Docs STAGE, never publish** — only when `docs.updateOnEpicRelease` is true (else silent):
-  `docs.updateSkill` null → say none is registered; a name with no `.claude/skills/<name>/SKILL.md`
-  → report the dangling hook and its fix (`/devstride:setup docs`), continue; otherwise invoke it in
-  mode `update` with the epic payload (`kind: "epic-release"`, release PR, merge commit, each leaf's
-  plain-English `summary` and `userFacing` judgement, **`live: false`**, never optional — shape:
-  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`), keeping its links exact. **Never
-  release notes here.**
+- **Docs STAGE, never publish** — only when `docs.updateOnEpicRelease` is true (else silent): call
+  **`update-docs update`** with the epic payload (`kind: "epic-release"`, release PR, merge commit,
+  each leaf's plain-English `summary` and `userFacing` judgement, **`live: false`**, never optional
+  — `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`); `NOT CONFIGURED` → say so
+  (`docs.updateSkill` null or dangling) and continue; keep its links exact. **Never release notes
+  here.**
 - Update handoff memory and sync develop.
 - **Human recap.** Lead with `Merged / Released`: every item and its effect, where it landed,
   validation/review/CI, docs, whether live, the remaining production action. Surface — never

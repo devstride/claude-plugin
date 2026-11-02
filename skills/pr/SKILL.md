@@ -110,12 +110,11 @@ Report the PR number and URL.
 
 ## 2. Review and CI gating
 
-**DECIDE THE PRE-SHIP HOLD BEFORE INVOKING** — it is declared in the same invocation. Compute step
-2b's selection now (the `when` filter plus the `pathGlobs` match): **at least one `preShipChecks`
-entry both selects AND matches this PR → declare a PRE-SHIP HOLD** — `review` settles the review,
-STOPS at its **7.1b** and hands back instead of flipping; then run 2b and finish at 2c — the flip
-never precedes the suites. Never hold on a non-empty config alone; nothing selected, or
-`preShipChecks` absent/empty → no hold, skip 2c. Read
+**DECIDE THE PRE-SHIP HOLD BEFORE INVOKING** — it is declared in the same invocation. Call
+**`pre-ship pr select`** on this PR's final diff now: **`PRE-SHIP SELECTED` → declare a PRE-SHIP
+HOLD** — `review` settles the review, STOPS at its **7.1b** and hands back instead of flipping;
+then run 2b and finish at 2c — the flip never precedes the suites. Never hold on a non-empty config
+alone; `PRE-SHIP: NOTHING TO RUN` → no hold, skip 2c. Read
 `${CLAUDE_PLUGIN_ROOT}/skills/pr/references/pre-ship-hold.md` when you declare a PRE-SHIP HOLD.
 
 Invoke **`review`** on the PR, saying driven or standalone and **passing the resolved profile**
@@ -127,21 +126,13 @@ ready-flip and settlement. Driven, carry its untracked-deferral list back to the
 ## 2b. Pre-ship checks — the repo's local suites against the final diff
 
 Suites a repo runs LOCALLY at the ship boundary instead of in cloud CI, declared in
-**`preShipChecks`** (schema: `_preShipChecks_readme`). **Absent or empty → an explicit no-op; say
-so.** Their CI check is EXPECTEDLY absent — never request, rerun or wait on one, or read it as
-pending.
+**`preShipChecks`**: call **`pre-ship pr run`** on the final diff, after `verify.test`
+(`PRE-SHIP: NOTHING TO RUN` is an explicit no-op; say so). Their CI check is EXPECTEDLY absent —
+never request, rerun or wait on one, or read it as pending. **Never narrow a glob to skip a run** —
+it exists because a change there breaks the check invisibly.
 
-1. Select entries with `when` ∈ {`perPr`, `always`}.
-2. For a non-empty `pathGlobs`, compute the FINAL changed files from a **SHA-pinned three-dot local
-   diff** — never `gh pr view --json files` (100-file cap) or REST pull-files (3000 cap) — and
-   glob-match them, renames on BOTH source and destination. Empty `pathGlobs` → runs on every PR.
-   **Never narrow a glob to skip a run** — it exists because a change there breaks the check
-   invisibly.
-3. Run matches **sequentially, in array order** (no dedup, no short-circuit), after `verify.test`,
-   each in the BACKGROUND with a long timeout (a foreground kill looks like a clean pass); surface
-   each `timeoutNote` first.
-4. **A red check blocks the PR — fix it; never ship over it.** Report name, command, pass/fail,
-   counts. No per-PR waiver (waivers exist only in `release` step 2b).
+- **`PRE-SHIP: FAIL` blocks the PR — fix it; never ship over it.** Report each entry's name,
+  command, pass/fail and counts. No per-PR waiver (waivers exist only in `release` step 2b).
 
 ## 2c. Discharge the pre-ship hold
 
