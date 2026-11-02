@@ -69,6 +69,7 @@ SITES = [  # skill, the heading the section starts with, the call it must contai
     ("release", "### 5d. ", "`post-deploy close-out`"),
     ("release", "### 5e. ", "`write-release-notes`"),
     ("build-item", "## 0. ", "`lease-checkout`"),
+    ("build-item", "## 0. ", "`return-checkout`"),  # every exit from step 0 returns the lease
     ("build-item", "## 7. ", "`return-checkout`"),
     ("build-item", "## 8. ", "`update-docs update`"),
     ("pr", "## 2. ", "`pre-ship pr select`"),
@@ -110,8 +111,11 @@ esac
 BASE="${STEP_SPLIT_BASE:-devstride--v3.19.0}"
 flat() { tr -s ' \t\n' '   '; }
 if ! git -C "$ROOT" rev-parse --verify -q "$BASE^{commit}" >/dev/null; then
-  if [ -n "${CI:-}" ]; then bad "(4) no $BASE in this clone; CI must fetch tags (or set STEP_SPLIT_BASE)"
-  else ok "(4) skipped: no $BASE in this clone (fetch tags, or set STEP_SPLIT_BASE, to run it)"; fi
+  # a shallow or tagless clone: fetch just that tag, quietly, before deciding
+  git -C "$ROOT" fetch -q --depth=1 origin tag "$BASE" >/dev/null 2>&1 || :
+fi
+if ! git -C "$ROOT" rev-parse --verify -q "$BASE^{commit}" >/dev/null; then
+  bad "(4) the base $BASE is not in this clone and could not be fetched: run \`git fetch origin tag $BASE\` (or set STEP_SPLIT_BASE to a ref that holds the pre-split bodies) — never skipped, or this test proves nothing"
 else
   moved=""
   moved() {  # <needle> <new home> <orchestrator>

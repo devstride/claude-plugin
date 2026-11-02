@@ -199,4 +199,12 @@ expect "(33) pool.checkoutt is a WARN suggesting pool.checkout" 0 "^CONFIG: 0 er
 cfg '{"pool": {"checkout": "lease <member> --purpose <purpose>", "checkin": "return <member>"}, "release": {"classifySkill": "classify", "preMergeSkill": null}, "docs": {"knowledgeBaseSyncSkill": "kb-sync"}}'
 expect "(34) pool.checkout, pool.checkin, release.classifySkill, release.preMergeSkill and docs.knowledgeBaseSyncSkill validate clean" 0 "$CLEAN"
 
+# (35)-(36) the pool commands are set together or not at all: one alone (absent or null) is an ERROR
+cfg '{"pool": {"checkout": "lease <member> <purpose>"}}'
+expect "(35) pool.checkout without pool.checkin is an ERROR" 1 "^CONFIG: 1 error(s), 0 warning(s)" \
+  "^ERROR pool: sets \`pool.checkout\` without \`pool.checkin\`; set them together or not at all$"
+cfg '{"pool": {"checkout": null, "checkin": "return <member>"}}'
+expect "(36) pool.checkin with a null pool.checkout is an ERROR" 1 "^CONFIG: 1 error(s), 0 warning(s)" \
+  "^ERROR pool: sets \`pool.checkin\` without \`pool.checkout\`"
+
 exit "$FAIL"
