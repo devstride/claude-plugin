@@ -4,7 +4,7 @@
 # Why: `version` in .claude-plugin/plugin.json is the install cache key. A shipped change that
 # lands on main without a bump is invisible to every installed copy, and it fails silently — the
 # repo looks right and no user sees it. This check makes the bump mechanical: run it against the
-# base the change will land on (RELEASING.md step 4).
+# base the change will land on (the plugin-release skill's prepare step 7, RELEASING.md).
 #
 # Rules, checked against `<base>...<head>`:
 #   1. If any shipped file changed — any path outside the inert maintainer files (root documents,
@@ -100,11 +100,11 @@ if tags:
 if bumped and semver(head_v):
     changelog = sh("show", "%s:CHANGELOG.md" % HEAD)
     if not re.search(r"^## \[%s\]" % re.escape(head_v), changelog, re.M):
-        problems.append("CHANGELOG.md has no `## [%s]` heading — move the Unreleased entries under one (RELEASING.md step 1)" % head_v)
+        problems.append("CHANGELOG.md has no `## [%s]` heading — move the Unreleased entries under one (plugin-release prepare, RELEASING.md)" % head_v)
     readme = sh("show", "%s:README.md" % HEAD)
     m = re.search(r"Current version:\s*\**\s*`?v?([0-9.]+)", readme)
     if not m or m.group(1) != head_v:
-        problems.append("README.md `Current version:` says %s, plugin.json says %s (RELEASING.md step 3)" % (m.group(1) if m else "nothing", head_v))
+        problems.append("README.md `Current version:` says %s, plugin.json says %s (plugin-release prepare, RELEASING.md)" % (m.group(1) if m else "nothing", head_v))
 if problems:
     for p in problems: print("VERSION-BUMP: " + p)
     sys.exit(1)

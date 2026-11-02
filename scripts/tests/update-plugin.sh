@@ -409,7 +409,7 @@ else bad "(15h) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 # is honoured by this helper, so a later scripts/ change blocks.
 setup_case narrowed devstride user 3.0.0 3.1.0 3.1.0
 python3 - "$MARKET/skills/update/scripts/update-plugin.py" <<'PY'
-import sys; p = sys.argv[1]; s = open(p).read(); open(p, "w").write(s.replace('INERT_DIRS = ("scripts/",)', "INERT_DIRS = ()"))
+import re, sys; p = sys.argv[1]; s = open(p).read(); open(p, "w").write(re.sub(r"INERT_DIRS = \([^)]*\)", "INERT_DIRS = ()", s, count=1))
 PY
 cp "$MARKET/skills/update/scripts/update-plugin.py" "$LINEAGE/3.1.0/skills/update/scripts/update-plugin.py"
 "$REAL_GIT" -C "$MARKET" commit -qa --amend -m narrowed
@@ -420,6 +420,40 @@ if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
    && [ "$(field shippedChanges)" = "['scripts/tool.sh']" ] && not_called 'claude:plugin update'; then
   ok "(15i) release narrows the inert list → the running helper honours it, scripts/ change blocks"
 else bad "(15i) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15i2. The maintainer folders and CLAUDE.md are inert too: a commit after the tag that touches only
+# .github/, .claude/ and CLAUDE.md still serves that release.
+setup_case maint-after devstride user 3.0.0 3.1.0 3.1.0
+mkdir -p "$MARKET/.github/workflows" "$MARKET/.claude"
+printf 'name: x\n' > "$MARKET/.github/workflows/x.yml"; printf '{}\n' > "$MARKET/.claude/ds-config.json"
+printf '@AGENTS.md\n' > "$MARKET/CLAUDE.md"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -qm maintainer
+mkdir -p "$LINEAGE/3.1.0/.github/workflows" "$LINEAGE/3.1.0/.claude"
+cp "$MARKET/.github/workflows/x.yml" "$LINEAGE/3.1.0/.github/workflows/x.yml"
+cp "$MARKET/.claude/ds-config.json" "$LINEAGE/3.1.0/.claude/ds-config.json"; cp "$MARKET/CLAUDE.md" "$LINEAGE/3.1.0/CLAUDE.md"
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 0 ] && [ "$(field status)" = updated ] \
+   && called 'claude:plugin update devstride@devstride --scope user'; then
+  ok "(15i2) .github/, .claude/ and CLAUDE.md after the tag → the release installs"
+else bad "(15i2) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
+
+# 15i3. A release older than the widening lists only scripts/: a later .github/ change still blocks.
+setup_case maint-older devstride user 3.0.0 3.1.0 3.1.0
+python3 - "$MARKET/skills/update/scripts/update-plugin.py" <<'PY'
+import re, sys; p = sys.argv[1]; s = open(p).read()
+s = re.sub(r"INERT_DIRS = \([^)]*\)", 'INERT_DIRS = ("scripts/",)', s, count=1)
+open(p, "w").write(s.replace('"CHANGELOG.md", "CLAUDE.md",', '"CHANGELOG.md",'))
+PY
+cp "$MARKET/skills/update/scripts/update-plugin.py" "$LINEAGE/3.1.0/skills/update/scripts/update-plugin.py"
+"$REAL_GIT" -C "$MARKET" commit -qa --amend -m older
+UP_RELEASE_COMMIT="$("$REAL_GIT" -C "$MARKET" rev-parse HEAD)"; export UP_RELEASE_COMMIT
+mkdir -p "$MARKET/.github"; printf 'x\n' > "$MARKET/.github/a.yml"
+"$REAL_GIT" -C "$MARKET" add -A; "$REAL_GIT" -C "$MARKET" commit -qm github
+OUT="$(run_apply)"; RC=$?
+if [ "$RC" -eq 3 ] && [ "$(field code)" = marketplace-checkout-untagged ] \
+   && [ "$(field shippedChanges)" = "['.github/a.yml']" ] && not_called 'claude:plugin update'; then
+  ok "(15i3) release listing only scripts/ → a later .github/ change blocks"
+else bad "(15i3) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
 # 15j. A shipped link may point only at a shipped regular file of the same release. Into scripts/,
 # at the tree root, at a letter-case variant, or at another link: the release is refused.
@@ -695,7 +729,13 @@ else bad "(29b) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 
 # 28. The inert list is only safe while nothing a session runs reads those paths. Scan every shipped
 # file for the ways a path is built — ${ROOT}/x, quoted literals in code, ../ traversal — check
-# shipped symlinks, and keep the list clear of folders Claude Code loads on its own.
+# shipped symlinks, and keep the list clear of folders Claude Code loads on its own. `.claude` and
+# `.github` are also the names of the CONSUMING repository's own folders, which shipped code reads
+# on purpose (its ds-config.json, its status line), so for those two only a read anchored on the
+# plugin root (a ${ROOT}/ path, or a quoted literal on a line that names the plugin root,
+# ROOT or __file__) or reached by ../ traversal counts; a quoted literal joined onto a repository
+# path does not. A name ends at /, at the end, or at a character that cannot continue it, so
+# `.claude-plugin` is not `.claude`.
 runtime_refs() {  # runtime_refs ROOT HELPER — prints each hit; empty output means clean
 python3 - "$1" "$2" <<'PY'
 import importlib.util, os, re, subprocess, sys
@@ -705,9 +745,16 @@ names = sorted(h.INERT_FILES) + [d.rstrip("/") for d in h.INERT_DIRS]
 if not names:
     print("inert list unreadable"); sys.exit()
 alt = "|".join(re.escape(n) for n in names)
-rooted = re.compile(r"(PLUGIN_ROOT|ROOT)(:-[^}]*)?\}?\"?/(" + alt + r")(/|\b)")
-quoted = re.compile(r"[\"'](" + alt + r")[\"'/]")
-traversal = re.compile(r"(\.\./)+(" + alt + r")(/|\b)")
+project = {".claude", ".github"}  # also folders of the consuming repository
+quoted_alt = "|".join(re.escape(n) for n in names if n not in project) or "(?!)"
+end = r"(?=/|[^\w.-]|$)"
+rooted = re.compile(r"(PLUGIN_ROOT|ROOT)(:-[^}]*)?\}?\"?/(" + alt + r")" + end)
+quoted = re.compile(r"[\"'](" + quoted_alt + r")[\"'/]")
+traversal = re.compile(r"(\.\./)+(" + alt + r")" + end)
+# The same two names joined onto the plugin's own location in code (Path(ROOT, ".claude"),
+# os.path.join(os.environ["CLAUDE_PLUGIN_ROOT"], ".github"), Path(__file__).parents[2] / ".claude").
+own = re.compile(r"PLUGIN_ROOT|plugin_root|\bROOT\b|__file__|own_root")
+project_quoted = re.compile(r"[\"'](" + "|".join(re.escape(n) for n in sorted(project)) + r")[\"'/]")
 auto = {"commands", "skills", "agents", "hooks", "output-styles", "themes", "monitors", "workflows",
         "bin", ".mcp.json", ".lsp.json", "settings.json", ".claude-plugin"}
 hits = ["inert name is an auto-loaded component: " + n for n in names if n in auto]
@@ -744,7 +791,8 @@ for mode, path in files:
         text = re.sub(r"INERT_FILES = frozenset\((.|\n)*?\)\nINERT_DIRS = \([^)]*\)", "", text)
     code = path.endswith((".sh", ".py", ".json"))
     for n, ln in enumerate(text.splitlines(), 1):
-        if rooted.search(ln) or (code and (quoted.search(ln) or traversal.search(ln))):
+        if rooted.search(ln) or (code and (quoted.search(ln) or traversal.search(ln)
+                                           or (own.search(ln) and project_quoted.search(ln)))):
             hits.append(f"{path}:{n}: {ln.strip()[:120]}")
 print("\n".join(hits))
 PY
@@ -762,6 +810,24 @@ PLANTED="$(runtime_refs "$NOGIT" "$NOGIT/skills/update/scripts/update-plugin.py"
 if [ -z "$CLEAN" ] && printf '%s' "$PLANTED" | grep -q "statusline-override.py"; then
   ok "(28b) without .git the scan walks the files: clean tree clean, planted read found"
 else bad "(28b) clean=[$CLEAN] planted=[$PLANTED]"; fi
+
+# 28c. A read of the plugin's own .claude/ or .github/ is still caught; the consuming repository's
+# .claude/ joined onto its path, and `.claude-plugin`, are not.
+NOGIT2="$WORK/nogit2"; mkdir -p "$NOGIT2"; (cd "$ROOT" && tar --exclude=.git --exclude=.claude -cf - .) | (cd "$NOGIT2" && tar -xf -)
+printf '\nCFG="$(cat "${CLAUDE_PLUGIN_ROOT}/.claude/ds-config.json")"\n' >> "$NOGIT2/hooks/session-gate.sh"
+printf '\nW="$(cat "${CLAUDE_PLUGIN_ROOT:-x}/.github/workflows/a.yml")"\n' >> "$NOGIT2/hooks/version-check.sh"
+printf '\n_CFG = os.path.join(repo, ".claude", "ds-config.json")\n_M = "$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json"\n' \
+  >> "$NOGIT2/skills/doctor/scripts/statusline-override.py"
+printf '\n_A = os.path.join(os.environ["CLAUDE_PLUGIN_ROOT"], ".github", "x.yml")\n_B = Path(__file__).resolve().parents[3] / ".claude" / "c.json"\n' \
+  >> "$NOGIT2/hooks/session-runtime.py"
+PLANTED2="$(runtime_refs "$NOGIT2" "$NOGIT2/skills/update/scripts/update-plugin.py")"
+if printf '%s' "$PLANTED2" | grep -q "session-gate.sh:.*\.claude/ds-config" \
+   && printf '%s' "$PLANTED2" | grep -q "version-check.sh:.*\.github/workflows" \
+   && printf '%s' "$PLANTED2" | grep -q "session-runtime.py:.*CLAUDE_PLUGIN_ROOT.*\.github" \
+   && printf '%s' "$PLANTED2" | grep -q "session-runtime.py:.*__file__.*\.claude" \
+   && ! printf '%s' "$PLANTED2" | grep -q "statusline-override.py"; then
+  ok "(28c) the plugin's own .claude/ and .github/ are caught; a repository's .claude/ and .claude-plugin are not"
+else bad "(28c) planted=[$PLANTED2]"; fi
 
 # 30. A timed-out command gets SIGTERM before SIGKILL, so git can remove its own lock files.
 MARKER="$WORK/term-marker"

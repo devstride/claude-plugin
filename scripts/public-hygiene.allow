@@ -1,0 +1,26 @@
+# scripts/public-hygiene.allow — exceptions for scripts/check-public-hygiene.sh, one per line:
+#   item <I-number> <reason>     a placeholder item number the shipped text uses as an example
+#   host <name> <reason>         a public DevStride host a stranger can visit
+#   file <path> <reason>         a binary file (an image), which the check cannot read
+# Every line carries its reason. Never loosen a pattern in the script to fit a hit: add a line
+# here with a reason, or reword the text.
+
+item I0000  the all-zero placeholder in examples
+item I1234  a generic example item number
+item I2000  an example item number in the planning skills
+item I20100 the example plan root used throughout the loop's skills
+item I20101 an example story under the example plan root
+item I20102 an example story under the example plan root
+item I20103 an example story under the example plan root
+item I20104 an example story under the example plan root
+item I20110 an example item in the build skills
+item I20111 an example item in the build skills
+item I20112 an example item in the build skills
+item I20130 the example story in the build and review skills
+item I20131 an example item in the build skills
+item I20431 an example item in the release skills
+
+host devstride.com       the public website, and the domain of public email addresses
+host api.devstride.com   the public API and the hosted MCP endpoint
+host app.devstride.com   the public web application
+host docs.devstride.com  the public documentation site

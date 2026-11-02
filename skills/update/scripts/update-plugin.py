@@ -33,9 +33,9 @@ CANONICAL_REPO = "devstride/claude-plugin"
 # these ships nothing: it needs no version bump (scripts/check-version-bump.sh imports is_inert) and
 # it does not stop an update from installing the release it follows. Every other path is shipped.
 INERT_FILES = frozenset(
-    {".gitignore", "AGENTS.md", "CHANGELOG.md", "CONTRIBUTING.md", "LICENSE", "README.md", "RELEASING.md"}
+    {".gitignore", "AGENTS.md", "CHANGELOG.md", "CLAUDE.md", "CONTRIBUTING.md", "LICENSE", "README.md", "RELEASING.md"}
 )
-INERT_DIRS = ("scripts/",)
+INERT_DIRS = ("scripts/", ".github/", ".claude/")
 TOTAL_DEADLINE: Optional[float] = None
 
 

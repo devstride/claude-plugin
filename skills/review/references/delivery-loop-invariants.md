@@ -506,7 +506,7 @@ T1. Cost is measured, never asserted: every body/reference and representative co
     grandfathered ceilings for larger ones. `validate.sh` fails a breach; generated cost tables are
     never written by hand.
 T2. Every `skills/*/SKILL.md` body has a committed budget row enforced at release
-    (`measure-cost.sh --check`, RELEASING.md step 0) plus an immutable ceiling: ordinary skills never
+    (`measure-cost.sh --check`, run by `scripts/validate.sh`) plus an immutable ceiling: ordinary skills never
     exceed 8,000 tokens; the two remaining 2.5.0-grandfathered bodies (plan, setup) never exceed
     their recorded ceilings and only move down — review left the list once its body fell under
     8,000. Reference/path budgets prevent moving mandatory text from manufacturing a false body

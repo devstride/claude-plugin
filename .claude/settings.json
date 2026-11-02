@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "devstride": {
+      "source": {
+        "source": "github",
+        "repo": "devstride/claude-plugin"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "devstride@devstride": true
+  }
+}
