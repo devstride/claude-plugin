@@ -45,7 +45,11 @@ into `main` here is its own release), with a clean tree and that branch up to da
    never the work tree, so they run after the commit:
    `bash scripts/check-version-bump.sh --base origin/main` must pass and
    `bash scripts/check-public-hygiene.sh --base origin/main --branch "$(git branch --show-current)"`
-   must print `CLEAN`. On a failure, fix it, `git commit --amend`, and run both again. Then push.
+   must print `CLEAN`. A finding in the release commit: fix it, `git commit --amend`, and run both
+   again. A finding in an EARLIER commit's message (a session trailer an agent harness added, an
+   item number): amend cannot reach it, so rebuild the branch's history without it — for example
+   `git reset --soft origin/main` and re-commit the work in clean commits — then run both again.
+   Then push (`--force-with-lease` after a rebuild; never onto `main`).
 
 The pull request then goes through the delivery loop's review. Never tag by hand and never push
 to `main`: the merge is the release, and the workflow tags it.

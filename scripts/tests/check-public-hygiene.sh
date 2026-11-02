@@ -104,6 +104,30 @@ printf '# from I14399\nitem I14321 used in I14322 at /Users/jane\n' > "$R/script
 expect "(20) the allow file's comments and reasons are scanned; only the allowed token is skipped" 1 \
   "^PUBLIC HYGIENE: 3 finding(s)$" "item-number in scripts/public-hygiene.allow:1" "item-number in scripts/public-hygiene.allow:2: .*I14322"
 
+new_case gitconfig; echo "Fixed in I14321." >> "$R/skills/a/SKILL.md"; commit "docs: x"
+OUT="$(cd "$R/skills" && GIT_CONFIG_COUNT=3 GIT_CONFIG_KEY_0=diff.noprefix GIT_CONFIG_VALUE_0=true \
+  GIT_CONFIG_KEY_1=diff.relative GIT_CONFIG_VALUE_1=true GIT_CONFIG_KEY_2=diff.dstPrefix GIT_CONFIG_VALUE_2=new/ \
+  bash "$CHECK" --base "$BASE" --allow "$ALLOW" 2>&1)"; RC=$?
+expect "(21) a person's diff settings (no prefix, relative, another prefix) cannot hide a finding" 1 \
+  "item-number in skills/a/SKILL.md:2"
+
+new_case allow-file-path; mkdir -p "$R/scripts"
+printf 'file /Users/jane/dev/repo/logo.png the logo\n' > "$R/scripts/public-hygiene.allow"; commit "chore: allow"; check
+expect "(22) a file line's path is scanned: an absolute machine path in it is a finding" 1 "internal-path in scripts/public-hygiene.allow:1"
+
+new_case smuggled; mkdir -p "$R/scripts"
+printf 'item https://claude.ai/code/session_x a link\nhost /Users/jane a path\n' > "$R/scripts/public-hygiene.allow"; commit "chore: allow"; check
+expect "(23) an allow line whose token is not an item number or host is scanned whole" 1 \
+  "session-link in scripts/public-hygiene.allow:1" "internal-path in scripts/public-hygiene.allow:2"
+printf 'item https://claude.ai/code/session_x a link\n' > "$WORK/smuggle-allow"
+OUT="$(cd "$R" && bash "$CHECK" --base "$BASE" --allow "$WORK/smuggle-allow" 2>&1)"; RC=$?
+expect "(24) an allow list whose token breaks its kind's grammar is refused, exit 2" 2 "allow list line 1"
+
+new_case binary-gone; printf 'PNG\0x' > "$R/skills/a/logo"; git -C "$R" add -A; git -C "$R" commit -qm "add"
+BASE="$(git -C "$R" rev-parse HEAD)"; git -C "$R" rm -q skills/a/logo; mkdir -p "$R/skills/a/logo"
+echo hi > "$R/skills/a/logo/readme.md"; commit "docs: replace"; check
+expect "(25) a deleted binary is not a finding, even when a folder now has its name" 0 "CLEAN"
+
 # The real allow list parses, and every line carries a reason.
 OUT="$(cd "$ROOT" && bash "$CHECK" --base HEAD --head HEAD 2>&1)"; RC=$?
 expect "(13) this repository's allow list parses" 0 "CLEAN"

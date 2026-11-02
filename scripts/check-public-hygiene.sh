@@ -8,7 +8,8 @@
 #
 # What it scans: the branch name, the title, the body (a file), every commit message in
 # <base>..<head> and every ADDED line of `git diff <base>...<head>`. This script and its test are
-# not scanned, since they must spell the patterns; in the allow file only the allowed token is.
+# not scanned, since they must spell the patterns; in the allow file only an allowed item number or
+# host is skipped (a `file` path is scanned, so it cannot carry a machine path).
 #
 # Kinds of finding:
 #   item-number      `I` followed by four to six digits, unless the allow file lists it
@@ -63,7 +64,11 @@ def usage(msg):
 # file is: its comments and every reason are, only the token a line allows is left out.
 SELF = {"scripts/check-public-hygiene.sh", "scripts/tests/check-public-hygiene.sh"}
 ALLOW_PATH = "scripts/public-hygiene.allow"
-ALLOW_LINE = re.compile(r"^\s*(item|host|file)\s+\S+(.*)$")
+# Each kind's token has a grammar; only a token that matches it is left out of the scan, so an allow
+# line cannot smuggle a link or a path in as its "item" or "host". A `file` line is scanned whole.
+TOKEN = {"item": re.compile(r"I[0-9]{4,6}"), "host": re.compile(r"(?:[a-z0-9-]+\.)+[a-z]{2,}"),
+         "file": re.compile(r"[^/~\s#][^\s#]*")}
+ALLOW_LINE = re.compile(r"^\s*(item|host)\s+(\S+)(.*)$")
 items, hosts, files = set(), set(), set()
 with open(env["PH_ALLOW"], encoding="utf-8") as f:
     for n, raw in enumerate(f, 1):
@@ -71,8 +76,9 @@ with open(env["PH_ALLOW"], encoding="utf-8") as f:
         if not line:
             continue
         parts = line.split(None, 2)
-        if len(parts) < 3 or parts[0] not in ("item", "host", "file"):
-            usage("allow list line %d must be `item <I-number> <reason>`, `host <name> <reason>` or `file <path> <reason>`" % n)
+        if len(parts) < 3 or parts[0] not in TOKEN or not TOKEN[parts[0]].fullmatch(parts[1].lower() if parts[0] == "host" else parts[1]):
+            usage("allow list line %d must be `item <I-number> <reason>`, `host <hostname> <reason>` or"
+                  " `file <repository-relative path> <reason>`" % n)
         {"item": items, "host": hosts, "file": files}[parts[0]].add(parts[1].lower() if parts[0] == "host" else parts[1])
 ITEM = re.compile(r"(?<![A-Za-z0-9_])I[0-9]{4,6}(?![A-Za-z0-9_])")
 LINK = re.compile(r"claude\.ai/code/session_", re.I)
@@ -105,8 +111,12 @@ if env["PH_TITLE"]:
 if env["PH_BODY_FILE"]:
     with open(env["PH_BODY_FILE"], encoding="utf-8", errors="replace") as f:
         scan(f.read(), "body", True)
+# Pin every diff setting a person's git config could change, so a local run reads exactly what CI
+# reads: prefixes (diff.noprefix, diff.dstPrefix), the whole tree (diff.relative) and the raw text
+# (a textconv driver).
+PINNED = ["-c", "diff.noprefix=false", "-c", "diff.relative=false", "-c", "diff.mnemonicPrefix=false"]
 def git(*args):
-    run = subprocess.run(["git", *args], capture_output=True)
+    run = subprocess.run(["git", *PINNED, *args], capture_output=True)
     if run.returncode != 0:
         usage("git %s failed: %s" % (" ".join(args), run.stderr.decode("utf-8", "replace").strip()))
     return run.stdout.decode("utf-8", "replace")
@@ -135,7 +145,8 @@ def unquote(name):
 # split on "\n" alone: a carriage return, form feed or Unicode separator inside a line is content.
 HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 path, line_no, old_left, new_left = None, 0, 0, 0
-diff = git("diff", "--no-color", "--no-ext-diff", "--no-renames", "-U0", "%s...%s" % (env["PH_BASE"], env["PH_HEAD"]))
+diff = git("diff", "--no-color", "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/",
+           "--no-renames", "-U0", "%s...%s" % (env["PH_BASE"], env["PH_HEAD"]))
 for line in diff.split("\n"):
     if old_left > 0 or new_left > 0:
         if line.startswith("+"):
@@ -144,7 +155,8 @@ for line in diff.split("\n"):
                 text = line[1:]
                 if path == ALLOW_PATH:
                     m = ALLOW_LINE.match(text)
-                    text = m.group(2) if m else text
+                    if m and TOKEN[m.group(1)].fullmatch(m.group(2).lower() if m.group(1) == "host" else m.group(2)):
+                        text = m.group(3)
                 scan(text, "%s:%d" % (path, line_no), False)
             line_no += 1
         elif line.startswith("-"):
@@ -161,13 +173,13 @@ for line in diff.split("\n"):
             new_left = int(m.group(3)) if m.group(3) is not None else 1
 # A binary file has no added lines to read, so it cannot be shown clean: each one added or changed
 # is a finding unless the allow file names it with a reason.
-numstat = git("diff", "--no-renames", "--numstat", "-z", "%s...%s" % (env["PH_BASE"], env["PH_HEAD"]))
+# Added or modified files only: a deleted binary is gone, whatever now sits at its path.
+numstat = git("diff", "--no-ext-diff", "--no-textconv", "--no-renames", "--diff-filter=AM", "--numstat", "-z",
+              "%s...%s" % (env["PH_BASE"], env["PH_HEAD"]))
 for entry in numstat.split("\0"):
     parts = entry.split("\t", 2)
     if len(parts) == 3 and parts[0] == "-" and parts[1] == "-" and parts[2] not in files:
-        exists = subprocess.run(["git", "cat-file", "-e", "%s:%s" % (env["PH_HEAD"], parts[2])], capture_output=True)
-        if exists.returncode == 0:
-            findings.append(("binary-file", parts[2], "a binary file cannot be scanned; allow it with `file <path> <reason>`"))
+        findings.append(("binary-file", parts[2], "a binary file cannot be scanned; allow it with `file <path> <reason>`"))
 if findings:
     print("PUBLIC HYGIENE: %d finding(s)" % len(findings))
     for kind, where, text in findings:

@@ -32,8 +32,9 @@ not trip its own check.
 `scripts/public-hygiene.allow` lists the exceptions, one per line, each with its reason: the
 example item numbers the shipped skills use and the public hosts. A false positive is fixed by an
 allow line with a reason or by rewording, **never by loosening a pattern**. The pull-request check
-runs `main`'s copy of the allow file, so a new allow line merges in its own pull request first (the
-allow file is never scanned, so that pull request passes). Run it before you push:
+runs `main`'s copy of the allow file, so a new allow line merges in its own pull request first. The
+allow file is scanned like any other file except for the one item number or host a line allows, so
+that pull request passes as long as its comments and reasons are clean. Run it before you push:
 `bash scripts/check-public-hygiene.sh --base origin/main --branch "$(git branch --show-current)"`.
 
 ## How a change reaches `main`
