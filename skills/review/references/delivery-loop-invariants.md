@@ -650,7 +650,7 @@ skills/review/references/github-review-api.md|requested_reviewer.node_id
 skills/review/SKILL.md|automatedReviewers
 skills/review/SKILL.md|baseBranches
 skills/pr/SKILL.md|baseBranches
-skills/pr/SKILL.md|source and destination
+skills/pre-ship/SKILL.md|source and destination
 skills/release/SKILL.md|DRIVEN
 skills/release/SKILL.md|0a. Clearance
 skills/branch-hotfix/SKILL.md|never claims release clearance

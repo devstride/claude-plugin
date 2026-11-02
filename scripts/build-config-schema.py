@@ -21,6 +21,11 @@ Registry rules the generator applies:
   - a hook whose shape is `provider-or-commands` becomes a oneOf: null, the provider shape (every
     registered child except `commands`) or the commands shape (only `commands`);
   - a `deprecated` setting becomes an x-severity annotation carrying its message.
+  - an object setting's `setTogether` list becomes `x-setTogether`: those children are all set
+    (non-null) or all unset, never one alone (the validator's own keyword; JSON Schema has none
+    that treats null as unset).
+  - a hook a step skill runs carries `step` (the skill's directory) and `stepVerdict` (the
+    verdict lines its `## Verdict` section spells); scripts/tests/step-skills.sh compares them.
 
 Usage: build-config-schema.py --write | --check [--release [--base <ref>]]
   --write     regenerate both files
@@ -41,7 +46,8 @@ TABLE = "skills/setup/references/seam-registry.md"
 ID_FORMAT = "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v{}/schemas/ds-config.schema.json"
 
 VALIDATION_KEYWORDS = {"type", "properties", "patternProperties", "additionalProperties",
-                       "required", "enum", "items", "oneOf", "minimum", "exclusiveMinimum"}
+                       "required", "enum", "items", "oneOf", "minimum", "exclusiveMinimum",
+                       "x-setTogether"}
 ANNOTATIONS = {"$schema", "$id", "title", "description", "default", "x-severity"}
 HOOK_FIELDS = ["key", "shape", "valueType", "nullable", "payload", "verdict", "calledBy",
                "unset", "contract", "since"]
@@ -86,6 +92,12 @@ def lint(registry):
                     problems.append("hook %s is a %s hook without modes" % (key, e.get("shape")))
                 if not isinstance(e.get("calledBy"), list) or not e.get("calledBy"):
                     problems.append("hook %s needs a non-empty calledBy list" % key)
+                if "step" in e or "stepVerdict" in e:
+                    sv = e.get("stepVerdict")
+                    if not isinstance(e.get("step"), str) or not e.get("step"):
+                        problems.append("hook %s needs step, the step skill's directory name" % key)
+                    if not isinstance(sv, list) or not sv or not all(isinstance(v, str) and v for v in sv):
+                        problems.append("hook %s needs stepVerdict, the step's verdict lines" % key)
             t = e.get("valueType" if kind == "hooks" else "type")
             for one in (t if isinstance(t, list) else [t]):
                 if one not in TYPES:
@@ -158,6 +170,8 @@ def build_schema(registry, version):
                 node = node_for(e["type"])
             if "enum" in e:
                 node["enum"] = e["enum"]
+            if "setTogether" in e:
+                node["x-setTogether"] = e["setTogether"]
             for bound in ("minimum", "exclusiveMinimum"):
                 if bound in e:
                     node[bound] = e[bound]

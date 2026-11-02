@@ -4,7 +4,7 @@ DevStride's agentic delivery loop, packaged as a Claude Code plugin. Plan a road
 existence, then let the loop walk it one story at a time — branch, build, adversarially review,
 merge, and release — against your own repository and your own DevStride organization.
 
-> **Status: early.** The twenty delivery-loop skills and the DevStride MCP connection are both
+> **Status: early.** The thirty delivery-loop skills and the DevStride MCP connection are both
 > bundled — installing the plugin is all the *configuration* the connection needs, though you still
 > sign in once. `/devstride:setup` then configures the plugin for your repository and proves the
 > config by running it.
@@ -458,6 +458,25 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `update` | Updates the exact loaded copy, verifies its official tag and files, then stops for a checked plugin reload (restart is the fallback) |
 | `ci-audit` | Measures what CI actually costs: executed runs per workflow per pull request (the design is one each), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
 
+**Steps (run one hook by itself)** — each runs exactly one hook your config names and prints a
+fixed verdict first. `release`, `build-item`, `pr` and `branch-hotfix` call them; run one by name to
+re-run a step that failed. Unset, each says `NOT CONFIGURED` (or its stated default) instead of
+failing; the four safety steps (`pre-ship`, `post-deploy`, `classify-release`, `pre-merge-check`)
+take the stricter path when their hook is missing or cannot answer. Shared rule:
+`skills/release/references/step-skills.md`.
+
+| Skill | What it does |
+|---|---|
+| `update-docs` | Runs `docs.updateSkill` once (`update` or `check`): published, staged, not configured or failed |
+| `sync-knowledge-base` | Runs `docs.knowledgeBaseSyncSkill` after documentation was published live; a failure never undoes the docs |
+| `write-release-notes` | Runs `docs.releaseNotesSkill` in `publish` or `draft` mode, only when the owner asked; never improvises a note |
+| `pre-ship` | Selects or runs the `preShipChecks` entries for a pull request or a release |
+| `post-deploy` | Runs `release.postDeployCheckSkill` (`check` or `close-out`) and passes its verdict through; an unreadable answer is NOT RUN |
+| `local-environment` | Runs one `localEnvironment` command (`create`, `recreate`, `migrate`, `seed`, `teardown`, `name`) with its placeholders filled; never guesses an instance name |
+| `lease-checkout` / `return-checkout` | Lease and return a pool checkout through `pool.checkout` / `pool.checkin`; busy means ask, never make a copy |
+| `classify-release` | Asks `release.classifySkill` whether a release is light or full; anything but a clear answer is FULL |
+| `pre-merge-check` | Asks `release.preMergeSkill` whether production needs anything before the merge: clear, hold, not run or not configured |
+
 ### Agents that do not run these skills
 
 Codex, a script or a person can follow the same routing without Claude. `skills/build-item/scripts/routing.py`
@@ -481,7 +500,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.19.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.20.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

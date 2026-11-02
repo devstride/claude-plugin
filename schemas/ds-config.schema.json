@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.19.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.20.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -755,6 +755,20 @@
           ],
           "description": "skill hook — check followed by {productionBranch, mergeCommit, deployConfirmedAt}"
         },
+        "classifySkill": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "skill hook — classify followed by {productionBranch, releaseSource, head}"
+        },
+        "preMergeSkill": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "skill hook — check followed by {productionBranch, releaseSource, head, pullRequest}"
+        },
         "deployApproval": {
           "type": [
             "string",
@@ -999,6 +1013,13 @@
           ],
           "description": "skill hook — the delta payload, live: true for publish"
         },
+        "knowledgeBaseSyncSkill": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "skill hook — sync: {docsOutcome, live} as a fenced JSON block (a re-run names `sync` too); check: none (the skill checks its own preconditions)"
+        },
         "updateOnEpicRelease": {
           "type": "boolean",
           "default": false,
@@ -1139,6 +1160,37 @@
       },
       "additionalProperties": false,
       "description": "this repository's isolated local instances; null reads as absent"
+    },
+    "pool": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "checkout": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — <member> and <purpose> placeholders"
+        },
+        "checkin": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — <member> placeholder"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "x-setTogether": [
+        "checkout",
+        "checkin"
+      ],
+      "description": "the repository's checkout-pool commands, set both or neither (one alone is an error); null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md"
     },
     "stage": {
       "type": "object",

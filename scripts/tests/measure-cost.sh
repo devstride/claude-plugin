@@ -99,7 +99,7 @@ OUT="$(/bin/bash "$MC" --check --budgets "$TMP/missing-path.json")"; RC=$?
 if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^PATH-MISSING fastStoryLoop skills/missing/SKILL.md'; then ok "(m2) missing composed-path member is rejected"; else bad "(m2) expected PATH-MISSING, got rc=$RC: $OUT"; fi
 
 # (n) even a raised row cannot hide an actual body above its hard ceiling
-python3 -c 'import sys; open(sys.argv[1],"a").write("x"*12000)' "$TMP/repo/skills/pr/SKILL.md"
+python3 -c 'import sys; open(sys.argv[1],"a").write("x"*24000)' "$TMP/repo/skills/pr/SKILL.md"
 OUT="$(/bin/bash "$TMP/repo/scripts/measure-cost.sh" --check --budgets "$TMP/high.json")"; RC=$?
 if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q '^HARD-OVER skills/pr/SKILL.md'; then ok "(n) body growth beyond hard ceiling is rejected"; else bad "(n) expected HARD-OVER, got rc=$RC: $OUT"; fi
 

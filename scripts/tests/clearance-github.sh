@@ -27,7 +27,7 @@ fresh() {
          CLEARANCE_PRODUCTION_BRANCH=master CLEARANCE_RELEASE_PATTERN='release/<YY-MM-DD>[-n]' \
          CLEARANCE_POLL_SECONDS=1 CLEARANCE_WAIT_MINUTES=1 CLEARANCE_STALE_MINUTES=20 \
          CLEARANCE_NOW=2026-10-18T10:05:00Z CLAUDE_CODE_SESSION_ID=me-1
-  unset DEVSTRIDE_LEASE_TOKEN CODEX_THREAD_ID CLEARANCE_PHASE_BUDGETS
+  unset CLEARANCE_HOLDER_TOKEN DEVSTRIDE_LEASE_TOKEN CODEX_THREAD_ID CLEARANCE_PHASE_BUDGETS
   rm -f "$CLEARANCE_RECORD" "$WORK/$1.record.owed.json"
 }
 # seed JSON — the ref points at a tag object carrying JSON (replacing whatever was there)
@@ -302,13 +302,27 @@ if [ "$RC" -eq 1 ] && printf '%s' "$OUT" | grep -q 'refusing to update protected
   ok "(19) a refused push → ERROR keeping the server's words and naming the ruleset finding, exit 1"
 else bad "(19) rc=$RC: $OUT"; fi
 
-# (20) identity: DEVSTRIDE_LEASE_TOKEN wins; codex+claude join with +; neither → a printed token
-fresh ident; export DEVSTRIDE_LEASE_TOKEN=tok-1; run claim; A="$(record holder)"
+# (20) identity: CLEARANCE_HOLDER_TOKEN wins; its older name DEVSTRIDE_LEASE_TOKEN still works
+# alone and loses when both are set; codex+claude join with +; neither → a printed token
+fresh ident; export CLEARANCE_HOLDER_TOKEN=tok-1; run claim; A="$(record holder)"
+fresh ident1; export DEVSTRIDE_LEASE_TOKEN=old-1; run claim; E="$(record holder)"
+fresh ident1b; export CLEARANCE_HOLDER_TOKEN=new-2 DEVSTRIDE_LEASE_TOKEN=old-2; run claim; F="$(record holder)"
 fresh ident2; export CODEX_THREAD_ID=c-9; run claim; B="$(record holder)"
 fresh ident3; unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID; run claim; C="$(record holder)"; D="$OUT"
-if [ "$A" = tok-1 ] && [ "$B" = "codex:c-9+claude:me-1" ] && printf '%s' "$C" | grep -q '^token:[0-9a-f]\{24\}$' && printf '%s' "$D" | grep -q "holder token $C — export it as DEVSTRIDE_LEASE_TOKEN"; then
-  ok "(20) holder = DEVSTRIDE_LEASE_TOKEN, else codex:…+claude:…, else token:<random> printed once"
-else bad "(20) a=$A b=$B c=$C d=$D"; fi
+if [ "$A" = tok-1 ] && [ "$E" = old-1 ] && [ "$F" = new-2 ] && [ "$B" = "codex:c-9+claude:me-1" ] \
+   && printf '%s' "$C" | grep -q '^token:[0-9a-f]\{24\}$' \
+   && printf '%s' "$D" | grep -q "holder token $C — export it as CLEARANCE_HOLDER_TOKEN"; then
+  ok "(20) holder = CLEARANCE_HOLDER_TOKEN (older name still read; new wins), else codex:…+claude:…, else token:<random> printed once"
+else bad "(20) a=$A e=$E f=$F b=$B c=$C d=$D"; fi
+
+# (20b) an empty new name falls back to the older one; a bad token's error names the variable it
+# came from and never echoes the token
+fresh ident4; export CLEARANCE_HOLDER_TOKEN='' DEVSTRIDE_LEASE_TOKEN=old-4; run claim; G="$(record holder)"
+fresh ident5; export DEVSTRIDE_LEASE_TOKEN='sec ret-5'; run claim; H="$OUT"; HR=$RC
+if [ "$G" = old-4 ] && [ "$HR" -ne 0 ] && printf '%s' "$H" | grep -q 'DEVSTRIDE_LEASE_TOKEN cannot contain' \
+   && ! printf '%s' "$H" | grep -q 'ret-5'; then
+  ok "(20b) an empty CLEARANCE_HOLDER_TOKEN reads the older name; a bad token is refused by name, never echoed"
+else bad "(20b) g=$G rc=$HR out=$H"; fi
 
 # (21) a release pattern absent: the release source itself is the release head for On final
 fresh nopattern; export CLEARANCE_RELEASE_PATTERN=''

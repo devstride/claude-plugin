@@ -20,6 +20,12 @@ holder or the owner, not minting a new copy. Which checkouts form the pool, the 
 and the hand-back ref are the repository's to state; read them from its conventions, never assume
 them.
 
+**With `pool.checkout` set, use the `lease-checkout` and `return-checkout` steps, NOT the generic
+protocol below** — the repository's own command takes and returns the lease, and a hand-made
+noclobber file beside it would be a second, conflicting lease
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/checkout-pool-commands.md`). The protocol below
+is for a pool the conventions declare without those commands.
+
 - **Take it atomically.** The lease is a file inside that checkout's OWN git directory
   (`git -C <dir> rev-parse --absolute-git-dir`), so it never dirties the tree, created under
   `set -o noclobber` so the create fails if the file exists and exactly one session wins. It
@@ -29,12 +35,13 @@ them.
   member. A lease that already exists is BUSY: read who holds it and pick another member or ask
   them. Never delete someone else's lease; a stale one is the owner's call.
 - **Hold it across branch switches** — the lease, not the branch, makes the checkout yours.
-- **Hand it back** when the work merges or is handed over: stop every process you started there
+- **Hand it back** when the work merges or is handed over, and on any exit before work begins
+  (every `build-item` step-0 exit, a release that stops with nothing to do): stop every process you started there
   (test runs, dev servers, watchers), leave it clean and detached at a freshly fetched base, then
   remove the lease. An owner-approved extra worktree is removed by the session that made it when
   its approved purpose ends.
 
-Without a declared pool, the current checkout is the only environment and no lease is taken.
+Without a declared pool there is no pool and no lease: the current checkout is the only environment.
 
 ## The procedure
 

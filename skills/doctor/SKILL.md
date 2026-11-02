@@ -67,10 +67,8 @@ next action. For each failure symptom, read
   the root with `git rev-parse --show-toplevel` and use the schema in `version-currency.md`. On one
   line report `checkedAt`, `running`, `newest`, `mode`, `result`, `install`, `statusLine`. Absent:
   say never run here (pre-1.2.0 plugin, disabled hooks, or
-  `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). Modes: `notify` fallback; `auto-update` only for a repo-bound
-  project/local install; `pinned` never updates. Shared user copies hand off to update, managed
-  copies to their administrator, and ambiguous copies to Doctor. A verified disk change needs
-  plugin reload (restart only if reload fails).
+  `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). Modes and who each copy hands off to: `version-currency.md`.
+  A verified disk change needs plugin reload (restart only if reload fails).
 - **Repo declaration** — `.claude/settings.json` enables but does not install. Print
   `version-currency.md`'s install line for this repository's rows (its `enabledPlugins` id). Always run both
   `git ls-files --error-unmatch .claude/settings.json` (tracked?) and
@@ -187,8 +185,9 @@ next action. For each failure symptom, read
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
   **array**, so iterate it — `review.localCommand`, `review.localAssistCommand`,
-  `generated.regenCommand`,
-  `preShipChecks[].command`, each non-null `localEnvironment.*` command, and `stage.resolve`): split on `&&` and `;`, take the first token of **each** segment, and
+  `generated.regenCommand`, `preShipChecks[].command`, each non-null `localEnvironment.*` command,
+  `stage.resolve`, `pool.checkout` and `pool.checkin`): split on `&&` and `;`, take the first
+  token of **each** segment, and
   skip shell builtins (`cd backend && pnpm test` starts with `cd`, which always resolves). A
   single-word command that does not resolve may be a shell alias or function — report "not on
   PATH (may be an alias)", not a flat FAIL.
@@ -283,27 +282,25 @@ Two separate checks, and **the first is the one everyone misses**:
 - **`preShipChecks`** — if any entry exists, confirm its command resolves (same segment-splitting as
   §4); these run at the ship boundary and nothing in CI covers them.
 
-## 7. Documentation hooks (`docs`)
+## 7. Hooks (`docs`, `release`)
 
-The plugin never edits documentation itself; it invokes local skills named in `docs.updateSkill` and
-`docs.releaseNotesSkill` (contract: `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`).
-Neither set → **N/A**, not a failure: the release skill's docs pass reports itself skipped and
-`--release-notes` reports itself unavailable.
+**Loop over every `shape: "skill"` hook in `${CLAUDE_PLUGIN_ROOT}/schemas/seam-registry.json`**
+(LOCAL skills: `docs.updateSkill`, `docs.releaseNotesSkill`, `release.postDeployCheckSkill`, the
+release safety hooks …), each against its registry `contract`:
 
-- **Each named skill exists** — `.claude/skills/<name>/SKILL.md`; missing → FAIL (a dangling
-  hook; fix `/devstride:setup docs`). Also `git check-ignore` the path (a gitignored skill
+- **Unset → N/A**, not a failure; quote its registry `unset` text.
+- **Set → `.claude/skills/<name>/SKILL.md` exists**; missing → FAIL (a dangling hook; the docs
+  skills' fix is `/devstride:setup docs`). Also `git check-ignore` the path (a gitignored skill
   exists on one machine only).
-- **Each skill's `check` mode passes** — invoke it with `check` (read-only by contract); translate
-  its verdict and fix into **Found / Why it matters / Fix**, keeping exact command/path evidence.
-  No `check` mode → FAIL naming the template to rebuild from.
+- **Its `check` self-test passes** — the docs skills and `docs.knowledgeBaseSyncSkill` only (a
+  release hook's `check` is the real production check, never run here); read-only by contract.
+  Translate its verdict and fix into **Found / Why it matters / Fix**, keeping exact
+  command/path evidence. A docs skill with no `check` mode → FAIL naming the template to rebuild
+  from.
 - **A legacy `release.docsRepo` block**, with or without a `docs` block beside it → FAIL: the
   release skill never acts on it. Fix: `/devstride:setup docs` (migrates and removes it).
 - **`release.deployApproval`, `release.deployVerification`** — each set → its first token
   resolves (§4's rule), never run. Unset → not a gap.
-- **`release.postDeployCheckSkill`** — set → `.claude/skills/<name>/SKILL.md` must exist
-  (missing → FAIL, a dangling hook; contract:
-  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/post-deploy-check.md`). Unset → N/A; the close-out
-  reports `not configured`.
 - **`release.clearance`** — null → N/A. Shape: §4's validator (run it here when §4 did not):
   its `release.clearance` lines — both shapes, a `provider` other than `github`, a missing verb —
   FAIL. `provider: github` → run its `status` once (read-only),

@@ -87,9 +87,11 @@ reads the exit code and quotes the line; it never parses further.
   skill's own `heartbeat <phase>` calls record progress and prove ownership; they do not keep the
   clearance alive. When no owning process can be found the provider says so, and the skill
   heartbeats at least every `staleMinutes` itself.
-- **Holder identity** is the same rule as a pool lease, so one identity means one thing everywhere:
-  `DEVSTRIDE_LEASE_TOKEN`; else `codex:$CODEX_THREAD_ID` and/or `claude:$CLAUDE_CODE_SESSION_ID`
-  joined with `+`; else `token:<random>`, printed once (stderr) for a plain terminal to export.
+- **Holder identity** — one identity means one thing across the clearance commands:
+  `CLEARANCE_HOLDER_TOKEN` (its older name `DEVSTRIDE_LEASE_TOKEN` is still read when it is unset;
+  the new name wins when both are set); else `codex:$CODEX_THREAD_ID` and/or
+  `claude:$CLAUDE_CODE_SESSION_ID` joined with `+`; else `token:<random>`, printed once (stderr)
+  for a plain terminal to export as `CLEARANCE_HOLDER_TOKEN`.
   `user` is `gh api user`'s login; `machine` is the hostname. A claim or adoption by the session
   that already holds it renews the heartbeat.
 - **The local record.** On `claim` and `adopt` the provider writes

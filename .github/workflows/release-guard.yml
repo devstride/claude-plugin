@@ -40,6 +40,8 @@ jobs:
         run: for f in hooks/*.sh scripts/*.sh scripts/tests/*.sh skills/*/scripts/*.sh; do [ -f "$f" ] && bash -n "$f"; done
       - name: Script tests
         run: bash scripts/tests/run.sh
+      - name: The shipped text names no single repository's tooling
+        run: bash scripts/check-neutrality.sh
       - name: Load budgets and reference load fields
         run: bash scripts/measure-cost.sh --check
       - name: Config schema and key table match the seam registry

@@ -87,11 +87,14 @@
     "deployApproval": null,
     "deployVerification": "scripts/verify-deploy.sh",
     "postDeployCheckSkill": "health-check",
+    "classifySkill": "release-classify",
+    "preMergeSkill": "release-pre-merge",
     "clearance": { "provider": "github", "ref": "refs/clearance/release", "staleMinutes": 20, "waitMinutes": 180, "phaseBudgetMinutes": { "pre-ship": 120, "deploy": 60 } }
   },
   "supportTrain": { "branch": "train/support", "fastMerges": true },
   "releaseTower": { "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" },
-  "docs": { "updateSkill": "docs-update", "releaseNotesSkill": null, "updateOnEpicRelease": false },
+  "docs": { "updateSkill": "docs-update", "releaseNotesSkill": null, "updateOnEpicRelease": false,
+            "knowledgeBaseSyncSkill": "kb-sync" },
   "plugin": { "updateCheck": true, "autoUpdate": true, "pin": null },
   "session": { "jobClassGate": true },
   "localEnvironment": {
@@ -105,6 +108,7 @@
     "instanceBoundTo": "directory",
     "fetchOnSessionStart": false
   },
+  "pool": { "checkout": "pool checkout <member> --purpose <purpose>", "checkin": "pool checkin <member>" },
   "stage": { "resolve": "cat .stage", "productionStages": ["prod"] },
   "statusLine": { "hiddenSegments": ["stage"], "autoUpdate": true }
 }

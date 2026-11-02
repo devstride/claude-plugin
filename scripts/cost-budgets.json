@@ -1,9 +1,9 @@
 {
   "_method": "tokens = ceil(utf8_bytes / 3); bytes as `wc -c`",
-  "_generatedBy": "scripts/measure-cost.sh --write-budgets at 3.8.0 on 2026-10-01; release-clearance ratchets raised by hand at 3.11.0; release body and config-defaults raised at 3.13.0 for the opt-in review-once economies and release.syncWorkflow; release-branch, delta-re-review, config-defaults and the epic/production release and fast-story paths raised at 3.14.0 for review.localEffort and absorbing late train landings; release body, docs-hooks and the epic/production release paths raised at 3.15.0 for release.deployApproval; clearance, post-deploy-check, release-branch, invariants, config-defaults and the production release path raised at 3.16.0 for the earlier hand-back, close-out owed and the stuck-phase alarm; version-currency, statusline-segments and the manual plugin update path raised at 3.17.0 for the per-session running-version record and the Plugin status-line segment",
+  "_generatedBy": "scripts/measure-cost.sh --write-budgets at 3.8.0 on 2026-10-01; release-clearance ratchets raised by hand at 3.11.0; release body and config-defaults raised at 3.13.0 for the opt-in review-once economies and release.syncWorkflow; release-branch, delta-re-review, config-defaults and the epic/production release and fast-story paths raised at 3.14.0 for review.localEffort and absorbing late train landings; release body, docs-hooks and the epic/production release paths raised at 3.15.0 for release.deployApproval; clearance, post-deploy-check, release-branch, invariants, config-defaults and the production release path raised at 3.16.0 for the earlier hand-back, close-out owed and the stuck-phase alarm; version-currency, statusline-segments and the manual plugin update path raised at 3.17.0 for the per-session running-version record and the Plugin status-line segment; at the step-skills story (unreleased): alwaysOnContext RAISED from 1,300 to 1,800 (measured 1,787) because the ten new step skills' descriptions are always loaded, the ten step bodies and three new contracts added, docs-hooks, clearance, config-defaults and seam-registry raised for the new keys, pr and doctor lowered, and the epic/production release and fast-story paths re-baselined to measured totals with the step skills and contracts they now load; pre-ship, update-docs, docs-hooks, checkout-pool-commands, ground-truth-at-start, release-safety-hooks, config-defaults and the three loop paths raised in the step-skill review for detail moved out of the orchestrator bodies (waivers, narrowed re-runs, docs verdicts and owed accounting, the lease lifecycle); lease-checkout, return-checkout, sync-knowledge-base, checkout-pool-commands, docs-hooks, seam-registry.md and the three loop paths raised again in the second review round (the pool pair refusal, the owed settlement line, the step-0 lease return)",
   "_rounding": "measured tokens rounded UP to the next multiple of 100",
   "_readme": "A RATCHET over bodies, references, and representative composed paths. Hard body ceilings live in measure-cost.sh: 8,000 normally, with two frozen grandfathered caps. Lower freely; raise a ratchet only with the text that needs it. Changing _method re-baselines every entry.",
-  "alwaysOnContext": 1300,
+  "alwaysOnContext": 1800,
   "bodies": {
     "branch-feature": 900,
     "branch-hotfix": 2200,
@@ -12,11 +12,11 @@
     "comprehend-plan": 1600,
     "create-defect": 2500,
     "create-story": 1400,
-    "doctor": 7952,
+    "doctor": 7900,
     "insert-defect": 1600,
     "insert-story": 1400,
     "plan": 8000,
-    "pr": 3800,
+    "pr": 3600,
     "push": 1100,
     "rationalize-gantt": 2700,
     "rebalance": 5900,
@@ -24,11 +24,21 @@
     "review": 8000,
     "setup": 10700,
     "ultracode-build": 4900,
-    "update": 1000
+    "update": 1000,
+    "update-docs": 900,
+    "sync-knowledge-base": 900,
+    "write-release-notes": 600,
+    "pre-ship": 1000,
+    "post-deploy": 700,
+    "local-environment": 700,
+    "lease-checkout": 700,
+    "return-checkout": 600,
+    "classify-release": 500,
+    "pre-merge-check": 600
   },
   "references": {
     "skills/build-item/references/epic-release.md": 2900,
-    "skills/build-item/references/ground-truth-at-start.md": 1800,
+    "skills/build-item/references/ground-truth-at-start.md": 1900,
     "skills/build-item/references/next-unblocked.md": 3200,
     "skills/build-item/references/plain-language-output.md": 2300,
     "skills/build-item/references/progress-table.md": 1300,
@@ -48,8 +58,8 @@
     "skills/rationalize-gantt/references/auto-scheduler-off.md": 900,
     "skills/rebalance/references/recoverable-write-order.md": 1000,
     "skills/release/references/branch-patterns.md": 1600,
-    "skills/release/references/clearance.md": 5450,
-    "skills/release/references/docs-hooks.md": 2800,
+    "skills/release/references/clearance.md": 5500,
+    "skills/release/references/docs-hooks.md": 4200,
     "skills/release/references/post-deploy-check.md": 1500,
     "skills/release/references/release-branch.md": 5150,
     "skills/release/references/release-gates.md": 1300,
@@ -65,23 +75,26 @@
     "skills/review/references/roster-and-modes.md": 2100,
     "skills/review/references/slow-suite-gating.md": 1700,
     "skills/setup/references/ci-cost-patterns.md": 5000,
-    "skills/setup/references/config-defaults.md": 13500,
+    "skills/setup/references/config-defaults.md": 14000,
     "skills/setup/references/detector-evidence.digest.md": 900,
     "skills/setup/references/detector-evidence.md": 4300,
     "skills/setup/references/docs-skill-templates/update-documentation.md": 1400,
     "skills/setup/references/docs-skill-templates/update-release-notes.md": 1200,
     "skills/setup/references/interview-rationale.md": 1900,
     "skills/setup/references/review-engines.md": 2700,
-    "skills/setup/references/seam-registry.md": 9000,
+    "skills/setup/references/seam-registry.md": 9800,
     "skills/setup/references/statusline-segments.md": 2300,
     "skills/setup/references/validation-checklist.md": 6000,
     "skills/ultracode-build/references/engineering-economy.md": 1400,
     "skills/ultracode-build/references/mandatory-lenses.md": 1800,
-    "skills/ultracode-build/references/review-fanout.md": 2200
+    "skills/ultracode-build/references/review-fanout.md": 2200,
+    "skills/release/references/step-skills.md": 1000,
+    "skills/release/references/release-safety-hooks.md": 1200,
+    "skills/build-item/references/checkout-pool-commands.md": 1400
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 70200,
+      "budget": 74400,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -107,11 +120,14 @@
         "skills/release/references/docs-hooks.md",
         "skills/push/SKILL.md",
         "skills/build-item/references/ground-truth-at-start.md",
-        "skills/ultracode-build/references/mandatory-lenses.md"
+        "skills/ultracode-build/references/mandatory-lenses.md",
+        "skills/pre-ship/SKILL.md",
+        "skills/update-docs/SKILL.md",
+        "skills/release/references/step-skills.md"
       ]
     },
     "fastStoryLoop": {
-      "budget": 58450,
+      "budget": 61900,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -133,7 +149,11 @@
         "skills/review/references/review-ledger.md",
         "skills/push/SKILL.md",
         "skills/build-item/references/ground-truth-at-start.md",
-        "skills/ultracode-build/references/mandatory-lenses.md"
+        "skills/ultracode-build/references/mandatory-lenses.md",
+        "skills/lease-checkout/SKILL.md",
+        "skills/return-checkout/SKILL.md",
+        "skills/release/references/step-skills.md",
+        "skills/build-item/references/checkout-pool-commands.md"
       ]
     },
     "manualPluginUpdate": {
@@ -145,7 +165,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 66100,
+      "budget": 74600,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
@@ -167,7 +187,16 @@
         "skills/build-item/references/ground-truth-at-start.md",
         "skills/release/references/post-deploy-check.md",
         "skills/ultracode-build/references/mandatory-lenses.md",
-        "skills/release/references/clearance.md"
+        "skills/release/references/clearance.md",
+        "skills/classify-release/SKILL.md",
+        "skills/pre-ship/SKILL.md",
+        "skills/pre-merge-check/SKILL.md",
+        "skills/post-deploy/SKILL.md",
+        "skills/update-docs/SKILL.md",
+        "skills/sync-knowledge-base/SKILL.md",
+        "skills/write-release-notes/SKILL.md",
+        "skills/release/references/step-skills.md",
+        "skills/release/references/release-safety-hooks.md"
       ]
     }
   }

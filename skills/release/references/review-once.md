@@ -38,10 +38,10 @@ Say which path the release took in the step-4 recap, with the two tree hashes.
 
 ## `onlyWhenTouched` on a `releaseOnly` pre-ship check
 
-A `releaseOnly` `preShipChecks` entry runs at every release, `pathGlobs` ignored — unless the entry
-ALSO sets `"onlyWhenTouched": true`. Then it runs only when the release diff touches one of its
-`pathGlobs`, and step 2b reports a skip with its reason (never silently). The diff is
-`origin/<productionBranch>...<head>` for the release head as it stands when 2b runs, and the
+A `releaseOnly` `preShipChecks` entry runs at every release, `pathGlobs` ignored — unless it ALSO
+sets `"onlyWhenTouched": true`. Then it runs only when the release diff touches one of its
+`pathGlobs`, and step 2b reports the skip with its reason. The diff is
+`origin/<productionBranch>...<head>` for the release head as it stands at 2b, and the
 selection is recomputed whenever the head moves (a fix commit, a hotfix merge). A diff that cannot
 be computed runs the check.
 
@@ -56,5 +56,5 @@ once over the whole train.
 
 ## Cited by
 
-- `skills/release/SKILL.md` — steps 2 and 2b.
+- `skills/release/SKILL.md` — step 2; `skills/pre-ship/SKILL.md` — 2b's selection.
 - `skills/release/references/release-branch.md` — §1 step 4.

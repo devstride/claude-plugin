@@ -155,4 +155,33 @@ PYI
 gen --write --check
 [ "$RC" = 2 ] && ok "(18) --write with --check is a usage error" || bad "(18) exit $RC: $OUT"
 
+# (20) the step-skill seams are registered as unreleased hooks with a contract, and every hook a step
+# runs names its step and verdict lines
+OUT="$(python3 - "$ROOT" <<'PYS'
+import json, os, sys
+root = sys.argv[1]
+reg = json.load(open(os.path.join(root, "schemas/seam-registry.json")))
+hooks = {h["key"]: h for h in reg["hooks"]}
+problems = []
+for key in ("docs.knowledgeBaseSyncSkill", "release.classifySkill", "release.preMergeSkill",
+            "pool.checkout", "pool.checkin"):
+    h = hooks.get(key)
+    if not h:
+        problems.append("MISSING " + key); continue
+    if h.get("since") != "unreleased" and not h.get("since", "").startswith(("3.", "4.")):
+        problems.append("SINCE " + key)
+    if not os.path.isfile(os.path.join(root, h.get("contract", ""))):
+        problems.append("CONTRACT " + key)
+for h in reg["hooks"]:
+    if "step" in h and not os.path.isfile(os.path.join(root, "skills", h["step"], "SKILL.md")):
+        problems.append("STEP %s -> %s" % (h["key"], h["step"]))
+print("\n".join(problems) or "clean")
+PYS
+)"
+[ "$OUT" = clean ] && ok "(20) the five step-skill seams are registered with a contract; every step a hook names exists" \
+  || bad "(20) $OUT"
+copy; edit schemas/seam-registry.json 'd["hooks"][0]["step"] = "update-docs"; d["hooks"][0].pop("stepVerdict", None)'; gen --check
+[ "$RC" = 1 ] && printf '%s' "$OUT" | grep -q "^REGISTRY .*stepVerdict" \
+  && ok "(21) a hook naming a step without its verdict lines is a REGISTRY finding" || bad "(21) exit $RC: $OUT"
+
 exit "$FAIL"

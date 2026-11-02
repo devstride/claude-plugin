@@ -45,9 +45,12 @@ one-off: $ARGUMENTS
   `epicIntegrationBranches.releaseTarget`; it surfaces `/devstride:release`, which merges to
   `release.productionBranch` only on the owner's explicit yes.
 - **Checkout pool — lease, never mint.** When the repo's `conventionsDoc` or config declares a fixed
-  checkout pool, work only in a member held under a lease. Never create a worktree or instance
-  unless the owner asks in this conversation; never delete another session's lease. Pool, lease name
-  and hand-back come from the repo, never hard-coded; protocol in `ground-truth-at-start.md`.
+  checkout pool, work only in a member held under a lease — with `pool.checkout` set, taken by
+  **`lease-checkout`** and returned by **`return-checkout`** on the lifecycle in
+  `checkout-pool-commands.md`; otherwise pool, lease name and
+  hand-back come from the repo, never hard-coded (`ground-truth-at-start.md`). Never create a
+  worktree or instance unless the owner asks in this conversation; never delete another session's
+  lease.
 - **Serial by design.** "Parallel waves" are SHAPE (why: `references/next-unblocked.md`):
   `localEnvironment` never makes the loop concurrent; a human fans out the ready-set.
 - **Full-auto through merge.** PAUSE only at a genuine fork: a user's human/infra decision, an
@@ -64,11 +67,10 @@ Knobs, floors, resolution order and root marker live ONLY in
 `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` — never restate its table. This
 skill honours `perStoryPullRequest` (4), `storyVerify` (4a), `autoRelease` and `releaseCiOrdering` (8).
 
-- **Resolve once the story is SELECTED**, by the contract's order: explicit word in `$ARGUMENTS`
-  (`prototype`/`standard`/`extended`; unknown → `standard`, said so) → root marker → config `profile` → `standard`.
-  The marker walks the story's ancestors (`hierarchy` for the chain, `get_item` with `view: 'full'`
-  each) and takes the NEAREST marker. A one-off skips only the marker step. Never carried over from
-  the previous story.
+- **Resolve once the story is SELECTED**, in the contract's order (explicit word → root marker →
+  config `profile` → `standard`; an unknown word → `standard`, said so). The marker walks the
+  story's ancestors (`get_item` with `view: 'full'` each) and takes the NEAREST. A one-off skips
+  only the marker step. Never carried over from the previous story.
 - **Announce it WITH ITS SOURCE** — `profile: extended — from the plan root I20100` — in the
   `Profile` row and handoff memory; pass it **by name**, `profile: <name>`, to `ultracode-build` (3),
   `review` (4a, 4b) and `pr` (4b, 8), which never re-resolve it.
@@ -76,8 +78,6 @@ skill honours `perStoryPullRequest` (4), `storyVerify` (4a), `autoRelease` and `
   dedicated key, resolved before any decision reads them. A present
   `epicIntegrationBranches.autoRelease` or `fastStoryMerges.enabled` wins, its contradiction with
   the profile reported aloud; unknown overrides are reported and ignored; none lowers a floor.
-- **The three `review.*` CI-ordering booleans describe what the workflows SUPPORT**: every profile
-  uses the supported hold; PR workflows without one are a setup fault.
 
 ## Progress table — at every step transition
 
@@ -142,7 +142,8 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
 
 ## 0. Select the story
 
-- **Ground truth first.** Hold your checkout under the pool rule, `git fetch --prune origin`, and read
+- **Ground truth first.** Hold your checkout under the pool rule (**`lease-checkout`** once per run
+  when `pool.checkout` is set, kept across iterations), `git fetch --prune origin`, and read
   what OTHER authors landed on the base (and epic) branch since the handoff — say so when another
   session appears active. Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`.
 - **Plan root**: `$ARGUMENTS`, else handoff memory; not ONE unambiguous root while several plans are
@@ -155,6 +156,8 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   plan complete / N landed, awaiting their release (gate on → step 8 for it, then step 0) / N
   blocked by X, Y / N gated. Suggest `/devstride:plan <root>` only when the chain ran out; never
   invoke it.
+- **Every exit from step 0** (DRY-CHAIN/TERMINAL, an ambiguous root, a given item merged or Done,
+  any other stop before step 1) → **`return-checkout`** first when this run leased.
 - **GATING CHECK** (a decision that is the user's → flag, next candidate), **SCOPE CHECK**
   (buildable now vs deferred, recorded), **VALIDATE THE SPEC** (re-fetch with `view: 'full'`; confirm
   paths, symbols and assumptions against the code).
@@ -233,9 +236,8 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 - **Observe greenness**: non-draft, and every applicable check succeeded — actually RAN — at the
   CURRENT head SHA. Re-poll only after a re-push, with `review` step 7's background poll; never
   `gh pr checks --watch`.
-- **Red CI**: failed to TRIGGER → `review` step 7.3 (close+reopen, then one empty commit);
-  flaky/infra → `gh run rerun <id> --failed`, ~2 tries; real → reproduce, fix, push, re-poll. Never
-  merge red; never quit after one failure.
+- **Red CI** → `review` step 7's ladder (failed to trigger, flaky, real). Never merge red; never
+  quit after one failure.
 - Slow suites (`verify.skipDuringStoryBuilds`): story PRs into an epic branch never wait on them; on
   develop each follows its applicability; an empty list settles an absent check. **Read the config
   before concluding either.**
@@ -275,7 +277,8 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 ## 7. Sync and proceed
 
 - `git checkout <working base> && git pull --ff-only`; **assert a clean tree** — dirty → name the
-  drift and STOP; never auto-reset or `git add .`.
+  drift and STOP; never auto-reset or `git add .`. Terminal exit or hand-over only:
+  **`return-checkout`**, after this sync.
 - **Handoff memory**: what shipped, what remains, the plan root WITH profile and source (never the
   profile alone), the epic's integration branch keyed to its number (or "develop — no epic").
 - **Counts**: `hierarchyRoles.leaf` descendants neither Done nor landed, of **the SAME
@@ -322,13 +325,10 @@ unit at zero and before cutting the release PR.**
   date), Done if its status is tracked, THEN landed leaves → Done, **linking the release PR onto
   every leaf** (the close-out comment, or `link_pull_request`). Delete the epic branch **only if
   `epicIntegrationBranches.deleteBranchAfterRelease`** — false retains it.
-- **Docs STAGE, never publish** — only when `docs.updateOnEpicRelease` is true (else silent):
-  `docs.updateSkill` null → say none is registered; a name with no `.claude/skills/<name>/SKILL.md`
-  → report the dangling hook and its fix (`/devstride:setup docs`), continue; otherwise invoke it in
-  mode `update` with the epic payload (`kind: "epic-release"`, release PR, merge commit, each leaf's
-  plain-English `summary` and `userFacing` judgement, **`live: false`**, never optional — shape:
-  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`), keeping its links exact. **Never
-  release notes here.**
+- **Docs STAGE, never publish** — only when `docs.updateOnEpicRelease` is true (else silent): call
+  **`update-docs update`** with the `epic-release` payload, **`live: false`**, never optional
+  (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`, every field it names);
+  `NOT CONFIGURED` → say so and continue; keep its links exact. **Never release notes here.**
 - Update handoff memory and sync develop.
 - **Human recap.** Lead with `Merged / Released`: every item and its effect, where it landed,
   validation/review/CI, docs, whether live, the remaining production action. Surface — never

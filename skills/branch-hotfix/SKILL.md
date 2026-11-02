@@ -58,18 +58,20 @@ The production branch is OLDER than what the instance has been running. `migrate
 forward, so running them leaves the instance schema-AHEAD of the code — the hotfix then validates
 against a schema production does not have. **An ABSENT `localEnvironment` member is the shipped
 `null`** (every config written before `recreate` existed omits it) — read every missing member as
-`null` throughout. Three cases:
+`null` throughout. Each command runs through the **`local-environment`** step, one verb per call
+(`${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md`); which verbs run, and when to
+stop, is decided here. Three cases:
 
-1. **`recreate` set** → run it after substituting its placeholders — **never pass one through to a
-   shell** (`<base>` unexpanded is input redirection and reads as a broken environment). `<base>` =
-   the fetched `hotfixBaseBranch` ref (a stale tracking ref rebuilds old production); `<branch>` =
-   the new hotfix branch; **`<name>` per `localEnvironment.recreateMode`, the ONLY thing that says
+1. **`recreate` set** → `local-environment recreate`, with every placeholder substituted — **never
+   pass one through to a shell** (`<base>` unexpanded is input redirection). `<base>` = the
+   fetched `hotfixBaseBranch` ref (a stale tracking ref rebuilds old production); `<branch>` = the
+   new hotfix branch; **`<name>` per `localEnvironment.recreateMode`, the ONLY thing that says
    what the command does — never inferred from the command text** (a wrapper is opaque, and both
    wrong guesses do damage):
    - `"newInstance"` → a NEW name (the hotfix item number is an obvious one); then move the session
      into the instance it creates;
-   - `"inPlace"` → the instance the session is ALREADY in, named by running
-     `localEnvironment.instanceName`; null or failing → **STOP and ask** (a directory-name guess
+   - `"inPlace"` → the instance the session is ALREADY in, named by `local-environment name`
+     (`localEnvironment.instanceName`); null or failing → **STOP and ask** (a directory-name guess
      silently resets someone else's instance);
    - mode absent/`null` while `recreate` contains `<name>` → **STOP and ask**, explaining both
      values; never pick. (No `<name>` → no mode needed.)
@@ -77,8 +79,8 @@ against a schema production does not have. **An ABSENT `localEnvironment` member
    The session must end in a WORKING instance — never in a directory whose instance was torn down,
    or on a detached HEAD the rebuilt instance no longer belongs to.
 2. **`recreate` absent/`null` and you can say WHY the schema has not diverged** (the instance stayed
-   on the production line, or there is no schema) → `migrate` then `seed`, in that order (a seed
-   against a stale schema fails or lies).
+   on the production line, or there is no schema) → `local-environment migrate`, then `seed`, in
+   that order (a seed against a stale schema fails or lies).
 3. **`recreate` absent/`null` and the schema HAS diverged or you cannot tell** → **STOP and ask.**
    Never migrate forward and carry on. Name the missing `localEnvironment.recreate`, offer the manual
    route (a fresh instance from the hotfix base), and continue only once the user confirms a rebuild

@@ -273,7 +273,7 @@ reads `skipping`, or CI is red.**
    drafts (resume then skips an inapplicable flip); after 7.1 so the suites test the FINAL head. **The caller MUST re-invoke in PRE-SHIP
    RESUME** — an unresumed hold strands a permanent draft; a caller that cannot finish says so and
    resumes or abandons explicitly. A substantive pre-ship fix follows step 5's rule; re-run only
-   failed/affected pre-ship commands.
+   failed/affected ones (`pre-ship --only`).
 2. **Slow suites** (`verify.skipDuringStoryBuilds`). **Empty (default): nothing to compute** — no
    extra check, no label, never wait on or rerun one; out-of-CI suites are the caller's local
    `preShipChecks`. **Non-empty:** applicability per
