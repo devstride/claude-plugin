@@ -36,8 +36,8 @@ STOPS and asks, and never retries with another name.
   branches freely while holding it.
 - **Busy** → ask the holder or the owner. Never create another checkout or worktree to get round
   it, and never delete or overwrite another session's lease.
-- **Returned** → only after the work has merged or been handed over and every process this
-  session started there has stopped.
+- **Returned** → only after the work has merged or been handed over, or the run ended at step 0
+  before building anything, and every process this session started there has stopped.
 - **Unset** (`pool.checkout` null or absent): the repository's own lease protocol applies when its conventions declare a pool; otherwise there is no pool and no lease (the generic protocol in
   `ground-truth-at-start.md`), said once.
 
@@ -46,8 +46,8 @@ STOPS and asks, and never retries with another name.
 - **`lease-checkout` once per top-level run, before the first fetch** (step 0's ground truth),
   and the lease is KEPT across loop iterations: a story that ends in "then step 0" never hands
   the checkout back.
-- **`return-checkout` only after the last checkout operation** — after step 7's checkout, pull and
-  clean-tree check, never before them — and only at a terminal exit (a one-off's TERMINATE, step
+- **`return-checkout` only after the last checkout operation** — for a run that built something,
+  after step 7's checkout, pull and clean-tree check, never before them — and only at a terminal exit (a one-off's TERMINATE, step
   8's release-ready stop) or a hand-over to another session or the owner. A STOP in steps 1–7 that
   leaves the work for this session to resume keeps the lease.
 - **Every exit from step 0 returns it too**, before the run ends — DRY-CHAIN or plan complete, an
