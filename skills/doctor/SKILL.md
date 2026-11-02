@@ -304,8 +304,9 @@ Neither set → **N/A**, not a failure: the release skill's docs pass reports it
   (missing → FAIL, a dangling hook; contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/post-deploy-check.md`). Unset → N/A; the close-out
   reports `not configured`.
-- **`release.clearance`** — null → N/A. Its shape (exactly one of `provider: github` or the
-  `commands` verbs) is §4's validator. `provider: github` → run its `status` once (read-only),
+- **`release.clearance`** — null → N/A. Shape: §4's validator (run it here when §4 did not):
+  its `release.clearance` lines — both shapes, a `provider` other than `github`, a missing verb —
+  FAIL. `provider: github` → run its `status` once (read-only),
   report the line; `UNKNOWN` FAILs naming the cause. No `.github/workflows/release-tower.yaml`
   beside it → INFO: `/devstride:setup ci` offers the floor. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`.
