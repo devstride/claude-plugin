@@ -67,11 +67,15 @@ for what each version component means here and how a release is cut.
   stays owed (`skills/release/references/docs-hooks.md`): a failed docs, knowledge-base or
   release-notes run stays owed; a staged one names the owner action in the recap; a docs hook that
   names a missing skill is reported when the release plans its documentation and is never owed. The
-  knowledge-base sync runs only when its hook is set and the docs were published; its re-run line
-  and the `no docs` catch-up print complete, runnable commands.
+  knowledge-base sync is planned only beside a valid docs hook and runs only when the docs were
+  published; its re-run line and the `no docs` catch-up print complete, runnable commands, each
+  followed by the `owed --done` command that settles the item once it succeeds.
 - **`build-item` leases a pool checkout once per run and keeps it across stories**, returning it
-  only at a terminal exit or a hand-over, after its final sync; `doctor` warns when only one of
-  `pool.checkout` and `pool.checkin` is set.
+  at a terminal exit or a hand-over after its final sync, and on every exit from selecting the
+  next item (nothing left, an ambiguous plan, an item already done). `pool.checkout` and
+  `pool.checkin` are set together or not at all: one alone is a config error the validator (and
+  `doctor`) reports, and both steps refuse to run, so a lease is never taken that nothing returns.
+  The validator gains its own `x-setTogether` keyword for this.
 - **`doctor` section 7 checks every skill-shaped hook in one loop** (the docs skills, the
   knowledge-base sync, the post-deploy check and the two release safety hooks): unset is N/A, a
   named skill must exist, and only the docs skills' and the knowledge-base sync's read-only `check`
@@ -83,14 +87,14 @@ for what each version component means here and how a release is cut.
   skill listing, and each new step adds a description line to it.
 - New: the ten step bodies (454 to 967 tokens each; `pre-ship` 967 and `update-docs` 872 carry the
   waivers, narrowed re-runs and docs verdicts) and three contracts (`step-skills.md` 971,
-  `release-safety-hooks.md` 1,116, `checkout-pool-commands.md` 1,175). `docs-hooks.md` grows to
-  3,903 with the documentation plan and the per-verdict owed table.
-- Bodies: `release` 7,998 → 7,970, `build-item` 8,000 → 8,000, `pr` 3,763 → 3,557, `doctor` 7,952
-  → 7,891, `branch-hotfix` 2,107 → 2,182, `review` 7,996 → 7,998.
-- Composed paths, re-baselined to what they now load: `productionReleaseGate` 66,012 → 74,098
-  (+12.3%: the seven release-side steps, `step-skills.md` and `release-safety-hooks.md`, and the
-  docs-hooks and clearance growth); `fastStoryLoop` 58,408 → 61,576 (+5.4%: the lease pair,
-  `step-skills.md` and `checkout-pool-commands.md`); `epicReleaseGate` 70,180 → 74,131 (+5.6%:
+  `release-safety-hooks.md` 1,116, `checkout-pool-commands.md` 1,321). `docs-hooks.md` grows to
+  4,146 with the documentation plan and the per-verdict owed table.
+- Bodies: `release` 7,998 → 7,987, `build-item` 8,000 → 7,964, `pr` 3,763 → 3,557, `doctor` 7,952
+  → 7,854, `branch-hotfix` 2,107 → 2,182, `review` 7,996 → 7,998.
+- Composed paths, re-baselined to what they now load: `productionReleaseGate` 66,012 → 74,519
+  (+12.9%: the seven release-side steps, `step-skills.md` and `release-safety-hooks.md`, and the
+  docs-hooks and clearance growth); `fastStoryLoop` 58,408 → 61,802 (+5.8%: the lease pair,
+  `step-skills.md` and `checkout-pool-commands.md`); `epicReleaseGate` 70,180 → 74,338 (+5.9%:
   `pre-ship`, `update-docs`, `step-skills.md` and `docs-hooks.md`). The steps load only when
   called, so a run that calls none of them pays only the always-on listing.
 
