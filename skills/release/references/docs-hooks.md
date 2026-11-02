@@ -128,11 +128,47 @@ Its step is `sync-knowledge-base`, which `release` calls right after 5c.
   "published", "live": true }`. Any other outcome, or `live` false, is `NOT RUN` without invoking
   it: a knowledge base never runs ahead of the documentation it mirrors.
 - **Mode `check`**, with no payload (also what a bare `/devstride:sync-knowledge-base` runs): the
-  skill checks its own preconditions, read-only.
+  skill checks its own preconditions, read-only. A re-run of the sync names the mode:
+  `/devstride:sync-knowledge-base sync {"docsOutcome": "published", "live": true}`.
 - **First line**: `KNOWLEDGE BASE SYNC: DONE`, `CURRENT` (nothing to change) or `FAILED`, then
   evidence. A `FAILED` never undoes or reverts the documentation push; the step adds the line
-  `re-run: /devstride:sync-knowledge-base`, and `release` records it owed as `knowledge-base`.
-- **`no docs`** on a release also skips the sync, and the recap names the catch-up command.
+  `re-run: /devstride:sync-knowledge-base sync {"docsOutcome": "published", "live": true}`, and
+  `release` keeps `knowledge-base` owed.
+- **`no docs`** on a release also skips the sync, and the recap names the catch-up commands.
+
+## What `release` does with each docs verdict
+
+**Step 3 — the documentation plan, before anything is owed.** For each hook this release would
+run (`docs.updateSkill`; `docs.knowledgeBaseSyncSkill`; `docs.releaseNotesSkill` when
+`--release-notes` asked), check that `.claude/skills/<name>/SKILL.md` exists:
+
+- **Resolves** → it joins the plan in the step-4 recap and is owed at 5b (`docs`,
+  `knowledge-base`, `release-notes`), unless `no docs` suppresses the first two.
+- **Set but dangling** → report it now with its fix (`/devstride:setup docs`) and leave it out of
+  the plan. It is never owed, so it can never sit in "close-out owed" for good.
+- **Unset** → `docs.updateSkill`: "none registered"; `docs.knowledgeBaseSyncSkill`: say
+  nothing — the release prints no line for a knowledge base it does not have.
+- **`release.docsRepo` present** → report the deprecation and its migration whatever else is
+  set; a valid `docs.updateSkill` still runs.
+
+**Steps 5c–5e — owed accounting and the close-out's `docs` value.** Each owed item is settled with
+`owed --done <item>` only on a successful or genuinely current result:
+
+| `update-docs` | `docs` owed | `knowledge-base` owed | close-out `docs` |
+|---|---|---|---|
+| `PUBLISHED` | settled | run `sync-knowledge-base sync`: `DONE`/`CURRENT` settles; `FAILED` stays owed with its re-run line | `published` |
+| `CURRENT` | settled | settled: nothing new to mirror | `nothing to change` |
+| `STAGED` | settled; the recap names the owner action (a draft to look at, a pull request to merge) | stays owed; catch-up once the docs are live | `skipped` |
+| `FAILED` | stays owed | stays owed | `failed` |
+| `no docs` | never owed | never owed | `skipped` |
+
+`write-release-notes`: `PUBLISHED` or `DRAFTED` settles `release-notes`; `FAILED` keeps it owed.
+
+**The catch-up after `no docs`** is printed whole, because a bare `/devstride:update-docs update`
+refuses without a payload: `/devstride:update-docs update` followed by this release's completed
+payload as a fenced JSON block (`live: true`), then, when `docs.knowledgeBaseSyncSkill` is set,
+`/devstride:sync-knowledge-base sync {"docsOutcome": "published", "live": true}` once the docs are
+live.
 
 ## Templates
 

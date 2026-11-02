@@ -32,12 +32,12 @@ and anyone can run it alone as `/devstride:<name>` — for example to re-run one
 | Step | Seam | Unset | Configured but broken |
 |---|---|---|---|
 | `update-docs` | `docs.updateSkill` | NOT CONFIGURED | FAILED |
-| `sync-knowledge-base` | `docs.knowledgeBaseSyncSkill` | NOT CONFIGURED | FAILED, re-run line; docs push stands |
+| `sync-knowledge-base` | `docs.knowledgeBaseSyncSkill` | NOT CONFIGURED | FAILED, a `sync` re-run line; docs push stands |
 | `write-release-notes` | `docs.releaseNotesSkill` | NOT CONFIGURED, never improvised | FAILED |
-| `pre-ship` | `preShipChecks` | NOTHING TO RUN | FAIL |
+| `pre-ship` | `preShipChecks` | NOTHING TO RUN | FAIL, naming every failed entry |
 | `post-deploy` | `release.postDeployCheckSkill` | NOT CONFIGURED | NOT RUN, owner asked |
 | `local-environment` | `localEnvironment.*` | NOT CONFIGURED | FAILED |
-| `lease-checkout` | `pool.checkout` | NOT CONFIGURED, no lease | ERROR |
+| `lease-checkout` | `pool.checkout` | NOT CONFIGURED: the repository's own lease protocol applies when its conventions declare a pool; otherwise there is no pool and no lease | ERROR |
 | `return-checkout` | `pool.checkin` | NOT CONFIGURED | ERROR |
 | `classify-release` | `release.classifySkill` | FULL | FULL |
 | `pre-merge-check` | `release.preMergeSkill` | NOT CONFIGURED, said at the go-ahead | NOT RUN, owner asked |

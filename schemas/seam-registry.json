@@ -24,7 +24,7 @@
       "since": "pre-registry",
       "step": "update-docs",
       "stepVerdict": [
-        "UPDATE DOCS: PUBLISHED | STAGED | NOT CONFIGURED | FAILED",
+        "UPDATE DOCS: PUBLISHED | STAGED | CURRENT | NOT CONFIGURED | FAILED",
         "UPDATE DOCS CHECK: PASS | FAIL | NOT CONFIGURED"
       ]
     },
@@ -59,7 +59,7 @@
       "shape": "skill",
       "valueType": "string",
       "nullable": true,
-      "payload": "sync: {docsOutcome, live} as a fenced JSON block; check: none (the skill checks its own preconditions)",
+      "payload": "sync: {docsOutcome, live} as a fenced JSON block (a re-run names `sync` too); check: none (the skill checks its own preconditions)",
       "modes": [
         "sync",
         "check"
@@ -302,7 +302,7 @@
       "step": "pre-ship",
       "stepVerdict": [
         "PRE-SHIP SELECTED: <names> | PRE-SHIP: NOTHING TO RUN",
-        "PRE-SHIP: PASS (<n> ran) | PRE-SHIP: FAIL <name>"
+        "PRE-SHIP: PASS (<n> ran, <k> waived) | PRE-SHIP: FAIL <names>"
       ]
     },
     {
@@ -431,7 +431,7 @@
         "lease-checkout",
         "build-item floors"
       ],
-      "unset": "the current checkout is the only environment and no lease is taken",
+      "unset": "the repository's own lease protocol applies when its conventions declare a pool; otherwise there is no pool and no lease",
       "contract": "skills/build-item/references/checkout-pool-commands.md",
       "since": "unreleased",
       "step": "lease-checkout",

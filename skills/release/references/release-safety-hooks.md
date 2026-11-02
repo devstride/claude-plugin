@@ -20,7 +20,8 @@ name, a mode word, and a fenced JSON payload. `null` or absent means not configu
 
 ## `release.classifySkill` — light or full
 
-- **When:** `release` step 0, once the release head is known; the step is `classify-release`.
+- **When:** `release` step 0, once the release head is known, and again at step 2b; the step is
+  `classify-release`.
 - **Invocation:** `classify` and `{ "productionBranch": "<name>", "releaseSource": "<name>",
   "head": "<sha>" }`.
 - **First line:** exactly `RELEASE CLASS: LIGHT` or `RELEASE CLASS: FULL`, then one line giving
@@ -28,8 +29,11 @@ name, a mode word, and a fenced JSON payload. `null` or absent means not configu
   repository's own rule; the plugin only carries the class.
 - **Unset, a name with no `SKILL.md`, a failing run or any other first line:** `RELEASE CLASS:
   FULL`, with the reason. A release is never light by default.
-- **Where it goes:** the class and reason print in step 0's delta summary and the step-4 recap,
-  and step 2b exports it to every pre-ship command as `RELEASE_CLASS=light|full`.
+- **Where it goes:** the class and reason print in step 0's delta summary. Because a merge, a
+  review fix or a hotfix can change the delta after step 0, step 2b runs `classify-release`
+  AGAIN at the head it tests, immediately before `pre-ship release run`; that class is the one
+  exported to every pre-ship command as `RELEASE_CLASS=light|full` and the one the step-4 recap
+  reports.
 
 ## `release.preMergeSkill` — anything production needs before the merge
 

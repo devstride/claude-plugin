@@ -1018,7 +1018,7 @@
             "string",
             "null"
           ],
-          "description": "skill hook — sync: {docsOutcome, live} as a fenced JSON block; check: none (the skill checks its own preconditions)"
+          "description": "skill hook — sync: {docsOutcome, live} as a fenced JSON block (a re-run names `sync` too); check: none (the skill checks its own preconditions)"
         },
         "updateOnEpicRelease": {
           "type": "boolean",
