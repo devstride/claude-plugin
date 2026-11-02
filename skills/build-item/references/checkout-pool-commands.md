@@ -20,6 +20,10 @@ authority for the two commands.
 | `pool.checkout` | Leases one member. Placeholders `<member>` (the checkout to lease) and `<purpose>` (the item or reason, shell-quoted) are substituted before it runs; neither is ever passed through to the shell unexpanded. **Exit 0** — the checkout is now held by this session. **Exit 2** — not held: another session holds it, or it is in use without a lease. **Any other exit** — an error. Its first stdout line is quoted as evidence either way. |
 | `pool.checkin` | Returns one member. Placeholder `<member>`. **Exit 0** — returned. **Any other exit** — a refusal (not the holder, a dirty tree, a process still running); its first line is quoted and it is never retried blindly. |
 
+**Set both or neither.** `pool.checkout` without `pool.checkin` takes a lease nothing can return;
+`doctor` reports either one alone. The same session leasing a member it already holds exits 0 (a
+renewal), so a loop may call `pool.checkout` on every run.
+
 The commands never list members: the caller names one. `build-item` passes the name of the
 checkout directory it is working in when nothing else names it; a refusal of that guessed name
 STOPS and asks, and never retries with another name.
@@ -32,11 +36,22 @@ STOPS and asks, and never retries with another name.
   it, and never delete or overwrite another session's lease.
 - **Returned** → only after the work has merged or been handed over and every process this
   session started there has stopped.
-- **Unset** (`pool.checkout` null or absent): the generic default — the current checkout is the
-  only environment and no lease is taken, said once. A pool the conventions document declares
-  without these commands still follows the generic lease protocol.
+- **Unset** (`pool.checkout` null or absent): the repository's own lease protocol applies when its conventions declare a pool; otherwise there is no pool and no lease (the generic protocol in
+  `ground-truth-at-start.md`), said once.
+
+## When `build-item` calls the steps
+
+- **`lease-checkout` once per top-level run, before the first fetch** (step 0's ground truth),
+  and the lease is KEPT across loop iterations: a story that ends in "then step 0" never hands
+  the checkout back.
+- **`return-checkout` only after the last checkout operation** — after step 7's checkout, pull and
+  clean-tree check, never before them — and only at a terminal exit (DRY-CHAIN or plan complete,
+  a one-off's TERMINATE, step 8's release-ready stop) or a hand-over to another session or the
+  owner. A STOP that leaves the work for this session to resume keeps the lease.
+- Every process the run started in the checkout stops before the return.
 
 ## Cited by
 
 - `skills/lease-checkout/SKILL.md`, `skills/return-checkout/SKILL.md` — the two steps.
-- `skills/build-item/SKILL.md` — the checkout-pool floor.
+- `skills/build-item/SKILL.md` — the checkout-pool floor, step 0 and step 7.
+- `skills/build-item/references/ground-truth-at-start.md` — the lease protocol's hand-off.

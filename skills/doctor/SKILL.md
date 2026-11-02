@@ -67,10 +67,8 @@ next action. For each failure symptom, read
   the root with `git rev-parse --show-toplevel` and use the schema in `version-currency.md`. On one
   line report `checkedAt`, `running`, `newest`, `mode`, `result`, `install`, `statusLine`. Absent:
   say never run here (pre-1.2.0 plugin, disabled hooks, or
-  `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). Modes: `notify` fallback; `auto-update` only for a repo-bound
-  project/local install; `pinned` never updates. Shared user copies hand off to update, managed
-  copies to their administrator, and ambiguous copies to Doctor. A verified disk change needs
-  plugin reload (restart only if reload fails).
+  `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). Modes and who each copy hands off to: `version-currency.md`.
+  A verified disk change needs plugin reload (restart only if reload fails).
 - **Repo declaration** — `.claude/settings.json` enables but does not install. Print
   `version-currency.md`'s install line for this repository's rows (its `enabledPlugins` id). Always run both
   `git ls-files --error-unmatch .claude/settings.json` (tracked?) and
@@ -187,11 +185,13 @@ next action. For each failure symptom, read
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
   **array**, so iterate it — `review.localCommand`, `review.localAssistCommand`,
-  `generated.regenCommand`,
-  `preShipChecks[].command`, each non-null `localEnvironment.*` command, and `stage.resolve`): split on `&&` and `;`, take the first token of **each** segment, and
+  `generated.regenCommand`, `preShipChecks[].command`, each non-null `localEnvironment.*` command,
+  `stage.resolve`, `pool.checkout` and `pool.checkin`): split on `&&` and `;`, take the first
+  token of **each** segment, and
   skip shell builtins (`cd backend && pnpm test` starts with `cd`, which always resolves). A
   single-word command that does not resolve may be a shell alias or function — report "not on
-  PATH (may be an alias)", not a flat FAIL.
+  PATH (may be an alias)", not a flat FAIL. **`pool.checkout` and `pool.checkin` are set both or
+  neither**; one alone → WARN, a lease nothing returns.
 - **`conventionsDoc` exists** — set → the file must be present; the build engine reads it.
 
 ## 5. The CI draft gate (`ci`)

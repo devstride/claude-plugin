@@ -17,8 +17,7 @@ No member → the name of the checkout directory this session works in. Command 
 
 ## Steps
 
-1. Read `pool.checkout`. Null or absent → `NOT CONFIGURED`: the current checkout is the only
-   environment and no lease is taken — say so once.
+1. Read `pool.checkout`. Null or absent → `NOT CONFIGURED`: the repository's own lease protocol applies when its conventions declare a pool; otherwise there is no pool and no lease — say which, once.
 2. Substitute `<member>` and `<purpose>` (shell-quoted); never pass a placeholder through.
 3. Run it once. Exit 0 → `LEASED <member>`; exit 2 → `BUSY <member>`; any other exit →
    `ERROR`. Quote its first stdout line as evidence in every case.
@@ -26,5 +25,5 @@ No member → the name of the checkout directory this session works in. Command 
    it, and never delete or overwrite another session's lease.** A refusal of a guessed member name
    stops and asks; never retry with another name.
 
-Holding the lease makes the checkout this session's across branch switches; hand it back with
-`/devstride:return-checkout`.
+Call it once per top-level run, before the first fetch; the lease is kept across loop iterations
+and branch switches. Hand it back with `/devstride:return-checkout`.

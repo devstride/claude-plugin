@@ -17,8 +17,9 @@ in). Command contract: `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/check
 ## Steps
 
 1. Read `pool.checkin`. Null or absent → `NOT CONFIGURED`: nothing to hand back.
-2. Return only once the work has merged or been handed over, and only after stopping every process
-   this session started in that checkout (test runs, servers, watchers).
+2. Return only at a terminal exit or a hand-over, after the caller's last checkout operation (in
+   `build-item`, after step 7's sync — never between loop iterations), and only after stopping
+   every process this session started in that checkout (test runs, servers, watchers).
 3. Substitute `<member>` and run the command once. Exit 0 → `RETURNED <member>`; any other exit →
    `REFUSED <member>` with its first line (not the holder, a dirty tree, a process still running).
    A command that cannot run at all → `ERROR`.
