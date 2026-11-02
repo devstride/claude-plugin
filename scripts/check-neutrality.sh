@@ -7,8 +7,8 @@
 # time. Each one reads as an instruction to a stranger whose repository has none of them.
 #
 # What it scans: skills/, hooks/, schemas/, .claude-plugin/, README.md, CONTRIBUTING.md and
-# RELEASING.md under the root (not CHANGELOG.md, whose history may name retired things), one line
-# at a time, against scripts/neutrality-denylist.txt (`<label><TAB><pattern>`, Python regular
+# RELEASING.md under the root (not CHANGELOG.md, whose history may name retired things) — each
+# file's relative path, then its contents one line at a time, against scripts/neutrality-denylist.txt (`<label><TAB><pattern>`, Python regular
 # expressions). Item numbers are checked separately: an `I` and four to six digits is a finding
 # unless scripts/public-hygiene.allow lists it (`item <I-number> <reason>`), the one list of the
 # example numbers the shipped text may use.
@@ -19,7 +19,8 @@
 # denylist pattern.
 #
 # Usage: check-neutrality.sh [--root <dir>] [--denylist <path>] [--allow <path>] [--items <path>]
-# Output: `NEUTRALITY: CLEAN`, or one `NEUTRALITY: <file>:<line>: <label>: <excerpt>` per finding.
+# Output: `NEUTRALITY: CLEAN`, or one `NEUTRALITY: <file>:<line>: <label>: <excerpt>` per finding
+# (`<file>:path: <label>: <file>` when the path itself is the finding).
 # Exit 0 clean, 1 findings, 2 usage (an unreadable list or root, a bad pattern).
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -94,21 +95,23 @@ def exempt(line, start, end):
             i = line.find(s, i + 1)
     return False
 found = []
+def hits_in(line):
+    hits = []
+    for label, rx in deny:
+        hits += [(label, m) for m in rx.finditer(line)]
+    hits += [("item-number", m) for m in ITEM.finditer(line) if m.group(0) not in items]
+    return [(label, m) for label, m in hits if not exempt(line, m.start(), m.end())]
 for path in files:
+    rel = os.path.relpath(path, root)
+    for label, m in hits_in(rel):  # a file's own path ships too: a name is text a stranger reads
+        found.append("NEUTRALITY: %s:path: %s: %s" % (rel, label, rel))
     try:
         with open(path, encoding="utf-8") as f:
             text = f.read()
     except (UnicodeDecodeError, OSError):
         continue  # a binary file has no lines to read
-    rel = os.path.relpath(path, root)
     for n, line in enumerate(text.splitlines(), 1):
-        hits = []
-        for label, rx in deny:
-            hits += [(label, m) for m in rx.finditer(line)]
-        hits += [("item-number", m) for m in ITEM.finditer(line) if m.group(0) not in items]
-        for label, m in hits:
-            if exempt(line, m.start(), m.end()):
-                continue
+        for label, m in hits_in(line):
             excerpt = line.strip()
             if len(excerpt) > 120:
                 excerpt = excerpt[:117] + "..."

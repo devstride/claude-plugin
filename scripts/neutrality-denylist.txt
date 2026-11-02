@@ -7,10 +7,15 @@
 # provider, the `devstride:` skill namespace and product-prefixed variables are allowed — nothing
 # here matches them. Item numbers are checked by the script itself against
 # scripts/public-hygiene.allow. Exceptions go in scripts/neutrality-allow.txt with a reason.
+# `local-skill` is a consumer's own skill name (`ds-<word>-<word>…`); the plugin's single-word
+# files `ds-config` and `ds-lessons` never match it. `golden` names the consumer's demo data set,
+# so a generic "golden file" or "golden test" is not flagged.
 launcher	(^|[^A-Za-z0-9_./-])\./ds\b
-command-family	\bds (pool|tower|verify|golden|work|fleet|machine|stage|migrations|worktree|agent|neon|secrets|run|script|data)\b
-golden	(?i)\bgolden\b
+command-family	\bds\s+(-{1,2}[\w-]+(\s+[^\s-]\S*)?\s+)*(pool|tower|verify|golden|work|fleet|machine|stage|migrations|worktree|agent|neon|secrets|run|script|data|merge-path|team|quickbooks|graph|stripe)\b
+local-skill	\bds-[a-z0-9]+(-[a-z0-9]+)+\b
+merge-guard	\.claude/hooks/merge-guard
+golden	(?i)\bgolden[- ](dataset|data|build|builds|source|template|snapshot|clone|org|organization|login|logins|release|refresh|push|import|anchor|generator)\b
 neon	(?i)\bneon(ctl)?\b
 checkout-name	\bwt[0-9]+\b
-deploy-workflow	\bdeploy-prod\b|\bDeploy Prod\b
+deploy-workflow	(?i)\bdeploy[- ]prod\b
 pool-lease	(^|[^-])\bpool lease\b
