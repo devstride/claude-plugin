@@ -8,6 +8,19 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **The update check treats the repository's own maintainer files as unshipped.** `CLAUDE.md`,
+  `.github/` and `.claude/` join the root documents and `scripts/` on the list of paths a commit
+  after a release may change without a new version: `/devstride:update` and the session-start
+  check still install the release beneath such a commit. As with every widening, machines on
+  3.18.0 or older still count those paths as shipped until they update to this release.
+- **This repository now runs the delivery loop it ships.** Maintainers get a committed loop config,
+  a `plugin-release` skill that prepares and verifies a release, and three required checks on every
+  pull request into `main`: the version-bump guard (now run once, when a draft is marked ready for
+  review), an allowed branch shape, and a scan that keeps private references out of this public
+  repository. Nothing changes for installations beyond the update check above.
+
 ## [3.18.0] — 2026-11-01
 
 ### Changed

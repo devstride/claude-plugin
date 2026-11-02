@@ -1,8 +1,8 @@
 # Releasing
 
-Cutting a release is a short manual checklist. There is no CI pipeline and no package registry — the
-marketplace source is this git repository, so the release artifacts are a version, a changelog entry,
-and a tag.
+A release is a pull request into `main` that carries a version bump. There is no package registry —
+the marketplace source is this git repository, so the release artifacts are a version, a changelog
+entry, and a tag, and the `release-guard` workflow pushes the tag when the release merges.
 
 ## Why the version matters more than usual
 
@@ -34,103 +34,53 @@ an existing `.claude/ds-config.json` key keep working, and keep meaning the same
 MAJOR bump. New skills and new keys can arrive in a MINOR — the promise protects what you already
 depend on, it does not freeze the surface.
 
-## The checklist
+## Cutting a release
 
-0. **Validate what you are about to ship.**
+The repo-local `plugin-release` skill (`.claude/skills/plugin-release/SKILL.md`) is the checklist;
+run it rather than these steps by hand.
 
-   ```bash
-   bash scripts/validate.sh --needles
-   ```
+- **`plugin-release prepare [major|minor|patch]`**, on the branch whose pull request carries the
+  release: `bash scripts/validate.sh --needles` (the three `claude plugin validate` passes, the
+  marketplace invariant, `bash -n` over every shipped script, the script tests, the load budgets and
+  the rule-loss needles — a budget breach or a DEAD REFERENCE blocks exactly like a manifest error;
+  a needle MISS is a prompt to read), then the CHANGELOG move with its comparison links and the
+  generated `### Cost` table, the version in `plugin.json` and the README's `Current version:` line,
+  the status-line marker when that script changed, and one `release: v<version>` commit that
+  `scripts/check-version-bump.sh` accepts.
+- **The pull request merges**, after the delivery loop's review and the three required checks
+  (`release-guard`, `merge-path`, `public-hygiene`; AGENTS.md, "How a change reaches `main`").
+- **`release-guard` tags `devstride--v<version>`** on the merge commit. Never tag by hand and never
+  push to `main`: the tag is created only for a commit that is already on `main`, so a public
+  release tag can never name a commit nobody merged.
+- **`plugin-release verify`** waits for the tag and proves a scratch project installs the version.
+- **Announce it**, including `/devstride:update` for installations on 3.5.1 or newer and the two
+  native bootstrap commands below for everything older — on 3.1.0–3.5.0 `/devstride:update` can
+  stop with `plugin-root-missing` (fixed in 3.5.1), and older copies do not contain the skill.
 
-   That one command runs everything: the three `claude plugin validate` passes (the marketplace
-   manifest, the skill frontmatter, and the plugin manifest from a copy without
-   `marketplace.json` — one run does not cover it, and the root-level run silently skips the
-   third), the marketplace invariant, `bash -n` over every shipped script, the script tests, and
-   the body/reference/composed-path budget check. **A budget or hard-ceiling breach blocks the
-   release exactly like a manifest error** — reduce the load, or raise only an eligible ratchet
-   visibly with the text that needs it; moving text to a reference does not bypass the check.
-   `--needles` adds the rule-loss check from
-   `delivery-loop-invariants.md` — a needle MISS is advisory (a prompt to read, not a failure); a
-   DEAD REFERENCE is blocking and fails the step.
+Three rules the skill applies, and why:
 
-   **If this release changes `skills/setup/references/statusline.sh`**, raise the
-   `# ds-statusline: managed v<x.y.z>` marker on its line 2 in the same commit — the session-start
-   hook compares that marker against the copy in each repository, so an unchanged marker strands
-   the fix in the field. Leave it alone when the script did not change.
+- **An empty `Unreleased` is not a release.** Either nothing user-visible changed, or the entries
+  were never written; write them from `git log <last tag>..HEAD`. Do not cut an empty version.
+- **The marketplace entries carry no version.** `devstride` and its `ds` alias must stay identical
+  in `source`, so both serve the same plugin at the same version; a `version` field on either would
+  manufacture drift. Assert it when you touch that file:
 
-1. **Move the `Unreleased` entries** in `CHANGELOG.md` under a new `## [x.y.z] — YYYY-MM-DD`
-   heading, add the comparison link at the bottom, and **re-point `[unreleased]`** at the tag you are
-   about to create — otherwise it spans the release you just cut. Then paste the output of
-   `bash scripts/measure-cost.sh --table --since <previous tag>` under the new heading as a
-   `### Cost` subsection: the numbers are generated, never edited by hand, and the table's leading
-   comment names the ref and commit it was measured against.
+  ```bash
+  python3 -c "import json; p=json.load(open('.claude-plugin/marketplace.json'))['plugins']; \
+    assert len({e['source'] for e in p})==1 and not [e for e in p if 'version' in e]; print('ok')"
+  ```
 
-   *If `Unreleased` is empty*, one of two things is true. Either nothing user-visible changed, in
-   which case do not cut a release at all; or the entries were never written, in which case write
-   them now from the commit range (`git log <last tag>..HEAD`). Do not cut an empty version.
+- **If `skills/setup/references/statusline.sh` changed, its `# ds-statusline: managed v<x.y.z>`
+  marker rises with the release.** The session-start hook compares that marker with each
+  repository's copy, so an unchanged marker strands the fix in the field.
 
-2. **Bump `version`** in `.claude-plugin/plugin.json`. This is the authority — the marketplace
-   entries deliberately carry no version, so there is nothing to keep in sync there.
-
-   **Keep it that way.** There are two entries now, `devstride` and its `ds` alias, and they must
-   stay identical in `source` so both always serve the same plugin at the same version. Adding a
-   `version` field to either one would manufacture exactly the drift this arrangement makes
-   impossible — two entries that can disagree about what they publish. The invariant is worth
-   asserting if you touch that file:
-
-   ```bash
-   python3 -c "import json; p=json.load(open('.claude-plugin/marketplace.json'))['plugins']; \
-     assert len({e['source'] for e in p})==1 and not [e for e in p if 'version' in e]; print('ok')"
-   ```
-
-3. **Update the README's `Current version:` line** to match. It is the only *other* place a version
-   literal lives, and it is the first thing a visitor reads. Every other example deliberately uses a
-   `<version>` placeholder so it cannot go stale.
-
-4. **Commit** as `release: v<version>`, then confirm the release is complete before it leaves
-   your machine: `bash scripts/check-version-bump.sh --base origin/main` checks that the number
-   rose past the newest tag and that the CHANGELOG heading and README line name it.
-
-5. **Push `main` FIRST.** Before tagging, not after: `claude plugin tag --push` pushes only the tag.
-   Tag first and a rejected or forgotten branch push leaves an immutable public release tag for a
-   commit that is not on `main`.
-
-   Until the tag exists, `/devstride:update` and the session-start auto-update stop on every machine
-   (`marketplace-checkout-untagged`), so tag straight away. A later commit that touches only the
-   maintainer files `skills/update/scripts/update-plugin.py` lists as inert — the root documents and
-   `scripts/` — needs neither a bump nor a tag: updates still install the release beneath it. **That
-   holds only on machines already running 3.5.1 or newer**, whose helper knows the rule; a 3.5.0 or
-   older copy still needs `main` exactly on the newest tag. Until most machines have moved, keep
-   `main` on the tag and hold maintainer-only commits for the next release. Widening the inert list is
-   the compatibility event: helpers older than the release that widened it still treat the new paths
-   as shipped, so hold `main` on the tag after a widening too. Narrowing is safe — a path is skipped
-   only when both the running helper and the release being installed list it.
-
-6. **Tag.** Use the official tooling rather than tagging by hand. Preview it first:
-
-   ```bash
-   claude plugin tag --dry-run
-   claude plugin tag --push
-   ```
-
-   This creates `devstride--v<version>` — note the plugin-name prefix, which is the convention the
-   tool expects, not a bare `v<version>`. It refuses to run on a dirty tree, and **refuses to
-   re-create a tag that already exists** — which is what actually catches a forgotten step 2, and it
-   only works because the previous release was tagged. (Its manifest-agreement check cannot catch an
-   un-bumped version: the marketplace entry has no version to disagree with.)
-
-7. **Verify the release is real**, in a scratch project — this whole document exists because these
-   failures are silent:
-
-   ```bash
-   claude plugin marketplace update devstride
-   claude plugin update devstride@devstride --scope project   # the scratch project's install
-   claude plugin list          # confirm the reported version is the one you just cut
-   ```
-
-8. **Announce it**, including `/devstride:update` for installations on 3.5.1 or newer and the two
-   native bootstrap commands below for everything older — on 3.1.0–3.5.0 `/devstride:update` can
-   stop with `plugin-root-missing` (fixed in 3.5.1), and older copies do not contain the skill.
+**Commits after a release that touch only maintainer files** — the paths
+`skills/update/scripts/update-plugin.py` lists as inert: the root documents, `CLAUDE.md`,
+`scripts/`, `.github/` and `.claude/` — need neither a bump nor a tag: updates still install the
+release beneath them. That holds only where both the running helper and the release being
+installed list the path. Widening the list is the compatibility event: a helper older than the
+release that widened it still treats the new paths as shipped, so hold `main` on the tag after a
+widening until most machines run that release. Narrowing is safe.
 
 ## When your users actually get it
 
