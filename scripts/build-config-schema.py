@@ -21,6 +21,8 @@ Registry rules the generator applies:
   - a hook whose shape is `provider-or-commands` becomes a oneOf: null, the provider shape (every
     registered child except `commands`) or the commands shape (only `commands`);
   - a `deprecated` setting becomes an x-severity annotation carrying its message.
+  - a hook a step skill runs carries `step` (the skill's directory) and `stepVerdict` (the
+    verdict lines its `## Verdict` section spells); scripts/tests/step-skills.sh compares them.
 
 Usage: build-config-schema.py --write | --check [--release [--base <ref>]]
   --write     regenerate both files
@@ -86,6 +88,13 @@ def lint(registry):
                     problems.append("hook %s is a %s hook without modes" % (key, e.get("shape")))
                 if not isinstance(e.get("calledBy"), list) or not e.get("calledBy"):
                     problems.append("hook %s needs a non-empty calledBy list" % key)
+                if "step" in e or "stepVerdict" in e:
+                    sv = e.get("stepVerdict")
+                    if not isinstance(e.get("step"), str) or not os.path.isfile(
+                            os.path.join(ROOT, "skills", str(e.get("step")), "SKILL.md")):
+                        problems.append("hook %s names a step with no skills/<step>/SKILL.md" % key)
+                    if not isinstance(sv, list) or not sv or not all(isinstance(v, str) and v for v in sv):
+                        problems.append("hook %s needs stepVerdict, the step's verdict lines" % key)
             t = e.get("valueType" if kind == "hooks" else "type")
             for one in (t if isinstance(t, list) else [t]):
                 if one not in TYPES:

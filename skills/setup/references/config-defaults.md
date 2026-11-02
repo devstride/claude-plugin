@@ -651,7 +651,8 @@ example above is a shape, not a recommendation for any particular repository. Co
   "docs": {
     "updateSkill": null,
     "releaseNotesSkill": null,
-    "updateOnEpicRelease": false
+    "updateOnEpicRelease": false,
+    "knowledgeBaseSyncSkill": null
   },
   "release": {
     "deployApproval": null,
@@ -667,8 +668,9 @@ here", which every docs phase reports as skipped. Core documentation is updated 
 skill is registered; **release notes are written only when the owner passes `--release-notes` to
 the release skill**, and only after `release.deployVerification` (or the owner) confirms the deploy
 is live. There is deliberately no "when a note is warranted" key: the loop does not interpret one.
-`release.docsRepo` is the pre-1.0 shape and is migrated, not written. The contract is
-`${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`.
+`release.docsRepo` is the pre-1.0 shape and is migrated, not written. `docs.knowledgeBaseSyncSkill`
+optionally names a local skill that syncs a knowledge base after documentation is published live.
+The contract is `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`.
 
 ## Post-deploy health check
 
@@ -688,6 +690,24 @@ only when `check` printed `CLOSE-OUT OWED`); `PASS` continues, `FAIL` stops for 
 degradation and asked about, and `null` reports **not configured**. `setup` does not write it; a
 repository adds it by hand once such a skill exists. The contract is
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/post-deploy-check.md`.
+
+## Release safety hooks and the checkout pool
+
+```json
+{
+  "release": { "classifySkill": null, "preMergeSkill": null },
+  "pool": { "checkout": null, "checkin": null }
+}
+```
+
+All four are `null`, and `setup` never writes them. `release.classifySkill` names a local skill
+that says whether a release is light or full (`null` → every release is FULL);
+`release.preMergeSkill` names one that says whether production needs anything before the merge
+(`null` → the go-ahead says **pre-merge production check: not configured**). Contract:
+`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-safety-hooks.md`. `pool.checkout` and
+`pool.checkin` are the repository's own commands for leasing and returning a pool checkout
+(`null` → the current checkout is the only environment, no lease is taken). Contract:
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/checkout-pool-commands.md`.
 
 ## Lessons store
 
@@ -709,5 +729,7 @@ says where the file goes.
 - `plan/references/delivery-profiles.md` — the `profile` key setup writes.
 - `release/references/post-deploy-check.md` — `release.postDeployCheckSkill`'s default.
 - `release/references/clearance.md` — `release.clearance` and `releaseTower`.
+- `release/references/release-safety-hooks.md`, `build-item/references/checkout-pool-commands.md`
+  — the classify, pre-merge and pool keys' defaults.
 - `ultracode-build/references/mandatory-lenses.md` — `review.mandatoryLenses`' default and example.
 - `review/references/delta-re-review.md` — the local command placeholders and `localReReviewScope`.

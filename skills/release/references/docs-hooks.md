@@ -18,7 +18,8 @@ cites it rather than restating it.
   "docs": {
     "updateSkill": null,
     "releaseNotesSkill": null,
-    "updateOnEpicRelease": false
+    "updateOnEpicRelease": false,
+    "knowledgeBaseSyncSkill": null
   },
   "release": {
     "deployApproval": null,
@@ -116,6 +117,22 @@ to decide whether it may publish.
 Anything else — where documentation lives, how it is edited, link conventions, how the site routes
 pages, what "publish" means here — is the skill's own business, written into it by `setup` from the
 owner's answers, or by hand.
+
+## The knowledge-base sync (`docs.knowledgeBaseSyncSkill`)
+
+Optional, `null` by default: the name of a local skill that brings a knowledge base (a help centre,
+a search index, an assistant's source set) in line with documentation that was just published.
+Its step is `sync-knowledge-base`, which `release` calls right after 5c.
+
+- **It runs only after documentation was published live.** Mode `sync` with `{ "docsOutcome":
+  "published", "live": true }`. Any other outcome, or `live` false, is `NOT RUN` without invoking
+  it: a knowledge base never runs ahead of the documentation it mirrors.
+- **Mode `check`**, with no payload (also what a bare `/devstride:sync-knowledge-base` runs): the
+  skill checks its own preconditions, read-only.
+- **First line**: `KNOWLEDGE BASE SYNC: DONE`, `CURRENT` (nothing to change) or `FAILED`, then
+  evidence. A `FAILED` never undoes or reverts the documentation push; the step adds the line
+  `re-run: /devstride:sync-knowledge-base`, and `release` records it owed as `knowledge-base`.
+- **`no docs`** on a release also skips the sync, and the recap names the catch-up command.
 
 ## Templates
 

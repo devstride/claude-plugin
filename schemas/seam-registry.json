@@ -13,6 +13,7 @@
       ],
       "verdict": "check: PASS or FAIL with the fix; update: the pages changed and where they went",
       "calledBy": [
+        "update-docs",
         "release 5c",
         "build-item 8",
         "doctor 7",
@@ -20,7 +21,12 @@
       ],
       "unset": "no documentation system registered; every docs phase reports itself skipped",
       "contract": "skills/release/references/docs-hooks.md",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "step": "update-docs",
+      "stepVerdict": [
+        "UPDATE DOCS: PUBLISHED | STAGED | NOT CONFIGURED | FAILED",
+        "UPDATE DOCS CHECK: PASS | FAIL | NOT CONFIGURED"
+      ]
     },
     {
       "key": "docs.releaseNotesSkill",
@@ -35,13 +41,42 @@
       ],
       "verdict": "check: PASS or FAIL with the fix; publish and draft: where the note is",
       "calledBy": [
+        "write-release-notes",
         "release 5e",
         "doctor 7",
         "setup G"
       ],
       "unset": "release notes cannot be requested; --release-notes reports itself unavailable",
       "contract": "skills/release/references/docs-hooks.md",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "step": "write-release-notes",
+      "stepVerdict": [
+        "RELEASE NOTES: PUBLISHED | DRAFTED | NOT CONFIGURED | FAILED"
+      ]
+    },
+    {
+      "key": "docs.knowledgeBaseSyncSkill",
+      "shape": "skill",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "sync: {docsOutcome, live} as a fenced JSON block; check: none (the skill checks its own preconditions)",
+      "modes": [
+        "sync",
+        "check"
+      ],
+      "verdict": "KNOWLEDGE BASE SYNC: DONE | CURRENT | FAILED (plus evidence); FAILED never reverts the documentation push",
+      "calledBy": [
+        "sync-knowledge-base",
+        "release 5c",
+        "doctor 7"
+      ],
+      "unset": "no knowledge base registered: the step reports NOT CONFIGURED and the release continues",
+      "contract": "skills/release/references/docs-hooks.md",
+      "since": "unreleased",
+      "step": "sync-knowledge-base",
+      "stepVerdict": [
+        "KNOWLEDGE BASE SYNC: DONE | CURRENT | FAILED | NOT RUN | NOT CONFIGURED"
+      ]
     },
     {
       "key": "release.postDeployCheckSkill",
@@ -55,13 +90,65 @@
       ],
       "verdict": "POST-DEPLOY HEALTH: PASS | FAIL | NOT RUN (plus CLOSE-OUT OWED); close-out: POST-DEPLOY CLOSE-OUT: DONE | PARTIAL",
       "calledBy": [
+        "post-deploy",
         "release 5a",
         "release 5d",
         "doctor 7"
       ],
       "unset": "the close-out reports the health check as not configured",
       "contract": "skills/release/references/post-deploy-check.md",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "step": "post-deploy",
+      "stepVerdict": [
+        "POST-DEPLOY HEALTH: PASS | FAIL | NOT RUN | NOT CONFIGURED",
+        "POST-DEPLOY CLOSE-OUT: DONE | PARTIAL"
+      ]
+    },
+    {
+      "key": "release.classifySkill",
+      "shape": "skill",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "classify followed by {productionBranch, releaseSource, head}",
+      "modes": [
+        "classify"
+      ],
+      "verdict": "RELEASE CLASS: LIGHT | FULL, then a one-line reason",
+      "calledBy": [
+        "classify-release",
+        "release 0",
+        "doctor 7"
+      ],
+      "unset": "RELEASE CLASS: FULL — a release is never light by default",
+      "contract": "skills/release/references/release-safety-hooks.md",
+      "since": "unreleased",
+      "step": "classify-release",
+      "stepVerdict": [
+        "RELEASE CLASS: LIGHT | FULL"
+      ]
+    },
+    {
+      "key": "release.preMergeSkill",
+      "shape": "skill",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "check followed by {productionBranch, releaseSource, head, pullRequest}",
+      "modes": [
+        "check"
+      ],
+      "verdict": "PRE-MERGE: CLEAR | HOLD | NOT RUN (plus evidence; HOLD states the action first)",
+      "calledBy": [
+        "pre-merge-check",
+        "release 4",
+        "doctor 7"
+      ],
+      "unset": "the go-ahead summary and the recap say: pre-merge production check: not configured",
+      "contract": "skills/release/references/release-safety-hooks.md",
+      "since": "unreleased",
+      "step": "pre-merge-check",
+      "stepVerdict": [
+        "PRE-MERGE: CLEAR | HOLD | NOT RUN | NOT CONFIGURED"
+      ]
     },
     {
       "key": "release.deployApproval",
@@ -204,13 +291,19 @@
       "payload": "none; selected by the entry's when and pathGlobs",
       "verdict": "exit 0 is green; red blocks the pull request or the release",
       "calledBy": [
+        "pre-ship",
         "pr 2b",
         "release 2b"
       ],
       "unset": "no pre-ship checks: an explicit no-op",
       "contract": "skills/pr/references/pre-ship-hold.md",
       "since": "pre-registry",
-      "required": true
+      "required": true,
+      "step": "pre-ship",
+      "stepVerdict": [
+        "PRE-SHIP SELECTED: <names> | PRE-SHIP: NOTHING TO RUN",
+        "PRE-SHIP: PASS (<n> ran) | PRE-SHIP: FAIL <name>"
+      ]
     },
     {
       "key": "localEnvironment.create",
@@ -220,12 +313,17 @@
       "payload": "<name>, <base>, <branch> placeholders",
       "verdict": "exit 0 made the instance",
       "calledBy": [
+        "local-environment",
         "branch-hotfix local environment",
         "build-item 0"
       ],
       "unset": "no isolated instances: the current checkout is the only environment",
       "contract": "skills/setup/references/config-defaults.md",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "step": "local-environment",
+      "stepVerdict": [
+        "LOCAL ENVIRONMENT <verb>: DONE | NOT CONFIGURED | FAILED"
+      ]
     },
     {
       "key": "localEnvironment.recreate",
@@ -235,11 +333,16 @@
       "payload": "<name> per recreateMode, <base>",
       "verdict": "exit 0 returned the instance to <base>'s schema",
       "calledBy": [
+        "local-environment",
         "branch-hotfix local environment"
       ],
       "unset": "branch-hotfix names the missing command and offers the manual path",
       "contract": "skills/setup/references/config-defaults.md",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "step": "local-environment",
+      "stepVerdict": [
+        "LOCAL ENVIRONMENT <verb>: DONE | NOT CONFIGURED | FAILED"
+      ]
     },
     {
       "key": "localEnvironment.instanceName",
@@ -249,11 +352,16 @@
       "payload": "none",
       "verdict": "stdout is the name of this checkout's instance",
       "calledBy": [
+        "local-environment",
         "branch-hotfix local environment"
       ],
       "unset": "an in-place recreate with <name> stops and asks",
       "contract": "skills/setup/references/config-defaults.md",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "step": "local-environment",
+      "stepVerdict": [
+        "LOCAL ENVIRONMENT <verb>: DONE | NOT CONFIGURED | FAILED"
+      ]
     },
     {
       "key": "localEnvironment.seed",
@@ -263,11 +371,16 @@
       "payload": "<name>",
       "verdict": "exit 0 seeded the instance",
       "calledBy": [
+        "local-environment",
         "branch-hotfix local environment"
       ],
       "unset": "nothing is seeded",
       "contract": "skills/setup/references/config-defaults.md",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "step": "local-environment",
+      "stepVerdict": [
+        "LOCAL ENVIRONMENT <verb>: DONE | NOT CONFIGURED | FAILED"
+      ]
     },
     {
       "key": "localEnvironment.migrate",
@@ -277,11 +390,16 @@
       "payload": "<name>",
       "verdict": "exit 0 migrated the instance forward",
       "calledBy": [
+        "local-environment",
         "branch-hotfix local environment"
       ],
       "unset": "nothing is migrated",
       "contract": "skills/setup/references/config-defaults.md",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "step": "local-environment",
+      "stepVerdict": [
+        "LOCAL ENVIRONMENT <verb>: DONE | NOT CONFIGURED | FAILED"
+      ]
     },
     {
       "key": "localEnvironment.teardown",
@@ -291,11 +409,54 @@
       "payload": "<name>",
       "verdict": "exit 0 removed the instance",
       "calledBy": [
+        "local-environment",
         "branch-hotfix local environment"
       ],
       "unset": "instances are left for the owner to remove",
       "contract": "skills/setup/references/config-defaults.md",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "step": "local-environment",
+      "stepVerdict": [
+        "LOCAL ENVIRONMENT <verb>: DONE | NOT CONFIGURED | FAILED"
+      ]
+    },
+    {
+      "key": "pool.checkout",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "<member> and <purpose> placeholders",
+      "verdict": "exit 0 held; exit 2 not held (busy or in use); any other exit is an error; the first stdout line is quoted",
+      "calledBy": [
+        "lease-checkout",
+        "build-item floors"
+      ],
+      "unset": "the current checkout is the only environment and no lease is taken",
+      "contract": "skills/build-item/references/checkout-pool-commands.md",
+      "since": "unreleased",
+      "step": "lease-checkout",
+      "stepVerdict": [
+        "LEASE: LEASED <member> | BUSY <member> | NOT CONFIGURED | ERROR"
+      ]
+    },
+    {
+      "key": "pool.checkin",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "<member> placeholder",
+      "verdict": "exit 0 returned; any other exit is a refusal, quoted and never retried blindly",
+      "calledBy": [
+        "return-checkout",
+        "build-item floors"
+      ],
+      "unset": "nothing is handed back",
+      "contract": "skills/build-item/references/checkout-pool-commands.md",
+      "since": "unreleased",
+      "step": "return-checkout",
+      "stepVerdict": [
+        "RETURN: RETURNED <member> | REFUSED <member> | NOT CONFIGURED | ERROR"
+      ]
     },
     {
       "key": "stage.resolve",
@@ -1391,6 +1552,15 @@
       "default": null,
       "description": "which shape recreate is",
       "since": "pre-registry"
+    },
+    {
+      "key": "pool",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "the repository's checkout-pool commands; null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md",
+      "since": "unreleased"
     },
     {
       "key": "localEnvironment.instanceBoundTo",
