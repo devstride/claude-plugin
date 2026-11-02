@@ -72,7 +72,7 @@
       ],
       "unset": "no knowledge base registered: the step reports NOT CONFIGURED and the release continues",
       "contract": "skills/release/references/docs-hooks.md",
-      "since": "unreleased",
+      "since": "3.20.0",
       "step": "sync-knowledge-base",
       "stepVerdict": [
         "KNOWLEDGE BASE SYNC: DONE | CURRENT | FAILED | NOT RUN | NOT CONFIGURED"
@@ -121,7 +121,7 @@
       ],
       "unset": "RELEASE CLASS: FULL — a release is never light by default",
       "contract": "skills/release/references/release-safety-hooks.md",
-      "since": "unreleased",
+      "since": "3.20.0",
       "step": "classify-release",
       "stepVerdict": [
         "RELEASE CLASS: LIGHT | FULL"
@@ -144,7 +144,7 @@
       ],
       "unset": "the go-ahead summary and the recap say: pre-merge production check: not configured",
       "contract": "skills/release/references/release-safety-hooks.md",
-      "since": "unreleased",
+      "since": "3.20.0",
       "step": "pre-merge-check",
       "stepVerdict": [
         "PRE-MERGE: CLEAR | HOLD | NOT RUN | NOT CONFIGURED"
@@ -433,7 +433,7 @@
       ],
       "unset": "the repository's own lease protocol applies when its conventions declare a pool; otherwise there is no pool and no lease",
       "contract": "skills/build-item/references/checkout-pool-commands.md",
-      "since": "unreleased",
+      "since": "3.20.0",
       "step": "lease-checkout",
       "stepVerdict": [
         "LEASE: LEASED <member> | BUSY <member> | NOT CONFIGURED | ERROR"
@@ -452,7 +452,7 @@
       ],
       "unset": "nothing is handed back",
       "contract": "skills/build-item/references/checkout-pool-commands.md",
-      "since": "unreleased",
+      "since": "3.20.0",
       "step": "return-checkout",
       "stepVerdict": [
         "RETURN: RETURNED <member> | REFUSED <member> | NOT CONFIGURED | ERROR"
@@ -1560,7 +1560,7 @@
         "null"
       ],
       "description": "the repository's checkout-pool commands, set both or neither (one alone is an error); null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md",
-      "since": "unreleased",
+      "since": "3.20.0",
       "setTogether": [
         "checkout",
         "checkin"
