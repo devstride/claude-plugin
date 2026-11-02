@@ -212,7 +212,7 @@ Build the `production-release` payload (`${CLAUDE_PLUGIN_ROOT}/skills/release/re
 from step 0's delta, recomputed over `origin/<productionBranch>..<reviewedHead>` so release-branch
 fixes are in it, with `mergeCommit`/`mergedAt` unset and `live: false`. Honour `no docs`. **Resolve
 the documentation plan now** by `docs-hooks.md`'s step-3 rule: a dangling hook is reported now,
-never owed; a legacy `release.docsRepo` is reported while a valid `docs.updateSkill` still runs. Never invoke docs before step 5a confirms
+never owed; the sync is planned only beside a valid docs hook; a legacy `release.docsRepo` is reported while a valid `docs.updateSkill` still runs. Never invoke docs before step 5a confirms
 the deploy.
 
 ## 4. Owner go-ahead → merge to production

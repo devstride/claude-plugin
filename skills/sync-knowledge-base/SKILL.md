@@ -26,7 +26,13 @@ the knowledge-base section of `${CLAUDE_PLUGIN_ROOT}/skills/release/references/d
    payload, so it checks its own preconditions, read-only.
 4. Pass its first line through when it is `DONE`, `CURRENT` or `FAILED`; any other first line
    or a failed run is `FAILED`. A `FAILED` verdict always carries the line
-   `re-run: /devstride:sync-knowledge-base sync {"docsOutcome": "published", "live": true}`.
+   `re-run: /devstride:sync-knowledge-base sync {"docsOutcome": "published", "live": true}`
+   and, when `release.clearance` names a provider with an `owed` command, the settlement after it:
+   `then, on DONE or CURRENT: <owed command> --done knowledge-base` — `bash
+   ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/clearance-github.sh owed` for `provider: github`,
+   else `commands.owed` (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`). This
+   step never runs it: settling owed work stays with whoever re-runs the sync.
 
 A failure here never undoes, reverts or re-publishes the documentation push; it is owed work,
-which the caller keeps owed as `knowledge-base` until a re-run settles it.
+which the caller keeps owed as `knowledge-base` until a re-run succeeds and its printed
+settlement line is run.
