@@ -47,7 +47,7 @@ PY
 cfg '{"review": {"localComand": "x"}}'
 expect "(6) a misspelled key is a WARN with the likely key" 0 "^CONFIG: 0 error(s), 1 warning(s)" "^WARN review.localComand: unknown key; did you mean review.localCommand?$"
 
-cfg '{"_readme": "x", "$schema": "y", "review": {"_localCommand_readme": "z"}, "preShipChecks": [{"_why": 1, "command": "c"}]}'
+cfg '{"_readme": "x", "$schema": "y", "review": {"_localCommand_readme": "z"}, "preShipChecks": [{"_why": 1, "command": "c", "when": "perPr"}]}'
 expect "(7) keys starting with _ and \$schema are silent" 0 "$CLEAN"
 
 cfg '{"repoLocalKeys": ["mergePath", "review.teamExtras"], "mergePath": {"anything": 1}, "review": {"teamExtras": {"x": 1}}}'
@@ -106,6 +106,48 @@ expect "(24) a config that is not an object is an ERROR at the root" 1 "^CONFIG:
 
 cfg '{"localCommand": "x"}'
 expect "(25) a misplaced key suggests where it belongs" 0 "^CONFIG: 0 error(s), 1 warning(s)" "did you mean review.localCommand?"
+
+# pre-ship checks: an entry without `when` is never selected, one without `command` runs nothing
+cfg '{"preShipChecks": [{"name": "db", "command": "make db"}]}'
+expect "(33a) a pre-ship check without when is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR preShipChecks\[0\]: missing required key \`when\`"
+cfg '{"preShipChecks": [{"name": "db", "when": "perPr"}]}'
+expect "(33b) a pre-ship check without command is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR preShipChecks\[0\]: missing required key \`command\`"
+cfg '{"preShipChecks": [{"command": "make db", "when": "perPr"}]}'
+expect "(33c) name is optional" 0 "$CLEAN"
+
+# slow cloud suites: a closed object with its mapping required
+cfg '{"verify": {"skipDuringStoryBuilds": [{"name": "e2e", "ciChecksByBase": {"baseBranch": ["e2e"]}, "runWhenChangedPaths": ["web/**"]}]}}'
+expect "(34a) a minimal slow-suite entry is clean" 0 "$CLEAN"
+cfg '{"verify": {"skipDuringStoryBuilds": [{"name": "e2e"}]}}'
+expect "(34b) a slow-suite entry without ciChecksByBase is an ERROR" 1 "^CONFIG: 1 error(s)" "missing required key \`ciChecksByBase\`"
+cfg '{"verify": {"skipDuringStoryBuilds": [{"name": "e2e", "ciChecksByBase": {"develop": ["e2e"]}, "runWhenChangedPath": ["x/**"]}]}}'
+expect "(34c) unknown slow-suite fields and roles are WARNs" 0 "^CONFIG: 0 error(s), 2 warning(s)" "did you mean verify.skipDuringStoryBuilds\[\].runWhenChangedPaths?"
+cfg '{"verify": {"skipDuringStoryBuilds": ["e2e"]}}'
+expect "(34d) a slow-suite entry that is a bare name is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR verify.skipDuringStoryBuilds\[0\]: expected object"
+
+# cloud reviewers: a name-only entry requests nothing, silently
+cfg '{"review": {"automatedReviewers": [{"name": "Copilot"}]}}'
+expect "(35a) a name-only reviewer is an ERROR for each missing identifier" 1 "^CONFIG: 4 error(s)" "missing required key \`graphqlBotId\`"
+cfg '{"review": {"automatedReviewers": [{"name": "X", "how": "mention", "bot": "x[bot]", "value": "x[bot]", "graphqlBotId": "BOT_x"}]}}'
+expect "(35b) a how the review flow does not implement is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR review.automatedReviewers\[0\].how: "mention" is not one of "requested_reviewer"$'
+
+# reviewer wait: greater than zero, fractions allowed
+cfg '{"review": {"pollTimeoutMinutes": 0}}'
+expect "(36a) pollTimeoutMinutes 0 is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR review.pollTimeoutMinutes: 0 must be greater than 0"
+cfg '{"review": {"pollTimeoutMinutes": 0.5}}'
+expect "(36b) pollTimeoutMinutes 0.5 is clean" 0 "$CLEAN"
+
+# integers: 2.0 is an integer (draft 2020-12), true never is
+cfg '{"ci": {"expectedRunsPerPullRequest": 2.0}}'
+expect "(37a) an integral float satisfies integer" 0 "$CLEAN"
+cfg '{"ci": {"expectedRunsPerPullRequest": true}}'
+expect "(37b) true is not an integer" 1 "^CONFIG: 1 error(s)" "^ERROR ci.expectedRunsPerPullRequest: expected integer, found boolean"
+
+# blocks read null-tolerantly accept null; others do not
+cfg '{"supportTrain": null, "hierarchyRoles": null, "localEnvironment": null, "session": null}'
+expect "(38a) supportTrain, hierarchyRoles, localEnvironment and session accept null" 0 "$CLEAN"
+cfg '{"plugin": null}'
+expect "(38b) a null plugin block is an ERROR (the session-start check reads it as invalid)" 1 "^CONFIG: 1 error(s)" "^ERROR plugin: expected object, found null"
 
 # exit 2 paths: one line each, never a fallback to defaults
 OUT="$(python3 "$VAL" "$WORK/absent.json" --schema "$SCHEMA" 2>&1)"; RC=$?

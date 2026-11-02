@@ -209,7 +209,8 @@
       ],
       "unset": "no pre-ship checks: an explicit no-op",
       "contract": "skills/pr/references/pre-ship-hold.md",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "required": true
     },
     {
       "key": "localEnvironment.create",
@@ -582,6 +583,12 @@
       "since": "pre-registry"
     },
     {
+      "key": "epicIntegrationBranches.example",
+      "type": "string",
+      "description": "descriptive only: a sample integration branch name; nothing reads it",
+      "since": "pre-registry"
+    },
+    {
       "key": "epicIntegrationBranches.releaseTarget",
       "type": "string",
       "default": "baseBranch",
@@ -612,6 +619,12 @@
       "type": "boolean",
       "default": true,
       "description": "the release pull request is the first cloud review",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.fastStoryMerges.localEngines",
+      "type": "any",
+      "description": "descriptive only: the expected local review roster for a fast story merge; the skills resolve behaviour from the active settings",
       "since": "pre-registry"
     },
     {
@@ -783,8 +796,9 @@
         "releaseOnly",
         "always"
       ],
-      "description": "when the check runs",
-      "since": "pre-registry"
+      "description": "when the check runs; an entry without it is never selected by pr or release",
+      "since": "pre-registry",
+      "required": true
     },
     {
       "key": "preShipChecks[].pathGlobs",
@@ -824,8 +838,52 @@
     },
     {
       "key": "verify.skipDuringStoryBuilds",
-      "type": "array",
+      "type": "object[]",
       "description": "slow cloud suites deferred during story builds; each needs a matching CI job",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].name",
+      "type": "string",
+      "required": true,
+      "description": "the suite's display name",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].alwaysRunWhenBase",
+      "type": "string[]",
+      "description": "branch roles (baseBranch, productionBranch) where the suite always applies, paths irrelevant",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].manualTriggerLabel",
+      "type": "string",
+      "description": "the label that requests the suite by hand; the workflow reacts only to it",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].runWhenChangedPaths",
+      "type": "string[]",
+      "description": "globs matched against the complete final diff, both sides of renames",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].ciChecksByBase",
+      "type": "object",
+      "required": true,
+      "description": "required check names per branch role; a role with no mapping requires nothing there",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].ciChecksByBase.baseBranch",
+      "type": "string[]",
+      "description": "check names required on pull requests into the base branch",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].ciChecksByBase.productionBranch",
+      "type": "string[]",
+      "description": "check names required on pull requests into the production branch",
       "since": "pre-registry"
     },
     {
@@ -848,8 +906,11 @@
     },
     {
       "key": "hierarchyRoles",
-      "type": "object",
-      "description": "which work types are leaves and release units",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "which work types are leaves and release units; null reads as absent",
       "since": "pre-registry"
     },
     {
@@ -916,31 +977,39 @@
       "key": "review.automatedReviewers[].name",
       "type": "string",
       "description": "the reviewer's display name",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "required": true
     },
     {
       "key": "review.automatedReviewers[].how",
       "type": "string",
-      "description": "how the reviewer is requested",
-      "since": "pre-registry"
+      "description": "how the reviewer is requested; requested_reviewer (a bot through GraphQL by its node id) is the one mechanism the review flow implements",
+      "since": "pre-registry",
+      "required": true,
+      "enum": [
+        "requested_reviewer"
+      ]
     },
     {
       "key": "review.automatedReviewers[].bot",
       "type": "string",
       "description": "the reviewer's bot login",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "required": true
     },
     {
       "key": "review.automatedReviewers[].value",
       "type": "string",
       "description": "the identifier the request uses",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "required": true
     },
     {
       "key": "review.automatedReviewers[].graphqlBotId",
       "type": "string",
       "description": "the bot's GraphQL node id",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "required": true
     },
     {
       "key": "review.automatedReviewers[].baseBranches",
@@ -951,7 +1020,7 @@
     {
       "key": "review.automatedReviewers[].requestPolicy",
       "type": "string",
-      "description": "every-round or final-head",
+      "description": "every-round (also any other value) or final-head",
       "since": "pre-registry"
     },
     {
@@ -975,9 +1044,9 @@
     {
       "key": "review.pollTimeoutMinutes",
       "type": "number",
-      "minimum": 0,
       "description": "the upper bound on waiting for a registered cloud reviewer",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "exclusiveMinimum": 0
     },
     {
       "key": "review.adaptiveReviewerWait",
@@ -1200,8 +1269,11 @@
     },
     {
       "key": "supportTrain",
-      "type": "object",
-      "description": "one long-lived branch one-off work batches on",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "one long-lived branch one-off work batches on; null reads as absent",
       "since": "pre-registry"
     },
     {
@@ -1282,8 +1354,11 @@
     },
     {
       "key": "session",
-      "type": "object",
-      "description": "session job classes",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "session job classes; null reads as absent",
       "since": "pre-registry"
     },
     {
@@ -1295,8 +1370,11 @@
     },
     {
       "key": "localEnvironment",
-      "type": "object",
-      "description": "this repository's isolated local instances",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "this repository's isolated local instances; null reads as absent",
       "since": "pre-registry"
     },
     {

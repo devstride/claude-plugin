@@ -171,6 +171,10 @@
           "type": "string",
           "description": "prose rule for the epic slug"
         },
+        "example": {
+          "type": "string",
+          "description": "descriptive only: a sample integration branch name; nothing reads it"
+        },
         "releaseTarget": {
           "type": "string",
           "default": "baseBranch",
@@ -192,6 +196,9 @@
               "type": "boolean",
               "default": true,
               "description": "the release pull request is the first cloud review"
+            },
+            "localEngines": {
+              "description": "descriptive only: the expected local review roster for a fast story merge; the skills resolve behaviour from the active settings"
             }
           },
           "patternProperties": {
@@ -370,7 +377,7 @@
               "releaseOnly",
               "always"
             ],
-            "description": "when the check runs"
+            "description": "when the check runs; an entry without it is never selected by pr or release"
           },
           "pathGlobs": {
             "type": "array",
@@ -391,7 +398,11 @@
         "patternProperties": {
           "^_": {}
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "when"
+        ]
       },
       "description": "slow suites run locally at the ship boundary"
     },
@@ -443,6 +454,65 @@
         },
         "skipDuringStoryBuilds": {
           "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "the suite's display name"
+              },
+              "alwaysRunWhenBase": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "branch roles (baseBranch, productionBranch) where the suite always applies, paths irrelevant"
+              },
+              "manualTriggerLabel": {
+                "type": "string",
+                "description": "the label that requests the suite by hand; the workflow reacts only to it"
+              },
+              "runWhenChangedPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "globs matched against the complete final diff, both sides of renames"
+              },
+              "ciChecksByBase": {
+                "type": "object",
+                "properties": {
+                  "baseBranch": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "check names required on pull requests into the base branch"
+                  },
+                  "productionBranch": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "check names required on pull requests into the production branch"
+                  }
+                },
+                "patternProperties": {
+                  "^_": {}
+                },
+                "additionalProperties": false,
+                "description": "required check names per branch role; a role with no mapping requires nothing there"
+              }
+            },
+            "patternProperties": {
+              "^_": {}
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "ciChecksByBase"
+            ]
+          },
           "description": "slow cloud suites deferred during story builds; each needs a matching CI job"
         }
       },
@@ -481,7 +551,10 @@
       "description": "generated build output"
     },
     "hierarchyRoles": {
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "properties": {
         "leaf": {
           "type": "array",
@@ -499,7 +572,7 @@
         "^_": {}
       },
       "additionalProperties": false,
-      "description": "which work types are leaves and release units"
+      "description": "which work types are leaves and release units; null reads as absent"
     },
     "review": {
       "type": "object",
@@ -559,7 +632,10 @@
               },
               "how": {
                 "type": "string",
-                "description": "how the reviewer is requested"
+                "enum": [
+                  "requested_reviewer"
+                ],
+                "description": "how the reviewer is requested; requested_reviewer (a bot through GraphQL by its node id) is the one mechanism the review flow implements"
               },
               "bot": {
                 "type": "string",
@@ -582,13 +658,20 @@
               },
               "requestPolicy": {
                 "type": "string",
-                "description": "every-round or final-head"
+                "description": "every-round (also any other value) or final-head"
               }
             },
             "patternProperties": {
               "^_": {}
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "how",
+              "bot",
+              "value",
+              "graphqlBotId"
+            ]
           },
           "description": "cloud reviewers requested on pull requests"
         },
@@ -606,7 +689,7 @@
         },
         "pollTimeoutMinutes": {
           "type": "number",
-          "minimum": 0,
+          "exclusiveMinimum": 0,
           "description": "the upper bound on waiting for a registered cloud reviewer"
         },
         "adaptiveReviewerWait": {
@@ -858,7 +941,10 @@
       "description": "production release settings"
     },
     "supportTrain": {
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "properties": {
         "branch": {
           "type": "string",
@@ -874,7 +960,7 @@
         "^_": {}
       },
       "additionalProperties": false,
-      "description": "one long-lived branch one-off work batches on"
+      "description": "one long-lived branch one-off work batches on; null reads as absent"
     },
     "releaseTower": {
       "type": "object",
@@ -954,7 +1040,10 @@
       "description": "plugin update behaviour"
     },
     "session": {
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "properties": {
         "jobClassGate": {
           "type": "boolean",
@@ -966,10 +1055,13 @@
         "^_": {}
       },
       "additionalProperties": false,
-      "description": "session job classes"
+      "description": "session job classes; null reads as absent"
     },
     "localEnvironment": {
-      "type": "object",
+      "type": [
+        "object",
+        "null"
+      ],
       "properties": {
         "create": {
           "type": [
@@ -1046,7 +1138,7 @@
         "^_": {}
       },
       "additionalProperties": false,
-      "description": "this repository's isolated local instances"
+      "description": "this repository's isolated local instances; null reads as absent"
     },
     "stage": {
       "type": "object",

@@ -22,8 +22,10 @@
     "enabled": true,
     "pattern": "<prefix>/<YY-MM-DD>/epic-<epic-title-slug>",
     "slugRule": "kebab-case",
+    "example": "jane/26-10-01/epic-checkout-redesign",
     "releaseTarget": "train/support",
-    "fastStoryMerges": { "enabled": true, "requireLocalVerifyGreen": true, "epicReleaseIsFirstCloudPass": true, "_note": "silent" },
+    "fastStoryMerges": { "enabled": true, "requireLocalVerifyGreen": true, "epicReleaseIsFirstCloudPass": true, "_note": "silent",
+      "localEngines": ["a build-time risk screen; the full roster reviews the release pull request"] },
     "autoRelease": "ask",
     "deleteBranchAfterRelease": true,
     "mergedStatusName": "Review"
@@ -43,7 +45,15 @@
     "testSingle": "make test FILE=<path/to/test>",
     "lint": "make lint",
     "testDir": "tests",
-    "skipDuringStoryBuilds": []
+    "skipDuringStoryBuilds": [
+      {
+        "name": "end-to-end",
+        "alwaysRunWhenBase": ["productionBranch"],
+        "manualTriggerLabel": "run-e2e",
+        "runWhenChangedPaths": ["web/**", "api/**"],
+        "ciChecksByBase": { "baseBranch": ["e2e / smoke"], "productionBranch": ["e2e / full"] }
+      }
+    ]
   },
   "generated": { "regenCommand": "make regen", "paths": ["gen/**"], "toleratedTypeErrors": [] },
   "hierarchyRoles": { "leaf": ["Story", "Defect"], "releaseUnit": "Epic" },

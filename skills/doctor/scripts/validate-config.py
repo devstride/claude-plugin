@@ -6,7 +6,8 @@ Usage: validate-config.py <config path> [--schema <path>] [--json]
 The schema defaults to ${CLAUDE_PLUGIN_ROOT}/schemas/ds-config.schema.json (the plugin root this
 script ships in when the variable is unset). It is generated from schemas/seam-registry.json, and
 this validator implements exactly the keyword subset the generator emits — type (a list included),
-properties, patternProperties, additionalProperties, required, enum, items, oneOf, minimum — plus
+properties, patternProperties, additionalProperties, required, enum, items, oneOf, minimum,
+exclusiveMinimum — plus
 the x-severity annotation for deprecated keys. No JSON Schema library is needed.
 
 Output: the first line is
@@ -40,7 +41,8 @@ def type_of(value):
     if isinstance(value, int):
         return "integer"
     if isinstance(value, float):
-        return "number"
+        # draft 2020-12: a number with a zero fractional part (2.0) is an integer
+        return "integer" if value.is_integer() else "number"
     if isinstance(value, str):
         return "string"
     if isinstance(value, list):
@@ -130,6 +132,10 @@ class Validator:
         if "minimum" in schema and type_of(value) in ("integer", "number") \
                 and value < schema["minimum"]:
             self.add("ERROR", path, "%s is below the minimum %s" % (show(value), schema["minimum"]))
+        if "exclusiveMinimum" in schema and type_of(value) in ("integer", "number") \
+                and value <= schema["exclusiveMinimum"]:
+            self.add("ERROR", path, "%s must be greater than %s" % (
+                show(value), schema["exclusiveMinimum"]))
         if "oneOf" in schema:
             self.one_of(value, schema["oneOf"], path)
         if isinstance(value, dict) and ("properties" in schema or "additionalProperties" in schema):

@@ -41,7 +41,7 @@ TABLE = "skills/setup/references/seam-registry.md"
 ID_FORMAT = "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v{}/schemas/ds-config.schema.json"
 
 VALIDATION_KEYWORDS = {"type", "properties", "patternProperties", "additionalProperties",
-                       "required", "enum", "items", "oneOf", "minimum"}
+                       "required", "enum", "items", "oneOf", "minimum", "exclusiveMinimum"}
 ANNOTATIONS = {"$schema", "$id", "title", "description", "default", "x-severity"}
 HOOK_FIELDS = ["key", "shape", "valueType", "nullable", "payload", "verdict", "calledBy",
                "unset", "contract", "since"]
@@ -158,8 +158,9 @@ def build_schema(registry, version):
                 node = node_for(e["type"])
             if "enum" in e:
                 node["enum"] = e["enum"]
-            if "minimum" in e:
-                node["minimum"] = e["minimum"]
+            for bound in ("minimum", "exclusiveMinimum"):
+                if bound in e:
+                    node[bound] = e[bound]
             if "default" in e:
                 node["default"] = e["default"]
             node["description"] = e["description"] if not e.get("_hook") else \
@@ -217,8 +218,13 @@ def build_table(registry, version):
         if s.get("deprecated"):
             meaning = "**Deprecated (%s):** %s" % (s["deprecated"]["severity"],
                                                     s["deprecated"]["message"])
+        if s.get("required"):
+            meaning = "**Required.** " + meaning
+        allowed = cell(s["enum"]) if "enum" in s else \
+            ">= %s" % s["minimum"] if "minimum" in s else \
+            "> %s" % s["exclusiveMinimum"] if "exclusiveMinimum" in s else "—"
         out.append("| `%s` | %s | %s | %s | %s | %s |" % (
-            s["key"], cell(s["type"]), cell(s["enum"]) if "enum" in s else "—",
+            s["key"], cell(s["type"]), allowed,
             cell(s["default"]) if "default" in s else "—", cell(meaning), s["since"]))
     out += ["", "## Cited by", "",
             "- `doctor` SKILL.md — §4, the config shape check (runs the validator).",

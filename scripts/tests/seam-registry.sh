@@ -75,6 +75,18 @@ PY
 )"
 [ -z "$OUT" ] && ok "(7) the schema uses only implemented keywords and annotations" || bad "(7) unimplemented: $OUT"
 
+# (7b) and every keyword in that subset is one the validator actually reads
+OUT="$(python3 - "$ROOT" <<'PY'
+import importlib.util, os, sys
+root = sys.argv[1]
+spec = importlib.util.spec_from_file_location("gen", os.path.join(root, "scripts/build-config-schema.py"))
+gen = importlib.util.module_from_spec(spec); spec.loader.exec_module(gen)
+src = open(os.path.join(root, "skills/doctor/scripts/validate-config.py")).read()
+print(" ".join(sorted(k for k in gen.VALIDATION_KEYWORDS | {"x-severity"} if '"%s"' % k not in src)))
+PY
+)"
+[ -z "$OUT" ] && ok "(7b) the validator reads every keyword the generator may emit" || bad "(7b) the validator never reads: $OUT"
+
 # a scratch copy of what the generator reads and writes, as its own git repository
 copy() {
   rm -rf "$WORK/r"; mkdir -p "$WORK/r/scripts" "$WORK/r/schemas" "$WORK/r/.claude-plugin" "$WORK/r/skills/setup/references"
