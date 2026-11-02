@@ -7,8 +7,8 @@
 # take back once pushed, and a reviewer who misses one is the only other line of defence.
 #
 # What it scans: the branch name, the title, the body (a file), every commit message in
-# <base>..<head> and every ADDED line of `git diff <base>...<head>`. The files that define this
-# check (this script, its test and the allow file) are not scanned: they must spell the patterns.
+# <base>..<head> and every ADDED line of `git diff <base>...<head>`. This script and its test are
+# not scanned, since they must spell the patterns; in the allow file only the allowed token is.
 #
 # Kinds of finding:
 #   item-number      `I` followed by four to six digits, unless the allow file lists it
@@ -16,12 +16,13 @@
 #   session-trailer  a `Claude-Session:` or `Codex-Session:` line — in commit messages, the title
 #                    and the body only, because skill text that documents the trailer is fine
 #   internal-host    a host under devstride.com or devstride.dev the allow file does not list
+#   binary-file      an added or changed binary file (it has no lines to scan), unless allowed
 #   internal-path    a home folder (macOS or Linux), a home-relative development path, a `.worktrees/`
 #                    path, or an agent's encoded session path (a `-Users-<name>` folder, a temporary
 #                    or projects folder under `/private/` or `.claude/`)
 #
-# The allow file (`scripts/public-hygiene.allow`) holds one `item <I-number> <reason>` or
-# `host <name> <reason>` per line; `#` starts a comment. A false positive is fixed by an allow line
+# The allow file (`scripts/public-hygiene.allow`) holds one `item <I-number> <reason>`,
+# `host <name> <reason>` or `file <path> <reason>` (a binary file) per line; `#` starts a comment. A false positive is fixed by an allow line
 # with a reason or by rewording — never by loosening a pattern here. The pull-request check runs
 # main's copy of the allow file, so a new allow line lands in its own pull request first.
 #
@@ -58,17 +59,21 @@ import os, re, subprocess, sys
 env = os.environ
 def usage(msg):
     print("check-public-hygiene: " + msg, file=sys.stderr); sys.exit(2)
-SELF = {"scripts/check-public-hygiene.sh", "scripts/tests/check-public-hygiene.sh", "scripts/public-hygiene.allow"}
-items, hosts = set(), set()
+# The script and its test spell every pattern, so their added lines are not scanned. The allow
+# file is: its comments and every reason are, only the token a line allows is left out.
+SELF = {"scripts/check-public-hygiene.sh", "scripts/tests/check-public-hygiene.sh"}
+ALLOW_PATH = "scripts/public-hygiene.allow"
+ALLOW_LINE = re.compile(r"^\s*(item|host|file)\s+\S+(.*)$")
+items, hosts, files = set(), set(), set()
 with open(env["PH_ALLOW"], encoding="utf-8") as f:
     for n, raw in enumerate(f, 1):
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
         parts = line.split(None, 2)
-        if len(parts) < 3 or parts[0] not in ("item", "host"):
-            usage("allow list line %d must be `item <I-number> <reason>` or `host <name> <reason>`" % n)
-        (items if parts[0] == "item" else hosts).add(parts[1].lower() if parts[0] == "host" else parts[1])
+        if len(parts) < 3 or parts[0] not in ("item", "host", "file"):
+            usage("allow list line %d must be `item <I-number> <reason>`, `host <name> <reason>` or `file <path> <reason>`" % n)
+        {"item": items, "host": hosts, "file": files}[parts[0]].add(parts[1].lower() if parts[0] == "host" else parts[1])
 ITEM = re.compile(r"(?<![A-Za-z0-9_])I[0-9]{4,6}(?![A-Za-z0-9_])")
 LINK = re.compile(r"claude\.ai/code/session_", re.I)
 TRAILER = re.compile(r"^\s*(Claude|Codex)-Session:", re.I | re.M)
@@ -136,7 +141,11 @@ for line in diff.split("\n"):
         if line.startswith("+"):
             new_left -= 1
             if path and path not in SELF:
-                scan(line[1:], "%s:%d" % (path, line_no), False)
+                text = line[1:]
+                if path == ALLOW_PATH:
+                    m = ALLOW_LINE.match(text)
+                    text = m.group(2) if m else text
+                scan(text, "%s:%d" % (path, line_no), False)
             line_no += 1
         elif line.startswith("-"):
             old_left -= 1
@@ -150,6 +159,15 @@ for line in diff.split("\n"):
             old_left = int(m.group(1)) if m.group(1) is not None else 1
             line_no = int(m.group(2))
             new_left = int(m.group(3)) if m.group(3) is not None else 1
+# A binary file has no added lines to read, so it cannot be shown clean: each one added or changed
+# is a finding unless the allow file names it with a reason.
+numstat = git("diff", "--no-renames", "--numstat", "-z", "%s...%s" % (env["PH_BASE"], env["PH_HEAD"]))
+for entry in numstat.split("\0"):
+    parts = entry.split("\t", 2)
+    if len(parts) == 3 and parts[0] == "-" and parts[1] == "-" and parts[2] not in files:
+        exists = subprocess.run(["git", "cat-file", "-e", "%s:%s" % (env["PH_HEAD"], parts[2])], capture_output=True)
+        if exists.returncode == 0:
+            findings.append(("binary-file", parts[2], "a binary file cannot be scanned; allow it with `file <path> <reason>`"))
 if findings:
     print("PUBLIC HYGIENE: %d finding(s)" % len(findings))
     for kind, where, text in findings:

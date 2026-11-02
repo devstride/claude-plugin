@@ -1,6 +1,7 @@
 # scripts/public-hygiene.allow — exceptions for scripts/check-public-hygiene.sh, one per line:
 #   item <I-number> <reason>     a placeholder item number the shipped text uses as an example
 #   host <name> <reason>         a public DevStride host a stranger can visit
+#   file <path> <reason>         a binary file (an image), which the check cannot read
 # Every line carries its reason. Never loosen a pattern in the script to fit a hit: add a line
 # here with a reason, or reword the text.
 

@@ -66,7 +66,7 @@ expect "(9) a REMOVED line is not scanned: taking a leak out is never blocked" 0
 
 new_case self; mkdir -p "$R/scripts/tests"; echo "item I14321 a reason" > "$R/scripts/public-hygiene.allow"
 echo "I14321" > "$R/scripts/tests/check-public-hygiene.sh"; commit "chore: the check's own files"; check
-expect "(10) the files that define the check are not scanned" 0 "CLEAN"
+expect "(10) the check's own test is not scanned, nor the token an allow line allows" 0 "CLEAN"
 
 new_case badref; check --head no-such-ref
 expect "(11) an unknown ref → exit 2" 2 "unknown ref"
@@ -92,6 +92,17 @@ new_case encoded; printf '%s\n' '/private/tmp/claude-501/-Users-jane-dev-repo/x'
   '/home/jane/dev/repo/file' '/private/var/folders/ab/T/x' > "$R/skills/a/b.md"; commit "docs: x"; check
 expect "(17) agent session paths and Linux home folders are internal paths" 1 \
   "internal-path in skills/a/b.md:1" "internal-path in skills/a/b.md:2" "internal-path in skills/a/b.md:3" "internal-path in skills/a/b.md:4"
+
+new_case binary; printf 'PNG\0see https://claude.ai/code/session_abc\0' > "$R/skills/a/shot.png"; commit "docs: x"; check
+expect "(18) a binary file cannot be shown clean → finding" 1 "^PUBLIC HYGIENE: 1 finding(s)$" "^HYGIENE: binary-file in skills/a/shot.png"
+printf 'file skills/a/shot.png a screenshot for the README\n' >> "$ALLOW"; check
+expect "(19) a binary file the allow list names, with a reason → CLEAN" 0 "CLEAN"
+printf '# scratch\nitem I20130 the example story\nhost docs.devstride.com the public docs\n' > "$ALLOW"
+
+new_case allow-reasons; mkdir -p "$R/scripts"
+printf '# from I14399\nitem I14321 used in I14322 at /Users/jane\n' > "$R/scripts/public-hygiene.allow"; commit "chore: allow"; check
+expect "(20) the allow file's comments and reasons are scanned; only the allowed token is skipped" 1 \
+  "^PUBLIC HYGIENE: 3 finding(s)$" "item-number in scripts/public-hygiene.allow:1" "item-number in scripts/public-hygiene.allow:2: .*I14322"
 
 # The real allow list parses, and every line carries a reason.
 OUT="$(cd "$ROOT" && bash "$CHECK" --base HEAD --head HEAD 2>&1)"; RC=$?

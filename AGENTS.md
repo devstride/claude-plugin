@@ -22,8 +22,9 @@ every added line for:
 - a link to an agent session on claude.ai;
 - a session trailer (`Claude-Session:` or `Codex-Session:`) in a commit message, title or body;
 - an internal host: any host under the company's own domains other than the public ones;
-- a path from someone's machine: a macOS home folder, a development folder under a home
-  directory, or a worktree folder.
+- a path from someone's machine: a home folder, a development folder under a home directory, a
+  worktree folder, or an agent session's encoded folder;
+- a binary file, which has no lines to read, unless the allow file names it with a reason.
 
 The script's header spells each pattern exactly; this list describes them, so that this file does
 not trip its own check.

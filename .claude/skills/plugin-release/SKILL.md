@@ -40,10 +40,12 @@ into `main` here is its own release), with a clean tree and that branch up to da
 6. **The status-line marker**, only if `skills/setup/references/statusline.sh` changed since the
    previous tag: raise its `# ds-statusline: managed v<x.y.z>` line to `<version>`. Otherwise leave
    it alone.
-7. **Check and commit.** `bash scripts/check-version-bump.sh --base origin/main` must pass; then
-   commit everything as `release: v<version>` (no item numbers, no session trailer — this
-   repository is public; `bash scripts/check-public-hygiene.sh --base origin/main --branch "$(git branch --show-current)"`
-   must print `CLEAN`) and push.
+7. **Commit, then check the commit.** Commit everything as `release: v<version>` (no item
+   numbers, no session trailer — this repository is public). Both checks read COMMITTED history,
+   never the work tree, so they run after the commit:
+   `bash scripts/check-version-bump.sh --base origin/main` must pass and
+   `bash scripts/check-public-hygiene.sh --base origin/main --branch "$(git branch --show-current)"`
+   must print `CLEAN`. On a failure, fix it, `git commit --amend`, and run both again. Then push.
 
 The pull request then goes through the delivery loop's review. Never tag by hand and never push
 to `main`: the merge is the release, and the workflow tags it.
