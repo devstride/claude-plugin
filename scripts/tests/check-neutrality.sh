@@ -29,7 +29,8 @@ fresh "neutral first line" \
   "$DS fleet status" "$DS machine ready" "$DS stage create" "$DS migrations run" \
   "$DS worktree ls" "$DS agent mcp-config" "$DS neon branches" "$DS secrets pull" \
   "the Gol""den dataset" "a gol""den build" "the Ne""on branch" "check w""t2 first" \
-  "deploy-""prod.yml" "the Deploy"" Prod workflow" "the same rule as a pool"" lease" "item I9""8765"
+  "deploy-""prod.yml" "the Deploy"" Prod workflow" "the same rule as a pool"" lease" "item I9""8765" \
+  "$DS run ui" "$DS script set-config" "the ne""onctl command"
 run
 expect_hit() {  # <line> <label>
   if printf '%s\n' "$OUT" | grep -qF "NEUTRALITY: skills/demo/SKILL.md:$1: $2: "; then return 0; fi
@@ -40,7 +41,7 @@ for spec in 2:launcher 3:command-family 4:command-family 5:command-family 6:comm
             7:command-family 8:command-family 9:command-family 10:command-family 11:command-family \
             12:command-family 13:command-family 14:command-family 15:command-family 16:golden \
             17:golden 18:neon 19:checkout-name 20:deploy-workflow 21:deploy-workflow 22:pool-lease \
-            23:item-number; do
+            23:item-number 24:command-family 25:command-family 26:neon; do
   expect_hit "${spec%%:*}" "${spec#*:}" || ALL=1
 done
 if [ "$RC" -eq 1 ] && [ "$ALL" -eq 0 ] && ! printf '%s\n' "$OUT" | grep -q 'SKILL.md:1:'; then

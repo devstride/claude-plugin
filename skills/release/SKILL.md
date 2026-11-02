@@ -42,8 +42,8 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   intent to PREPARE, never standing authorization to deploy.
 - **Docs are on by default and still outward-facing.** With `docs.updateSkill` registered the
   update is pre-authorized, runs only after the deploy is confirmed (5c), and "no docs" suppresses
-  it and the knowledge-base sync. **This skill never edits documentation or writes notes** — its
-  steps invoke the registered local skills; it translates their results preserving exact links.
+  it and the knowledge-base sync. **This skill never edits documentation or writes notes**; it
+  translates its steps' results, links exact.
 - **Release notes are NEVER written without `--release-notes`.** No size, scope or "user-facing"
   threshold is interpreted on the owner's behalf; if a release seems to deserve one, say so in the
   step-4 summary and let them add the flag.
@@ -276,18 +276,20 @@ adopted (`clearance.md`).
 `git checkout <productionBranch> && git pull --ff-only`, `<releaseSource>` likewise; then
 `release-branch.md` §5 steps 1–3 (source synced, release branch deleted once both contain it,
 train level). With clearance: `heartbeat close-out` first, then `release --owed <item>` per later
-step that will run (`docs`, `knowledge-base`, `close-out` after `CLOSE-OUT OWED`,
-`release-notes`; a provider without `commands.owed`: plain `release`, no `owed` calls). A FAIL, an unanswered NOT RUN or a
-stop before here KEEPS clearance.
+step that will run (`docs` and `knowledge-base` when their hooks are set and docs are not
+suppressed, `close-out` after `CLOSE-OUT OWED`, `release-notes`; a provider without
+`commands.owed`: plain `release`, no `owed` calls). A FAIL, an unanswered NOT RUN or a stop before
+here KEEPS clearance.
 
 ### 5c. Documentation update — default on when registered
 
 `no docs` → skip this and the sync, naming the catch-up (`/devstride:update-docs`, then
 `/devstride:sync-knowledge-base`). Otherwise **`update-docs update`** with the completed payload;
-translate it, preserving exact pages and destination; `owed --done docs` unless NOT CONFIGURED.
-Only after `PUBLISHED`: **`sync-knowledge-base`** (`docsOutcome: "published"`, `live: true`) —
+translate it, pages and destination exact; `owed --done docs` unless NOT CONFIGURED. Only after
+`PUBLISHED`: **`sync-knowledge-base`** (`docsOutcome: "published"`, `live: true`) —
 `DONE`/`CURRENT` → `owed --done knowledge-base`; `FAILED` → report its re-run line, keep it owed;
-never undo the docs push.
+never undo the docs push. Docs not `PUBLISHED` → no sync: `owed --done knowledge-base`, naming
+`/devstride:sync-knowledge-base` as the catch-up once they publish.
 
 ### 5d. The post-deploy check's close-out
 
@@ -299,15 +301,15 @@ After a `CLOSE-OUT OWED` line only: call **`post-deploy close-out`** once, with 
 **Default none**: `--release-notes` absent or `false` → "release notes: not requested"; this skill
 never decides a release deserves one. Otherwise call **`write-release-notes`**
 (`docs.releaseNotesSkill`) in mode `publish` (`true`) or `draft` with the payload: `NOT CONFIGURED`
-→ report it cannot be met and stop — never improvise a note; else translate, preserving the
-location and whether it is live or awaiting the owner; `owed --done release-notes`.
+→ report it cannot be met and stop; else translate it, location and live-or-awaiting state exact;
+`owed --done release-notes`.
 
 ## 6. Recap
 
 - **Human recap.** Lead with `Merged / Released`: every included item and its effect, the PR and
   merge commit, where it landed, whether the deploy is confirmed live, the release class, the
   pre-merge and post-deploy health results, documentation, knowledge-base and release-note results,
-  whether clearance was handed back (kept, with the reason, when a check failed or 5b stopped early), anything still `owed`, and any owner action
-  left (a docs draft awaiting a look, a PR to merge).
+  whether clearance was handed back (kept, with the reason, when a check failed or 5b stopped
+  early), anything still `owed`, and any owner action left (a docs draft awaiting a look).
 - Update any project memory tracking release/plan state: epics that reached production, the date,
   docs/release-note status.

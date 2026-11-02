@@ -315,6 +315,15 @@ if [ "$A" = tok-1 ] && [ "$E" = old-1 ] && [ "$F" = new-2 ] && [ "$B" = "codex:c
   ok "(20) holder = CLEARANCE_HOLDER_TOKEN (older name still read; new wins), else codex:…+claude:…, else token:<random> printed once"
 else bad "(20) a=$A e=$E f=$F b=$B c=$C d=$D"; fi
 
+# (20b) an empty new name falls back to the older one; a bad token's error names the variable it
+# came from and never echoes the token
+fresh ident4; export CLEARANCE_HOLDER_TOKEN='' DEVSTRIDE_LEASE_TOKEN=old-4; run claim; G="$(record holder)"
+fresh ident5; export DEVSTRIDE_LEASE_TOKEN='sec ret-5'; run claim; H="$OUT"; HR=$RC
+if [ "$G" = old-4 ] && [ "$HR" -ne 0 ] && printf '%s' "$H" | grep -q 'DEVSTRIDE_LEASE_TOKEN cannot contain' \
+   && ! printf '%s' "$H" | grep -q 'ret-5'; then
+  ok "(20b) an empty CLEARANCE_HOLDER_TOKEN reads the older name; a bad token is refused by name, never echoed"
+else bad "(20b) g=$G rc=$HR out=$H"; fi
+
 # (21) a release pattern absent: the release source itself is the release head for On final
 fresh nopattern; export CLEARANCE_RELEASE_PATTERN=''
 printf '[{"number":12,"headRefName":"develop","state":"OPEN","isDraft":false,"createdAt":"2026-10-18T09:52:00Z"}]' > "$STATE/prs.json"

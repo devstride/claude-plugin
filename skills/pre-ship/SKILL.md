@@ -15,26 +15,27 @@ Arguments: $ARGUMENTS — `pr|release`, `select|run`, and the final diff's base 
 
 ## Select
 
-Names print in array order. No `preShipChecks` → `NOTHING TO RUN`, an explicit no-op.
+Names in array order; no `preShipChecks` → `NOTHING TO RUN` (an explicit no-op).
 
 - **`pr`**: `when` ∈ {`perPr`, `always`}. A non-empty `pathGlobs` must match the FINAL changed
   files from a **SHA-pinned three-dot local diff** — never `gh pr view --json files` or REST
-  pull-files (both capped) — renames on BOTH source and destination; empty → every pull request.
+  pull-files (both capped) — renames on BOTH source and destination; empty → every PR.
   **Never narrow a glob to skip a run.**
 - **`release`**: `when` ∈ {`releaseOnly`, `always`}.
   **Run each selected entry UNCONDITIONALLY** — except a `releaseOnly` entry with
-  `onlyWhenTouched: true`: it runs only when the release diff matches its `pathGlobs`.
+  `onlyWhenTouched: true`: it runs only when the release diff matches its `pathGlobs`
+  (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/review-once.md`).
 
 ## Run
 
-Select again; run matches **sequentially, in array order** (no dedup, no short-circuit), each in
+Re-select; run matches **sequentially, in array order** (no dedup, no short-circuit), each in
 the BACKGROUND with a long timeout (a foreground kill looks like a clean pass), `timeoutNote`
 first. `pr`: after `verify.test`. `release`: export `RELEASE_CLASS` from `classify-release`
 (unknown → `full`).
 
-- All green → `PASS (<n> ran)`. **Red → `FAIL <name>`** with the failing spec names, a block; so
-  is a command that does not resolve or dies without a result.
-- Evidence per entry: name, command, pass or fail, file and test counts. A waiver exists only at
-  `release` scope, on the owner's explicit "skip <name>": recorded, never assumed.
+- All green → `PASS (<n> ran)`. **Red, unresolvable or dead without a result → `FAIL <name>`**
+  with the failing spec names: a block.
+- Evidence per entry: name, command, result, file and test counts. A waiver exists only for
+  `release`, on the owner's explicit "skip <name>", recorded.
 
-Their CI check is EXPECTEDLY absent: never request, rerun or wait on it; never "covered by CI".
+Their CI check is EXPECTEDLY absent: never request, rerun or wait on it, or say "covered by CI".

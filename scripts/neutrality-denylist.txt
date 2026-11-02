@@ -8,9 +8,9 @@
 # here matches them. Item numbers are checked by the script itself against
 # scripts/public-hygiene.allow. Exceptions go in scripts/neutrality-allow.txt with a reason.
 launcher	(^|[^A-Za-z0-9_./-])\./ds\b
-command-family	\bds (pool|tower|verify|golden|work|fleet|machine|stage|migrations|worktree|agent|neon|secrets)\b
+command-family	\bds (pool|tower|verify|golden|work|fleet|machine|stage|migrations|worktree|agent|neon|secrets|run|script|data)\b
 golden	(?i)\bgolden\b
-neon	\bNeon\b
+neon	(?i)\bneon(ctl)?\b
 checkout-name	\bwt[0-9]+\b
 deploy-workflow	\bdeploy-prod\b|\bDeploy Prod\b
 pool-lease	(^|[^-])\bpool lease\b
