@@ -8,6 +8,19 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **The config file has a published JSON Schema, and doctor and setup check it.** Every key and
+  every hook the skills read is now listed once, with its shape, default and the skill steps that
+  call it; the schema (`schemas/ds-config.schema.json`) and the readable table
+  (`skills/setup/references/seam-registry.md`) are generated from that list. `/devstride:doctor`
+  and setup's validation checklist run it against your `.claude/ds-config.json`: a wrong shape (a
+  list where a command belongs, both forms of `release.clearance`, `release.docsRepo`) fails, and
+  an unknown key is a warning that suggests the key you probably meant, where before an unknown key
+  was silently ignored. Point an editor at the schema with a top-level `"$schema"` for completion.
+- **`repoLocalKeys`.** A list of key prefixes your own repository's tools read; the check leaves
+  them alone.
+
 ## [3.18.1] — 2026-11-02
 
 ### Changed

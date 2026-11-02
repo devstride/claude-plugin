@@ -102,6 +102,10 @@ paths individually) rather than trusting a single root-level run.
   (SessionStart) and `session-gate.sh` (UserPromptSubmit). Both fail open and never block a
   session by accident. Skill-owned helpers live under `skills/<name>/scripts/` and are run by
   the skill's text, never read as context.
+- `schemas/` holds `seam-registry.json`, the one list of every config key and hook (hand-edited),
+  and `ds-config.schema.json`, generated from it by `scripts/build-config-schema.py --write`
+  together with `skills/setup/references/seam-registry.md`; never edit either output by hand. It
+  ships: doctor's validator reads the schema from `${CLAUDE_PLUGIN_ROOT}/schemas/`.
 - `scripts/` holds repo-level maintenance scripts (`validate.sh`, `measure-cost.sh`, their tests).
   Nothing at runtime reads them and the plugin loader ignores the directory — it is not a
   component directory, and it must not move under `.claude-plugin/`.

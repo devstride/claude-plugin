@@ -291,6 +291,14 @@ repository's real branch names rather than copying those two values:
 
 The full contract — every key, its shape and default — is in the
 [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference).
+The plugin also ships that contract as a JSON Schema, `schemas/ds-config.schema.json`, generated
+from one registry of every key and hook (`skills/setup/references/seam-registry.md` is its readable
+table). Point your editor at it for completion and inline errors by adding a top-level `"$schema"`
+naming the release you run: `https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v<version>/schemas/ds-config.schema.json`.
+`/devstride:doctor` and `/devstride:setup` check the file against it: a wrong shape (a list where a
+command belongs, both forms of `release.clearance`, a retired key) is a failure, and an unknown key
+is a warning that names the key you probably meant. Keys your own repository's tools read go in
+`repoLocalKeys`, a list of key prefixes the check leaves alone.
 
 **CI cost.** The loop runs CI once per pull request, on the final reviewed diff — the draft hold
 guarantees it. What the hold does not cover is the rest of the bill: superseded runs, a
