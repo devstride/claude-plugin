@@ -294,12 +294,17 @@ def gh_user():
         return "unknown"
 
 
-# ── identity (the same rule as a pool lease: one identity means one thing everywhere) ──
+# ── identity (one identity means one thing across the clearance commands) ──
+# CLEARANCE_HOLDER_TOKEN names the holder; DEVSTRIDE_LEASE_TOKEN is its older name, still read when
+# the new one is unset, and the new name wins when both are set.
 def holder():
-    token = os.environ.get("DEVSTRIDE_LEASE_TOKEN")
+    name = "CLEARANCE_HOLDER_TOKEN"
+    token = os.environ.get(name)
+    if not token:
+        name, token = "DEVSTRIDE_LEASE_TOKEN", os.environ.get("DEVSTRIDE_LEASE_TOKEN")
     if token:
         if re.search(r"[|\s]", token):
-            fail("DEVSTRIDE_LEASE_TOKEN cannot contain | or whitespace")
+            fail("%s cannot contain | or whitespace" % name)
         return token, False
     ids = []
     if os.environ.get("CODEX_THREAD_ID"):
@@ -700,7 +705,7 @@ def cmd_claim(args):
     purpose = option(args, "--purpose") or "release"
     me, print_token = holder()
     if print_token:
-        progress("holder token %s — export it as DEVSTRIDE_LEASE_TOKEN for heartbeat and release" % me)
+        progress("holder token %s — export it as CLEARANCE_HOLDER_TOKEN for heartbeat and release" % me)
     user = None
     deadline = time.monotonic() + WAIT_MINUTES * 60
     stuck = 0
@@ -1058,7 +1063,7 @@ def cmd_adopt(args):
             return 2
         progress("adopting a stuck clearance whose session was confirmed stopped: " + describe(record, at))
     if print_token:
-        progress("holder token %s — export it as DEVSTRIDE_LEASE_TOKEN for heartbeat and release" % me)
+        progress("holder token %s — export it as CLEARANCE_HOLDER_TOKEN for heartbeat and release" % me)
     record.update({"holder": me, "user": gh_user(), "machine": socket.gethostname(), "heartbeatAt": iso(at),
                    "phaseStartedAt": iso(at)})
     try:
