@@ -128,6 +128,24 @@ BASE="$(git -C "$R" rev-parse HEAD)"; git -C "$R" rm -q skills/a/logo; mkdir -p 
 echo hi > "$R/skills/a/logo/readme.md"; commit "docs: replace"; check
 expect "(25) a deleted binary is not a finding, even when a folder now has its name" 0 "CLEAN"
 
+new_case cross-kind; mkdir -p "$R/scripts"
+printf 'host I14321.devstride.dev a host\nhost x-Users-jane.devstride.dev a host\nitem I14322 fine\n' > "$R/scripts/public-hygiene.allow"
+commit "chore: allow"; check
+expect "(26) an allowed host is exempt only as a host: a number or session path inside it is still found" 1 \
+  "^PUBLIC HYGIENE: 2 finding(s)$" "item-number in scripts/public-hygiene.allow:1" "internal-path in scripts/public-hygiene.allow:2"
+
+new_case link-to-binary; ln -s SKILL.md "$R/skills/a/pic"; git -C "$R" add -A; git -C "$R" commit -qm "link"
+BASE="$(git -C "$R" rev-parse HEAD)"; rm "$R/skills/a/pic"; printf 'PNG\0x' > "$R/skills/a/pic"; commit "docs: replace"; check
+expect "(27) a link replaced by a binary file is a binary finding" 1 "binary-file in skills/a/pic"
+
+new_case interhunk; mkdir -p "$R/scripts/tests"; seq 1 20 > "$R/scripts/tests/check-public-hygiene.sh"
+git -C "$R" add -A; git -C "$R" commit -qm "seed"; BASE="$(git -C "$R" rev-parse HEAD)"
+sed -i.bak -e '2s/.*/x/' -e '9s/.*/y/' "$R/scripts/tests/check-public-hygiene.sh"; rm -f "$R/scripts/tests/check-public-hygiene.sh.bak"
+echo "Fixed in I14321." >> "$R/skills/a/SKILL.md"; commit "docs: x"
+OUT="$(cd "$R" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=diff.interHunkContext GIT_CONFIG_VALUE_0=10 \
+  bash "$CHECK" --base "$BASE" --allow "$ALLOW" 2>&1)"; RC=$?
+expect "(28) merged hunks (diff.interHunkContext) cannot hide the next file's lines" 1 "item-number in skills/a/SKILL.md:2"
+
 # The real allow list parses, and every line carries a reason.
 OUT="$(cd "$ROOT" && bash "$CHECK" --base HEAD --head HEAD 2>&1)"; RC=$?
 expect "(13) this repository's allow list parses" 0 "CLEAN"

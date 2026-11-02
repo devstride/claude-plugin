@@ -64,8 +64,10 @@ def usage(msg):
 # file is: its comments and every reason are, only the token a line allows is left out.
 SELF = {"scripts/check-public-hygiene.sh", "scripts/tests/check-public-hygiene.sh"}
 ALLOW_PATH = "scripts/public-hygiene.allow"
-# Each kind's token has a grammar; only a token that matches it is left out of the scan, so an allow
-# line cannot smuggle a link or a path in as its "item" or "host". A `file` line is scanned whole.
+# Each kind's token has a grammar, and a token that matches it is exempt only from its OWN kind of
+# finding (an item number from item-number, a host from internal-host); every other pattern still
+# reads it, so an allow line cannot smuggle a link, a path or another number in. A `file` line is
+# scanned whole.
 TOKEN = {"item": re.compile(r"I[0-9]{4,6}"), "host": re.compile(r"(?:[a-z0-9-]+\.)+[a-z]{2,}"),
          "file": re.compile(r"[^/~\s#][^\s#]*")}
 ALLOW_LINE = re.compile(r"^\s*(item|host)\s+(\S+)(.*)$")
@@ -90,9 +92,12 @@ findings = []
 def excerpt(text, start, end):
     a, b = max(0, start - 30), min(len(text), end + 30)
     return " ".join(text[a:b].split())
-def scan(text, where, trailers):
+def scan(text, where, trailers, exempt=None):
+    """exempt = (kind, span): an allow line's token, exempt ONLY from its own kind of finding."""
+    def own(kind, m):
+        return exempt is not None and exempt[0] == kind and m.start() >= exempt[1][0] and m.end() <= exempt[1][1]
     for m in ITEM.finditer(text):
-        if m.group(0) not in items:
+        if m.group(0) not in items and not own("item", m):
             findings.append(("item-number", where, excerpt(text, m.start(), m.end())))
     for m in LINK.finditer(text):
         findings.append(("session-link", where, excerpt(text, m.start(), m.end())))
@@ -100,7 +105,7 @@ def scan(text, where, trailers):
         for m in TRAILER.finditer(text):
             findings.append(("session-trailer", where, excerpt(text, m.start(), m.end())))
     for m in HOST.finditer(text):
-        if m.group(1).lower() not in hosts:
+        if m.group(1).lower() not in hosts and not own("host", m):
             findings.append(("internal-host", where, excerpt(text, m.start(), m.end())))
     for m in PATH.finditer(text):
         findings.append(("internal-path", where, excerpt(text, m.start(), m.end())))
@@ -146,21 +151,23 @@ def unquote(name):
 HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 path, line_no, old_left, new_left = None, 0, 0, 0
 diff = git("diff", "--no-color", "--no-ext-diff", "--no-textconv", "--src-prefix=a/", "--dst-prefix=b/",
-           "--no-renames", "-U0", "%s...%s" % (env["PH_BASE"], env["PH_HEAD"]))
+           "--no-renames", "-U0", "--inter-hunk-context=0", "%s...%s" % (env["PH_BASE"], env["PH_HEAD"]))
 for line in diff.split("\n"):
     if old_left > 0 or new_left > 0:
         if line.startswith("+"):
             new_left -= 1
             if path and path not in SELF:
-                text = line[1:]
+                text, exempt = line[1:], None
                 if path == ALLOW_PATH:
                     m = ALLOW_LINE.match(text)
                     if m and TOKEN[m.group(1)].fullmatch(m.group(2).lower() if m.group(1) == "host" else m.group(2)):
-                        text = m.group(3)
-                scan(text, "%s:%d" % (path, line_no), False)
+                        exempt = (m.group(1), m.span(2))
+                scan(text, "%s:%d" % (path, line_no), False, exempt)
             line_no += 1
         elif line.startswith("-"):
             old_left -= 1
+        elif line.startswith(" "):  # a context line, should a merged hunk carry one
+            old_left -= 1; new_left -= 1; line_no += 1
         continue  # "\ No newline at end of file" and anything else inside a hunk is not a line
     if line.startswith("+++ "):
         target = unquote(line[4:].rstrip("\t"))
@@ -173,8 +180,9 @@ for line in diff.split("\n"):
             new_left = int(m.group(3)) if m.group(3) is not None else 1
 # A binary file has no added lines to read, so it cannot be shown clean: each one added or changed
 # is a finding unless the allow file names it with a reason.
-# Added or modified files only: a deleted binary is gone, whatever now sits at its path.
-numstat = git("diff", "--no-ext-diff", "--no-textconv", "--no-renames", "--diff-filter=AM", "--numstat", "-z",
+# Added, modified or type-changed (a link replaced by a file) only: a deleted binary is gone,
+# whatever now sits at its path.
+numstat = git("diff", "--no-ext-diff", "--no-textconv", "--no-renames", "--diff-filter=AMT", "--numstat", "-z",
               "%s...%s" % (env["PH_BASE"], env["PH_HEAD"]))
 for entry in numstat.split("\0"):
     parts = entry.split("\t", 2)
