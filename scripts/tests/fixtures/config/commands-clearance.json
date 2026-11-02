@@ -1,0 +1,1 @@
+{ "release": { "clearance": { "commands": { "claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a", "owed": "o" } } } }
