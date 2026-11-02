@@ -1,0 +1,100 @@
+{
+  "_readme": "This repository's own delivery-loop config: the plugin is built with the loop it ships. It has ONE trunk, `main`, so the base, hotfix base, production branch and release source are all `main`. `/devstride:release` is deliberately NOT used here: its model, a release source promoted to a separate production branch, does not fit a repository whose release is a version bump merged into `main` and tagged by the release-guard workflow. A release is cut with the repo-local `plugin-release` skill (`.claude/skills/plugin-release/`) instead. `mergePath` is owned by this repository and read by `scripts/check-merge-path.sh`, not by the plugin; `/devstride:doctor` may WARN that it does not recognise the key. Branch names, commit messages and pull-request bodies carry NO tracker item numbers, because this repository is public (AGENTS.md).",
+  "profile": "standard",
+  "baseBranch": "main",
+  "hotfixBaseBranch": "main",
+  "integrationBranch": null,
+  "protectedBranches": ["main"],
+  "branchNaming": {
+    "pattern": "<prefix>/<YY-MM-DD>/<slug>",
+    "prefixSource": "git user.name first name, lowercased; ask if empty or ambiguous",
+    "dateFormat": "YY-MM-DD"
+  },
+  "epicIntegrationBranches": {
+    "enabled": true,
+    "pattern": "<prefix>/<YY-MM-DD>/epic-<epic-title-slug>",
+    "slugRule": "epic title kebab-cased, lowercased, [a-z0-9-] only, execution-order bracket prefix stripped, truncated to ~6 words",
+    "releaseTarget": "baseBranch",
+    "fastStoryMerges": {
+      "enabled": true,
+      "requireLocalVerifyGreen": true,
+      "epicReleaseIsFirstCloudPass": true
+    },
+    "autoRelease": "ask",
+    "deleteBranchAfterRelease": true
+  },
+  "commitConventions": {
+    "messageFormat": "<type>(<scope>): <summary>",
+    "reviewFixFormat": "fix(<scope>): <summary> (review)",
+    "epicMergeFormat": "merge: <short scope> into <epic-slug> integration"
+  },
+  "prBodyTemplate": {
+    "sections": [
+      {
+        "heading": "## Simple Description",
+        "guidance": "Plain-language, non-technical: what this does and why, understandable without knowing the codebase."
+      },
+      {
+        "heading": "## Technical Description",
+        "guidance": "The approach; the skills, references, hooks and scripts touched; notable design choices."
+      },
+      {
+        "heading": "## Notable Changes to System Architecture or Behavior",
+        "guidance": "Config keys, skill contracts, hook behaviour, the update path, user-visible behaviour. 'None' explicitly if none."
+      },
+      {
+        "heading": "## Testing Steps",
+        "guidance": "Concrete steps to exercise it, plus which scripts/tests cover it."
+      }
+    ],
+    "noAiAttribution": true
+  },
+  "hierarchyRoles": {
+    "releaseUnit": "Epic",
+    "leaf": ["Story", "Defect"]
+  },
+  "release": {
+    "productionBranch": "main",
+    "releaseSource": "main"
+  },
+  "verify": {
+    "typecheck": ["bash scripts/validate.sh --needles"],
+    "test": "bash scripts/tests/run.sh",
+    "testSingle": "bash <path/to/test.sh>",
+    "lint": "bash scripts/measure-cost.sh --check",
+    "testDir": "scripts/tests",
+    "skipDuringStoryBuilds": []
+  },
+  "review": {
+    "openPullRequestsAsDraft": true,
+    "readyForReviewReleasesCi": true,
+    "ciHeldUntilReviewSettled": true,
+    "localReviewerName": "Codex",
+    "localCommand": "codex exec --ephemeral --sandbox read-only -c model_reasoning_effort=\"<effort>\" -c mcp_servers.devstride.enabled=false <context>",
+    "localEffort": { "initial": "max", "followUp": "xhigh", "safety": "max" },
+    "automatedReviewers": [],
+    "pollTimeoutMinutes": 10,
+    "resolveAddressedThreads": true,
+    "mandatoryLenses": [
+      {
+        "name": "rule-loss-and-config-keys",
+        "paths": ["skills/**", "hooks/**"],
+        "question": "CONTRIBUTING.md 'Editing skills without losing rules': for every changed hunk, was an imperative dropped while the rationale that explained it survived; does a rationale that moved still hold where it now sits; does every config key a changed body cites still exist in a real config and does every key still have an instruction honouring it; and which claim of preservation rests only on a grep finding the words rather than on the rule still being true?"
+      }
+    ]
+  },
+  "ci": {
+    "workflowGlobs": [".github/workflows/*.yml"],
+    "draftGateCondition": "github.event.pull_request.draft == false",
+    "expectedRunsPerPullRequest": 1
+  },
+  "conventionsDoc": "AGENTS.md",
+  "lessonsDoc": ".claude/ds-lessons.md",
+  "mergePath": {
+    "_readme": "Repo-owned: read by scripts/check-merge-path.sh (run by the public-repo-guards workflow), never by the plugin. Matching is the plugin's anchored rule (skills/build-item/scripts/routing.py match). An epic branch reaches main only as a release, so the epic pattern admits a head only when the change bumps the version. No pattern carries an item number: this repository is public.",
+    "guardedBases": ["main"],
+    "epicHeadPatterns": ["*/<YY-MM-DD>/epic-*"],
+    "allowedHeadPatterns": ["*/<YY-MM-DD>/epic-*", "*/hotfix/<YY-MM-DD>/*", "*/<YY-MM-DD>/*", "dependabot/**"],
+    "overrideLabel": "merge-path-override"
+  }
+}
