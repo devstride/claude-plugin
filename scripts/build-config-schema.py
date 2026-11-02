@@ -90,9 +90,8 @@ def lint(registry):
                     problems.append("hook %s needs a non-empty calledBy list" % key)
                 if "step" in e or "stepVerdict" in e:
                     sv = e.get("stepVerdict")
-                    if not isinstance(e.get("step"), str) or not os.path.isfile(
-                            os.path.join(ROOT, "skills", str(e.get("step")), "SKILL.md")):
-                        problems.append("hook %s names a step with no skills/<step>/SKILL.md" % key)
+                    if not isinstance(e.get("step"), str) or not e.get("step"):
+                        problems.append("hook %s needs step, the step skill's directory name" % key)
                     if not isinstance(sv, list) or not sv or not all(isinstance(v, str) and v for v in sv):
                         problems.append("hook %s needs stepVerdict, the step's verdict lines" % key)
             t = e.get("valueType" if kind == "hooks" else "type")

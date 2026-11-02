@@ -3,6 +3,8 @@ name: local-environment
 description: "Step: run one localEnvironment command (create, recreate, migrate, seed, teardown or name) with its placeholders filled, and print one verdict."
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
 Arguments: $ARGUMENTS — `<verb> [<name>] [--branch <b>] [--base <ref>]`; verbs `create`,

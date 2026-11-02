@@ -3,6 +3,8 @@ name: write-release-notes
 description: "Step: run the release-notes hook (docs.releaseNotesSkill) in publish or draft mode, only when the owner asked, and print one verdict."
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
 Arguments: $ARGUMENTS — the mode (`publish` or `draft`) and the delta payload as a fenced JSON

@@ -191,4 +191,12 @@ N="$(printf '%s\n' "$OUT" | grep -c '^\(ERROR\|WARN\) ')"
   && printf '%s\n' "$OUT" | grep -q "^ERROR verify.test" && printf '%s\n' "$OUT" | grep -q "^ERROR release.clearance: sets both" \
   && ok "(32) the acceptance config reports exactly its three findings" || bad "(32) exit $RC: $OUT"
 
+# (33)-(34) the step-skill seams: a misspelled pool key is a WARN naming the right one; the new keys
+# validate clean
+cfg '{"pool": {"checkoutt": "lease <member> <purpose>"}}'
+expect "(33) pool.checkoutt is a WARN suggesting pool.checkout" 0 "^CONFIG: 0 error(s), 1 warning(s)" \
+  "^WARN pool.checkoutt: unknown key; did you mean pool.checkout?$"
+cfg '{"pool": {"checkout": "lease <member> --purpose <purpose>", "checkin": "return <member>"}, "release": {"classifySkill": "classify", "preMergeSkill": null}, "docs": {"knowledgeBaseSyncSkill": "kb-sync"}}'
+expect "(34) pool.checkout, pool.checkin, release.classifySkill, release.preMergeSkill and docs.knowledgeBaseSyncSkill validate clean" 0 "$CLEAN"
+
 exit "$FAIL"

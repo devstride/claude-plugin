@@ -3,6 +3,8 @@ name: lease-checkout
 description: "Step: lease one checkout of the repository's pool through its pool.checkout command, and print one verdict; build-item calls it first."
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
 Arguments: $ARGUMENTS — the member (the checkout to lease) and the purpose (the item or reason).

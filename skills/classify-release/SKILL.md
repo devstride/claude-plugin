@@ -3,6 +3,8 @@ name: classify-release
 description: "Step: ask the repository's release.classifySkill whether a release is light or full; anything but a clear answer is FULL."
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
 Arguments: $ARGUMENTS — the payload `{ "productionBranch", "releaseSource", "head" }` as a fenced

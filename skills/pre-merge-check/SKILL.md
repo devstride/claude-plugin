@@ -3,6 +3,8 @@ name: pre-merge-check
 description: "Step: ask the repository's release.preMergeSkill whether production needs anything before the release merges, and print one verdict."
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
 Arguments: $ARGUMENTS — the payload `{ "productionBranch", "releaseSource", "head", "pullRequest" }`

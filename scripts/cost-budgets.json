@@ -26,15 +26,15 @@
     "ultracode-build": 4900,
     "update": 1000,
     "update-docs": 700,
-    "sync-knowledge-base": 600,
-    "write-release-notes": 500,
+    "sync-knowledge-base": 700,
+    "write-release-notes": 600,
     "pre-ship": 700,
-    "post-deploy": 600,
+    "post-deploy": 700,
     "local-environment": 700,
-    "lease-checkout": 500,
-    "return-checkout": 400,
+    "lease-checkout": 600,
+    "return-checkout": 500,
     "classify-release": 500,
-    "pre-merge-check": 500
+    "pre-merge-check": 600
   },
   "references": {
     "skills/build-item/references/epic-release.md": 2900,
@@ -127,7 +127,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 60900,
+      "budget": 61000,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -165,7 +165,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 72200,
+      "budget": 72600,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

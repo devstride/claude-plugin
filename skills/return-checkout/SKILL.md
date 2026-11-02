@@ -3,6 +3,8 @@ name: return-checkout
 description: "Step: return a leased checkout through the repository's pool.checkin command once the work has merged, and print one verdict."
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
 Arguments: $ARGUMENTS — the member to return (default: the checkout directory this session works

@@ -3,6 +3,8 @@ name: post-deploy
 description: "Step: run the post-deploy health hook (release.postDeployCheckSkill) in check or close-out mode and pass its verdict through; release calls it."
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
 Arguments: $ARGUMENTS — the mode (`check` or `close-out`) and the payload as a fenced JSON block

@@ -3,6 +3,8 @@ name: update-docs
 description: "Step: run the repository's documentation hook (docs.updateSkill) once — update or check — and print one verdict; release and build-item call it."
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
 Arguments: $ARGUMENTS — a mode (`update`, the default, or `check`) and, for `update`, the

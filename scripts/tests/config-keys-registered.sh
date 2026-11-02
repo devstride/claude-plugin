@@ -102,4 +102,24 @@ scan
 corpus; rm "$WORK/r/schemas/seam-registry.json"; scan
 [ "$RC" = 2 ] && ok "(10) a missing registry is exit 2" || bad "(10) exit $RC: $OUT"
 
+# (11) the step skills and their contracts cite only registered keys, and an unregistered key in a
+# new contract is still caught (the scan reaches skills/<step>/SKILL.md and the new references)
+rm -rf "$WORK/s"; mkdir -p "$WORK/s/schemas" "$WORK/s/scripts"
+cp "$ROOT/schemas/seam-registry.json" "$WORK/s/schemas/"; cp "$ROOT/scripts/config-key-scan.ignore" "$WORK/s/scripts/"
+for f in skills/release/references/step-skills.md skills/release/references/release-safety-hooks.md \
+         skills/build-item/references/checkout-pool-commands.md skills/release/references/docs-hooks.md \
+         skills/update-docs/SKILL.md skills/sync-knowledge-base/SKILL.md skills/write-release-notes/SKILL.md \
+         skills/pre-ship/SKILL.md skills/post-deploy/SKILL.md skills/local-environment/SKILL.md \
+         skills/lease-checkout/SKILL.md skills/return-checkout/SKILL.md skills/classify-release/SKILL.md \
+         skills/pre-merge-check/SKILL.md; do
+  mkdir -p "$WORK/s/$(dirname "$f")"; cp "$ROOT/$f" "$WORK/s/$f"
+done
+: > "$WORK/s/README.md"
+OUT="$(python3 "$SCAN" --root "$WORK/s" 2>&1)"; A=$?
+printf 'Set `pool.checkoutCommand`.\n' >> "$WORK/s/skills/build-item/references/checkout-pool-commands.md"
+OUT2="$(python3 "$SCAN" --root "$WORK/s" 2>&1)"; B=$?
+if [ "$A" = 0 ] && [ "$B" = 1 ] && printf '%s' "$OUT2" | grep -q "UNREGISTERED skills/build-item/references/checkout-pool-commands.md:[0-9]*: pool.checkoutCommand"; then
+  ok "(11) the step skills and new contracts cite only registered keys; a stray key in one is caught"
+else bad "(11) exits $A $B: $OUT $OUT2"; fi
+
 exit "$FAIL"

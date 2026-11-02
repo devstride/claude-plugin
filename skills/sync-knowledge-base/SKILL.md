@@ -3,6 +3,8 @@ name: sync-knowledge-base
 description: "Step: run the knowledge-base sync hook (docs.knowledgeBaseSyncSkill) after documentation was published live, and print one verdict; release calls it after docs."
 ---
 
+**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
+
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
 Arguments: $ARGUMENTS — a fenced JSON payload `{ "docsOutcome": "...", "live": true|false }`
