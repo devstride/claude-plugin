@@ -8,6 +8,63 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Ten step skills: every hook the release loop calls can be run, and re-run, by itself.**
+  `update-docs`, `sync-knowledge-base`, `write-release-notes`, `pre-ship`, `post-deploy`,
+  `local-environment`, `lease-checkout`, `return-checkout`, `classify-release` and
+  `pre-merge-check` each run exactly one hook your config names and print a fixed verdict first
+  (for example `PRE-SHIP: PASS (3 ran)` or `RELEASE CLASS: FULL`). `release`, `build-item`, `pr`
+  and `branch-hotfix` now call them instead of carrying the same paragraphs, so a step that failed
+  is re-run by name (`/devstride:update-docs`). With a hook unset a step says `NOT CONFIGURED` (or
+  its stated default) and the caller carries on; the four safety steps take the stricter path when
+  their hook is missing or cannot answer: an unclassified release is FULL, a broken pre-ship check
+  fails, an unreadable post-deploy or pre-merge answer is NOT RUN and the owner is asked. The shared
+  rule is `skills/release/references/step-skills.md`. Nothing is renamed or removed, and with none
+  of the new keys set every orchestrator runs the same hooks in the same order as before.
+- **Five new optional keys**, all `null` by default:
+  - `docs.knowledgeBaseSyncSkill` — a local skill that syncs a knowledge base after documentation
+    was published live; `release` calls it right after the docs update, owes it as
+    `knowledge-base` at the hand-back, and a failure never undoes the documentation push.
+  - `release.classifySkill` — says whether a release is light or full; printed in the release's
+    delta summary and passed to pre-ship commands as `RELEASE_CLASS`. Unset: every release is FULL.
+  - `release.preMergeSkill` — says whether production needs anything before the merge; run before
+    the owner is asked for the go-ahead. Unset: the summary says **pre-merge production check: not
+    configured**. Contract for both: `skills/release/references/release-safety-hooks.md`.
+  - `pool.checkout` / `pool.checkin` — your repository's own commands for leasing and returning a
+    pool checkout; `build-item` uses them when set and keeps its generic lease rule otherwise.
+    Contract: `skills/build-item/references/checkout-pool-commands.md`.
+- **A neutrality check** (`scripts/check-neutrality.sh`, run by the script tests and as its own
+  release-guard step) fails when the shipped text names one repository's own tooling — its command
+  launcher and command families, its data set and database vendor, checkout names, its production
+  deploy workflow, the pool-lease phrase, or an item number the hygiene allow list does not hold.
+  Exceptions go in `scripts/neutrality-allow.txt`, one exact substring with a reason (none today).
+
+### Changed
+
+- **The release clearance's holder variable is `CLEARANCE_HOLDER_TOKEN`.** The older name,
+  `DEVSTRIDE_LEASE_TOKEN`, is still read when the new one is unset, and the new name wins when both
+  are set; the one-time token printed to a plain terminal now says to export the new name.
+- **`doctor` section 7 checks every skill-shaped hook in one loop** (the docs skills, the
+  knowledge-base sync, the post-deploy check and the two release safety hooks): unset is N/A, a
+  named skill must exist, and only the docs skills' and the knowledge-base sync's read-only `check`
+  is run.
+
+### Cost
+
+- **`alwaysOnContext` raised from 1,300 to 1,800 tokens** (measured 1,787): every session loads the
+  skill listing, and each new step adds a description line to it.
+- New: the ten step bodies (454 to 700 tokens each) and three contracts (`step-skills.md` 947,
+  `release-safety-hooks.md` 1,038, `checkout-pool-commands.md` 828).
+- Bodies: `release` 7,998 → 7,975, `build-item` 8,000 → 7,996, `pr` 3,763 → 3,557, `doctor` 7,952
+  → 7,897, `branch-hotfix` 2,107 → 2,182.
+- Composed paths, re-baselined to what they now load: `productionReleaseGate` 66,012 → 72,558
+  (+9.9%: the seven release-side steps, `step-skills.md` and `release-safety-hooks.md`, and the
+  docs-hooks and clearance growth); `fastStoryLoop` 58,408 → 60,962 (+4.4%: the lease pair,
+  `step-skills.md` and `checkout-pool-commands.md`); `epicReleaseGate` 70,180 → 72,685 (+3.6%:
+  `pre-ship`, `update-docs` and `step-skills.md`). The steps load only when called, so a run that
+  calls none of them pays only the always-on listing.
+
 ## [3.19.0] — 2026-11-02
 
 ### Added

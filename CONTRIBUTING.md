@@ -173,7 +173,7 @@ same every time. `skills/setup/scripts/check-review-engine.sh` is the model — 
 doctor §6 each spend one sentence to run it, and `scripts/tests/check-review-engine.sh` pins every
 command template the engine catalogue ships to pass it. A hook is the same idea at the harness
 level: `hooks/session-gate.sh` enforces one job class per session from a `UserPromptSubmit` hook
-rather than from a step 0 in twenty bodies, and fails open. Every script under `hooks/`,
+rather than from a step 0 in thirty bodies, and fails open. Every script under `hooks/`,
 `scripts/` and `skills/*/scripts/` gets `bash -n` in `validate.sh`; every test under
 `scripts/tests/` is auto-discovered by `run.sh`; a new hook script must also be added to the
 executed-files tuple in `measure-cost.sh`.
