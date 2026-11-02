@@ -91,6 +91,8 @@
   },
   "conventionsDoc": "AGENTS.md",
   "lessonsDoc": ".claude/ds-lessons.md",
+  "_repoLocalKeys_readme": "Keys this repository's own tooling reads and the plugin does not: the plugin's config validator (doctor, setup check 0) stays silent about them instead of reporting them as unknown.",
+  "repoLocalKeys": ["mergePath"],
   "mergePath": {
     "_readme": "Repo-owned: read by scripts/check-merge-path.sh (run by the public-repo-guards workflow), never by the plugin. Matching is the plugin's anchored rule (skills/build-item/scripts/routing.py match). An epic branch reaches main only as a release, so the epic pattern admits a head only when the change bumps the version. No pattern carries an item number: this repository is public.",
     "guardedBases": ["main"],

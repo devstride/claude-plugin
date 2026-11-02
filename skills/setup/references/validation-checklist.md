@@ -26,6 +26,14 @@ names them — a verdict that hides a skipped test suite is claiming more than i
 
 ## The checks
 
+0. **Config shape** — run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py
+   .claude/ds-config.json`, which checks the file against the schema this installed release
+   publishes (`schemas/ds-config.schema.json`, generated from the seam registry,
+   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/seam-registry.md`). Report its lines verbatim.
+   Any `ERROR` (a wrong type, a value outside its allowed set, both clearance shapes, a retired
+   key) is a `FAIL`; a `WARN` (an unknown key, with its closest registered key) is a warning,
+   never a failure; exit 2 (the file cannot be read or parsed) is a `FAIL`. It checks shape only —
+   whether a command resolves or a branch exists is the checks below.
 1. **Verify commands** — every `verify.typecheck` entry, and `verify.lint`. Exit 0 is the pass.
    `generated.toleratedTypeErrors` matches are not failures where `generated.paths` matches the file.
    `verify.test` is offered, never forced.
@@ -66,6 +74,15 @@ names them — a verdict that hides a skipped test suite is claiming more than i
 - The verdict names a dirty working tree and an offline run whenever either is true.
 
 ## Failure modes
+
+### Config shape
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `WARN <key>: unknown key; did you mean <other>?` | a misspelled or misplaced key, which every skill silently ignores | rename it to the suggested key |
+| `WARN <key>: unknown key` on a key the repository's own skills read | a repository-local key | add its prefix to `repoLocalKeys` |
+| `ERROR <key>: expected …, found …` or `… is not one of …` | the value has the wrong shape | write the shape the registry names for that key |
+| `CONFIG: cannot parse …` | the file is not valid JSON | fix the syntax the message points at |
 
 ### Verify commands
 

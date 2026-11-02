@@ -92,6 +92,13 @@ next action. For each failure symptom, read
 
 - **Present and parses** — read `.claude/ds-config.json`. Absence is legal: report shipped defaults,
   but do not call ready until the effective branches pass below.
+- **Config shape** — present → run `python3
+  ${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py .claude/ds-config.json` (the
+  schema of this installed release) and report its lines in its own words: `ERROR` is a FAIL,
+  `WARN` a warning; exit 2 (unreadable, unparsable) is a FAIL. An unknown key is never a typo
+  accusation and its `did you mean` a possibility, not a verdict; keys the repository's own skills
+  read belong under `repoLocalKeys`. What a key means:
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/seam-registry.md`.
 - **Branch roles resolve.** Even for `doctor config`, find the repo/origin and run read-only
   `git ls-remote --heads origin` (never fetch). If unavailable, use normalized local and
   `refs/remotes/origin/*` names, label them possibly stale, and never PASS an unconfirmed branch.
@@ -147,15 +154,7 @@ next action. For each failure symptom, read
   explicit key wins by contract — but say which key, which value, and what the profile would
   have written (`silent-failures.md` holds why). A present `review.localCommand` under
   `prototype` is NOT a contradiction — it names the engine without scheduling it.
-  `profileOverrides`: report as a WARNING any name that is not a knob in the contract's table;
-  nothing else.
-- **Unrecognized keys — a WARNING, not a typo accusation.** List them and let the user judge. **Exclude by convention**: any key whose leaf name starts with
-  `_` (the `_*_readme` documentation convention) and `$schema`.
-  Check against the published [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference),
-  **not** by grepping skill prose — several real keys are descriptive and appear in no skill.
-  Where a key is one edit away from a real one, offer that as a possibility, not a verdict.
-  `profile`, `profileOverrides`, `supportTrain`, `releaseTower` and `config-defaults.md`'s
-  `release.*` keys are recognized even if unpublished.
+  `profileOverrides`: an unknown knob is the validator's WARNING; nothing else.
 - **`localEnvironment`** — report the block. Absent → the shipped default is in force (every
   command `null`, `instanceBoundTo: none`): `branch-hotfix` asks before touching a database.
   Present → report `instanceBoundTo` and each command's resolution per the rule below.
@@ -305,8 +304,8 @@ Neither set → **N/A**, not a failure: the release skill's docs pass reports it
   (missing → FAIL, a dangling hook; contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/post-deploy-check.md`). Unset → N/A; the close-out
   reports `not configured`.
-- **`release.clearance`** — null → N/A. Both `provider` and `commands`, a `provider` other than
-  `github`, or a missing verb → FAIL. `provider: github` → run its `status` once (read-only),
+- **`release.clearance`** — null → N/A. Its shape (exactly one of `provider: github` or the
+  `commands` verbs) is §4's validator. `provider: github` → run its `status` once (read-only),
   report the line; `UNKNOWN` FAILs naming the cause. No `.github/workflows/release-tower.yaml`
   beside it → INFO: `/devstride:setup ci` offers the floor. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`.
