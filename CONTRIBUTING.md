@@ -63,9 +63,14 @@ the explanation can survive intact while quietly becoming wrong — technically 
 untrue, and invisible to any grep.
 
 **Walk the config keys, one by one.** "The file wins over the defaults" is not self-executing.
-After any change that touches configuration, check that **every** key the skills cite actually
-exists in a real config, and that every key in a real config still has an instruction honouring it.
-An absent JSON key does not error — the agent simply reads nothing and improvises.
+An absent JSON key does not error — the agent simply reads nothing and improvises. The first half
+of the walk is now mechanical: every key lives in `schemas/seam-registry.json`, and
+`scripts/check-config-keys.py` fails when a skill, a reference or the README cites a key the
+registry does not hold (a token that only looks like a key goes in `scripts/config-key-scan.ignore`,
+with its reason). So a new or renamed key is a registry edit first, then
+`python3 scripts/build-config-schema.py --write` to regenerate the schema and the key table, both of
+which the release guard checks. The second half is still yours: after any change that touches
+configuration, check that every key in a real config still has an instruction honouring it.
 
 **Presence is not fidelity, and fidelity is not correctness.** Grepping for a rule proves only that
 the words are there. It cannot tell you the rule is still *true* after the change around it. And

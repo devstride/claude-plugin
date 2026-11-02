@@ -37,10 +37,15 @@ into `main` here is its own release), with a clean tree and that branch up to da
    `### Cost` subsection, unedited.
 5. **The version.** Set `version` in `.claude-plugin/plugin.json` (never in `marketplace.json`) and
    the README's `Current version:` line to `<version>`.
-6. **The status-line marker**, only if `skills/setup/references/statusline.sh` changed since the
+6. **The seam registry.** Set every `"since": "unreleased"` in `schemas/seam-registry.json` to
+   `"<version>"`, then `python3 scripts/build-config-schema.py --write` (the schema's `$id` and the
+   key table carry the new version). `python3 scripts/build-config-schema.py --check --release --base origin/main`
+   must print `SCHEMA: ok`: an `UNRELEASED` or `DRIFT` line blocks the commit, exactly as the
+   release guard would block the pull request.
+7. **The status-line marker**, only if `skills/setup/references/statusline.sh` changed since the
    previous tag: raise its `# ds-statusline: managed v<x.y.z>` line to `<version>`. Otherwise leave
    it alone.
-7. **Commit, then check the commit.** Commit everything as `release: v<version>` (no item
+8. **Commit, then check the commit.** Commit everything as `release: v<version>` (no item
    numbers, no session trailer — this repository is public). Both checks read COMMITTED history,
    never the work tree, so they run after the commit:
    `bash scripts/check-version-bump.sh --base origin/main` must pass and

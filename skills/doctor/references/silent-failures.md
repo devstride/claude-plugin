@@ -116,8 +116,8 @@ Migrating a legacy base-only command to context mode is a tradeoff rather than a
 mode buys the cumulative ledger, so cycle N+1 can check whether the previous fix held; a base-only
 invocation cannot be fed one and gets a single cycle. But some engines' dedicated review
 subcommands return a structured findings item that the general exec path does not, and that
-structure is lost in the move. Where `review.maxLocalReviewRounds` is 1 there is no cycle N+1 to
-buy, so the ledger is worth nothing and only the loss remains. Say which side the repository is on
+structure is lost in the move. Where the effective `maxLocalReviewRounds` is 1 (the profile's value,
+or `profileOverrides.maxLocalReviewRounds`) there is no cycle N+1 to buy, so the ledger is worth nothing and only the loss remains. Say which side the repository is on
 instead of recommending the migration flatly.
 
 ## §6 — why the fix must match their config

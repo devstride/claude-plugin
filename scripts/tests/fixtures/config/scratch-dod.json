@@ -1,0 +1,5 @@
+{
+  "review": { "localComand": "reviewer <context>" },
+  "verify": { "test": ["make", "test"] },
+  "release": { "clearance": { "provider": "github", "commands": { "claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a" } } }
+}

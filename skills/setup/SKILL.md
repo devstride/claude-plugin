@@ -428,7 +428,7 @@ wrote.
 
 **A config is not done until it has run.** Phase G runs automatically after every write, and on
 its own against a config setup did not write. **Validation reads the file, not any memory of
-writing it**; unrecognized keys are ignored. **Read
+writing it**; check 0 validates its shape. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/validation-checklist.md` when you run this
 phase** — it holds each check's full procedure, its run rules, and the failure-mode table
 (symptom, cause, exact fix); map every failure to its row rather than improvising.

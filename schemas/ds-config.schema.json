@@ -1,0 +1,1194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.19.0/schemas/ds-config.schema.json",
+  "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "prototype",
+        "standard",
+        "extended"
+      ],
+      "default": "standard",
+      "description": "the delivery profile; contract: skills/plan/references/delivery-profiles.md"
+    },
+    "profileOverrides": {
+      "type": "object",
+      "properties": {
+        "grain": {
+          "type": "string",
+          "description": "overrides the profile's grain knob"
+        },
+        "specDepth": {
+          "type": "string",
+          "description": "overrides the profile's specDepth knob"
+        },
+        "understandReaders": {
+          "type": "integer",
+          "description": "overrides the profile's understandReaders knob"
+        },
+        "reviewBreadthCeiling": {
+          "type": "string",
+          "description": "overrides the profile's reviewBreadthCeiling knob"
+        },
+        "verificationDefault": {
+          "type": "string",
+          "description": "overrides the profile's verificationDefault knob"
+        },
+        "verificationGrouping": {
+          "type": "string",
+          "description": "overrides the profile's verificationGrouping knob"
+        },
+        "fixFloor": {
+          "type": "string",
+          "description": "overrides the profile's fixFloor knob"
+        },
+        "localCliEngine": {
+          "description": "overrides the profile's localCliEngine knob"
+        },
+        "maxLocalReviewRounds": {
+          "type": "integer",
+          "description": "overrides the profile's maxLocalReviewRounds knob"
+        },
+        "storyVerify": {
+          "description": "overrides the profile's storyVerify knob"
+        },
+        "perStoryPullRequest": {
+          "description": "overrides the profile's perStoryPullRequest knob"
+        },
+        "releaseCiOrdering": {
+          "description": "overrides the profile's releaseCiOrdering knob"
+        },
+        "reviewerRegistrationWindowMinutes": {
+          "type": "number",
+          "description": "overrides the profile's reviewerRegistrationWindowMinutes knob"
+        },
+        "pollTimeoutMinutes": {
+          "type": "number",
+          "description": "overrides the profile's pollTimeoutMinutes knob"
+        },
+        "autoRelease": {
+          "description": "overrides the profile's autoRelease knob"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "pins one knob under the profile; operator hand-edit, never written by setup"
+    },
+    "baseBranch": {
+      "type": "string",
+      "default": "develop",
+      "description": "the branch work merges into and branches are cut from"
+    },
+    "hotfixBaseBranch": {
+      "type": "string",
+      "default": "master",
+      "description": "the production-safe branch a hotfix starts from"
+    },
+    "protectedBranches": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "branches never rebased, force-pushed or deleted; exact names or patterns"
+    },
+    "integrationBranch": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "one integration branch for all work; null derives one per release unit"
+    },
+    "conventionsDoc": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "the coding-standards file the build engine obeys"
+    },
+    "lessonsDoc": {
+      "type": "string",
+      "default": ".claude/ds-lessons.md",
+      "description": "the lessons store the review skill writes"
+    },
+    "itemTagFormat": {
+      "type": "string",
+      "default": "[I#####]",
+      "description": "the item tag commit messages carry"
+    },
+    "repoLocalKeys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "dotted prefixes of keys the repository's own local skills read; keys at or under one are never reported as unknown"
+    },
+    "branchNaming": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "default": "<prefix>/<MM-DD-YY>/<slug>",
+          "description": "the branch name pattern"
+        },
+        "prefixSource": {
+          "type": "string",
+          "description": "prose the branch skills follow to choose the prefix"
+        },
+        "dateFormat": {
+          "type": "string",
+          "default": "MM-DD-YY",
+          "description": "the date token's format"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "how branches are named"
+    },
+    "epicIntegrationBranches": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "turns integration branches on"
+        },
+        "pattern": {
+          "type": "string",
+          "description": "the integration branch name pattern"
+        },
+        "slugRule": {
+          "type": "string",
+          "description": "prose rule for the epic slug"
+        },
+        "example": {
+          "type": "string",
+          "description": "descriptive only: a sample integration branch name; nothing reads it"
+        },
+        "releaseTarget": {
+          "type": "string",
+          "default": "baseBranch",
+          "description": "where a finished release unit lands; baseBranch means the base branch itself"
+        },
+        "fastStoryMerges": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "decided per repository by setup"
+            },
+            "requireLocalVerifyGreen": {
+              "type": "boolean",
+              "default": true,
+              "description": "the local gate must be green"
+            },
+            "epicReleaseIsFirstCloudPass": {
+              "type": "boolean",
+              "default": true,
+              "description": "the release pull request is the first cloud review"
+            },
+            "localEngines": {
+              "description": "descriptive only: the expected local review roster for a fast story merge; the skills resolve behaviour from the active settings"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "description": "story merges onto the integration branch without a pull request"
+        },
+        "autoRelease": {
+          "type": [
+            "boolean",
+            "string"
+          ],
+          "enum": [
+            true,
+            false,
+            "ask"
+          ],
+          "default": false,
+          "description": "true, false or \"ask\": whether a finished release unit's pull request merges unasked"
+        },
+        "deleteBranchAfterRelease": {
+          "type": "boolean",
+          "default": true,
+          "description": "delete the integration branch after its release"
+        },
+        "mergedStatusName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": "Review",
+          "description": "the status a landed story moves to, by name"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "per-release-unit integration branches"
+    },
+    "defects": {
+      "type": "object",
+      "properties": {
+        "deferredContainerTitle": {
+          "type": "string",
+          "default": "Deferred defects",
+          "description": "the container deferred defects are parked under"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "deferred-defect placement"
+    },
+    "commitConventions": {
+      "type": "object",
+      "properties": {
+        "messageFormat": {
+          "type": "string",
+          "description": "the commit message format"
+        },
+        "reviewFixFormat": {
+          "type": "string",
+          "description": "the review-fix commit format"
+        },
+        "epicMergeFormat": {
+          "type": "string",
+          "description": "the story merge subject on an integration branch"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "commit message formats"
+    },
+    "prBodyTemplate": {
+      "type": "object",
+      "properties": {
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "heading": {
+                "type": "string",
+                "description": "the section heading"
+              },
+              "guidance": {
+                "type": "string",
+                "description": "how to fill the section"
+              }
+            },
+            "patternProperties": {
+              "^_": {}
+            },
+            "additionalProperties": false,
+            "required": [
+              "heading",
+              "guidance"
+            ]
+          },
+          "description": "the body sections, in order"
+        },
+        "noAiAttribution": {
+          "type": "boolean",
+          "default": true,
+          "description": "keeps AI attribution out of pull-request bodies"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "pull-request body sections"
+    },
+    "ci": {
+      "type": "object",
+      "properties": {
+        "workflowGlobs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "the workflow files the CI checks read"
+        },
+        "draftGateCondition": {
+          "type": "string",
+          "default": "github.event.pull_request.draft == false",
+          "description": "the expression every pull-request job gates on"
+        },
+        "gateJobName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "the job proving the ready-flip released CI"
+        },
+        "expectedRunsPerPullRequest": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1,
+          "description": "executed runs per workflow per pull request"
+        },
+        "freezeBaseWhileReleasePrReady": {
+          "x-severity": "warn",
+          "description": "ignored since 3.8.0 whatever its value; remove it"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "CI facts the loop reads"
+    },
+    "preShipChecks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "command hook — none; selected by the entry's when and pathGlobs"
+          },
+          "name": {
+            "type": "string",
+            "description": "the check's name"
+          },
+          "when": {
+            "type": "string",
+            "enum": [
+              "perPr",
+              "releaseOnly",
+              "always"
+            ],
+            "description": "when the check runs; an entry without it is never selected by pr or release"
+          },
+          "pathGlobs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "the paths that select the check"
+          },
+          "timeoutNote": {
+            "type": "string",
+            "description": "surfaced before the check runs"
+          },
+          "onlyWhenTouched": {
+            "type": "boolean",
+            "description": "a releaseOnly check runs only when the release touches its pathGlobs"
+          }
+        },
+        "patternProperties": {
+          "^_": {}
+        },
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "when"
+        ]
+      },
+      "description": "slow suites run locally at the ship boundary"
+    },
+    "preCommitWiringChecks": {
+      "type": "array",
+      "description": "repository-specific wiring assertions"
+    },
+    "verify": {
+      "type": "object",
+      "properties": {
+        "typecheck": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "command hook — none; run from the repository root, in array order"
+        },
+        "typecheckCombined": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — none"
+        },
+        "test": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — none"
+        },
+        "testSingle": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — <path/to/test> replaced with the file to run"
+        },
+        "lint": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — none"
+        },
+        "testDir": {
+          "type": "string",
+          "description": "where tests live"
+        },
+        "skipDuringStoryBuilds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "the suite's display name"
+              },
+              "alwaysRunWhenBase": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "branch roles (baseBranch, productionBranch) where the suite always applies, paths irrelevant"
+              },
+              "manualTriggerLabel": {
+                "type": "string",
+                "description": "the label that requests the suite by hand; the workflow reacts only to it"
+              },
+              "runWhenChangedPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "globs matched against the complete final diff, both sides of renames"
+              },
+              "ciChecksByBase": {
+                "type": "object",
+                "properties": {
+                  "baseBranch": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "check names required on pull requests into the base branch"
+                  },
+                  "productionBranch": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "check names required on pull requests into the production branch"
+                  }
+                },
+                "patternProperties": {
+                  "^_": {}
+                },
+                "additionalProperties": false,
+                "description": "required check names per branch role; a role with no mapping requires nothing there"
+              }
+            },
+            "patternProperties": {
+              "^_": {}
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "ciChecksByBase"
+            ]
+          },
+          "description": "slow cloud suites deferred during story builds; each needs a matching CI job"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "the verification commands"
+    },
+    "generated": {
+      "type": "object",
+      "properties": {
+        "regenCommand": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — none"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "paths of generated files"
+        },
+        "toleratedTypeErrors": {
+          "type": "array",
+          "description": "type errors tolerated in generated files"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "generated build output"
+    },
+    "hierarchyRoles": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "leaf": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "the one-day leaf work types"
+        },
+        "releaseUnit": {
+          "type": "string",
+          "description": "the release-unit work type"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "which work types are leaves and release units; null reads as absent"
+    },
+    "review": {
+      "type": "object",
+      "properties": {
+        "localCommand": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — <context> replaced with - and the prompt on stdin; <effort>; legacy <base>"
+        },
+        "localAssistCommand": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — <context> and <effort>, as review.localCommand"
+        },
+        "localReviewerName": {
+          "type": "string",
+          "description": "the name local findings are attributed to"
+        },
+        "localEffort": {
+          "type": "object",
+          "properties": {
+            "initial": {
+              "type": "string",
+              "description": "the first full round's tier"
+            },
+            "followUp": {
+              "type": "string",
+              "description": "an ordinary follow-up's tier"
+            },
+            "safety": {
+              "type": "string",
+              "description": "a P1 or serious-P2 fix check's tier"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "description": "the <effort> tier per round kind"
+        },
+        "localReReviewScope": {
+          "type": "string",
+          "description": "\"full\" pins every follow-up to the whole diff"
+        },
+        "automatedReviewers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "the reviewer's display name"
+              },
+              "how": {
+                "type": "string",
+                "enum": [
+                  "requested_reviewer"
+                ],
+                "description": "how the reviewer is requested; requested_reviewer (a bot through GraphQL by its node id) is the one mechanism the review flow implements"
+              },
+              "bot": {
+                "type": "string",
+                "description": "the reviewer's bot login"
+              },
+              "value": {
+                "type": "string",
+                "description": "the identifier the request uses"
+              },
+              "graphqlBotId": {
+                "type": "string",
+                "description": "the bot's GraphQL node id"
+              },
+              "baseBranches": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "exact base branches the reviewer is requested on"
+              },
+              "requestPolicy": {
+                "type": "string",
+                "description": "every-round (also any other value) or final-head"
+              }
+            },
+            "patternProperties": {
+              "^_": {}
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "how",
+              "bot",
+              "value",
+              "graphqlBotId"
+            ]
+          },
+          "description": "cloud reviewers requested on pull requests"
+        },
+        "openPullRequestsAsDraft": {
+          "type": "boolean",
+          "description": "open pull requests as drafts"
+        },
+        "readyForReviewReleasesCi": {
+          "type": "boolean",
+          "description": "marking a draft ready starts CI"
+        },
+        "ciHeldUntilReviewSettled": {
+          "type": "boolean",
+          "description": "CI waits for review to settle"
+        },
+        "pollTimeoutMinutes": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "the upper bound on waiting for a registered cloud reviewer"
+        },
+        "adaptiveReviewerWait": {
+          "type": "boolean",
+          "default": true,
+          "description": "bound the wait by learned reviewer latency"
+        },
+        "resolveAddressedThreads": {
+          "type": "boolean",
+          "description": "resolve each addressed review thread"
+        },
+        "notifyWhenSettled": {
+          "type": "boolean",
+          "description": "notify when a standalone review settles"
+        },
+        "mandatoryLenses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "the lens name"
+              },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "anchored globs that select the lens"
+              },
+              "question": {
+                "type": "string",
+                "description": "the question the lens's finder answers"
+              }
+            },
+            "patternProperties": {
+              "^_": {}
+            },
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "paths",
+              "question"
+            ]
+          },
+          "description": "path-selected review lenses"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "review engines and the CI hold"
+    },
+    "release": {
+      "type": "object",
+      "properties": {
+        "postDeployCheckSkill": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "skill hook — check followed by {productionBranch, mergeCommit, deployConfirmedAt}"
+        },
+        "deployApproval": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — RELEASE_COMMIT in the environment"
+        },
+        "deployVerification": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — RELEASE_COMMIT in the environment"
+        },
+        "clearance": {
+          "description": "provider-or-commands hook — each verb's own arguments appended (--wait, --short, <phase> --branch <b> --pr <n>, --force, --yes)",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "enum": [
+                    "github"
+                  ],
+                  "description": "the built-in provider"
+                },
+                "ref": {
+                  "type": "string",
+                  "default": "refs/clearance/release",
+                  "description": "the custom ref holding the clearance"
+                },
+                "staleMinutes": {
+                  "type": "number",
+                  "default": 20,
+                  "description": "heartbeat age that makes a clearance stale"
+                },
+                "waitMinutes": {
+                  "type": "number",
+                  "default": 180,
+                  "description": "how long claim --wait polls"
+                },
+                "phaseBudgetMinutes": {
+                  "description": "phase to minutes; a bad value is ignored with a status warning"
+                }
+              },
+              "patternProperties": {
+                "^_": {}
+              },
+              "additionalProperties": false,
+              "required": [
+                "provider"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "commands": {
+                  "type": "object",
+                  "properties": {
+                    "claim": {
+                      "type": "string",
+                      "description": "the claim command"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "the status command"
+                    },
+                    "heartbeat": {
+                      "type": "string",
+                      "description": "the heartbeat command"
+                    },
+                    "release": {
+                      "type": "string",
+                      "description": "the release command"
+                    },
+                    "adopt": {
+                      "type": "string",
+                      "description": "the adopt command"
+                    },
+                    "owed": {
+                      "type": "string",
+                      "description": "the optional owed command"
+                    }
+                  },
+                  "patternProperties": {
+                    "^_": {}
+                  },
+                  "additionalProperties": false,
+                  "description": "a provider the repository supplies",
+                  "required": [
+                    "claim",
+                    "status",
+                    "heartbeat",
+                    "release",
+                    "adopt"
+                  ]
+                }
+              },
+              "patternProperties": {
+                "^_": {}
+              },
+              "additionalProperties": false,
+              "required": [
+                "commands"
+              ]
+            }
+          ]
+        },
+        "productionBranch": {
+          "type": "string",
+          "default": "master",
+          "description": "the production release target"
+        },
+        "releaseSource": {
+          "type": "string",
+          "default": "develop",
+          "description": "the branch promoted in a release"
+        },
+        "autoDeployOnMerge": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "one plain-English sentence on what merging to production does"
+        },
+        "releaseBranchPattern": {
+          "type": "string",
+          "description": "cut each release as its own protected branch"
+        },
+        "releaseBranchFixExclusions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "paths a fix on a release branch may not touch"
+        },
+        "syncWorkflow": {
+          "type": "string",
+          "description": "the workflow syncing production into the source"
+        },
+        "mergeTrainBeforeCut": {
+          "type": "boolean",
+          "default": false,
+          "description": "merge the support train into the source before each cut"
+        },
+        "productionReview": {
+          "type": "object",
+          "properties": {
+            "reviewIdenticalTree": {
+              "type": "boolean",
+              "description": "false skips re-reviewing a tree already reviewed"
+            },
+            "highRiskPaths": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "paths that still get one pass"
+            },
+            "highRiskEngine": {
+              "type": "string",
+              "description": "the engine for that pass"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "description": "review-once economy for the production pull request"
+        },
+        "docsRepo": {
+          "x-severity": "error",
+          "description": "retired pre-1.0 shape the release skill never acts on; run /devstride:setup docs to migrate it into the docs block"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "production release settings"
+    },
+    "supportTrain": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "description": "the train's branch"
+        },
+        "fastMerges": {
+          "type": "boolean",
+          "default": false,
+          "description": "a one-off merges onto the train without its own pull request"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "one long-lived branch one-off work batches on; null reads as absent"
+    },
+    "releaseTower": {
+      "type": "object",
+      "properties": {
+        "overrideLabel": {
+          "type": "string",
+          "default": "release-tower-override",
+          "description": "the label passing an owner-approved pull request"
+        },
+        "hotfixPattern": {
+          "type": "string",
+          "default": "*/hotfix/**",
+          "description": "heads never held"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "the release-tower check's settings"
+    },
+    "docs": {
+      "type": "object",
+      "properties": {
+        "updateSkill": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "skill hook — the delta payload as a fenced JSON block (docs-hooks.md, The delta payload)"
+        },
+        "releaseNotesSkill": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "skill hook — the delta payload, live: true for publish"
+        },
+        "updateOnEpicRelease": {
+          "type": "boolean",
+          "default": false,
+          "description": "update docs after each epic release"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "documentation hooks"
+    },
+    "plugin": {
+      "type": "object",
+      "properties": {
+        "updateCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "check for a newer release at session start"
+        },
+        "autoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "description": "update a repository-bound install at session start"
+        },
+        "pin": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "a version this repository holds at"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "plugin update behaviour"
+    },
+    "session": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "jobClassGate": {
+          "type": "boolean",
+          "default": true,
+          "description": "block mixing authoring and execution in one session"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "session job classes; null reads as absent"
+    },
+    "localEnvironment": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "create": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — <name>, <base>, <branch> placeholders"
+        },
+        "recreate": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — <name> per recreateMode, <base>"
+        },
+        "instanceName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — none"
+        },
+        "seed": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — <name>"
+        },
+        "migrate": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — <name>"
+        },
+        "teardown": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — <name>"
+        },
+        "recreateMode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "inPlace",
+            "newInstance",
+            null
+          ],
+          "default": null,
+          "description": "which shape recreate is"
+        },
+        "instanceBoundTo": {
+          "type": "string",
+          "enum": [
+            "none",
+            "directory",
+            "branch"
+          ],
+          "default": "none",
+          "description": "what the tooling keys an instance on"
+        },
+        "fetchOnSessionStart": {
+          "type": "boolean",
+          "default": false,
+          "description": "a bounded fetch at session start"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "this repository's isolated local instances; null reads as absent"
+    },
+    "stage": {
+      "type": "object",
+      "properties": {
+        "resolve": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — none; run from the repository root"
+        },
+        "productionStages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "stage names that are production"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "the cloud stage this checkout deploys to"
+    },
+    "statusLine": {
+      "type": "object",
+      "properties": {
+        "hiddenSegments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "segments confirmed not to apply"
+        },
+        "autoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "description": "the session-start hook may refresh the copied script"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "the shipped status line's settings"
+    }
+  },
+  "patternProperties": {
+    "^_": {}
+  },
+  "additionalProperties": false
+}

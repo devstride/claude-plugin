@@ -291,6 +291,16 @@ repository's real branch names rather than copying those two values:
 
 The full contract — every key, its shape and default — is in the
 [configuration reference](https://docs.devstride.com/developer-experience/agentic-skills/configuration-reference).
+The plugin also ships that contract as a JSON Schema, `schemas/ds-config.schema.json`, generated
+from one registry of every key and hook (`skills/setup/references/seam-registry.md` is its readable
+table). Point your editor at it for completion and inline errors by adding a top-level `"$schema"`
+naming the release you run: `https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v<version>/schemas/ds-config.schema.json`.
+`/devstride:doctor` and `/devstride:setup` check the file against it: a wrong shape (a list where a
+command belongs, both forms of `release.clearance`, a retired key) is a failure, and an unknown key
+is a warning that names the key you probably meant. Keys your own repository's tools read go in
+`repoLocalKeys`, a list of key prefixes the check leaves alone. An editor still flags keys listed
+under `repoLocalKeys` as unknown, because the published schema cannot read your list; doctor
+honours it.
 
 **CI cost.** The loop runs CI once per pull request, on the final reviewed diff — the draft hold
 guarantees it. What the hold does not cover is the rest of the bill: superseded runs, a
@@ -471,7 +481,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.18.1** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.19.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

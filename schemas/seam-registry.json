@@ -1,0 +1,1446 @@
+{
+  "$comment": "The one seam registry: every hook the plugin calls (hooks) and every other config key (settings). schemas/ds-config.schema.json and skills/setup/references/seam-registry.md are generated from it by scripts/build-config-schema.py --write; never edit those two by hand.",
+  "hooks": [
+    {
+      "key": "docs.updateSkill",
+      "shape": "skill",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "the delta payload as a fenced JSON block (docs-hooks.md, The delta payload)",
+      "modes": [
+        "update",
+        "check"
+      ],
+      "verdict": "check: PASS or FAIL with the fix; update: the pages changed and where they went",
+      "calledBy": [
+        "release 5c",
+        "build-item 8",
+        "doctor 7",
+        "setup G"
+      ],
+      "unset": "no documentation system registered; every docs phase reports itself skipped",
+      "contract": "skills/release/references/docs-hooks.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "docs.releaseNotesSkill",
+      "shape": "skill",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "the delta payload, live: true for publish",
+      "modes": [
+        "publish",
+        "draft",
+        "check"
+      ],
+      "verdict": "check: PASS or FAIL with the fix; publish and draft: where the note is",
+      "calledBy": [
+        "release 5e",
+        "doctor 7",
+        "setup G"
+      ],
+      "unset": "release notes cannot be requested; --release-notes reports itself unavailable",
+      "contract": "skills/release/references/docs-hooks.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.postDeployCheckSkill",
+      "shape": "skill",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "check followed by {productionBranch, mergeCommit, deployConfirmedAt}",
+      "modes": [
+        "check",
+        "close-out"
+      ],
+      "verdict": "POST-DEPLOY HEALTH: PASS | FAIL | NOT RUN (plus CLOSE-OUT OWED); close-out: POST-DEPLOY CLOSE-OUT: DONE | PARTIAL",
+      "calledBy": [
+        "release 5a",
+        "release 5d",
+        "doctor 7"
+      ],
+      "unset": "the close-out reports the health check as not configured",
+      "contract": "skills/release/references/post-deploy-check.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.deployApproval",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "RELEASE_COMMIT in the environment",
+      "verdict": "exit 0 approved and read back; 2 not waiting yet; any other exit STOPS",
+      "calledBy": [
+        "release 4",
+        "release 5a",
+        "doctor 7"
+      ],
+      "unset": "the deploy runs without an approval step",
+      "contract": "skills/release/references/docs-hooks.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.deployVerification",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "RELEASE_COMMIT in the environment",
+      "verdict": "exit 0 only when production serves RELEASE_COMMIT",
+      "calledBy": [
+        "release 5a",
+        "doctor 7"
+      ],
+      "unset": "the owner confirms the deploy by hand",
+      "contract": "skills/release/references/docs-hooks.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance",
+      "shape": "provider-or-commands",
+      "valueType": "object",
+      "nullable": true,
+      "payload": "each verb's own arguments appended (--wait, --short, <phase> --branch <b> --pr <n>, --force, --yes)",
+      "modes": [
+        "claim",
+        "status",
+        "heartbeat",
+        "release",
+        "adopt",
+        "owed"
+      ],
+      "verdict": "the verdict is stdout's first line; exit codes 0-5 per the provider contract",
+      "calledBy": [
+        "release 0",
+        "release 5b",
+        "branch-hotfix rules",
+        "doctor 7"
+      ],
+      "unset": "no clearance: release runs as before and nothing is claimed",
+      "contract": "skills/release/references/clearance.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.typecheck",
+      "shape": "command",
+      "valueType": "string[]",
+      "nullable": false,
+      "payload": "none; run from the repository root, in array order",
+      "verdict": "exit 0 passes; an error outside generated.paths fails",
+      "calledBy": [
+        "ultracode-build 2",
+        "push rules",
+        "build-item 4a",
+        "setup G"
+      ],
+      "unset": "push asks for a command; fast story merges stay off",
+      "contract": "skills/build-item/references/verification-receipts.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.typecheckCombined",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "none",
+      "verdict": "exit 0 passes",
+      "calledBy": [
+        "push rules"
+      ],
+      "unset": "the verify.typecheck array is used; this legacy single command is read only when that array is absent",
+      "contract": "skills/build-item/references/verification-receipts.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.test",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "none",
+      "verdict": "exit 0 is green; red is a stop",
+      "calledBy": [
+        "ultracode-build 2",
+        "build-item 8",
+        "setup G"
+      ],
+      "unset": "no full-suite gate; fast story merges stay off",
+      "contract": "skills/build-item/references/verification-receipts.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.testSingle",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "<path/to/test> replaced with the file to run",
+      "verdict": "exit 0 is green",
+      "calledBy": [
+        "ultracode-build 2",
+        "doctor 6"
+      ],
+      "unset": "the story gate widens to verify.test",
+      "contract": "skills/build-item/references/verification-receipts.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.lint",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "none",
+      "verdict": "exit 0 is green",
+      "calledBy": [
+        "ultracode-build 2",
+        "setup G"
+      ],
+      "unset": "no lint step",
+      "contract": "skills/build-item/references/verification-receipts.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "preShipChecks[].command",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": false,
+      "payload": "none; selected by the entry's when and pathGlobs",
+      "verdict": "exit 0 is green; red blocks the pull request or the release",
+      "calledBy": [
+        "pr 2b",
+        "release 2b"
+      ],
+      "unset": "no pre-ship checks: an explicit no-op",
+      "contract": "skills/pr/references/pre-ship-hold.md",
+      "since": "pre-registry",
+      "required": true
+    },
+    {
+      "key": "localEnvironment.create",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "<name>, <base>, <branch> placeholders",
+      "verdict": "exit 0 made the instance",
+      "calledBy": [
+        "branch-hotfix local environment",
+        "build-item 0"
+      ],
+      "unset": "no isolated instances: the current checkout is the only environment",
+      "contract": "skills/setup/references/config-defaults.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "localEnvironment.recreate",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "<name> per recreateMode, <base>",
+      "verdict": "exit 0 returned the instance to <base>'s schema",
+      "calledBy": [
+        "branch-hotfix local environment"
+      ],
+      "unset": "branch-hotfix names the missing command and offers the manual path",
+      "contract": "skills/setup/references/config-defaults.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "localEnvironment.instanceName",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "none",
+      "verdict": "stdout is the name of this checkout's instance",
+      "calledBy": [
+        "branch-hotfix local environment"
+      ],
+      "unset": "an in-place recreate with <name> stops and asks",
+      "contract": "skills/setup/references/config-defaults.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "localEnvironment.seed",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "<name>",
+      "verdict": "exit 0 seeded the instance",
+      "calledBy": [
+        "branch-hotfix local environment"
+      ],
+      "unset": "nothing is seeded",
+      "contract": "skills/setup/references/config-defaults.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "localEnvironment.migrate",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "<name>",
+      "verdict": "exit 0 migrated the instance forward",
+      "calledBy": [
+        "branch-hotfix local environment"
+      ],
+      "unset": "nothing is migrated",
+      "contract": "skills/setup/references/config-defaults.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "localEnvironment.teardown",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "<name>",
+      "verdict": "exit 0 removed the instance",
+      "calledBy": [
+        "branch-hotfix local environment"
+      ],
+      "unset": "instances are left for the owner to remove",
+      "contract": "skills/setup/references/config-defaults.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "stage.resolve",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "none; run from the repository root",
+      "verdict": "stdout's one line is the stage; empty means no stage; non-zero with output, or several lines, is a fault",
+      "calledBy": [
+        "doctor 4",
+        "release 4",
+        "setup E3"
+      ],
+      "unset": "no per-environment infrastructure: no stage renders and doctor reports N/A",
+      "contract": "skills/setup/references/config-defaults.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.localCommand",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "<context> replaced with - and the prompt on stdin; <effort>; legacy <base>",
+      "verdict": "findings on stdout; a failed run is this-run degradation",
+      "calledBy": [
+        "review 1",
+        "review 5",
+        "doctor 6",
+        "setup G"
+      ],
+      "unset": "no local CLI engine on the roster",
+      "contract": "skills/setup/references/review-engines.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.localAssistCommand",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "<context> and <effort>, as review.localCommand",
+      "verdict": "advisory findings on stdout",
+      "calledBy": [
+        "ultracode-build 1",
+        "ultracode-build 3",
+        "doctor 6",
+        "setup G"
+      ],
+      "unset": "no read-only support call",
+      "contract": "skills/setup/references/review-engines.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "generated.regenCommand",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "none",
+      "verdict": "exit 0 regenerated the build output",
+      "calledBy": [
+        "push rules",
+        "ultracode-build 2"
+      ],
+      "unset": "generated files cannot be regenerated by the loop",
+      "contract": "skills/push/SKILL.md",
+      "since": "pre-registry"
+    }
+  ],
+  "settings": [
+    {
+      "key": "profile",
+      "type": "string",
+      "enum": [
+        "prototype",
+        "standard",
+        "extended"
+      ],
+      "default": "standard",
+      "description": "the delivery profile; contract: skills/plan/references/delivery-profiles.md",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides",
+      "type": "object",
+      "description": "pins one knob under the profile; operator hand-edit, never written by setup",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.grain",
+      "type": "string",
+      "description": "overrides the profile's grain knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.specDepth",
+      "type": "string",
+      "description": "overrides the profile's specDepth knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.understandReaders",
+      "type": "integer",
+      "description": "overrides the profile's understandReaders knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.reviewBreadthCeiling",
+      "type": "string",
+      "description": "overrides the profile's reviewBreadthCeiling knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.verificationDefault",
+      "type": "string",
+      "description": "overrides the profile's verificationDefault knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.verificationGrouping",
+      "type": "string",
+      "description": "overrides the profile's verificationGrouping knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.fixFloor",
+      "type": "string",
+      "description": "overrides the profile's fixFloor knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.localCliEngine",
+      "type": "any",
+      "description": "overrides the profile's localCliEngine knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.maxLocalReviewRounds",
+      "type": "integer",
+      "description": "overrides the profile's maxLocalReviewRounds knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.storyVerify",
+      "type": "any",
+      "description": "overrides the profile's storyVerify knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.perStoryPullRequest",
+      "type": "any",
+      "description": "overrides the profile's perStoryPullRequest knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.releaseCiOrdering",
+      "type": "any",
+      "description": "overrides the profile's releaseCiOrdering knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.reviewerRegistrationWindowMinutes",
+      "type": "number",
+      "description": "overrides the profile's reviewerRegistrationWindowMinutes knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.pollTimeoutMinutes",
+      "type": "number",
+      "description": "overrides the profile's pollTimeoutMinutes knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "profileOverrides.autoRelease",
+      "type": "any",
+      "description": "overrides the profile's autoRelease knob",
+      "since": "pre-registry"
+    },
+    {
+      "key": "baseBranch",
+      "type": "string",
+      "default": "develop",
+      "description": "the branch work merges into and branches are cut from",
+      "since": "pre-registry"
+    },
+    {
+      "key": "hotfixBaseBranch",
+      "type": "string",
+      "default": "master",
+      "description": "the production-safe branch a hotfix starts from",
+      "since": "pre-registry"
+    },
+    {
+      "key": "protectedBranches",
+      "type": "string[]",
+      "description": "branches never rebased, force-pushed or deleted; exact names or patterns",
+      "since": "pre-registry"
+    },
+    {
+      "key": "integrationBranch",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "one integration branch for all work; null derives one per release unit",
+      "since": "pre-registry"
+    },
+    {
+      "key": "conventionsDoc",
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "the coding-standards file the build engine obeys",
+      "since": "pre-registry"
+    },
+    {
+      "key": "lessonsDoc",
+      "type": "string",
+      "default": ".claude/ds-lessons.md",
+      "description": "the lessons store the review skill writes",
+      "since": "pre-registry"
+    },
+    {
+      "key": "itemTagFormat",
+      "type": "string",
+      "default": "[I#####]",
+      "description": "the item tag commit messages carry",
+      "since": "pre-registry"
+    },
+    {
+      "key": "repoLocalKeys",
+      "type": "string[]",
+      "description": "dotted prefixes of keys the repository's own local skills read; keys at or under one are never reported as unknown",
+      "since": "3.19.0"
+    },
+    {
+      "key": "branchNaming",
+      "type": "object",
+      "description": "how branches are named",
+      "since": "pre-registry"
+    },
+    {
+      "key": "branchNaming.pattern",
+      "type": "string",
+      "default": "<prefix>/<MM-DD-YY>/<slug>",
+      "description": "the branch name pattern",
+      "since": "pre-registry"
+    },
+    {
+      "key": "branchNaming.prefixSource",
+      "type": "string",
+      "description": "prose the branch skills follow to choose the prefix",
+      "since": "pre-registry"
+    },
+    {
+      "key": "branchNaming.dateFormat",
+      "type": "string",
+      "default": "MM-DD-YY",
+      "description": "the date token's format",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches",
+      "type": "object",
+      "description": "per-release-unit integration branches",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.enabled",
+      "type": "boolean",
+      "default": true,
+      "description": "turns integration branches on",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.pattern",
+      "type": "string",
+      "description": "the integration branch name pattern",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.slugRule",
+      "type": "string",
+      "description": "prose rule for the epic slug",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.example",
+      "type": "string",
+      "description": "descriptive only: a sample integration branch name; nothing reads it",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.releaseTarget",
+      "type": "string",
+      "default": "baseBranch",
+      "description": "where a finished release unit lands; baseBranch means the base branch itself",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.fastStoryMerges",
+      "type": "object",
+      "description": "story merges onto the integration branch without a pull request",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.fastStoryMerges.enabled",
+      "type": "boolean",
+      "description": "decided per repository by setup",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.fastStoryMerges.requireLocalVerifyGreen",
+      "type": "boolean",
+      "default": true,
+      "description": "the local gate must be green",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.fastStoryMerges.epicReleaseIsFirstCloudPass",
+      "type": "boolean",
+      "default": true,
+      "description": "the release pull request is the first cloud review",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.fastStoryMerges.localEngines",
+      "type": "any",
+      "description": "descriptive only: the expected local review roster for a fast story merge; the skills resolve behaviour from the active settings",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.autoRelease",
+      "type": [
+        "boolean",
+        "string"
+      ],
+      "enum": [
+        true,
+        false,
+        "ask"
+      ],
+      "default": false,
+      "description": "true, false or \"ask\": whether a finished release unit's pull request merges unasked",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.deleteBranchAfterRelease",
+      "type": "boolean",
+      "default": true,
+      "description": "delete the integration branch after its release",
+      "since": "pre-registry"
+    },
+    {
+      "key": "epicIntegrationBranches.mergedStatusName",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": "Review",
+      "description": "the status a landed story moves to, by name",
+      "since": "pre-registry"
+    },
+    {
+      "key": "defects",
+      "type": "object",
+      "description": "deferred-defect placement",
+      "since": "pre-registry"
+    },
+    {
+      "key": "defects.deferredContainerTitle",
+      "type": "string",
+      "default": "Deferred defects",
+      "description": "the container deferred defects are parked under",
+      "since": "pre-registry"
+    },
+    {
+      "key": "commitConventions",
+      "type": "object",
+      "description": "commit message formats",
+      "since": "pre-registry"
+    },
+    {
+      "key": "commitConventions.messageFormat",
+      "type": "string",
+      "description": "the commit message format",
+      "since": "pre-registry"
+    },
+    {
+      "key": "commitConventions.reviewFixFormat",
+      "type": "string",
+      "description": "the review-fix commit format",
+      "since": "pre-registry"
+    },
+    {
+      "key": "commitConventions.epicMergeFormat",
+      "type": "string",
+      "description": "the story merge subject on an integration branch",
+      "since": "pre-registry"
+    },
+    {
+      "key": "prBodyTemplate",
+      "type": "object",
+      "description": "pull-request body sections",
+      "since": "pre-registry"
+    },
+    {
+      "key": "prBodyTemplate.sections",
+      "type": "object[]",
+      "description": "the body sections, in order",
+      "since": "pre-registry"
+    },
+    {
+      "key": "prBodyTemplate.sections[].heading",
+      "type": "string",
+      "required": true,
+      "description": "the section heading",
+      "since": "pre-registry"
+    },
+    {
+      "key": "prBodyTemplate.sections[].guidance",
+      "type": "string",
+      "required": true,
+      "description": "how to fill the section",
+      "since": "pre-registry"
+    },
+    {
+      "key": "prBodyTemplate.noAiAttribution",
+      "type": "boolean",
+      "default": true,
+      "description": "keeps AI attribution out of pull-request bodies",
+      "since": "pre-registry"
+    },
+    {
+      "key": "ci",
+      "type": "object",
+      "description": "CI facts the loop reads",
+      "since": "pre-registry"
+    },
+    {
+      "key": "ci.workflowGlobs",
+      "type": "string[]",
+      "description": "the workflow files the CI checks read",
+      "since": "pre-registry"
+    },
+    {
+      "key": "ci.draftGateCondition",
+      "type": "string",
+      "default": "github.event.pull_request.draft == false",
+      "description": "the expression every pull-request job gates on",
+      "since": "pre-registry"
+    },
+    {
+      "key": "ci.gateJobName",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "the job proving the ready-flip released CI",
+      "since": "pre-registry"
+    },
+    {
+      "key": "ci.expectedRunsPerPullRequest",
+      "type": "integer",
+      "default": 1,
+      "minimum": 0,
+      "description": "executed runs per workflow per pull request",
+      "since": "pre-registry"
+    },
+    {
+      "key": "ci.freezeBaseWhileReleasePrReady",
+      "type": "any",
+      "description": "the retired release freeze switch",
+      "since": "pre-registry",
+      "deprecated": {
+        "severity": "warn",
+        "message": "ignored since 3.8.0 whatever its value; remove it"
+      }
+    },
+    {
+      "key": "preShipChecks",
+      "type": "object[]",
+      "description": "slow suites run locally at the ship boundary",
+      "since": "pre-registry"
+    },
+    {
+      "key": "preShipChecks[].name",
+      "type": "string",
+      "description": "the check's name",
+      "since": "pre-registry"
+    },
+    {
+      "key": "preShipChecks[].when",
+      "type": "string",
+      "enum": [
+        "perPr",
+        "releaseOnly",
+        "always"
+      ],
+      "description": "when the check runs; an entry without it is never selected by pr or release",
+      "since": "pre-registry",
+      "required": true
+    },
+    {
+      "key": "preShipChecks[].pathGlobs",
+      "type": "string[]",
+      "description": "the paths that select the check",
+      "since": "pre-registry"
+    },
+    {
+      "key": "preShipChecks[].timeoutNote",
+      "type": "string",
+      "description": "surfaced before the check runs",
+      "since": "pre-registry"
+    },
+    {
+      "key": "preShipChecks[].onlyWhenTouched",
+      "type": "boolean",
+      "description": "a releaseOnly check runs only when the release touches its pathGlobs",
+      "since": "pre-registry"
+    },
+    {
+      "key": "preCommitWiringChecks",
+      "type": "array",
+      "description": "repository-specific wiring assertions",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify",
+      "type": "object",
+      "description": "the verification commands",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.testDir",
+      "type": "string",
+      "description": "where tests live",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds",
+      "type": "object[]",
+      "description": "slow cloud suites deferred during story builds; each needs a matching CI job",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].name",
+      "type": "string",
+      "required": true,
+      "description": "the suite's display name",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].alwaysRunWhenBase",
+      "type": "string[]",
+      "description": "branch roles (baseBranch, productionBranch) where the suite always applies, paths irrelevant",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].manualTriggerLabel",
+      "type": "string",
+      "description": "the label that requests the suite by hand; the workflow reacts only to it",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].runWhenChangedPaths",
+      "type": "string[]",
+      "description": "globs matched against the complete final diff, both sides of renames",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].ciChecksByBase",
+      "type": "object",
+      "required": true,
+      "description": "required check names per branch role; a role with no mapping requires nothing there",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].ciChecksByBase.baseBranch",
+      "type": "string[]",
+      "description": "check names required on pull requests into the base branch",
+      "since": "pre-registry"
+    },
+    {
+      "key": "verify.skipDuringStoryBuilds[].ciChecksByBase.productionBranch",
+      "type": "string[]",
+      "description": "check names required on pull requests into the production branch",
+      "since": "pre-registry"
+    },
+    {
+      "key": "generated",
+      "type": "object",
+      "description": "generated build output",
+      "since": "pre-registry"
+    },
+    {
+      "key": "generated.paths",
+      "type": "string[]",
+      "description": "paths of generated files",
+      "since": "pre-registry"
+    },
+    {
+      "key": "generated.toleratedTypeErrors",
+      "type": "array",
+      "description": "type errors tolerated in generated files",
+      "since": "pre-registry"
+    },
+    {
+      "key": "hierarchyRoles",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "which work types are leaves and release units; null reads as absent",
+      "since": "pre-registry"
+    },
+    {
+      "key": "hierarchyRoles.leaf",
+      "type": "string[]",
+      "description": "the one-day leaf work types",
+      "since": "pre-registry"
+    },
+    {
+      "key": "hierarchyRoles.releaseUnit",
+      "type": "string",
+      "description": "the release-unit work type",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review",
+      "type": "object",
+      "description": "review engines and the CI hold",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.localReviewerName",
+      "type": "string",
+      "description": "the name local findings are attributed to",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.localEffort",
+      "type": "object",
+      "description": "the <effort> tier per round kind",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.localEffort.initial",
+      "type": "string",
+      "description": "the first full round's tier",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.localEffort.followUp",
+      "type": "string",
+      "description": "an ordinary follow-up's tier",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.localEffort.safety",
+      "type": "string",
+      "description": "a P1 or serious-P2 fix check's tier",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.localReReviewScope",
+      "type": "string",
+      "description": "\"full\" pins every follow-up to the whole diff",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.automatedReviewers",
+      "type": "object[]",
+      "description": "cloud reviewers requested on pull requests",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.automatedReviewers[].name",
+      "type": "string",
+      "description": "the reviewer's display name",
+      "since": "pre-registry",
+      "required": true
+    },
+    {
+      "key": "review.automatedReviewers[].how",
+      "type": "string",
+      "description": "how the reviewer is requested; requested_reviewer (a bot through GraphQL by its node id) is the one mechanism the review flow implements",
+      "since": "pre-registry",
+      "required": true,
+      "enum": [
+        "requested_reviewer"
+      ]
+    },
+    {
+      "key": "review.automatedReviewers[].bot",
+      "type": "string",
+      "description": "the reviewer's bot login",
+      "since": "pre-registry",
+      "required": true
+    },
+    {
+      "key": "review.automatedReviewers[].value",
+      "type": "string",
+      "description": "the identifier the request uses",
+      "since": "pre-registry",
+      "required": true
+    },
+    {
+      "key": "review.automatedReviewers[].graphqlBotId",
+      "type": "string",
+      "description": "the bot's GraphQL node id",
+      "since": "pre-registry",
+      "required": true
+    },
+    {
+      "key": "review.automatedReviewers[].baseBranches",
+      "type": "string[]",
+      "description": "exact base branches the reviewer is requested on",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.automatedReviewers[].requestPolicy",
+      "type": "string",
+      "description": "every-round (also any other value) or final-head",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.openPullRequestsAsDraft",
+      "type": "boolean",
+      "description": "open pull requests as drafts",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.readyForReviewReleasesCi",
+      "type": "boolean",
+      "description": "marking a draft ready starts CI",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.ciHeldUntilReviewSettled",
+      "type": "boolean",
+      "description": "CI waits for review to settle",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.pollTimeoutMinutes",
+      "type": "number",
+      "description": "the upper bound on waiting for a registered cloud reviewer",
+      "since": "pre-registry",
+      "exclusiveMinimum": 0
+    },
+    {
+      "key": "review.adaptiveReviewerWait",
+      "type": "boolean",
+      "default": true,
+      "description": "bound the wait by learned reviewer latency",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.resolveAddressedThreads",
+      "type": "boolean",
+      "description": "resolve each addressed review thread",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.notifyWhenSettled",
+      "type": "boolean",
+      "description": "notify when a standalone review settles",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.mandatoryLenses",
+      "type": "object[]",
+      "description": "path-selected review lenses",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.mandatoryLenses[].name",
+      "type": "string",
+      "required": true,
+      "description": "the lens name",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.mandatoryLenses[].paths",
+      "type": "string[]",
+      "required": true,
+      "description": "anchored globs that select the lens",
+      "since": "pre-registry"
+    },
+    {
+      "key": "review.mandatoryLenses[].question",
+      "type": "string",
+      "required": true,
+      "description": "the question the lens's finder answers",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release",
+      "type": "object",
+      "description": "production release settings",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.productionBranch",
+      "type": "string",
+      "default": "master",
+      "description": "the production release target",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.releaseSource",
+      "type": "string",
+      "default": "develop",
+      "description": "the branch promoted in a release",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.autoDeployOnMerge",
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "one plain-English sentence on what merging to production does",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.releaseBranchPattern",
+      "type": "string",
+      "description": "cut each release as its own protected branch",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.releaseBranchFixExclusions",
+      "type": "string[]",
+      "description": "paths a fix on a release branch may not touch",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.syncWorkflow",
+      "type": "string",
+      "description": "the workflow syncing production into the source",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.mergeTrainBeforeCut",
+      "type": "boolean",
+      "default": false,
+      "description": "merge the support train into the source before each cut",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.productionReview",
+      "type": "object",
+      "description": "review-once economy for the production pull request",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.productionReview.reviewIdenticalTree",
+      "type": "boolean",
+      "description": "false skips re-reviewing a tree already reviewed",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.productionReview.highRiskPaths",
+      "type": "string[]",
+      "description": "paths that still get one pass",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.productionReview.highRiskEngine",
+      "type": "string",
+      "description": "the engine for that pass",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.provider",
+      "type": "string",
+      "enum": [
+        "github"
+      ],
+      "required": true,
+      "description": "the built-in provider",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.ref",
+      "type": "string",
+      "default": "refs/clearance/release",
+      "description": "the custom ref holding the clearance",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.staleMinutes",
+      "type": "number",
+      "default": 20,
+      "description": "heartbeat age that makes a clearance stale",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.waitMinutes",
+      "type": "number",
+      "default": 180,
+      "description": "how long claim --wait polls",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.phaseBudgetMinutes",
+      "type": "any",
+      "description": "phase to minutes; a bad value is ignored with a status warning",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.commands",
+      "type": "object",
+      "required": true,
+      "description": "a provider the repository supplies",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.commands.claim",
+      "type": "string",
+      "required": true,
+      "description": "the claim command",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.commands.status",
+      "type": "string",
+      "required": true,
+      "description": "the status command",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.commands.heartbeat",
+      "type": "string",
+      "required": true,
+      "description": "the heartbeat command",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.commands.release",
+      "type": "string",
+      "required": true,
+      "description": "the release command",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.commands.adopt",
+      "type": "string",
+      "required": true,
+      "description": "the adopt command",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.commands.owed",
+      "type": "string",
+      "description": "the optional owed command",
+      "since": "pre-registry"
+    },
+    {
+      "key": "release.docsRepo",
+      "type": "any",
+      "description": "the pre-1.0 docs shape",
+      "since": "pre-registry",
+      "deprecated": {
+        "severity": "error",
+        "message": "retired pre-1.0 shape the release skill never acts on; run /devstride:setup docs to migrate it into the docs block"
+      }
+    },
+    {
+      "key": "supportTrain",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "one long-lived branch one-off work batches on; null reads as absent",
+      "since": "pre-registry"
+    },
+    {
+      "key": "supportTrain.branch",
+      "type": "string",
+      "description": "the train's branch",
+      "since": "pre-registry"
+    },
+    {
+      "key": "supportTrain.fastMerges",
+      "type": "boolean",
+      "default": false,
+      "description": "a one-off merges onto the train without its own pull request",
+      "since": "pre-registry"
+    },
+    {
+      "key": "releaseTower",
+      "type": "object",
+      "description": "the release-tower check's settings",
+      "since": "pre-registry"
+    },
+    {
+      "key": "releaseTower.overrideLabel",
+      "type": "string",
+      "default": "release-tower-override",
+      "description": "the label passing an owner-approved pull request",
+      "since": "pre-registry"
+    },
+    {
+      "key": "releaseTower.hotfixPattern",
+      "type": "string",
+      "default": "*/hotfix/**",
+      "description": "heads never held",
+      "since": "pre-registry"
+    },
+    {
+      "key": "docs",
+      "type": "object",
+      "description": "documentation hooks",
+      "since": "pre-registry"
+    },
+    {
+      "key": "docs.updateOnEpicRelease",
+      "type": "boolean",
+      "default": false,
+      "description": "update docs after each epic release",
+      "since": "pre-registry"
+    },
+    {
+      "key": "plugin",
+      "type": "object",
+      "description": "plugin update behaviour",
+      "since": "pre-registry"
+    },
+    {
+      "key": "plugin.updateCheck",
+      "type": "boolean",
+      "default": true,
+      "description": "check for a newer release at session start",
+      "since": "pre-registry"
+    },
+    {
+      "key": "plugin.autoUpdate",
+      "type": "boolean",
+      "default": true,
+      "description": "update a repository-bound install at session start",
+      "since": "pre-registry"
+    },
+    {
+      "key": "plugin.pin",
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "a version this repository holds at",
+      "since": "pre-registry"
+    },
+    {
+      "key": "session",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "session job classes; null reads as absent",
+      "since": "pre-registry"
+    },
+    {
+      "key": "session.jobClassGate",
+      "type": "boolean",
+      "default": true,
+      "description": "block mixing authoring and execution in one session",
+      "since": "pre-registry"
+    },
+    {
+      "key": "localEnvironment",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "this repository's isolated local instances; null reads as absent",
+      "since": "pre-registry"
+    },
+    {
+      "key": "localEnvironment.recreateMode",
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "inPlace",
+        "newInstance",
+        null
+      ],
+      "default": null,
+      "description": "which shape recreate is",
+      "since": "pre-registry"
+    },
+    {
+      "key": "localEnvironment.instanceBoundTo",
+      "type": "string",
+      "enum": [
+        "none",
+        "directory",
+        "branch"
+      ],
+      "default": "none",
+      "description": "what the tooling keys an instance on",
+      "since": "pre-registry"
+    },
+    {
+      "key": "localEnvironment.fetchOnSessionStart",
+      "type": "boolean",
+      "default": false,
+      "description": "a bounded fetch at session start",
+      "since": "pre-registry"
+    },
+    {
+      "key": "stage",
+      "type": "object",
+      "description": "the cloud stage this checkout deploys to",
+      "since": "pre-registry"
+    },
+    {
+      "key": "stage.productionStages",
+      "type": "string[]",
+      "description": "stage names that are production",
+      "since": "pre-registry"
+    },
+    {
+      "key": "statusLine",
+      "type": "object",
+      "description": "the shipped status line's settings",
+      "since": "pre-registry"
+    },
+    {
+      "key": "statusLine.hiddenSegments",
+      "type": "string[]",
+      "description": "segments confirmed not to apply",
+      "since": "pre-registry"
+    },
+    {
+      "key": "statusLine.autoUpdate",
+      "type": "boolean",
+      "default": true,
+      "description": "the session-start hook may refresh the copied script",
+      "since": "pre-registry"
+    }
+  ]
+}
