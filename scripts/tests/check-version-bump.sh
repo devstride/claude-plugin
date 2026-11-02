@@ -66,4 +66,16 @@ git -C "$R" commit -qam "base without the list"; BASE="$(git -C "$R" rev-parse H
 echo two > "$R/scripts/tool.sh"; check
 expect "(10) after a release with no inert list, a scripts/ change needs a bump — the updater's strict rule" 1 "without a version bump.*scripts/tool.sh"
 
+new_case maintainer-folders; mkdir -p "$R/.claude" "$R/.github/workflows"
+printf '{}\n' > "$R/.claude/ds-config.json"; printf 'name: x\n' > "$R/.github/workflows/x.yml"; printf '@AGENTS.md\n' > "$R/CLAUDE.md"; check
+expect "(11) .claude/, .github/ and CLAUDE.md after a release that lists them → no bump required" 0 "no bump required"
+
+new_case older-list; python3 - "$R/skills/update/scripts/update-plugin.py" <<'PY'
+import re, sys; p = sys.argv[1]; s = open(p).read()
+open(p, "w").write(re.sub(r"INERT_DIRS = \([^)]*\)", 'INERT_DIRS = ("scripts/",)', s, count=1))
+PY
+git -C "$R" commit -qam "base listing only scripts/"; BASE="$(git -C "$R" rev-parse HEAD)"
+mkdir -p "$R/.claude"; printf '{}\n' > "$R/.claude/ds-config.json"; check
+expect "(12) after a release listing only scripts/, a .claude/ change needs a bump — the widening ships first" 1 "without a version bump.*\.claude/ds-config.json"
+
 exit $FAIL
