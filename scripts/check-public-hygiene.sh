@@ -16,11 +16,14 @@
 #   session-trailer  a `Claude-Session:` or `Codex-Session:` line — in commit messages, the title
 #                    and the body only, because skill text that documents the trailer is fine
 #   internal-host    a host under devstride.com or devstride.dev the allow file does not list
-#   internal-path    a macOS home path, a home-relative development path, or a `.worktrees/` path
+#   internal-path    a home folder (macOS or Linux), a home-relative development path, a `.worktrees/`
+#                    path, or an agent's encoded session path (a `-Users-<name>` folder, a temporary
+#                    or projects folder under `/private/` or `.claude/`)
 #
 # The allow file (`scripts/public-hygiene.allow`) holds one `item <I-number> <reason>` or
 # `host <name> <reason>` per line; `#` starts a comment. A false positive is fixed by an allow line
-# with a reason or by rewording — never by loosening a pattern here.
+# with a reason or by rewording — never by loosening a pattern here. The pull-request check runs
+# main's copy of the allow file, so a new allow line lands in its own pull request first.
 #
 # Usage: check-public-hygiene.sh --base <ref> [--head <ref>] [--branch <name>] [--title <text>]
 #                                [--body-file <path>] [--allow <path>]
@@ -70,7 +73,8 @@ ITEM = re.compile(r"(?<![A-Za-z0-9_])I[0-9]{4,6}(?![A-Za-z0-9_])")
 LINK = re.compile(r"claude\.ai/code/session_", re.I)
 TRAILER = re.compile(r"^\s*(Claude|Codex)-Session:", re.I | re.M)
 HOST = re.compile(r"(?<![A-Za-z0-9.-])((?:[A-Za-z0-9-]+\.)*devstride\.(?:com|dev))(?![A-Za-z0-9-])", re.I)
-PATH = re.compile(r"/Users/|(?:~|\$HOME|\$\{HOME\})/(?:dev|src|code|git|repos|projects|work)/|\.worktrees/")
+PATH = re.compile(r"/Users/|/home/[A-Za-z0-9._-]+/|(?:~|\$HOME|\$\{HOME\})/(?:dev|src|code|git|repos|projects|work)/"
+                  r"|\.worktrees/|-Users-[A-Za-z0-9]|/private/tmp/claude-|/private/var/folders/|\.claude/projects/")
 findings = []
 def excerpt(text, start, end):
     a, b = max(0, start - 30), min(len(text), end + 30)
@@ -107,20 +111,45 @@ for record in log.split("\x1e"):
     if "\x00" in record:
         sha, message = record.split("\x00", 1)
         scan(message, "commit " + sha[:7], True)
-path, line_no = None, 0
+ESCAPES = {"a": 7, "b": 8, "t": 9, "n": 10, "v": 11, "f": 12, "r": 13, '"': 34, "\\": 92}
+def unquote(name):
+    """git C-quotes a path holding a double quote, a backslash or (core.quotePath) a non-ASCII byte."""
+    if not (len(name) >= 2 and name.startswith('"') and name.endswith('"')):
+        return name
+    body, out, i = name[1:-1], bytearray(), 0
+    while i < len(body):
+        if body[i] == "\\" and i + 1 < len(body):
+            if body[i + 1] in ESCAPES:
+                out.append(ESCAPES[body[i + 1]]); i += 2; continue
+            if body[i + 1:i + 4].isdigit():
+                out.append(int(body[i + 1:i + 4], 8) & 0xFF); i += 4; continue
+        out += body[i].encode("utf-8"); i += 1
+    return out.decode("utf-8", "replace")
+# Headers are read only BETWEEN hunks: inside one, the hunk header's counts say how many removed
+# and added lines follow, so an added line that itself starts with "++ " is content. Lines are
+# split on "\n" alone: a carriage return, form feed or Unicode separator inside a line is content.
+HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+path, line_no, old_left, new_left = None, 0, 0, 0
 diff = git("diff", "--no-color", "--no-ext-diff", "--no-renames", "-U0", "%s...%s" % (env["PH_BASE"], env["PH_HEAD"]))
-for line in diff.splitlines():
+for line in diff.split("\n"):
+    if old_left > 0 or new_left > 0:
+        if line.startswith("+"):
+            new_left -= 1
+            if path and path not in SELF:
+                scan(line[1:], "%s:%d" % (path, line_no), False)
+            line_no += 1
+        elif line.startswith("-"):
+            old_left -= 1
+        continue  # "\ No newline at end of file" and anything else inside a hunk is not a line
     if line.startswith("+++ "):
-        target = line[4:]
+        target = unquote(line[4:].rstrip("\t"))
         path = target[2:] if target.startswith("b/") else None
-        continue
-    if line.startswith("@@"):
-        m = re.search(r"\+(\d+)", line)
-        line_no = int(m.group(1)) if m else 0
-        continue
-    if line.startswith("+") and path and path not in SELF:
-        scan(line[1:], "%s:%d" % (path, line_no), False)
-        line_no += 1
+    elif line.startswith("@@"):
+        m = HUNK.match(line)
+        if m:
+            old_left = int(m.group(1)) if m.group(1) is not None else 1
+            line_no = int(m.group(2))
+            new_left = int(m.group(3)) if m.group(3) is not None else 1
 if findings:
     print("PUBLIC HYGIENE: %d finding(s)" % len(findings))
     for kind, where, text in findings:

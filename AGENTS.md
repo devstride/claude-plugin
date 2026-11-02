@@ -30,7 +30,9 @@ not trip its own check.
 
 `scripts/public-hygiene.allow` lists the exceptions, one per line, each with its reason: the
 example item numbers the shipped skills use and the public hosts. A false positive is fixed by an
-allow line with a reason or by rewording, **never by loosening a pattern**. Run it before you push:
+allow line with a reason or by rewording, **never by loosening a pattern**. The pull-request check
+runs `main`'s copy of the allow file, so a new allow line merges in its own pull request first (the
+allow file is never scanned, so that pull request passes). Run it before you push:
 `bash scripts/check-public-hygiene.sh --base origin/main --branch "$(git branch --show-current)"`.
 
 ## How a change reaches `main`
@@ -40,18 +42,19 @@ no item numbers. Every pull request into `main` must pass three checks: `release
 shipped change carries a version bump; the tests and budgets pass), `merge-path` (the head branch
 has an admitted shape, `scripts/check-merge-path.sh`) and `public-hygiene`.
 
-1. **A story in a plugin-only epic** fast-merges onto the epic's integration branch,
-   `<prefix>/<YY-MM-DD>/epic-<epic-title-slug>`, with no pull request of its own. The epic's single
-   release pull request into `main` carries the version bump, the CHANGELOG heading, the README
-   line and the cost table; the last story of the epic does that work. An epic branch is admitted
-   into `main` only when it bumps the version.
-2. **A story whose plugin half must release inside the story** (a story in an epic that also
-   changes another repository, or any one-off): branch `<prefix>/<YY-MM-DD>/<slug>` off `main`,
-   one pull request into `main` carrying the bump, merged after review. Link the pull request to
-   the story's tracker item with the tracker's own linking tool, never through a branch name or
-   title. Do not run the loop's completion ritual here: the story is closed by the flow of the
-   repository that holds its other half, when that half reaches its release target.
-3. **A hotfix:** `<prefix>/hotfix/<YY-MM-DD>/<slug>` off `main`, with the same pull-request rules.
+1. **Every story — a member of an epic or a one-off:** branch `<prefix>/<YY-MM-DD>/<slug>` off
+   `main`, one pull request into `main` that carries its own version bump, merged after review.
+   Each merge is a release. There are no epic integration branches here
+   (`epicIntegrationBranches.enabled` is false): the loop finds which stories have landed on one by
+   reading item numbers out of merge subjects, and this repository allows no item numbers in git.
+   Link the pull request to the story's tracker item with the tracker's own linking tool, never
+   through a branch name, title or commit. When the story's plugin half is all of it, the loop's
+   completion ritual closes it at the merge; when another repository holds its other half, that
+   repository's flow closes it when that half reaches its release target.
+2. **A hotfix:** `<prefix>/hotfix/<YY-MM-DD>/<slug>` off `main`, with the same pull-request rules.
+
+The `merge-path` rules still admit an epic-shaped branch (`<prefix>/<YY-MM-DD>/epic-<slug>`) only
+when it bumps the version, so a branch cut by hand in that shape cannot reach `main` unreleased.
 
 A release is cut with the repo-local `plugin-release` skill (`.claude/skills/plugin-release/`),
 never by hand; `/devstride:release` is not configured here.

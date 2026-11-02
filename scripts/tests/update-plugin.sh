@@ -732,8 +732,9 @@ else bad "(29b) rc=$RC out=$OUT calls=$(cat "$UP_LOG" 2>/dev/null)"; fi
 # shipped symlinks, and keep the list clear of folders Claude Code loads on its own. `.claude` and
 # `.github` are also the names of the CONSUMING repository's own folders, which shipped code reads
 # on purpose (its ds-config.json, its status line), so for those two only a read anchored on the
-# plugin root or reached by ../ traversal counts; a quoted literal joined onto a repository path
-# does not. A name ends at /, at the end, or at a character that cannot continue it, so
+# plugin root (a ${ROOT}/ path, or a quoted literal on a line that names the plugin root,
+# ROOT or __file__) or reached by ../ traversal counts; a quoted literal joined onto a repository
+# path does not. A name ends at /, at the end, or at a character that cannot continue it, so
 # `.claude-plugin` is not `.claude`.
 runtime_refs() {  # runtime_refs ROOT HELPER — prints each hit; empty output means clean
 python3 - "$1" "$2" <<'PY'
@@ -750,6 +751,10 @@ end = r"(?=/|[^\w.-]|$)"
 rooted = re.compile(r"(PLUGIN_ROOT|ROOT)(:-[^}]*)?\}?\"?/(" + alt + r")" + end)
 quoted = re.compile(r"[\"'](" + quoted_alt + r")[\"'/]")
 traversal = re.compile(r"(\.\./)+(" + alt + r")" + end)
+# The same two names joined onto the plugin's own location in code (Path(ROOT, ".claude"),
+# os.path.join(os.environ["CLAUDE_PLUGIN_ROOT"], ".github"), Path(__file__).parents[2] / ".claude").
+own = re.compile(r"PLUGIN_ROOT|plugin_root|\bROOT\b|__file__|own_root")
+project_quoted = re.compile(r"[\"'](" + "|".join(re.escape(n) for n in sorted(project)) + r")[\"'/]")
 auto = {"commands", "skills", "agents", "hooks", "output-styles", "themes", "monitors", "workflows",
         "bin", ".mcp.json", ".lsp.json", "settings.json", ".claude-plugin"}
 hits = ["inert name is an auto-loaded component: " + n for n in names if n in auto]
@@ -786,7 +791,8 @@ for mode, path in files:
         text = re.sub(r"INERT_FILES = frozenset\((.|\n)*?\)\nINERT_DIRS = \([^)]*\)", "", text)
     code = path.endswith((".sh", ".py", ".json"))
     for n, ln in enumerate(text.splitlines(), 1):
-        if rooted.search(ln) or (code and (quoted.search(ln) or traversal.search(ln))):
+        if rooted.search(ln) or (code and (quoted.search(ln) or traversal.search(ln)
+                                           or (own.search(ln) and project_quoted.search(ln)))):
             hits.append(f"{path}:{n}: {ln.strip()[:120]}")
 print("\n".join(hits))
 PY
@@ -812,9 +818,13 @@ printf '\nCFG="$(cat "${CLAUDE_PLUGIN_ROOT}/.claude/ds-config.json")"\n' >> "$NO
 printf '\nW="$(cat "${CLAUDE_PLUGIN_ROOT:-x}/.github/workflows/a.yml")"\n' >> "$NOGIT2/hooks/version-check.sh"
 printf '\n_CFG = os.path.join(repo, ".claude", "ds-config.json")\n_M = "$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json"\n' \
   >> "$NOGIT2/skills/doctor/scripts/statusline-override.py"
+printf '\n_A = os.path.join(os.environ["CLAUDE_PLUGIN_ROOT"], ".github", "x.yml")\n_B = Path(__file__).resolve().parents[3] / ".claude" / "c.json"\n' \
+  >> "$NOGIT2/hooks/session-runtime.py"
 PLANTED2="$(runtime_refs "$NOGIT2" "$NOGIT2/skills/update/scripts/update-plugin.py")"
 if printf '%s' "$PLANTED2" | grep -q "session-gate.sh:.*\.claude/ds-config" \
    && printf '%s' "$PLANTED2" | grep -q "version-check.sh:.*\.github/workflows" \
+   && printf '%s' "$PLANTED2" | grep -q "session-runtime.py:.*CLAUDE_PLUGIN_ROOT.*\.github" \
+   && printf '%s' "$PLANTED2" | grep -q "session-runtime.py:.*__file__.*\.claude" \
    && ! printf '%s' "$PLANTED2" | grep -q "statusline-override.py"; then
   ok "(28c) the plugin's own .claude/ and .github/ are caught; a repository's .claude/ and .claude-plugin are not"
 else bad "(28c) planted=[$PLANTED2]"; fi

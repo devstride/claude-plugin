@@ -75,6 +75,24 @@ new_case badallow; printf 'item\n' > "$WORK/bad-allow"
 OUT="$(cd "$R" && bash "$CHECK" --base "$BASE" --allow "$WORK/bad-allow" 2>&1)"; RC=$?
 expect "(12) an allow line without a reason → exit 2, never a silent allow" 2 "allow list line 1"
 
+new_case quoted; printf 'Fixed in I14321.\n' > "$R/skills/a/café.md"; printf 'Fixed in I14322.\n' > "$R/skills/a/a\"b.md"
+commit "docs: x"; check
+expect "(14) files whose names git quotes (non-ASCII, a double quote) are still scanned" 1 \
+  "^PUBLIC HYGIENE: 2 finding(s)$" "item-number in skills/a/café.md:1" 'item-number in skills/a/a"b.md:1'
+
+new_case plusplus; printf 'one\n++ not a header\nFixed in I14321.\n' > "$R/skills/a/b.md"; commit "docs: x"; check
+expect "(15) an added line starting with '++ ' is content; the lines after it are still scanned" 1 \
+  "^PUBLIC HYGIENE: 1 finding(s)$" "item-number in skills/a/b.md:3"
+
+new_case separators; printf 'ok\rFixed in I14321\nx\fin I14322\ny\342\200\250see I14323\n' > "$R/skills/a/b.md"; commit "docs: x"; check
+expect "(16) carriage returns, form feeds and Unicode separators inside a line hide nothing" 1 \
+  "^PUBLIC HYGIENE: 3 finding(s)$" "item-number in skills/a/b.md:1" "item-number in skills/a/b.md:3"
+
+new_case encoded; printf '%s\n' '/private/tmp/claude-501/-Users-jane-dev-repo/x' '~/.claude/projects/-Users-jane-dev-repo/m.md' \
+  '/home/jane/dev/repo/file' '/private/var/folders/ab/T/x' > "$R/skills/a/b.md"; commit "docs: x"; check
+expect "(17) agent session paths and Linux home folders are internal paths" 1 \
+  "internal-path in skills/a/b.md:1" "internal-path in skills/a/b.md:2" "internal-path in skills/a/b.md:3" "internal-path in skills/a/b.md:4"
+
 # The real allow list parses, and every line carries a reason.
 OUT="$(cd "$ROOT" && bash "$CHECK" --base HEAD --head HEAD 2>&1)"; RC=$?
 expect "(13) this repository's allow list parses" 0 "CLEAN"

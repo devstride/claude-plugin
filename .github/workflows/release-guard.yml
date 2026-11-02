@@ -9,7 +9,7 @@
 #                         `release-guard`, the required check on `main`.
 #   push → main:          creates and pushes the annotated tag devstride--v<version> when it
 #                         does not exist yet, so a merged bump is a release the update check can
-#                         see. `claude plugin tag --push` remains the manual equivalent.
+#                         see. This is the only place a release is tagged: never tag by hand.
 name: release-guard
 on:
   pull_request:
@@ -20,7 +20,8 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: release-guard-${{ github.event.pull_request.number || github.ref }}
+  # one group per pull request; every push to main gets its own, so no merge's tag job is dropped
+  group: release-guard-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   check:

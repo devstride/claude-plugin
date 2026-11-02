@@ -20,6 +20,8 @@ except (OSError, ValueError) as e:
 need(c.get("profile") == "standard", "profile is not standard")
 need(c.get("baseBranch") == "main" and c.get("hotfixBaseBranch") == "main", "baseBranch/hotfixBaseBranch are not main")
 need(c.get("integrationBranch") is None, "integrationBranch is set")
+need(c.get("epicIntegrationBranches", {}).get("enabled") is False,
+     "epic integration branches are on: the loop finds landed stories by item numbers in git, which this repository forbids")
 need(c.get("protectedBranches") == ["main"], "protectedBranches is not [main]")
 need("stage" not in c, "a stage block is present: this repository deploys nothing")
 need(c.get("branchNaming", {}).get("dateFormat") == "YY-MM-DD", "branchNaming.dateFormat is not YY-MM-DD")

@@ -11,7 +11,8 @@
     "dateFormat": "YY-MM-DD"
   },
   "epicIntegrationBranches": {
-    "enabled": true,
+    "_readme": "OFF in this repository. The loop learns which epic stories have landed on an integration branch by reading item numbers out of its merge subjects (build-item's next-unblocked rule), and this public repository forbids item numbers in git (scripts/check-public-hygiene.sh). So every story, epic member or one-off, ships through its own pull request into main, which is its own release. The remaining keys stay as written for the day the loop can record a landed story without a number.",
+    "enabled": false,
     "pattern": "<prefix>/<YY-MM-DD>/epic-<epic-title-slug>",
     "slugRule": "epic title kebab-cased, lowercased, [a-z0-9-] only, execution-order bracket prefix stripped, truncated to ~6 words",
     "releaseTarget": "baseBranch",

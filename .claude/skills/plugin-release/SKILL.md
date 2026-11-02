@@ -19,8 +19,9 @@ Every message to a person says what happened in plain words, and ends with one r
 
 ## prepare [major|minor|patch]
 
-Run on the branch whose pull request will carry the release (an epic's integration branch, or a
-one-off or hotfix branch), with a clean tree and that branch up to date with `origin/main`.
+Run on the branch whose pull request will carry the release (a story or hotfix branch: every merge
+into `main` here is its own release), with a clean tree and that branch up to date with
+`origin/main`.
 
 1. **Choose the bump.** The argument, or else read `## [Unreleased]` in `CHANGELOG.md` against
    RELEASING.md's table and say which row decided it. An empty `Unreleased` blocks: either nothing

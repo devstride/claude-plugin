@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/validate.sh — everything RELEASING.md step 0 requires, in one command.
+# scripts/validate.sh — everything a release must pass before it is prepared (RELEASING.md), in one command.
 # Stops at the first failure and names the step. `--needles` also runs the
 # rule-loss check from delivery-loop-invariants.md (needle misses advisory — a miss is a
 # signal to READ, not proof of loss; a DEAD REFERENCE blocks).
