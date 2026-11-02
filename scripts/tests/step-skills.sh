@@ -52,32 +52,84 @@ OUT="$(cat "$WORK/structure.txt")"
 [ "$OUT" = clean ] && ok "(1-2) ten steps: name = directory, description <= 25 words, body <= 1,200 tokens, the pointer, and a Verdict equal to the registry's stepVerdict" \
   || bad "(1-2) $OUT"
 
-# (3) the orchestrators call the steps they own
-missing=""
-need() {  # <skill> <step>...
-  local skill="$1"; shift
-  for s in "$@"; do grep -q "\`$s" "$ROOT/skills/$skill/SKILL.md" || missing="$missing $skill→$s"; done
-}
-need release classify-release pre-ship pre-merge-check post-deploy update-docs sync-knowledge-base write-release-notes
-need build-item lease-checkout return-checkout update-docs
-need pr pre-ship
-need branch-hotfix local-environment
-[ -z "$missing" ] && ok "(3) release, build-item, pr and branch-hotfix name every step they call" || bad "(3) not called:$missing"
+# (3) each orchestrator calls each step at its call site: the step's name, with the mode that site
+# uses, inside the section that runs it (a mention elsewhere in the body does not count)
+python3 - "$ROOT" > "$WORK/calls.txt" 2>&1 <<'PY2'
+import re, sys
+root = sys.argv[1]
+SITES = [  # skill, the heading the section starts with, the call it must contain
+    ("release", "## 0. ", "`classify-release`"),
+    ("release", "## 2. ", "`pre-ship release select`"),
+    ("release", "## 2b. ", "`classify-release`"),
+    ("release", "## 2b. ", "`pre-ship release run`"),
+    ("release", "## 4. ", "`pre-merge-check`"),
+    ("release", "### 5a. ", "`post-deploy check`"),
+    ("release", "### 5c. ", "`update-docs update`"),
+    ("release", "### 5c. ", "`sync-knowledge-base sync`"),
+    ("release", "### 5d. ", "`post-deploy close-out`"),
+    ("release", "### 5e. ", "`write-release-notes`"),
+    ("build-item", "## 0. ", "`lease-checkout`"),
+    ("build-item", "## 7. ", "`return-checkout`"),
+    ("build-item", "## 8. ", "`update-docs update`"),
+    ("pr", "## 2. ", "`pre-ship pr select`"),
+    ("pr", "## 2b. ", "`pre-ship pr run`"),
+    ("branch-hotfix", "## The local environment", "`local-environment recreate`"),
+    ("branch-hotfix", "## The local environment", "`local-environment migrate`"),
+]
+def section(text, head):
+    lines = text.splitlines(); level = len(head) - len(head.lstrip("#"))
+    out, on = [], False
+    for line in lines:
+        m = re.match(r"(#+) ", line)
+        if on and m and len(m.group(1)) <= level:
+            break
+        if line.startswith(head):
+            on = True
+        if on:
+            out.append(line)
+    return " ".join(" ".join(out).split())
+missing = []
+for skill, head, call in SITES:
+    body = open("%s/skills/%s/SKILL.md" % (root, skill), encoding="utf-8").read()
+    sec = section(body, head)
+    if not sec:
+        missing.append("%s has no section %r" % (skill, head.strip()))
+    elif call not in sec:
+        missing.append("%s %s does not call %s" % (skill, head.strip(), call))
+print("\n".join(missing) or "clean %d" % len(SITES))
+PY2
+OUT="$(cat "$WORK/calls.txt")"
+case "$OUT" in
+  clean*) ok "(3) every orchestrator calls each step, with its mode, inside the section that runs it (${OUT#clean } call sites)" ;;
+  *) bad "(3) $OUT" ;;
+esac
 
-# (4) moved needles live in a step or its contract, and no longer in the orchestrator body
-moved=""
-moved() {  # <needle> <new home> <old body>
-  grep -qF -- "$1" "$ROOT/$2" || moved="$moved [absent from $2: $1]"
-  ! grep -qF -- "$1" "$ROOT/$3" || moved="$moved [still in $3: $1]"
-}
-moved "Run each selected entry UNCONDITIONALLY" skills/pre-ship/SKILL.md skills/release/SKILL.md
-moved "SHA-pinned three-dot local diff" skills/pre-ship/SKILL.md skills/pr/SKILL.md
-moved "renames on BOTH source and destination" skills/pre-ship/SKILL.md skills/pr/SKILL.md
-moved "| \`FAIL\` | **STOP.**" skills/release/references/post-deploy-check.md skills/release/SKILL.md
-moved "| \`NOT RUN\` | Report it as this-run degradation" skills/release/references/post-deploy-check.md skills/release/SKILL.md
-moved "owns the pages" skills/update-docs/SKILL.md skills/release/SKILL.md
-moved "\`/devstride:setup docs\` (it scaffolds the skill)" skills/update-docs/SKILL.md skills/build-item/SKILL.md
-[ -z "$moved" ] && ok "(4) moved text lives in its step or contract and left the orchestrator" || bad "(4)$moved"
+# (4) text that really stood in an orchestrator before the split now lives in a step (whitespace and
+# line wraps collapsed before matching) and no longer in that orchestrator. The base is PINNED to the
+# last release before the split, never the moving main, which holds the split bodies once merged.
+BASE="${STEP_SPLIT_BASE:-devstride--v3.19.0}"
+flat() { tr -s ' \t\n' '   '; }
+if ! git -C "$ROOT" rev-parse --verify -q "$BASE^{commit}" >/dev/null; then
+  if [ -n "${CI:-}" ]; then bad "(4) no $BASE in this clone; CI must fetch tags (or set STEP_SPLIT_BASE)"
+  else ok "(4) skipped: no $BASE in this clone (fetch tags, or set STEP_SPLIT_BASE, to run it)"; fi
+else
+  moved=""
+  moved() {  # <needle> <new home> <orchestrator>
+    local n="$1" home="$2" orch="$3"
+    git -C "$ROOT" show "$BASE:skills/$orch/SKILL.md" 2>/dev/null | flat | grep -qF -- "$n" || moved="$moved [never in $orch at $BASE: $n]"
+    flat < "$ROOT/skills/$home/SKILL.md" | grep -qF -- "$n" || moved="$moved [absent from $home: $n]"
+    ! flat < "$ROOT/skills/$orch/SKILL.md" | grep -qF -- "$n" || moved="$moved [still in $orch: $n]"
+  }
+  moved "Run each selected entry UNCONDITIONALLY" pre-ship release
+  moved "SHA-pinned three-dot local diff" pre-ship pr
+  moved "renames on BOTH source and destination" pre-ship pr
+  moved "never \`gh pr view --json files\`" pre-ship pr
+  moved "a foreground kill looks like a clean pass" pre-ship pr
+  moved "a foreground kill looks like a clean pass" pre-ship release
+  moved "owns the pages" update-docs release
+  moved "no \`.claude/skills/<name>/SKILL.md\`" update-docs build-item
+  [ -z "$moved" ] && ok "(4) eight passages that stood in an orchestrator at $BASE live in their step and left it" || bad "(4)$moved"
+fi
 
 # (5) every new reference is a contract with a Cited by list
 refs=""
