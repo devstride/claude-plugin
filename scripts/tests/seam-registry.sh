@@ -137,6 +137,21 @@ edit .claude-plugin/plugin.json 'd["version"] = "99.0.0"'; gen --write >/dev/nul
 gen --check --release --base no-such-ref
 [ "$RC" = 2 ] && ok "(17) an unreadable base is exit 2" || bad "(17) exit $RC: $OUT"
 
+# (19) every required field, hook or setting, is marked in the readable table
+MISSING="$(python3 - "$ROOT" <<'PYI'
+import json, sys
+root = sys.argv[1]
+reg = json.load(open(root + "/schemas/seam-registry.json"))
+table = open(root + "/skills/setup/references/seam-registry.md").read().splitlines()
+for e in reg["hooks"] + reg["settings"]:
+    if e.get("required"):
+        row = [l for l in table if l.startswith("| `%s` |" % e["key"])]
+        if not row or "**Required.**" not in row[0]:
+            print(e["key"])
+PYI
+)"
+[ -z "$MISSING" ] && ok "(19) every required key is marked Required in the table" || bad "(19) unmarked: $MISSING"
+
 gen --write --check
 [ "$RC" = 2 ] && ok "(18) --write with --check is a usage error" || bad "(18) exit $RC: $OUT"
 

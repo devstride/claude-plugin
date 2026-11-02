@@ -208,6 +208,8 @@ def build_table(registry, version):
            "|---|---|---|---|---|---|---|---|---|---|"]
     for h in registry["hooks"]:
         value = cell(h["valueType"]) + (" or null" if h.get("nullable") else "")
+        if h.get("required"):
+            value = "**Required.** " + value
         out.append("| `%s` | %s | %s | %s | %s | %s | %s | %s | `%s` | %s |" % (
             h["key"], h["shape"], value, cell(h.get("modes", [])) or "—", cell(h["payload"]),
             cell(h["verdict"]), cell(h["calledBy"]), cell(h["unset"]), h["contract"], h["since"]))
