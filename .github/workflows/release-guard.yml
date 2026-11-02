@@ -2,7 +2,11 @@
 #
 #   pull_request → main:  scripts/check-version-bump.sh fails the PR when skills/, hooks/ or
 #                         plugin.json changed without a higher version, a CHANGELOG heading and
-#                         a README line; the script tests and the load budgets run too.
+#                         a README line; the script tests and the load budgets run too. A draft
+#                         runs nothing: marking it ready for review starts the check, once, on
+#                         the reviewed head (the delivery loop opens every pull request as a
+#                         draft and flips it when review has settled). The job is named
+#                         `release-guard`, the required check on `main`.
 #   push → main:          creates and pushes the annotated tag devstride--v<version> when it
 #                         does not exist yet, so a merged bump is a release the update check can
 #                         see. `claude plugin tag --push` remains the manual equivalent.
@@ -10,13 +14,18 @@ name: release-guard
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 permissions:
   contents: write
+concurrency:
+  group: release-guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   check:
-    if: github.event_name == 'pull_request'
+    name: release-guard
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

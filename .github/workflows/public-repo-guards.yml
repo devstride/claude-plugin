@@ -1,0 +1,90 @@
+# Two checks every pull request into main must pass, because this repository is public:
+#
+#   merge-path:     the head branch has a shape the delivery loop admits
+#                   (scripts/check-merge-path.sh, rules in .claude/ds-config.json → mergePath).
+#                   An epic integration branch is admitted only when it bumps the version.
+#   public-hygiene: nothing private in the branch name, title, body, commit messages or added
+#                   lines (scripts/check-public-hygiene.sh, exceptions in
+#                   scripts/public-hygiene.allow).
+#
+# Why pull_request_target: it runs the BASE branch's copy of this workflow and its scripts, so a
+# pull request cannot weaken its own gate, and it re-runs when the title, body or labels change.
+# The price of that trigger is care: the pull request's code is never checked out or executed.
+# Its commits are fetched as objects and only read with git; its branch name, title, body and
+# labels reach the scripts through environment variables, never through ${{ }} in a script line.
+# The token is read-only. Both checks are cheap, so they also run on drafts.
+name: public-repo-guards
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited, ready_for_review, labeled, unlabeled]
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: public-repo-guards-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  merge-path:
+    name: merge-path
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch the pull request's commits as objects (never checked out)
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/pull/head"
+      - name: The head branch may open a pull request into the base
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -eu
+          BUMPS="$(python3 - <<'PY'
+          import json, os, subprocess
+          def version(sha):
+              try:
+                  raw = subprocess.run(["git", "show", sha + ":.claude-plugin/plugin.json"],
+                                       capture_output=True, check=True).stdout
+                  return tuple(int(p) for p in json.loads(raw)["version"].split("."))
+              except Exception:
+                  return None
+          base, head = version(os.environ["BASE_SHA"]), version(os.environ["HEAD_SHA"])
+          print("yes" if base is not None and head is not None and head > base else "no")
+          PY
+          )"
+          echo "bumps the version: $BUMPS"
+          bash scripts/check-merge-path.sh --head "$HEAD_REF" --base "$BASE_REF" \
+            --labels "$LABELS" --bumps-version "$BUMPS"
+  public-hygiene:
+    name: public-hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch the pull request's commits as objects (never checked out)
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/pull/head"
+      - name: Nothing private in the branch, title, body, commits or added lines
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -eu
+          printf '%s' "${PR_BODY:-}" > "$RUNNER_TEMP/pr-body.md"
+          bash scripts/check-public-hygiene.sh --base "$BASE_SHA" --head "$HEAD_SHA" \
+            --branch "$HEAD_REF" --title "$PR_TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
