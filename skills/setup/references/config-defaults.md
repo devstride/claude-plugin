@@ -706,8 +706,8 @@ that says whether a release is light or full (`null` → every release is FULL);
 (`null` → the go-ahead says **pre-merge production check: not configured**). Contract:
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-safety-hooks.md`. `pool.checkout` and
 `pool.checkin` are the repository's own commands for leasing and returning a pool checkout
-(`null` → the repository's own lease protocol applies when its conventions declare a pool; otherwise there is no pool and no lease). Set both or neither: a lease taken with no command to return it is
-stranded. Contract:
+(`null` → the repository's own lease protocol applies when its conventions declare a pool; otherwise there is no pool and no lease). Set both or neither: one alone is a config error (a lease nothing
+could return), and both steps refuse to run. Contract:
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/checkout-pool-commands.md`.
 
 ## Lessons store

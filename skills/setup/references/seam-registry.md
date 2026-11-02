@@ -199,7 +199,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `session.jobClassGate` | boolean | — | `true` | block mixing authoring and execution in one session | pre-registry |
 | `localEnvironment` | object, null | — | — | this repository's isolated local instances; null reads as absent | pre-registry |
 | `localEnvironment.recreateMode` | string, null | inPlace, newInstance, `null` | `null` | which shape recreate is | pre-registry |
-| `pool` | object, null | — | — | the repository's checkout-pool commands; null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md | unreleased |
+| `pool` | object, null | — | — | the repository's checkout-pool commands, set both or neither (one alone is an error); null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md | unreleased |
 | `localEnvironment.instanceBoundTo` | string | none, directory, branch | none | what the tooling keys an instance on | pre-registry |
 | `localEnvironment.fetchOnSessionStart` | boolean | — | `false` | a bounded fetch at session start | pre-registry |
 | `stage` | object | — | — | the cloud stage this checkout deploys to | pre-registry |

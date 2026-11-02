@@ -7,7 +7,8 @@ The schema defaults to ${CLAUDE_PLUGIN_ROOT}/schemas/ds-config.schema.json (the 
 script ships in when the variable is unset). It is generated from schemas/seam-registry.json, and
 this validator implements exactly the keyword subset the generator emits — type (a list included),
 properties, patternProperties, additionalProperties, required, enum, items, oneOf, minimum,
-exclusiveMinimum — plus
+exclusiveMinimum, and its own x-setTogether (children set all together or not at all; null is
+unset) — plus
 the x-severity annotation for deprecated keys. No JSON Schema library is needed.
 
 Output: the first line is
@@ -16,7 +17,8 @@ then one line per finding, `ERROR <path>: <message>` or `WARN <path>: <message>`
 JSON document instead (`schemaVersion`, `errors`, `warnings`, `findings`; on exit 2 the counts are
 null and `fatal` carries the one-line reason). An unknown key is a WARN (with the closest registered key when one is
 similar enough); a wrong type, a value outside its enum, a missing required key, both shapes of a
-one-of, and a deprecated key marked `error` are ERRORs. Keys starting with `_`, the top-level
+one-of, one key of a set-together group set without the others, and a deprecated key marked
+`error` are ERRORs. Keys starting with `_`, the top-level
 `$schema`, and keys at or under a prefix listed in the config's own `repoLocalKeys` are silent.
 
 The schema checks SHAPE only. Whether a command resolves on PATH or a branch exists stays with
@@ -139,6 +141,14 @@ class Validator:
                 show(value), schema["exclusiveMinimum"]))
         if "oneOf" in schema:
             self.one_of(value, schema["oneOf"], path)
+        if "x-setTogether" in schema and isinstance(value, dict):
+            group = schema["x-setTogether"]
+            present = [k for k in group if value.get(k) is not None]
+            if present and len(present) != len(group):
+                missing = [k for k in group if k not in present]
+                self.add("ERROR", path, "sets %s without %s; set them together or not at all" % (
+                    " and ".join("`%s`" % join(path, k) for k in present),
+                    " and ".join("`%s`" % join(path, k) for k in missing)))
         if isinstance(value, dict) and ("properties" in schema or "additionalProperties" in schema):
             props = schema.get("properties") or {}
             patterns = schema.get("patternProperties") or {}

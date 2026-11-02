@@ -1559,8 +1559,12 @@
         "object",
         "null"
       ],
-      "description": "the repository's checkout-pool commands; null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md",
-      "since": "unreleased"
+      "description": "the repository's checkout-pool commands, set both or neither (one alone is an error); null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md",
+      "since": "unreleased",
+      "setTogether": [
+        "checkout",
+        "checkin"
+      ]
     },
     {
       "key": "localEnvironment.instanceBoundTo",

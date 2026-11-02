@@ -78,8 +78,6 @@ skill honours `perStoryPullRequest` (4), `storyVerify` (4a), `autoRelease` and `
   dedicated key, resolved before any decision reads them. A present
   `epicIntegrationBranches.autoRelease` or `fastStoryMerges.enabled` wins, its contradiction with
   the profile reported aloud; unknown overrides are reported and ignored; none lowers a floor.
-- **The three `review.*` CI-ordering booleans describe what the workflows SUPPORT**: every profile
-  uses the supported hold; PR workflows without one are a setup fault.
 
 ## Progress table — at every step transition
 
@@ -145,7 +143,7 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
 ## 0. Select the story
 
 - **Ground truth first.** Hold your checkout under the pool rule (**`lease-checkout`** once per run
-  with `pool.checkout` set, the lease kept across iterations), `git fetch --prune origin`, and read
+  when `pool.checkout` is set, kept across iterations), `git fetch --prune origin`, and read
   what OTHER authors landed on the base (and epic) branch since the handoff — say so when another
   session appears active. Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`.
 - **Plan root**: `$ARGUMENTS`, else handoff memory; not ONE unambiguous root while several plans are
@@ -158,6 +156,8 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   plan complete / N landed, awaiting their release (gate on → step 8 for it, then step 0) / N
   blocked by X, Y / N gated. Suggest `/devstride:plan <root>` only when the chain ran out; never
   invoke it.
+- **Every exit from step 0** (DRY-CHAIN/TERMINAL, an ambiguous root, a given item merged or Done,
+  any other stop before step 1) → **`return-checkout`** first when this run leased.
 - **GATING CHECK** (a decision that is the user's → flag, next candidate), **SCOPE CHECK**
   (buildable now vs deferred, recorded), **VALIDATE THE SPEC** (re-fetch with `view: 'full'`; confirm
   paths, symbols and assumptions against the code).
@@ -236,9 +236,8 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 - **Observe greenness**: non-draft, and every applicable check succeeded — actually RAN — at the
   CURRENT head SHA. Re-poll only after a re-push, with `review` step 7's background poll; never
   `gh pr checks --watch`.
-- **Red CI**: failed to TRIGGER → `review` step 7.3 (close+reopen, then one empty commit);
-  flaky/infra → `gh run rerun <id> --failed`, ~2 tries; real → reproduce, fix, push, re-poll. Never
-  merge red; never quit after one failure.
+- **Red CI** → `review` step 7's ladder (failed to trigger, flaky, real). Never merge red; never
+  quit after one failure.
 - Slow suites (`verify.skipDuringStoryBuilds`): story PRs into an epic branch never wait on them; on
   develop each follows its applicability; an empty list settles an absent check. **Read the config
   before concluding either.**

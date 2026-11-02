@@ -20,8 +20,10 @@ authority for the two commands.
 | `pool.checkout` | Leases one member. Placeholders `<member>` (the checkout to lease) and `<purpose>` (the item or reason, shell-quoted) are substituted before it runs; neither is ever passed through to the shell unexpanded. **Exit 0** — the checkout is now held by this session. **Exit 2** — not held: another session holds it, or it is in use without a lease. **Any other exit** — an error. Its first stdout line is quoted as evidence either way. |
 | `pool.checkin` | Returns one member. Placeholder `<member>`. **Exit 0** — returned. **Any other exit** — a refusal (not the holder, a dirty tree, a process still running); its first line is quoted and it is never retried blindly. |
 
-**Set both or neither.** `pool.checkout` without `pool.checkin` takes a lease nothing can return;
-`doctor` reports either one alone. The same session leasing a member it already holds exits 0 (a
+**Set both or neither.** `pool.checkout` without `pool.checkin` would take a lease nothing can
+return, so one alone is an ERROR: the config validator (and `doctor` with it) rejects it, and
+`lease-checkout` and `return-checkout` both check the pair FIRST and stop with `ERROR`, nothing
+leased or returned. The same session leasing a member it already holds exits 0 (a
 renewal), so a loop may call `pool.checkout` on every run.
 
 The commands never list members: the caller names one. `build-item` passes the name of the
@@ -45,9 +47,12 @@ STOPS and asks, and never retries with another name.
   and the lease is KEPT across loop iterations: a story that ends in "then step 0" never hands
   the checkout back.
 - **`return-checkout` only after the last checkout operation** — after step 7's checkout, pull and
-  clean-tree check, never before them — and only at a terminal exit (DRY-CHAIN or plan complete,
-  a one-off's TERMINATE, step 8's release-ready stop) or a hand-over to another session or the
-  owner. A STOP that leaves the work for this session to resume keeps the lease.
+  clean-tree check, never before them — and only at a terminal exit (a one-off's TERMINATE, step
+  8's release-ready stop) or a hand-over to another session or the owner. A STOP in steps 1–7 that
+  leaves the work for this session to resume keeps the lease.
+- **Every exit from step 0 returns it too**, before the run ends — DRY-CHAIN or plan complete, an
+  ambiguous plan root, a given item already merged or Done, any other stop before step 1: nothing
+  is built in the checkout yet, so nothing is lost, and the next run leases again.
 - Every process the run started in the checkout stops before the return.
 
 ## Cited by

@@ -1186,7 +1186,11 @@
         "^_": {}
       },
       "additionalProperties": false,
-      "description": "the repository's checkout-pool commands; null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md"
+      "x-setTogether": [
+        "checkout",
+        "checkin"
+      ],
+      "description": "the repository's checkout-pool commands, set both or neither (one alone is an error); null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md"
     },
     "stage": {
       "type": "object",

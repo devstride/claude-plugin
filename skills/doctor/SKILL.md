@@ -190,8 +190,7 @@ next action. For each failure symptom, read
   token of **each** segment, and
   skip shell builtins (`cd backend && pnpm test` starts with `cd`, which always resolves). A
   single-word command that does not resolve may be a shell alias or function — report "not on
-  PATH (may be an alias)", not a flat FAIL. **`pool.checkout` and `pool.checkin` are set both or
-  neither**; one alone → WARN, a lease nothing returns.
+  PATH (may be an alias)", not a flat FAIL.
 - **`conventionsDoc` exists** — set → the file must be present; the build engine reads it.
 
 ## 5. The CI draft gate (`ci`)

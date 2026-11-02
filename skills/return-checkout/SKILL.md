@@ -16,7 +16,9 @@ in). Command contract: `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/check
 
 ## Steps
 
-1. Read `pool.checkin`. Null or absent → `NOT CONFIGURED`: nothing to hand back.
+1. Check the pair first: exactly one of `pool.checkout` and `pool.checkin` set (non-null) →
+   `ERROR`, naming the missing one, and STOP — nothing is returned. `pool.checkin` null or absent
+   → `NOT CONFIGURED`: nothing to hand back.
 2. Return only at a terminal exit or a hand-over, after the caller's last checkout operation (in
    `build-item`, after step 7's sync — never between loop iterations), and only after stopping
    every process this session started in that checkout (test runs, servers, watchers).

@@ -17,7 +17,10 @@ No member → the name of the checkout directory this session works in. Command 
 
 ## Steps
 
-1. Read `pool.checkout`. Null or absent → `NOT CONFIGURED`: the repository's own lease protocol applies when its conventions declare a pool; otherwise there is no pool and no lease — say which, once.
+1. Check the pair first: exactly one of `pool.checkout` and `pool.checkin` set (non-null) →
+   `ERROR`, naming the missing one, and STOP — nothing is leased (a lease nothing could return).
+   `pool.checkout` null or absent → `NOT CONFIGURED`: the repository's own lease protocol applies
+   when its conventions declare a pool; otherwise there is no pool and no lease — say which, once.
 2. Substitute `<member>` and `<purpose>` (shell-quoted); never pass a placeholder through.
 3. Run it once. Exit 0 → `LEASED <member>`; exit 2 → `BUSY <member>`; any other exit →
    `ERROR`. Quote its first stdout line as evidence in every case.

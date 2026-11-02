@@ -21,6 +21,9 @@ Registry rules the generator applies:
   - a hook whose shape is `provider-or-commands` becomes a oneOf: null, the provider shape (every
     registered child except `commands`) or the commands shape (only `commands`);
   - a `deprecated` setting becomes an x-severity annotation carrying its message.
+  - an object setting's `setTogether` list becomes `x-setTogether`: those children are all set
+    (non-null) or all unset, never one alone (the validator's own keyword; JSON Schema has none
+    that treats null as unset).
   - a hook a step skill runs carries `step` (the skill's directory) and `stepVerdict` (the
     verdict lines its `## Verdict` section spells); scripts/tests/step-skills.sh compares them.
 
@@ -43,7 +46,8 @@ TABLE = "skills/setup/references/seam-registry.md"
 ID_FORMAT = "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v{}/schemas/ds-config.schema.json"
 
 VALIDATION_KEYWORDS = {"type", "properties", "patternProperties", "additionalProperties",
-                       "required", "enum", "items", "oneOf", "minimum", "exclusiveMinimum"}
+                       "required", "enum", "items", "oneOf", "minimum", "exclusiveMinimum",
+                       "x-setTogether"}
 ANNOTATIONS = {"$schema", "$id", "title", "description", "default", "x-severity"}
 HOOK_FIELDS = ["key", "shape", "valueType", "nullable", "payload", "verdict", "calledBy",
                "unset", "contract", "since"]
@@ -166,6 +170,8 @@ def build_schema(registry, version):
                 node = node_for(e["type"])
             if "enum" in e:
                 node["enum"] = e["enum"]
+            if "setTogether" in e:
+                node["x-setTogether"] = e["setTogether"]
             for bound in ("minimum", "exclusiveMinimum"):
                 if bound in e:
                     node[bound] = e[bound]
