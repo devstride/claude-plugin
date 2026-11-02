@@ -35,7 +35,8 @@ is for a pool the conventions declare without those commands.
   member. A lease that already exists is BUSY: read who holds it and pick another member or ask
   them. Never delete someone else's lease; a stale one is the owner's call.
 - **Hold it across branch switches** — the lease, not the branch, makes the checkout yours.
-- **Hand it back** when the work merges or is handed over: stop every process you started there
+- **Hand it back** when the work merges or is handed over, and on any exit before work begins
+  (every `build-item` step-0 exit, a release that stops with nothing to do): stop every process you started there
   (test runs, dev servers, watchers), leave it clean and detached at a freshly fetched base, then
   remove the lease. An owner-approved extra worktree is removed by the session that made it when
   its approved purpose ends.
