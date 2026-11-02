@@ -149,6 +149,18 @@ expect "(38a) supportTrain, hierarchyRoles, localEnvironment and session accept 
 cfg '{"plugin": null}'
 expect "(38b) a null plugin block is an ERROR (the session-start check reads it as invalid)" 1 "^CONFIG: 1 error(s)" "^ERROR plugin: expected object, found null"
 
+# exit 2 under --json: one JSON document, never a plain line
+printf '{"review": ' > "$WORK/broken.json"
+for case in "$WORK/absent.json|cannot read the config" "$WORK/broken.json|cannot parse the config"; do
+  OUT="$(python3 "$VAL" "${case%%|*}" --schema "$SCHEMA" --json 2>&1)"; RC=$?
+  F="$(printf '%s' "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["errors"], d["fatal"])' 2>/dev/null)"
+  case "$F" in "None ${case##*|}"*) [ "$RC" = 2 ] && ok "(39) --json on an unusable config: a JSON document with fatal, exit 2" || bad "(39) exit $RC";;
+    *) bad "(39) not a JSON fatal document (exit $RC): $OUT";; esac
+done
+OUT="$(python3 "$VAL" "$FIX/minimal.json" --schema "$WORK/no-schema.json" --json 2>&1)"; RC=$?
+printf '%s' "$OUT" | python3 -c 'import json,sys; assert json.load(sys.stdin)["fatal"].startswith("cannot read the schema")' 2>/dev/null && [ "$RC" = 2 ] \
+  && ok "(39c) --json with a missing schema: a JSON document, exit 2" || bad "(39c) exit $RC: $OUT"
+
 # exit 2 paths: one line each, never a fallback to defaults
 OUT="$(python3 "$VAL" "$WORK/absent.json" --schema "$SCHEMA" 2>&1)"; RC=$?
 [ "$RC" = 2 ] && [ "$(printf '%s\n' "$OUT" | wc -l | tr -d ' ')" = 1 ] && printf '%s' "$OUT" | grep -q "^CONFIG: cannot read the config" \

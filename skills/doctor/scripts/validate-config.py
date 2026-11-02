@@ -13,7 +13,8 @@ the x-severity annotation for deprecated keys. No JSON Schema library is needed.
 Output: the first line is
     CONFIG: <n> error(s), <m> warning(s) against schema <version>
 then one line per finding, `ERROR <path>: <message>` or `WARN <path>: <message>`. With --json, one
-JSON document instead. An unknown key is a WARN (with the closest registered key when one is
+JSON document instead (`schemaVersion`, `errors`, `warnings`, `findings`; on exit 2 the counts are
+null and `fatal` carries the one-line reason). An unknown key is a WARN (with the closest registered key when one is
 similar enough); a wrong type, a value outside its enum, a missing required key, both shapes of a
 one-of, and a deprecated key marked `error` are ERRORs. Keys starting with `_`, the top-level
 `$schema`, and keys at or under a prefix listed in the config's own `repoLocalKeys` are silent.
@@ -206,30 +207,39 @@ def schema_version(schema):
 
 
 def main(argv):
-    config_path, schema_path, as_json = None, None, False
+    as_json = "--json" in argv
+    usage = "usage: validate-config.py <config> [--schema <path>] [--json]"
+
+    def fatal(message):
+        """Exit 2 with one line, or with one JSON document under --json."""
+        if as_json:
+            print(json.dumps({"schemaVersion": None, "errors": None, "warnings": None,
+                              "fatal": message, "findings": []}, indent=2))
+        else:
+            print("CONFIG: " + message)
+        return 2
+
+    config_path, schema_path = None, None
     i = 0
     while i < len(argv):
         a = argv[i]
         if a == "--schema":
             if i + 1 >= len(argv):
-                print("CONFIG: usage: validate-config.py <config> [--schema <path>] [--json]")
-                return 2
+                return fatal(usage)
             schema_path = argv[i + 1]
             i += 1
         elif a == "--json":
-            as_json = True
+            pass
         elif a in ("-h", "--help"):
             print(__doc__)
             return 0
         elif config_path is None:
             config_path = a
         else:
-            print("CONFIG: usage: validate-config.py <config> [--schema <path>] [--json]")
-            return 2
+            return fatal(usage)
         i += 1
     if not config_path:
-        print("CONFIG: usage: validate-config.py <config> [--schema <path>] [--json]")
-        return 2
+        return fatal(usage)
     if not schema_path:
         root = os.environ.get("CLAUDE_PLUGIN_ROOT") or os.path.dirname(os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -239,18 +249,15 @@ def main(argv):
             with open(p, encoding="utf-8") as f:
                 loaded = json.load(f)
         except OSError as exc:
-            print("CONFIG: cannot read the %s %s: %s" % (label, p, exc.strerror or exc))
-            return 2
+            return fatal("cannot read the %s %s: %s" % (label, p, exc.strerror or exc))
         except ValueError as exc:
-            print("CONFIG: cannot parse the %s %s: %s" % (label, p, exc))
-            return 2
+            return fatal("cannot parse the %s %s: %s" % (label, p, exc))
         if label == "schema":
             schema = loaded
         else:
             config = loaded
     if not isinstance(schema, dict):
-        print("CONFIG: cannot parse the schema %s: not a JSON object" % schema_path)
-        return 2
+        return fatal("cannot parse the schema %s: not a JSON object" % schema_path)
     local = config.get("repoLocalKeys") if isinstance(config, dict) else None
     local = [p for p in local if isinstance(p, str) and p] if isinstance(local, list) else []
     v = Validator(schema, local)
