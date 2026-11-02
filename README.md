@@ -298,7 +298,9 @@ naming the release you run: `https://raw.githubusercontent.com/devstride/claude-
 `/devstride:doctor` and `/devstride:setup` check the file against it: a wrong shape (a list where a
 command belongs, both forms of `release.clearance`, a retired key) is a failure, and an unknown key
 is a warning that names the key you probably meant. Keys your own repository's tools read go in
-`repoLocalKeys`, a list of key prefixes the check leaves alone.
+`repoLocalKeys`, a list of key prefixes the check leaves alone. An editor still flags keys listed
+under `repoLocalKeys` as unknown, because the published schema cannot read your list; doctor
+honours it.
 
 **CI cost.** The loop runs CI once per pull request, on the final reviewed diff — the draft hold
 guarantees it. What the hold does not cover is the rest of the bill: superseded runs, a
