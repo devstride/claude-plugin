@@ -1,6 +1,6 @@
 {
   "_method": "tokens = ceil(utf8_bytes / 3); bytes as `wc -c`",
-  "_generatedBy": "scripts/measure-cost.sh --write-budgets at 3.8.0 on 2026-10-01; release-clearance ratchets raised by hand at 3.11.0; release body and config-defaults raised at 3.13.0 for the opt-in review-once economies and release.syncWorkflow; release-branch, delta-re-review, config-defaults and the epic/production release and fast-story paths raised at 3.14.0 for review.localEffort and absorbing late train landings; release body, docs-hooks and the epic/production release paths raised at 3.15.0 for release.deployApproval; clearance, post-deploy-check, release-branch, invariants, config-defaults and the production release path raised at 3.16.0 for the earlier hand-back, close-out owed and the stuck-phase alarm; version-currency, statusline-segments and the manual plugin update path raised at 3.17.0 for the per-session running-version record and the Plugin status-line segment; at the step-skills story (unreleased): alwaysOnContext RAISED from 1,300 to 1,800 (measured 1,787) because the ten new step skills' descriptions are always loaded, the ten step bodies and three new contracts added, docs-hooks, clearance, config-defaults and seam-registry raised for the new keys, pr and doctor lowered, and the epic/production release and fast-story paths re-baselined to measured totals with the step skills and contracts they now load",
+  "_generatedBy": "scripts/measure-cost.sh --write-budgets at 3.8.0 on 2026-10-01; release-clearance ratchets raised by hand at 3.11.0; release body and config-defaults raised at 3.13.0 for the opt-in review-once economies and release.syncWorkflow; release-branch, delta-re-review, config-defaults and the epic/production release and fast-story paths raised at 3.14.0 for review.localEffort and absorbing late train landings; release body, docs-hooks and the epic/production release paths raised at 3.15.0 for release.deployApproval; clearance, post-deploy-check, release-branch, invariants, config-defaults and the production release path raised at 3.16.0 for the earlier hand-back, close-out owed and the stuck-phase alarm; version-currency, statusline-segments and the manual plugin update path raised at 3.17.0 for the per-session running-version record and the Plugin status-line segment; at the step-skills story (unreleased): alwaysOnContext RAISED from 1,300 to 1,800 (measured 1,787) because the ten new step skills' descriptions are always loaded, the ten step bodies and three new contracts added, docs-hooks, clearance, config-defaults and seam-registry raised for the new keys, pr and doctor lowered, and the epic/production release and fast-story paths re-baselined to measured totals with the step skills and contracts they now load; pre-ship, update-docs, docs-hooks, checkout-pool-commands, ground-truth-at-start, release-safety-hooks, config-defaults and the three loop paths raised in the step-skill review for detail moved out of the orchestrator bodies (waivers, narrowed re-runs, docs verdicts and owed accounting, the lease lifecycle)",
   "_rounding": "measured tokens rounded UP to the next multiple of 100",
   "_readme": "A RATCHET over bodies, references, and representative composed paths. Hard body ceilings live in measure-cost.sh: 8,000 normally, with two frozen grandfathered caps. Lower freely; raise a ratchet only with the text that needs it. Changing _method re-baselines every entry.",
   "alwaysOnContext": 1800,
@@ -25,10 +25,10 @@
     "setup": 10700,
     "ultracode-build": 4900,
     "update": 1000,
-    "update-docs": 700,
+    "update-docs": 900,
     "sync-knowledge-base": 700,
     "write-release-notes": 600,
-    "pre-ship": 700,
+    "pre-ship": 1000,
     "post-deploy": 700,
     "local-environment": 700,
     "lease-checkout": 600,
@@ -38,7 +38,7 @@
   },
   "references": {
     "skills/build-item/references/epic-release.md": 2900,
-    "skills/build-item/references/ground-truth-at-start.md": 1800,
+    "skills/build-item/references/ground-truth-at-start.md": 1900,
     "skills/build-item/references/next-unblocked.md": 3200,
     "skills/build-item/references/plain-language-output.md": 2300,
     "skills/build-item/references/progress-table.md": 1300,
@@ -59,7 +59,7 @@
     "skills/rebalance/references/recoverable-write-order.md": 1000,
     "skills/release/references/branch-patterns.md": 1600,
     "skills/release/references/clearance.md": 5500,
-    "skills/release/references/docs-hooks.md": 3200,
+    "skills/release/references/docs-hooks.md": 4000,
     "skills/release/references/post-deploy-check.md": 1500,
     "skills/release/references/release-branch.md": 5150,
     "skills/release/references/release-gates.md": 1300,
@@ -75,7 +75,7 @@
     "skills/review/references/roster-and-modes.md": 2100,
     "skills/review/references/slow-suite-gating.md": 1700,
     "skills/setup/references/ci-cost-patterns.md": 5000,
-    "skills/setup/references/config-defaults.md": 13900,
+    "skills/setup/references/config-defaults.md": 14000,
     "skills/setup/references/detector-evidence.digest.md": 900,
     "skills/setup/references/detector-evidence.md": 4300,
     "skills/setup/references/docs-skill-templates/update-documentation.md": 1400,
@@ -89,12 +89,12 @@
     "skills/ultracode-build/references/mandatory-lenses.md": 1800,
     "skills/ultracode-build/references/review-fanout.md": 2200,
     "skills/release/references/step-skills.md": 1000,
-    "skills/release/references/release-safety-hooks.md": 1100,
-    "skills/build-item/references/checkout-pool-commands.md": 900
+    "skills/release/references/release-safety-hooks.md": 1200,
+    "skills/build-item/references/checkout-pool-commands.md": 1200
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 72700,
+      "budget": 74200,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -127,7 +127,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 61000,
+      "budget": 61600,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -165,7 +165,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 72600,
+      "budget": 74100,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

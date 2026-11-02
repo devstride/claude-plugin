@@ -14,7 +14,7 @@ for what each version component means here and how a release is cut.
   `update-docs`, `sync-knowledge-base`, `write-release-notes`, `pre-ship`, `post-deploy`,
   `local-environment`, `lease-checkout`, `return-checkout`, `classify-release` and
   `pre-merge-check` each run exactly one hook your config names and print a fixed verdict first
-  (for example `PRE-SHIP: PASS (3 ran)` or `RELEASE CLASS: FULL`). `release`, `build-item`, `pr`
+  (for example `PRE-SHIP: PASS (3 ran, 0 waived)` or `RELEASE CLASS: FULL`). `release`, `build-item`, `pr`
   and `branch-hotfix` now call them instead of carrying the same paragraphs, so a step that failed
   is re-run by name (`/devstride:update-docs`). With a hook unset a step says `NOT CONFIGURED` (or
   its stated default) and the caller carries on; the four safety steps take the stricter path when
@@ -38,13 +38,40 @@ for what each version component means here and how a release is cut.
   release-guard step) fails when the shipped text names one repository's own tooling — its command
   launcher and command families, its data set and database vendor, checkout names, its production
   deploy workflow, the pool-lease phrase, or an item number the hygiene allow list does not hold.
-  Exceptions go in `scripts/neutrality-allow.txt`, one exact substring with a reason (none today).
+  It reads each shipped file's path as well as its contents, tolerates flags and extra spaces in a
+  command (`ds -u script …`), matches a production deploy workflow however it is spelt, and flags a
+  consumer's own local skill names (`ds-<word>-<word>`) — never the plugin's own `ds-config` or
+  `ds-lessons` — and its demo data set (`golden dataset`, `golden build` …) without flagging a
+  generic golden file or test. Exceptions go in `scripts/neutrality-allow.txt`, one exact
+  substring with a reason (today only the plugin's own status-line cache file names).
 
 ### Changed
 
 - **The release clearance's holder variable is `CLEARANCE_HOLDER_TOKEN`.** The older name,
   `DEVSTRIDE_LEASE_TOKEN`, is still read when the new one is unset, and the new name wins when both
   are set; the one-time token printed to a plain terminal now says to export the new name.
+- **A repository that mirrors the holder identity rule outside the plugin must read
+  `CLEARANCE_HOLDER_TOKEN` too, with the new name winning** — for example a merge guard that
+  computes the same holder from the token or the session ids to decide whether this session holds
+  the clearance. Until it does, a session that exports only the new name is not recognised there.
+- **`pre-ship` takes `--skip <name>` and `--only <names>`.** `--skip` is the owner's explicit
+  waiver at a release, reported as `WAIVED` and never assumed; `--only` re-runs just the failed or
+  affected checks after a fix. A failure names every failed check, not the first. At a release,
+  every `releaseOnly` or `always` check is selected (the hold fires whenever one exists, as before
+  the split), and each `onlyWhenTouched` check the release does not touch is listed with its reason.
+- **A release classifies itself again right before its pre-ship checks**, at the head they test,
+  so a merge, review fix or hotfix since the start can no longer leave a stale `RELEASE_CLASS`.
+- **Documentation results say what really happened.** `update-docs` adds `CURRENT` (nothing to
+  change), says `PUBLISHED` only on evidence the docs are live, and `STAGED` for a draft or a docs
+  pull request awaiting the owner. Each result maps to the close-out's `docs` value and to what
+  stays owed (`skills/release/references/docs-hooks.md`): a failed docs, knowledge-base or
+  release-notes run stays owed; a staged one names the owner action in the recap; a docs hook that
+  names a missing skill is reported when the release plans its documentation and is never owed. The
+  knowledge-base sync runs only when its hook is set and the docs were published; its re-run line
+  and the `no docs` catch-up print complete, runnable commands.
+- **`build-item` leases a pool checkout once per run and keeps it across stories**, returning it
+  only at a terminal exit or a hand-over, after its final sync; `doctor` warns when only one of
+  `pool.checkout` and `pool.checkin` is set.
 - **`doctor` section 7 checks every skill-shaped hook in one loop** (the docs skills, the
   knowledge-base sync, the post-deploy check and the two release safety hooks): unset is N/A, a
   named skill must exist, and only the docs skills' and the knowledge-base sync's read-only `check`
@@ -54,16 +81,18 @@ for what each version component means here and how a release is cut.
 
 - **`alwaysOnContext` raised from 1,300 to 1,800 tokens** (measured 1,787): every session loads the
   skill listing, and each new step adds a description line to it.
-- New: the ten step bodies (454 to 700 tokens each) and three contracts (`step-skills.md` 947,
-  `release-safety-hooks.md` 1,038, `checkout-pool-commands.md` 828).
-- Bodies: `release` 7,998 → 7,975, `build-item` 8,000 → 7,996, `pr` 3,763 → 3,557, `doctor` 7,952
-  → 7,897, `branch-hotfix` 2,107 → 2,182.
-- Composed paths, re-baselined to what they now load: `productionReleaseGate` 66,012 → 72,558
-  (+9.9%: the seven release-side steps, `step-skills.md` and `release-safety-hooks.md`, and the
-  docs-hooks and clearance growth); `fastStoryLoop` 58,408 → 60,962 (+4.4%: the lease pair,
-  `step-skills.md` and `checkout-pool-commands.md`); `epicReleaseGate` 70,180 → 72,685 (+3.6%:
-  `pre-ship`, `update-docs` and `step-skills.md`). The steps load only when called, so a run that
-  calls none of them pays only the always-on listing.
+- New: the ten step bodies (454 to 967 tokens each; `pre-ship` 967 and `update-docs` 872 carry the
+  waivers, narrowed re-runs and docs verdicts) and three contracts (`step-skills.md` 971,
+  `release-safety-hooks.md` 1,116, `checkout-pool-commands.md` 1,175). `docs-hooks.md` grows to
+  3,903 with the documentation plan and the per-verdict owed table.
+- Bodies: `release` 7,998 → 7,970, `build-item` 8,000 → 8,000, `pr` 3,763 → 3,557, `doctor` 7,952
+  → 7,891, `branch-hotfix` 2,107 → 2,182, `review` 7,996 → 7,998.
+- Composed paths, re-baselined to what they now load: `productionReleaseGate` 66,012 → 74,098
+  (+12.3%: the seven release-side steps, `step-skills.md` and `release-safety-hooks.md`, and the
+  docs-hooks and clearance growth); `fastStoryLoop` 58,408 → 61,576 (+5.4%: the lease pair,
+  `step-skills.md` and `checkout-pool-commands.md`); `epicReleaseGate` 70,180 → 74,131 (+5.6%:
+  `pre-ship`, `update-docs`, `step-skills.md` and `docs-hooks.md`). The steps load only when
+  called, so a run that calls none of them pays only the always-on listing.
 
 ## [3.19.0] — 2026-11-02
 
