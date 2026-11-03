@@ -27,7 +27,8 @@ Usage:
 
 Checked set: the files each FIRST-PARENT commit in `<source-before>..<head>` changed
 (`git diff --name-only --no-renames <c>^1 <c>`). Left out of it:
-  (i)  a merge of the release source (its second parent is an ancestor of `origin/<releaseSource>`);
+  (i)  a merge of the release source (its second parent is an ancestor of `origin/<releaseSource>`),
+       for what the source changed — anything else it does to the train side is checked;
   (ii) a merge that brought a REVIEWED release-unit pull request onto the train: the subject is
        `Merge pull request #<n> from <owner>/<head>`, `<head>` matches `epicIntegrationBranches.pattern`
        (matched as in `skills/release/references/branch-patterns.md`, with date tokens and every other
@@ -159,6 +160,8 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
         fail("--source-before %s is not an ancestor of %s: the range is wrong" % (source_before, start_ref))
     if not is_ancestor(repo, source_before, head):
         fail("--source-before %s is not an ancestor of --head %s: the range is wrong" % (source_before, head))
+    if start_on == "train" and not is_ancestor(repo, head, origin_train):
+        fail("--head %s is not on %s: --start-on train checks train work only" % (head, origin_train))
 
     introduced, reviewed = set(), []
     refused, renumbers, pending_meta = set(), [], set()
@@ -189,6 +192,18 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
         refused.update(p for p in hits if p not in accounted)
         renumbers.extend({"from": old, "to": new} for old, new in pairs)
 
+    def flag_merge_path(p):
+        """An excluded path a merge itself changed: metadata waits on a renumber, the rest is refused."""
+        if not matches(p, exclusions):
+            return
+        if sql_globs is not None and matches(p, meta_globs) and not matches(p, sql_globs):
+            pending_meta.add(p)
+        else:
+            refused.add(p)
+
+    def names(a, b):
+        return set(zlist(git(repo, "diff", "--name-only", "--no-renames", "-z", a, b).stdout.decode("utf-8", "surrogateescape")))
+
     def walk(commits):
         for c in commits:
             parents = git_text(repo, "rev-list", "--parents", "-n", "1", c).split()[1:]
@@ -198,15 +213,16 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
                 # what the merge ITSELF changed (a conflict resolution) is never exempt; migration
                 # metadata resolved in a merge is allowed only if the range also yields a renumber
                 for p in merge_only_changes(repo, c):
-                    if matches(p, exclusions):
-                        if sql_globs is not None and matches(p, meta_globs) and not matches(p, sql_globs):
-                            pending_meta.add(p)
-                        else:
-                            refused.add(p)
+                    flag_merge_path(p)
                 if len(parents) > 2:  # an octopus merge is never exempt and never expanded
                     check_commit(c, parents[0])
                     continue
                 if is_ancestor(repo, parents[1], origin_source):
+                    # a source merge brings only what the source changed: anything else it does to
+                    # the train side (a resolution that deletes or edits train work) is checked
+                    base = git_text(repo, "merge-base", parents[0], parents[1]).strip()
+                    for p in names(parents[0], c) - names(base, parents[1]):
+                        flag_merge_path(p)
                     continue
                 number = reviewed_unit(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip(), epic_regex, train) \
                     if epic_regex else None

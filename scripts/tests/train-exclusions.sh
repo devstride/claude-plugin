@@ -189,4 +189,15 @@ journal_repo t18b; run t18b yes
 expect "(18b) the same journal resolution with no renumber in the range is refused" 1 "d['refused']==['db/migrations/meta/_journal.json']"
 journal_repo t18c renumber; run t18c
 expect "(18c) ... and with no release.migrationRenumber it is refused" 1 "'db/migrations/meta/_journal.json' in d['refused']"
+# (19) a source merge may bring only the source's changes: one whose resolution deletes a reviewed migration is refused
+repo t19; unit epic "Merge pull request #7 from acme/jane/26-10-01/epic-checkout" db/migrations/0002_col.sql
+stub 7 train MERGED "$(git rev-parse HEAD)"
+git checkout -q develop; echo dev > src/dev.txt; git add -A; git commit -qm "source work"; git update-ref refs/remotes/origin/develop develop
+git checkout -q train; git merge -q --no-ff --no-commit develop >/dev/null 2>&1; git rm -q db/migrations/0002_col.sql; git commit -qm "merge the source"; run t19
+expect "(19) a source merge whose resolution deletes a reviewed migration is refused" 1 "d['refused']==['db/migrations/0002_col.sql'] and d['reviewedUnits']==[7]"
+# (19b) --start-on train needs a head on the train
+repo t19b; unit first "merge: item-0 docs into train" src/first.txt; SNAP="$(git rev-parse HEAD)"; git update-ref refs/remotes/origin/train train
+git checkout -q -b offtrain train; echo o > src/o.txt; git add -A; git commit -qm off; config "$WORK/c-t19b.json"
+OUT="$(python3 "$TOOL" --config "$WORK/c-t19b.json" --start-on train --source-before "$SNAP" --head offtrain --repo "$WORK/t19b" 2>&1)"; RC=$?
+[ "$RC" = 2 ] && ok "(19b) --start-on train with a head off the train is exit 2" || bad "(19b) exit $RC: $OUT"
 exit $FAIL
