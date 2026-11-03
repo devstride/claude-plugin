@@ -193,7 +193,7 @@
       ],
       "unset": "the release does not wait for a development deploy",
       "contract": "skills/release/SKILL.md",
-      "since": "unreleased"
+      "since": "3.22.0"
     },
     {
       "key": "release.clearance",
@@ -1343,19 +1343,19 @@
         "null"
       ],
       "description": "allow a migration renumber forced by merging the source into the train snapshot; null reads as absent",
-      "since": "unreleased"
+      "since": "3.22.0"
     },
     {
       "key": "release.migrationRenumber.sqlGlobs",
       "type": "string[]",
       "description": "migration files a renumber may delete and re-add under a new name",
-      "since": "unreleased"
+      "since": "3.22.0"
     },
     {
       "key": "release.migrationRenumber.metaGlobs",
       "type": "string[]",
       "description": "migration metadata files a renumber may change",
-      "since": "unreleased"
+      "since": "3.22.0"
     },
     {
       "key": "release.syncWorkflow",
@@ -1586,19 +1586,19 @@
         "null"
       ],
       "description": "the old name of releaseTrain, still read when releaseTrain is absent (doctor notes it; both together is an error)",
-      "since": "unreleased"
+      "since": "3.22.0"
     },
     {
       "key": "supportTrain.branch",
       "type": "string",
       "description": "the old name of releaseTrain.branch",
-      "since": "unreleased"
+      "since": "3.22.0"
     },
     {
       "key": "supportTrain.fastMerges",
       "type": "boolean",
       "description": "the old name of releaseTrain.fastMerges",
-      "since": "unreleased"
+      "since": "3.22.0"
     },
     {
       "key": "releaseTower",

@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.21.0.
+`.claude/ds-config.json` against. Schema version: 3.22.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -25,7 +25,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.preMergeSkill` | skill | string or null | check | check followed by {productionBranch, releaseSource, head, pullRequest} | PRE-MERGE: CLEAR \| HOLD \| NOT RUN (plus evidence; HOLD states the action first) | pre-merge-check, release 4, doctor 7 | the go-ahead summary and the recap say: pre-merge production check: not configured | `skills/release/references/release-safety-hooks.md` | 3.20.0 |
 | `release.deployApproval` | command | string or null | — | RELEASE_COMMIT in the environment | exit 0 approved and read back; 2 not waiting yet; any other exit STOPS | release 4, release 5a, doctor 7 | the deploy runs without an approval step | `skills/release/references/docs-hooks.md` | pre-registry |
 | `release.deployVerification` | command | string or null | — | RELEASE_COMMIT in the environment | exit 0 only when production serves RELEASE_COMMIT | release 5a, doctor 7 | the owner confirms the deploy by hand | `skills/release/references/docs-hooks.md` | pre-registry |
-| `release.devDeployVerification` | command | string or null | — | RELEASE_COMMIT in the environment (the head the release merges from the source) | exit 0 deployed to the development environment; 2 not deployed yet; 1 the development deploy failed | release 4 | the release does not wait for a development deploy | `skills/release/SKILL.md` | unreleased |
+| `release.devDeployVerification` | command | string or null | — | RELEASE_COMMIT in the environment (the head the release merges from the source) | exit 0 deployed to the development environment; 2 not deployed yet; 1 the development deploy failed | release 4 | the release does not wait for a development deploy | `skills/release/SKILL.md` | 3.22.0 |
 | `release.clearance` | provider-or-commands | object or null | claim, status, heartbeat, release, adopt, owed | each verb's own arguments appended (--wait, --short, <phase> --branch <b> --pr <n>, --force, --yes) | the verdict is stdout's first line; exit codes 0-5 per the provider contract | release 0, release 5b, branch-hotfix rules, doctor 7 | no clearance: release runs as before and nothing is claimed | `skills/release/references/clearance.md` | pre-registry |
 | `claims` | provider-or-commands | object or null | claim, heartbeat, release, get, list | <kind> <key>, then the verb's options (claim: --purpose, --phase, --expiry, --takeover; heartbeat: --phase; release: --outcome; list: --kind); the holder in CLAIM_HOLDER, never on argv | stdout's first line (WON, LOST, OK, NOT HOLDER, ABSENT, FORBIDDEN, UNREACHABLE, ERROR), then the claim JSON; exit 0 won or ok, 2 lost, 4 not the holder, 1 anything else | build-item 0, build-item 6, doctor 7 | no claims: build-item selects and builds exactly as before and claims nothing | `skills/build-item/references/story-claims.md` | 3.21.0 |
 | `verify.typecheck` | command | string[] | — | none; run from the repository root, in array order | exit 0 passes; an error outside generated.paths fails | ultracode-build 2, push rules, build-item 4a, setup G | push asks for a command; fast story merges stay off | `skills/build-item/references/verification-receipts.md` | pre-registry |
@@ -166,9 +166,9 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.autoDeployOnMerge` | string, null | — | — | one plain-English sentence on what merging to production does | pre-registry |
 | `release.releaseBranchPattern` | string | — | — | cut each release as its own protected branch | pre-registry |
 | `release.releaseBranchFixExclusions` | string[] | — | — | paths a fix on a release branch may not touch | pre-registry |
-| `release.migrationRenumber` | object, null | — | — | allow a migration renumber forced by merging the source into the train snapshot; null reads as absent | unreleased |
-| `release.migrationRenumber.sqlGlobs` | string[] | — | — | migration files a renumber may delete and re-add under a new name | unreleased |
-| `release.migrationRenumber.metaGlobs` | string[] | — | — | migration metadata files a renumber may change | unreleased |
+| `release.migrationRenumber` | object, null | — | — | allow a migration renumber forced by merging the source into the train snapshot; null reads as absent | 3.22.0 |
+| `release.migrationRenumber.sqlGlobs` | string[] | — | — | migration files a renumber may delete and re-add under a new name | 3.22.0 |
+| `release.migrationRenumber.metaGlobs` | string[] | — | — | migration metadata files a renumber may change | 3.22.0 |
 | `release.syncWorkflow` | string | — | — | the workflow syncing production into the source | pre-registry |
 | `release.mergeTrainBeforeCut` | boolean | — | `false` | merge the release train into the source before each cut | pre-registry |
 | `release.productionReview` | object | — | — | review-once economy for the production pull request | pre-registry |
@@ -200,9 +200,9 @@ starting with `_` and `$schema` are never reported as unknown.
 | `releaseTrain` | object, null | — | — | one long-lived branch one-off work batches on; null reads as absent | pre-registry |
 | `releaseTrain.branch` | string | — | — | the train's branch | pre-registry |
 | `releaseTrain.fastMerges` | boolean | — | `false` | a one-off merges onto the train without its own pull request | pre-registry |
-| `supportTrain` | object, null | — | — | the old name of releaseTrain, still read when releaseTrain is absent (doctor notes it; both together is an error) | unreleased |
-| `supportTrain.branch` | string | — | — | the old name of releaseTrain.branch | unreleased |
-| `supportTrain.fastMerges` | boolean | — | — | the old name of releaseTrain.fastMerges | unreleased |
+| `supportTrain` | object, null | — | — | the old name of releaseTrain, still read when releaseTrain is absent (doctor notes it; both together is an error) | 3.22.0 |
+| `supportTrain.branch` | string | — | — | the old name of releaseTrain.branch | 3.22.0 |
+| `supportTrain.fastMerges` | boolean | — | — | the old name of releaseTrain.fastMerges | 3.22.0 |
 | `releaseTower` | object | — | — | the release-tower check's settings | pre-registry |
 | `releaseTower.overrideLabel` | string | — | release-tower-override | the label passing an owner-approved pull request | pre-registry |
 | `releaseTower.hotfixPattern` | string | — | */hotfix/** | heads never held | pre-registry |
