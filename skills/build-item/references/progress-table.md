@@ -11,8 +11,8 @@ and the reasoning, for the first render in a session or a resume after a compact
 The loop's position is otherwise recoverable only from prose, so a compacted or resumed session
 has to re-derive where it is — and skill text remembered across a compaction is EXPIRED, which
 makes the table the one durable, cheap statement of position. Observed live: a compacted session
-kept re-requesting a review through a connector that had been disabled months earlier, waiting
-out timeout after timeout, because the stale in-context copy won. A table row saying which
+kept re-requesting a review through a connector disabled months earlier, waiting out timeout
+after timeout, because the stale in-context copy won. A table row saying which
 engine actually registered would have surfaced that in one glance.
 
 ## The PR-path shape (4b — develop-base stories and one-offs)
@@ -22,6 +22,7 @@ engine actually registered would have surfaced that in one glance.
 |---|---|
 | 0 · Select | I20110 — one-off → base develop (or the support train, when configured), no epic branch |
 | Profile | standard — from `.claude/ds-config.json` (one-off: no root marker) |
+| Claim | won (or renewed, took over, skipped N held, not configured, degraded) |
 | 1 · In Progress | ✅ |
 | 2 · Branch | ✅ jane/03-14-26/I20110-… |
 | 3 · Build + risk screen | ✅ 1 finding fixed |

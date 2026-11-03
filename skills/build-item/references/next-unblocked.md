@@ -14,7 +14,8 @@ org's Story/Defect) that is neither Done nor LANDED (below), with every `blocked
 satisfied, in the earliest-dated open container (this org: Capability/Epic) on the critical
 path. Priority breaks ties; earlier `startDate` breaks remaining ties. Exclude anything the gating
 check catches (`build-item` step 0's GATING CHECK — items that depend on a human/infra decision
-that is the user's).
+that is the user's). With `claims` configured it also skips a candidate another live agent holds
+(`story-claims.md`).
 
 **A `blocked_by` target is satisfied** when it is Done, OR when it is in the git-confirmed landed
 set (below) AND has the SAME nearest release-unit ancestor as the dependent leaf, so the same

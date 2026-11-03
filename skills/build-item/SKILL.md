@@ -8,7 +8,7 @@ description: "Orchestrate one DevStride work item end-to-end: select, branch, bu
 **Goal:** ONE DevStride one-day leaf item (this org's Story or Defect types) delivered end-to-end —
 select → In Progress → branch → build → review → merge → ritual → sync → next. This ORCHESTRATOR
 owns ONLY the DevStride glue (selection, status moves, the completion ritual); it composes the other
-delivery skills — **invoke them by name; never re-spell what they do.**
+delivery skills — **invoke them by name; never re-spell them.**
 
 Argument — an item number, or `next`/empty for the next unblocked item; `next under I20100`, or
 **`I20100` alone, means "the next unblocked item under this root"** — a bare plan root (any grouping
@@ -25,7 +25,7 @@ one-off: $ARGUMENTS
 - **Skill freshness.** Skill text remembered from an earlier iteration or across a compaction is
   EXPIRED; re-invoke each composed skill when needed (cost: `references/progress-table.md`).
 - **Name the fields you read.** Default projections and `search_items` OMIT `relationships` and
-  `description`; read them with `get_item(view: 'full')`. Absence is never data.
+  `description`; read them via `get_item(view: 'full')`. Absence is never data.
 - **Never compose an item number.** Every `I#####` in a comment, commit or PR body is
   `get_item`-verified; work needing an item gets it created BEFORE any text cites it.
 - **Dates only with the auto-scheduler OFF** — step 6's date write applies
@@ -39,7 +39,7 @@ one-off: $ARGUMENTS
 - **Deploy safety travels with the diff.** Migrations are idempotent and rolling-deploy safe;
   reshaped durable events stay readable by both. `ultracode-build`'s focused verifier on auth,
   migration, irreversible-state or deployed-runtime changes fires from the DIFF, not the plan's
-  theme, under every profile — `extended` included — as does each matching `review.mandatoryLenses`
+  theme, under every profile (`extended` too), as does each matching `review.mandatoryLenses`
   finder. Neither is skippable.
 - **Production merges are the owner's.** This loop merges only into the working base or
   `epicIntegrationBranches.releaseTarget`; it surfaces `/devstride:release`, which merges to
@@ -51,15 +51,15 @@ one-off: $ARGUMENTS
   hand-back come from the repo, never hard-coded (`ground-truth-at-start.md`). Never create a
   worktree or instance unless the owner asks in this conversation; never delete another session's
   lease.
-- **Serial by design.** "Parallel waves" are SHAPE (why: `references/next-unblocked.md`):
+- **Serial by design.** "Parallel waves" are SHAPE (`references/next-unblocked.md`):
   `localEnvironment` never makes the loop concurrent; a human fans out the ready-set.
 - **Full-auto through merge.** PAUSE only at a genuine fork: a user's human/infra decision, an
   ambiguous or unverifiable finding, a destructive or outward-facing action. Record every deferral;
   never skip silently.
 - **The plan is a HYPOTHESIS.** Validate the spec against the ACTUAL code and correct the item's
   description as the work firms up — the item, not the PR, is the durable source of truth.
-- **Develop only receives a COMPLETE release unit** — refreshed, fully reviewed, every applicable
-  gate green — or a one-off that settled the same gates. Out-of-scope findings follow 6.5.
+- **Develop only receives a COMPLETE release unit** (refreshed, fully reviewed, every applicable
+  gate green) or a one-off that settled the same gates. Out-of-scope findings: 6.5.
 
 ## Delivery profile — resolve once per story, announce with its source
 
@@ -70,7 +70,7 @@ skill honours `perStoryPullRequest` (4), `storyVerify` (4a), `autoRelease` and `
 - **Resolve once the story is SELECTED**, in the contract's order (explicit word → root marker →
   config `profile` → `standard`; an unknown word → `standard`, said so). The marker walks the
   story's ancestors (`get_item` with `view: 'full'` each) and takes the NEAREST. A one-off skips
-  only the marker step. Never carried over from the previous story.
+  only the marker step. Never carried over from the last story.
 - **Announce it WITH ITS SOURCE** — `profile: extended — from the plan root I20100` — in the
   `Profile` row and handoff memory; pass it **by name**, `profile: <name>`, to `ultracode-build` (3),
   `review` (4a, 4b) and `pr` (4b, 8), which never re-resolve it.
@@ -82,12 +82,10 @@ skill honours `perStoryPullRequest` (4), `storyVerify` (4a), `autoRelease` and `
 ## Progress table — at every step transition
 
 One row per NUMBERED step in this skill's names (CI release/settle belong to `review` step 7), the
-`Profile` row with its source, every configured engine its own row and an unconfigured one an
-explicit "not configured" row, each matched `mandatory lens <name>: ran (N findings)`, step 8 `n/a`
+`Profile` row with its source, a row per configured engine (an unconfigured one: "not configured"), each matched `mandatory lens <name>: ran (N findings)`, step 8 `n/a`
 on a one-off. **EVIDENCE, not intent**: "request registered in timeline", never "requested";
 "non-applicable" with its reason, never a bare "skipped"; a missing CI check says `skipping` or
-never ran, and why. The fast path shows 4a/5a with the deferred cloud rows visible. A render, never
-a gate. **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/progress-table.md` at the first
+never ran, and why. The fast path shows 4a/5a with the deferred cloud rows visible. A render, not a gate. **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/progress-table.md` at the first
 render in a session or after a compaction.**
 
 ## Working base — epic integration branches
@@ -112,7 +110,7 @@ Read "the working base" wherever a step says develop; re-derive it per RELEASE U
 **This precedence is code**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/routing.py
 target` (pass `oneOff`, and `roles` when resolved); follow its answer.
 
-Stories merge into it (why: `references/epic-release.md`), skipping `verify.skipDuringStoryBuilds`
+Stories merge into it (`references/epic-release.md`), skipping `verify.skipDuringStoryBuilds`
 suites; the last leaf's merge triggers step 8. **The working base and the effective
 `perStoryPullRequest` pick the path** — integration branch → fast develop mode (4a), the train → 4a
 only when `supportTrain.fastMerges` is true, `baseBranch` → the full PR ritual (4b); announce it.
@@ -121,8 +119,7 @@ only when `supportTrain.fastMerges` is true, `baseBranch` → the full PR ritual
 
 ## One-off / no-plan single-shot mode
 
-Detect before plan-root resolution. TEST:
-`get_item(view: 'full', fields: ['number','title','workType','relationships'])`, and apply the
+Detect before plan-root resolution. TEST: `get_item(view: 'full', fields: ['number','title','workType','relationships'])`, and apply the
 heuristic only to `hierarchyRoles.leaf` types. **No `[N]` prefix AND no `blocked_by`/`blocks` edge →
 one-off**; both → plan mode; exactly one → plan mode if a root resolves, else state your read and
 ask. **Steps 1–6 run VERBATIM.** Deltas:
@@ -149,19 +146,21 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
 - **Plan root**: `$ARGUMENTS`, else handoff memory; not ONE unambiguous root while several plans are
   open → STOP and ask.
 - A given story number IS the story; merged or Done → never step 1 (`next-unblocked.md`).
-  Otherwise apply `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full,
-  projection warning included. **Never auto-select from the deferred container.** Surface the
+  Otherwise apply `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full
+  (projection warning too). **Never auto-select from the deferred container.** Surface the
   whole ready-set.
 - **DRY-CHAIN / TERMINAL:** no selectable candidate → exit cleanly, never re-ask, saying which:
   plan complete / N landed, awaiting their release (gate on → step 8 for it, then step 0) / N
   blocked by X, Y / N gated. Suggest `/devstride:plan <root>` only when the chain ran out; never
   invoke it.
-- **Every exit from step 0** (DRY-CHAIN/TERMINAL, an ambiguous root, a given item merged or Done,
-  any other stop before step 1) → **`return-checkout`** first when this run leased.
+- **Every exit from step 0** (DRY-CHAIN/TERMINAL, ambiguous root, a given item merged or Done, any
+  other stop before step 1) → **`return-checkout`** first when this run leased.
 - **GATING CHECK** (a decision that is the user's → flag, next candidate), **SCOPE CHECK**
   (buildable now vs deferred, recorded), **VALIDATE THE SPEC** (re-fetch with `view: 'full'`; confirm
   paths, symbols and assumptions against the code).
 - Resolve the profile; report item, title, ready-set, profile with source, buildable-now line.
+- **Claim it** (`claims` set) BEFORE step 1; heartbeat each step; held → next candidate, named →
+  STOP (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`).
 
 ## 1. Mark In Progress
 
@@ -197,7 +196,7 @@ lenses included) or no valid verification receipt → **4b**, saying why.
   re-imposed) per `commitConventions.reviewFixFormat` (fallback
   `fix(<scope>): <summary> [<itemNumber> review]`); an unfixed finding worth filing (`review` step
   4) → its owning item, else the untracked-deferral list; any other → dismissed (5a's body).
-- **Local suites are the gate** (`fastStoryMerges.requireLocalVerifyGreen`), width = the effective
+- **Local suites are the gate** (`fastStoryMerges.requireLocalVerifyGreen`), width = effective
   `storyVerify`. Per `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/verification-receipts.md`,
   an unchanged tree + command set is REUSED; fixes rerun affected checks plus the required gate.
   Commands and counts go in the merge-commit body. Red is a STOP.
@@ -208,8 +207,8 @@ lenses included) or no valid verification receipt → **4b**, saying why.
 
 Invoke **`pr`** in autonomous (driven-by-`build-item`) mode with the working base pre-answered and the
 profile by name — `review` owns the cycle target, P1/serious-P2 continuation and fix floor; this loop
-owns PR-to-item linking (6). It opens a draft wherever the repo holds CI on drafts, `prototype`
-included, requests every in-scope cloud reviewer in the same call and settles through `review`.
+owns PR-to-item linking (6). It opens a draft wherever the repo holds CI on drafts (`prototype` too),
+requests every in-scope cloud reviewer in the same call and settles through `review`.
 Deferrals, deviations and dismissals (with rationale) go in the PR body. The push/ready-flip race
 is `review` step 7's; step 5 never reads `skipping` as green.
 
@@ -233,7 +232,7 @@ is `review` step 7's; step 5 never reads `skipping` as green.
   cumulative ledger, target and safety state, never a fresh budget; tree-identical keeps its
   receipt, else affected checks rerun. Then RECOMPUTE `verify.skipDuringStoryBuilds` applicability
   from the new SHA.
-- **Observe greenness**: non-draft, and every applicable check succeeded — actually RAN — at the
+- **Observe greenness**: non-draft, every applicable check succeeded — actually RAN — at the
   CURRENT head SHA. Re-poll only after a re-push, with `review` step 7's background poll; never
   `gh pr checks --watch`.
 - **Red CI** → `review` step 7's ladder (failed to trigger, flaky, real). Never merge red; never
@@ -257,11 +256,11 @@ is `review` step 7's; step 5 never reads `skipping` as green.
   that comment. Never invent a PR number.
 - **Reconcile as-built** on a material deviation: `add_comment` the `view: 'full'` description
   verbatim under "📋 Original spec (as planned) — superseded by the description below" (HTML: pass
-  `{ html }`, never Markdown), then rewrite it: an italic as-built note naming what it shipped in, a
+  `{ html }`, never Markdown), then rewrite it: italic as-built note naming what it shipped in, a
   **Deviations** list with one-line rationales, an **As shipped** summary — citing the artifact that
-  EXISTS (4b its PR; 4a its merge SHA + branch). None → "shipped as specified". These are exactly
-  step 3/4's deviations.
-- **Report** item + `[N]`, status, dates, PR link or SHA + branch, profile + source, reconciled y/n.
+  EXISTS (4b its PR; 4a merge SHA + branch). None → "shipped as specified". Deviations are step 3/4's.
+- **Release the claim** (`claims` set): outcome `done`.
+- **Report** item + `[N]`, status, dates, PR link or SHA + branch, profile + source, reconciled.
 
 ## 6.5 Capture untracked findings as tracked items
 
@@ -297,9 +296,9 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 
 **Gate**: zero remaining leaves, working base the unit's integration branch, **auto-release on** —
 `epicIntegrationBranches.autoRelease` when PRESENT, the profile default only when ABSENT. Off →
-cut nothing; report release-ready and stop — once the owner merges the release, one
+cut nothing; report release-ready and stop — after the owner merges it, one
 `/devstride:build-item <root>` run marks its stories Done. **`"ask"` is a third legal value**: ask
-the owner once per unit and cut nothing until answered; unanswerable → `false`, SAYING so. **Read
+the owner once per unit, cutting nothing until answered; unanswerable → `false`, SAYING so. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` when step 7 reports the release
 unit at zero and before cutting the release PR.**
 
@@ -331,6 +330,6 @@ unit at zero and before cutting the release PR.**
   `NOT CONFIGURED` → say so and continue; keep its links exact. **Never release notes here.**
 - Update handoff memory and sync develop.
 - **Human recap.** Lead with `Merged / Released`: every item and its effect, where it landed,
-  validation/review/CI, docs, whether live, the remaining production action. Surface — never
-  perform — the owner-cut promotion (`/devstride:release`). New findings → step 6.5.
+  validation/review/CI, docs, whether live, the remaining production action. Surface, never
+  perform, the owner-cut promotion (`/devstride:release`). New findings → 6.5.
 
