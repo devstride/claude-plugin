@@ -53,7 +53,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILLS = os.path.dirname(os.path.dirname(HERE))
-ROUTING = os.path.join(SKILLS, "build-item", "scripts", "routing.py")
+ROUTING = os.path.join(SKILLS, "build-item/scripts/routing.py")
 
 
 def fail(msg):
