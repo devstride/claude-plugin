@@ -43,7 +43,7 @@ unit() {
 }
 stub() { printf '{"baseRefName":"%s","state":"%s","mergeCommit":{"oid":"%s"}}\n' "$2" "$3" "$4" > "$GH_STUB_DIR/$1.json"; }
 # run NAME [renumber]: the tool over SB..train; sets RC and OUT
-run() { config "$WORK/c-$1.json" "${2:-}"; OUT="$(python3 "$TOOL" --config "$WORK/c-$1.json" --source-before "$SB" --head train --repo "$WORK/$1" 2>&1)"; RC=$?; }
+run() { config "$WORK/c-$1.json" "${2:-}"; OUT="$(python3 "$TOOL" --config "$WORK/c-$1.json" --source-before "${SB_OVERRIDE:-$SB}" --head "${HEAD_REF:-train}" --repo "$WORK/$1" 2>&1)"; RC=$?; }
 # expect LABEL RC PYTHON-CONDITION-ON-d
 expect() {
   if [ "$RC" = "$2" ] && printf '%s' "$OUT" | python3 -c "import json,sys; d=json.load(sys.stdin); assert $3" 2>/dev/null; then ok "$1"
@@ -98,4 +98,48 @@ expect "(8) merges of the source are ignored" 0 "d['refused']==[] and d['reviewe
 
 repo t9; unit oneoff "merge: item-1 docs into train" src/b.txt; run t9
 expect "(9) a one-off touching no excluded path passes" 0 "d['refused']==[]"
+
+# (10) A: a source merge whose conflict resolution adds a migration is refused; the clean one (t8) passes
+repo t10; git checkout -q develop; echo dev > src/a.txt; git add -A; git commit -qm "source edits a"
+git update-ref refs/remotes/origin/develop develop; git checkout -q train; echo train > src/a.txt; git add -A; git commit -qm "train edits a"
+git merge -q --no-ff -m "merge the source" develop >/dev/null 2>&1; echo resolved > src/a.txt; echo "select 5;" > db/migrations/x.sql; git add -A; git commit -qm "merge the source"; run t10
+expect "(10) a source merge whose resolution adds a migration is refused" 1 "d['refused']==['db/migrations/x.sql']"
+repo t10b; git checkout -q -b epic train; echo e > src/e.txt; git add -A; git commit -qm e; git checkout -q train
+git merge -q --no-ff -m "Merge pull request #7 from acme/jane/26-10-01/epic-checkout" epic; echo x > db/migrations/y.sql; git add -A
+git commit -q --amend -m "Merge pull request #7 from acme/jane/26-10-01/epic-checkout"
+stub 7 train MERGED "$(git rev-parse HEAD)"; run t10b
+expect "(10b) a reviewed-unit merge whose own result adds a migration is refused" 1 "d['refused']==['db/migrations/y.sql']"
+
+# (11) B: the range must be an ancestor of the source and of the head
+repo t11; git checkout -q -b side; echo s > src/s.txt; git add -A; git commit -qm side; SIDE="$(git rev-parse HEAD)"; git checkout -q train
+SB_OVERRIDE="$SIDE" run t11
+[ "$RC" = 2 ] && printf '%s' "$OUT" | grep -q "^train_exclusions: .*not an ancestor" && ok "(11) a source-before that is not an ancestor of the source is exit 2" || bad "(11) exit $RC: $OUT"
+repo t11c; git checkout -q develop; echo n > src/n.txt; git add -A; git commit -qm n; git update-ref refs/remotes/origin/develop develop
+git checkout -q train; SB_OVERRIDE="$(git rev-parse develop)" run t11c
+[ "$RC" = 2 ] && printf '%s' "$OUT" | grep -q "not an ancestor of --head" && ok "(11c) a source-before that is not an ancestor of the head is exit 2" || bad "(11c) exit $RC: $OUT"
+
+# (12) C: a non-ASCII migration path is matched
+repo t12; unit oneoff "merge: item-1 accent into train" "db/migrations/é.sql"; run t12
+expect "(12) a fast-merged one-off adding a non-ASCII migration is refused" 1 "d['refused']==['db/migrations/\\u00e9.sql']"
+
+# (13) D: no release.releaseSource means develop
+repo t13; unit oneoff "merge: item-1 col into train" db/migrations/0002_col.sql
+config "$WORK/c-t13.json"
+python3 - "$WORK/c-t13.json" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1])); del c["release"]["releaseSource"]; json.dump(c, open(sys.argv[1], "w"))
+PYEOF
+OUT="$(python3 "$TOOL" --config "$WORK/c-t13.json" --source-before "$SB" --head train --repo "$WORK/t13" 2>&1)"; RC=$?
+expect "(13) a config without releaseSource defaults to develop" 1 "d['refused']==['db/migrations/0002_col.sql']"
+
+# (14) E: late absorption into the snapshot
+late() {  # late NAME SUBJECT: snapshot cut, then the train gains a unit, absorbed by a --no-ff merge
+  repo "$1"; git checkout -q -b snapshot train; git checkout -q train
+  unit late "$2" db/migrations/0002_col.sql infra/q.tf; TRAIN_TIP="$(git rev-parse HEAD)"
+  git update-ref refs/remotes/origin/train train; git checkout -q snapshot; git merge -q --no-ff -m "absorb late landings" "$TRAIN_TIP"; HEAD_REF=snapshot
+}
+late t14 "Merge pull request #7 from acme/jane/26-10-01/epic-checkout"; stub 7 train MERGED "$TRAIN_TIP"; run t14; unset HEAD_REF
+expect "(14) a reviewed epic absorbed late into the snapshot passes the whole-range check" 0 "d['refused']==[] and d['reviewedUnits']==[7]"
+late t14b "merge: item-2 col into train"; run t14b; unset HEAD_REF
+expect "(14b) a one-off carrying a migration absorbed late is still refused" 1 "'db/migrations/0002_col.sql' in d['refused']"
 exit $FAIL

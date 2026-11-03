@@ -12,10 +12,11 @@ Usage:
                       [--train <branch>] [--repo <dir>]
 
   --config         the repository's `.claude/ds-config.json`. Read: `release.releaseBranchFixExclusions`,
-                   `release.releaseSource`, `releaseTrain.branch` (the old name `supportTrain.branch`
+                   `release.releaseSource` (default `develop`), `releaseTrain.branch` (the old name `supportTrain.branch`
                    when only that is present), `epicIntegrationBranches.pattern` and the optional
                    `release.migrationRenumber` ({"sqlGlobs": [...], "metaGlobs": [...]}).
-  --source-before  the release source's SHA when the train snapshot was cut (the range start).
+  --source-before  the release source's SHA when the train snapshot was cut (the range start); it
+                   must be an ancestor of `origin/<releaseSource>` and of --head, else exit 2.
   --head           the snapshot (or any commit) whose range `<source-before>..<head>` is checked.
   --train          the train branch (default: the configured `releaseTrain.branch`); a reviewed
                    release unit counts only when its pull request was based on it.
@@ -31,7 +32,10 @@ Checked set: the files each FIRST-PARENT commit in `<source-before>..<head>` cha
        token a wildcard), AND `gh pr view <n> --json baseRefName,state,mergeCommit` says the pull
        request is MERGED, based on the train, with exactly that commit as its merge commit. A
        hand-written subject gh does not confirm is checked like any other commit.
-Everything else (a fast-merged one-off, a direct commit, a snapshot fix commit) is checked exactly:
+Every merge, exempt or not, also has what it ITSELF changed (against all parents, so a conflict
+resolution) checked. A merge that is neither of the above whose second parent is an ancestor of
+`origin/<train>` is a late absorption of train commits: its brought-in first-parent commits are
+judged by these same rules, recursively. Paths are read NUL-delimited. Everything else (a fast-merged one-off, a direct commit, a snapshot fix commit) is checked exactly:
 a changed file matching `release.releaseBranchFixExclusions` is refused.
 
 Named exception, only with `release.migrationRenumber` set: a commit whose only excluded-path changes
@@ -111,15 +115,31 @@ def reviewed_unit(repo, commit, subject, epic_regex, train):
     return int(number)
 
 
+def zlist(text):
+    return [x for x in text.split("\0") if x]
+
+
+def name_status(repo, first, c):
+    """{path: status letter} for c against its first parent, NUL-delimited so no path is mangled."""
+    tokens = zlist(git(repo, "diff", "--name-status", "--no-renames", "-z", first, c).stdout.decode("utf-8", "surrogateescape"))
+    return {tokens[i + 1]: tokens[i][:1] for i in range(0, len(tokens) - 1, 2)}
+
+
+def merge_only_changes(repo, c):
+    """Files a merge's result changes against ALL its parents (conflict resolutions, 'evil merges')."""
+    out = git(repo, "diff-tree", "-z", "--cc", "--name-only", "--no-commit-id", "-r", c).stdout
+    return zlist(out.decode("utf-8", "surrogateescape"))
+
+
 def analyse(repo, config, source_before, head, train):
     release = config.get("release") if isinstance(config.get("release"), dict) else {}
     exclusions = release.get("releaseBranchFixExclusions") or []
-    source = release.get("releaseSource")
+    source = release.get("releaseSource") or "develop"
     epic_pattern = (config.get("epicIntegrationBranches") or {}).get("pattern")
     if not isinstance(exclusions, list) or not all(isinstance(x, str) for x in exclusions):
         fail("config: release.releaseBranchFixExclusions must be a list of patterns")
-    if not isinstance(source, str) or not source:
-        fail("config: release.releaseSource is missing")
+    if not isinstance(source, str):
+        fail("config: release.releaseSource must be a string")
     epic_regex = routing.template_regex(epic_pattern, {}) if isinstance(epic_pattern, str) and epic_pattern else None
     renumber = release.get("migrationRenumber")
     sql_globs = meta_globs = None
@@ -129,37 +149,23 @@ def analyse(repo, config, source_before, head, train):
             if not isinstance(g, list) or not all(isinstance(x, str) for x in g):
                 fail("config: release.migrationRenumber globs must be lists of patterns")
 
-    commits = git_text(repo, "rev-list", "--first-parent", "--reverse", "%s..%s" % (source_before, head)).split()
-    origin_source = "origin/" + source
-    introduced, reviewed, plan = set(), [], []
-    for c in commits:
-        parents = git_text(repo, "rev-list", "--parents", "-n", "1", c).split()[1:]
-        if not parents:
-            continue
-        if len(parents) > 1:
-            if is_ancestor(repo, parents[1], origin_source):
-                continue
-            number = reviewed_unit(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip(), epic_regex, train) \
-                if epic_regex else None
-            if number is not None:
-                reviewed.append(number)
-                added = git_text(repo, "diff", "--name-only", "--no-renames", "--diff-filter=A", parents[0], c)
-                introduced.update(added.splitlines())
-                continue
-        plan.append((c, parents[0]))
+    origin_source, origin_train = "origin/" + source, "origin/" + train
+    if not is_ancestor(repo, source_before, origin_source):
+        fail("--source-before %s is not an ancestor of %s: the range is wrong" % (source_before, origin_source))
+    if not is_ancestor(repo, source_before, head):
+        fail("--source-before %s is not an ancestor of --head %s: the range is wrong" % (source_before, head))
 
+    introduced, reviewed = set(), []
     refused, renumbers = set(), []
-    for c, first in plan:
-        status = {}
-        for line in git_text(repo, "diff", "--name-status", "--no-renames", first, c).splitlines():
-            code, _, path = line.partition("\t")
-            status[path] = code[:1]
+
+    def check_commit(c, first):
+        status = name_status(repo, first, c)
         hits = sorted(p for p in status if matches(p, exclusions))
         if not hits:
-            continue
+            return
         if sql_globs is None:
             refused.update(hits)
-            continue
+            return
         deleted = [p for p in hits if status[p] == "D" and matches(p, sql_globs)]
         added = [p for p in hits if status[p] == "A" and matches(p, sql_globs)]
         meta = [p for p in hits if matches(p, meta_globs) and not matches(p, sql_globs)]
@@ -176,7 +182,32 @@ def analyse(repo, config, source_before, head, train):
                     break
         accounted = {p for pair in pairs for p in pair} | (set(meta) if pairs else set())
         refused.update(p for p in hits if p not in accounted)
-        renumbers += [{"from": old, "to": new} for old, new in pairs]
+        renumbers.extend({"from": old, "to": new} for old, new in pairs)
+
+    def walk(commits):
+        for c in commits:
+            parents = git_text(repo, "rev-list", "--parents", "-n", "1", c).split()[1:]
+            if not parents:
+                continue
+            if len(parents) > 1:
+                # what the merge ITSELF changed (a conflict resolution) is never exempt
+                refused.update(p for p in merge_only_changes(repo, c) if matches(p, exclusions))
+                if is_ancestor(repo, parents[1], origin_source):
+                    continue
+                number = reviewed_unit(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip(), epic_regex, train) \
+                    if epic_regex else None
+                if number is not None:
+                    reviewed.append(number)
+                    added = git(repo, "diff", "--name-only", "--no-renames", "-z", "--diff-filter=A", parents[0], c)
+                    introduced.update(zlist(added.stdout.decode("utf-8", "surrogateescape")))
+                    continue
+                if is_ancestor(repo, parents[1], origin_train):
+                    # a late absorption of train commits: judge what it brought, commit by commit
+                    walk(git_text(repo, "rev-list", "--first-parent", "--reverse", parents[1], "^" + parents[0]).split())
+                    continue
+            check_commit(c, parents[0])
+
+    walk(git_text(repo, "rev-list", "--first-parent", "--reverse", "%s..%s" % (source_before, head)).split())
     return {"refused": sorted(refused), "allowedRenumbers": renumbers, "reviewedUnits": reviewed}
 
 

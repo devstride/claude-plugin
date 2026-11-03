@@ -35,7 +35,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   **If the file disagrees, the file wins**; absent → the inline defaults, said so.
 - **Hooks run through step skills** (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md`):
   call each by name, read its first-line verdict, decide what follows; never inline its logic.
-- **Steps 0–3 run autonomously**, surfacing only genuine forks (an unverifiable finding, an unresolvable conflict, an infra/secret gate the owner must provision).
+- **Steps 0–3 run autonomously**, surfacing only genuine forks (an ambiguous/risky/unverifiable finding, an unresolvable conflict, an infra/secret gate the owner must provision).
 - **The production merge is a human gate.** NEVER merge the release PR into `master` without an
   explicit, in-the-moment owner go-ahead — it deploys production. Invoking `/devstride:release` is
   intent to PREPARE, never standing consent to deploy.
@@ -90,7 +90,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 - **0b. Merge the release train** when `release.mergeTrainBeforeCut` is `true` and no release BRANCH
   was adopted (else nothing merges first): a snapshot of the train in
   its own draft PR into `releaseSource`, fully reviewed, CI once, merged, and every one-off it
-  carried closed — `release-branch.md` §1 (nothing ahead → a reported no-op).
+  carried closed — `release-branch.md` §1 (nothing ahead → a reported no-op; late landings: §1 4a).
 - `git fetch origin master develop`; `origin/develop` not ahead of `origin/master` → STOP, nothing to
   release.
 - **No freeze.** Open PRs into `releaseSource` are never settled, parked or waited for; a leftover
@@ -233,9 +233,8 @@ the deploy.
   `release-branch.md` §4, then back to step 2. With clearance, append the provider's `status`
   to the recap: a `Hotfix landed` line goes to §4 first; a `Waiting` line names who is next; and
   on the yes this pull request must be the one `On final`, else STOP.
-- **Development deploy wait** (`release.devDeployVerification` set AND the delta touches a
-  `release.releaseBranchFixExclusions` path): the recap names it; after the yes, before `gh pr
-  merge`, run it per `docs-hooks.md` (0 go, 2 poll, 1 STOP).
+- **Dev deploy wait** (`release.devDeployVerification` set, delta touching a fix-exclusion path):
+  named in the recap; after the yes, before `gh pr merge`, run per `docs-hooks.md`.
 - **On the yes**, confirm: the head equals `<reviewedHead>` (the only tolerated advance is `review`
   7.3's same-tree empty re-trigger commit; anything else → back to step 2); CI is green at that
   head; in a draft-hold repo the PR is non-draft (still draft means CI never ran — do NOT merge; a
