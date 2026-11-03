@@ -227,7 +227,7 @@
       ],
       "unset": "no claims: build-item selects and builds exactly as before and claims nothing",
       "contract": "skills/build-item/references/story-claims.md",
-      "since": "unreleased",
+      "since": "3.21.0",
       "sharedKeys": [
         "expiryMinutes"
       ]
@@ -1401,7 +1401,7 @@
       "key": "release.clearance.credentialsFile",
       "type": "string",
       "description": "a KEY=VALUE file holding the DevStride API credentials for the devstride provider; must not be readable by group or others",
-      "since": "unreleased"
+      "since": "3.21.0"
     },
     {
       "key": "release.clearance.commands",
@@ -1459,7 +1459,7 @@
       ],
       "required": true,
       "description": "the built-in provider: the agent's own DevStride MCP connection",
-      "since": "unreleased"
+      "since": "3.21.0"
     },
     {
       "key": "claims.expiryMinutes",
@@ -1470,47 +1470,47 @@
         "warnMaximum": 1440
       },
       "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here",
-      "since": "unreleased"
+      "since": "3.21.0"
     },
     {
       "key": "claims.commands",
       "type": "object",
       "required": true,
       "description": "a claims store the repository supplies",
-      "since": "unreleased"
+      "since": "3.21.0"
     },
     {
       "key": "claims.commands.claim",
       "type": "string",
       "required": true,
       "description": "the claim command",
-      "since": "unreleased"
+      "since": "3.21.0"
     },
     {
       "key": "claims.commands.heartbeat",
       "type": "string",
       "required": true,
       "description": "the heartbeat command",
-      "since": "unreleased"
+      "since": "3.21.0"
     },
     {
       "key": "claims.commands.release",
       "type": "string",
       "required": true,
       "description": "the release command",
-      "since": "unreleased"
+      "since": "3.21.0"
     },
     {
       "key": "claims.commands.get",
       "type": "string",
       "description": "the optional get command",
-      "since": "unreleased"
+      "since": "3.21.0"
     },
     {
       "key": "claims.commands.list",
       "type": "string",
       "description": "the optional list command",
-      "since": "unreleased"
+      "since": "3.21.0"
     },
     {
       "key": "release.docsRepo",
