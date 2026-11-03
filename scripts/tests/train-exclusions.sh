@@ -221,4 +221,13 @@ git merge -q --no-ff --no-commit develop >/dev/null 2>&1; M21=$?; [ "$M21" = 1 ]
 git add infra/gone.tf; git commit -qm "merge the source"   # keep the train's edit: the result matches git's own merge
 [ -z "$(git diff --name-only "$(git merge-tree --write-tree HEAD^1 HEAD^2 | head -1)" HEAD)" ] || bad "(21) setup: the resolution differs from git's merge"; run t21
 expect "(21) a modify/delete conflict on an excluded file, resolved to match git's own merge, is still refused" 1 "d['refused']==['infra/gone.tf'] and d['reviewedUnits']==[9]"
+# (22) a directory-rename split names only a directory, beside an ordinary conflict: the check stops
+repo t22; mkdir -p infra/z; echo b > infra/z/b; echo c > infra/z/c; git add -A; git commit -qm "z"; git checkout -q develop; git merge -q --ff-only train
+git update-ref refs/remotes/origin/develop develop; SB="$(git rev-parse HEAD)"; git checkout -q -b split train
+mkdir -p infra/y infra/w; git mv infra/z/b infra/y/b; git mv infra/z/c infra/w/c; echo split > src/a.txt; git commit -qam "split z"
+git checkout -q train; git merge -q --no-ff -m "Merge pull request #10 from acme/jane/26-10-01/epic-split" split; stub 10 train MERGED "$(git rev-parse HEAD)"
+git checkout -q develop; echo d > infra/z/d; echo dev > src/a.txt; git add -A; git commit -qm "source adds z/d"; git update-ref refs/remotes/origin/develop develop
+git checkout -q train; git merge -q --no-ff --no-commit develop >/dev/null 2>&1; M22=$?; [ "$M22" = 1 ] || bad "(22) setup: the merge did not stop ($M22)"
+git checkout -q --ours src/a.txt; git add -A; git commit -qm "merge the source"; run t22
+[ "$RC" = 2 ] && ok "(22) a directory-rename split beside an ordinary conflict stops the check (exit 2)" || bad "(22) exit $RC: $OUT"
 exit $FAIL

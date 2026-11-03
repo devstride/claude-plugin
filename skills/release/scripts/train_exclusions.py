@@ -141,7 +141,7 @@ def merge_only_changes(repo, c, parents):
     if len(parents) != 2:
         out = git(repo, "diff-tree", "-z", "--cc", "--name-only", "--no-commit-id", "-r", c).stdout
         return zlist(out.decode("utf-8", "surrogateescape"))
-    p = git(repo, "merge-tree", "--write-tree", "--no-messages", "-z", parents[0], parents[1], check=False)
+    p = git(repo, "merge-tree", "--write-tree", "-z", parents[0], parents[1], check=False)
     tokens = p.stdout.decode("utf-8", "surrogateescape").split("\0")
     tree = tokens[0].strip() if tokens else ""
     if p.returncode not in (0, 1) or not re.fullmatch(r"[0-9a-f]{40,64}", tree):
@@ -149,13 +149,26 @@ def merge_only_changes(repo, c, parents):
              % (c, p.stderr.decode("utf-8", "replace").strip()))
     conflicted = set()
     if p.returncode == 1:
-        for entry in tokens[1:]:
-            if not entry:
-                break
-            conflicted.add(entry.split("\t", 1)[1] if "\t" in entry else entry)
-        if not conflicted:
-            # git may report a conflict it names no file for (a directory-rename split)
-            fail("git merge-tree reported a conflict in %s without naming a file; check that merge by hand" % c)
+        i = 1
+        while i < len(tokens) and tokens[i]:
+            conflicted.add(tokens[i].split("\t", 1)[1] if "\t" in tokens[i] else tokens[i])
+            i += 1
+        # every conflict git reports must name a file it lists as conflicted: a directory-rename
+        # split names only a directory, and can sit beside an ordinary conflict
+        unlisted = set()
+        try:
+            i += 1
+            while i < len(tokens) and tokens[i]:
+                n = int(tokens[i])
+                paths, kind = tokens[i + 1:i + 1 + n], tokens[i + 1 + n]
+                i += n + 3
+                if kind != "Auto-merging":
+                    unlisted.update(x for x in paths if x not in conflicted)
+        except (ValueError, IndexError):
+            fail("could not read git merge-tree's conflict messages for %s" % c)
+        if not conflicted or unlisted:
+            fail("git merge-tree reported a conflict in %s on %s that names no conflicted file; "
+                 "check that merge by hand" % (c, ", ".join(sorted(unlisted)) or "no path"))
     out = git(repo, "diff", "--name-only", "--no-renames", "-z", tree, c).stdout
     return sorted(set(zlist(out.decode("utf-8", "surrogateescape"))) | conflicted)
 
