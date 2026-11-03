@@ -112,10 +112,10 @@ target` (pass `oneOff`, and `roles` when resolved); follow its answer.
 
 Stories merge into it (`references/epic-release.md`), skipping `verify.skipDuringStoryBuilds`
 suites; the last leaf's merge triggers step 8. **The working base and the effective
-`perStoryPullRequest` pick the path** — integration branch → fast develop mode (4a), the train → 4a
-only when `releaseTrain.fastMerges` is true, `baseBranch` → the full PR ritual (4b); announce it.
+`perStoryPullRequest` pick the path** — integration branch → fast mode (4a), train → 4a
+only if `releaseTrain.fastMerges` is true, `baseBranch` → the full PR ritual (4b); announce.
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-train.md` when
-`releaseTrain.branch` is set.**
+`releaseTrain.branch` is set** (legacy too).
 
 ## One-off / no-plan single-shot mode
 

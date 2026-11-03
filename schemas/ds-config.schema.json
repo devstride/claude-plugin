@@ -888,7 +888,7 @@
             "string",
             "null"
           ],
-          "description": "command hook — RELEASE_COMMIT in the environment (the train pull request's merge commit)"
+          "description": "command hook — RELEASE_COMMIT in the environment (the commit the release was cut from)"
         },
         "clearance": {
           "description": "provider-or-commands hook — each verb's own arguments appended (--wait, --short, <phase> --branch <b> --pr <n>, --force, --yes)",

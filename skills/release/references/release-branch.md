@@ -10,7 +10,10 @@ release train's one-offs merged into the source first so they ship with it.
 A reviewed release unit (an epic's pull request merged onto the train through its own review) may
 carry migrations and infrastructure on the train; the exclusion check below covers only work no
 pull request reviewed, and `release.devDeployVerification` makes the release wait for the
-development deploy (SKILL step 4).
+development deploy (SKILL step 4), given `RELEASE_COMMIT=<sourceHead>` (the commit the release was cut from).
+
+`releaseTrain` below means `releaseTrain`, or `supportTrain` when only that is present; both present
+is a config error — STOP and name it.
 
 Every key here is optional. `release.releaseBranchPattern` absent → no release branch: the release
 pull request's head is `release.releaseSource`, as before, and sections 2–4 and 5.1–5.2 do not run.

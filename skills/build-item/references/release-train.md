@@ -7,6 +7,9 @@ load: contract
 every release, instead of each merging straight into `baseBranch` and paying its own CI and
 deploy.
 
+`releaseTrain` below means `releaseTrain`, or `supportTrain` when only that is present; both present
+is a config error — STOP and name it.
+
 `releaseTrain.branch` absent → none of this runs: a one-off's working base is `baseBranch` and it
 takes the full per-story PR ritual, as before. `releaseTrain.fastMerges` absent or `false` → a
 one-off on the train still takes the full per-story PR ritual (4b), with the train as the pull

@@ -264,7 +264,7 @@ a trailing `[-n]`): `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patt
   under a new name with byte-identical content (plus files under `metaGlobs`) is allowed, and the
   release pull request reports it. Absent, a renumber is refused like any migration change.
 - **`release.devDeployVerification`** — optional command shaped like `release.deployVerification`,
-  run with `RELEASE_COMMIT=<the train pull request's merge commit>`: exit 0 deployed to the
+  run with `RELEASE_COMMIT=<sourceHead>` (the commit the release was cut from, which holds everything it ships): exit 0 deployed to the
   development environment, 2 not deployed yet, 1 the development deploy failed. When it is set AND
   the release delta touches a `release.releaseBranchFixExclusions` path, `release` runs it at step 4
   after the owner's yes and before the production merge, polling every 60 s for at most 45 minutes

@@ -6,7 +6,7 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 [ "${1:-}" = "--root" ] && { ROOT="$2"; shift 2; }
-ALLOW="skills/setup/references/config-defaults.md skills/doctor/SKILL.md skills/setup/references/seam-registry.md"
+ALLOW="skills/release/references/release-branch.md skills/build-item/references/release-train.md skills/setup/references/config-defaults.md skills/doctor/SKILL.md skills/setup/references/seam-registry.md"
 BAD=0
 while IFS= read -r f; do
   rel="${f#"$ROOT"/}"
