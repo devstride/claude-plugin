@@ -54,6 +54,9 @@ phase 1, and announce it with its source:
 Then apply `profileOverrides` to those knobs within the contract's floors; report and ignore an
 unknown knob.
 
+**Story claim.** With `claims` set, heartbeat the story at the start of each phase below, phase
+name as `phase` (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`).
+
 ## 1. UNDERSTAND
 
 An evidence-backed picture of "done" before any code. **Provision readers proportional to the

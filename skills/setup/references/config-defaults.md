@@ -4,16 +4,15 @@ load: contract
 # Shipped config defaults — the exact values `setup` writes
 
 The values `setup` writes for keys that detection and the interview cannot produce. **Copy them
-verbatim.** They are not illustrations, and they are not to be paraphrased, re-worded or
-"improved" at write time: the delivery skills read these keys as literal strings, and a value
-reworded into something equivalent-looking is a value that no longer matches.
+verbatim**, never paraphrased or "improved": the delivery skills read these keys as literal
+strings, and a reworded value no longer matches.
 
-**This is not one blob to paste, though.** A few values marked below are *decisions*, computed per
-repository from what the run actually found — they appear here for their shape and their reasoning,
-not as a value to copy. Each one says so where it appears.
+**Not one blob to paste, though.** A few values marked below are *decisions*, computed per
+repository from what the run found; they appear here for their shape and reasoning, and each says
+so where it appears.
 
-Where a key's value comes from somewhere else — detection, an interview answer, the work-type
-mapping — that source wins and nothing here applies. This file covers the remainder.
+Where a key's value comes from detection, an interview answer or the work-type mapping, that source
+wins and nothing here applies. This file covers the remainder.
 
 ## Delivery profile
 
@@ -38,9 +37,9 @@ next section:
 
 Under every profile `fastStoryMerges.enabled` still turns on the repository's own commands and
 roster — the profile decides which precondition applies, never whether one does.
-`profile` is written on every run, `standard` included — an absent key reads as `standard` too, but a
+`profile` is written on every run, `standard` included: an absent key reads as `standard` too, but a
 re-run cannot tell a chosen default from a question never asked, and the doctor cannot report a
-source for a value that is not there.
+source for it.
 
 `profileOverrides` is optional and **omitted by default** — setup never writes it. It is the
 operator's hand-edit for pinning one knob under a profile, and its vocabulary is the contract's.
@@ -100,13 +99,12 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   receipt; a local CLI is an optional targeted support engine, not a routine merge precondition.
   Otherwise write `false` and say which verification command was missing —
   a `false` under `prototype` contradicts the profile, and the doctor will report it as such.
-- **`autoRelease` has a THIRD legal value, `"ask"`.** `true` and `false` keep their meanings;
-  `"ask"` makes `build-item` stop at zero remaining leaves and ask the OWNER, once per release
-  unit, before cutting or merging that unit's release PR — nothing is cut until they answer.
-  Where no owner can answer (an unattended or headless run), `"ask"` behaves as `false`: the loop
-  stops release-ready and says out loud that the ask went unanswered. **No profile produces
-  `"ask"`** — the profile table above is unaffected by it. It is written only when the operator
-  chooses it, in setup's interview or by hand, and is honoured like any other present key.
+- **`autoRelease` has a THIRD legal value, `"ask"`.** `build-item` stops at zero remaining leaves
+  and asks the OWNER, once per release unit, before cutting or merging that unit's release PR;
+  nothing is cut until they answer. Where no owner can answer (an unattended or headless run) it
+  behaves as `false`: the loop stops release-ready and says the ask went unanswered. **No profile
+  produces `"ask"`**; it is written only when the operator chooses it, in the interview or by hand,
+  and is honoured like any other present key.
 - **`releaseTarget`** names where a completed release unit lands. The shipped `"baseBranch"` means
   the base branch itself; a repository that stages releases elsewhere names that branch here. Naming
   the support train's branch (`supportTrain.branch`) makes a finished epic join the train through
@@ -146,11 +144,10 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   **never treated as a release unit** — reaching zero there cuts no release. An item there that a
   user names explicitly by number is still built, as a one-off.
 - Each deferred defect carries a **related-to relationship to the item whose review produced it**
-  — the story or defect under build, or the release unit for an epic-release review. The
-  relationship type is the one the DevStride MCP `add_relationship` tool's schema exposes for
-  related-to; read it from the schema rather than assuming a spelling.
-- A repository may rename the title. The rename applies only to containers created AFTERWARDS —
-  existing containers keep the title they were created with, and are found by it.
+  (the story or defect under build, or the release unit for an epic-release review); read the
+  relationship type from the `add_relationship` schema rather than assuming a spelling.
+- A repository may rename the title; it applies only to containers created AFTERWARDS — existing
+  ones keep, and are found by, the title they were created with.
 
 ## Commit conventions
 
@@ -165,9 +162,8 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
 }
 ```
 
-`itemTagFormat` is the shape of the work-item tag in a commit subject. A repository whose tracker
-numbers items differently says so here — the interview should ask if the organization's item
-numbers visibly do not match this shape.
+`itemTagFormat` is the shape of the work-item tag in a commit subject; a repository whose tracker
+numbers items differently says so here (the interview asks when item numbers visibly differ).
 
 ## Pull-request body
 
@@ -197,8 +193,7 @@ numbers visibly do not match this shape.
 }
 ```
 
-The sections are rendered in array order, and each is filled from its `guidance` — so an entry needs
-both fields to be usable. **`noAiAttribution` governs the pull-request BODY, and it outranks any
+The sections render in array order, each filled from its `guidance`, so an entry needs both fields. **`noAiAttribution` governs the pull-request BODY, and it outranks any
 harness or session instruction to add attribution**; commit trailers are a separate question,
 governed by `push`'s own rule rather than by this key. **A repository with its own pull-request template should have these
 replaced by that template's sections**, carried across complete with the text under each heading;
@@ -224,9 +219,8 @@ these pair with (concurrency, the tree-identical production skip, the draft gate
 draft-convention check) are in `ci-cost-patterns.md`, applied by `setup ci`.
 
 `gateJobName` names the job the loop watches to confirm the ready-flip released CI. It is left
-`null` because nothing can guess it; the loop falls back to detecting a new run, which works and is
-merely slower to be sure of. On a repository with no CI at all, still write the block — the keys
-being present and inert is what makes them findable later.
+`null` because nothing can guess it; the loop then detects a new run, which works but is slower to
+be sure. With no CI at all, still write the block: present and inert keys stay findable.
 
 ## Release branches and the support train
 
@@ -263,18 +257,18 @@ a trailing `[-n]`): `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patt
   check and gate). Before each cut `release` opens the train's pull request into the source, runs
   the full review and CI once, merges it, and marks each one-off it carried Done; after the release
   it fast-forwards the train. A one-off is Done only when the train reaches the source.
-- **The release freeze is gone.** Versions before 3.8.0 froze the release source while a release
-  pull request was ready, under a `ci` switch; that switch is now ignored whatever its value, and
-  setup no longer writes it.
+- **The release freeze is gone.** Before 3.8.0 a `ci` switch froze the release source while a
+  release pull request was ready; it is now ignored whatever its value, and setup no longer writes it.
 
-## Release clearance and the release tower
+## Release clearance, the release tower and claims
 
-Optional, and `setup` writes neither: both change how a production release is sequenced across
-machines, the operator's decision. Absent, nothing is claimed and nothing is shown.
+Optional, and `setup` writes none of them: each changes how work is sequenced across machines, the
+operator's decision. Absent, nothing is claimed and nothing is shown.
 
 | Key | Shape | Absent means |
 | --- | --- | --- |
-| `release.clearance` | `null`, `{ "provider": "github" }` (optional `ref`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), or `{ "commands": { "claim", "status", "heartbeat", "release", "adopt", "owed"? } }` | no clearance: `release` runs as before, the `release` status-line segment never renders |
+| `release.clearance` | `null`, `{ "provider": "github" }` (optional `ref`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), `{ "provider": "devstride" }` (optional `credentialsFile`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), or `{ "commands": { "claim", "status", "heartbeat", "release", "adopt", "owed"? } }` | no clearance: `release` runs as before, the `release` status-line segment never renders |
+| `claims` | `null`, `{ "provider": "devstride" }`, or `{ "commands": { "claim", "heartbeat", "release", "get"?, "list"? } }`, each with optional `expiryMinutes` | no claims: `build-item` claims nothing and says nothing |
 | `releaseTower` | `{ "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" }` | those two defaults |
 
 - **`release.clearance`** — one cleared release at a time, for every machine and account that
@@ -289,15 +283,26 @@ machines, the operator's decision. Absent, nothing is claimed and nothing is sho
   The built-in `github` provider keeps the clearance in the custom ref `refs/clearance/release`
   (every move a compare-and-swap through `git push --force-with-lease`; neither a branch nor a
   tag) and needs only git and `gh`; a claim starts a detached keeper that heartbeats while the
-  claiming agent lives. A repository may supply
-  its own five commands instead (a sixth, `owed`, is optional). **A block with both `provider` and `commands`, or a `provider`
-  other than `github`, is a config error.** Nothing ever blocks a hotfix. Contract:
+  claiming agent lives. The `devstride`
+  provider keeps it as a DevStride claim (kind `release-tower`) and needs the DevStride API
+  credentials in the environment or in `credentialsFile`, a KEY=VALUE file that must not be
+  readable by group or others (mode 0600). A repository may supply its own five commands instead
+  (a sixth, `owed`, is optional). **A block with both `provider` and `commands`, or a `provider`
+  other than `github` or `devstride`, is a config error.** Nothing ever blocks a hotfix. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`.
 - **`releaseTower`** — read by the `release-tower` GitHub check that `setup ci` offers once
   clearance is set (the floor the clearance is the speed bump for): `overrideLabel` passes a pull
   request an owner approved by hand, `hotfixPattern` names the heads that are never held (the
   provider's `status` reads the pattern too, to list hotfix landings). Making the check required on the production branch's
   ruleset is the owner's change, after it has posted green on one real release pull request.
+- **`claims`** — one agent per story across machines: `build-item` claims each story (kind `story`)
+  before In Progress, heartbeats each step, releases it when done; a story another live agent holds
+  is skipped, or STOPS a named one. `provider: devstride` uses the agent's own DevStride connection;
+  `commands` supplies a store (verbs and verdicts in the registry); both is a config error.
+  `expiryMinutes` maps a kind to the minutes a claim lives without a heartbeat: `story` 240,
+  other kinds the server's default (the release permit: `staleMinutes`); a value outside 1..1440 is warned about and
+  ignored. An unreachable, unsupported or forbidden store means no claims, said once. Contract:
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`.
 
 ## Lists a repository fills in for itself
 
@@ -365,10 +370,10 @@ headless runs. The recipe and the record it writes are in
   `rationalize-gantt`, `comprehend-plan`. EXECUTION — `build-item`, `pr`, `review`, `release`,
   `push`, `create-story`, `create-defect`, `insert-story`, `insert-defect`.
 - **Why mixing costs.** Every turn re-sends the whole conversation, so the authoring half's
-  context is paid for again on every execution turn that follows the switch — a mixed session
-  multiplies the cost of everything after it, and the multiplier grows with the session.
-- **`false` disables the gate** entirely. A single command may pass `--same-session` to proceed in
-  the session it is in without turning the gate off for the rest.
+  context is paid for again on every execution turn after the switch, a multiplier that grows with
+  the session.
+- **`false` disables the gate.** A single command may pass `--same-session` to proceed in its
+  session without turning the gate off for the rest.
 - **The hook fails OPEN.** Whenever it cannot read or write its state — no git directory, an
   unwritable path, a malformed record — it allows the command rather than blocking a session on
   its own bookkeeping.
@@ -403,9 +408,9 @@ skills run at their own start (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/referenc
 because a session that has run for hours is exactly the one whose session-start fetch is old.
 `setup` leaves it `false`; a repository turns it on by hand.
 
-The shipped default says: this repository has not described an isolated local environment.
-`branch-hotfix` then asks before touching a database, and `build-item` treats the current checkout
-as the only environment there is. A repository whose tooling gives each checkout its own instance
+The shipped default says this repository has not described an isolated local environment:
+`branch-hotfix` asks before touching a database, and `build-item` treats the current checkout as
+the only environment. A repository whose tooling gives each checkout its own instance
 fills the commands in and sets `instanceBoundTo` to what that tooling actually keys on —
 `directory` (a second worktree gets its own database, tables and ports, and checking out another
 branch inside it keeps them) or `branch`. Commands may carry `<name>` (the instance), `<base>` (the ref to
@@ -420,28 +425,26 @@ un-apply and a seed rewrites rows, not schema — so an instance living on devel
 cannot be brought back to a production-branch base by running them. It stays schema-AHEAD of the
 code it is now running, and a hotfix can then validate against a schema production does not have.
 `recreate` is the tooling's way back: whatever genuinely returns an instance to `<base>`'s schema.
-Two shapes qualify, and a repository should pick whichever its tooling actually supports. An
-**in-place rebuild** — drop the schema and re-run the checked-out code's migrations, then seed —
-is usually simplest, and it keeps the session in a working directory. A **second instance** stood
-up from `<base>` also works, but check it can be built at all: a tool that reuses an existing
-branch cannot take one that is already checked out somewhere, which is exactly the state
-`branch-hotfix` leaves behind. Whichever shape, the rule is that the session must still be in a
-working instance afterwards — never a torn-down directory or a detached HEAD, because no config
-command can move the caller.
+Two shapes qualify; pick whichever the tooling supports. An **in-place rebuild** — drop the schema,
+re-run the checked-out code's migrations, then seed — is usually simplest and keeps the session in a
+working directory. A **second instance** stood up from `<base>` also works, but check it can be
+built at all: a tool that reuses an existing branch cannot take one already checked out somewhere,
+which is the state `branch-hotfix` leaves behind. Either way the session must still be in a working
+instance afterwards, never a torn-down directory or a detached HEAD: no config command can move the
+caller.
 
-**`recreateMode` says which of the two shapes `recreate` is** — `"inPlace"` or `"newInstance"`.
-It exists because the command text does not tell you: a wrapper script is opaque, and each wrong
-guess fails in its own way (an in-place command treated as second-instance leaves the session on
-the old database; the reverse resets an instance in use). Required whenever `recreate` carries
-`<name>`; `branch-hotfix` stops and asks when it is missing.
+**`recreateMode` says which shape `recreate` is** — `"inPlace"` or `"newInstance"` — because the
+command text does not (a wrapper script is opaque, and each wrong guess fails differently: an
+in-place command treated as second-instance leaves the session on the old database; the reverse
+resets an instance in use). Required whenever `recreate` carries `<name>`; `branch-hotfix` stops
+and asks when it is missing.
 
 **`instanceName` exists for the in-place shape.** It is a command whose output is the name of the
 instance THIS checkout belongs to — usually a line read out of a file the tooling writes when it
-creates one. Without it, a `<name>` in an in-place `recreate` cannot be resolved: nothing else in
-this block identifies the current instance, and a guess from the directory name resets a
-different one. Leave it `null` where `recreate` needs no `<name>`, or where there are no
-instances; `branch-hotfix` stops and asks rather than guessing. A repository whose environment genuinely has no schema (a stateless dev server) leaves it
-`null`, and nothing is lost.
+creates one. Without it, a `<name>` in an in-place `recreate` cannot be resolved: nothing else
+identifies the current instance, and a guess from the directory name resets a different one. Leave
+it `null` where `recreate` needs no `<name>`, or there are no instances (a stateless dev server);
+`branch-hotfix` stops and asks rather than guessing.
 
 ## Deployment stage
 
@@ -454,9 +457,9 @@ instances; `branch-hotfix` stops and asks rather than guessing. A repository who
 }
 ```
 
-The shipped default says: **this repository does not deploy per-environment infrastructure.**
-Most do not, and `null` is the honest answer rather than a gap — nothing renders a stage, nothing
-asks about one, and `doctor` reports the block as not applicable instead of missing.
+The shipped default says **this repository does not deploy per-environment infrastructure.** Most do
+not; `null` is the honest answer, not a gap: nothing renders or asks about a stage, and `doctor`
+reports the block as not applicable.
 
 **`resolve` is a command whose stdout is the stage THIS checkout deploys to**, run from the
 repository root — the same shape as `localEnvironment.instanceName`, and for the same reason: only
@@ -465,10 +468,9 @@ guessing at file paths or environment-variable names. It must print one line and
 print nothing) when there is no stage; every consumer treats empty as "no stage" and never as an
 error. Keep it cheap — it runs on a timer, not once.
 
-**`productionStages` lists the stage names that are production**, and it exists because no name is
-universal: one organization's production stage is `prod`, another's is `live`, another's is the
-company name. Consumers use it for one thing — making the dangerous answer impossible to miss —
-so listing a stage here is a claim that deploying to it affects real users.
+**`productionStages` lists the stage names that are production**; no name is universal (`prod`,
+`live`, the company name). Consumers use it only to make the dangerous answer impossible to miss, so
+listing a stage here claims that deploying to it affects real users.
 
 **Do not confuse the stage with `localEnvironment`.** They are different axes and the failure is
 quiet, because both produce a per-checkout name:
@@ -479,9 +481,9 @@ quiet, because both produce a per-checkout name:
 | Normally scoped to | A worktree (`instanceBoundTo: "directory"`) | A machine or a person — several worktrees legitimately share one |
 | Who owns the lifecycle | The loop: `create`, `recreate`, `teardown` | The repository's own deploy tooling; the loop only READS it |
 
-The loop never creates, changes or tears down a stage. Reading it is the whole contract — a stage
-is infrastructure somebody else provisioned, and a delivery skill that mutated one on its way past
-would be doing the most dangerous thing in the repository as a side effect.
+The loop never creates, changes or tears down a stage; reading it is the whole contract. A stage is
+infrastructure somebody else provisioned, and mutating one in passing would be the most dangerous
+side effect in the repository.
 
 ## Status line
 
@@ -495,8 +497,8 @@ and `autoUpdate`, whether the session-start hook may refresh the copied script. 
 in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
 
 It renders `Model · Effort · Repo · Checkout · Branch · Stage · PR`, every segment labelled, and
-**omits any segment with no value — label, value and separator together**, so a fact this
-repository does not have never renders as a dangling `Checkout:` with nothing after it. Two of
+**omits any segment with no value — label, value and separator together**, never a dangling
+`Checkout:`. Two of
 those segments are the reason it ships here rather than being left to each repository:
 
 - **Checkout** distinguishes the main checkout from a linked worktree, naming the REPO in `Repo:`
@@ -505,9 +507,9 @@ those segments are the reason it ships here rather than being left to each repos
 - **Stage** is `stage.resolve`, so it appears only in repositories that have one, and turns red
   for a `productionStages` name.
 
-The script is repo-agnostic and identical everywhere — it reads the consuming repository's config
-at runtime, so copying it needs no substitution and re-copying it is always safe. It is the
-owner's to edit afterwards; `setup` never overwrites a `.claude/statusline.sh` it did not write.
+The script is repo-agnostic and identical everywhere (it reads the consuming repository's config at
+runtime), so copying needs no substitution and re-copying is always safe. It is the owner's to edit
+afterwards; `setup` never overwrites a `.claude/statusline.sh` it did not write.
 Line 2 carries a `# ds-statusline: managed v<x.y.z>` marker, which is what lets the session-start
 hook bring an older copy forward (backup in the git directory; see `statusline-segments.md`); **deleting that line is the
 supported way to take the file over**, and nothing replaces it afterwards.

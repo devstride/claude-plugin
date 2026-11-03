@@ -89,7 +89,8 @@
     "postDeployCheckSkill": "health-check",
     "classifySkill": "release-classify",
     "preMergeSkill": "release-pre-merge",
-    "clearance": { "provider": "github", "ref": "refs/clearance/release", "staleMinutes": 20, "waitMinutes": 180, "phaseBudgetMinutes": { "pre-ship": 120, "deploy": 60 } }
+    "clearance": { "provider": "github", "ref": "refs/clearance/release", "staleMinutes": 20, "waitMinutes": 180, "phaseBudgetMinutes": { "pre-ship": 120, "deploy": 60 },
+                   "credentialsFile": ".devstride/agent.env" }
   },
   "supportTrain": { "branch": "train/support", "fastMerges": true },
   "releaseTower": { "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" },
@@ -110,5 +111,6 @@
   },
   "pool": { "checkout": "pool checkout <member> --purpose <purpose>", "checkin": "pool checkin <member>" },
   "stage": { "resolve": "cat .stage", "productionStages": ["prod"] },
-  "statusLine": { "hiddenSegments": ["stage"], "autoUpdate": true }
+  "statusLine": { "hiddenSegments": ["stage"], "autoUpdate": true },
+  "claims": { "provider": "devstride", "expiryMinutes": { "story": 240, "release-tower": 20 } }
 }

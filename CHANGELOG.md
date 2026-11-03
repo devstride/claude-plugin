@@ -8,6 +8,72 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.21.0] — 2026-11-03
+
+### Added
+
+- **Claims: build-item claims a story before starting it and skips one another agent holds; new
+  optional `claims` config block; `release.clearance.provider` accepts `devstride`.** With
+  `claims` set (`{ "provider": "devstride" }`, or your own `commands` for `claim`, `heartbeat` and
+  `release`, plus optional `expiryMinutes` per kind), `build-item` claims each story before moving
+  it to In Progress, so two agents on two machines never build the same one. A story another live
+  agent holds is skipped for the next candidate; one you named, or the resumed one, stops and says
+  who holds it, on which machine and since when; an expired claim is taken over. Each step and
+  build phase renews the claim, and completion releases it with outcome `done`. A stop leaves the
+  claim to expire (240 minutes for a story by default), so a person can resume it in that window.
+  When claims are unavailable — the server has no claim tools, the key lacks
+  `MANAGE_AGENT_CLAIMS`, or it cannot be reached — the loop carries on without them and says so
+  once. Hotfixes never claim. Without a `claims` block nothing changes. Contract:
+  `skills/build-item/references/story-claims.md`.
+- **A DevStride release permit.** `release.clearance.provider: "devstride"` keeps the one cleared
+  release as a DevStride claim instead of a git ref, with the same six verbs, verdict lines, exit
+  codes and `status --json` shape as `github`; pull-request facts still come from `gh`. Credentials
+  come from the environment or from `release.clearance.credentialsFile`, which must be your own
+  regular file with no group or other access. The key, the secret and the session's holder are
+  never printed. Both providers now share one core, and a new `identity` verb prints the holder
+  so every skill uses one rule.
+- **`/devstride:doctor`** reports the `claims` block, checks that the DevStride MCP server lists
+  `claim_work` when the provider is `devstride`, and accepts the `devstride` release permit
+  (running its `status` once, checking credentials without printing them).
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.20.0 @ 81a7156, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.20.0 | tokens@devstride--v3.20.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,094 | 10,698 | 32,094 | 10,698 | +0 | 10,700 |
+| skills/build-item/SKILL.md | 23,891 | 7,964 | 23,999 | 8,000 | +36 | 8,000 |
+| skills/review/SKILL.md | 23,994 | 7,998 | 23,994 | 7,998 | +0 | 8,000 |
+| skills/release/SKILL.md | 23,961 | 7,987 | 23,961 | 7,987 | +0 | 8,000 |
+| skills/plan/SKILL.md | 23,891 | 7,964 | 23,891 | 7,964 | +0 | 8,000 |
+| skills/doctor/SKILL.md | 23,561 | 7,854 | 23,698 | 7,900 | +46 | 7,900 |
+| skills/rebalance/SKILL.md | 17,409 | 5,803 | 17,409 | 5,803 | +0 | 5,900 |
+| skills/ultracode-build/SKILL.md | 14,470 | 4,824 | 14,655 | 4,885 | +61 | 4,900 |
+| skills/pr/SKILL.md | 10,669 | 3,557 | 10,669 | 3,557 | +0 | 3,600 |
+| skills/rationalize-gantt/SKILL.md | 7,902 | 2,634 | 7,902 | 2,634 | +0 | 2,700 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 7,483 | 2,495 | 7,483 | 2,495 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/insert-defect/SKILL.md | 4,714 | 1,572 | 4,714 | 1,572 | +0 | 1,600 |
+| skills/comprehend-plan/SKILL.md | 4,583 | 1,528 | 4,583 | 1,528 | +0 | 1,600 |
+| skills/insert-story/SKILL.md | 4,037 | 1,346 | 4,037 | 1,346 | +0 | 1,400 |
+| skills/create-story/SKILL.md | 3,999 | 1,333 | 3,999 | 1,333 | +0 | 1,400 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/pre-ship/SKILL.md | 2,901 | 967 | 2,901 | 967 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,406 | 802 | 2,425 | 809 | +7 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,368 | 1,790 | 5,368 | 1,790 | +0 | 1,800 |
+| **total (bodies)** | 269,219 | 89,747 | 269,668 | 89,897 | +150 | |
+
 ## [3.20.0] — 2026-11-02
 
 ### Added
@@ -2566,7 +2632,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.20.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.21.0...HEAD
+[3.21.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.20.0...devstride--v3.21.0
 [3.20.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.19.0...devstride--v3.20.0
 [3.19.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.18.1...devstride--v3.19.0
 [3.18.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.18.0...devstride--v3.18.1

@@ -1,5 +1,5 @@
 #!/bin/bash
-# ds-statusline: managed v3.18.0 — installed and kept up to date by the devstride
+# ds-statusline: managed v3.21.0 — installed and kept up to date by the devstride
 # plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
 # replaces a file that still carries it, and never touches one that does not.
 #
@@ -126,7 +126,7 @@ emit("SL_PLUGIN", plugin_state)
 
 # Release clearance (release.clearance): the command whose `status --short` names the
 # release in flight, or nothing when the block is null. A repo-supplied provider is its
-# own `commands.status`; the built-in one is the clearance-github.sh the plugin ships, found
+# own `commands.status`; a built-in one is the clearance-<provider>.sh the plugin ships, found
 # through $DEVSTRIDE_CLEARANCE_PROVIDER, the loaded plugin ($CLAUDE_PLUGIN_ROOT), or the
 # installed copy recorded in the Claude Code plugin registry (a status line runs outside
 # any skill, so it cannot assume a plugin root). Nothing found → no segment, never an error.
@@ -136,8 +136,8 @@ if isinstance(clearance, dict) and clearance:
     commands = clearance.get("commands") or {}
     if isinstance(commands, dict) and commands.get("status"):
         clearance_cmd = str(commands["status"]) + " --short"
-    elif clearance.get("provider") == "github":
-        rel = "skills/release/scripts/clearance-github.sh"
+    elif clearance.get("provider") in ("github", "devstride"):
+        rel = "skills/release/scripts/clearance-%s.sh" % clearance["provider"]
         candidates = [os.environ.get("DEVSTRIDE_CLEARANCE_PROVIDER") or ""]
         candidates += [os.path.join(root, rel) for root in roots]
         for candidate in candidates:

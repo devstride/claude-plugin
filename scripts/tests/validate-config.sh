@@ -18,7 +18,7 @@ CLEAN="^CONFIG: 0 error(s), 0 warning(s) against schema [0-9]*\.[0-9]*\.[0-9]*$"
 
 run "$FIX/minimal.json"; expect "(1) a minimal config is clean, and the first line names the schema version" 0 "$CLEAN"
 run "$FIX/full.json"; expect "(2) the full-coverage config is clean" 0 "$CLEAN"
-run "$FIX/commands-clearance.json"; expect "(3) the commands shape of release.clearance is clean" 0 "$CLEAN"
+run "$FIX/commands-clearance.json"; expect "(3) the commands shapes of release.clearance and claims are clean" 0 "$CLEAN"
 run "$ROOT/.claude/ds-config.json"; expect "(4) this repository's own config is clean" 0 "$CLEAN"
 
 # (5) the full-coverage fixtures name every registered key (deprecated ones aside)
@@ -62,7 +62,7 @@ cfg '{"release": {"clearance": {"provider": "github", "commands": {"claim": "c",
 expect "(10) release.clearance with both shapes is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR release.clearance: sets both \`provider\` and \`commands\`"
 
 cfg '{"release": {"clearance": {"provider": "gitlab"}}}'
-expect "(11) a clearance provider other than github is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR release.clearance.provider: "gitlab" is not one of "github"$'
+expect "(11) a clearance provider other than github or devstride is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR release.clearance.provider: "gitlab" is not one of "github", "devstride"$'
 
 cfg '{"release": {"clearance": {"commands": {"claim": "c", "status": "s"}}}}'
 expect "(12) a commands clearance missing a verb is an ERROR naming it" 1 "^CONFIG: 3 error(s)" "^ERROR release.clearance.commands: missing required key \`heartbeat\`"
@@ -206,5 +206,28 @@ expect "(35) pool.checkout without pool.checkin is an ERROR" 1 "^CONFIG: 1 error
 cfg '{"pool": {"checkout": null, "checkin": "return <member>"}}'
 expect "(36) pool.checkin with a null pool.checkout is an ERROR" 1 "^CONFIG: 1 error(s), 0 warning(s)" \
   "^ERROR pool: sets \`pool.checkin\` without \`pool.checkout\`"
+
+# (40)-(47) the claims seam: provider or commands, never both; expiry out of range is only a WARN
+cfg '{"release": {"clearance": {"provider": "devstride", "credentialsFile": ".devstride/agent.env"}}}'
+expect "(40) release.clearance.provider devstride with a credentialsFile is clean" 0 "$CLEAN"
+cfg '{"claims": {"provider": "devstride", "expiryMinutes": {"story": 240, "release-tower": 20}}}'
+expect "(41) the claims provider form with expiryMinutes is clean" 0 "$CLEAN"
+cfg '{"claims": {"commands": {"claim": "c", "heartbeat": "h", "release": "r"}, "expiryMinutes": {"story": 60}}}'
+expect "(42) the claims commands form with expiryMinutes is clean" 0 "$CLEAN"
+cfg '{"claims": {"provider": "devstride", "commands": {"claim": "c", "heartbeat": "h", "release": "r"}}}'
+expect "(43) claims with both provider and commands is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR claims: sets both \`provider\` and \`commands\`"
+cfg '{"claims": {"provider": "redis"}}'
+expect "(44) an unknown claims provider is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR claims.provider: "redis" is not one of "devstride"$'
+cfg '{"claims": {"commands": {"claim": "c", "release": "r"}}}'
+expect "(45) a claims commands block without heartbeat is an ERROR naming it" 1 "^CONFIG: 1 error(s)" "^ERROR claims.commands: missing required key \`heartbeat\`"
+cfg '{"claims": {"provider": "devstride", "expiryMinutes": {"story": 0, "release-tower": 2000}}}'
+expect "(46) expiryMinutes 0 and 2000 are WARNs, exit 0" 0 "^CONFIG: 0 error(s), 2 warning(s)" \
+  "^WARN claims.expiryMinutes.release-tower: 2000 is outside 1..1440; ignored, the default stands$"
+printf '%s\n' "$OUT" | grep -q "^WARN claims.expiryMinutes.story: 0 is outside 1..1440" \
+  && ok "(46b) the WARN names the kind that stays at its default" || bad "(46b) $OUT"
+cfg '{"claims": {"provider": "devstride", "expiryMinutes": {"story": "four hours"}}}'
+expect "(47) a non-integer expiry is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR claims.expiryMinutes.story: expected integer, found string"
+cfg '{"claims": null}'
+expect "(48) a null claims block is clean" 0 "$CLEAN"
 
 exit "$FAIL"

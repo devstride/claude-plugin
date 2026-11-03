@@ -31,10 +31,10 @@ next action. For each failure symptom, read
 ## 1. Environment (`env`)
 
 - **git** — `git --version`; confirm you are inside a repo (`git rev-parse --is-inside-work-tree`).
-  Not a repo → the rest is N/A; say so and stop the section.
+  Not a repo → the rest is N/A; say so, stop the section.
 - **An `origin` remote** — `git remote get-url origin`, checked **by name** because delivery
   skills hardcode it. Other remotes but no `origin` → name them.
-- **gh present** — `gh --version`. Missing → the whole delivery half is unavailable. Fix:
+- **gh present** — `gh --version`. Missing → no delivery half. Fix:
   install GitHub CLI (cli.github.com).
 - **gh authenticated** — `gh auth status`. Fix: `gh auth login`.
 - **gh scopes, for the ACTIVE account** — read the account marked active (`gh auth status`
@@ -42,7 +42,7 @@ next action. For each failure symptom, read
   files. Fix: `gh auth refresh -s repo,read:org` — **with `workflow` in the SAME list when that
   is the missing scope**. Auth from `GH_TOKEN`/`GITHUB_TOKEN` → say so: `refresh` cannot touch
   an environment token; unset it or reissue with the scopes.
-- **Forge** — non-GitHub `origin`: delivery assumes GitHub; planning still works.
+- **Forge** — non-GitHub `origin`: delivery assumes GitHub; planning works.
 
 ## 2. Plugin install (`plugin`)
 
@@ -84,7 +84,7 @@ next action. For each failure symptom, read
   organization. Inspect with
   `claude mcp get <name>`; OAuth uses `claude mcp logout <name>`, API-key headers require
   `claude mcp remove <name>`.
-- **Do not call a DevStride tool to test this.** Presence and connection state are enough.
+- **Do not call a DevStride tool to test this**; presence and connection state are enough.
 
 ## 4. Config file (`config`)
 
@@ -204,7 +204,7 @@ legible until all three and the workflows agree.
 
 Scope the audit to workflows with an `on: pull_request` trigger. A workflow triggered only by
 `pull_request_review` or `pull_request_review_comment` is PR-related but must run on drafts —
-exempt it, and do not advise gating it. Likewise a **convention-only workflow** (pattern D of
+exempt it; do not advise gating it. Likewise a **convention-only workflow** (pattern D of
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`, in its `opened`-only and
 `opened` + `converted_to_draft` + `ready_for_review` forms) is a policy notice, not a CI gate:
 remove it from the population before the four-events, concurrency and draft-gate checks; list it
@@ -222,11 +222,11 @@ Two separate checks, and **the first is the one everyone misses**:
   such as `if: ${{ !github.event.pull_request.draft }}`. **A job is also gated if ANY job it
   `needs` is gated** — never require the whole closure. The exception is a job that opts out of
   GitHub's default dependency condition with `if: always()` or similar — it runs regardless, so it
-  is genuinely ungated. Ungated → you pay for CI repeatedly and lose the run-once guarantee.
+  is genuinely ungated. Ungated → repeated CI cost, no run-once.
 - **`ci.gateJobName`** — if set, confirm a job with that **display name** (`name:`) or key exists;
-  the loop uses it to prove the flip released CI. Unset → note the fallback to detecting a new run.
+  the loop uses it to prove the flip released CI. Unset → note the fallback (detect a new run).
 - **The CI-cost mechanics** (`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`),
-  each a WARNING when missing, never a FAIL — CI is correct without them, just more expensive:
+  each a WARNING when missing, never a FAIL (CI is correct without them, just dearer):
   - a top-level `concurrency:` block with `cancel-in-progress: true` on every pull-request
     workflow (a superseded run is cancelled instead of finished);
   - on workflows that also run on `push` to the production branch, a tree-identical skip
@@ -300,13 +300,15 @@ release safety hooks …), each against its registry `contract`:
 - **A legacy `release.docsRepo` block**, with or without a `docs` block beside it → FAIL: the
   release skill never acts on it. Fix: `/devstride:setup docs` (migrates and removes it).
 - **`release.deployApproval`, `release.deployVerification`** — each set → its first token
-  resolves (§4's rule), never run. Unset → not a gap.
-- **`release.clearance`** — null → N/A. Shape: §4's validator (run it here when §4 did not):
-  its `release.clearance` lines — both shapes, a `provider` other than `github`, a missing verb —
-  FAIL. `provider: github` → run its `status` once (read-only),
-  report the line; `UNKNOWN` FAILs naming the cause. No `.github/workflows/release-tower.yaml`
-  beside it → INFO: `/devstride:setup ci` offers the floor. Contract:
+  resolves (§4's rule), never run; unset is no gap.
+- **`release.clearance`** — null → N/A. §4's validator lines (run it here when §4 did not; both shapes, unknown `provider`,
+  missing verb) FAIL. `github` or `devstride` → run its `status` once (read-only), report the line;
+  `UNKNOWN` FAILs naming the cause; `devstride` also checks its credentials
+  (`${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/claims-checks.md`). No `.github/workflows/release-tower.yaml` beside it → INFO:
+  `/devstride:setup ci` offers the floor. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`.
+- **`claims`** — absent or null → N/A: "claims: not configured". Set → shape as above; check the
+  provider per that file. Never call `claim_work` here.
 - **Say the release-notes default** — notes only on `--release-notes`; the loop never decides a
   release "deserves" one.
 
@@ -319,6 +321,6 @@ repairs, and rerun each Phase 1 check. Name failures not offered. Leave writes u
 and say so. Non-interactive invocation prints the list and repairs nothing.
 
 IMPORTANT:
-- **Never emit a command you have not confirmed exists.** Check flags with `--help` first.
+- **Never emit a command you have not confirmed exists**; check flags with `--help` first.
 - **Never repair during Phase 1, and never repair what `repairs.md` does not list.** The
   classification is the safety property; never widen it in the moment.

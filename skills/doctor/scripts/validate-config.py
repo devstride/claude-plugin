@@ -6,9 +6,11 @@ Usage: validate-config.py <config path> [--schema <path>] [--json]
 The schema defaults to ${CLAUDE_PLUGIN_ROOT}/schemas/ds-config.schema.json (the plugin root this
 script ships in when the variable is unset). It is generated from schemas/seam-registry.json, and
 this validator implements exactly the keyword subset the generator emits — type (a list included),
-properties, patternProperties, additionalProperties, required, enum, items, oneOf, minimum,
-exclusiveMinimum, and its own x-setTogether (children set all together or not at all; null is
-unset) — plus
+properties, patternProperties, additionalProperties (false, or the schema every other key's value
+must meet), required, enum, items, oneOf, minimum, exclusiveMinimum, its own x-setTogether
+(children set all together or not at all; null is unset) and its own x-warnMinimum /
+x-warnMaximum (a value outside them is ignored by its reader, which keeps its default: a WARN) —
+plus
 the x-severity annotation for deprecated keys. No JSON Schema library is needed.
 
 Output: the first line is
@@ -18,8 +20,8 @@ JSON document instead (`schemaVersion`, `errors`, `warnings`, `findings`; on exi
 null and `fatal` carries the one-line reason). An unknown key is a WARN (with the closest registered key when one is
 similar enough); a wrong type, a value outside its enum, a missing required key, both shapes of a
 one-of, one key of a set-together group set without the others, and a deprecated key marked
-`error` are ERRORs. Keys starting with `_`, the top-level
-`$schema`, and keys at or under a prefix listed in the config's own `repoLocalKeys` are silent.
+`error` are ERRORs; a number outside an x-warnMinimum / x-warnMaximum range is a WARN. Keys
+starting with `_`, the top-level `$schema`, and keys at or under a prefix listed in the config's own `repoLocalKeys` are silent.
 
 The schema checks SHAPE only. Whether a command resolves on PATH or a branch exists stays with
 doctor's own checks. The script reads two local files, writes nothing and calls no network.
@@ -139,6 +141,11 @@ class Validator:
                 and value <= schema["exclusiveMinimum"]:
             self.add("ERROR", path, "%s must be greater than %s" % (
                 show(value), schema["exclusiveMinimum"]))
+        if type_of(value) in ("integer", "number"):
+            low, high = schema.get("x-warnMinimum"), schema.get("x-warnMaximum")
+            if (low is not None and value < low) or (high is not None and value > high):
+                self.add("WARN", path, "%s is outside %s..%s; ignored, the default stands" % (
+                    show(value), "" if low is None else low, "" if high is None else high))
         if "oneOf" in schema:
             self.one_of(value, schema["oneOf"], path)
         if "x-setTogether" in schema and isinstance(value, dict):
@@ -164,6 +171,9 @@ class Validator:
                 if matched:
                     for p in matched:
                         self.walk(sub, patterns[p], child, strict)
+                    continue
+                if isinstance(schema.get("additionalProperties"), dict):
+                    self.walk(sub, schema["additionalProperties"], child, strict)
                     continue
                 if schema.get("additionalProperties") is False:
                     if strict:
