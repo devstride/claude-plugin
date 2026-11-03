@@ -26,6 +26,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.deployApproval` | command | string or null | — | RELEASE_COMMIT in the environment | exit 0 approved and read back; 2 not waiting yet; any other exit STOPS | release 4, release 5a, doctor 7 | the deploy runs without an approval step | `skills/release/references/docs-hooks.md` | pre-registry |
 | `release.deployVerification` | command | string or null | — | RELEASE_COMMIT in the environment | exit 0 only when production serves RELEASE_COMMIT | release 5a, doctor 7 | the owner confirms the deploy by hand | `skills/release/references/docs-hooks.md` | pre-registry |
 | `release.clearance` | provider-or-commands | object or null | claim, status, heartbeat, release, adopt, owed | each verb's own arguments appended (--wait, --short, <phase> --branch <b> --pr <n>, --force, --yes) | the verdict is stdout's first line; exit codes 0-5 per the provider contract | release 0, release 5b, branch-hotfix rules, doctor 7 | no clearance: release runs as before and nothing is claimed | `skills/release/references/clearance.md` | pre-registry |
+| `claims` | provider-or-commands | object or null | claim, heartbeat, release, get, list | <kind> <key>, then the verb's options (claim: --purpose, --phase, --expiry, --takeover; heartbeat: --phase; release: --outcome; list: --kind); the holder in CLAIM_HOLDER, never on argv | stdout's first line (WON, LOST, OK, NOT HOLDER, ABSENT, FORBIDDEN, UNREACHABLE, ERROR), then the claim JSON; exit 0 won or ok, 2 lost, 4 not the holder, 1 anything else | build-item 0, build-item 6, doctor 7 | no claims: build-item selects and builds exactly as before and claims nothing | `skills/build-item/references/story-claims.md` | unreleased |
 | `verify.typecheck` | command | string[] | — | none; run from the repository root, in array order | exit 0 passes; an error outside generated.paths fails | ultracode-build 2, push rules, build-item 4a, setup G | push asks for a command; fast story merges stay off | `skills/build-item/references/verification-receipts.md` | pre-registry |
 | `verify.typecheckCombined` | command | string or null | — | none | exit 0 passes | push rules | the verify.typecheck array is used; this legacy single command is read only when that array is absent | `skills/build-item/references/verification-receipts.md` | pre-registry |
 | `verify.test` | command | string or null | — | none | exit 0 is green; red is a stop | ultracode-build 2, build-item 8, setup G | no full-suite gate; fast story merges stay off | `skills/build-item/references/verification-receipts.md` | pre-registry |
@@ -170,11 +171,12 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.productionReview.reviewIdenticalTree` | boolean | — | — | false skips re-reviewing a tree already reviewed | pre-registry |
 | `release.productionReview.highRiskPaths` | string[] | — | — | paths that still get one pass | pre-registry |
 | `release.productionReview.highRiskEngine` | string | — | — | the engine for that pass | pre-registry |
-| `release.clearance.provider` | string | github | — | **Required.** the built-in provider | pre-registry |
+| `release.clearance.provider` | string | github, devstride | — | **Required.** the built-in provider: github (a custom git ref) or devstride (a DevStride claim) | pre-registry |
 | `release.clearance.ref` | string | — | refs/clearance/release | the custom ref holding the clearance | pre-registry |
 | `release.clearance.staleMinutes` | number | — | `20` | heartbeat age that makes a clearance stale | pre-registry |
 | `release.clearance.waitMinutes` | number | — | `180` | how long claim --wait polls | pre-registry |
 | `release.clearance.phaseBudgetMinutes` | any | — | — | phase to minutes; a bad value is ignored with a status warning | pre-registry |
+| `release.clearance.credentialsFile` | string | — | — | a KEY=VALUE file holding the DevStride API credentials for the devstride provider; must not be readable by group or others | unreleased |
 | `release.clearance.commands` | object | — | — | **Required.** a provider the repository supplies | pre-registry |
 | `release.clearance.commands.claim` | string | — | — | **Required.** the claim command | pre-registry |
 | `release.clearance.commands.status` | string | — | — | **Required.** the status command | pre-registry |
@@ -182,6 +184,14 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.clearance.commands.release` | string | — | — | **Required.** the release command | pre-registry |
 | `release.clearance.commands.adopt` | string | — | — | **Required.** the adopt command | pre-registry |
 | `release.clearance.commands.owed` | string | — | — | the optional owed command | pre-registry |
+| `claims.provider` | string | devstride | — | **Required.** the built-in provider: the agent's own DevStride MCP connection | unreleased |
+| `claims.expiryMinutes` | object | each value integer, 1..1440, else warned and the default stands | — | kind to minutes a claim lives without a heartbeat; unset kinds take story 240, release-tower 20, any other the server's default | unreleased |
+| `claims.commands` | object | — | — | **Required.** a claims store the repository supplies | unreleased |
+| `claims.commands.claim` | string | — | — | **Required.** the claim command | unreleased |
+| `claims.commands.heartbeat` | string | — | — | **Required.** the heartbeat command | unreleased |
+| `claims.commands.release` | string | — | — | **Required.** the release command | unreleased |
+| `claims.commands.get` | string | — | — | the optional get command | unreleased |
+| `claims.commands.list` | string | — | — | the optional list command | unreleased |
 | `release.docsRepo` | any | — | — | **Deprecated (error):** retired pre-1.0 shape the release skill never acts on; run /devstride:setup docs to migrate it into the docs block | pre-registry |
 | `supportTrain` | object, null | — | — | one long-lived branch one-off work batches on; null reads as absent | pre-registry |
 | `supportTrain.branch` | string | — | — | the train's branch | pre-registry |

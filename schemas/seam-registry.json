@@ -207,6 +207,32 @@
       "since": "pre-registry"
     },
     {
+      "key": "claims",
+      "shape": "provider-or-commands",
+      "valueType": "object",
+      "nullable": true,
+      "payload": "<kind> <key>, then the verb's options (claim: --purpose, --phase, --expiry, --takeover; heartbeat: --phase; release: --outcome; list: --kind); the holder in CLAIM_HOLDER, never on argv",
+      "modes": [
+        "claim",
+        "heartbeat",
+        "release",
+        "get",
+        "list"
+      ],
+      "verdict": "stdout's first line (WON, LOST, OK, NOT HOLDER, ABSENT, FORBIDDEN, UNREACHABLE, ERROR), then the claim JSON; exit 0 won or ok, 2 lost, 4 not the holder, 1 anything else",
+      "calledBy": [
+        "build-item 0",
+        "build-item 6",
+        "doctor 7"
+      ],
+      "unset": "no claims: build-item selects and builds exactly as before and claims nothing",
+      "contract": "skills/build-item/references/story-claims.md",
+      "since": "unreleased",
+      "sharedKeys": [
+        "expiryMinutes"
+      ]
+    },
+    {
       "key": "verify.typecheck",
       "shape": "command",
       "valueType": "string[]",
@@ -1337,10 +1363,11 @@
       "key": "release.clearance.provider",
       "type": "string",
       "enum": [
-        "github"
+        "github",
+        "devstride"
       ],
       "required": true,
-      "description": "the built-in provider",
+      "description": "the built-in provider: github (a custom git ref) or devstride (a DevStride claim)",
       "since": "pre-registry"
     },
     {
@@ -1369,6 +1396,12 @@
       "type": "any",
       "description": "phase to minutes; a bad value is ignored with a status warning",
       "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.credentialsFile",
+      "type": "string",
+      "description": "a KEY=VALUE file holding the DevStride API credentials for the devstride provider; must not be readable by group or others",
+      "since": "unreleased"
     },
     {
       "key": "release.clearance.commands",
@@ -1417,6 +1450,67 @@
       "type": "string",
       "description": "the optional owed command",
       "since": "pre-registry"
+    },
+    {
+      "key": "claims.provider",
+      "type": "string",
+      "enum": [
+        "devstride"
+      ],
+      "required": true,
+      "description": "the built-in provider: the agent's own DevStride MCP connection",
+      "since": "unreleased"
+    },
+    {
+      "key": "claims.expiryMinutes",
+      "type": "object",
+      "values": {
+        "type": "integer",
+        "warnMinimum": 1,
+        "warnMaximum": 1440
+      },
+      "description": "kind to minutes a claim lives without a heartbeat; unset kinds take story 240, release-tower 20, any other the server's default",
+      "since": "unreleased"
+    },
+    {
+      "key": "claims.commands",
+      "type": "object",
+      "required": true,
+      "description": "a claims store the repository supplies",
+      "since": "unreleased"
+    },
+    {
+      "key": "claims.commands.claim",
+      "type": "string",
+      "required": true,
+      "description": "the claim command",
+      "since": "unreleased"
+    },
+    {
+      "key": "claims.commands.heartbeat",
+      "type": "string",
+      "required": true,
+      "description": "the heartbeat command",
+      "since": "unreleased"
+    },
+    {
+      "key": "claims.commands.release",
+      "type": "string",
+      "required": true,
+      "description": "the release command",
+      "since": "unreleased"
+    },
+    {
+      "key": "claims.commands.get",
+      "type": "string",
+      "description": "the optional get command",
+      "since": "unreleased"
+    },
+    {
+      "key": "claims.commands.list",
+      "type": "string",
+      "description": "the optional list command",
+      "since": "unreleased"
     },
     {
       "key": "release.docsRepo",

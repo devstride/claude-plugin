@@ -19,11 +19,17 @@ Registry rules the generator applies:
   - objects are closed (additionalProperties: false), except for keys starting with `_` (the
     readme convention) and, at the top level, `$schema`;
   - a hook whose shape is `provider-or-commands` becomes a oneOf: null, the provider shape (every
-    registered child except `commands`) or the commands shape (only `commands`);
+    registered child except `commands`) or the commands shape (only `commands`, plus the children
+    the hook's optional `sharedKeys` list names, which both shapes accept);
   - a `deprecated` setting becomes an x-severity annotation carrying its message.
   - an object setting's `setTogether` list becomes `x-setTogether`: those children are all set
     (non-null) or all unset, never one alone (the validator's own keyword; JSON Schema has none
     that treats null as unset).
+  - a setting's `warnMinimum` / `warnMaximum` become `x-warnMinimum` / `x-warnMaximum`: a value
+    outside them is ignored by its reader, which keeps its default, so the validator WARNs rather
+    than errs (the validator's own keywords; `minimum` and `exclusiveMinimum` stay errors);
+  - an object setting's `values` (a type plus optional bounds) types every entry of a map whose
+    keys are the user's own (`additionalProperties` carrying that schema instead of false);
   - a hook a step skill runs carries `step` (the skill's directory) and `stepVerdict` (the
     verdict lines its `## Verdict` section spells); scripts/tests/step-skills.sh compares them.
 
@@ -47,8 +53,10 @@ ID_FORMAT = "https://raw.githubusercontent.com/devstride/claude-plugin/devstride
 
 VALIDATION_KEYWORDS = {"type", "properties", "patternProperties", "additionalProperties",
                        "required", "enum", "items", "oneOf", "minimum", "exclusiveMinimum",
-                       "x-setTogether"}
+                       "x-setTogether", "x-warnMinimum", "x-warnMaximum"}
 ANNOTATIONS = {"$schema", "$id", "title", "description", "default", "x-severity"}
+BOUNDS = (("minimum", "minimum"), ("exclusiveMinimum", "exclusiveMinimum"),
+          ("warnMinimum", "x-warnMinimum"), ("warnMaximum", "x-warnMaximum"))
 HOOK_FIELDS = ["key", "shape", "valueType", "nullable", "payload", "verdict", "calledBy",
                "unset", "contract", "since"]
 SETTING_FIELDS = ["key", "type", "description", "since"]
@@ -90,6 +98,11 @@ def lint(registry):
                     problems.append("hook %s has an unknown shape %r" % (key, e.get("shape")))
                 if e.get("shape") in ("skill", "provider-or-commands") and not e.get("modes"):
                     problems.append("hook %s is a %s hook without modes" % (key, e.get("shape")))
+                shared = e.get("sharedKeys", [])
+                if not isinstance(shared, list) or not all(isinstance(k, str) and k for k in shared) \
+                        or (shared and e.get("shape") != "provider-or-commands"):
+                    problems.append("hook %s: sharedKeys is a list of child names on a "
+                                    "provider-or-commands hook" % key)
                 if not isinstance(e.get("calledBy"), list) or not e.get("calledBy"):
                     problems.append("hook %s needs a non-empty calledBy list" % key)
                 if "step" in e or "stepVerdict" in e:
@@ -102,10 +115,40 @@ def lint(registry):
             for one in (t if isinstance(t, list) else [t]):
                 if one not in TYPES:
                     problems.append("%s has an unknown type %r" % (key, one))
+            values = e.get("values")
+            if values is not None and (not isinstance(values, dict) or t != "object"
+                                       or values.get("type") not in TYPES):
+                problems.append("%s: values belongs on an object setting and names a type" % key)
             since = e.get("since")
             if not isinstance(since, str) or not since:
                 problems.append("%s has no since" % key)
     return problems
+
+
+def apply_bounds(node, spec):
+    """Copy a registry entry's bounds onto its schema node, under their schema names."""
+    for field, keyword in BOUNDS:
+        if field in spec:
+            node[keyword] = spec[field]
+    return node
+
+
+def allowed(spec):
+    """The table's Allowed cell for an entry's enum or bounds (a map's are its values')."""
+    if "enum" in spec:
+        return cell(spec["enum"])
+    parts = []
+    if "minimum" in spec:
+        parts.append(">= %s" % spec["minimum"])
+    if "exclusiveMinimum" in spec:
+        parts.append("> %s" % spec["exclusiveMinimum"])
+    if "warnMinimum" in spec or "warnMaximum" in spec:
+        parts.append("%s..%s, else warned and the default stands" % (
+            spec.get("warnMinimum", ""), spec.get("warnMaximum", "")))
+    if isinstance(spec.get("values"), dict):
+        inner = allowed(spec["values"])
+        return "each value %s%s" % (spec["values"]["type"], "" if inner == "—" else ", " + inner)
+    return ", ".join(parts) or "—"
 
 
 def closed_object():
@@ -172,9 +215,10 @@ def build_schema(registry, version):
                 node["enum"] = e["enum"]
             if "setTogether" in e:
                 node["x-setTogether"] = e["setTogether"]
-            for bound in ("minimum", "exclusiveMinimum"):
-                if bound in e:
-                    node[bound] = e[bound]
+            apply_bounds(node, e)
+            if isinstance(e.get("values"), dict):
+                node["additionalProperties"] = apply_bounds(node_for(e["values"]["type"]),
+                                                            e["values"])
             if "default" in e:
                 node["default"] = e["default"]
             node["description"] = e["description"] if not e.get("_hook") else \
@@ -183,8 +227,8 @@ def build_schema(registry, version):
         if e.get("required"):
             parent.setdefault("required", []).append(leaf)
         if e.get("_hook") and e["shape"] == "provider-or-commands":
-            providers.append((parent, leaf))
-    for parent, leaf in providers:
+            providers.append((parent, leaf, e.get("sharedKeys", [])))
+    for parent, leaf, shared in providers:
         node = parent["properties"][leaf]
         props, req = node["properties"], node.get("required", [])
         provider = closed_object()
@@ -192,6 +236,10 @@ def build_schema(registry, version):
         provider["required"] = [r for r in req if r != "commands"]
         commands = closed_object()
         commands["properties"] = {"commands": props.get("commands", {})}
+        for k in shared:
+            if k not in props:
+                fail(1, "%s: sharedKeys names %s, which is not registered under it" % (leaf, k))
+            commands["properties"][k] = props[k]
         commands["required"] = ["commands"]
         parent["properties"][leaf] = {"description": node.get("description", ""),
                                       "oneOf": [{"type": "null"}, provider, commands]}
@@ -236,11 +284,8 @@ def build_table(registry, version):
                                                     s["deprecated"]["message"])
         if s.get("required"):
             meaning = "**Required.** " + meaning
-        allowed = cell(s["enum"]) if "enum" in s else \
-            ">= %s" % s["minimum"] if "minimum" in s else \
-            "> %s" % s["exclusiveMinimum"] if "exclusiveMinimum" in s else "—"
         out.append("| `%s` | %s | %s | %s | %s | %s |" % (
-            s["key"], cell(s["type"]), allowed,
+            s["key"], cell(s["type"]), allowed(s),
             cell(s["default"]) if "default" in s else "—", cell(meaning), s["since"]))
     out += ["", "## Cited by", "",
             "- `doctor` SKILL.md — §4, the config shape check (runs the validator).",

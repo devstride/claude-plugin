@@ -7,6 +7,106 @@
     "$schema": {
       "type": "string"
     },
+    "claims": {
+      "description": "provider-or-commands hook — <kind> <key>, then the verb's options (claim: --purpose, --phase, --expiry, --takeover; heartbeat: --phase; release: --outcome; list: --kind); the holder in CLAIM_HOLDER, never on argv",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": [
+                "devstride"
+              ],
+              "description": "the built-in provider: the agent's own DevStride MCP connection"
+            },
+            "expiryMinutes": {
+              "type": "object",
+              "properties": {},
+              "patternProperties": {
+                "^_": {}
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "x-warnMinimum": 1,
+                "x-warnMaximum": 1440
+              },
+              "description": "kind to minutes a claim lives without a heartbeat; unset kinds take story 240, release-tower 20, any other the server's default"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "required": [
+            "provider"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "commands": {
+              "type": "object",
+              "properties": {
+                "claim": {
+                  "type": "string",
+                  "description": "the claim command"
+                },
+                "heartbeat": {
+                  "type": "string",
+                  "description": "the heartbeat command"
+                },
+                "release": {
+                  "type": "string",
+                  "description": "the release command"
+                },
+                "get": {
+                  "type": "string",
+                  "description": "the optional get command"
+                },
+                "list": {
+                  "type": "string",
+                  "description": "the optional list command"
+                }
+              },
+              "patternProperties": {
+                "^_": {}
+              },
+              "additionalProperties": false,
+              "description": "a claims store the repository supplies",
+              "required": [
+                "claim",
+                "heartbeat",
+                "release"
+              ]
+            },
+            "expiryMinutes": {
+              "type": "object",
+              "properties": {},
+              "patternProperties": {
+                "^_": {}
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "x-warnMinimum": 1,
+                "x-warnMaximum": 1440
+              },
+              "description": "kind to minutes a claim lives without a heartbeat; unset kinds take story 240, release-tower 20, any other the server's default"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "required": [
+            "commands"
+          ]
+        }
+      ]
+    },
     "profile": {
       "type": "string",
       "enum": [
@@ -795,9 +895,10 @@
                 "provider": {
                   "type": "string",
                   "enum": [
-                    "github"
+                    "github",
+                    "devstride"
                   ],
-                  "description": "the built-in provider"
+                  "description": "the built-in provider: github (a custom git ref) or devstride (a DevStride claim)"
                 },
                 "ref": {
                   "type": "string",
@@ -816,6 +917,10 @@
                 },
                 "phaseBudgetMinutes": {
                   "description": "phase to minutes; a bad value is ignored with a status warning"
+                },
+                "credentialsFile": {
+                  "type": "string",
+                  "description": "a KEY=VALUE file holding the DevStride API credentials for the devstride provider; must not be readable by group or others"
                 }
               },
               "patternProperties": {
