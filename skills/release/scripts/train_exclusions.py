@@ -153,6 +153,9 @@ def merge_only_changes(repo, c, parents):
             if not entry:
                 break
             conflicted.add(entry.split("\t", 1)[1] if "\t" in entry else entry)
+        if not conflicted:
+            # git may report a conflict it names no file for (a directory-rename split)
+            fail("git merge-tree reported a conflict in %s without naming a file; check that merge by hand" % c)
     out = git(repo, "diff", "--name-only", "--no-renames", "-z", tree, c).stdout
     return sorted(set(zlist(out.decode("utf-8", "surrogateescape"))) | conflicted)
 
