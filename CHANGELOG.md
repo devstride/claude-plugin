@@ -8,6 +8,32 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Claims: build-item claims a story before starting it and skips one another agent holds; new
+  optional `claims` config block; `release.clearance.provider` accepts `devstride`.** With
+  `claims` set (`{ "provider": "devstride" }`, or your own `commands` for `claim`, `heartbeat` and
+  `release`, plus optional `expiryMinutes` per kind), `build-item` claims each story before moving
+  it to In Progress, so two agents on two machines never build the same one. A story another live
+  agent holds is skipped for the next candidate; one you named, or the resumed one, stops and says
+  who holds it, on which machine and since when; an expired claim is taken over. Each step and
+  build phase renews the claim, and completion releases it with outcome `done`. A stop leaves the
+  claim to expire (240 minutes for a story by default), so a person can resume it in that window.
+  When claims are unavailable — the server has no claim tools, the key lacks
+  `MANAGE_AGENT_CLAIMS`, or it cannot be reached — the loop carries on without them and says so
+  once. Hotfixes never claim. Without a `claims` block nothing changes. Contract:
+  `skills/build-item/references/story-claims.md`.
+- **A DevStride release permit.** `release.clearance.provider: "devstride"` keeps the one cleared
+  release as a DevStride claim instead of a git ref, with the same six verbs, verdict lines, exit
+  codes and `status --json` shape as `github`; pull-request facts still come from `gh`. Credentials
+  come from the environment or from `release.clearance.credentialsFile`, which must be your own
+  regular file with no group or other access. The key, the secret and the session's holder are
+  never printed. Both providers now share one core, and a new `identity` verb prints the holder
+  so every skill uses one rule.
+- **`/devstride:doctor`** reports the `claims` block, checks that the DevStride MCP server lists
+  `claim_work` when the provider is `devstride`, and accepts the `devstride` release permit
+  (running its `status` once, checking credentials without printing them).
+
 ## [3.20.0] — 2026-11-02
 
 ### Added
