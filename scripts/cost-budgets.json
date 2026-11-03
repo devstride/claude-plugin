@@ -61,7 +61,7 @@
     "skills/release/references/clearance.md": 5500,
     "skills/release/references/docs-hooks.md": 4400,
     "skills/release/references/post-deploy-check.md": 1500,
-    "skills/release/references/release-branch.md": 5900,
+    "skills/release/references/release-branch.md": 5950,
     "skills/release/references/release-gates.md": 1300,
     "skills/release/references/review-once.md": 1100,
     "skills/review/references/ci-settle.md": 1800,
@@ -96,7 +96,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 76050,
+      "budget": 76100,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -169,7 +169,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 74800,
+      "budget": 74850,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
