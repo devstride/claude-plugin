@@ -185,7 +185,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.clearance.commands.adopt` | string | — | — | **Required.** the adopt command | pre-registry |
 | `release.clearance.commands.owed` | string | — | — | the optional owed command | pre-registry |
 | `claims.provider` | string | devstride | — | **Required.** the built-in provider: the agent's own DevStride MCP connection | unreleased |
-| `claims.expiryMinutes` | object | each value integer, 1..1440, else warned and the default stands | — | kind to minutes a claim lives without a heartbeat; unset kinds take story 240, release-tower 20, any other the server's default | unreleased |
+| `claims.expiryMinutes` | object | each value integer, 1..1440, else warned and the default stands | — | kind to minutes a claim lives without a heartbeat; an unset story takes 240, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here | unreleased |
 | `claims.commands` | object | — | — | **Required.** a claims store the repository supplies | unreleased |
 | `claims.commands.claim` | string | — | — | **Required.** the claim command | unreleased |
 | `claims.commands.heartbeat` | string | — | — | **Required.** the heartbeat command | unreleased |

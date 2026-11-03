@@ -165,12 +165,12 @@ if [ "$A" -eq 4 ] && [ "$KEPT" = 1 ] && [ "${B%%:*}" -eq 0 ] && printf '%s' "$B"
 else bad "(3) a=$A kept=$KEPT b=$B gone=$GONE s=$S"; fi
 fresh owed; run claim; run heartbeat close-out --branch release/26-10-18 --pr 3990
 run release --owed docs --owed close-out; A="$RC:$OUT"; F="$WORK/owed.record.owed.json"
-export CLEARANCE_NOW=2026-10-18T10:17:00Z; run status; B="$RC:$OUT"; run status --short; C="$OUT"; export CLEARANCE_NOW=2026-10-18T10:05:00Z
+export CLEARANCE_NOW=2026-10-18T10:17:00Z; run status; B="$RC:$OUT"; run status --short; C="$OUT"; run status --json; export CLEARANCE_NOW=2026-10-18T10:05:00Z
 if [ "${A%%:*}" -eq 0 ] && [ "$(printf '%s\n' "${A#*:}" | head -n 1)" = "RELEASED release/26-10-18" ] && printf '%s' "$A" | grep -q '^Close-out owed: docs, close-out$' \
    && [ ! -f "$CLEARANCE_RECORD" ] && [ -f "$F" ] && [ "$(released)" = True ] \
    && printf '%s' "$B" | grep -q "^Close-out owed: release/26-10-18 #3990 — docs, close-out (handed back 12 min ago by alice on .*, session $(digest claude:me-1 | cut -c1-12))\$" \
    && [ "$C" = "close-out owed · release/26-10-18 · docs, close-out" ]; then
-  ok "(3a) release --owed → RELEASED first, then Close-out owed; the owed work shows in status and --short"
+  ok "(3a) release --owed → RELEASED first, then Close-out owed; the owed work shows in status and --short (and --json, swept by 12)"
 else bad "(3a) a=$A b=$B c=$C"; fi
 run owed --done docs --done close-out; if [ "$RC" -eq 0 ] && [ "$OUT" = NONE ] && [ ! -f "$F" ]; then ok "(3b) owed --done settles it; NONE"; else bad "(3b) rc=$RC: $OUT"; fi
 fresh rel-own; run claim; run release; A="$RC:$OUT"

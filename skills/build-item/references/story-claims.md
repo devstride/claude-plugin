@@ -42,7 +42,9 @@ heartbeats, no message; build exactly as before. Hotfixes never claim. `build-it
    gating check's shape). Expired → take over. Already yours (a resumed story) → renewed, carry on.
 2. **A story the user NAMED, or the handoff's resumed story** (`mode: named` / `resume`) held by
    another live holder → STOP, naming that holder's machine and session and since when. Expired →
-   take over, as in selection.
+   take over, as in selection. Your own earlier session (after a restart or `/clear`) counts as
+   another holder: wait out the expiry, or the owner releases it (`release_claim` with `force`)
+   and the loop claims it afresh. Every candidate held → DRY-CHAIN, "N held by other agents".
 3. **Heartbeats.** `heartbeat_claim` with `phase` = the step's name at each step transition from
    step 1 on, and at each `ultracode-build` phase (`mode: heartbeat`). NOT HOLDER → STOP naming the
    holder: another agent took the story after it lapsed. A phase longer than the expiry lets the
@@ -56,7 +58,8 @@ heartbeats, no message; build exactly as before. Hotfixes never claim. `build-it
 
 `ABSENT` (the server has no `claim_work`), `UNREACHABLE`, `FORBIDDEN` (the key's user lacks
 `MANAGE_AGENT_CLAIMS`, named in the message) or any other error → `degrade`: carry on WITHOUT claims
-and say so once per session. A claims outage never stops delivery.
+and say so once per session. A failing `identity` (no session id to claim with) degrades the
+same way. A claims outage never stops delivery.
 
 ## Progress row
 

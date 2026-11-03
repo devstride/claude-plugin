@@ -301,6 +301,10 @@ class Store:
     def refusal(self, text):
         return ToolError(text.splitlines()[0] if text else "the store refused the change")
 
+    def beat(self, record):
+        """The keeper's liveness stamp. A compare-and-swap store re-writes the record it just read."""
+        self.renew(record, record)
+
 
 def unreadable(record):
     return bool(record) and record.get("_invalid") is True
@@ -590,10 +594,11 @@ class DevStrideStore(Store):
         if not isinstance(payload, dict) or not isinstance(digest, str) or not digest or parse_iso(payload.get("takenAt")) is None:
             return {"_invalid": True, "_version": self.version_of(row)}
         record = dict(payload, holder=digest, _version=self.version_of(row))
+        if parse_iso(row.get("heartbeatAt")) is not None:
+            record["heartbeatAt"] = row["heartbeatAt"]  # the server's stamp: a keeper beat moves only that
         expires = parse_iso(row.get("expiresAt"))
         if expires is not None and now() > expires:
             # The server's clock lapsed the claim: that is a stale record (its keeper is dead).
-            record["_expired"] = True
             lapsed = expires - timedelta(minutes=STALE_MINUTES)
             beat = parse_iso(record.get("heartbeatAt") or record.get("takenAt"))
             record["heartbeatAt"] = iso(min(beat, lapsed) if beat else lapsed)
@@ -622,11 +627,16 @@ class DevStrideStore(Store):
         self.claim(record, takeover=expected["holder"])
 
     def renew(self, record, expected):
-        if expected.get("_expired"):
-            return self.claim(record)  # a lapsed claim is not heartbeated; its holder claims it again
+        # The server renews its holder's lapsed claim too, unless someone took it over (NOT_HOLDER):
+        # never claim_work here, which would win afresh a claim released a moment ago.
         self.refuse_unless(self.call("heartbeat_claim", {
             "kind": CLAIM_KIND, "key": repo(), "phase": record.get("phase"), "payload": clean_record(record),
             "expiryMinutes": STALE_MINUTES, "holder": self.me}))
+
+    def beat(self, record):
+        # Liveness only: no phase or payload, so a keeper tick never undoes the owner's phase change.
+        self.refuse_unless(self.call("heartbeat_claim", {
+            "kind": CLAIM_KIND, "key": repo(), "expiryMinutes": STALE_MINUTES, "holder": self.me}))
 
     def adopt(self, record, expected):
         self.refuse_unless(self.call("adopt_claim", {
@@ -753,7 +763,7 @@ def owed_line(entry, at):
         where += " #%s" % entry["pr"]
     return "%s — %s (handed back %s by %s on %s, session %s)" % (
         where, ", ".join(str(i) for i in entry["owed"]), age_text(parse_iso(entry.get("releasedAt")), at),
-        entry.get("user") or "?", entry.get("machine") or "?", STORE.shown(STORE.rid(entry["holder"])) if entry.get("holder") else "?")
+        entry.get("user") or "?", entry.get("machine") or "?", STORE.shown(entry["holder"]) if entry.get("holder") else "?")
 
 
 def read_local():
@@ -882,7 +892,7 @@ def cmd_keeper(_args):
             if record is None or unreadable(record) or not STORE.holds(record, me):
                 return 0
             record["heartbeatAt"] = iso(now())
-            STORE.renew(record, record)
+            STORE.beat(record)
         except ToolError:
             continue  # a failed stamp is retried next tick; the owner's death still ends it
 
@@ -1168,7 +1178,6 @@ def cmd_heartbeat(args):
             # from the object it wrote. NOT HOLDER is for a record naming someone else.
             stuck = lost_race(error, record["_version"], stuck)
             record["_version"] = current["_version"]
-            record["_expired"] = current.get("_expired", False)
     write_local(record, me)
     print("HEARTBEAT %s %s" % (phase, record["heartbeatAt"]))
     return 0
@@ -1191,7 +1200,9 @@ def record_owed(items, record, me, at):
     local = read_local() or {}
     source = record if record and not unreadable(record) else local
     name = source.get("branch") or source.get("purpose") or "release"
-    entry = {"repo": repo(), "release": name, "pr": source.get("pr"), "holder": me,
+    # The holder as the store names it (the DevStride store: its digest), never the raw holder:
+    # status --json prints these entries.
+    entry = {"repo": repo(), "release": name, "pr": source.get("pr"), "holder": STORE.rid(me),
              "user": source.get("user") if source.get("holder") in (me, STORE.rid(me)) else gh_user(),
              "machine": socket.gethostname(), "releasedAt": iso(at), "owed": list(dict.fromkeys(items))}
     # One entry per release: the name repeats when no release branch is cut ("release"), so the
@@ -1262,7 +1273,7 @@ def cmd_owed(args):
             target = [e for e in target if str(e.get("pr")) == str(pr_number(number))]
         if not name and not number:
             me, _ = holder()
-            target = [e for e in entries if e.get("holder") == me] or entries
+            target = [e for e in entries if e.get("holder") == STORE.rid(me)] or entries
         if not target:
             print("NONE (nothing owed%s)" % (" for " + " ".join(x for x in (name, number) if x) if (name or number) else ""))
             return 0

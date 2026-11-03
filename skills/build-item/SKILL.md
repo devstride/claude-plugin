@@ -8,7 +8,7 @@ description: "Orchestrate one DevStride work item end-to-end: select, branch, bu
 **Goal:** ONE DevStride one-day leaf item (this org's Story or Defect types) delivered end-to-end —
 select → In Progress → branch → build → review → merge → ritual → sync → next. This ORCHESTRATOR
 owns ONLY the DevStride glue (selection, status moves, the completion ritual); it composes the other
-delivery skills — **invoke them by name; never re-spell them.**
+delivery skills — **invoke them by name; never re-spell what they do.**
 
 Argument — an item number, or `next`/empty for the next unblocked item; `next under I20100`, or
 **`I20100` alone, means "the next unblocked item under this root"** — a bare plan root (any grouping

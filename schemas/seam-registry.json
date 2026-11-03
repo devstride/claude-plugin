@@ -1469,7 +1469,7 @@
         "warnMinimum": 1,
         "warnMaximum": 1440
       },
-      "description": "kind to minutes a claim lives without a heartbeat; unset kinds take story 240, release-tower 20, any other the server's default",
+      "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here",
       "since": "unreleased"
     },
     {

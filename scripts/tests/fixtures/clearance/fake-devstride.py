@@ -113,7 +113,7 @@ def call(tool, a):
     if not live(row):
         return {"outcome": "NOT_HOLDER", "current": None}
     if tool == "heartbeat_claim":
-        if row["holderDigest"] != me or expired(row):
+        if row["holderDigest"] != me:  # the real server renews its holder's lapsed claim too
             return {"outcome": "NOT_HOLDER", "current": row}
         stamp(row, a); save(rows)
         return row
@@ -127,7 +127,7 @@ def call(tool, a):
         if row["holderDigest"] != a.get("expectedHolderDigest"):
             return {"outcome": "NOT_HOLDER", "current": row}
         row["machine"] = a.get("machine")
-        stamp(row, dict(a, expiryMinutes=(a.get("expiryMinutes") or 20)), holder_digest=me)
+        stamp(row, dict(a, expiryMinutes=20), holder_digest=me)  # adopt takes no expiry: the kind's default
         save(rows)
         return row
     raise KeyError(tool)

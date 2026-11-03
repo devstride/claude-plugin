@@ -301,13 +301,13 @@ release safety hooks …), each against its registry `contract`:
   release skill never acts on it. Fix: `/devstride:setup docs` (migrates and removes it).
 - **`release.deployApproval`, `release.deployVerification`** — each set → its first token
   resolves (§4's rule), never run; unset is no gap.
-- **`release.clearance`** — null → N/A. §4's validator lines (both shapes, unknown `provider`, missing
-  verb) FAIL. `github` or `devstride` → run its `status` once (read-only), report the line;
+- **`release.clearance`** — null → N/A. §4's validator lines (run it here when §4 did not; both shapes, unknown `provider`,
+  missing verb) FAIL. `github` or `devstride` → run its `status` once (read-only), report the line;
   `UNKNOWN` FAILs naming the cause; `devstride` also checks its credentials
   (`${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/claims-checks.md`). No `.github/workflows/release-tower.yaml` beside it → INFO:
   `/devstride:setup ci` offers the floor. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`.
-- **`claims`** — absent or null → N/A, say "claims: not configured". Set → shape is §4's; check the
+- **`claims`** — absent or null → N/A: "claims: not configured". Set → shape as above; check the
   provider per that file. Never call `claim_work` here.
 - **Say the release-notes default** — notes only on `--release-notes`; the loop never decides a
   release "deserves" one.

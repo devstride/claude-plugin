@@ -32,6 +32,7 @@ DEGRADE = {
     "ERROR": "DevStride claims returned an error; continuing without them.",
 }
 VERDICT_ERRORS = ("ABSENT", "FORBIDDEN", "UNREACHABLE", "ERROR")
+VERDICTS = {"WON": "won", "LOST": "lost", "OK": "ok", "NOT HOLDER": "not_holder", "NOT_HOLDER": "not_holder"}
 
 
 def parse(value):
@@ -83,20 +84,15 @@ def normalise(response):
         name = str(response["error"]).upper()
         return "error:" + (name if name in VERDICT_ERRORS else "ERROR"), None, {}
     if "verdict" in response:
+        # Only a verdict the commands contract names counts; an exit code alone never decides.
         verdict = str(response["verdict"]).upper()
-        code = response.get("exitCode")
         claim = response.get("claim")
         if verdict in VERDICT_ERRORS:
             return "error:" + verdict, None, {}
-        if verdict == "WON" or (verdict == "" and code == 0):
-            return "won", claim, {}
-        if verdict == "LOST" or code == 2:
-            return "lost", claim, {}
-        if verdict in ("NOT HOLDER", "NOT_HOLDER") or code == 4:
-            return "not_holder", response.get("current") or claim, {}
-        if verdict == "OK" or code == 0:
-            return "ok", claim, {}
-        return "error:ERROR", None, {}
+        kind = VERDICTS.get(verdict)
+        if kind is None:
+            return "error:ERROR", None, {}
+        return kind, (response.get("current") or claim) if kind == "not_holder" else claim, {}
     if str(response.get("outcome", "")).upper() == "NOT_HOLDER":
         return "not_holder", response.get("current"), {}
     if "won" in response:

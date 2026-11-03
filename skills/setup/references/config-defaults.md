@@ -300,7 +300,7 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   is skipped, or STOPS a named one. `provider: devstride` uses the agent's own DevStride connection;
   `commands` supplies a store (verbs and verdicts in the registry); both is a config error.
   `expiryMinutes` maps a kind to the minutes a claim lives without a heartbeat: `story` 240,
-  `release-tower` 20, other kinds the server's default; a value outside 1..1440 is warned about and
+  other kinds the server's default (the release permit: `staleMinutes`); a value outside 1..1440 is warned about and
   ignored. An unreachable, unsupported or forbidden store means no claims, said once. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`.
 

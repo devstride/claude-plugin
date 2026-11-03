@@ -123,6 +123,9 @@ _, d = decide("heartbeat", {"verdict": "NOT HOLDER", "exitCode": 4, "claim": {"s
 check("(16) a commands NOT HOLDER stops", d["action"] == "stop", d)
 _, d = decide("select", {"verdict": "FORBIDDEN", "exitCode": 1}, A, late, "S3")
 check("(17) a commands FORBIDDEN degrades naming the permission", d["action"] == "degrade" and "MANAGE_AGENT_CLAIMS" in d["message"], d)
+_, d = decide("select", {"verdict": "BUSY", "exitCode": 2}, A, late, "S3")
+_, e = decide("select", {"verdict": "", "exitCode": 0}, A, late, "S3")
+check("(17a) a verdict the contract does not name degrades, whatever the exit code", d["action"] == "degrade" and e["action"] == "degrade", (d, e))
 
 check("(18) no holder string appears in anything decide printed", not any("secret" in s for s in SEEN))
 p = subprocess.run([sys.executable, helper, "digest"], input="claude:session-a-secret\n", capture_output=True, text=True)
