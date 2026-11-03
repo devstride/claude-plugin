@@ -32,7 +32,7 @@ DEGRADE = {
     "ERROR": "DevStride claims returned an error; continuing without them.",
 }
 VERDICT_ERRORS = ("ABSENT", "FORBIDDEN", "UNREACHABLE", "ERROR")
-VERDICTS = {"WON": "won", "LOST": "lost", "OK": "ok", "NOT HOLDER": "not_holder", "NOT_HOLDER": "not_holder"}
+VERDICTS = {"WON": "won", "LOST": "lost", "OK": "ok", "NOT HOLDER": "not_holder"}
 
 
 def parse(value):

@@ -173,6 +173,12 @@ if [ "${A%%:*}" -eq 0 ] && [ "$(printf '%s\n' "${A#*:}" | head -n 1)" = "RELEASE
   ok "(3a) release --owed → RELEASED first, then Close-out owed; the owed work shows in status and --short (and --json, swept by 12)"
 else bad "(3a) a=$A b=$B c=$C"; fi
 run owed --done docs --done close-out; if [ "$RC" -eq 0 ] && [ "$OUT" = NONE ] && [ ! -f "$F" ]; then ok "(3b) owed --done settles it; NONE"; else bad "(3b) rc=$RC: $OUT"; fi
+fresh owed-legacy; F="$WORK/owed-legacy.record.owed.json"
+printf '{"entries": [{"repo": "o/r", "release": "release/26-10-17", "pr": 3980, "holder": "claude:other", "user": "bob", "machine": "m9", "handedBackAt": "2026-10-18T09:00:00Z", "owed": ["docs"]}, {"repo": "o/r", "release": "release/26-10-18", "pr": 3990, "holder": "claude:me-1", "user": "alice", "machine": "m1", "handedBackAt": "2026-10-18T10:00:00Z", "owed": ["notes"]}]}' > "$F"; chmod 600 "$F"
+run status; A="$OUT"; run status --json; B="$OUT"; run owed --done notes; C="$RC:$OUT"; run status --json; D="$OUT"
+if ! printf '%s%s%s' "$A" "$B" "$D" | grep -qF 'claude:' && printf '%s' "$D" | grep -q 'release/26-10-17' && ! printf '%s' "$D" | grep -q 'release/26-10-18' && [ "${C%%:*}" -eq 0 ]; then
+  ok "(3b2) an owed file from before holders were digests: no raw holder printed (status, --json); --done settles this session's own entry"
+else bad "(3b2) a=$A b=$B c=$C d=$D"; fi
 fresh rel-own; run claim; run release; A="$RC:$OUT"
 if [ "${A%%:*}" -eq 0 ] && printf '%s' "$A" | grep -q 'RELEASED' && [ "$(released)" = True ] && [ ! -f "$CLEARANCE_RECORD" ]; then ok "(3c) release by the holder → claim released, local record removed"; else bad "(3c) $A"; fi
 run claim

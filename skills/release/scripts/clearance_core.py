@@ -292,6 +292,10 @@ class Store:
     def shown(self, rid):
         return rid
 
+    def as_rid(self, holder):
+        """A holder read back from a local file, as the store names it."""
+        return holder
+
     def identify(self, me):
         pass
 
@@ -437,6 +441,10 @@ class DevStrideStore(Store):
 
     def shown(self, rid):
         return (rid or "?")[:12]
+
+    def as_rid(self, holder):
+        # An owed file written before holders were stored as digests names the raw holder.
+        return holder if re.match(r"^[0-9a-f]{64}\Z", holder) else self.rid(holder)
 
     def identify(self, me):
         self.me = me
@@ -736,8 +744,12 @@ def read_owed():
         here = repo()
     except (ToolError, SystemExit):
         here = None
-    return [e for e in entries if isinstance(e, dict) and e.get("repo") in (None, here)
+    kept = [e for e in entries if isinstance(e, dict) and e.get("repo") in (None, here)
             and isinstance(e.get("owed"), list) and e["owed"]]
+    for entry in kept:
+        if isinstance(entry.get("holder"), str) and entry["holder"]:
+            entry["holder"] = STORE.as_rid(entry["holder"])
+    return kept
 
 
 def write_owed(entries):
