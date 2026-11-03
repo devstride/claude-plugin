@@ -14,7 +14,7 @@ its upstream set. Branch name argument: $ARGUMENTS (none → ask for one).
   `branchNaming`, `protectedBranches`); every literal below is a shipped default kept for
   readability — **if the file disagrees, the file wins**. No file → use the defaults and say so.
 - **Working base**, in precedence: (1) the base the CALLER passed — `build-item` derives it (the
-  story's epic integration branch; for a one-off the support train when `supportTrain.branch` is
+  story's epic integration branch; for a one-off the release train when `releaseTrain.branch` is
   set, else `baseBranch`) and says "branch off `<name>`"; (2) config `integrationBranch` when
   non-null; (3) `baseBranch`. An integration branch must already exist on the remote (`build-item`
   step 0 creates the epic branch); if checking it out fails, STOP and tell the caller to create it

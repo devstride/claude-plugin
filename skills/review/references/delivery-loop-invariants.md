@@ -244,14 +244,14 @@ K5. A release branch (`release.releaseBranchPattern`) takes new commits only —
     amended or force-pushed; a production-branch advance (a hotfix) is MERGED into it and
     re-reviewed. It is deleted only by `release`'s close-out, and only once both the production
     branch and the release source contain it — the one place the loop deletes a protected branch.
-    The release pattern and `supportTrain.branch` protect by the key alone — a review that relied
+    The release pattern and `releaseTrain.branch` protect by the key alone — a review that relied
     on `protectedBranches` listing them rebased a release branch onto a hotfix. Merge-only heads
     (the train, the production→source sync) are never rebased; a moved base under one is not
     refreshed, since the pull request's merge with its base is what CI tests.
 K6. Infra-touching fixes never land on a release branch: a commit staging any path matching
     `release.releaseBranchFixExclusions` is refused (merge it to the source, abandon, re-cut), and
     the same check runs over an adopted branch's commits, since a hand-pushed one bypasses the
-    commit-time check. The same list keeps such one-offs off the support train.
+    commit-time check. The same list keeps such one-offs off the release train.
 K7. One matching rule for `protectedBranches`, `releaseBranchPattern` and
     `releaseBranchFixExclusions`, anchored at both ends: `*` within one path segment, `**` across
     segments, `<YY-MM-DD>` two-digit date parts, trailing `[-n]` an optional `-<digits>`. A shell
@@ -346,10 +346,10 @@ M11. `prBodyTemplate.noAiAttribution` governs the PR body and outranks a harness
 M12. Widen the test run beyond the touched suite when the change is broad.
 M13. Unsure trivial-vs-substantive → treat as SUBSTANTIVE.
 M14. NARROW depth picks correctness + conventions-when-the-diff-touches-them, not any 1–2 lenses.
-M15. A one-off merged onto the support train (`supportTrain.branch`) is NOT Done at that merge:
+M15. A one-off merged onto the release train (`releaseTrain.branch`) is NOT Done at that merge:
      it is Done only when the train's pull request reaches the release source, closed by `release`
      from looked-up item numbers in the train's merge subjects — never a guessed number. With
-     `supportTrain.fastMerges` the train's pull request is the one-offs' first full review, so it is
+     `releaseTrain.fastMerges` the train's pull request is the one-offs' first full review, so it is
      a FULL-diff review, as an epic release pull request is.
 M16. A story merged onto its release unit's integration branch is LANDED, not Done: it is Done only
      when the release unit's release pull request reaches the release target, marked by
@@ -366,11 +366,11 @@ M16. A story merged onto its release unit's integration branch is LANDED, not Do
      excludes landed leaves, or step 8 never fires; a fresh run at a unit's zero reports "N landed,
      awaiting their release", never "plan complete". Recovery and the never-rebuild guard key on
      the landed COMMENT step 6 always writes, never on the status, and a story named by number
-     skips selection but never that guard: Done, landed or on the support train, it never reaches
+     skips selection but never that guard: Done, landed or on the release train, it never reaches
      step 1. A landed leaf moves to the status named `epicIntegrationBranches.mergedStatusName`
      (absent → "Review"), resolved by NAME per work type, never a shipped id; that status is the
      visible signal, the git landed set the record. The epic release pull request is cut `merge-only` (its first-parent story merges ARE
-     the record); a story pull request merged into an integration branch or the support train
+     the record); a story pull request merged into an integration branch or the release train
      passes GitHub's default merge subject with `--subject`; the close-out writes no dates, keeping
      step 6's.
 
@@ -447,7 +447,7 @@ Q2. `release.postDeployCheckSkill` names a LOCAL skill invoked once, after the d
     configured** are different facts and never collapse into each other.
 Q3. Doctor checks that a configured `postDeployCheckSkill` names an existing local skill; `setup`
     never writes the key.
-Q4. The support train reaches the release source only through its own reviewed pull request,
+Q4. The release train reaches the release source only through its own reviewed pull request,
     opened from a SNAPSHOT branch only the release run writes to — reviewing the live train let a
     one-off merged mid-review ride in unreviewed and let a moving ref mark unshipped items Done —
     never a direct push, which would bypass the source's required checks — and a conflict STOPS
@@ -623,7 +623,7 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "postDeployCheckSkill" "POST-DEPLOY HEALTH" "nothing required from you" \
               "mandatoryLenses" "mandatory lens" "mandatory-lenses.md" \
               "release.releaseBranchPattern" "releaseBranchFixExclusions" "requestPolicy" \
-              "supportTrain.branch" "final-head" "branch-patterns.md" \
+              "releaseTrain.branch" "final-head" "branch-patterns.md" \
               "release.clearance" "clearance.md" "release-tower" "never claims" "handed back at 5b"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
@@ -785,8 +785,8 @@ skills/review/SKILL.md|final-head
 skills/review/references/final-head-request.md|At most once per head
 skills/pr/SKILL.md|requestPolicy
 skills/pr/SKILL.md|releaseBranchPattern
-skills/build-item/SKILL.md|supportTrain.branch
-skills/build-item/references/support-train.md|NOT Done
+skills/build-item/SKILL.md|releaseTrain.branch
+skills/build-item/references/release-train.md|NOT Done
 skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor
 skills/build-item/references/next-unblocked.md|landed set BEFORE the merge
 skills/build-item/SKILL.md|neither Done nor landed

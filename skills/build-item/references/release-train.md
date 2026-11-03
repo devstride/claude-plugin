@@ -1,14 +1,17 @@
 ---
 load: contract
 ---
-# The support train — where one-offs go when one is configured
+# The release train — where one-offs go when one is configured
 
 **Goal:** one-off items (no release-unit ancestor) batch on one long-lived branch that ships with
 every release, instead of each merging straight into `baseBranch` and paying its own CI and
 deploy.
 
-`supportTrain.branch` absent → none of this runs: a one-off's working base is `baseBranch` and it
-takes the full per-story PR ritual, as before. `supportTrain.fastMerges` absent or `false` → a
+`releaseTrain` below means `releaseTrain`, or `supportTrain` when only that is present; both present
+is a config error — STOP and name it.
+
+`releaseTrain.branch` absent → none of this runs: a one-off's working base is `baseBranch` and it
+takes the full per-story PR ritual, as before. `releaseTrain.fastMerges` absent or `false` → a
 one-off on the train still takes the full per-story PR ritual (4b), with the train as the pull
 request's base.
 
@@ -16,12 +19,12 @@ request's base.
 
 - **A train that never ships strands its one-offs.** With `release.mergeTrainBeforeCut` not `true`,
   nothing ever merges the train into `baseBranch`, so route the one-off to `baseBranch` instead and
-  announce why ("support train set, but releases do not merge it").
-- **One-off AND `supportTrain.branch` set (and the train ships) → the working base is the train.**
+  announce why ("release train set, but releases do not merge it").
+- **One-off AND `releaseTrain.branch` set (and the train ships) → the working base is the train.**
   Resolve it with `git ls-remote --exit-code --heads origin <train>`: present → reuse; absent →
-  create it off a freshly fetched `origin/<baseBranch>` and push. Announce "support train <name>:
+  create it off a freshly fetched `origin/<baseBranch>` and push. Announce "release train <name>:
   reused" or "created".
-- **Deploy configuration and migrations never ride the train.** A one-off whose change touches a
+- **One-offs touching deploy configuration or migrations never ride the train; a reviewed release unit may.** A one-off whose change touches a
   path matching an entry of `release.releaseBranchFixExclusions` (absent → nothing is excluded;
   matching per `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`) ships to
   `baseBranch` by the full 4b ritual instead, announced with the matching paths. Decide it at step 0
@@ -31,14 +34,17 @@ request's base.
   touch one is moved with `git rebase --onto origin/<baseBranch> origin/<train>` (a disposable story
   branch; this drops the other one-offs the train carries), its verification receipt is void (rerun
   the local gate on the new tree), and it continues by 4b into `baseBranch` as a `pr-boundary`
-  review.
+  review. A reviewed release unit (an epic's pull request, merged onto the train through its own
+  review) may carry migrations and infrastructure on the train: `release` checks only work no pull
+  request reviewed, and, when `release.devDeployVerification` is set, waits for the development
+  deploy before merging production.
 
 `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/routing.py` implements this routing: `target`
 (with `changedFiles` for the exclusion rule) at step 0, `excluded` for the check before a merge.
 
 ## Delivery path
 
-- **`supportTrain.fastMerges` true → fast mode (4a, then 5a) exactly as for an epic branch, with the
+- **`releaseTrain.fastMerges` true → fast mode (4a, then 5a) exactly as for an epic branch, with the
   train in its place**: the completed risk check (immediate-risk verifier and matched lenses
   included), a green local gate at the profile's `storyVerify` width, a `--no-ff` merge onto the
   train with the subject `merge: <itemNumber> <short scope> into <train>` — the item number always
@@ -50,12 +56,12 @@ request's base.
 
 ## Completion ritual (step 6) for a one-off on the train
 
-- **It is NOT Done yet.** `add_comment` "merged to the support train <name> (<pull request link,
+- **It is NOT Done yet.** `add_comment` "merged to the release train <name> (<pull request link,
   or merge SHA>); ships with the next release". Leave its status as it is — the train is not an
   epic branch, so no merged status — set `startDate`, set no `dueDate`. `release` marks it Done
   when the train's pull request reaches `baseBranch`.
 - The pull request link (4b) and the as-built reconciliation run as usual.
-- Step 7 terminates as for any one-off; the recap says it is on the support train and becomes Done
+- Step 7 terminates as for any one-off; the recap says it is on the release train and becomes Done
   when the next release ships it.
 
 ## Why

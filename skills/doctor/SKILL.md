@@ -114,8 +114,7 @@ next action. For each failure symptom, read
   `protectedBranches`. `release.releaseBranchPattern` set and no `protectedBranches` entry matching
   the names it produces (anchored:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`) → WARN (unprotected);
-  `supportTrain.branch` absent on `origin` → INFO, created on first use. Explicit valid names win
-  without heuristic warnings. Only when an absent key's fallback is missing, match whole remote-head
+  `releaseTrain.branch` absent on `origin` → INFO; `supportTrain` only → NOTE; both → ERROR. Explicit names win; for missing fallback only, match whole remote-head
   names: production = `main`, `master`, `production`, `prod`; development = `develop`,
   `development`, `staging`, `stage`, `canary`, `test`, `testing`, `qa`; `trunk` may be a single
   trunk.
@@ -299,7 +298,7 @@ release safety hooks …), each against its registry `contract`:
   from.
 - **A legacy `release.docsRepo` block**, with or without a `docs` block beside it → FAIL: the
   release skill never acts on it. Fix: `/devstride:setup docs` (migrates and removes it).
-- **`release.deployApproval`, `release.deployVerification`** — each set → its first token
+- **`release.deployApproval`, `release.deployVerification`, `release.devDeployVerification`** — each set → its first token
   resolves (§4's rule), never run; unset is no gap.
 - **`release.clearance`** — null → N/A. §4's validator lines (run it here when §4 did not; both shapes, unknown `provider`,
   missing verb) FAIL. `github` or `devstride` → run its `status` once (read-only), report the line;

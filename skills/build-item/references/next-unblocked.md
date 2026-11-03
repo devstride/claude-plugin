@@ -74,7 +74,7 @@ carries the landed comment.
 - **A story named by number** (`build-item` step 0, a one-off too) skips selection, never this
   guard: it is never rebuilt and stops before step 1. Done → report it; in the landed set → report
   "landed, awaiting its release"; the landed comment outside the set → the recovery above; the
-  support-train comment ("merged to the support train …") → report it ships with the next release.
+  release-train comment ("merged to the release train …") → report it ships with the next release.
 - **Close-out (`build-item` step 8, first thing after the release pull request merges; or
   recovery).** Capture the landed set BEFORE the merge — when step 7 reports the unit at zero, and
   again right before step 8 merges (the range is empty after it). A release already merged, by

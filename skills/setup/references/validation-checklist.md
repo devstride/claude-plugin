@@ -59,7 +59,7 @@ names them — a verdict that hides a skipped test suite is claiming more than i
 7. **Documentation hooks** — only when `docs.updateSkill` / `docs.releaseNotesSkill` is set; `null`
    or absent is `N/A`. Each named `.claude/skills/<name>/SKILL.md` exists, and its `check` mode
    passes (read-only by contract). A legacy `release.docsRepo` block is a `FAIL` whenever present, with or without a `docs`
-   block beside it. `release.deployApproval` and `release.deployVerification`, if set, each resolve but are not run.
+   block beside it. `release.deployApproval`, `release.deployVerification` and `release.devDeployVerification`, if set, each resolve but are not run.
 
 ## Run rules (Phase G cites these; they are the check-execution contract)
 

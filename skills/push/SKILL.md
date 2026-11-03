@@ -36,7 +36,7 @@ type-checked, and pushed — never a pull request (those open separately, not on
 - **Any other type error → do NOT push**; report the errors and ask.
 - **Push**: `git push`. Rejected as non-fast-forward because this branch's history was rewritten →
   `git push --force-with-lease`, never `--force`. **Never force-push a protected branch**
-  (`protectedBranches`, the release pattern and the support train, per
+  (`protectedBranches`, the release pattern and the release train, per
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`) — nor main/master when the
   key is absent.
 

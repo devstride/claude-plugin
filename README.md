@@ -270,9 +270,9 @@ repository's real branch names rather than copying those two values:
 | `release.productionBranch` | The production release target. |
 | `release.releaseBranchPattern` | Optional. Cut each release as its own protected branch (e.g. `release/<YY-MM-DD>[-n]`) so the source keeps receiving merges while the release is reviewed. Absent: the release pull request's head is `release.releaseSource`. |
 | `release.releaseBranchFixExclusions` | Optional. Paths a fix on a release branch may not touch (deploy configuration, migrations): such a fix goes through the source and the release is re-cut. |
-| `supportTrain.branch` | Optional. A long-lived branch one-off work batches on; with `release.mergeTrainBeforeCut` it ships with every release through its own reviewed pull request. Absent: one-offs go to `baseBranch`. |
-| `supportTrain.fastMerges` | Optional. A one-off on the train merges there after its local risk check and gate, without a pull request of its own; the train's pull request is its full review. Absent: a pull request into the train. |
-| `release.mergeTrainBeforeCut` | Optional. Each release first merges the support train into the source through its own reviewed pull request. Without it a configured train is bypassed, so one-offs go to `baseBranch`. |
+| `releaseTrain.branch` | Optional. A long-lived branch one-off work batches on; with `release.mergeTrainBeforeCut` it ships with every release through its own reviewed pull request. Absent: one-offs go to `baseBranch`. |
+| `releaseTrain.fastMerges` | Optional. A one-off on the train merges there after its local risk check and gate, without a pull request of its own; the train's pull request is its full review. Absent: a pull request into the train. |
+| `release.mergeTrainBeforeCut` | Optional. Each release first merges the release train into the source through its own reviewed pull request. Without it a configured train is bypassed, so one-offs go to `baseBranch`. |
 | `conventionsDoc` | Your coding-standards file. The build skill reads it and obeys it — this is how the loop writes code that looks like yours. |
 | `verify.typecheck` | Type checks; unchanged-tree receipts prevent identical reruns. |
 | `verify.test` | Your test suite. Green is a gate, not a suggestion. |
@@ -340,7 +340,7 @@ loaded once per top-level run so composed skills do not repeatedly spend context
 
 When releases are cut from more than one machine, or by more than one person or agent, set
 `"release": { "clearance": { "provider": "github" } }`. The release skill then claims clearance
-before it touches the support train or cuts a release branch, waits and tells you who holds it
+before it touches the release train or cuts a release branch, waits and tells you who holds it
 when another session is releasing, keeps a heartbeat so a crashed session cannot hold the runway
 forever, flags a live release whose phase has run past its time budget as stuck, can adopt a
 release a dead or stopped session left half-done (with your yes), and hands clearance back as soon
@@ -482,9 +482,9 @@ take the stricter path when their hook is missing or cannot answer. Shared rule:
 Codex, a script or a person can follow the same routing without Claude. `skills/build-item/scripts/routing.py`
 is the loop's rule for where an item lands and what its branches are called, as one dependency-free
 Python 3 file: JSON in on stdin, JSON out. `target` answers "which branch does this item land on"
-(its epic's integration branch, the support train, or the base branch), `branch-name` names the
+(its epic's integration branch, the release train, or the base branch), `branch-name` names the
 feature branch, `match` applies the branch-pattern rule, and `excluded` lists changed files that may
-not ride the support train. Pass `oneOff: true` for an item delivered outside a plan, and `roles`
+not ride the release train. Pass `oneOff: true` for an item delivered outside a plan, and `roles`
 when your config has no `hierarchyRoles`. `routing-fixtures.json` beside it holds the canonical examples; if your
 repository implements the rule itself, run those examples against your implementation in its tests.
 
@@ -500,7 +500,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.21.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.22.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

@@ -4,7 +4,7 @@ load: contract
 # Release clearance — one cleared release at a time, across every machine and account
 
 **Goal:** when releases are cut from several machines, people or agents, only one is in flight. A session asks for CLEARANCE before it touches anything a release touches
-(the support train, the cut, the release pull request), keeps a heartbeat while it works, and hands
+(the release train, the cut, the release pull request), keeps a heartbeat while it works, and hands
 clearance back as soon as nothing the next release depends on is left: after the post-deploy check
 and the source sync, before documentation and the rest of the close-out. A second session is told
 who holds it and waits; the next cleared release carries that session's work, so there is never a

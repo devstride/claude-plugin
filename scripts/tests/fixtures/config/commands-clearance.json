@@ -1,2 +1,3 @@
-{ "release": { "clearance": { "commands": { "claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a", "owed": "o" } } },
+{ "supportTrain": { "branch": "train/support", "fastMerges": false },
+  "release": { "clearance": { "commands": { "claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a", "owed": "o" } } },
   "claims": { "commands": { "claim": "c", "heartbeat": "h", "release": "r", "get": "g", "list": "l" }, "expiryMinutes": { "story": 90 } } }

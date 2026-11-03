@@ -23,7 +23,7 @@
         "Defect"
       ]
     },
-    "supportTrain": {
+    "releaseTrain": {
       "branch": "train/support",
       "fastMerges": true
     },
@@ -439,7 +439,7 @@
       }
     },
     {
-      "name": "a one-off (no epic above it) rides the support train",
+      "name": "a one-off (no epic above it) rides the release train",
       "chain": [
         {
           "number": "I400",
@@ -462,7 +462,61 @@
       }
     },
     {
-      "name": "the support train is created when it is not on origin",
+      "name": "a config carrying only the old supportTrain name still routes a one-off to the train",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        },
+        {
+          "number": "F900",
+          "title": "Support"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "config": {
+        "releaseTrain": null,
+        "supportTrain": {
+          "branch": "train/support",
+          "fastMerges": true
+        }
+      },
+      "expect": {
+        "kind": "train",
+        "branch": "train/support",
+        "create": false
+      }
+    },
+    {
+      "name": "a config carrying both releaseTrain and supportTrain is malformed",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        },
+        {
+          "number": "F900",
+          "title": "Support"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "config": {
+        "supportTrain": {
+          "branch": "train/support"
+        }
+      },
+      "error": true
+    },
+    {
+      "name": "the release train is created when it is not on origin",
       "chain": [
         {
           "number": "I400",
@@ -550,9 +604,9 @@
       }
     },
     {
-      "name": "no support train configured: the base branch",
+      "name": "no release train configured: the base branch",
       "config": {
-        "supportTrain": null
+        "releaseTrain": null
       },
       "chain": [
         {
@@ -747,7 +801,7 @@
           "pattern": "<prefix>/<MM-DD-YY>/<I#####>-<slug>",
           "dateFormat": "MM-DD-YY"
         },
-        "supportTrain": null
+        "releaseTrain": null
       },
       "prefix": "jane",
       "date": "10-02-26",
@@ -1140,7 +1194,7 @@
       }
     },
     {
-      "name": "naming the support train explicitly does not let deploy configuration ride it",
+      "name": "naming the release train explicitly does not let deploy configuration ride it",
       "chain": [
         {
           "number": "I400",

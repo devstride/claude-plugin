@@ -19,7 +19,7 @@ as its SKILL.md says (every engine on the production PR, every `releaseOnly` che
 ```
 
 With `reviewIdenticalTree: false`, step 2 compares the release head's tree with the tree a full
-review last settled at a pull request into `releaseSource` (the support-train pull request, an
+review last settled at a pull request into `releaseSource` (the release-train pull request, an
 epic release pull request): `git rev-parse <sha>^{tree}`.
 
 - **Identical** → no merge-gate review on the production pull request. Instead, run ONE pass of
@@ -47,7 +47,7 @@ be computed runs the check.
 
 ## A train that carries reviewed release units
 
-Only when `release.productionReview` is set and `epicIntegrationBranches.releaseTarget` is the support train's branch: a finished epic reaches the
+Only when `release.productionReview` is set and `epicIntegrationBranches.releaseTarget` is the release train's branch: a finished epic reaches the
 train through its own release pull request — its full review — and the train pull request
 (`release-branch.md` §1 step 4) then reviews only what no pull request has reviewed: the commits
 the fast one-offs brought, NOT the commits a merged, reviewed release pull request brought (list

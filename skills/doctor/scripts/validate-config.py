@@ -15,7 +15,9 @@ the x-severity annotation for deprecated keys. No JSON Schema library is needed.
 
 Output: the first line is
     CONFIG: <n> error(s), <m> warning(s) against schema <version>
-then one line per finding, `ERROR <path>: <message>` or `WARN <path>: <message>`. With --json, one
+then one line per finding, `ERROR <path>: <message>`, `WARN <path>: <message>` or (uncounted)
+`NOTE <path>: <message>` — a NOTE is the legacy `supportTrain` name; carrying both it and
+`releaseTrain` is an ERROR. With --json, one
 JSON document instead (`schemaVersion`, `errors`, `warnings`, `findings`; on exit 2 the counts are
 null and `fatal` carries the one-line reason). An unknown key is a WARN (with the closest registered key when one is
 similar enough); a wrong type, a value outside its enum, a missing required key, both shapes of a
@@ -282,16 +284,22 @@ def main(argv):
     local = [p for p in local if isinstance(p, str) and p] if isinstance(local, list) else []
     v = Validator(schema, local)
     v.walk(config, schema, "")
+    if isinstance(config, dict) and config.get("releaseTrain") is not None and config.get("supportTrain") is not None:
+        v.add("ERROR", "supportTrain", "supportTrain is the old name of releaseTrain and both are set; "
+              "keep releaseTrain only")
+    elif isinstance(config, dict) and config.get("supportTrain") is not None:
+        v.add("NOTE", "supportTrain", "supportTrain is the old name of releaseTrain; rename it")
     errors = [f for f in v.findings if f[0] == "ERROR"]
     warns = [f for f in v.findings if f[0] == "WARN"]
+    notes = [f for f in v.findings if f[0] == "NOTE"]
     version = schema_version(schema)
     if as_json:
         print(json.dumps({"schemaVersion": version, "errors": len(errors), "warnings": len(warns),
                           "findings": [{"severity": s, "path": p, "message": m}
-                                       for s, p, m in errors + warns]}, indent=2))
+                                       for s, p, m in errors + warns + notes]}, indent=2))
     else:
         print("CONFIG: %d error(s), %d warning(s) against schema %s" % (len(errors), len(warns), version))
-        for s, p, m in errors + warns:
+        for s, p, m in errors + warns + notes:
             print("%s %s: %s" % (s, p, m))
     return 1 if errors else 0
 

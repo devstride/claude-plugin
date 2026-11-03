@@ -2,7 +2,7 @@
 """Where a leaf item lands, and what its branches are called — deterministic, dependency-free.
 
 The single implementation of the routing rule in `skills/build-item/SKILL.md` ("Working base")
-and `references/support-train.md`, and of the matching rule in
+and `references/release-train.md`, and of the matching rule in
 `skills/release/references/branch-patterns.md`. Claude follows those documents; any other agent
 (Codex, a script, a person) runs this file and gets the same answer. A repository's own tooling
 that re-implements the rule should run `routing-fixtures.json` beside it against itself.
@@ -24,7 +24,7 @@ it is the production branch or the release source, matches `protectedBranches` o
 `release.releaseBranchPattern`, or is not on origin) → `integrationBranch` → for an item that is NOT a
 one-off, the NEAREST release-unit ancestor's integration branch when `epicIntegrationBranches.enabled`
 (one on origin → reuse; several → ask; none, but one in an older naming → ask; else create) → for a
-one-off, the support train when `supportTrain.branch` is set AND `release.mergeTrainBeforeCut` is
+one-off, the release train when `releaseTrain.branch` (or, by its old name, `supportTrain.branch`) is set AND `release.mergeTrainBeforeCut` is
 true, unless a changed file matches `release.releaseBranchFixExclusions` (then the base branch, by
 its own pull request) → `baseBranch`. `create: true` means: create it on origin off `baseBranch`.
 
@@ -140,6 +140,16 @@ def section(config, key):
     return value if isinstance(value, dict) else {}
 
 
+def train_section(config):
+    """The train's settings: `releaseTrain`, or — when only the old name is present — `supportTrain`.
+    A config carrying both is malformed (exit 2): which one wins would be a guess."""
+    if isinstance(config.get("releaseTrain"), dict) and isinstance(config.get("supportTrain"), dict):
+        fail("config: both releaseTrain and supportTrain are set — supportTrain is the old name of "
+             "releaseTrain; keep releaseTrain only")
+    new = section(config, "releaseTrain")
+    return new if new else section(config, "supportTrain")
+
+
 def need(value, what):
     if not isinstance(value, str) or not value:
         fail("config: %s is missing" % what)
@@ -195,14 +205,14 @@ def cmd_target(req):
     files = req.get("changedFiles") or []
     if not isinstance(files, list) or not all(isinstance(f, str) for f in files):
         fail("target: changedFiles must be a list of paths")
-    train = section(config, "supportTrain").get("branch")
+    train = train_section(config).get("branch")
     blocked = [f for f in files if first_match(f, release.get("releaseBranchFixExclusions") or [])]
 
     def landing(kind, branch, create, reason):
         # Deploy configuration and migrations never ride the train, however the train was chosen.
         if train and branch == train and blocked:
             return {"kind": "base", "branch": base, "create": False,
-                    "reason": "it touches %s, which never rides the support train" % ", ".join(blocked)}
+                    "reason": "it touches %s, which never rides the release train" % ", ".join(blocked)}
         return {"kind": kind, "branch": branch, "create": create, "reason": reason}
 
     explicit = req.get("explicit")
@@ -250,7 +260,7 @@ def cmd_target(req):
         return landing("train", train, train not in heads, "a one-off")
     reason = "a one-off"
     if train:
-        reason += " (support train set, but releases do not merge it)"
+        reason += " (release train set, but releases do not merge it)"
     return {"kind": "base", "branch": base, "create": False, "reason": reason}
 
 
