@@ -79,12 +79,16 @@ else bad "(3) rc=$RC: $OUT"; fi
 # (4) a lost race: another claimant lands between this one's read and its push. A pre-receive
 #     hook on origin declines the claimant's pushes while the ref is absent (a hook cannot move a
 #     ref itself), and a side process creates the other claimant's ref the moment the first push
-#     was declined; the claimant's loop re-reads, finds the winner, and reports BUSY.
+#     was declined; the claimant's loop re-reads, finds the winner, and reports BUSY. The hook
+#     declines only once the winner's ref exists, so a slow runner cannot spend the claimant's
+#     retries before the side process lands it.
 fresh race
 cat > "$STATE/origin.git/hooks/pre-receive" <<HOOK
 #!/bin/bash
 if [ -f "$STATE/race-armed" ] && ! git rev-parse -q --verify refs/clearance/release >/dev/null; then
-  : > "$STATE/race-declined"; echo "another claimant is landing" >&2; exit 1
+  : > "$STATE/race-declined"
+  n=0; until git rev-parse -q --verify refs/clearance/release >/dev/null || [ \$n -ge 400 ]; do sleep 0.05; n=\$((n + 1)); done
+  echo "another claimant is landing" >&2; exit 1
 fi
 exit 0
 HOOK
