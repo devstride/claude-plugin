@@ -209,6 +209,14 @@ git checkout -q train; unit epic "Merge pull request #7 from acme/jane/26-10-01/
 git checkout -q -b epic2 train; sed -i.bak 's/^2$/two/' infra/big.tf; rm -f infra/big.tf.bak; git commit -qam "epic edits line 2"
 git checkout -q train; git merge -q --no-ff -m "Merge pull request #8 from acme/jane/26-10-01/epic-billing" epic2; stub 8 train MERGED "$(git rev-parse HEAD)"
 stub 7 train MERGED "$(git rev-parse HEAD^1)"
-git merge -q --no-ff -m "merge the source" develop; run t20
+git merge -q --no-ff -m "merge the source" develop || bad "(20) setup: the source merge failed"
+[ "$(git rev-list --parents -n 1 HEAD | wc -w | tr -d " ")" = 3 ] || bad "(20) setup: HEAD is not the source merge"; run t20
 expect "(20) a clean source merge of a file both sides edited is allowed" 0 "d['refused']==[] and 8 in d['reviewedUnits']"
+# (21) a modify/delete conflict on an excluded file leaves no markers; its resolution is still checked
+repo t21; echo keep > infra/gone.tf; git add -A; git commit -qm "gone.tf"; git checkout -q develop; git merge -q --ff-only train
+git update-ref refs/remotes/origin/develop develop; SB="$(git rev-parse HEAD)"; git checkout -q train
+git checkout -q develop; git rm -q infra/gone.tf; git commit -qm "source deletes gone.tf"; git update-ref refs/remotes/origin/develop develop
+git checkout -q train; echo edited > infra/gone.tf; git commit -qam "train edits gone.tf"
+git merge -q --no-ff --no-commit develop >/dev/null 2>&1; git rm -q infra/gone.tf; git commit -qm "merge the source"; run t21
+expect "(21) a modify/delete conflict on an excluded file, resolved by deleting it, is refused" 1 "'infra/gone.tf' in d['refused']"
 exit $FAIL

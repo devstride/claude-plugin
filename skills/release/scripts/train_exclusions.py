@@ -132,19 +132,29 @@ def name_status(repo, first, c):
 
 def merge_only_changes(repo, c, parents):
     """Files a merge's result changes beyond what git's own merge of its parents produces: conflict
-    resolutions and hand edits ('evil merges'). A clean automatic merge of edits both sides made to
-    one file is not listed. Two parents: compared with `git merge-tree --write-tree` (git 2.38+;
-    a conflicted file there carries markers, so any resolution of it is listed). Otherwise, or on
-    an older git, the combined diff (`--cc`), which also lists cleanly merged files: stricter, never
-    looser."""
-    if len(parents) == 2:
-        p = git(repo, "merge-tree", "--write-tree", "--no-messages", parents[0], parents[1], check=False)
-        tree = p.stdout.decode("utf-8", "replace").split("\n", 1)[0].strip() if p.returncode in (0, 1) else ""
-        if re.fullmatch(r"[0-9a-f]{40,64}", tree):
-            out = git(repo, "diff", "--name-only", "--no-renames", "-z", tree, c).stdout
-            return zlist(out.decode("utf-8", "surrogateescape"))
-    out = git(repo, "diff-tree", "-z", "--cc", "--name-only", "--no-commit-id", "-r", c).stdout
-    return zlist(out.decode("utf-8", "surrogateescape"))
+    resolutions and hand edits ('evil merges'), plus every path git reported as conflicted (a
+    modify/delete or rename conflict leaves no markers, so its resolution may match the synthetic
+    tree). A clean automatic merge of edits both sides made to one file is not listed. Two parents
+    are compared with `git merge-tree --write-tree` (git 2.38+); when it cannot run the check stops
+    (exit 2) rather than check less. More than two parents: the combined diff (`--cc`); such a merge
+    is also checked in full against its first parent."""
+    if len(parents) != 2:
+        out = git(repo, "diff-tree", "-z", "--cc", "--name-only", "--no-commit-id", "-r", c).stdout
+        return zlist(out.decode("utf-8", "surrogateescape"))
+    p = git(repo, "merge-tree", "--write-tree", "--no-messages", "-z", parents[0], parents[1], check=False)
+    tokens = p.stdout.decode("utf-8", "surrogateescape").split("\0")
+    tree = tokens[0].strip() if tokens else ""
+    if p.returncode not in (0, 1) or not re.fullmatch(r"[0-9a-f]{40,64}", tree):
+        fail("git merge-tree --write-tree failed for %s (git 2.38 or newer is needed): %s"
+             % (c, p.stderr.decode("utf-8", "replace").strip()))
+    conflicted = set()
+    if p.returncode == 1:
+        for entry in tokens[1:]:
+            if not entry:
+                break
+            conflicted.add(entry.split("\t", 1)[1] if "\t" in entry else entry)
+    out = git(repo, "diff", "--name-only", "--no-renames", "-z", tree, c).stdout
+    return sorted(set(zlist(out.decode("utf-8", "surrogateescape"))) | conflicted)
 
 
 def analyse(repo, config, source_before, head, train, start_on="source"):
@@ -231,8 +241,11 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
                 if is_ancestor(repo, parents[1], origin_source):
                     # a source merge brings only what the source changed: anything else it does to
                     # the train side (a resolution that deletes or edits train work) is checked
-                    base = git_text(repo, "merge-base", parents[0], parents[1]).strip()
-                    for p in names(parents[0], c) - names(base, parents[1]):
+                    # every merge base (criss-cross history has several): what the source changed
+                    # since any of them is the source's own work
+                    bases = git_text(repo, "merge-base", "--all", parents[0], parents[1]).split()
+                    brought = set().union(*(names(b, parents[1]) for b in bases)) if bases else set()
+                    for p in names(parents[0], c) - brought:
                         flag_merge_path(p)
                     continue
                 number = reviewed_unit(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip(), epic_regex, train) \
