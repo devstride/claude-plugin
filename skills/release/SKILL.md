@@ -27,7 +27,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 
 - **Config wins.** Load `.claude/ds-config.json` first: `release.productionBranch`,
   `release.releaseSource`, `release.autoDeployOnMerge` (a plain-English string quoted back to the
-  owner — never assume a provider), `release.deployApproval`, `release.deployVerification`,
+  owner — never assume a provider), `release.deployApproval`, `release.deployVerification`, `release.devDeployVerification`,
   the hooks its steps run, `baseBranch`, `protectedBranches` (names or patterns),
   `release.releaseBranchPattern`, `release.releaseBranchFixExclusions`,
   `release.mergeTrainBeforeCut`, `releaseTrain.branch`, `release.clearance`, and the `review.*` /
@@ -35,22 +35,20 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   **If the file disagrees, the file wins**; absent → the inline defaults, said so.
 - **Hooks run through step skills** (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md`):
   call each by name, read its first-line verdict, decide what follows; never inline its logic.
-- **Steps 0–3 run autonomously**, surfacing only genuine forks (an ambiguous/risky/unverifiable
-  finding, an unresolvable conflict, an infra/secret gate the owner must provision).
+- **Steps 0–3 run autonomously**, surfacing only genuine forks (an unverifiable finding, an unresolvable conflict, an infra/secret gate the owner must provision).
 - **The production merge is a human gate.** NEVER merge the release PR into `master` without an
   explicit, in-the-moment owner go-ahead — it deploys production. Invoking `/devstride:release` is
-  intent to PREPARE, never standing authorization to deploy.
+  intent to PREPARE, never standing consent to deploy.
 - **Docs are on by default and still outward-facing.** With `docs.updateSkill` registered the
   update is pre-authorized, runs only after the deploy is confirmed (5c), and "no docs" suppresses
   it and the knowledge-base sync. **This skill never edits documentation or writes notes**; it
-  translates its steps' results, links exact, and returns to the code repo.
-- **Release notes are NEVER written without `--release-notes`.** No size, scope or "user-facing"
-  threshold is interpreted on the owner's behalf; if a release seems to deserve one, say so in the
-  step-4 summary and let them add the flag.
+  translates its steps' results, links exact.
+- **Release notes are NEVER written without `--release-notes`.** No size or scope threshold is
+  interpreted on the owner's behalf; if a release seems to deserve one, say so in step 4's recap.
 - **CI last, once.** The release PR is a draft whenever PR workflows exist; review and the
   release-gating pre-ship checks settle first; `review`'s ready-flip releases CI once on the final
   reviewed head.
-- **Real systems.** The DevStride MCP targets PRODUCTION; git/gh act on the real repos. The
+- **Real systems.** The DevStride MCP targets PRODUCTION; git/gh act on real repos. The
   production merge and anything the local docs skills publish are user-visible events. `develop` and
   `master` are protected — never force-push either, never `--delete-branch` a PR headed by one.
 - **A release branch is PROTECTED** (any name matching `release.releaseBranchPattern`): new commits
@@ -58,8 +56,8 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   deleted. **Every commit added to one first passes the fix-exclusion check** against
   `release.releaseBranchFixExclusions`; a match is REFUSED (abandon and re-cut). **Read
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` when
-  `release.releaseBranchPattern` or `release.mergeTrainBeforeCut` is set** — steps 0b and 0c, the
-  fix-commit check, the hotfix rule and step 5b's branch work; names match per
+  `release.releaseBranchPattern` or `release.mergeTrainBeforeCut` is set** (steps 0b, 0c, 5b, the
+  fix-commit check, hotfixes); names match per
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`, never by substring.
 - **Clearance first, handed back at 5b** when `release.clearance` is set (contract and commands:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`): step 0a claims it before
@@ -92,8 +90,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 - **0b. Merge the release train** when `release.mergeTrainBeforeCut` is `true` and no release BRANCH
   was adopted (else nothing merges first): a snapshot of the train in
   its own draft PR into `releaseSource`, fully reviewed, CI once, merged, and every one-off it
-  carried closed — `release-branch.md` §1. Nothing ahead → a reported no-op. A late train landing
-  is offered while that PR is a draft, absorbed on the owner's word (§1 4a).
+  carried closed — `release-branch.md` §1 (nothing ahead → a reported no-op).
 - `git fetch origin master develop`; `origin/develop` not ahead of `origin/master` → STOP, nothing to
   release.
 - **No freeze.** Open PRs into `releaseSource` are never settled, parked or waited for; a leftover
@@ -189,11 +186,11 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 Immediately before, run **`classify-release`** again at the head 2b tests (a merge, fix or hotfix
 since step 0 changes the delta); then **`pre-ship release run`** on the release diff with THAT class
 — the only thing validating those suites before production (`PRE-SHIP: NOTHING TO RUN` is an
-explicit no-op; say so). Step 4 reports that class.
+explicit no-op, said so). Step 4 reports that class.
 
 - **`PRE-SHIP: FAIL` is a STOP** — fix it or surface it as a release blocker naming every failed
-  entry and spec. Never present a release green over a red or unrun check; never say "covered by CI".
-- Report each entry's result in the step-4 summary. The owner may explicitly waive one ("skip
+  entry and spec. Never present a release green over a red or unrun check, or say "covered by CI".
+- Report each entry's result in step 4's recap. The owner may explicitly waive one ("skip
   <name>") — pass `--skip <name>`, reported `WAIVED`; "not run" is legitimate, silent omission is not.
 
 ## 2c. Discharge the pre-ship hold
@@ -236,6 +233,9 @@ the deploy.
   `release-branch.md` §4, then back to step 2. With clearance, append the provider's `status`
   to the recap: a `Hotfix landed` line goes to §4 first; a `Waiting` line names who is next; and
   on the yes this pull request must be the one `On final`, else STOP.
+- **Development deploy wait** (`release.devDeployVerification` set AND the delta touches a
+  `release.releaseBranchFixExclusions` path): the recap names it; after the yes, before `gh pr
+  merge`, run it per `docs-hooks.md` (0 go, 2 poll, 1 STOP).
 - **On the yes**, confirm: the head equals `<reviewedHead>` (the only tolerated advance is `review`
   7.3's same-tree empty re-trigger commit; anything else → back to step 2); CI is green at that
   head; in a draft-hold repo the PR is non-draft (still draft means CI never ran — do NOT merge; a

@@ -52,7 +52,8 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROUTING = os.path.join(HERE, "..", "..", "build-item", "scripts", "routing.py")
+SKILLS = os.path.dirname(os.path.dirname(HERE))
+ROUTING = os.path.join(SKILLS, "build-item", "scripts", "routing.py")
 
 
 def fail(msg):

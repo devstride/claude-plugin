@@ -33,6 +33,9 @@ for f in hooks/*.sh scripts/*.sh scripts/tests/*.sh skills/*/scripts/*.sh; do
   "$SH" -n "$f" && echo "ok $f" || fail 5
 done
 
+step "5b the old config name supportTrain stays out of skill text (scripts/check-train-name.sh)"
+bash scripts/check-train-name.sh || fail 5b
+
 step "6/7 script tests (scripts/tests/run.sh)"
 bash scripts/tests/run.sh || fail 6
 

@@ -8,6 +8,21 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **The support train is now the release train.** The config key is `releaseTrain` (`supportTrain` is
+  still read by name when `releaseTrain` is absent; `doctor` notes it, and a file carrying both is an
+  error). Snapshots are `release-train-<date>`, titled `Release train:`, with the range marker
+  `devstride:release-train`; the release still finds and finishes a pull request from before the
+  rename. A repository whose merge rules admit only `*/*/support-train-*` must add
+  `*/*/release-train-*` before updating.
+- **A reviewed release unit may carry migrations and infrastructure on the train.** The exclusion
+  check (`skills/release/scripts/train_exclusions.py`) now covers only work no pull request
+  reviewed: fast-merged one-offs, direct commits and snapshot fixes. Optional
+  `release.migrationRenumber` allows a byte-identical migration renumber forced by merging the
+  source into the snapshot, and optional `release.devDeployVerification` makes the release wait for
+  the development deploy before the production merge, when the release touches an excluded path.
+
 ## [3.21.0] — 2026-11-03
 
 ### Added

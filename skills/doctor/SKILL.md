@@ -114,10 +114,8 @@ next action. For each failure symptom, read
   `protectedBranches`. `release.releaseBranchPattern` set and no `protectedBranches` entry matching
   the names it produces (anchored:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`) → WARN (unprotected);
-  `releaseTrain.branch` absent on `origin` → INFO, created on first use. Config carries `supportTrain`
-  and no `releaseTrain` → NOTE "supportTrain is the old name of releaseTrain; rename it" (never an
-  error; the plugin honours it by name). BOTH keys present → ERROR (which one wins would be a guess). Explicit valid names win
-  without heuristic warnings. Only when an absent key's fallback is missing, match whole remote-head
+  `releaseTrain.branch` absent on `origin` → INFO; `supportTrain` alone →
+  NOTE; both → ERROR. Explicit names win; for an absent key's missing fallback only, match whole remote-head
   names: production = `main`, `master`, `production`, `prod`; development = `develop`,
   `development`, `staging`, `stage`, `canary`, `test`, `testing`, `qa`; `trunk` may be a single
   trunk.

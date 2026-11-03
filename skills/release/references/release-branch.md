@@ -7,6 +7,11 @@ load: contract
 the source keeps receiving merges while the release is reviewed, and — when configured — the
 release train's one-offs merged into the source first so they ship with it.
 
+A reviewed release unit (an epic's pull request merged onto the train through its own review) may
+carry migrations and infrastructure on the train; the exclusion check below covers only work no
+pull request reviewed, and `release.devDeployVerification` makes the release wait for the
+development deploy (SKILL step 4).
+
 Every key here is optional. `release.releaseBranchPattern` absent → no release branch: the release
 pull request's head is `release.releaseSource`, as before, and sections 2–4 and 5.1–5.2 do not run.
 §5.3 runs whenever `releaseTrain.branch` is set. `release.mergeTrainBeforeCut` absent or `false`, or
@@ -24,12 +29,30 @@ The live train keeps receiving one-offs from other sessions while this runs, so 
 reviews or merges the live branch: it reviews a SNAPSHOT that only this run writes to. Every
 release-train pull request records its range in a body marker,
 `<!-- devstride:release-train source <sourceBefore> snapshot <trainSnapshot> -->`; that marker,
-never the live train, is what closes items later.
+never the live train, is what closes items later. A pull request from before the rename carries
+`<!-- devstride:support-train source … snapshot … -->` with the same fields and is read the same way.
 
-**Finding release-train pull requests.** Query `gh pr list --base <releaseSource> --state <state>
---search 'in:title "Release train:" sort:created-desc' --json number,title,body,mergedAt --limit
-50`, then keep only titles starting `Release train:` whose body carries the marker; for merged ones
-take the latest `mergedAt`. Never trust best-match ranking or a body match alone.
+**The exclusion check (`train_exclusions.py`).** Migrations and deploy configuration
+(`release.releaseBranchFixExclusions`) may ride the train only inside a REVIEWED release unit. The
+check is `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/train_exclusions.py --config
+.claude/ds-config.json --source-before <from> --head <to>` (its header documents the rules): over
+each first-parent commit in the range it leaves out merges of `releaseSource` and merges of a pull
+request that `gh` confirms was merged onto the train as a release unit, and checks every other commit
+(a fast-merged one-off, a direct commit, a snapshot fix). Exit 1 → STOP, naming each file in
+`refused` and saying: "this touches deploy configuration or database migrations without a reviewed
+pull request; merge it to <releaseSource> through a normal pull request, then re-run." Exit 2 → STOP
+on the error. `allowedRenumbers` (only with `release.migrationRenumber` set) lists each migration
+renumber the source merge forced; the snapshot pull request's body reports each as "migration
+renumbered NNNN → MMMM (the source took NNNN)".
+
+**Finding release-train pull requests — both spellings, permanently.** Run two queries, one per
+title, because `gh pr list --search` has no reliable OR across quoted phrases: `gh pr list --base
+<releaseSource> --state <state> --search 'in:title "Release train:" sort:created-desc' --json
+number,title,body,mergedAt --limit 50` and the same with `"Support train:"`. Merge the results and
+keep only titles starting `Release train:` OR `Support train:` whose body carries
+`devstride:release-train` OR `devstride:support-train` (the marker written before the rename), so an
+interrupted run, or an open train pull request from before the update, is still finished or adopted;
+for merged ones take the latest `mergedAt`. Never trust best-match ranking or a body match alone.
 
 1. **Finish an interrupted earlier run first**, every time: for the latest merged release-train
    pull request, apply step 6 to its marker's range. Step 6 skips any item already Done or already
@@ -60,24 +83,25 @@ take the latest `mergedAt`. Never trust best-match ranking or a body match alone
    `fix-exclusions: true`. `pr` owns the draft hold, the pre-ship checks its step 2 selects and the
    ready-flip that releases CI once; the untracked-deferral list it returns (an adopted run's too)
    goes to `release` step 2, never spliced. Fixes are committed on the snapshot, each passing §3's
-   fix-exclusion check first (a migration or deploy-configuration fix leaves the train: merge it to
-   the source by its own pull request).
+   staged-file check first (a migration or deploy-configuration fix leaves the train: merge it to
+   the source by its own pull request); once cut (and again on an adopted pull request) run the
+   exclusion check with `--source-before <sourceBefore> --head <snapshot head>` and put each
+   `allowedRenumbers` entry in the body.
 4a. **Absorb late landings — before the ready-flip only.** While the snapshot pull request is a
    draft (an adopted one included), each progress report runs `git fetch origin <releaseSource> <train>` and
    names any late one-offs in `git log --no-merges --oneline <trainSnapshot>..origin/<train>`.
    On the owner's instruction — applied before `review` step 7's ready-flip, never after — it
-   resolves `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said back): `<trainSnapshot>` must be its ancestor (else STOP); §3's exclusion check over the files
-   of the NEW train work only, `git log --no-merges --name-only --format=
-   <trainSnapshot>..<absorbAt> ^origin/<releaseSource>` (source commits are not train work; a
-   match STOPS); `git merge --no-ff <absorbAt>` into the snapshot (a conflict
+   resolves `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said back): `<trainSnapshot>` must be its ancestor (else STOP); the exclusion check over the NEW train
+   work only, `--source-before <trainSnapshot> --head <absorbAt>` (source merges are not train
+   work; exit 1 STOPS); `git merge --no-ff <absorbAt>` into the snapshot (a conflict
    STOPS) and push; rewrite the marker to `snapshot <absorbAt>`, the title's count and the body's
    list, so step 6 closes exactly what shipped. The absorbed range then gets its first full
    review before the flip: one FULL-scope cycle of every configured engine with the ledger,
    outside the cycle budget (a required engine that cannot run STOPS). Later landings ship next time, said so. After the ready-flip the offer closes
    (a push would restart CI).
-5. **Merge** — first `git fetch origin <releaseSource>` and run §3's exclusion check over
-   `git diff --name-only --no-renames origin/<releaseSource>...<reviewedHead>` (source-owned
-   changes are not train work; a match STOPS); then `gh pr merge <n> --merge --match-head-commit <reviewedHead>
+5. **Merge** — first `git fetch origin <releaseSource>` and run the exclusion check with
+   `--source-before <sourceBefore> --head <reviewedHead>` (source merges are not train work, and a
+   reviewed release unit is allowed; exit 1 STOPS); then `gh pr merge <n> --merge --match-head-commit <reviewedHead>
    --delete-branch` (the snapshot is disposable). **Never a direct push to `releaseSource`**: its
    own required checks run on the pull request. A verified P1 or serious P2 that is not fixed STOPS
    the release.

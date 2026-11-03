@@ -41,6 +41,7 @@ BARE = re.compile(r"`([A-Za-z]+)`")
 def keys(text):
     dotted = {k for k in KEY.findall(text) if k.rsplit(".", 1)[-1] not in FILE_EXT}
     return dotted | {k for k in BARE.findall(text) if k in TOP}
+RENAMED = {"supportTrain.branch": "releaseTrain.branch", "supportTrain.fastMerges": "releaseTrain.fastMerges"}
 def read(rel):
     p = os.path.join(root, rel)
     return open(p, encoding="utf-8").read() if os.path.isfile(p) else ""
@@ -56,7 +57,8 @@ for n in names:
         for rel in POINTER.findall(text):
             reach.append(read(rel))
     after = set().union(*(keys(t) for t in reach))
-    lost = sorted(before - after)
+    # a key renamed on purpose counts as kept when its new name is cited (the old name is read by name)
+    lost = sorted(k for k in before - after if RENAMED.get(k, k) not in after)
     counts.append("%s %d" % (n, len(before)))
     problems += ["LOST %s: %s" % (n, k) for k in lost]
 print("\n".join(problems) or "clean " + ", ".join(counts))
