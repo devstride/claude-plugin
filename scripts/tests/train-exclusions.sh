@@ -142,4 +142,51 @@ late t14 "Merge pull request #7 from acme/jane/26-10-01/epic-checkout"; stub 7 t
 expect "(14) a reviewed epic absorbed late into the snapshot passes the whole-range check" 0 "d['refused']==[] and d['reviewedUnits']==[7]"
 late t14b "merge: item-2 col into train"; run t14b; unset HEAD_REF
 expect "(14b) a one-off carrying a migration absorbed late is still refused" 1 "'db/migrations/0002_col.sql' in d['refused']"
+
+# (15) octopus merges are never exempt: an unreviewed branch inside one is checked
+repo t15; git checkout -q develop; echo d > src/d.txt; git add -A; git commit -qm "source tip"; git update-ref refs/remotes/origin/develop develop
+git checkout -q -b side "$SB"; echo s > src/s.txt; git add -A; git commit -qm side
+git checkout -q -b unrel "$SB"; echo y > db/migrations/y.sql; git add -A; git commit -qm unrel; git checkout -q train
+git merge -q -m "octopus" develop side unrel >/dev/null 2>&1; run t15
+expect "(15) an octopus merge carrying an unreviewed migration is refused" 1 "d['refused']==['db/migrations/y.sql']"
+
+# (16) step 4a's exact call: the start is the snapshot, which is on the train and not on the source
+repo t16; unit first "merge: item-0 docs into train" src/first.txt; SNAP="$(git rev-parse HEAD)"; git branch snapshot
+unit late "Merge pull request #7 from acme/jane/26-10-01/epic-checkout" db/migrations/0002_col.sql; stub 7 train MERGED "$(git rev-parse HEAD)"
+git update-ref refs/remotes/origin/train train; config "$WORK/c-t16.json"
+OUT="$(python3 "$TOOL" --config "$WORK/c-t16.json" --start-on train --source-before "$SNAP" --head train --repo "$WORK/t16" 2>&1)"; RC=$?
+expect "(16) 4a: a late reviewed unit passes with --start-on train" 0 "d['refused']==[] and d['reviewedUnits']==[7]"
+OUT="$(python3 "$TOOL" --config "$WORK/c-t16.json" --source-before "$SNAP" --head train --repo "$WORK/t16" 2>&1)"; RC=$?
+[ "$RC" = 2 ] && ok "(16b) the same train-only start without --start-on train is exit 2" || bad "(16b) exit $RC: $OUT"
+unit late2 "merge: item-3 col into train" db/migrations/0003_col.sql; git update-ref refs/remotes/origin/train train
+OUT="$(python3 "$TOOL" --config "$WORK/c-t16.json" --start-on train --source-before "$SNAP" --head train --repo "$WORK/t16" 2>&1)"; RC=$?
+expect "(16c) 4a: a late one-off carrying a migration is refused" 1 "d['refused']==['db/migrations/0003_col.sql']"
+
+# (17) only a MISSING releaseSource defaults; present but empty, false or null is exit 2
+repo t17; unit oneoff "merge: item-1 docs into train" src/b.txt
+for bad_value in '""' false null; do
+  config "$WORK/c-t17.json"; python3 - "$WORK/c-t17.json" "$bad_value" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1])); c["release"]["releaseSource"] = json.loads(sys.argv[2]); json.dump(c, open(sys.argv[1], "w"))
+PYEOF
+  OUT="$(python3 "$TOOL" --config "$WORK/c-t17.json" --source-before "$SB" --head train --repo "$WORK/t17" 2>&1)"; RC=$?
+  [ "$RC" = 2 ] && ok "(17) releaseSource $bad_value is exit 2" || bad "(17) releaseSource $bad_value: exit $RC: $OUT"
+done
+
+# (18) a journal conflict resolved inside the source merge: allowed only beside an allowed renumber
+journal_repo() {  # journal_repo NAME [renumber]
+  repo "$1"; unit epic "Merge pull request #7 from acme/jane/26-10-01/epic-checkout" db/migrations/0002_add.sql
+  echo '{"e":1}' > db/migrations/meta/_journal.json; git add -A; git commit -q --amend -m "Merge pull request #7 from acme/jane/26-10-01/epic-checkout"
+  stub 7 train MERGED "$(git rev-parse HEAD)"
+  git checkout -q develop; echo "select 2;" > db/migrations/0002_other.sql; echo '{"d":1}' > db/migrations/meta/_journal.json; git add -A; git commit -qm "source takes 0002"
+  git update-ref refs/remotes/origin/develop develop; git checkout -q train
+  git merge -q --no-ff -m "merge the source" develop >/dev/null 2>&1; echo '{"e":1,"d":1}' > db/migrations/meta/_journal.json; git add -A; git commit -qm "merge the source"
+  if [ "${2:-}" = renumber ]; then git mv db/migrations/0002_add.sql db/migrations/0003_add.sql; git commit -qm renumber; fi
+}
+journal_repo t18 renumber; run t18 yes
+expect "(18) a journal resolution inside the source merge plus a byte-identical renumber is allowed and reported" 0 "d['refused']==[] and d['allowedRenumbers']==[{'from':'db/migrations/0002_add.sql','to':'db/migrations/0003_add.sql'}]"
+journal_repo t18b; run t18b yes
+expect "(18b) the same journal resolution with no renumber in the range is refused" 1 "d['refused']==['db/migrations/meta/_journal.json']"
+journal_repo t18c renumber; run t18c
+expect "(18c) ... and with no release.migrationRenumber it is refused" 1 "'db/migrations/meta/_journal.json' in d['refused']"
 exit $FAIL

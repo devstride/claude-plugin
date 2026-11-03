@@ -12,11 +12,13 @@ Usage:
                       [--train <branch>] [--repo <dir>]
 
   --config         the repository's `.claude/ds-config.json`. Read: `release.releaseBranchFixExclusions`,
-                   `release.releaseSource` (default `develop`), `releaseTrain.branch` (the old name `supportTrain.branch`
+                   `release.releaseSource` (default `develop` only when the key is missing), `releaseTrain.branch` (the old name `supportTrain.branch`
                    when only that is present), `epicIntegrationBranches.pattern` and the optional
                    `release.migrationRenumber` ({"sqlGlobs": [...], "metaGlobs": [...]}).
   --source-before  the release source's SHA when the train snapshot was cut (the range start); it
-                   must be an ancestor of `origin/<releaseSource>` and of --head, else exit 2.
+                   must be an ancestor of --head and of `origin/<releaseSource>` (--start-on source,
+                   the default) or of `origin/<train>` (--start-on train, for a start on the
+                   train such as step 4a's snapshot), else exit 2.
   --head           the snapshot (or any commit) whose range `<source-before>..<head>` is checked.
   --train          the train branch (default: the configured `releaseTrain.branch`); a reviewed
                    release unit counts only when its pull request was based on it.
@@ -32,7 +34,9 @@ Checked set: the files each FIRST-PARENT commit in `<source-before>..<head>` cha
        token a wildcard), AND `gh pr view <n> --json baseRefName,state,mergeCommit` says the pull
        request is MERGED, based on the train, with exactly that commit as its merge commit. A
        hand-written subject gh does not confirm is checked like any other commit.
-Every merge, exempt or not, also has what it ITSELF changed (against all parents, so a conflict
+A merge with more than two parents (octopus) is never exempt and never expanded: its whole diff
+against its first parent is checked. Migration metadata (`migrationRenumber.metaGlobs`) that only a
+merge changed is allowed when the range also yields an allowed renumber. Every merge, exempt or not, also has what it ITSELF changed (against all parents, so a conflict
 resolution) checked. A merge that is neither of the above whose second parent is an ancestor of
 `origin/<train>` is a late absorption of train commits: its brought-in first-parent commits are
 judged by these same rules, recursively. Paths are read NUL-delimited. Everything else (a fast-merged one-off, a direct commit, a snapshot fix commit) is checked exactly:
@@ -131,15 +135,15 @@ def merge_only_changes(repo, c):
     return zlist(out.decode("utf-8", "surrogateescape"))
 
 
-def analyse(repo, config, source_before, head, train):
+def analyse(repo, config, source_before, head, train, start_on="source"):
     release = config.get("release") if isinstance(config.get("release"), dict) else {}
     exclusions = release.get("releaseBranchFixExclusions") or []
-    source = release.get("releaseSource") or "develop"
+    source = release["releaseSource"] if "releaseSource" in release else "develop"
     epic_pattern = (config.get("epicIntegrationBranches") or {}).get("pattern")
     if not isinstance(exclusions, list) or not all(isinstance(x, str) for x in exclusions):
         fail("config: release.releaseBranchFixExclusions must be a list of patterns")
-    if not isinstance(source, str):
-        fail("config: release.releaseSource must be a string")
+    if not isinstance(source, str) or not source:
+        fail("config: release.releaseSource must be a non-empty string when present")
     epic_regex = routing.template_regex(epic_pattern, {}) if isinstance(epic_pattern, str) and epic_pattern else None
     renumber = release.get("migrationRenumber")
     sql_globs = meta_globs = None
@@ -150,13 +154,14 @@ def analyse(repo, config, source_before, head, train):
                 fail("config: release.migrationRenumber globs must be lists of patterns")
 
     origin_source, origin_train = "origin/" + source, "origin/" + train
-    if not is_ancestor(repo, source_before, origin_source):
-        fail("--source-before %s is not an ancestor of %s: the range is wrong" % (source_before, origin_source))
+    start_ref = origin_source if start_on == "source" else origin_train
+    if not is_ancestor(repo, source_before, start_ref):
+        fail("--source-before %s is not an ancestor of %s: the range is wrong" % (source_before, start_ref))
     if not is_ancestor(repo, source_before, head):
         fail("--source-before %s is not an ancestor of --head %s: the range is wrong" % (source_before, head))
 
     introduced, reviewed = set(), []
-    refused, renumbers = set(), []
+    refused, renumbers, pending_meta = set(), [], set()
 
     def check_commit(c, first):
         status = name_status(repo, first, c)
@@ -190,8 +195,17 @@ def analyse(repo, config, source_before, head, train):
             if not parents:
                 continue
             if len(parents) > 1:
-                # what the merge ITSELF changed (a conflict resolution) is never exempt
-                refused.update(p for p in merge_only_changes(repo, c) if matches(p, exclusions))
+                # what the merge ITSELF changed (a conflict resolution) is never exempt; migration
+                # metadata resolved in a merge is allowed only if the range also yields a renumber
+                for p in merge_only_changes(repo, c):
+                    if matches(p, exclusions):
+                        if sql_globs is not None and matches(p, meta_globs) and not matches(p, sql_globs):
+                            pending_meta.add(p)
+                        else:
+                            refused.add(p)
+                if len(parents) > 2:  # an octopus merge is never exempt and never expanded
+                    check_commit(c, parents[0])
+                    continue
                 if is_ancestor(repo, parents[1], origin_source):
                     continue
                 number = reviewed_unit(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip(), epic_regex, train) \
@@ -208,15 +222,17 @@ def analyse(repo, config, source_before, head, train):
             check_commit(c, parents[0])
 
     walk(git_text(repo, "rev-list", "--first-parent", "--reverse", "%s..%s" % (source_before, head)).split())
+    if not renumbers:
+        refused.update(pending_meta)
     return {"refused": sorted(refused), "allowedRenumbers": renumbers, "reviewedUnits": reviewed}
 
 
 def main(argv):
     opts, i = {}, 0
-    names = {"--config": "config", "--source-before": "source", "--head": "head", "--train": "train", "--repo": "repo"}
+    names = {"--config": "config", "--source-before": "source", "--head": "head", "--train": "train", "--repo": "repo", "--start-on": "start"}
     while i < len(argv):
         if argv[i] not in names or i + 1 >= len(argv):
-            fail("usage: train_exclusions.py --config <file> --source-before <sha> --head <ref> [--train <branch>] [--repo <dir>]")
+            fail("usage: train_exclusions.py --config <file> --source-before <sha> --head <ref> [--train <branch>] [--repo <dir>] [--start-on train|source]")
         opts[names[argv[i]]] = argv[i + 1]
         i += 2
     for key in ("config", "source", "head"):
@@ -233,7 +249,10 @@ def main(argv):
     train = opts.get("train") or train_cfg.get("branch")
     if not isinstance(train, str) or not train:
         fail("no train branch: pass --train or set releaseTrain.branch")
-    out = analyse(opts.get("repo") or ".", config, opts["source"], opts["head"], train)
+    start = opts.get("start", "source")
+    if start not in ("source", "train"):
+        fail("--start-on must be train or source")
+    out = analyse(opts.get("repo") or ".", config, opts["source"], opts["head"], train, start)
     sys.stdout.write(json.dumps(out, sort_keys=True) + "\n")
     return 1 if out["refused"] else 0
 

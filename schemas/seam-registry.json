@@ -186,7 +186,7 @@
       "shape": "command",
       "valueType": "string",
       "nullable": true,
-      "payload": "RELEASE_COMMIT in the environment (the commit the release was cut from)",
+      "payload": "RELEASE_COMMIT in the environment (the head the release merges from the source)",
       "verdict": "exit 0 deployed to the development environment; 2 not deployed yet; 1 the development deploy failed",
       "calledBy": [
         "release 4"

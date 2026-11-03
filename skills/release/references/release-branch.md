@@ -10,7 +10,7 @@ release train's one-offs merged into the source first so they ship with it.
 A reviewed release unit (an epic's pull request merged onto the train through its own review) may
 carry migrations and infrastructure on the train; the exclusion check below covers only work no
 pull request reviewed, and `release.devDeployVerification` makes the release wait for the
-development deploy (SKILL step 4), given `RELEASE_COMMIT=<sourceHead>` (the commit the release was cut from).
+development deploy (SKILL step 4), given `RELEASE_COMMIT` = the head the release pull request merges from the source (`<sourceHead>`, the cut, with a release branch; `<reviewedHead>` without one).
 
 `releaseTrain` below means `releaseTrain`, or `supportTrain` when only that is present; both present
 is a config error — STOP and name it.
@@ -95,7 +95,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    names any late one-offs in `git log --no-merges --oneline <trainSnapshot>..origin/<train>`.
    On the owner's instruction — applied before `review` step 7's ready-flip, never after — it
    resolves `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said back): `<trainSnapshot>` must be its ancestor (else STOP); the exclusion check over the NEW train
-   work only, `--source-before <trainSnapshot> --head <absorbAt>` (source merges are not train
+   work only, `--start-on train --source-before <trainSnapshot> --head <absorbAt>` (source merges are not train
    work; exit 1 STOPS); `git merge --no-ff <absorbAt>` into the snapshot (a conflict
    STOPS) and push; rewrite the marker to `snapshot <absorbAt>`, the title's count and the body's
    list, so step 6 closes exactly what shipped. The absorbed range then gets its first full
