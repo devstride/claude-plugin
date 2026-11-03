@@ -24,6 +24,8 @@ for what each version component means here and how a release is cut.
   `release.migrationRenumber` allows a byte-identical migration renumber forced by merging the
   source into the snapshot, and optional `release.devDeployVerification` makes the release wait for
   the development deploy before the production merge, when the release touches an excluded path.
+  The check compares each merge with git's own merge of its parents, so it needs git 2.38 or newer,
+  and it stops (exit 2) on a merge whose conflicts it cannot account for, rather than check less.
 
 ### Cost
 
