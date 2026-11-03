@@ -46,7 +46,7 @@ Done is read by people as "this is in the product", and by the loop as "nothing 
 A story merged onto its integration branch is neither: it has not been through the release
 pull request's full review or CI, and it is not on the base branch. Marking it Done at that merge
 shows whole epics as finished while their release pull request is still a draft. So the story is *landed* until the release merges, and step 8 closes every landed story
-at once — the same shape as a one-off on the support train, which `release` closes when the
+at once — the same shape as a one-off on the release train, which `release` closes when the
 train arrives.
 
 Blocking must follow, or every epic would stall after its first story: a later story in the
@@ -117,8 +117,8 @@ it onto that epic's integration branch and strand it there until an unrelated ep
 one-off ships straight to develop, and because nothing comes after it, its own PR is the only place
 the cloud roster and CI will ever see the code — which is why it takes the full 4b ritual under
 every profile, and why fast mode is never available to it. The one exception is a configured support
-train (`support-train.md`): there something DOES come after it — the train's own pull request into
-develop, a full-diff review with CI — so with `supportTrain.fastMerges` a one-off on the train may
+train (`release-train.md`): there something DOES come after it — the train's own pull request into
+develop, a full-diff review with CI — so with `releaseTrain.fastMerges` a one-off on the train may
 take fast mode, exactly as an epic story does.
 
 ## Cited by

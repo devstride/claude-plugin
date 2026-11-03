@@ -883,6 +883,13 @@
           ],
           "description": "command hook — RELEASE_COMMIT in the environment"
         },
+        "devDeployVerification": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — RELEASE_COMMIT in the environment (the train pull request's merge commit)"
+        },
         "clearance": {
           "description": "provider-or-commands hook — each verb's own arguments appended (--wait, --short, <phase> --branch <b> --pr <n>, --force, --yes)",
           "oneOf": [
@@ -1014,6 +1021,33 @@
           },
           "description": "paths a fix on a release branch may not touch"
         },
+        "migrationRenumber": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "sqlGlobs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "migration files a renumber may delete and re-add under a new name"
+            },
+            "metaGlobs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "migration metadata files a renumber may change"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "description": "allow a migration renumber forced by merging the source into the train snapshot; null reads as absent"
+        },
         "syncWorkflow": {
           "type": "string",
           "description": "the workflow syncing production into the source"
@@ -1021,7 +1055,7 @@
         "mergeTrainBeforeCut": {
           "type": "boolean",
           "default": false,
-          "description": "merge the support train into the source before each cut"
+          "description": "merge the release train into the source before each cut"
         },
         "productionReview": {
           "type": "object",
@@ -1059,7 +1093,7 @@
       "additionalProperties": false,
       "description": "production release settings"
     },
-    "supportTrain": {
+    "releaseTrain": {
       "type": [
         "object",
         "null"
@@ -1080,6 +1114,27 @@
       },
       "additionalProperties": false,
       "description": "one long-lived branch one-off work batches on; null reads as absent"
+    },
+    "supportTrain": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "description": "the old name of releaseTrain.branch"
+        },
+        "fastMerges": {
+          "type": "boolean",
+          "description": "the old name of releaseTrain.fastMerges"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "the old name of releaseTrain, still read when releaseTrain is absent (doctor notes it; both together is an error)"
     },
     "releaseTower": {
       "type": "object",

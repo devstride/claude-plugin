@@ -107,7 +107,7 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   and is honoured like any other present key.
 - **`releaseTarget`** names where a completed release unit lands. The shipped `"baseBranch"` means
   the base branch itself; a repository that stages releases elsewhere names that branch here. Naming
-  the support train's branch (`supportTrain.branch`) makes a finished epic join the train through
+  the release train's branch (`releaseTrain.branch`) makes a finished epic join the train through
   its reviewed release pull request, so every release carries epics and one-offs to the base branch
   together, CI once (`skills/release/references/review-once.md`).
 - **Optional release economies** (`release.productionReview`, `onlyWhenTouched` on a `releaseOnly`
@@ -222,7 +222,7 @@ draft-convention check) are in `ci-cost-patterns.md`, applied by `setup ci`.
 `null` because nothing can guess it; the loop then detects a new run, which works but is slower to
 be sure. With no CI at all, still write the block: present and inert keys stay findable.
 
-## Release branches and the support train
+## Release branches and the release train
 
 All optional, and `setup` writes none of them: each changes how releases are cut or where one-off
 work lands, which is the operator's decision. Absent, the loop behaves as before.
@@ -233,9 +233,15 @@ work lands, which is the operator's decision. Absent, the loop behaves as before
 | `release.releaseBranchFixExclusions` | an array of path patterns, e.g. `["infra/**", "db/migrations/**"]` | no fix commit is refused on a release branch |
 | `release.syncWorkflow` | a workflow file, e.g. `"sync-master-into-develop.yaml"` | `release` opens its own pull request syncing production into the source |
 | `release.mergeTrainBeforeCut` | boolean | `false`: nothing is merged into the source before the cut |
-| `supportTrain.branch` | a branch name, e.g. `"train/support"` | one-offs use `baseBranch` |
-| `supportTrain.fastMerges` | boolean | `false`: a one-off on the train takes the full per-story pull-request ritual, into the train |
+| `release.migrationRenumber` | `{ "sqlGlobs": [...], "metaGlobs": [...] }` | a migration renumber on the train snapshot is refused like any other migration change |
+| `release.devDeployVerification` | a shell command (exit 0 deployed, 2 not yet, 1 failed) | the release does not wait for a development deploy |
+| `releaseTrain.branch` | a branch name, e.g. `"train/support"` | one-offs use `baseBranch` |
+| `releaseTrain.fastMerges` | boolean | `false`: a one-off on the train takes the full per-story pull-request ritual, into the train |
 | `protectedBranches` entries | exact names or patterns, e.g. `"release/*"` | exact names only |
+
+`releaseTrain` was called `supportTrain` before this release. The plugin reads `releaseTrain` first and,
+when only `supportTrain` is present, honours it by name; `doctor` notes it and says to rename it, and a file
+carrying both keys is a config error.
 
 Patterns follow one anchored rule (`*` within a path segment, `**` across segments, `<YY-MM-DD>`,
 a trailing `[-n]`): `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`.
@@ -249,10 +255,24 @@ a trailing `[-n]`): `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patt
 - **`release.releaseBranchFixExclusions`** — paths a fix commit on a release branch may not touch
   (deploy configuration, database migrations). Such a fix goes to the source by a normal pull
   request; the release branch is abandoned and re-cut. The same list keeps one-offs that touch
-  those paths off the support train.
+  those paths off the release train. A reviewed release unit (an epic's pull request merged onto
+  the train) may carry such paths on the train: the release's exclusion check covers only work no
+  pull request reviewed (`skills/release/scripts/train_exclusions.py`).
+- **`release.migrationRenumber`** — optional `{ "sqlGlobs": [...], "metaGlobs": [...] }`. Merging
+  the source into the train snapshot can force a reviewed migration to take a new number; with this
+  key set, a commit whose only excluded-path changes are that migration file deleted and re-added
+  under a new name with byte-identical content (plus files under `metaGlobs`) is allowed, and the
+  release pull request reports it. Absent, a renumber is refused like any migration change.
+- **`release.devDeployVerification`** — optional command shaped like `release.deployVerification`,
+  run with `RELEASE_COMMIT=<the train pull request's merge commit>`: exit 0 deployed to the
+  development environment, 2 not deployed yet, 1 the development deploy failed. When it is set AND
+  the release delta touches a `release.releaseBranchFixExclusions` path, `release` runs it at step 4
+  after the owner's yes and before the production merge, polling every 60 s for at most 45 minutes
+  on exit 2; exit 1 or the timeout STOPS, never merging production over a failed development deploy.
+  A release touching no such path does not wait.
 - **`release.syncWorkflow`** — a workflow that syncs the production branch into the source after
   every push to production; `release` then waits for it instead of opening a duplicate.
-- **`release.mergeTrainBeforeCut` and `supportTrain.*`** — one-off work batches on one long-lived
+- **`release.mergeTrainBeforeCut` and `releaseTrain.*`** — one-off work batches on one long-lived
   branch (with `fastMerges`, merged there without a pull request of its own after the local risk
   check and gate). Before each cut `release` opens the train's pull request into the source, runs
   the full review and CI once, merges it, and marks each one-off it carried Done; after the release
@@ -272,7 +292,7 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
 | `releaseTower` | `{ "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" }` | those two defaults |
 
 - **`release.clearance`** — one cleared release at a time, for every machine and account that
-  releases this repository. `release` claims clearance before it touches the support train or
+  releases this repository. `release` claims clearance before it touches the release train or
   cuts anything, waits and says who holds it when denied, heartbeats each phase, and hands it
   back once the post-deploy check passed and the source, release branch and train are settled —
   before docs, notes and the check's own close-out, which it records as owed; a stale clearance

@@ -1,6 +1,6 @@
 ---
 name: build-item
-description: "Orchestrate one DevStride work item end-to-end: select, branch, build, review, merge, and completion ritual — epic stories batch onto the epic's integration branch in fast develop mode (local engines, no per-story PR) and the fully-reviewed epic release PR carries them to develop; one-off items ship to develop with the full per-story PR ritual, or batch on a configured support train"
+description: "Orchestrate one DevStride work item end-to-end: select, branch, build, review, merge, and completion ritual — epic stories batch onto the epic's integration branch in fast develop mode (local engines, no per-story PR) and the fully-reviewed epic release PR carries them to develop; one-off items ship to develop with the full per-story PR ritual, or batch on a configured release train"
 ---
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
@@ -103,7 +103,7 @@ Read "the working base" wherever a step says develop; re-derive it per RELEASE U
    per `epicIntegrationBranches.pattern` / `slugRule`, dated at CREATION, never re-minted. Resolve:
    handoff memory → `git ls-remote --heads origin` → the helper below (`create` → off a fresh
    `baseBranch`, pushed). Cache per epic; **announce reused or created.**
-3. **A one-off AND `supportTrain.branch` set** → the train, unless `support-train.md` routes it to
+3. **A one-off AND `releaseTrain.branch` set** → the train, unless `release-train.md` routes it to
    `baseBranch` (announced).
 4. **Otherwise** → `baseBranch`. A disabled flag falls back.
 
@@ -113,9 +113,9 @@ target` (pass `oneOff`, and `roles` when resolved); follow its answer.
 Stories merge into it (`references/epic-release.md`), skipping `verify.skipDuringStoryBuilds`
 suites; the last leaf's merge triggers step 8. **The working base and the effective
 `perStoryPullRequest` pick the path** — integration branch → fast develop mode (4a), the train → 4a
-only when `supportTrain.fastMerges` is true, `baseBranch` → the full PR ritual (4b); announce it.
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/support-train.md` when
-`supportTrain.branch` is set.**
+only when `releaseTrain.fastMerges` is true, `baseBranch` → the full PR ritual (4b); announce it.
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-train.md` when
+`releaseTrain.branch` is set.**
 
 ## One-off / no-plan single-shot mode
 
@@ -125,10 +125,10 @@ one-off**; both → plan mode; exactly one → plan mode if a root resolves, els
 ask. **Steps 1–6 run VERBATIM.** Deltas:
 
 - **Step 0** — no root, ready-set or selection. **SKIP THE EPIC-BRANCH DERIVATION TOO — the working
-  base is the support train when configured (precedence 3), else `baseBranch`** — never reason "a
+  base is the release train when configured (precedence 3), else `baseBranch`** — never reason "a
   one-off has no release-unit ancestor". The merged-or-Done guard, gating, scope and spec checks
   still run; the profile skips only the marker. **4b under every profile** — except 4a on a train
-  with `supportTrain.fastMerges` true. **Read
+  with `releaseTrain.fastMerges` true. **Read
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` before changing the one-off
   classification or its step-0 delta.**
 - **Step 6.5** — follow-ups become their own one-offs (`/devstride:create-story` /
@@ -183,7 +183,7 @@ untracked deferrals, dismissed findings. Deferrals + deviations → PR body (4b)
 
 Integration branch → **4a** when `fastStoryMerges.enabled` is `true`, or ABSENT under `prototype` (a
 present `false` wins, routes to 4b and is reported). `baseBranch` → **4b**, every profile; the train
-per `supportTrain.fastMerges`. Never mix: 4a toward develop reaches production never cloud-reviewed.
+per `releaseTrain.fastMerges`. Never mix: 4a toward develop reaches production never cloud-reviewed.
 
 ### 4a. FAST DEVELOP MODE — epic-branch stories, no per-story PR
 
@@ -251,7 +251,7 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 - `update_item` → **Done** (never `mark_done`); `startDate`/`dueDate` = branch creation → merge.
   **NOT Done** after an epic-branch merge — LANDED (merged status, landed comment, same dates;
   `next-unblocked.md`), closed by step 8 — or a train merge — its comment, status unchanged
-  (`support-train.md`), closed by `release`.
+  (`release-train.md`), closed by `release`.
 - **The item points at its code**: 4b — confirm the PR auto-linked, else `link_pull_request`; 4a —
   that comment. Never invent a PR number.
 - **Reconcile as-built** on a material deviation: `add_comment` the `view: 'full'` description

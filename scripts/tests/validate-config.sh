@@ -144,10 +144,18 @@ cfg '{"ci": {"expectedRunsPerPullRequest": true}}'
 expect "(37b) true is not an integer" 1 "^CONFIG: 1 error(s)" "^ERROR ci.expectedRunsPerPullRequest: expected integer, found boolean"
 
 # blocks read null-tolerantly accept null; others do not
-cfg '{"supportTrain": null, "hierarchyRoles": null, "localEnvironment": null, "session": null}'
-expect "(38a) supportTrain, hierarchyRoles, localEnvironment and session accept null" 0 "$CLEAN"
+cfg '{"releaseTrain": null, "hierarchyRoles": null, "localEnvironment": null, "session": null}'
+expect "(38a) releaseTrain, hierarchyRoles, localEnvironment and session accept null" 0 "$CLEAN"
 cfg '{"plugin": null}'
 expect "(38b) a null plugin block is an ERROR (the session-start check reads it as invalid)" 1 "^CONFIG: 1 error(s)" "^ERROR plugin: expected object, found null"
+
+# the train key: the old name is a NOTE, both names together an ERROR
+cfg '{"supportTrain": {"branch": "train/support"}}'
+expect "(38c) supportTrain alone is a NOTE, not an error" 0 "^CONFIG: 0 error(s), 0 warning(s)" "^NOTE supportTrain: supportTrain is the old name of releaseTrain; rename it$"
+cfg '{"supportTrain": {"branch": "train/support"}, "releaseTrain": {"branch": "train/support"}}'
+expect "(38d) a config carrying both supportTrain and releaseTrain is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR supportTrain: .*both are set"
+cfg '{"supportTrain": null, "releaseTrain": {"branch": "train/support"}}'
+expect "(38e) a null supportTrain beside releaseTrain is clean" 0 "$CLEAN"
 
 # exit 2 under --json: one JSON document, never a plain line
 printf '{"review": ' > "$WORK/broken.json"

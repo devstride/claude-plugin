@@ -30,7 +30,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   owner — never assume a provider), `release.deployApproval`, `release.deployVerification`,
   the hooks its steps run, `baseBranch`, `protectedBranches` (names or patterns),
   `release.releaseBranchPattern`, `release.releaseBranchFixExclusions`,
-  `release.mergeTrainBeforeCut`, `supportTrain.branch`, `release.clearance`, and the `review.*` /
+  `release.mergeTrainBeforeCut`, `releaseTrain.branch`, `release.clearance`, and the `review.*` /
   `verify.*` / `preShipChecks` / `prBodyTemplate` blocks the composed skills read.
   **If the file disagrees, the file wins**; absent → the inline defaults, said so.
 - **Hooks run through step skills** (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md`):
@@ -89,7 +89,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   is `1`); act on its exit exactly as `clearance.md` "Where the release skill calls it" says — `0`
   continue; `3` ask once, adopt or keep waiting; `5` tell the owner once, adopt only on their yes
   AND word that session stopped; `1` STOP, a release blocker.
-- **0b. Merge the support train** when `release.mergeTrainBeforeCut` is `true` and no release BRANCH
+- **0b. Merge the release train** when `release.mergeTrainBeforeCut` is `true` and no release BRANCH
   was adopted (else nothing merges first): a snapshot of the train in
   its own draft PR into `releaseSource`, fully reviewed, CI once, merged, and every one-off it
   carried closed — `release-branch.md` §1. Nothing ahead → a reported no-op. A late train landing

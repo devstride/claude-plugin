@@ -20,7 +20,7 @@ engine actually registered would have surfaced that in one glance.
 ```
 | Step | Status |
 |---|---|
-| 0 · Select | I20110 — one-off → base develop (or the support train, when configured), no epic branch |
+| 0 · Select | I20110 — one-off → base develop (or the release train, when configured), no epic branch |
 | Profile | standard — from `.claude/ds-config.json` (one-off: no root marker) |
 | Claim | won (or renewed, took over, skipped N held, not configured, degraded) |
 | 1 · In Progress | ✅ |
