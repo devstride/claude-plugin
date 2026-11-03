@@ -234,7 +234,7 @@ the deploy.
   to the recap: a `Hotfix landed` line goes to §4 first; a `Waiting` line names who is next; and
   on the yes this pull request must be the one `On final`, else STOP.
 - **Dev deploy wait** (`release.devDeployVerification` set, delta touching a fix-exclusion path):
-  named in the recap; after the yes, before `gh pr merge`, run per `docs-hooks.md`.
+  named in the recap; after the yes, before the checks below, run per `docs-hooks.md`.
 - **On the yes**, confirm: the head equals `<reviewedHead>` (the only tolerated advance is `review`
   7.3's same-tree empty re-trigger commit; anything else → back to step 2); CI is green at that
   head; in a draft-hold repo the PR is non-draft (still draft means CI never ran — do NOT merge; a

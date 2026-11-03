@@ -37,8 +37,8 @@ Checked set: the files each FIRST-PARENT commit in `<source-before>..<head>` cha
        hand-written subject gh does not confirm is checked like any other commit.
 A merge with more than two parents (octopus) is never exempt and never expanded: its whole diff
 against its first parent is checked. Migration metadata (`migrationRenumber.metaGlobs`) that only a
-merge changed is allowed when the range also yields an allowed renumber. Every merge, exempt or not, also has what it ITSELF changed (against all parents, so a conflict
-resolution) checked. A merge that is neither of the above whose second parent is an ancestor of
+merge changed is allowed when the range also yields an allowed renumber. Every merge, exempt or not, also has what it ITSELF changed (beyond git's own merge of its
+parents: a conflict resolution or a hand edit) checked. A merge that is neither of the above whose second parent is an ancestor of
 `origin/<train>` is a late absorption of train commits: its brought-in first-parent commits are
 judged by these same rules, recursively. Paths are read NUL-delimited. Everything else (a fast-merged one-off, a direct commit, a snapshot fix commit) is checked exactly:
 a changed file matching `release.releaseBranchFixExclusions` is refused.
@@ -130,8 +130,19 @@ def name_status(repo, first, c):
     return {tokens[i + 1]: tokens[i][:1] for i in range(0, len(tokens) - 1, 2)}
 
 
-def merge_only_changes(repo, c):
-    """Files a merge's result changes against ALL its parents (conflict resolutions, 'evil merges')."""
+def merge_only_changes(repo, c, parents):
+    """Files a merge's result changes beyond what git's own merge of its parents produces: conflict
+    resolutions and hand edits ('evil merges'). A clean automatic merge of edits both sides made to
+    one file is not listed. Two parents: compared with `git merge-tree --write-tree` (git 2.38+;
+    a conflicted file there carries markers, so any resolution of it is listed). Otherwise, or on
+    an older git, the combined diff (`--cc`), which also lists cleanly merged files: stricter, never
+    looser."""
+    if len(parents) == 2:
+        p = git(repo, "merge-tree", "--write-tree", "--no-messages", parents[0], parents[1], check=False)
+        tree = p.stdout.decode("utf-8", "replace").split("\n", 1)[0].strip() if p.returncode in (0, 1) else ""
+        if re.fullmatch(r"[0-9a-f]{40,64}", tree):
+            out = git(repo, "diff", "--name-only", "--no-renames", "-z", tree, c).stdout
+            return zlist(out.decode("utf-8", "surrogateescape"))
     out = git(repo, "diff-tree", "-z", "--cc", "--name-only", "--no-commit-id", "-r", c).stdout
     return zlist(out.decode("utf-8", "surrogateescape"))
 
@@ -212,7 +223,7 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
             if len(parents) > 1:
                 # what the merge ITSELF changed (a conflict resolution) is never exempt; migration
                 # metadata resolved in a merge is allowed only if the range also yields a renumber
-                for p in merge_only_changes(repo, c):
+                for p in merge_only_changes(repo, c, parents):
                     flag_merge_path(p)
                 if len(parents) > 2:  # an octopus merge is never exempt and never expanded
                     check_commit(c, parents[0])

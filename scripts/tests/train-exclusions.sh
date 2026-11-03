@@ -200,4 +200,15 @@ repo t19b; unit first "merge: item-0 docs into train" src/first.txt; SNAP="$(git
 git checkout -q -b offtrain train; echo o > src/o.txt; git add -A; git commit -qm off; config "$WORK/c-t19b.json"
 OUT="$(python3 "$TOOL" --config "$WORK/c-t19b.json" --start-on train --source-before "$SNAP" --head offtrain --repo "$WORK/t19b" 2>&1)"; RC=$?
 [ "$RC" = 2 ] && ok "(19b) --start-on train with a head off the train is exit 2" || bad "(19b) exit $RC: $OUT"
+# (20) a clean automatic merge of edits both sides made to one excluded file is not a resolution
+repo t20; seq 1 60 > infra/big.tf; git add -A; git commit -qm "big file"; git checkout -q develop; git merge -q --ff-only train
+git update-ref refs/remotes/origin/develop develop; SB="$(git rev-parse HEAD)"; git checkout -q train
+git checkout -q develop; sed -i.bak 's/^40$/forty/' infra/big.tf; rm -f infra/big.tf.bak; git commit -qam "source edits line 40"
+git update-ref refs/remotes/origin/develop develop
+git checkout -q train; unit epic "Merge pull request #7 from acme/jane/26-10-01/epic-checkout" src/e.txt
+git checkout -q -b epic2 train; sed -i.bak 's/^2$/two/' infra/big.tf; rm -f infra/big.tf.bak; git commit -qam "epic edits line 2"
+git checkout -q train; git merge -q --no-ff -m "Merge pull request #8 from acme/jane/26-10-01/epic-billing" epic2; stub 8 train MERGED "$(git rev-parse HEAD)"
+stub 7 train MERGED "$(git rev-parse HEAD^1)"
+git merge -q --no-ff -m "merge the source" develop; run t20
+expect "(20) a clean source merge of a file both sides edited is allowed" 0 "d['refused']==[] and 8 in d['reviewedUnits']"
 exit $FAIL
