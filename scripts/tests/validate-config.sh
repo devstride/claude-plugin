@@ -156,6 +156,19 @@ cfg '{"supportTrain": {"branch": "train/support"}, "releaseTrain": {"branch": "t
 expect "(38d) a config carrying both supportTrain and releaseTrain is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR supportTrain: .*both are set"
 cfg '{"supportTrain": null, "releaseTrain": {"branch": "train/support"}}'
 expect "(38e) a null supportTrain beside releaseTrain is clean" 0 "$CLEAN"
+# the deferred container's titles: an empty one is a WARN, the current title listed as legacy a NOTE
+cfg '{"defects": {"deferredContainerTitle": "Deferred", "deferredContainerLegacyTitles": ["Deferred defects", "Parked"]}}'
+expect "(38f) a title plus extra legacy titles is clean" 0 "$CLEAN"
+cfg '{"defects": {"deferredContainerTitle": "  "}}'
+expect "(38g) an empty deferred container title is a WARN" 0 "^CONFIG: 0 error(s), 1 warning(s)" "^WARN defects.deferredContainerTitle: an empty title matches no container"
+cfg '{"defects": {"deferredContainerLegacyTitles": ["Deferred defects", ""]}}'
+expect "(38h) an empty legacy title is a WARN" 0 "^CONFIG: 0 error(s), 1 warning(s)" "^WARN defects.deferredContainerLegacyTitles\\[1\\]: an empty title matches nothing"
+cfg '{"defects": {"deferredContainerTitle": "Deferred", "deferredContainerLegacyTitles": ["  deferred "]}}'
+expect "(38i) the current title also listed as legacy is a NOTE" 0 "^CONFIG: 0 error(s), 0 warning(s)" "^NOTE defects.deferredContainerLegacyTitles: lists the current title too"
+cfg '{"defects": {"deferredContainerLegacyTitles": ["Deferred"]}}'
+expect "(38k) the default title listed as legacy is a NOTE when the title key is absent" 0 "^CONFIG: 0 error(s), 0 warning(s)" "^NOTE defects.deferredContainerLegacyTitles: lists the current title too"
+cfg '{"defects": {"deferredContainerLegacyTitles": "Deferred defects"}}'
+expect "(38j) a legacy-titles string instead of an array is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR defects.deferredContainerLegacyTitles: expected array"
 
 # exit 2 under --json: one JSON document, never a plain line
 printf '{"review": ' > "$WORK/broken.json"

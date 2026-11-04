@@ -48,7 +48,8 @@ to an explicit sub-branch and tell the user you scoped it.
 For the root and every descendant: `get_item(view:"full")` (description, status, dates,
 relationships) and `list_comments` (whole thread). Fan out with a `Workflow`, ~8–10 items per
 agent, each returning a SUMMARIZED record, never raw HTML — `{number, title, workType, status,
-description_summary, key_comments, relationships: {blocked_by, blocks}}`. Read `args` defensively
+description_summary, key_comments, relationships: {blocked_by, blocks}}`, plus `isBug`,
+`completedAt`, `endedOutcome` and the `related_to` edge for deferred-container members. Read `args` defensively
 (`const items = Array.isArray(args) ? args : JSON.parse(args)` — it can arrive JSON-stringified).
 
 ## 3. Synthesize
@@ -62,6 +63,11 @@ Organize by the tree's own hierarchy (root → grouping items → leaves), not a
   path, and the item `/devstride:build-item` would pick next per the canonical rule in
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`.
 - **Deferrals and known gaps** — anything flagged deferred, blocked on a human, or a known compromise.
+- **Deferred container** — its own section, apart from the value tree, the status distribution and
+  "what runs next": the plan root's container
+  (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`, "Finding it"; its
+  members never count as open plan work), any duplicates, and **Still open in Deferred** — number,
+  title, kind and the item each relates to. No container → say so.
 - **Sub-plan shape** — which grouping items and release units exist (this org: Capabilities/Epics)
   and roughly what each owns.
 - A focus question gets a direct, explicit answer backed by evidence — not buried in the synthesis.

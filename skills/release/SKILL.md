@@ -177,9 +177,9 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   voids an owner yes already given.
 - Only genuinely ambiguous/risky findings stall — surface them with a recommendation. A dismissed
   finding stays dismissed; each entry on this release's or the step-0b train pull request's
-  untracked-deferral list → `/devstride:create-defect deferred <item#>` (the item it concerns;
-  discovered scope: `insert-story`) when a plan root is known, else noted for the owner — never
-  spliced. **Do NOT merge here** — hold at green-and-settled for step 4.
+  untracked-deferral list → `create-defect deferred <item#>` (a bug) or
+  `create-story deferred <item#>` (the item it concerns; discovered scope: `insert-story`) with a
+  plan root, else noted for the owner — never spliced. **Do NOT merge here** — hold at green-and-settled for step 4.
 
 ## 2b. Pre-ship checks — the release's mandatory local gates
 

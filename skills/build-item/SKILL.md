@@ -132,7 +132,7 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` before changing the one-off
   classification or its step-0 delta.**
 - **Step 6.5** — follow-ups become their own one-offs (`/devstride:create-story` /
-  `/devstride:create-defect`), never `insert-*`; a deferred defect keeps the DEFERRED placement
+  `/devstride:create-defect`), never `insert-*`; a deferred finding keeps the DEFERRED placement
   under the root this item resolves to.
 - **Step 7** — no loop, no persisted root: sync, clean tree, close out, TERMINATE; no release
   countdown.
@@ -150,9 +150,9 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   (projection warning too). **Never auto-select from the deferred container.** Surface the
   whole ready-set.
 - **DRY-CHAIN / TERMINAL:** no selectable candidate → exit cleanly, never re-ask, saying which:
-  plan complete / N landed, awaiting their release (gate on → step 8 for it, then step 0) / N
-  blocked by X, Y / N gated. Suggest `/devstride:plan <root>` only when the chain ran out; never
-  invoke it.
+  plan complete (with **Still open in Deferred**) / N landed, awaiting their release (gate on →
+  step 8 for it, then step 0) / N blocked by X, Y / N gated. Suggest `/devstride:plan <root>` only
+  when the chain ran out; never invoke it.
 - **Every exit from step 0** (DRY-CHAIN/TERMINAL, ambiguous root, a given item merged or Done, any
   other stop before step 1) → **`return-checkout`** first when this run leased.
 - **GATING CHECK** (a decision that is the user's → flag, next candidate), **SCOPE CHECK**
@@ -264,11 +264,11 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 
 ## 6.5 Capture untracked findings as tracked items
 
-- **A deferred defect** (worth filing, `review` step 4; any other is dismissed, never filed) **→
-  `/devstride:create-defect` DEFERRED**: parent = the `defects.deferredContainerTitle` container
-  directly under the plan root (resolved or created), no `blocked_by`, no prefix, no delivery, plus
-  the `add_relationship` related-to edge to the item whose review produced it (the RELEASE UNIT for
-  a step-8 review). **Never splice a deferred finding into the chain**, under any profile (why:
+- **A deferred finding** (worth filing, `review` step 4; any other is dismissed, never filed) **→
+  DEFERRED placement** in the plan root's ONE container (`references/deferred-container.md`):
+  `/devstride:create-defect deferred <item#>` for a bug, `/devstride:create-story deferred
+  <item#>` otherwise, related to the item whose review produced it (the RELEASE UNIT for a step-8
+  review). **Never splice a deferred finding into the chain**, under any profile (why:
   `references/epic-release.md`).
 - **Discovered scope → `/devstride:insert-story`**, spliced so selection reaches it.
 - A deferral owned by an EXISTING item goes on that item. Report what went where.
@@ -283,7 +283,8 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 - **Counts**: `hierarchyRoles.leaf` descendants neither Done nor landed, of **the SAME
   release-unit ancestor step 0 resolved** — never the direct parent (why:
   `references/epic-release.md`) — plus the whole plan root. **The deferred container counts in
-  NEITHER** and is never a release unit. Unnumbered plan
+  NEITHER** and is never a release unit; a plan root at zero adds its **Still open in Deferred**
+  list. Unnumbered plan
   (`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/execution-order-numbering.md`) → bare numbers, noting
   `/devstride:plan <root>` would number it.
 - **Human recap.** After a direct pull-request merge (5b), lead with `Merged / Released`: item and

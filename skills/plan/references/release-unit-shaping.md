@@ -50,8 +50,9 @@ section, where the delivery loop meets them at the release gate instead of redis
 Deferred enhancements, tech debt, compat-shim removals and "harden later" items under a value
 release unit stop it ever reaching zero remaining leaves, so its release can never cut — and
 under frequent promotion that means the release unit never ships or someone hand-waves a
-partial release. So the parking place is a plain container directly under the PLAN ROOT, titled
-by `defects.deferredContainerTitle`, and it is deliberately NOT a release unit: anything the
+partial release. So the parking place is ONE plain container directly under the PLAN ROOT
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`: titled by
+`defects.deferredContainerTitle`, a bug or a follow-up alike), and it is deliberately NOT a release unit: anything the
 loop can cut has to reach zero, and a bucket that fills as fast as it drains never will. The
 same reasoning rules out the edge type. A `blocked_by` edge would splice parked work back into
 the dependency chain — giving it an execution position, an `[N]` number and eventually a build

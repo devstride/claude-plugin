@@ -29,11 +29,13 @@ while a leaf of B waits on a not-yet-Done leaf of A, so neither unit can release
 release-unit cycle, naming the edge to repoint — the one making the unit in flight (it holds landed
 leaves; else the earlier-dated) wait on the other.
 
-**Exclude everything under the deferred-defect container** — the container titled
-`defects.deferredContainerTitle` that sits directly under the plan root and holds postponed
-review findings. Those items are tracked, not queued: they are never auto-selected, they never
-count toward a remaining-leaf total, and the container is never a release unit. An item there
-that the USER names explicitly by number is still built, as a one-off.
+**Exclude everything under the deferred container** — the plan root's container of postponed
+work, every match of it (duplicates included) and its `members`, found by
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md` ("Finding it": the
+title `defects.deferredContainerTitle` or a `defects.deferredContainerLegacyTitles` entry,
+membership by its script, never by eye). Those items are tracked, not queued: they are never auto-selected, they never count
+toward a remaining-leaf total, and the container is never a release unit. An item there that the
+USER names explicitly by number is still built, as a one-off.
 
 ## Landed leaves — merged onto an integration branch, not yet Done
 

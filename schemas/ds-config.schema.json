@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.23.1/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.24.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -345,15 +345,25 @@
       "properties": {
         "deferredContainerTitle": {
           "type": "string",
-          "default": "Deferred defects",
-          "description": "the container deferred defects are parked under"
+          "default": "Deferred",
+          "description": "the title of the plan root's one deferred container"
+        },
+        "deferredContainerLegacyTitles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "Deferred defects"
+          ],
+          "description": "earlier container titles still matched; only adds to the built-in Deferred defects"
         }
       },
       "patternProperties": {
         "^_": {}
       },
       "additionalProperties": false,
-      "description": "deferred-defect placement"
+      "description": "deferred-work placement"
     },
     "commitConventions": {
       "type": "object",

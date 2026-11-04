@@ -8,6 +8,79 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.24.0] — 2026-11-04
+
+### Added
+
+- **One deferred container, for follow-ups as well as bugs.** `create-story deferred <item#>`
+  parks a postponed follow-up that is not a bug (tech debt, a clean-up, hardening, a dated
+  after-deploy step) beside `create-defect deferred <item#>`, in the same container directly under
+  the plan root. The rules live in one place, `skills/build-item/references/deferred-container.md`,
+  which every caller cites: how the container is found (its title, or a legacy title, compared
+  after trimming, collapsing whitespace and ignoring case), what happens when two match (the
+  lowest number is used, the others are reported and never filed into), that a closed container
+  is reopened and reused rather than duplicated, and the repair procedure that merges a duplicate.
+  `skills/build-item/scripts/deferred-container.py` decides the match and the container's members,
+  so no caller decides by eye.
+- **`defects.deferredContainerLegacyTitles`**, an array of earlier container titles that still
+  identify the container. The built-in `Deferred defects` is always matched; a configured list
+  only adds to it. Doctor's config check warns about an empty title and notes a current title
+  that is also listed as a legacy one.
+- **Deferred items are dated after the plan.** `rationalize-gantt` keeps the container's members
+  out of the cascade and the violation pass, then dates each open one on its own day after the
+  plan's last value leaf (`skills/rationalize-gantt/scripts/deferred-dates.py`), keeping the date
+  of an item that already starts later. Filing never writes a date.
+- **"Still open in Deferred."** When a plan reaches zero remaining stories, `build-item`'s closing
+  report lists the container's open items; `comprehend-plan` reports the container in its own
+  section. `plan` and `rebalance` skip its members in their no-orphans checks, and `rebalance`
+  never merges, splits, renumbers or archives one.
+
+### Changed
+
+- **The default container title is now `Deferred`** (it was `Deferred defects`). Containers created
+  under the old title keep being found, because `Deferred defects` is a built-in legacy title, so
+  no running plan gets a second container. An older plugin ignores
+  `defects.deferredContainerLegacyTitles` and keeps looking for its own default, so a repository
+  that sets either key, or relies on the new default, must require this release.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.23.1 @ 1eadf8a, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.23.1 | tokens@devstride--v3.23.1 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,094 | 10,698 | 32,094 | 10,698 | +0 | 10,700 |
+| skills/release/SKILL.md | 23,975 | 7,992 | 23,998 | 8,000 | +8 | 8,000 |
+| skills/plan/SKILL.md | 23,891 | 7,964 | 23,967 | 7,989 | +25 | 8,000 |
+| skills/doctor/SKILL.md | 23,700 | 7,900 | 23,700 | 7,900 | +0 | 7,900 |
+| skills/review/SKILL.md | 23,261 | 7,754 | 23,290 | 7,764 | +10 | 7,770 |
+| skills/build-item/SKILL.md | 21,640 | 7,214 | 21,717 | 7,239 | +25 | 7,300 |
+| skills/rebalance/SKILL.md | 17,409 | 5,803 | 17,724 | 5,908 | +105 | 5,910 |
+| skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,655 | 4,885 | +0 | 4,900 |
+| skills/pr/SKILL.md | 10,837 | 3,613 | 10,837 | 3,613 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 7,902 | 2,634 | 9,575 | 3,192 | +558 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-defect/SKILL.md | 7,483 | 2,495 | 6,202 | 2,068 | -427 | 2,500 |
+| skills/create-story/SKILL.md | 3,999 | 1,333 | 5,793 | 1,931 | +598 | 1,940 |
+| skills/comprehend-plan/SKILL.md | 4,583 | 1,528 | 5,099 | 1,700 | +172 | 1,700 |
+| skills/insert-defect/SKILL.md | 4,714 | 1,572 | 4,714 | 1,572 | +0 | 1,600 |
+| skills/insert-story/SKILL.md | 4,037 | 1,346 | 4,037 | 1,346 | +0 | 1,400 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/pre-ship/SKILL.md | 2,901 | 967 | 2,901 | 967 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,368 | 1,790 | 5,349 | 1,783 | -7 | 1,800 |
+| **total (bodies)** | 266,760 | 88,928 | 269,982 | 90,002 | +1074 | |
+
 ## [3.23.1] — 2026-11-03
 
 ### Changed
@@ -2803,7 +2876,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.23.1...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.24.0...HEAD
+[3.24.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.23.1...devstride--v3.24.0
 [3.23.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.23.0...devstride--v3.23.1
 [3.23.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.22.0...devstride--v3.23.0
 [3.22.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.21.0...devstride--v3.22.0

@@ -30,7 +30,7 @@
     "deleteBranchAfterRelease": true,
     "mergedStatusName": "Review"
   },
-  "defects": { "deferredContainerTitle": "Deferred defects" },
+  "defects": { "deferredContainerTitle": "Deferred", "deferredContainerLegacyTitles": ["Deferred defects"] },
   "commitConventions": { "messageFormat": "<type>: <summary>", "reviewFixFormat": "fix: <summary>", "epicMergeFormat": "merge: <scope>" },
   "prBodyTemplate": { "sections": [ { "heading": "## Summary", "guidance": "What and why." } ], "noAiAttribution": true },
   "ci": { "workflowGlobs": [".github/workflows/*.yml"], "draftGateCondition": "github.event.pull_request.draft == false", "gateJobName": null, "expectedRunsPerPullRequest": 1 },

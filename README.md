@@ -394,16 +394,22 @@ continue anyway, add `--same-session` to the command; to turn the gate off for a
 `"session": {"jobClassGate": false}` in `.claude/ds-config.json`. The hook fails open — it never
 blocks by accident.
 
-## Deferred defects
+## Deferred work
 
 A review finding left unfixed never vanishes. A minor one — not a P1, not a security finding, and
 not both likely to happen and material — is dismissed with a one-line reason in the pull request
-or merge commit, and nothing is filed for it. Any other, deliberately postponed, `build-item`
-files as a Defect in a container titled **Deferred defects** (configurable as
-`defects.deferredContainerTitle`) directly under the plan root, related to the item whose review
-produced it, never spliced into the plan's execution order and never selected or auto-released by
-the loop. Build one deliberately by naming it: `/devstride:build-item <number>`. Missing scope a
-review uncovers is never dismissed: it becomes a story spliced into the plan.
+or merge commit, and nothing is filed for it. Any other, deliberately postponed, goes into ONE
+container titled **Deferred** (configurable as `defects.deferredContainerTitle`) directly under the
+plan root: a bug as a Defect (`/devstride:create-defect deferred <item>`), anything else — tech
+debt, a clean-up, a dated after-deploy step — as a Story (`/devstride:create-story deferred
+<item>`), each related to the item whose review produced it. A container created under the old
+default title, **Deferred defects**, is still found, as is any title listed in
+`defects.deferredContainerLegacyTitles`; a closed container is reopened rather than duplicated.
+Its items are never spliced into the plan's execution order and never selected or auto-released
+by the loop; `rationalize-gantt` dates them after the plan's last story, and when a plan finishes
+its closing report lists what is **Still open in Deferred**. Build one deliberately by naming it:
+`/devstride:build-item <number>`. Missing scope a review uncovers is never dismissed: it becomes a
+story spliced into the plan.
 
 ## Your first plan
 
@@ -451,7 +457,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `pr` | Opens a pull request and runs the review-and-settle loop |
 | `push` | Stages, commits, type-checks, and pushes following the repo's commit conventions |
 | `branch-feature` / `branch-hotfix` | Cuts a working branch from the development or production branch |
-| `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end; `create-defect deferred <item>` files a deferred defect beside the plan instead |
+| `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end; `create-story deferred <item>` / `create-defect deferred <item>` instead parks a follow-up or a bug in the plan's deferred container |
 | `release` | Promotes the release branch to production with a full gated review; with `release.clearance` set, claims one-release-at-a-time clearance first and hands it back last; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
 | `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it — including that the configured local review engine actually runs read-only |
 | `doctor` | Checks git, `gh`, the plugin, DevStride, config, CI gates, docs and personal status-line settings; after the shared replacement is committed and verified, it can separately remove only the personal `statusLine` key you approve while preserving every other setting and script |
@@ -500,7 +506,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.23.1** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.24.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

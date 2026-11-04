@@ -67,22 +67,22 @@ A rejected push of the integration branch means the story's merge exists only lo
 the remote story branch at that moment destroys the sole remote copy of the work, so the deletion
 waits on a push that actually succeeded — local and remote together, never the remote first.
 
-## Why deferred defects live beside the plan, not inside its chain
+## Why deferred work lives beside the plan, not inside its chain
 
 An out-of-scope or postponed finding worth filing — a P1, a security finding, or one both likely
 and material — that lives only in a PR body is invisible to every later selection, so it has to
 become a tracked item; any other is dismissed with its reason, since filing it parks work nobody
-builds. WHERE a filed finding is tracked decides whether it is also execution order. A deferred
-defect spliced into the dependency chain with `blocked_by` edges is work the loop must build
-before the plan can reach zero: the plan never finishes, and the finding that was explicitly
-deferred is not deferred at all.
+builds. WHERE filed work is tracked decides whether it is also execution order. A deferred item
+spliced into the dependency chain with `blocked_by` edges is work the loop must build before the
+plan can reach zero: the plan never finishes, and the work that was explicitly deferred is not
+deferred at all.
 
-So deferred defects go into a container of their own directly under the plan root, related to the
-item whose review produced them and blocked by nothing. The container is deliberately NOT a
-release unit: a parking lot that later reached zero remaining leaves would trip the auto-release
-decision and cut a release PR for work that was parked, not planned. Items in it are tracked,
-visible and re-schedulable by a human — which is what deferring is supposed to mean — and an
-explicitly named one can still be built as a one-off.
+So deferred work — a bug or a follow-up — goes into ONE container of its own directly under the
+plan root (`deferred-container.md`), related to the item whose review produced it and blocked by
+nothing. The container is deliberately NOT a release unit: a parking lot that later reached zero
+remaining leaves would trip the auto-release decision and cut a release PR for work that was
+parked, not planned. Items in it are tracked, visible and re-schedulable by a human — which is
+what deferring is supposed to mean — and an explicitly named one can still be built as a one-off.
 
 ## Why docs stage rather than publish
 
@@ -130,7 +130,7 @@ take fast mode, exactly as an epic story does.
   unit at zero") and the one-off section's pointer ("Read … before changing the one-off
   classification or its step-0 delta").
 - `skills/build-item/SKILL.md` — the working-base note on why stories merge into the integration
-  branch, step 5a's story-branch deletion and step 6.5's deferred defect placement, each citing
+  branch, step 5a's story-branch deletion and step 6.5's deferred finding placement, each citing
   this file with "(why: …)", as does step 7's release-unit count; step 8's auto-release gate
   is covered by the step-8 pointer above, and its `live: false` and no-release-notes rules by its
   pointer to `epic-release-steps.md`.

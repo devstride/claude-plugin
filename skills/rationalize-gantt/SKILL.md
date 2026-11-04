@@ -42,7 +42,12 @@ changes the output: (a) the root; (b) re-date completed items too, or only not-d
 everything, for one clean cascade — callers extending a live plan ask for not-done only; a landed
 leaf — merged status or a "merged onto" comment, awaiting its epic's release
 (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`) — counts as done); (c) the
-1-day-per-story assumption.
+1-day-per-story assumption; (d) the deferred items: resolve the plan root's deferred container and
+its `members` with `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`
+("Finding it") and say "N deferred items will be dated after the plan". **Members — the container
+included — stay out of steps 2, 3, 5 and 6 entirely** (no depth, no violation, no edge
+rationalized); a `blocked_by` or `blocks` edge found touching one is REPORTED, never written or
+removed. Step 4.5 alone dates them.
 
 ## 1. Disable the organization-wide dependency auto-scheduler FIRST — non-negotiable
 
@@ -85,6 +90,20 @@ merged); read `args` defensively — `const items = Array.isArray(args) ? args :
 
 `bulk_update_items` with `{ workItems: [{number, startDate, dueDate}] }`. CHUNK to ~22 items per call; a ~65-item payload returns `503 Service Unavailable`.
 
+## 4.5 Date the deferred items — after the plan
+
+Pipe `{"today", "valueLeaves": [{"number", "dueDate"}], "deferred": [{"number", "done",
+"startDate", "dueDate"}]}` to `python3 ${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/scripts/deferred-dates.py`
+— `valueLeaves` the dates step 3 just computed for every leaf outside the container (plus the
+existing dates of Done leaves in not-done-only mode), `deferred` every member leaf with its
+`groups` (the matched containers and intermediate nodes above it). It returns the
+`boundary` (the last value due date), `assignments` (`scheduled`: start = due = one day after the
+boundary, then the next, in item-number order; `kept`: an item already starting after the boundary
+keeps its dates),
+`untouchedDone` and `groupSpans`. Write every `scheduled` entry and every group's span
+with step 4's chunked `bulk_update_items`, under step 1's check, `staticMode` omitted; a `kept`
+entry writes nothing. Related-only items cannot trigger propagation. No member → skip.
+
 ## 5. Find the violations (the red lines)
 
 For EVERY `blocked_by` edge X→D, a violation is `start(X) ≤ due(D)`. Two sources dominate: coarse
@@ -114,4 +133,6 @@ remove plus an add. Omit `staticMode` per
 
 Recompute violations over the UPDATED graph (your removes/repoints plus the known external dates)
 and assert ZERO remain. Report the per-day distribution (earliest → today), the edge changes
-(removed / repointed / kept-with-offset) and any offsets; tell the user to refresh the Gantt.
+(removed / repointed / kept-with-offset) and any offsets, and one deferred line: how many items
+were dated and from which day to which, how many kept their own date, how many Done were left
+alone, and any edge found touching a member; tell the user to refresh the Gantt.

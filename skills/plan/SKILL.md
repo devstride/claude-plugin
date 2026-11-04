@@ -131,11 +131,10 @@ consequence per bullet. Ask as many rounds as the ambiguity needs. Cover at mini
     a bill), **(c) deploy integrity** (no leaf may reference a resource a later leaf creates — that
     ordering sits inside one unit). The answers land in the unit's **Release safety** section.
   - **Provision the deferred-work container; never park follow-ups under an active value release
-    unit** — they stop it ever reaching zero remaining leaves. It sits DIRECTLY under the plan root,
-    titled `defects.deferredContainerTitle` (fallback `Deferred defects`), is NOT a release unit the
-    loop cuts, and its items carry a related-to edge — never `blocked_by`, never an `[N]` prefix —
-    back to the item that produced them. Discovered SCOPE still splices into the chain via
-    `insert-story`. A leaf whose theme does not match its release unit is a rehoming signal.
+    unit** — they stop it ever reaching zero remaining leaves. ONE container DIRECTLY under the plan
+    root (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`), NOT a release
+    unit; its items carry a related-to edge — never `blocked_by` or an `[N]` prefix — back.
+    Discovered SCOPE still splices into the chain via `insert-story`. A leaf whose theme does not match its release unit is a rehoming signal.
 - **Leaf titles per release unit** (this org: Stories) — titles only, no specs yet. Grain is **the
   resolved profile's `grain` row, read now and quoted** when proposing, never a remembered size;
   the row also settles foundation placement (`prototype`/`extended` fold foundation work —
@@ -231,6 +230,7 @@ miscalibration.
   org with `Enterprise → Epic → Feature → Story` needs the Feature tier; the backend rejects illegal
   parent/type pairings, and a skipped tier fails AFTER part of the tree exists). `create_item` with
   step 0's type names; `create_sub_item` only if the plan genuinely needs sub-items (rare — confirm).
+  Then step 2's deferred container.
 - Leaves (Story, or Defect for known-bug remediation) reuse the `create_item` CALL PATTERN of
   `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/splice-mechanics.md` step 3 (same field shape,
   today-dated placeholder) — NOT its step-4 UPSTREAM/NEXT splice topology; step 5 owns the graph. Invoke `insert-story` itself only to splice
@@ -251,7 +251,7 @@ miscalibration.
   independent branches stay parallel. The goal is dependency ACCURACY, not one serial thread.
 - **Edges between two release units run one way**, never both (why:
   `references/release-unit-shaping.md`).
-- **Hard gate**: every new leaf has ≥ 1 `blocked_by` OR `blocks` edge, verified with `search_items`
+- **Hard gate**: every new leaf (deferred-container members excepted) has ≥ 1 `blocked_by` OR `blocks` edge, verified with `search_items`
   plus `get_item(view:"full", fields:["number","relationships"])` (a large batch: fan this
   read-only check out on `haiku`/`low`). An orphan is a wiring bug — give a parallel branch a
   `blocks` edge where it rejoins, or place it on the spine.
@@ -288,7 +288,7 @@ owns only the compute-and-stamp.
 ## 7. Final review with the user
 
 - Report: the profile and its source; grouping-item/release-unit/leaf counts (new vs pre-existing
-  when extending); the critical-path spine (root story → gate stories → final story); the parallel
+  when extending; deferred container excluded, saying if it exists); the critical-path spine (root story → gate stories → final story); the parallel
   waves; the `[1] … [N]` range; per-release-unit leaf counts (each reads as its own shippable
   increment — a `prototype` plan visibly has a few slices per unit, not a dozen layers); recorded
   deviations; and zero orphan leaves confirmed.

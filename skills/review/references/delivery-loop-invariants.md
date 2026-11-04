@@ -331,12 +331,15 @@ M5. Every `epicIntegrationBranches` flag is honoured, each by its own instructio
 M6. A review finding left unfixed — below the fix floor or out of scope — that is MINOR (not a
     P1, not security, and not both likely and material) is DISMISSED with its posted one-line
     rationale, never filed; only one worth filing is filed for later, `review` step 4 defining both
-    once. Deferred DEFECTS are never spliced into the chain under any profile. They are filed by
-    `create-defect`'s deferred placement in the container titled `defects.deferredContainerTitle`
-    directly under the plan root — no `[N]` prefix, no `blocked_by`, a related-to relationship to
-    the item whose review produced them (type read from the `add_relationship` schema, never
-    assumed), no delivery phase. Step 0 never auto-selects there; the container is never a release
-    unit at zero. Discovered SCOPE is always captured, whatever its likelihood, and splices via
+    once. Deferred work is never spliced into the chain under any profile. A bug is filed by
+    `create-defect`'s deferred placement, anything else by `create-story`'s, both into the ONE
+    container directly under the plan root that `deferred-container.md` defines (title
+    `defects.deferredContainerTitle` or a `defects.deferredContainerLegacyTitles` entry, matched by
+    its script; a closed container reopened, a duplicate reported, never a second created) — no
+    `[N]` prefix, no `blocked_by`, a related-to relationship to the item whose review produced it
+    (type read from the `add_relationship` schema, never assumed), no delivery phase. Step 0 never
+    auto-selects there and no count includes it; the container is never a release unit at zero;
+    `rationalize-gantt` dates its members after the plan, outside the cascade. Discovered SCOPE is always captured, whatever its likelihood, and splices via
     `insert-story`; `release` files its release's deferrals the same way, never with `insert-*`.
 M7. Resolve the In Progress status id from the work-type status collection when needed.
 M8. Step 6 ends with a report line: item + [N], status, dates, PR link, spec-reconciled y/n.
@@ -614,6 +617,7 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "cumulative ledger" "verification receipt" "review-moment:" \
               "check-review-engine.sh" "MISSING READ-ONLY FLAG" "settled by running it" \
               "sandbox_mode=read-only" "deferredContainerTitle" "Never auto-select from the deferred container" \
+              "deferredContainerLegacyTitles" "deferred-container.md" \
               "Never splice a deferred finding" "third legal value" "jobClassGate" "same-session" \
               "describes a repository that no longer exists" "load: contract" "related-to" \
               "engineering-economy" "CI-last" "localAssistCommand" "review-settled" \
@@ -814,6 +818,15 @@ skills/build-item/SKILL.md|never step 1
 skills/build-item/references/next-unblocked.md|A story named by number
 skills/build-item/references/next-unblocked.md|The release unit first
 skills/release/SKILL.md|create-defect deferred
+skills/release/SKILL.md|create-story deferred
+skills/build-item/references/next-unblocked.md|deferredContainerLegacyTitles
+skills/create-defect/SKILL.md|deferred-container.md
+skills/create-story/SKILL.md|deferred-container.md
+skills/plan/SKILL.md|deferred-container.md
+skills/rebalance/SKILL.md|deferred-container.md
+skills/comprehend-plan/SKILL.md|deferred-container.md
+skills/rationalize-gantt/SKILL.md|deferred-container.md
+skills/build-item/SKILL.md|deferred-container.md
 skills/push/SKILL.md|branch-patterns.md
 skills/release/references/branch-patterns.md|protected by the key
 skills/review/SKILL.md|merge-only

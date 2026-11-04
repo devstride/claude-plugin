@@ -125,29 +125,39 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   `null` → the story keeps its status. An organization with no status of that name keeps the
   story's status too, and the loop says so; the comment and the git history still record it.
 
-## Deferred defects
+## Deferred work
 
 ```json
 {
   "defects": {
-    "deferredContainerTitle": "Deferred defects"
+    "deferredContainerTitle": "Deferred",
+    "deferredContainerLegacyTitles": ["Deferred defects"]
   }
 }
 ```
 
-- **`deferredContainerTitle`** is the title of the container `build-item` resolves — or creates —
-  **directly under the plan root** to hold postponed review findings worth filing (a P1, a
-  security finding, or one both likely and material); any other is dismissed with its reason, never
-  filed. It is a parking lot beside the plan, not a stage of it.
+- **`deferredContainerTitle`** is the title of the ONE container directly under the plan root that
+  holds deliberately postponed work worth filing — a bug through `create-defect deferred <item#>`,
+  any other follow-up through `create-story deferred <item#>`; a finding below the bar (not a P1,
+  not security, not both likely and material) is dismissed with its reason, never filed. It is a
+  parking lot beside the plan, not a stage of it. Finding, reopening and creating it, and every
+  rule below: `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`.
+- **`deferredContainerLegacyTitles`** lists earlier titles that still identify the container. The
+  built-in `Deferred defects` is always matched, so a configured list only ADDS to it. Matching is
+  exact after trimming, collapsing whitespace and ignoring case; a title that only contains the
+  word is not a match.
 - Items in that container are **never spliced into the execution chain** (no `blocked_by` edges,
   no execution-order prefix), **never auto-selected** by `build-item` step 0, and the container is
   **never treated as a release unit** — reaching zero there cuts no release. An item there that a
-  user names explicitly by number is still built, as a one-off.
-- Each deferred defect carries a **related-to relationship to the item whose review produced it**
+  user names explicitly by number is still built, as a one-off. `rationalize-gantt` dates them
+  after the plan's last value leaf.
+- Each deferred item carries a **related-to relationship to the item whose review produced it**
   (the story or defect under build, or the release unit for an epic-release review); read the
   relationship type from the `add_relationship` schema rather than assuming a spelling.
-- A repository may rename the title; it applies only to containers created AFTERWARDS — existing
-  ones keep, and are found by, the title they were created with.
+- A repository may rename the title; the new title applies to containers created AFTERWARDS, so
+  put the previous title in `deferredContainerLegacyTitles` and the existing container is still
+  found. An older plugin ignores `deferredContainerLegacyTitles` and looks only for its own
+  default, so a repository that sets either key requires the release that introduced it.
 
 ## Commit conventions
 

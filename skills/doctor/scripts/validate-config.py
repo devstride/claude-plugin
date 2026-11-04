@@ -16,8 +16,9 @@ the x-severity annotation for deprecated keys. No JSON Schema library is needed.
 Output: the first line is
     CONFIG: <n> error(s), <m> warning(s) against schema <version>
 then one line per finding, `ERROR <path>: <message>`, `WARN <path>: <message>` or (uncounted)
-`NOTE <path>: <message>` — a NOTE is the legacy `supportTrain` name; carrying both it and
-`releaseTrain` is an ERROR. With --json, one
+`NOTE <path>: <message>` — a NOTE is the legacy `supportTrain` name (carrying both it and
+`releaseTrain` is an ERROR) or a current deferred container title also listed as a legacy one; an
+empty deferred container title is a WARN. With --json, one
 JSON document instead (`schemaVersion`, `errors`, `warnings`, `findings`; on exit 2 the counts are
 null and `fatal` carries the one-line reason). An unknown key is a WARN (with the closest registered key when one is
 similar enough); a wrong type, a value outside its enum, a missing required key, both shapes of a
@@ -95,6 +96,29 @@ def registered_paths(schema, prefix="", out=None):
     for branch in schema.get("oneOf") or []:
         registered_paths(branch, prefix, out)
     return out
+
+
+def deferred_container_checks(v, config):
+    """What the schema cannot say about the deferred container's titles: an empty title matches
+    nothing (WARN), and a current title that is also listed as a legacy one is redundant (NOTE).
+    A wrong type is already the schema's ERROR."""
+    defects = config.get("defects") if isinstance(config, dict) else None
+    if not isinstance(defects, dict):
+        return
+    title = defects.get("deferredContainerTitle")
+    if isinstance(title, str) and not title.strip():
+        v.add("WARN", "defects.deferredContainerTitle", "an empty title matches no container; "
+              "remove it to use the default")
+    legacy = defects.get("deferredContainerLegacyTitles")
+    if isinstance(legacy, list):
+        for i, entry in enumerate(legacy):
+            if isinstance(entry, str) and not entry.strip():
+                v.add("WARN", "defects.deferredContainerLegacyTitles[%d]" % i, "an empty title matches nothing")
+        norm = lambda t: " ".join(t.split()).casefold()
+        effective = title if isinstance(title, str) and title.strip() else ("Deferred" if title is None else "")
+        if effective and norm(effective) in {norm(t) for t in legacy if isinstance(t, str)}:
+            v.add("NOTE", "defects.deferredContainerLegacyTitles", "lists the current title too; "
+                  "the current title is matched already")
 
 
 class Validator:
@@ -289,6 +313,7 @@ def main(argv):
               "keep releaseTrain only")
     elif isinstance(config, dict) and config.get("supportTrain") is not None:
         v.add("NOTE", "supportTrain", "supportTrain is the old name of releaseTrain; rename it")
+    deferred_container_checks(v, config)
     errors = [f for f in v.findings if f[0] == "ERROR"]
     warns = [f for f in v.findings if f[0] == "WARN"]
     notes = [f for f in v.findings if f[0] == "NOTE"]
