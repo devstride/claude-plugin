@@ -156,9 +156,9 @@ if printf '%s' "$N1" | grep -q 'still running 3.15.0, and 3.16.0 is installed' &
 
 # (13) a loop or scheduled prompt, and /devstride:update itself, never get the line
 L1="$(prompt "$P15" n2 "$R" '/loop /devstride:build-item')"; L2="$(prompt "$P15" n2 "$R" '<<autonomous-loop-dynamic>>')"
-L3="$(prompt "$P15" n2 "$R" '/devstride:update')$(prompt "$P15" n2 "$R" '<task-notification><task-id>x</task-id></task-notification>')"; L4="$(prompt "$P15" n2 "$R")"
+L3="$(prompt "$P15" n2 "$R" '/devstride:update')$(prompt "$P15" n2 "$R" '<task-notification><task-id>x</task-id></task-notification>')"; L4="$(prompt "$P15" n2 "$R" 'what does <task-notification> mean here')"
 if [ -z "$L1$L2$L3" ] && printf '%s' "$L4" | grep -q '3.16.0 is installed'; then
-  ok "(13) /loop, an autonomous-loop wakeup, a background-task report and /devstride:update → no line; the next ordinary prompt gets it"; else bad "(13) [$L1|$L2|$L3|$L4]"; fi
+  ok "(13) /loop, an autonomous-loop wakeup, a background-task report and /devstride:update → no line; a prompt that only mentions one gets it"; else bad "(13) [$L1|$L2|$L3|$L4]"; fi
 
 # (14) running the installed copy with a newer release → ONE ask to update; never for a pinned or
 #      opted-out repository, nor with DEVSTRIDE_PLUGIN_UPDATE_CHECK=0; a newer target asks again
@@ -213,11 +213,19 @@ if [ $FETCHED = 1 ] && [ "$FMT" = 1 ] && [ "$D1$D2$NONE" = 111 ] && [ $FRESH = 1
   ok "(16) stale cache → one detached fetch, newest.json in the session-start format, lock dropped; held lock / pin / check off / a 10-minute-old cache → no fetch"
 else bad "(16) d1=$D1 d2=$D2 fetched=$FETCHED fmt=$FMT none=$NONE fresh=$FRESH"; fi
 
-# (17) a failed fetch (offline) keeps its lock, so the next prompts do not each start another one
-printf 'import sys\nsys.exit(1)\n' > "$FP/skills/update/scripts/update-plugin.py"; rm -f "$LOCK"
+# (17) a failed fetch (offline) keeps its lock: the next prompts start no fetch until it is five
+#      minutes old, and then one does. The fake helper counts its runs.
+printf 'import os\nopen(os.path.join(os.path.dirname(__file__), "runs"), "a").write("x")\nraise SystemExit(1)\n' \
+  > "$FP/skills/update/scripts/update-plugin.py"; RUNS="$FP/skills/update/scripts/runs"; rm -f "$LOCK" "$RUNS"
+runs() { wc -c < "$RUNS" 2>/dev/null | tr -d ' ' || echo 0; }
 newest 3.16.0 4000; RUNTIME="$FP/hooks/session-runtime.py" prompt "$P16" n13 "$R" >/dev/null
-for _ in $(seq 1 30); do [ -e "$LOCK" ] && break; sleep 0.1; done; sleep 1
-[ -e "$LOCK" ] && grep -q '3.16.0' "$NJ" && ok "(17) a failed fetch leaves newest.json alone and keeps its lock: retried after 5 minutes, not every prompt" \
-  || bad "(17) lock=$([ -e "$LOCK" ] && echo kept || echo gone)"
+for _ in $(seq 1 30); do [ "$(runs)" = 1 ] && break; sleep 0.1; done; sleep 0.5
+RUNTIME="$FP/hooks/session-runtime.py" prompt "$P16" n13 "$R" >/dev/null; sleep 1; R1="$(runs)"
+touch -t "$(date -v-6M +%Y%m%d%H%M.%S 2>/dev/null || date -d '6 minutes ago' +%Y%m%d%H%M.%S)" "$LOCK"
+RUNTIME="$FP/hooks/session-runtime.py" prompt "$P16" n13 "$R" >/dev/null
+for _ in $(seq 1 30); do [ "$(runs)" = 2 ] && break; sleep 0.1; done; R2="$(runs)"
+if [ "$R1" = 1 ] && [ "$R2" = 2 ] && [ -e "$LOCK" ] && grep -q '3.16.0' "$NJ"; then
+  ok "(17) a failed fetch keeps newest.json and its lock: no retry on the next prompt, one retry once the lock is 5 minutes old"
+else bad "(17) runs after 2 prompts=$R1, after the lock aged=$R2"; fi
 
 exit $FAIL

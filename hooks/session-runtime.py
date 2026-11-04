@@ -54,8 +54,7 @@ REFRESH_AFTER = 1800          # a prompt refreshes a newest-release cache older 
 REFRESH_LOCK = 300            # one background refresh at a time; a dead one's lock lapses
 FETCH_TIMEOUT = 30            # the background fetch's own bound
 NUDGED = re.compile(r"^(reload|update):[0-9]+\.[0-9]+\.[0-9]+$")
-LOOP_PROMPT = re.compile(r"^\s*(/loop\b|/devstride:update\b|/reload-plugins\b|<<autonomous-loop)")
-AUTOMATIC = re.compile(r"<task-notification>|<<autonomous-loop")  # turns no person typed
+LOOP_PROMPT = re.compile(r"^\s*(/loop\b|/devstride:update\b|/reload-plugins\b|<<autonomous-loop|<task-notification>)")
 
 
 def cache_dir():
@@ -385,7 +384,7 @@ def prompt():
         if check_enabled() and updates_wanted(top) and refresh_due(now) and take_refresh_lock(time.time()):
             spawn_refresh()
         text = payload.get("prompt")
-        if isinstance(text, str) and (LOOP_PROMPT.match(text) or AUTOMATIC.search(text)):
+        if isinstance(text, str) and LOOP_PROMPT.match(text):
             return
         plugin = plugin_block(top)
         if not check_enabled() or plugin.get("updateCheck", True) is False:
