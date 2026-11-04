@@ -116,7 +116,7 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   `skills/release/references/review-once.md`.
 - **`preShipChecks[].runAt`**: `"train"`, valid only on a `when: "releaseOnly"` entry (anything else
   is a config error). The check runs on the release-train snapshot before the train merges, outside
-  release clearance, and is not repeated at the release's step 2b. Absent, a `releaseOnly` check
+  release clearance, and is not repeated at the release's step 2b when it passed there on the same snapshot (otherwise 2b runs it). Absent, a `releaseOnly` check
   runs at 2b as before.
 - **A story is Done when its release unit reaches `releaseTarget`**, not when it merges onto the
   integration branch. Until then it is *landed*

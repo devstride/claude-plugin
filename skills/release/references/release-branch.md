@@ -96,11 +96,12 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    **Train-run pre-ship checks.** When `pr` has settled the train pull request's review and its CI is
    running, before step 5, run **`pre-ship train run`** at the snapshot head: every `preShipChecks`
    entry with `when: "releaseOnly"` and `runAt: "train"`, in the background, printing the evidence
-   lines `pre-ship` prints (`NOTHING TO RUN` is an explicit no-op, said so). **A red result STOPS
+   lines `pre-ship` prints plus, on all passing, `PRE-SHIP TRAIN: PASS <names> at <sha>` (`NOTHING TO RUN` is an explicit no-op, said so). Carry that line to the release: step 2b
+   passes `--ran-at-train <names>@<sha>`, and only that line skips an entry there. **A red result STOPS
    the train merge** exactly as a red pre-ship check does; fix it on the snapshot, or the owner
    waives it in words. A fix that moves the head re-runs it at the new head. This phase holds no
-   release clearance (scope `cut-to-deploy` claims it only at the cut), and step 2b of `release`
-   does not repeat these entries.
+   release clearance (scope `cut-to-deploy` claims it only at the cut), and with no train pull request, no
+   passing line or a different tree, step 2b runs these entries itself.
 4a. **Late landings.** Each progress report runs `git fetch origin <releaseSource> <train>` and
    names any late one-offs in `git log --no-merges --oneline <trainSnapshot>..origin/<train>`. To
    ABSORB them: resolve `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said

@@ -1069,7 +1069,7 @@
       "enum": [
         "train"
       ],
-      "description": "a releaseOnly check with runAt train runs on the release-train snapshot before the train merges, outside release clearance, and is not repeated at the release's step 2b; only valid with when releaseOnly",
+      "description": "a releaseOnly check with runAt train runs on the release-train snapshot before the train merges, outside release clearance, and is not repeated at the release's step 2b when it passed there on the same snapshot; only valid with when releaseOnly",
       "since": "unreleased"
     },
     {
