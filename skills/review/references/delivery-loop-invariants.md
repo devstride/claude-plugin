@@ -515,7 +515,10 @@ T2. Every `skills/*/SKILL.md` body has a committed budget row enforced at releas
 T3. A body carries every imperative, config-key-honouring instruction, step number another skill
     cites, and scoped needle pinned to it; a paragraph whose deletion would change what an agent
     does is a rule and stays. Rationale, examples and incident evidence move to the owning skill's
-    `references/`, each moved paragraph leaving its imperative behind in its own sentence.
+    `references/`, each moved paragraph leaving its imperative behind in its own sentence. The one
+    exception is a BRANCH reference (CONTRIBUTING.md, "Branch references"): the imperatives of a
+    branch only some runs take may move to a `load: contract` reference read in full before acting
+    on it, the body keeping the branch's heading, step number, gate and gate needles.
 T4. A rule that survives only in this checklist is effectively DELETED from the runtime path unless
     a SKILL.md step tells the agent to read this file — and nothing at runtime does, so every rule
     here must also live in a file the runtime path reads.
@@ -642,7 +645,9 @@ while IFS='|' read -r file needle; do
   grep -qiF "$needle" "$file" 2>/dev/null || echo "MISSING in $file: $needle"
 done <<'PAIRS'
 skills/build-item/SKILL.md|autoRelease
-skills/build-item/SKILL.md|deleteBranchAfterRelease
+skills/build-item/references/epic-release-steps.md|deleteBranchAfterRelease
+skills/build-item/references/epic-release-steps.md|NEVER rebase shared story SHAs
+skills/build-item/SKILL.md|epic-release-steps.md
 skills/build-item/SKILL.md|release-unit ancestor step 0 resolved
 skills/build-item/SKILL.md|EPIC-BRANCH DERIVATION
 skills/build-item/SKILL.md|hierarchyRoles
@@ -665,6 +670,9 @@ skills/review/scripts/rereview-scope.sh|reviewed-head <sha>
 skills/review/SKILL.md|Initialize the cumulative ledger
 skills/review/SKILL.md|maxLocalReviewRounds
 skills/review/SKILL.md|reviewerRegistrationWindowMinutes
+skills/review/SKILL.md|cloud-reviewers.md
+skills/review/references/cloud-reviewers.md|review_requested
+skills/review/references/cloud-reviewers.md|reviewerRegistrationWindowMinutes
 skills/pr/SKILL.md|reviewerRegistrationWindowMinutes
 skills/plan/SKILL.md|Delivery profile:
 skills/rebalance/SKILL.md|archive
@@ -703,8 +711,8 @@ skills/review/SKILL.md|CHANGED the patch
 skills/review/references/ci-settle.md|skipping
 skills/build-item/SKILL.md|EXPIRED
 skills/build-item/SKILL.md|registered in timeline
-skills/build-item/SKILL.md|FULL diff
-skills/build-item/SKILL.md|live: false
+skills/build-item/references/epic-release-steps.md|FULL diff
+skills/build-item/references/epic-release-steps.md|live: false
 skills/build-item/references/progress-table.md|not configured
 skills/plan/SKILL.md|yes, build this
 skills/pr/SKILL.md|cannot guarantee CI-last
@@ -715,8 +723,8 @@ skills/doctor/SKILL.md|text to PRINT
 skills/doctor/SKILL.md|ready_for_review
 skills/rebalance/SKILL.md|convex
 skills/rebalance/SKILL.md|NEVER `delete_item`
-skills/review/SKILL.md|wait-for-reviewers.sh
-skills/review/SKILL.md|adaptiveReviewerWait
+skills/review/references/cloud-reviewers.md|wait-for-reviewers.sh
+skills/review/references/cloud-reviewers.md|adaptiveReviewerWait
 skills/review/references/reviewer-latency.md|nearest-rank
 skills/doctor/SKILL.md|reviewer-latency
 skills/review/scripts/wait-for-reviewers.sh|submitted_at
@@ -799,7 +807,7 @@ skills/build-item/references/next-unblocked.md|keyed on the landed comment
 skills/build-item/references/next-unblocked.md|release-unit cycle
 skills/plan/references/splice-mechanics.md|already holds landed leaves
 skills/build-item/SKILL.md|awaiting their release
-skills/build-item/SKILL.md|merge-only: true
+skills/build-item/references/epic-release-steps.md|merge-only: true
 skills/build-item/SKILL.md|Merge pull request #<n> from <owner>/<head branch>
 skills/build-item/SKILL.md|integration-branch or train base
 skills/build-item/SKILL.md|never step 1

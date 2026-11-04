@@ -3,8 +3,10 @@ load: rationale
 ---
 # The epic release, and the one-off bypass — why they are shaped this way
 
-The rules live in the body (step 8, the one-off mode section, 5a and 6.5); this file holds the
-reasoning, read before cutting a release PR or changing the one-off classification.
+The rules live in the body (step 8's gate, the one-off mode section, 5a and 6.5) and in
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release-steps.md` (step 8 once its gate
+fires); this file holds the reasoning, read before cutting a release PR or changing the one-off
+classification.
 
 ## Why the epic release PR reviews the FULL diff under fast mode
 
@@ -123,10 +125,12 @@ take fast mode, exactly as an epic story does.
 
 ## Cited by
 
+- `skills/build-item/references/epic-release-steps.md` — its opening paragraph, for the reasoning.
 - `skills/build-item/SKILL.md` — the step-8 pointer ("Read … when step 7 reports the release
   unit at zero") and the one-off section's pointer ("Read … before changing the one-off
   classification or its step-0 delta").
 - `skills/build-item/SKILL.md` — the working-base note on why stories merge into the integration
   branch, step 5a's story-branch deletion and step 6.5's deferred defect placement, each citing
-  this file with "(why: …)", as does step 7's release-unit count; step 8's auto-release gate,
-  `live: false` and no-release-notes rules are covered by the step-8 pointer above.
+  this file with "(why: …)", as does step 7's release-unit count; step 8's auto-release gate
+  is covered by the step-8 pointer above, and its `live: false` and no-release-notes rules by its
+  pointer to `epic-release-steps.md`.

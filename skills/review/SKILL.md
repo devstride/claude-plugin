@@ -129,14 +129,9 @@ reports. In one turn:
   local round 1; ordinary relaunches respect `maxLocalReviewRounds` (under
   `targetAdversarialCycles`); safety cycles override both.
 - **Cloud** — none configured or in scope → no request, no step 2 (step 6 still runs for human
-  threads). A caller that requested at PR-open (`pr` does; never a `final-head` entry) hands over
-  per-reviewer baseline, request time and outcome; request any `every-round` entry without one.
-  **Request EACH in-scope `every-round` entry per its `how`** — a bot via GraphQL with its
-  `graphqlBotId` (REST rejects bots) — **then confirm a NEW `review_requested` event for THAT
-  reviewer**; the mutation reports success even when it creates nothing. A draft does not block an
-  explicit request; never flip to "unblock" one. Hard error → drop. **Unproven within
-  `reviewerRegistrationWindowMinutes` (2 minutes, every profile; re-count on a short interval) →
-  DROPPED for the run**, never waited out. Track the REGISTERED set with each event's `created_at`.
+  threads). In scope → **read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/cloud-reviewers.md`
+  in full before acting on it, and before any re-request (steps 5, 7)**: each `every-round` entry requested and a NEW `review_requested`
+  event proven, or DROPPED unproven within `reviewerRegistrationWindowMinutes`.
 - **Roster fell to Claude-only on a PR path:** configured-but-FAILED (cloud never
   registered/responded AND the local engine failed) → **STOP for a human GitHub-UI review before
   releasing CI**, driven too; configured-EMPTY → the repo's choice, proceed announced. Failed local
@@ -144,13 +139,9 @@ reports. In one turn:
 
 ## 2. Wait for the cloud reviewer
 
-Nothing registered → skip. While local triage continues, ONE self-terminating background call to
-`${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/wait-for-reviewers.sh` — never Monitor, re-armed
-wakeups, `gh pr checks --watch` or a foreground sleep — with repo/PR, registered ids + server
-`created_at`, the review-id high-water mark and both bounds (`adaptiveReviewerWait` false →
-`--fixed-bound`). Its `RESULT` is authoritative; `proceed-p95`/`timeout` degrade the named reviewer,
-kept for step 8. Standalone may ask to keep waiting. Details:
-`${CLAUDE_PLUGIN_ROOT}/skills/review/references/reviewer-latency.md`.
+Nothing registered → skip. Otherwise **read
+`${CLAUDE_PLUGIN_ROOT}/skills/review/references/cloud-reviewers.md` in full before acting on the
+wait**: one self-terminating background call — never Monitor or a foreground sleep.
 
 ## 3. Collect findings — BOTH halves, this cycle only
 
@@ -197,7 +188,8 @@ exact-head receipt it may legally reuse.
 **One contextual follow-up at a time**: ONE scope per `delta-re-review.md` — explicit `full`, else
 `rereview-scope.sh` from the prior cycle anchor (`none` spends nothing); freeze the next anchor;
 every stream reviews that exact range with the ledger, the PR context comment updated before any
-cloud re-request.
+cloud re-request (read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/cloud-reviewers.md` in full
+before acting on it).
 Findings return through steps 3–6.5 and
 the paginated zero-thread check before any flip.
 
