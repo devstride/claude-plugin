@@ -16,7 +16,8 @@ plugin data, so the loaded copy writes down what it is:
            line and this prompt check without a restart); then, when this session runs an older
            plugin than it could, prints ONE context line asking Claude to tell or ask the person:
            once per session per target version (`nudged`), never on a loop or scheduled prompt,
-           never for a repository that pins or switches the check off. It changes nothing itself:
+           never with the check switched off, and in a pinning repository only a reload onto
+           the pinned version. It changes nothing itself:
            an update stays the person's own `/devstride:update`, a reload their `/reload-plugins`.
   refresh-newest  the background half of `prompt`: one bounded `update-plugin.py latest` and an
            atomic write of newest.json in the session-start check's own format.
@@ -54,6 +55,7 @@ REFRESH_LOCK = 300            # one background refresh at a time; a dead one's l
 FETCH_TIMEOUT = 30            # the background fetch's own bound
 NUDGED = re.compile(r"^(reload|update):[0-9]+\.[0-9]+\.[0-9]+$")
 LOOP_PROMPT = re.compile(r"^\s*(/loop\b|/devstride:update\b|/reload-plugins\b|<<autonomous-loop)")
+AUTOMATIC = re.compile(r"<task-notification>|<<autonomous-loop")  # turns no person typed
 
 
 def cache_dir():
@@ -226,12 +228,15 @@ def newest_version(now):
     return None
 
 
-def updates_wanted(top):
-    """False when the repository pins the plugin or switches the update check off."""
+def plugin_block(top):
     config = read_json(os.path.join(top, ".claude", "ds-config.json")) if top else None
     plugin = config.get("plugin") if isinstance(config, dict) else None
-    if not isinstance(plugin, dict):
-        return True
+    return plugin if isinstance(plugin, dict) else {}
+
+
+def updates_wanted(top):
+    """False when the repository pins the plugin or switches the update check off."""
+    plugin = plugin_block(top)
     return plugin.get("pin") is None and plugin.get("updateCheck", True) is not False
 
 
@@ -330,7 +335,8 @@ def spawn_refresh():
 
 
 def refresh_newest():
-    """Fetch the newest published release once and store it as the session-start check does."""
+    """Fetch the newest published release once and store it as the session-start check does. A
+    failed fetch keeps its lock, so an offline machine retries once per REFRESH_LOCK, not per prompt."""
     lock = os.path.join(cache_dir(), "newest.refresh")
     try:
         helper = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
@@ -342,13 +348,9 @@ def refresh_newest():
         if done.returncode == 0 and SEMVER.match(newest):
             write_atomic(private_dir(cache_dir()), "newest.json",
                          {"schema": 2, "source": SOURCE, "newest": newest, "fetchedAt": int(time.time())})
+            os.unlink(lock)
     except Exception:
         pass
-    finally:
-        try:
-            os.unlink(lock)
-        except OSError:
-            pass
 
 
 def nudge_text(result):
@@ -358,8 +360,9 @@ def nudge_text(result):
         target = result.get("installed")
         return "reload", target, ("devstride plugin: this session is still running %s, and %s is installed on this machine. "
                         "Tell the user so in one short line at the start of your reply: they load it by typing "
-                        "/reload-plugins themselves (you cannot run it). Then carry on with their request." % (running, target))
-    if verdict == "update" and check_enabled():
+                        "/reload-plugins themselves (you cannot run it). Then carry on with their request; if no person "
+                        "is at the keyboard (a scheduled or unattended run), just mention it in your final report." % (running, target))
+    if verdict == "update":
         target = result.get("newest")
         return "update", target, ("devstride plugin: this session runs %s and %s is published. Ask the user once whether to "
                         "update now: on yes, run /devstride:update and follow its handoff (they then type "
@@ -382,11 +385,16 @@ def prompt():
         if check_enabled() and updates_wanted(top) and refresh_due(now) and take_refresh_lock(time.time()):
             spawn_refresh()
         text = payload.get("prompt")
-        if isinstance(text, str) and LOOP_PROMPT.match(text):
+        if isinstance(text, str) and (LOOP_PROMPT.match(text) or AUTOMATIC.search(text)):
+            return
+        plugin = plugin_block(top)
+        if not check_enabled() or plugin.get("updateCheck", True) is False:
             return
         kind, target, line = nudge_text(check(sid, cwd))
         if not line or not isinstance(target, str) or not SEMVER.match(target):
             return
+        if kind == "reload" and plugin.get("pin") is not None and plugin.get("pin") != target:
+            return  # a pinned repository is told to reload only onto its pinned version
         marker = "%s:%s" % (kind, target)
         if entry.get("nudged") == marker:
             return

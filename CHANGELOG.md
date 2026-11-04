@@ -30,8 +30,9 @@ for what each version component means here and how a release is cut.
   When the session runs an older plugin than it could, the prompt hook adds one line asking Claude
   to tell you (a newer copy is installed: you type `/reload-plugins`) or to ask you (a newer
   release is published: on yes it runs `/devstride:update`). Once per session per version; never on
-  a `/loop` or autonomous wakeup, never in a repository that pins the plugin or turns the check
-  off, never with `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`. It changes nothing on its own: automatic
+  a `/loop` or autonomous wakeup, never with `updateCheck: false` or
+  `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`, and in a repository that pins the plugin never an update and
+  only a reload onto the pinned version. It changes nothing on its own: automatic
   updates still happen only at session start.
 
 ### Cost

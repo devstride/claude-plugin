@@ -156,9 +156,9 @@ if printf '%s' "$N1" | grep -q 'still running 3.15.0, and 3.16.0 is installed' &
 
 # (13) a loop or scheduled prompt, and /devstride:update itself, never get the line
 L1="$(prompt "$P15" n2 "$R" '/loop /devstride:build-item')"; L2="$(prompt "$P15" n2 "$R" '<<autonomous-loop-dynamic>>')"
-L3="$(prompt "$P15" n2 "$R" '/devstride:update')"; L4="$(prompt "$P15" n2 "$R")"
+L3="$(prompt "$P15" n2 "$R" '/devstride:update')$(prompt "$P15" n2 "$R" '<task-notification><task-id>x</task-id></task-notification>')"; L4="$(prompt "$P15" n2 "$R")"
 if [ -z "$L1$L2$L3" ] && printf '%s' "$L4" | grep -q '3.16.0 is installed'; then
-  ok "(13) /loop, an autonomous-loop wakeup and /devstride:update → no line; the next ordinary prompt gets it"; else bad "(13) [$L1|$L2|$L3|$L4]"; fi
+  ok "(13) /loop, an autonomous-loop wakeup, a background-task report and /devstride:update → no line; the next ordinary prompt gets it"; else bad "(13) [$L1|$L2|$L3|$L4]"; fi
 
 # (14) running the installed copy with a newer release → ONE ask to update; never for a pinned or
 #      opted-out repository, nor with DEVSTRIDE_PLUGIN_UPDATE_CHECK=0; a newer target asks again
@@ -169,6 +169,18 @@ newest 3.16.2 0; U4="$(prompt "$P16" n3 "$R")"
 if printf '%s' "$U1" | grep -q 'runs 3.16.0 and 3.16.1 is published' && printf '%s' "$U1" | grep -q '/devstride:update' \
    && printf '%s' "$U1" | grep -q 'do not ask' && [ -z "$U2" ] && [ -z "$U3" ] && printf '%s' "$U4" | grep -q '3.16.2 is published'; then
   ok "(14) update: asked once per published version; pinned, opted-out and check-off repos are never asked"; else bad "(14) [$U1] [$U2] [$U3] [$U4]"; fi
+
+# (14b) the reload line obeys the same switches: none with the check off (setting or variable),
+#       and in a pinning repository only a reload onto the pinned version
+registry "\"devstride@devstride\":[$(project_row "$R" 3.16.0),$(project_row "$P" 3.16.0),$(project_row "$OFF" 3.16.0)]"
+P17="$(mkrepo pinned17 '{"plugin":{"pin":"3.17.0"}}')"
+registry "\"devstride@devstride\":[$(project_row "$R" 3.16.0),$(project_row "$P" 3.16.0),$(project_row "$OFF" 3.16.0),$(project_row "$P17" 3.16.0)]"
+newest 3.16.0 0
+B1="$(prompt "$P15" r20 "$OFF")$(UC=0 prompt "$P15" r21 "$R")$(prompt "$P15" r22 "$P17")"
+B2="$(prompt "$P15" r23 "$P")"
+if [ -z "$B1" ] && printf '%s' "$B2" | grep -q '3.16.0 is installed'; then
+  ok "(14b) reload line: none with updateCheck false, the variable at 0, or a pin on another version; pinned onto 3.16.0 → told"
+else bad "(14b) [$B1] [$B2]"; fi
 
 # (15) current → silent; no record (no plugin root) → silent, exit 0
 newest 3.16.0 0
@@ -200,5 +212,12 @@ grep -q '3.16.0' "$NJ" && FRESH=1 || FRESH=0
 if [ $FETCHED = 1 ] && [ "$FMT" = 1 ] && [ "$D1$D2$NONE" = 111 ] && [ $FRESH = 1 ] && [ ! -d "$FP/hooks/__pycache__" ]; then
   ok "(16) stale cache → one detached fetch, newest.json in the session-start format, lock dropped; held lock / pin / check off / a 10-minute-old cache → no fetch"
 else bad "(16) d1=$D1 d2=$D2 fetched=$FETCHED fmt=$FMT none=$NONE fresh=$FRESH"; fi
+
+# (17) a failed fetch (offline) keeps its lock, so the next prompts do not each start another one
+printf 'import sys\nsys.exit(1)\n' > "$FP/skills/update/scripts/update-plugin.py"; rm -f "$LOCK"
+newest 3.16.0 4000; RUNTIME="$FP/hooks/session-runtime.py" prompt "$P16" n13 "$R" >/dev/null
+for _ in $(seq 1 30); do [ -e "$LOCK" ] && break; sleep 0.1; done; sleep 1
+[ -e "$LOCK" ] && grep -q '3.16.0' "$NJ" && ok "(17) a failed fetch leaves newest.json alone and keeps its lock: retried after 5 minutes, not every prompt" \
+  || bad "(17) lock=$([ -e "$LOCK" ] && echo kept || echo gone)"
 
 exit $FAIL
