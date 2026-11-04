@@ -8,6 +8,20 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **`release.clearance.scope: "cut-to-deploy"` holds the release tower only from the cut to a
+  confirmed deploy.** It claims clearance at the cut instead of before the train, and hands it
+  back once the deploy is confirmed. The post-deploy check then runs as the first owed item. Its
+  result is posted as the `release/post-deploy` commit status on the production merge commit,
+  and the next release refuses to merge (never to cut) until that status is success. A new
+  `post-deploy only` argument finishes a check whose session stopped after the hand-back. Two
+  new scripts, `post-deploy-status.sh` and `previous-release-gate.sh`, do the posting and the
+  reading. The key is accepted in both clearance shapes, and `doctor` and `setup validate` reject
+  any other value. The default, `release`, keeps today's behaviour, and no new status is posted.
+- The commands shape of `release.clearance` now also accepts `phaseBudgetMinutes`, which a
+  repository-supplied provider reads too.
+
 ## [3.25.0] — 2026-11-04
 
 ### Added

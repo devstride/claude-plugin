@@ -218,7 +218,11 @@
       ],
       "unset": "no clearance: release runs as before and nothing is claimed",
       "contract": "skills/release/references/clearance.md",
-      "since": "pre-registry"
+      "since": "pre-registry",
+      "sharedKeys": [
+        "phaseBudgetMinutes",
+        "scope"
+      ]
     },
     {
       "key": "claims",
@@ -1471,6 +1475,17 @@
       "type": "any",
       "description": "phase to minutes; a bad value is ignored with a status warning",
       "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.scope",
+      "type": "string",
+      "enum": [
+        "release",
+        "cut-to-deploy"
+      ],
+      "default": "release",
+      "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check) or cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge)",
+      "since": "3.26.0"
     },
     {
       "key": "release.clearance.credentialsFile",
