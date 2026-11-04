@@ -1,3 +1,4 @@
 { "supportTrain": { "branch": "train/support", "fastMerges": false, "smallFixes": { "maxFiles": 3, "maxChangedLines": 200 }, "lateArrivals": "offer" },
   "release": { "clearance": { "commands": { "claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a", "owed": "o" } } },
-  "claims": { "commands": { "claim": "c", "heartbeat": "h", "release": "r", "get": "g", "list": "l" }, "expiryMinutes": { "story": 90 } } }
+  "claims": { "commands": { "claim": "c", "heartbeat": "h", "release": "r", "get": "g", "list": "l" }, "expiryMinutes": { "story": 90 } },
+  "sessionSummary": { "commands": { "write": "w" } } }

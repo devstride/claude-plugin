@@ -265,12 +265,11 @@ is `review` step 7's; step 5 never reads `skipping` as green.
   (`release-train.md`), closed by `release`.
 - **The item points at its code**: 4b — confirm the PR auto-linked, else `link_pull_request`; 4a —
   that comment. Never invent a PR number.
-- **Reconcile as-built** on a material deviation: `add_comment` the `view: 'full'` description
-  verbatim under "📋 Original spec (as planned) — superseded by the description below" (HTML: pass
-  `{ html }`, never Markdown), then rewrite it: italic as-built note naming what it shipped in, a
-  **Deviations** list with one-line rationales, an **As shipped** summary — citing the artifact that
-  EXISTS (4b its PR; 4a merge SHA + branch). None → "shipped as specified". Deviations are step 3/4's.
-- **Release the claim** (`claims` set): outcome `done`.
+- **Reconcile as-built** on a material deviation: `add_comment` the `view: 'full'` description under "📋 Original spec (as planned) — superseded by the description below" (HTML via
+  `{ html }`), then rewrite it: italic as-built note naming what it shipped in, a
+  **Deviations** list with one-line rationales, an **As shipped** summary citing the artifact that
+  EXISTS (4b its PR; 4a merge SHA + branch). None → "shipped as specified".
+- **Release the claim** (`claims`): outcome `done`. Summary (`sessionSummary`): `references/session-summary.md`.
 - **Report** item + `[N]`, status, dates, PR link or SHA + branch, profile + source, reconciled.
 
 ## 6.5 Capture untracked findings as tracked items

@@ -122,5 +122,6 @@
   "activeAgents": {
     "boardId": "board-1", "tagName": "agent active", "tagColor": "green", "staleMinutes": 20,
     "commands": { "start": "./tools/presence start <root>", "end": "./tools/presence end <root>" }
-  }
+  },
+  "sessionSummary": { "provider": "devstride" }
 }

@@ -225,6 +225,24 @@
       ]
     },
     {
+      "key": "sessionSummary",
+      "shape": "provider-or-commands",
+      "valueType": "object",
+      "nullable": true,
+      "payload": "one scrubbed agent session summary as JSON on stdin (itemNumber, sessionId, agent, startedAt, then the optional fields the loop knows)",
+      "modes": [
+        "write"
+      ],
+      "verdict": "stdout's first line (WROTE, ABSENT, FORBIDDEN, UNREACHABLE, ERROR); exit 0 wrote, 1 anything else; a failure never stops delivery",
+      "calledBy": [
+        "build-item 0",
+        "build-item 6"
+      ],
+      "unset": "no summary: build-item writes nothing and says nothing",
+      "contract": "skills/build-item/references/session-summary.md",
+      "since": "unreleased"
+    },
+    {
       "key": "claims",
       "shape": "provider-or-commands",
       "valueType": "object",
@@ -1716,6 +1734,30 @@
       "required": true,
       "description": "the repository's own start and end commands",
       "since": "3.25.0"
+    },
+    {
+      "key": "sessionSummary.provider",
+      "type": "string",
+      "enum": [
+        "devstride"
+      ],
+      "required": true,
+      "description": "the built-in provider: the agent's own DevStride MCP connection (record_agent_session)",
+      "since": "unreleased"
+    },
+    {
+      "key": "sessionSummary.commands",
+      "type": "object",
+      "required": true,
+      "description": "a summary store the repository supplies",
+      "since": "unreleased"
+    },
+    {
+      "key": "sessionSummary.commands.write",
+      "type": "string",
+      "required": true,
+      "description": "the write command; the scrubbed summary JSON arrives on stdin",
+      "since": "unreleased"
     },
     {
       "key": "release.docsRepo",
