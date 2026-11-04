@@ -11,9 +11,10 @@ beside the plan").
 
 ## Finding it
 
-- **Plan root.** `get_item` with `view: "full"` on the item the finding concerns, walking its
-  hierarchy UPWARD to the top-most item under the portfolio. That root — not the item's own
-  parent — owns the container.
+- **Plan root.** The root the caller already works under (`build-item`'s plan root, the plan
+  being authored or re-cut); without one, `get_item` with `view: "full"` on the item the finding
+  concerns, walking its hierarchy UPWARD to the top-most item under the portfolio. That root — not
+  the item's own parent — owns the container.
 - **Identity.** A DIRECT child of the plan root whose title, trimmed, inner whitespace collapsed
   and case ignored, equals `defects.deferredContainerTitle` (shipped default `Deferred`) or a
   legacy title: the built-in `Deferred defects` plus every entry of
@@ -37,8 +38,10 @@ beside the plan").
   never create a second container to get around it.
 - **Creation**, only when `create` is true: the work type the organization's hierarchy requires
   directly under the root (`get_work_type_hierarchy`; an Epic under a Capability), creating every
-  intermediate level the `parentWorkTypeId` chain requires, titled `defects.deferredContainerTitle`,
-  with a one-paragraph description: a parking container whose items are never built from here
+  intermediate level the `parentWorkTypeId` chain requires, titled `defects.deferredContainerTitle`.
+  When the only type allowed directly under the root is a leaf type, no container can hold work:
+  the finding is noted for the owner, not filed, and nothing is created. The container gets
+  a one-paragraph description: a parking container whose items are never built from here
   automatically, carry no execution-order number and no blocking links, and link back to what
   produced them. `plan` step 2 provisions it up front this same way; otherwise the first filing
   does.

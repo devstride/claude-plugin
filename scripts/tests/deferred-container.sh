@@ -22,7 +22,7 @@ expect "no match: create" match '{"title":"Deferred","children":[]}' '[d["contai
 expect "an empty legacy entry is skipped, never a refusal" match '{"title":"Deferred","legacyTitles":["Deferred defects",""],"children":[{"number":"I38","title":"Deferred"}]}' 'd["container"]' '"I38"'
 expect "a configured list never removes the built-in legacy title" match '{"title":"Deferred","legacyTitles":["Something else"],"children":[{"number":"I37","title":"Deferred defects"}]}' 'd["container"]' '"I37"'
 
-for bad_input in 'not json' '{"children":[]}' '{"title":"Deferred","children":"x"}' '{"title":"Deferred","legacyTitles":"x","children":[]}' '{"title":"Deferred","legacyTitles":[5],"children":[]}' '{"title":"Deferred","children":[{"number":5,"title":"Deferred"}]}'; do
+for bad_input in 'not json' '{"children":[]}' '{"title":"Deferred","children":"x"}' '{"title":"Deferred","legacyTitles":"x","children":[]}' '{"title":"Deferred","legacyTitles":[5],"children":[]}' '{"title":"Deferred","children":[{"number":5,"title":"Deferred"}]}' '{"title":"Deferred","children":[{"number":"I5"}]}'; do
   out="$(run match "$bad_input")"; rc=$?
   if [ "$rc" = 2 ] && printf '%s' "$out" | python3 -c 'import json,sys; assert "error" in json.load(sys.stdin)' 2>/dev/null; then ok "malformed match input exits 2 with a JSON error ($bad_input)"; else bad "malformed $bad_input -> rc=$rc $out"; fi
 done
@@ -33,5 +33,6 @@ expect "members: nested descendants included, sibling tree excluded" members "{\
 expect "members: two containers are both honoured" members "{\"containers\":[\"I1\",\"I6\"],\"nodes\":$NODES}" 'd["members"]' '["I1", "I2", "I3", "I6", "I7"]'
 expect "members: a parent cycle terminates" members '{"containers":["I1"],"nodes":[{"number":"I8","parentNumber":"I9"},{"number":"I9","parentNumber":"I8"},{"number":"I2","parentNumber":"I1"}]}' 'd["members"]' '["I1", "I2"]'
 out="$(run members '{"containers":"I1","nodes":[]}')"; [ $? = 2 ] && ok "malformed members input exits 2" || bad "malformed members -> $out"
+out="$(run members '{"containers":["I1"],"nodes":[{"number":"I2"}]}')"; [ $? = 2 ] && ok "a node without parentNumber exits 2" || bad "missing parentNumber -> $out"
 
 [ "$FAIL" -eq 0 ]

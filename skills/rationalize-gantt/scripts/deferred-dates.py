@@ -66,7 +66,8 @@ def main():
     for item in deferred:
         if not isinstance(item, dict) or not isinstance(item.get("number"), str) or not item["number"]:
             fail("every deferred item needs a number")
-        if not isinstance(item.get("groups", []), list):
+        groups = item.get("groups", [])
+        if not isinstance(groups, list) or not all(isinstance(g, str) and g for g in groups):
             fail("groups must be an array of item numbers")
     assignments, done, cursor = [], [], boundary
     for item in sorted(deferred, key=lambda i: number_key(i["number"])):

@@ -48,7 +48,8 @@ to an explicit sub-branch and tell the user you scoped it.
 For the root and every descendant: `get_item(view:"full")` (description, status, dates,
 relationships) and `list_comments` (whole thread). Fan out with a `Workflow`, ~8–10 items per
 agent, each returning a SUMMARIZED record, never raw HTML — `{number, title, workType, status,
-description_summary, key_comments, relationships: {blocked_by, blocks}}`. Read `args` defensively
+description_summary, key_comments, relationships: {blocked_by, blocks}}`, plus `isBug`,
+`completedAt`, `endedOutcome` and the `related_to` edge for deferred-container members. Read `args` defensively
 (`const items = Array.isArray(args) ? args : JSON.parse(args)` — it can arrive JSON-stringified).
 
 ## 3. Synthesize

@@ -66,7 +66,9 @@ def match(request):
         if not isinstance(child, dict):
             fail("every child must be an object")
         number = text(child.get("number"), "a child's number")
-        name = norm(child.get("title") if isinstance(child.get("title"), str) else "")
+        if not isinstance(child.get("title"), str):
+            fail("every child needs a title")
+        name = norm(child["title"])
         if name == title:
             hits.append((number, "title"))
         elif name in legacy_set:
@@ -91,8 +93,8 @@ def members(request):
         fail("nodes must be an array")
     parent = {}
     for node in nodes:
-        if not isinstance(node, dict):
-            fail("every node must be an object")
+        if not isinstance(node, dict) or "parentNumber" not in node:
+            fail("every node must be an object with a parentNumber (null at the top)")
         parent[text(node.get("number"), "a node's number")] = node.get("parentNumber")
     roots = set(containers)
     found = []

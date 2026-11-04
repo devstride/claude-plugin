@@ -9,7 +9,7 @@
     "branch-hotfix": 2200,
     "build-item": 7300,
     "ci-audit": 2600,
-    "comprehend-plan": 1670,
+    "comprehend-plan": 1700,
     "create-defect": 2500,
     "create-story": 1940,
     "doctor": 7900,
@@ -95,11 +95,11 @@
     "skills/doctor/references/claims-checks.md": 450,
     "skills/build-item/references/epic-release-steps.md": 1220,
     "skills/review/references/cloud-reviewers.md": 700,
-    "skills/build-item/references/deferred-container.md": 2280
+    "skills/build-item/references/deferred-container.md": 2380
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 79620,
+      "budget": 79720,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -136,7 +136,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 64970,
+      "budget": 65070,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
