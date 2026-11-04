@@ -1425,6 +1425,32 @@
       "since": "pre-registry"
     },
     {
+      "key": "release.autoStart",
+      "type": "object",
+      "description": "releases that start themselves under a one-winner release-train claim; contract: skills/release/references/auto-start.md",
+      "since": "unreleased"
+    },
+    {
+      "key": "release.autoStart.enabled",
+      "type": "boolean",
+      "default": false,
+      "description": "a train landing or a finished release starts the next release; needs a claims block",
+      "since": "unreleased"
+    },
+    {
+      "key": "release.lightRelease",
+      "type": "object",
+      "description": "rules for a light release (one the classify skill calls LIGHT)",
+      "since": "unreleased"
+    },
+    {
+      "key": "release.lightRelease.standingYes",
+      "type": "boolean",
+      "default": false,
+      "description": "the owner's standing yes: a light release identical to its reviewed train merges and deploys without an in-the-moment yes; contract: skills/release/references/auto-start.md",
+      "since": "unreleased"
+    },
+    {
       "key": "release.productionReview",
       "type": "object",
       "description": "review-once economy for the production pull request",
@@ -1569,7 +1595,7 @@
         "warnMinimum": 1,
         "warnMaximum": 1440
       },
-      "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here",
+      "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here",
       "since": "3.21.0"
     },
     {

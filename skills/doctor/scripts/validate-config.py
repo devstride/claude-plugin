@@ -133,6 +133,19 @@ def pre_ship_checks(v, config):
             v.add("ERROR", "preShipChecks[%d].runAt" % i, "cannot be combined with `onlyWhenTouched: true`: a train check is skipped only by same-snapshot train evidence, never by path")
 
 
+def auto_start_checks(v, config):
+    """`release.autoStart.enabled` needs a claims store; the standing yes needs a classify skill."""
+    release = config.get("release") if isinstance(config, dict) else None
+    if not isinstance(release, dict):
+        return
+    auto = release.get("autoStart")
+    if isinstance(auto, dict) and auto.get("enabled") is True and not isinstance(config.get("claims"), dict):
+        v.add("ERROR", "release.autoStart.enabled", "needs a `claims` block: without a one-winner release-train claim two sessions could start the same release")
+    light = release.get("lightRelease")
+    if isinstance(light, dict) and light.get("standingYes") is True and not release.get("classifySkill"):
+        v.add("WARN", "release.lightRelease.standingYes", "has no effect without `release.classifySkill`: no release is ever classified LIGHT")
+
+
 class Validator:
     def __init__(self, schema, local_prefixes):
         self.findings = []
@@ -327,6 +340,7 @@ def main(argv):
         v.add("NOTE", "supportTrain", "supportTrain is the old name of releaseTrain; rename it")
     deferred_container_checks(v, config)
     pre_ship_checks(v, config)
+    auto_start_checks(v, config)
     errors = [f for f in v.findings if f[0] == "ERROR"]
     warns = [f for f in v.findings if f[0] == "WARN"]
     notes = [f for f in v.findings if f[0] == "NOTE"]

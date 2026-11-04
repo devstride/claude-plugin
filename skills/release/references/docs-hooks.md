@@ -50,7 +50,8 @@ none).
   production merge is confirmed and the deploy verified, never before. The owner suppresses it per
   run with `no docs`.
 - **Release notes are written only when the owner asks** — `--release-notes true|draft` on
-  `release`, per invocation — and only after the production deploy is confirmed live.
+  `release`, per invocation — and only after the production deploy is confirmed live. If a release
+  seems to deserve one, say so in step 4's recap.
 - **No skill in this plugin decides on its own that a delta "warrants" a note, is "large", or is
   "user-facing enough".** Those are the owner's words to say, never adjectives for the loop to
   interpret: a loop that judges a release note-worthy will eventually publish one the owner did

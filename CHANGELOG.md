@@ -8,6 +8,10 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- `release.autoStart.enabled` (with a `claims` block) lets a train landing or a finished release start the next release under a one-winner `release-train` claim, which also guards every train phase; `release.lightRelease.standingYes` merges a light release identical to its reviewed tree on the owner's standing yes. Both default off. `doctor` reports `autoStart` without `claims` as an error.
+
 ## [3.28.0] — 2026-11-04
 
 ### Added

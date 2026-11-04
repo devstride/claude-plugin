@@ -63,7 +63,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    item is never closed again.
 2. **An open release-train pull request is ADOPTED** before anything is cut (scope `cut-to-deploy`:
    only when its holder marker is this session's or absent; another holder's → STOP and ask,
-   `clearance.md`): read `<sourceBefore>`
+   `clearance.md`; with a `claims` block the won train claim decides instead, `auto-start.md`): read `<sourceBefore>`
    and `<trainSnapshot>` from its marker (no marker → STOP and name it; never guess a range), skip
    steps 3–4, check out its head (`gh pr checkout <n>`, then confirm `HEAD` equals the pull
    request's `headRefOid`, so the local engine and pre-ship suites see that tree), and run `pr`
@@ -81,7 +81,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    land on the live train from now on ship in the next release.
 4. **Open it through `pr` in driven mode** — base `<releaseSource>`, title `Release train: <n>
    one-off(s) for release <date>`, the body listing each one-off and carrying the range marker
-   (scope `cut-to-deploy`: and the holder marker) —
+   (scope `cut-to-deploy` without a `claims` block: and the holder marker) —
    flagged as a release-unit pull request exactly as `build-item` step 8 flags an epic release, so
    `review` takes the FULL diff (a one-off merged fast onto the train had no full review yet — this
    is its first and only full review before production; with `release.productionReview` set, a

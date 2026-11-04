@@ -307,6 +307,8 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
 | `release.clearance` | `null`, `{ "provider": "github" }` (optional `ref`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), `{ "provider": "devstride" }` (optional `credentialsFile`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), or `{ "commands": { "claim", "status", "heartbeat", "release", "adopt", "owed"? } }` | no clearance: `release` runs as before, the `release` status-line segment never renders |
 | `claims` | `null`, `{ "provider": "devstride" }`, or `{ "commands": { "claim", "heartbeat", "release", "get"?, "list"? } }`, each with optional `expiryMinutes` | no claims: `build-item` claims nothing and says nothing |
 | `releaseTower` | `{ "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" }` | those two defaults |
+| `release.autoStart.enabled` | boolean; needs `claims` | `false`: a release starts only when someone runs `release` |
+| `release.lightRelease.standingYes` | boolean; needs `release.classifySkill` | `false`: every production merge waits for the owner's in-the-moment yes |
 
 - **`release.clearance`** — one cleared release at a time, for every machine and account that
   releases this repository. `release` claims clearance before it touches the release train or
@@ -340,9 +342,22 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   is skipped, or STOPS a named one. `provider: devstride` uses the agent's own DevStride connection;
   `commands` supplies a store (verbs and verdicts in the registry); both is a config error.
   `expiryMinutes` maps a kind to the minutes a claim lives without a heartbeat: `story` 240,
-  other kinds the server's default (the release permit: `staleMinutes`); a value outside 1..1440 is warned about and
+  `release-train` 30, other kinds the server's default (the release permit: `staleMinutes`); a value outside 1..1440 is warned about and
   ignored. An unreachable, unsupported or forbidden store means no claims, said once. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`.
+  With a `claims` block every release also claims the `release-train` claim (key `<owner>/<repo>`)
+  before it opens or adopts the train's pull request, and hands it on at the cut.
+- **`release.autoStart.enabled`** — releases that start themselves: after a one-off lands on the
+  train, an epic release merges onto it, or a release finishes, the session checks whether the
+  train holds work beyond the source and, if it wins the `release-train` claim, runs `release`.
+  Exactly one machine wins; a session that loses carries on with its own loop. Without `claims`
+  it does nothing and `doctor` reports an error.
+- **`release.lightRelease.standingYes`** — the owner's standing yes for one kind of release: a
+  light release (per `release.classifySkill`) whose tree is identical to the reviewed train, with
+  every required check green, no open threads, every pre-ship check passed unwaived, the previous
+  release's post-deploy check green and the release on final, merges and approves its deploy
+  without asking. Anything else asks as before. Contract for both:
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`.
 
 ## Lists a repository fills in for itself
 

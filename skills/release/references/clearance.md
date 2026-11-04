@@ -183,7 +183,8 @@ the release skill calls it does.
   `<!-- devstride:release-train-holder <digest> on <machine> -->` (`<digest>`: the first 12 hex
   characters of the SHA-256 of `identity`'s answer; the holder itself is never written). An open
   train pull request whose marker names another holder is never adopted silently: STOP, name it,
-  adopt only on the owner's yes. Its own marker is adopted as before.
+  adopt only on the owner's yes. Its own marker is adopted as before. With a `claims` block the
+  `release-train` claim replaces this marker (`auto-start.md`).
 - **Step 4 gates the merge on the previous release.** Before the recap, and again on the yes
   before merging: `${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/previous-release-gate.sh --wait`.
   `0` continue; `2` (still pending after its 45-minute wait) STOP, naming that release and

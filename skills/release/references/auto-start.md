@@ -1,0 +1,72 @@
+---
+load: contract
+---
+# The train claim, releases that start themselves, and the standing yes
+
+Three rules, each opt-in. With no `claims` block, `release.autoStart` and
+`release.lightRelease.standingYes` unset, nothing here applies.
+
+## The train claim — every release, when a `claims` block is configured
+
+- **Kind `release-train`, key `<owner>/<repo>`** (`python3
+  ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/auto-start.py key`). Step 0b claims it BEFORE it
+  opens or adopts a train pull request, for a hand-started and an auto-started run alike. The
+  calls, holder, verdicts and takeover of a lapsed holder are `story-claims.md`'s (build-item's
+  references) with this kind and key; decide with its `story-claim.py decide`, item `the release
+  train`, mode `named` for a hand-started run and `select` for an auto start. Expiry:
+  `claims.expiryMinutes["release-train"]`, else 30.
+- **Heartbeat** at each step transition and at most every 10 minutes while review and CI poll
+  (phase: the step). NOT HOLDER or LOST to a live holder → STOP: another session owns the train
+  phase now.
+- **Release it NON-final** (never outcome `done` or `final`, so the next cycle can claim it) right
+  after the tower `claim` at the cut succeeds, so the next train phase can begin while this release
+  holds the tower; also when the train holds nothing to ship, and when the run stops.
+- **Lost to a live holder**: a hand-started run names who holds it and STOPs; an auto start carries
+  on with its caller's loop, logging no failure.
+- **Won with an open train pull request present** (its previous holder lapsed): `release-branch.md`
+  §1 step 2 ADOPTS it, never opens a second. The old session learns at its next heartbeat and stops.
+- **It replaces the holder marker.** With a `claims` block no `release-train-holder` marker is
+  written or read; the claim decides adoption. Without one, `clearance.md`'s marker rule stands.
+
+## Auto start — `release.autoStart.enabled`
+
+Honoured only with a `claims` block (doctor: an ERROR; at run time it does nothing). Triggers:
+
+1. `build-item`, after a one-off lands on the release train (`release-train.md`);
+2. `build-item`, after step 8 merges an epic release pull request onto the train
+   (`epic-release-steps.md`);
+3. `release`, at the end of step 6, after its own close-out.
+
+At a trigger run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/auto-start.py check`
+(it fetches the train and the release source). `SKIP <reason>` → carry on, saying nothing; `ERROR`
+→ say it once and carry on. `START …` → claim the train (above, mode `select`): lost → carry on
+silently; won → invoke **`release`** in this session, declaring `started-by: auto` (`; adopt #<n>`
+names the open train pull request step 0b adopts). When that release stops — at the owner's yes,
+or merged — return to the caller's own loop. Never resume, message or adopt another session's
+release; the fleet's hourly machine check never starts one. No batching wait: each release carries
+whatever landed during the previous cycle, and there is never a second concurrent release.
+
+## Unattended stop
+
+A `started-by: auto` release that reaches step 4 without a MERGE from the standing yes sends ONE
+`PushNotification` (where the tool exists): the release, READY or BLOCKED, why it is not eligible
+(the `ASK` reason, or "standing yes off"), and the pull request link. Then it waits for the yes,
+holding the tower as any release does.
+
+## The standing yes — `release.lightRelease.standingYes`
+
+At step 4, after the pre-merge check and the recap, run
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/standing-yes.py --pr <n> --head <head>
+--reviewed-tree <tree> --class "<classify-release line>" --checks green|red --unresolved <count>
+--pre-ship "<2b verdict line>" --previous-release <gate exit> [--dev-deploy <exit>] --tower
+"<provider status output>"`. `<tree>` is `git rev-parse <the train pull request's merged head>^{tree}`,
+recorded at 0b; `--dev-deploy` only when the dev-deploy wait applies. `MERGE` only when all of its
+nine conditions hold (the script's header lists them); anything else prints `ASK <reason>`.
+
+- **`MERGE`** is the owner's yes for this pull request and this head: run step 4's "On the yes"
+  checks, merge, and 5a approves the deploy on the same yes. Post ONE comment on the pull request:
+  "Merged on the standing yes for light releases identical to the reviewed train
+  (release.lightRelease.standingYes, owner decision <the date the owner set it>)."
+- **`ASK` or `ERROR`** → the owner's in-the-moment yes, exactly as before. A FULL release, a tree
+  that differs from the reviewed one, a waived pre-ship check or a failed previous release always
+  asks. A return to step 2 voids it like any yes.

@@ -34,7 +34,8 @@ instruction for a release that fires; a recovery close-out applies only the Merg
   **close out** (`next-unblocked.md`): `add_comment` on the RELEASE-UNIT item (release PR, leaves,
   date), Done if its status is tracked, THEN landed leaves → Done, **linking the release PR onto
   every leaf** (the close-out comment, or `link_pull_request`). Delete the epic branch **only if
-  `epicIntegrationBranches.deleteBranchAfterRelease`** — false retains it.
+  `epicIntegrationBranches.deleteBranchAfterRelease`** — false retains it. Onto the train with
+  `release.autoStart.enabled` → its trigger (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`).
 - **Docs STAGE, never publish** — only when `docs.updateOnEpicRelease` is true (else silent): call
   **`update-docs update`** with the `epic-release` payload, **`live: false`**, never optional
   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`, every field it names);

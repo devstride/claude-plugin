@@ -34,7 +34,7 @@
                 "x-warnMinimum": 1,
                 "x-warnMaximum": 1440
               },
-              "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here"
+              "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here"
             }
           },
           "patternProperties": {
@@ -94,7 +94,7 @@
                 "x-warnMinimum": 1,
                 "x-warnMaximum": 1440
               },
-              "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here"
+              "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here"
             }
           },
           "patternProperties": {
@@ -1094,6 +1094,36 @@
           "type": "boolean",
           "default": false,
           "description": "merge the release train into the source before each cut"
+        },
+        "autoStart": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "a train landing or a finished release starts the next release; needs a claims block"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "description": "releases that start themselves under a one-winner release-train claim; contract: skills/release/references/auto-start.md"
+        },
+        "lightRelease": {
+          "type": "object",
+          "properties": {
+            "standingYes": {
+              "type": "boolean",
+              "default": false,
+              "description": "the owner's standing yes: a light release identical to its reviewed train merges and deploys without an in-the-moment yes; contract: skills/release/references/auto-start.md"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "description": "rules for a light release (one the classify skill calls LIGHT)"
         },
         "productionReview": {
           "type": "object",
