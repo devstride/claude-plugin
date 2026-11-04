@@ -266,7 +266,7 @@ adopted (`clearance.md`).
 - **Post-deploy health** (scope `cut-to-deploy`: after 5b, per `clearance.md`): call **`post-deploy check`** with the
   `post-deploy-check.md` payload (`release.postDeployCheckSkill`). `PASS` → continue. `FAIL` →
   STOP: surface the evidence and ask
-  for a rollback decision; never proceed to 5b, 5c or 6 on your own. `NOT RUN` → this-run
+  for a rollback decision; never proceed to 5b (default scope), 5c or 6 on your own. `NOT RUN` → this-run
   degradation; ask whether to proceed. `NOT CONFIGURED` → the close-out says **post-deploy health:
   not configured**.
 

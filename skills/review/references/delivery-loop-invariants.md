@@ -780,7 +780,7 @@ skills/release/SKILL.md|Ground truth
 skills/build-item/references/plain-language-output.md|labelled **unverified**
 skills/build-item/references/plain-language-output.md|Steps you must do yourself
 skills/release/SKILL.md|postDeployCheckSkill
-skills/release/SKILL.md|never proceed to 5b, 5c or 6
+skills/release/SKILL.md|never proceed to 5b (default scope), 5c or 6
 skills/release/SKILL.md|second copy
 skills/release/SKILL.md|release --owed
 skills/release/references/clearance.md|original-stopped

@@ -163,7 +163,11 @@ def previous_release(name):
     hotfix = section(CONFIG, "releaseTower").get("hotfixPattern") or "*/hotfix/**"
     is_hotfix = pattern_regex(hotfix).match
     is_release = pattern_regex(pattern).match if isinstance(pattern, str) and pattern else (lambda head: head == source)
+    # Newest UPDATED first (gh's default is creation order): a merge updates a pull request, so the
+    # newest release merge falls off this page only when PAGE others changed after it, and then
+    # the page is full and reads UNREADABLE below; the local sort by mergedAt picks among them.
     merged = json.loads(gh(["pr", "list", "--repo", name, "--base", production, "--state", "merged",
+                            "--search", "sort:updated-desc",
                             "--json", "number,headRefName,mergeCommit,mergedAt", "--limit", str(PAGE)]) or "[]")
     full = len(merged) >= PAGE
     merged = [pr for pr in merged if isinstance(pr, dict) and pr.get("mergedAt")]

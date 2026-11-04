@@ -56,10 +56,13 @@ fresh cut-to-deploy; prs "$TWO"; touch "$FAKE_GH_STATE/gh-down"; run
 [ "$RC" = 4 ] && printf '%s' "$OUT" | grep -q '^PREVIOUS RELEASE: UNREADABLE' && ok "(12) gh unreachable → 4 UNREADABLE, never a pass" || bad "(12) rc=$RC: $OUT"
 fresh nonsense; run
 [ "$RC" = 4 ] && printf '%s' "$OUT" | grep -q '^PREVIOUS RELEASE: UNREADABLE release.clearance.scope is' && ok "(13) an unknown scope is UNREADABLE (4), never \"the release failed\"" || bad "(13) rc=$RC: $OUT"
-fresh cut-to-deploy; printf '{"release":{"clearance":{"provider":"github","scope":"cut-to-deploy"}}}' > .claude/ds-config.json
+fresh cut-to-deploy; printf '{"baseBranch":"main","release":{"clearance":{"provider":"github","scope":"cut-to-deploy"}}}' > .claude/ds-config.json
 prs '[{"number":20,"headRefName":"develop","mergeCommit":{"oid":"'$A'"},"mergedAt":"2026-11-03T20:00:00Z"}]'; status $A success; run
 [ "$RC" = 0 ] && printf '%s' "$OUT" | grep -q 'SUCCESS develop (#20)' && grep -q '"--base", "master"' "$FAKE_GH_STATE/calls.log" \
-  && ok "(14) unset branch keys: production master, release source develop (the release defaults)" || bad "(14) rc=$RC: $OUT"
+  && ok "(14) unset branch keys: production master, release source develop (never baseBranch)" || bad "(14) rc=$RC: $OUT"
+C="$(head -1 "$FAKE_GH_STATE/calls.log")"; S="$(grep '/status' "$FAKE_GH_STATE/calls.log" | head -1)"
+printf '%s' "$C" | grep -q '"--limit", "100"' && printf '%s' "$C" | grep -q '"--search", "sort:updated-desc"' && printf '%s' "$S" | grep -q 'status?per_page=100"' \
+  && ok "(14b) it reads 100 merges, newest updated first, and every status context" || bad "(14b) $C / $S"
 fresh cut-to-deploy
 prs '[{"number":10,"headRefName":"release/26-11-02","mergeCommit":{"oid":"'$B'"},"mergedAt":"2026-11-02T20:00:00Z"},
       {"number":20,"headRefName":"release/26-11-03","mergeCommit":{"oid":"'$A'"},"mergedAt":"2026-11-03T20:00:00Z"}]'
@@ -70,6 +73,11 @@ prs '[{"number":30,"headRefName":"phil/hotfix/26-11-04/I1-fix","mergeCommit":{"o
       {"number":20,"headRefName":"release/26-11-03","mergeCommit":{"oid":"'$A'"},"mergedAt":"2026-11-03T20:00:00Z"}]'
 status $A success; run
 [ "$RC" = 0 ] && printf '%s' "$OUT" | grep -q 'SUCCESS release/26-11-03 (#20)' && ok "(16) a hotfix head never counts, even under a release pattern that matches it" || bad "(16) rc=$RC: $OUT"
+fresh cut-to-deploy; printf '{"releaseTower":{"hotfixPattern":"urgent/**"},"release":{"releaseBranchPattern":"**","clearance":{"provider":"github","scope":"cut-to-deploy"}}}' > .claude/ds-config.json
+prs '[{"number":31,"headRefName":"urgent/fix-login","mergeCommit":{"oid":"'$H'"},"mergedAt":"2026-11-04T09:00:00Z"},
+      {"number":20,"headRefName":"release/26-11-03","mergeCommit":{"oid":"'$A'"},"mergedAt":"2026-11-03T20:00:00Z"}]'
+status $A success; run
+[ "$RC" = 0 ] && printf '%s' "$OUT" | grep -q 'SUCCESS release/26-11-03 (#20)' && ok "(16b) a configured releaseTower.hotfixPattern is honoured" || bad "(16b) rc=$RC: $OUT"
 fresh cut-to-deploy
 python3 -c 'import json; print(json.dumps([{"number":100+i,"headRefName":"phil/hotfix/26-11-04/I%d-x" % i,"mergeCommit":{"oid":"c"*40},"mergedAt":"2026-11-04T%02d:%02d:00Z" % (i//60, i%60)} for i in range(100)]))' > "$FAKE_GH_STATE/prs.json"
 run
