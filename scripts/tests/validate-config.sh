@@ -251,4 +251,12 @@ expect "(47) a non-integer expiry is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR c
 cfg '{"claims": null}'
 expect "(48) a null claims block is clean" 0 "$CLEAN"
 
+# (49)-(51) release.clearance.scope: either shape takes it (with phaseBudgetMinutes); any other value is an ERROR
+cfg '{"release": {"clearance": {"commands": {"claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a"}, "scope": "cut-to-deploy", "phaseBudgetMinutes": {"deploy": 30}}}}'
+expect "(49) a commands clearance with scope and phaseBudgetMinutes is clean" 0 "$CLEAN"
+cfg '{"release": {"clearance": {"provider": "github", "scope": "release"}}}'
+expect "(50) a provider clearance with scope release is clean" 0 "$CLEAN"
+cfg '{"release": {"clearance": {"provider": "github", "scope": "deploy-only"}}}'
+expect "(51) any other scope is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR release.clearance.scope: "deploy-only" is not one of "release", "cut-to-deploy"$'
+
 exit "$FAIL"

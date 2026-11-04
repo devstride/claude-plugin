@@ -311,7 +311,10 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   (heartbeat older than `staleMinutes`, default 20) whose pull request is still open is adopted
   with the owner's yes, never deleted. `phaseBudgetMinutes` (defaults `pre-ship` 120, `deploy` 60,
   `close-out` 45; `0` switches one off) marks a live release STUCK past its phase's budget — an
-  alarm, never a takeover.
+  alarm, never a takeover. `scope` (either shape) `"release"` (default, the above) or
+  `"cut-to-deploy"`: claimed at the cut, handed back once the deploy is confirmed; the post-deploy
+  check then runs as owed work, posts the `release/post-deploy` commit status, and the next release
+  refuses to merge until it is success (`clearance.md`).
   The built-in `github` provider keeps the clearance in the custom ref `refs/clearance/release`
   (every move a compare-and-swap through `git push --force-with-lease`; neither a branch nor a
   tag) and needs only git and `gh`; a claim starts a detached keeper that heartbeats while the

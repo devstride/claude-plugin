@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.26.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.27.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -935,6 +935,15 @@
                 "phaseBudgetMinutes": {
                   "description": "phase to minutes; a bad value is ignored with a status warning"
                 },
+                "scope": {
+                  "type": "string",
+                  "enum": [
+                    "release",
+                    "cut-to-deploy"
+                  ],
+                  "default": "release",
+                  "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check) or cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge)"
+                },
                 "credentialsFile": {
                   "type": "string",
                   "description": "a KEY=VALUE file holding the DevStride API credentials for the devstride provider; must not be readable by group or others"
@@ -991,6 +1000,18 @@
                     "release",
                     "adopt"
                   ]
+                },
+                "phaseBudgetMinutes": {
+                  "description": "phase to minutes; a bad value is ignored with a status warning"
+                },
+                "scope": {
+                  "type": "string",
+                  "enum": [
+                    "release",
+                    "cut-to-deploy"
+                  ],
+                  "default": "release",
+                  "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check) or cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge)"
                 }
               },
               "patternProperties": {

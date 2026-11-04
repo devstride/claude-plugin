@@ -33,6 +33,8 @@ shown, and `release` runs exactly as before.** Nothing ever blocks a hotfix.
   the verb's own arguments are appended). It honours the same contract. A block with BOTH keys is a
   config error (`doctor` and `setup validate` report it); so is a `provider` other than `github` or
   `devstride`.
+- **`"scope"`** — `"release"` (default) or `"cut-to-deploy"` (§ Scope `cut-to-deploy`), in either
+  shape; any other value is a config error.
 - **`releaseTower`** — read by the `release-tower` check and the built-in `status`: `overrideLabel`
   passes a pull request an owner approved by hand; `hotfixPattern` names hotfix heads (the
   branch-patterns rule, `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`).
@@ -145,7 +147,7 @@ nothing on any failure. `gh` still serves pull-request facts.
 
 ## Where the release skill calls it
 
-Only when `release.clearance` is set. **0a** `claim --wait --purpose release` before anything else,
+Only when `release.clearance` is set; scope `cut-to-deploy` changes 0a, 4 and 5a–5b (below). **0a** `claim --wait --purpose release` before anything else,
 in the background with a long timeout: `0` continue (say who was waiting when stderr said so); `3`
 ask the owner once — adopt `<branch>` / `#<n>`, or keep waiting — and on adopt run `adopt --yes`
 and enter the adopted path (0b skips the train, 0c skips the cut, step 2 reviews the open pull
@@ -167,6 +169,42 @@ close-out and release notes, each passed as `--owed <item>` and settled by `owed
 run by the same session one after another. A failed check, or a 5b that stops early, KEEPS
 clearance for the retry, and the recap says so. **`branch-hotfix` and the hotfix path never
 claim**, and a hotfix pull request into the production branch merges with no clearance step.
+
+## Scope `cut-to-deploy`
+
+`release.clearance.scope` (default `"release"`: everything above, unchanged) set to
+`"cut-to-deploy"` holds clearance only from the cut until the deploy is confirmed, so the next
+release reviews and tests while this one deploys. The provider contract does not move; only where
+the release skill calls it does.
+
+- **0a moves.** 0b (the train) runs uncleared, with no `heartbeat train`. `claim --wait --purpose
+  release` runs just before 0c, with the exits handled as above; the first heartbeat is `cut
+  --branch <b>`. Until a one-winner train claim exists, 0b's train pull request body carries
+  `<!-- devstride:release-train-holder <digest> on <machine> -->` (`<digest>`: the first 12 hex
+  characters of the SHA-256 of `identity`'s answer; the holder itself is never written). An open
+  train pull request whose marker names another holder is never adopted silently: STOP, name it,
+  adopt only on the owner's yes. Its own marker is adopted as before.
+- **Step 4 gates the merge on the previous release.** Before the recap, and again on the yes
+  before merging: `${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/previous-release-gate.sh --wait`.
+  `0` continue; `2` (still pending after its 45-minute wait) STOP, naming that release and
+  `/devstride:release post-deploy only`; `1` STOP: "Production merge refused: release <name>
+  (#<n>) failed its post-deploy check." — the owner may override in words, recorded as a comment
+  on this pull request; `3` ask the owner once (the first release under this scope, or one from
+  before it); `4` (unreadable, a config error too) ask the owner. It never blocks the cut, the review or a hotfix.
+- **Hand back at deploy-confirmed.** 5a confirms the merge, approves and confirms the deploy, and
+  stops there. 5b then runs its branch work (`heartbeat close-out`, the sync, the release branch
+  deleted, the train level), posts `post-deploy-status.sh <merge sha> pending "<release> by
+  <machine> / <session name>: post-deploy check running"` (a session NAME, never the holder), and
+  runs `release --owed post-deploy-check` with the other `--owed` items. The post-deploy check is then the FIRST owed
+  item: `post-deploy check`, its result posted as `release/post-deploy`, then `owed --done
+  post-deploy-check`. `PASS` posts `success`. `FAIL` posts `failure`, then STOP for the rollback
+  decision; documentation and release notes never run. `NOT RUN` asks the owner: a yes posts
+  `success` with "not run — owner accepted: <reason>", a no posts `error` and stops.
+- **`post-deploy only`** — for a session that died after the hand-back: on the newest release
+  merge, run 5a's confirmation, the `check` and the status post, then stop. Any session may; it
+  claims nothing.
+- `post-deploy-status.sh` and `previous-release-gate.sh` print `SKIPPED` / `NOT GATED` and do
+  nothing under the default scope, so a repository that never sets the key sees no new status.
 
 ## The floor: the `release-tower` check
 
@@ -194,3 +232,4 @@ request — then even an administrator cannot land a second release beside the f
 - `skills/doctor/SKILL.md` — the config audit of `release.clearance` and `releaseTower`.
 - `skills/setup/references/statusline-segments.md` — the `release` segment.
 - `skills/branch-hotfix/SKILL.md` — a hotfix never claims.
+- `skills/release/scripts/post-deploy-status.sh`, `previous-release-gate.sh` — scope `cut-to-deploy`.

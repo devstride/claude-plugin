@@ -92,7 +92,7 @@
     "classifySkill": "release-classify",
     "preMergeSkill": "release-pre-merge",
     "clearance": { "provider": "github", "ref": "refs/clearance/release", "staleMinutes": 20, "waitMinutes": 180, "phaseBudgetMinutes": { "pre-ship": 120, "deploy": 60 },
-                   "credentialsFile": ".devstride/agent.env" }
+                   "credentialsFile": ".devstride/agent.env", "scope": "cut-to-deploy" }
   },
   "releaseTrain": { "branch": "train/support", "fastMerges": true, "smallFixes": { "maxFiles": 5, "maxChangedLines": 500 }, "lateArrivals": "restart" },
   "releaseTower": { "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" },

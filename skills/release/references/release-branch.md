@@ -61,7 +61,9 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    pull request, apply step 6 to its marker's range. Step 6 skips any item already Done or already
    carrying that pull request's "reached …" comment, so a finished run is a no-op and a re-opened
    item is never closed again.
-2. **An open release-train pull request is ADOPTED** before anything is cut: read `<sourceBefore>`
+2. **An open release-train pull request is ADOPTED** before anything is cut (scope `cut-to-deploy`:
+   only when its holder marker is this session's or absent; another holder's → STOP and ask,
+   `clearance.md`): read `<sourceBefore>`
    and `<trainSnapshot>` from its marker (no marker → STOP and name it; never guess a range), skip
    steps 3–4, check out its head (`gh pr checkout <n>`, then confirm `HEAD` equals the pull
    request's `headRefOid`, so the local engine and pre-ship suites see that tree), and run `pr`
@@ -77,7 +79,8 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    combined tree (a conflict STOPS with the files — never auto-resolved), then push. One-offs that
    land on the live train from now on ship in the next release.
 4. **Open it through `pr` in driven mode** — base `<releaseSource>`, title `Release train: <n>
-   one-off(s) for release <date>`, the body listing each one-off and carrying the range marker —
+   one-off(s) for release <date>`, the body listing each one-off and carrying the range marker
+   (scope `cut-to-deploy`: and the holder marker) —
    flagged as a release-unit pull request exactly as `build-item` step 8 flags an epic release, so
    `review` takes the FULL diff (a one-off merged fast onto the train had no full review yet — this
    is its first and only full review before production; with `release.productionReview` set, a
@@ -193,9 +196,11 @@ advanced under a release-branch head.
 
 ## 5. Close out inside the clearance (step 5b)
 
-Runs right after 5a's post-deploy check passes, BEFORE documentation (5c), the post-deploy
+Default scope: runs right after 5a's post-deploy check passes, BEFORE documentation (5c), the post-deploy
 check's own close-out (5d) and release notes (5e): these steps are what the next release depends
-on, so they finish while this release still holds clearance, and nothing else does.
+on, so they finish while this release still holds clearance, and nothing else does. Under scope
+`cut-to-deploy` it runs as soon as 5a confirms the deploy, and the post-deploy check follows the
+hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
 
 1. **Sync production into the source.** Without it the release branch's fix commits never reach
    `releaseSource`. Already `git merge-base --is-ancestor origin/<productionBranch>
@@ -220,7 +225,8 @@ on, so they finish while this release still holds clearance, and nothing else do
    (fast-forward when it is an ancestor of the source, else merge the source into it), so the
    release's own fixes reach it too; report how many unreleased one-offs it carries.
 4. **Hand clearance back** (`release.clearance` set): the provider's `release --owed <item>` for
-   each later step still to run (`docs`, `close-out`, `release-notes` — only those that will run),
+   each later step still to run (`post-deploy-check` under scope `cut-to-deploy`, then `docs`,
+   `close-out`, `release-notes` — only those that will run),
    only now — after 1–3, never before — so a session that waits on `claim --wait` starts from a
    synced source and a level train (the next release's step 0 checks only that the source is
    ahead of production, and its train merge writes the same train branch). A 5b that stops before
