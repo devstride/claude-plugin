@@ -880,7 +880,7 @@
         "Deferred defects"
       ],
       "description": "earlier container titles still matched; only adds to the built-in Deferred defects",
-      "since": "unreleased"
+      "since": "3.24.0"
     },
     {
       "key": "commitConventions",
