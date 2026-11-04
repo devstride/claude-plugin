@@ -196,7 +196,7 @@ advanced under a release-branch head.
 
 ## 5. Close out inside the clearance (step 5b)
 
-Runs right after 5a's post-deploy check passes, BEFORE documentation (5c), the post-deploy
+Default scope: runs right after 5a's post-deploy check passes, BEFORE documentation (5c), the post-deploy
 check's own close-out (5d) and release notes (5e): these steps are what the next release depends
 on, so they finish while this release still holds clearance, and nothing else does. Under scope
 `cut-to-deploy` it runs as soon as 5a confirms the deploy, and the post-deploy check follows the

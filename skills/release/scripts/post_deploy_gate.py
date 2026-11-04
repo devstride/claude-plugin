@@ -36,7 +36,13 @@ SCOPES = ("release", "cut-to-deploy")
 DESCRIPTION_LIMIT = 140  # GitHub's own limit for a commit status description
 
 
+MODE = "status"  # set by main(); a config error in `gate` is UNREADABLE (4), never "the release failed" (1)
+
+
 def fail(message, code=1):
+    if MODE == "gate" and code == 1:
+        print("PREVIOUS RELEASE: UNREADABLE %s" % message)
+        sys.exit(4)
     sys.stderr.write("post-deploy: %s\n" % message)
     sys.exit(code)
 
@@ -63,9 +69,15 @@ def section(config, key):
     return value if isinstance(value, dict) else {}
 
 
-CONFIG = load_config()
-RELEASE = section(CONFIG, "release")
-CLEARANCE = section(RELEASE, "clearance")
+CONFIG = RELEASE = CLEARANCE = {}
+PAGE = 100  # merged pull requests read; a full page with no release in it is UNREADABLE, never NONE
+
+
+def setup():
+    global CONFIG, RELEASE, CLEARANCE
+    CONFIG = load_config()
+    RELEASE = section(CONFIG, "release")
+    CLEARANCE = section(RELEASE, "clearance")
 
 
 def scope():
@@ -143,22 +155,30 @@ def cmd_status(argv):
 
 
 def previous_release(name):
-    production = RELEASE.get("productionBranch") or "main"
+    # The same defaults as `release` and the release-tower check; a hotfix head never counts, even
+    # when the release pattern would also match it.
+    production = RELEASE.get("productionBranch") or "master"
     pattern = RELEASE.get("releaseBranchPattern")
-    source = RELEASE.get("releaseSource") or CONFIG.get("baseBranch") or "develop"
+    source = RELEASE.get("releaseSource") or "develop"
+    hotfix = section(CONFIG, "releaseTower").get("hotfixPattern") or "*/hotfix/**"
+    is_hotfix = pattern_regex(hotfix).match
     is_release = pattern_regex(pattern).match if isinstance(pattern, str) and pattern else (lambda head: head == source)
     merged = json.loads(gh(["pr", "list", "--repo", name, "--base", production, "--state", "merged",
-                            "--json", "number,headRefName,mergeCommit,mergedAt", "--limit", "20"]) or "[]")
+                            "--json", "number,headRefName,mergeCommit,mergedAt", "--limit", str(PAGE)]) or "[]")
+    full = len(merged) >= PAGE
     merged = [pr for pr in merged if isinstance(pr, dict) and pr.get("mergedAt")]
     merged.sort(key=lambda pr: pr["mergedAt"], reverse=True)
     for pr in merged:
-        if is_release(pr.get("headRefName") or "") and (pr.get("mergeCommit") or {}).get("oid"):
+        head = pr.get("headRefName") or ""
+        if not is_hotfix(head) and is_release(head) and (pr.get("mergeCommit") or {}).get("oid"):
             return pr
+    if full:
+        raise GhError("no release among the newest %d merges into %s; read it by hand" % (PAGE, production))
     return None
 
 
 def read_status(name, sha):
-    combined = json.loads(gh(["api", "repos/%s/commits/%s/status" % (name, sha)]) or "{}")
+    combined = json.loads(gh(["api", "repos/%s/commits/%s/status?per_page=100" % (name, sha)]) or "{}")
     for entry in combined.get("statuses") or []:
         if entry.get("context") == CONTEXT:
             return entry.get("state"), entry.get("description") or ""
@@ -172,8 +192,11 @@ def cmd_gate(argv):
     if scope() != "cut-to-deploy":
         print("PREVIOUS RELEASE: NOT GATED (release.clearance.scope is release)")
         return 0
-    poll = int(os.environ.get("POST_DEPLOY_POLL_SECONDS") or 60)
-    deadline = time.time() + 60 * float(os.environ.get("POST_DEPLOY_WAIT_MINUTES") or 45)
+    try:
+        poll = int(os.environ.get("POST_DEPLOY_POLL_SECONDS") or 60)
+        deadline = time.time() + 60 * float(os.environ.get("POST_DEPLOY_WAIT_MINUTES") or 45)
+    except ValueError:
+        fail("POST_DEPLOY_POLL_SECONDS and POST_DEPLOY_WAIT_MINUTES must be numbers")
     try:
         name = repo()
         pr = previous_release(name)
@@ -182,15 +205,17 @@ def cmd_gate(argv):
             return 0
         label = "%s (#%s)" % (pr["headRefName"], pr["number"])
         sha = pr["mergeCommit"]["oid"]
-        while True:
-            state, description = read_status(name, sha)
-            if state != "pending" or not wait or time.time() >= deadline:
-                break
-            print("waiting: %s post-deploy check is running — %s" % (label, description), flush=True)
-            time.sleep(poll)
+        state, description = read_status(name, sha)
     except (GhError, ValueError) as error:
         print("PREVIOUS RELEASE: UNREADABLE %s" % error)
         return 4
+    while state == "pending" and wait and time.time() < deadline:
+        print("waiting: %s post-deploy check is running — %s" % (label, description), flush=True)
+        time.sleep(poll)
+        try:
+            state, description = read_status(name, sha)
+        except (GhError, ValueError) as error:  # a brief network failure while waiting: keep waiting
+            print("waiting: could not read the status (%s); trying again" % error, flush=True)
     if state == "success":
         print("PREVIOUS RELEASE: SUCCESS %s — %s" % (label, description))
         return 0
@@ -206,8 +231,11 @@ def cmd_gate(argv):
 
 
 def main():
+    global MODE
     if len(sys.argv) < 2 or sys.argv[1] not in ("status", "gate"):
         fail("usage: post_deploy_gate.py status|gate ...", 2)
+    MODE = sys.argv[1]
+    setup()
     sys.exit(cmd_status(sys.argv[2:]) if sys.argv[1] == "status" else cmd_gate(sys.argv[2:]))
 
 

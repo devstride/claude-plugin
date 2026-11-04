@@ -48,8 +48,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 - **CI last, once.** The release PR is a draft whenever PR workflows exist; review and the
   release-gating pre-ship checks settle first; `review`'s ready-flip releases CI once on the final
   reviewed head.
-- **Real systems.** The DevStride MCP targets PRODUCTION; git/gh act on real repos. The
-  production merge and anything the local docs skills publish are user-visible events. `develop` and
+- **Real systems.** The DevStride MCP targets PRODUCTION; git/gh act on real repos. `develop` and
   `master` are protected — never force-push either, never `--delete-branch` a PR headed by one.
 - **A release branch is PROTECTED** (any name matching `release.releaseBranchPattern`): new commits
   only — never rebased, amended, force-pushed or `--delete-branch`ed; step 5b is the one place it is
@@ -79,7 +78,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   → a valid no-CI release, said plainly. An expensive PR workflow without all draft-hold flags true
   → STOP with `/devstride:setup ci`; false, mixed or ambiguous facts cannot prove a hold.
 - **Ground truth.** Read what OTHER authors landed on both branches
-  (`git log --format='%h %an %ar %s' origin/<branch> --since='6 hours ago'`), say so when another
+  (`git log origin/<branch> --since='6 hours ago'`), say so when another
   session appears active, and verify every remembered fact (open PRs, "nothing merges under this
   release") against `origin`/`gh` first —
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`.
@@ -232,6 +231,7 @@ the deploy.
   `release-branch.md` §4, then back to step 2. With clearance, append the provider's `status`
   to the recap: a `Hotfix landed` line goes to §4 first; a `Waiting` line names who is next; and
   on the yes this pull request must be the one `On final`, else STOP.
+- **Scope `cut-to-deploy`**: run the previous-release gate first and on the yes (`clearance.md`).
 - **Dev deploy wait** (`release.devDeployVerification` set, delta touching a fix-exclusion path):
   named in the recap; after the yes, before the checks below, run per `docs-hooks.md`.
 - **On the yes**, confirm: the head equals `<reviewedHead>` (the only tolerated advance is `review`
@@ -263,7 +263,7 @@ adopted (`clearance.md`).
   confirms; non-zero → retry on an interval suited to the deploy; still failing → report it
   unconfirmed and STOP (no 5c–5e). Unset → ask the owner to confirm (a legitimate pause). Nothing
   in 5c–5e would run and no `release.postDeployCheckSkill` → skip the confirmation, said so.
-- **Post-deploy health** (scope `cut-to-deploy`: after 5b): call **`post-deploy check`** with the
+- **Post-deploy health** (scope `cut-to-deploy`: after 5b, per `clearance.md`): call **`post-deploy check`** with the
   `post-deploy-check.md` payload (`release.postDeployCheckSkill`). `PASS` → continue. `FAIL` →
   STOP: surface the evidence and ask
   for a rollback decision; never proceed to 5b, 5c or 6 on your own. `NOT RUN` → this-run

@@ -28,7 +28,7 @@ which thresholds lives in that skill. This file is the authority for the contrac
 
 `release` invokes it with `check` once, **after the production deploy is confirmed** (step 5a —
 the merge commit is known and `release.deployVerification` or the owner has confirmed the deploy)
-and **before** the hand-back (5b), the documentation update (5c) and the release notes (5e). A
+and **before** the hand-back (5b; default scope only), the documentation update (5c) and the release notes (5e). A
 health check before the deploy is confirmed measures the previous release; one after the docs are
 published cannot stop them. Under the default clearance scope the release still holds its
 clearance while `check` runs, so `check` does only what the next release depends on (health, and

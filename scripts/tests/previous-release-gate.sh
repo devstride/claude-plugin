@@ -55,5 +55,30 @@ fresh cut-to-deploy; prs "$TWO"; status $A pending; POST_DEPLOY_WAIT_MINUTES=0 r
 fresh cut-to-deploy; prs "$TWO"; touch "$FAKE_GH_STATE/gh-down"; run
 [ "$RC" = 4 ] && printf '%s' "$OUT" | grep -q '^PREVIOUS RELEASE: UNREADABLE' && ok "(12) gh unreachable → 4 UNREADABLE, never a pass" || bad "(12) rc=$RC: $OUT"
 fresh nonsense; run
-[ "$RC" = 1 ] && printf '%s' "$OUT" | grep -q 'release.clearance.scope is' && ok "(13) an unknown scope is a config error" || bad "(13) rc=$RC: $OUT"
+[ "$RC" = 4 ] && printf '%s' "$OUT" | grep -q '^PREVIOUS RELEASE: UNREADABLE release.clearance.scope is' && ok "(13) an unknown scope is UNREADABLE (4), never \"the release failed\"" || bad "(13) rc=$RC: $OUT"
+fresh cut-to-deploy; printf '{"release":{"clearance":{"provider":"github","scope":"cut-to-deploy"}}}' > .claude/ds-config.json
+prs '[{"number":20,"headRefName":"develop","mergeCommit":{"oid":"'$A'"},"mergedAt":"2026-11-03T20:00:00Z"}]'; status $A success; run
+[ "$RC" = 0 ] && printf '%s' "$OUT" | grep -q 'SUCCESS develop (#20)' && grep -q '"--base", "master"' "$FAKE_GH_STATE/calls.log" \
+  && ok "(14) unset branch keys: production master, release source develop (the release defaults)" || bad "(14) rc=$RC: $OUT"
+fresh cut-to-deploy
+prs '[{"number":10,"headRefName":"release/26-11-02","mergeCommit":{"oid":"'$B'"},"mergedAt":"2026-11-02T20:00:00Z"},
+      {"number":20,"headRefName":"release/26-11-03","mergeCommit":{"oid":"'$A'"},"mergedAt":"2026-11-03T20:00:00Z"}]'
+status $A failure; status $B success; run
+[ "$RC" = 1 ] && printf '%s' "$OUT" | grep -q 'FAILED release/26-11-03 (#20)' && ok "(15) the newest by merge time is read, whatever order gh lists them in" || bad "(15) rc=$RC: $OUT"
+fresh cut-to-deploy; printf '{"release":{"releaseBranchPattern":"**","clearance":{"provider":"github","scope":"cut-to-deploy"}}}' > .claude/ds-config.json
+prs '[{"number":30,"headRefName":"phil/hotfix/26-11-04/I1-fix","mergeCommit":{"oid":"'$H'"},"mergedAt":"2026-11-04T09:00:00Z"},
+      {"number":20,"headRefName":"release/26-11-03","mergeCommit":{"oid":"'$A'"},"mergedAt":"2026-11-03T20:00:00Z"}]'
+status $A success; run
+[ "$RC" = 0 ] && printf '%s' "$OUT" | grep -q 'SUCCESS release/26-11-03 (#20)' && ok "(16) a hotfix head never counts, even under a release pattern that matches it" || bad "(16) rc=$RC: $OUT"
+fresh cut-to-deploy
+python3 -c 'import json; print(json.dumps([{"number":100+i,"headRefName":"phil/hotfix/26-11-04/I%d-x" % i,"mergeCommit":{"oid":"c"*40},"mergedAt":"2026-11-04T%02d:%02d:00Z" % (i//60, i%60)} for i in range(100)]))' > "$FAKE_GH_STATE/prs.json"
+run
+[ "$RC" = 4 ] && printf '%s' "$OUT" | grep -q '^PREVIOUS RELEASE: UNREADABLE no release among the newest 100' && ok "(17) a full page with no release in it is UNREADABLE, never NONE" || bad "(17) rc=$RC: $OUT"
+fresh cut-to-deploy; printf '{not json' > .claude/ds-config.json; run
+[ "$RC" = 4 ] && printf '%s' "$OUT" | grep -q '^PREVIOUS RELEASE: UNREADABLE' && ok "(18) a config file that is not JSON is UNREADABLE (4)" || bad "(18) rc=$RC: $OUT"
+fresh cut-to-deploy; prs "$TWO"; status $A success; printf 1 > "$FAKE_GH_STATE/status-down"; run --wait
+[ "$RC" = 4 ] && printf '%s' "$OUT" | grep -q '^PREVIOUS RELEASE: UNREADABLE' && ok "(19) a failed FIRST read is UNREADABLE: nothing is known yet" || bad "(19) rc=$RC: $OUT"
+fresh cut-to-deploy; prs "$TWO"; printf success > "$FAKE_GH_STATE/flip-$A"; printf 2 > "$FAKE_GH_STATE/status-down"; run --wait
+[ "$RC" = 0 ] && printf '%s' "$OUT" | grep -q 'could not read the status' && printf '%s' "$OUT" | grep -q '^PREVIOUS RELEASE: SUCCESS' \
+  && ok "(20) a failed read WHILE waiting is retried, not reported" || bad "(20) rc=$RC: $OUT"
 exit $FAIL

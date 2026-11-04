@@ -2,7 +2,7 @@
 """A fake `gh` for scripts/tests/previous-release-gate.sh and post-deploy-status.sh, served from
 FAKE_GH_STATE: prs.json (merged pull requests), status-<sha>.json (a list of statuses, the first
 of each context the latest; `pending-then-<state>` in a file `flip-<sha>` turns the second read
-into <state>), gh-down (every call fails). Every call is appended to calls.log."""
+into <state>), gh-down (every call fails), status-down holding k (the k-th status read fails, once). Every call is appended to calls.log."""
 import json, os, sys
 
 STATE = os.environ["FAKE_GH_STATE"]
@@ -16,8 +16,14 @@ if args[:2] == ["pr", "list"]:
     print(open(path).read() if os.path.exists(path) else "[]"); sys.exit(0)
 if args[:2] == ["api", "--method"]:
     print("{}"); sys.exit(0)
-if args[0] == "api" and args[1].endswith("/status"):
-    sha = args[1].split("/")[-2]
+if args[0] == "api" and "/status" in args[1] and os.path.exists(os.path.join(STATE, "status-down")):
+    counter = os.path.join(STATE, "status-reads")
+    n = (int(open(counter).read()) if os.path.exists(counter) else 0) + 1
+    open(counter, "w").write(str(n))
+    if n == int(open(os.path.join(STATE, "status-down")).read() or 1):  # that one read fails
+        sys.stderr.write("gh: HTTP 502\n"); sys.exit(1)
+if args[0] == "api" and args[1].split("?")[0].endswith("/status"):
+    sha = args[1].split("?")[0].split("/")[-2]
     flip = os.path.join(STATE, "flip-" + sha)
     if os.path.exists(flip):
         reads = os.path.join(STATE, "reads-" + sha)

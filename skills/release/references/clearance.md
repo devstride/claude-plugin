@@ -190,7 +190,7 @@ the release skill calls it does.
   `/devstride:release post-deploy only`; `1` STOP: "Production merge refused: release <name>
   (#<n>) failed its post-deploy check." — the owner may override in words, recorded as a comment
   on this pull request; `3` ask the owner once (the first release under this scope, or one from
-  before it); `4` ask the owner. It never blocks the cut, the review or a hotfix.
+  before it); `4` (unreadable, a config error too) ask the owner. It never blocks the cut, the review or a hotfix.
 - **Hand back at deploy-confirmed.** 5a confirms the merge, approves and confirms the deploy, and
   stops there. 5b then runs its branch work (`heartbeat close-out`, the sync, the release branch
   deleted, the train level), posts `post-deploy-status.sh <merge sha> pending "<release> by
