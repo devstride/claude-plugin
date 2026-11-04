@@ -12,8 +12,11 @@ with open(os.path.join(STATE, "calls.log"), "a") as handle:
 if os.path.exists(os.path.join(STATE, "gh-down")):
     sys.stderr.write("gh: error connecting to api.github.com\n"); sys.exit(1)
 if args[:2] == ["pr", "list"]:
+    # Only the fields asked for with --json, as gh does: a field the gate forgets to request is absent.
     path = os.path.join(STATE, "prs.json")
-    print(open(path).read() if os.path.exists(path) else "[]"); sys.exit(0)
+    fields = args[args.index("--json") + 1].split(",")
+    rows = json.load(open(path)) if os.path.exists(path) else []
+    print(json.dumps([{k: row[k] for k in fields if k in row} for row in rows])); sys.exit(0)
 if args[:2] == ["api", "--method"]:
     print("{}"); sys.exit(0)
 if args[0] == "api" and "/status" in args[1] and os.path.exists(os.path.join(STATE, "status-down")):
