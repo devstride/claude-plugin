@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.25.0.
+`.claude/ds-config.json` against. Schema version: 3.26.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -183,7 +183,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.clearance.staleMinutes` | number | — | `20` | heartbeat age that makes a clearance stale | pre-registry |
 | `release.clearance.waitMinutes` | number | — | `180` | how long claim --wait polls | pre-registry |
 | `release.clearance.phaseBudgetMinutes` | any | — | — | phase to minutes; a bad value is ignored with a status warning | pre-registry |
-| `release.clearance.scope` | string | release, cut-to-deploy | release | how long a release holds clearance: release (claim before the train, hand back after the post-deploy check) or cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge) | 3.26.0 |
+| `release.clearance.scope` | string | release, cut-to-deploy | release | how long a release holds clearance: release (claim before the train, hand back after the post-deploy check) or cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge) | unreleased |
 | `release.clearance.credentialsFile` | string | — | — | a KEY=VALUE file holding the DevStride API credentials for the devstride provider; must not be readable by group or others | 3.21.0 |
 | `release.clearance.commands` | object | — | — | **Required.** a provider the repository supplies | pre-registry |
 | `release.clearance.commands.claim` | string | — | — | **Required.** the claim command | pre-registry |

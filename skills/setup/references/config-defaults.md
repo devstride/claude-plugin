@@ -545,13 +545,12 @@ covers two other things: `hiddenSegments`, the segments this repository has conf
 and `autoUpdate`, whether the session-start hook may refresh the copied script. Both are documented
 in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
 
-It renders `Model · Effort · Repo · Checkout · Branch · Stage · PR`, every segment labelled, and
-**omits any segment with no value — label, value and separator together**, never a dangling
-`Checkout:`. Two of
+It renders two lines of symbol-labelled segments (`statusline-segments.md`) and **omits any
+segment with no value — symbol, value and separator together**, never a dangling `⑂`. Two of
 those segments are the reason it ships here rather than being left to each repository:
 
-- **Checkout** distinguishes the main checkout from a linked worktree, naming the REPO in `Repo:`
-  and the WORKTREE in `Checkout:`. Under `epicIntegrationBranches` the loop puts work in
+- **Checkout** distinguishes the main checkout from a linked worktree, naming the REPO after `▣`
+  and the WORKTREE after `⑂`. Under `epicIntegrationBranches` the loop puts work in
   worktrees, and "which checkout am I in" stops being obvious exactly when it starts to matter.
 - **Stage** is `stage.resolve`, so it appears only in repositories that have one, and turns red
   for a `productionStages` name.

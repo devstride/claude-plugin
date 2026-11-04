@@ -57,10 +57,11 @@ Phase E3 of `/devstride:setup` is authoritative:
 3. MERGE this into `.claude/settings.json` — never replace the document:
 
    ```json
-   { "statusLine": { "type": "command", "command": "bash .claude/statusline.sh", "padding": 0 } }
+   { "statusLine": { "type": "command", "command": "bash .claude/statusline.sh", "padding": 0, "refreshInterval": 30 } }
    ```
 
-   Never use `.claude/settings.local.json`; that recreates one-machine-only config.
+   Never use `.claude/settings.local.json`; that recreates one-machine-only config. An existing
+   canonical `statusLine` without `refreshInterval` gets only that key added.
 4. Verify non-empty output (failure is otherwise silent):
 
    ```bash

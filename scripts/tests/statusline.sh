@@ -26,90 +26,90 @@ mkrepo() { # mkrepo NAME [CONFIG-JSON] — a git repo with one commit, on branch
   printf '%s' "$d"
 }
 
-# No label may be left dangling: "Label:" followed by the separator or the end of
-# the line means a segment rendered with nothing in it. This is the invariant the
-# whole seg() mechanism exists to hold, so it is asserted on every case below.
-no_dangling() { ! printf '%s' "$1" | grep -qE '[A-Za-z]+:( ·|[[:space:]]*$)'; }
+# No label may be left dangling: a segment symbol followed by the separator or the
+# end of a line means a segment rendered with nothing in it. This is the invariant
+# the whole seg() mechanism exists to hold, so it is asserted on every case below.
+no_dangling() { printf '%s\n' "$1" | perl -Mutf8 -CS -ne 'exit 1 if /[◆↯▣⑂⎇⊞▲⇄⚑](?: ·|\s*$)/'; }
 
 R="$(mkrepo plain '{}')"
 
 # (1) the ordinary case: every segment that has a value, in order, separated by ·
 O="$(render "$R" ',"model":{"display_name":"Opus 5"}')"
-if [ "$O" = "Model: Opus 5 · Repo: plain · Checkout: main · Branch: main" ] && no_dangling "$O"; then
+if [ "$O" = "◆ Opus 5 · ▣ plain · ⑂ main · ⎇ main" ] && no_dangling "$O"; then
   ok "(1) full line: Model · Repo · Checkout · Branch, no Stage/PR/Effort to show"
 else bad "(1) got: $O"; fi
 
 # (2) a missing value drops its segment AND its separator — no leading " · "
 O="$(render "$R")"
-if [ "$O" = "Repo: plain · Checkout: main · Branch: main" ] && no_dangling "$O"; then
+if [ "$O" = "▣ plain · ⑂ main · ⎇ main" ] && no_dangling "$O"; then
   ok "(2) no model in the payload → no Model segment and no orphan separator"
 else bad "(2) got: $O"; fi
 
 # (3) the regression this file exists for: a label is never printed empty
 O="$(render "$R" ',"model":{"display_name":""}')"
-if no_dangling "$O" && ! printf '%s' "$O" | grep -q 'Model:'; then
-  ok "(3) an empty display_name renders no 'Model:' label at all"
+if no_dangling "$O" && ! printf '%s' "$O" | grep -q '◆'; then
+  ok "(3) an empty display_name renders no '◆' label at all"
 else bad "(3) got: $O"; fi
 
 # (4) hiddenSegments suppresses a segment that WOULD have rendered
 H="$(mkrepo hidden '{"statusLine":{"hiddenSegments":["checkout","model"]}}')"
 O="$(render "$H" ',"model":{"display_name":"Opus 5"}')"
-if [ "$O" = "Repo: hidden · Branch: main" ] && no_dangling "$O"; then
+if [ "$O" = "▣ hidden · ⎇ main" ] && no_dangling "$O"; then
   ok "(4) hiddenSegments [checkout, model] → both gone, the rest still joined correctly"
 else bad "(4) got: $O"; fi
 
 # (5) an unknown key in hiddenSegments is inert, not fatal
 O="$(render "$(mkrepo unknownkey '{"statusLine":{"hiddenSegments":["nosuchsegment"]}}')")"
-if [ "$O" = "Repo: unknownkey · Checkout: main · Branch: main" ]; then
+if [ "$O" = "▣ unknownkey · ⑂ main · ⎇ main" ]; then
   ok "(5) an unrecognized hiddenSegments entry changes nothing"
 else bad "(5) got: $O"; fi
 
 # (6) not a git repo: the message, and nothing dangling before it
 mkdir -p "$WORK/nogit"
 O="$(render "$WORK/nogit" ',"model":{"display_name":"Opus 5"}')"
-if [ "$O" = "Model: Opus 5 · —not a git repo—" ] && no_dangling "$O"; then
+if [ "$O" = "◆ Opus 5 · —not a git repo—" ] && no_dangling "$O"; then
   ok "(6) outside a repo → Model · —not a git repo—"
 else bad "(6) got: $O"; fi
 
 # (7) detached HEAD renders the sha; the "(detached)" suffix never appears alone
 D="$(mkrepo detached '{}')"; git -C "$D" checkout -q --detach HEAD
 O="$(render "$D")"
-if printf '%s' "$O" | grep -qE 'Branch: [0-9a-f]+ \(detached\)' && no_dangling "$O"; then
-  ok "(7) detached HEAD → 'Branch: <sha> (detached)', never a bare '(detached)'"
+if printf '%s' "$O" | grep -qE '⎇ [0-9a-f]+ \(detached\)' && no_dangling "$O"; then
+  ok "(7) detached HEAD → '⎇ <sha> (detached)', never a bare '(detached)'"
 else bad "(7) got: $O"; fi
 
 # (8) stage.resolve drives the Stage segment; a resolve printing nothing shows none
 S="$(mkrepo staged '{"stage":{"resolve":"echo my-stage","productionStages":["prod"]}}')"
 O="$(render "$S")"
 N="$(render "$(mkrepo unstaged '{"stage":{"resolve":"true"}}')")"
-if printf '%s' "$O" | grep -q 'Stage: my-stage' && ! printf '%s' "$N" | grep -q 'Stage:' && no_dangling "$N"; then
+if printf '%s' "$O" | grep -q '▲ my-stage' && ! printf '%s' "$N" | grep -q '▲' && no_dangling "$N"; then
   ok "(8) stage.resolve with output → Stage; resolve printing nothing → no Stage label"
 else bad "(8) got: $O | $N"; fi
 
 # (9) a production stage is still just one segment (the colour differs, stripped here)
 O="$(render "$(mkrepo prodstage '{"stage":{"resolve":"echo prod","productionStages":["prod"]}}')")"
-if printf '%s' "$O" | grep -q 'Stage: prod'; then
+if printf '%s' "$O" | grep -q '▲ prod'; then
   ok "(9) a stage named in productionStages renders normally (red, stripped in test)"
 else bad "(9) got: $O"; fi
 
 # (10) the config is found from a SUBDIRECTORY, not just the repo root
 mkdir -p "$H/packages/web"
 O="$(render "$H/packages/web" ',"model":{"display_name":"Opus 5"}')"
-if [ "$O" = "Repo: hidden · Branch: main" ]; then
+if [ "$O" = "▣ hidden · ⎇ main" ]; then
   ok "(10) config resolved by walking up from packages/web — hiddenSegments still applied"
 else bad "(10) got: $O"; fi
 
 # (11) unparsable config is tolerated: a status line must never be what breaks
 B="$(mkrepo broken 'not json at all')"
 O="$(render "$B")"
-if [ "$O" = "Repo: broken · Checkout: main · Branch: main" ]; then
+if [ "$O" = "▣ broken · ⑂ main · ⎇ main" ]; then
   ok "(11) a corrupt ds-config.json degrades to the default segments, no error"
 else bad "(11) got: $O"; fi
 
 # (12) a linked worktree renders ⑂ <worktree> and names the REPO, not the worktree dir
 git -C "$R" worktree add -q "$WORK/wt-feature" -b feature 2>/dev/null
 O="$(render "$WORK/wt-feature")"
-if printf '%s' "$O" | grep -q 'Repo: plain' && printf '%s' "$O" | grep -q 'Checkout: ⑂ wt-feature'; then
+if printf '%s' "$O" | grep -q '▣ plain' && printf '%s' "$O" | grep -q '⑂ wt-feature'; then
   ok "(12) linked worktree → Repo stays 'plain', Checkout shows ⑂ wt-feature"
 else bad "(12) got: $O"; fi
 
@@ -123,7 +123,7 @@ printf '#412|open|https://example.test/pr/412' > "$TMPDIR/ds-statusline-pr-$key"
 O="$(render "$R")"
 printf '#412' > "$TMPDIR/ds-statusline-pr-$key"
 O2="$(render "$R")"
-if printf '%s' "$O" | grep -q 'PR: #412 open' && printf '%s' "$O2" | grep -q 'PR: #412' && no_dangling "$O2"; then
+if printf '%s' "$O" | grep -q '⇄ #412 open' && printf '%s' "$O2" | grep -q '⇄ #412' && no_dangling "$O2"; then
   ok "(13) PR from cache renders '#412 open'; a truncated line renders '#412' with no empty state"
 else bad "(13) got: $O | $O2"; fi
 
@@ -158,8 +158,8 @@ NL="$(mkrepo unreleased '{"release":{"clearance":null}}')"
 nkey=$(printf '%s' "$(git -C "$NL" rev-parse --show-toplevel)" | (md5 -q 2>/dev/null || shasum | cut -d' ' -f1))
 printf 'release/26-10-17 · alice · ci' > "$TMPDIR/ds-statusline-release-$nkey"
 O3="$(render "$NL")"
-if printf '%s' "$O" | grep -q 'Release: release/26-10-17 · alice · ci$' && printf '%s' "$O2" | grep -q 'Release: release/26-10-17 · alice · review · STALE$' \
-   && ! printf '%s' "$O3" | grep -q 'Release:' && no_dangling "$O3"; then
+if printf '%s' "$O" | grep -q '⚑ release/26-10-17 · alice · ci$' && printf '%s' "$O2" | grep -q '⚑ release/26-10-17 · alice · review · STALE$' \
+   && ! printf '%s' "$O3" | grep -q '⚑' && no_dangling "$O3"; then
   ok "(16) Release segment from the provider's short line; STALE kept; null clearance → no Release label"
 else bad "(16) got: $O | $O2 | $O3"; fi
 
@@ -171,20 +171,20 @@ O="$(DEVSTRIDE_CLEARANCE_PROVIDER="$WORK/fake-provider.sh" render "$GH")"
 gkey=$(printf '%s' "$(git -C "$GH" rev-parse --show-toplevel)" | (md5 -q 2>/dev/null || shasum | cut -d' ' -f1))
 for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$TMPDIR/ds-statusline-release-$gkey" ] && break; sleep 0.3; done
 O2="$(DEVSTRIDE_CLEARANCE_PROVIDER="$WORK/fake-provider.sh" render "$GH")"
-if ! printf '%s' "$O" | grep -q 'Release:' && no_dangling "$O" && printf '%s' "$O2" | grep -q 'Release: release/26-10-18 · bob · pr$'; then
+if ! printf '%s' "$O" | grep -q '⚑' && no_dangling "$O" && printf '%s' "$O2" | grep -q '⚑ release/26-10-18 · bob · pr$'; then
   ok "(17) provider github → resolved via DEVSTRIDE_CLEARANCE_PROVIDER, refreshed out of band, shown on the next render"
 else bad "(17) got: $O | $O2"; fi
 
 # (18) provider github with no provider anywhere → no segment, no error, nothing dangling
 O="$(DEVSTRIDE_CLEARANCE_PROVIDER=/nonexistent CLAUDE_PLUGIN_ROOT=/nonexistent CLAUDE_CONFIG_DIR="$WORK/noclaude" render "$(mkrepo noprov '{"release":{"clearance":{"provider":"github"}}}')")"
-if ! printf '%s' "$O" | grep -q 'Release:' && no_dangling "$O" && [ -n "$O" ]; then
+if ! printf '%s' "$O" | grep -q '⚑' && no_dangling "$O" && [ -n "$O" ]; then
   ok "(18) provider github with no installed provider → the segment is simply absent"
 else bad "(18) got: $O"; fi
 
 # (19) the Plugin segment: the session-runtime record against the install that applies here. Red
 #      "A → B · /reload-plugins" when the installed copy is newer than the loaded one, yellow
-#      "A (B out · /devstride:update)" when a newer release is published, nothing when current or
-#      when the session has no record, and hidden by hiddenSegments like any other segment.
+#      "A (B out · /devstride:update)" when a newer release is published, the running version
+#      (dim) when current, nothing when the session has no record, and hidden by hiddenSegments.
 export XDG_CACHE_HOME="$WORK/xdg" CLAUDE_CONFIG_DIR="$WORK/claude"; mkdir -p "$CLAUDE_CONFIG_DIR/plugins"
 PL="$(mkrepo pluginrepo '{}')"; PH="$(mkrepo pluginhidden '{"statusLine":{"hiddenSegments":["plugin"]}}')"
 mkdir -p "$WORK/loaded/.claude-plugin"; printf '{"name":"devstride","version":"3.15.0"}' > "$WORK/loaded/.claude-plugin/plugin.json"
@@ -197,11 +197,26 @@ sed -i.bak 's/"version":"3.16.0"/"version":"3.15.0"/g' "$CLAUDE_CONFIG_DIR/plugi
 python3 -c 'import json,time; print(json.dumps({"schema":2,"source":"https://github.com/devstride/claude-plugin","newest":"3.16.1","fetchedAt":int(time.time())}))' > "$XDG_CACHE_HOME/devstride-plugin/newest.json"
 OU="$(render "$PL" ',"session_id":"sl1"')"
 rm -f "$XDG_CACHE_HOME/devstride-plugin/newest.json"; OC="$(render "$PL" ',"session_id":"sl1"')"
-if printf '%s' "$O" | grep -q 'Plugin: 3.15.0 → 3.16.0 · /reload-plugins' && ! printf '%s' "$OH" | grep -q 'Plugin' \
-   && ! printf '%s' "$ON" | grep -q 'Plugin' && printf '%s' "$OU" | grep -q 'Plugin: 3.15.0 (3.16.1 out · /devstride:update)' \
-   && ! printf '%s' "$OC" | grep -q 'Plugin' && no_dangling "$O" && no_dangling "$OU"; then
-  ok "(19) Plugin segment: reload (red) and update (yellow) render; current, no record and hiddenSegments render none"
+if printf '%s' "$O" | grep -q '⊞ 3.15.0 → 3.16.0 · /reload-plugins' && ! printf '%s' "$OH" | grep -q '⊞' \
+   && ! printf '%s' "$ON" | grep -q '⊞' && printf '%s' "$OU" | grep -q '⊞ 3.15.0 (3.16.1 out · /devstride:update)' \
+   && printf '%s' "$OC" | grep -q '^⊞ 3.15.0$' && no_dangling "$O" && no_dangling "$OU"; then
+  ok "(19) Plugin segment: reload (red), update (yellow) and current (dim version) render on line 2; no record and hiddenSegments render none"
 else bad "(19) got: $O | $OH | $ON | $OU | $OC"; fi
 unset XDG_CACHE_HOME CLAUDE_CONFIG_DIR
+
+# (20) two lines: where you are on line 1 (model, effort, repo, checkout, branch), what is in
+#      flight on line 2 (plugin, stage, PR, release); line 2 is printed only when it has a value
+O="$(render "$S" ',"model":{"display_name":"Opus 5"}')"
+L1="$(printf '%s\n' "$O" | sed -n 1p)"; L2="$(printf '%s\n' "$O" | sed -n 2p)"; LN="$(printf '%s\n' "$O" | wc -l | tr -d ' ')"
+ONE="$(render "$(mkrepo oneline '{}')")"
+if [ "$LN" = 2 ] && [ "$L1" = "◆ Opus 5 · ▣ staged · ⑂ main · ⎇ main" ] && [ "$L2" = "▲ my-stage" ] \
+   && [ "$(printf '%s\n' "$ONE" | wc -l | tr -d ' ')" = 1 ]; then
+  ok "(20) line 1 = model · repo · checkout · branch; line 2 = stage; no line 2 when it would be empty"
+else bad "(20) got [$O] / [$ONE]"; fi
+
+# (21) the setting setup writes redraws every 30 seconds
+if grep -qF '"refreshInterval": 30' "$ROOT/skills/setup/SKILL.md" && grep -qF '"refreshInterval": 30' "$ROOT/skills/doctor/references/repairs.md"; then
+  ok "(21) setup and the doctor repair write statusLine.refreshInterval 30"
+else bad "(21) refreshInterval 30 missing from the setup or doctor template"; fi
 
 exit $FAIL
