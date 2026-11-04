@@ -79,9 +79,31 @@ prs '[{"number":31,"headRefName":"urgent/fix-login","mergeCommit":{"oid":"'$H'"}
 status $A success; run
 [ "$RC" = 0 ] && printf '%s' "$OUT" | grep -q 'SUCCESS release/26-11-03 (#20)' && ok "(16b) a configured releaseTower.hotfixPattern is honoured" || bad "(16b) rc=$RC: $OUT"
 fresh cut-to-deploy
-python3 -c 'import json; print(json.dumps([{"number":100+i,"headRefName":"phil/hotfix/26-11-04/I%d-x" % i,"mergeCommit":{"oid":"c"*40},"mergedAt":"2026-11-04T%02d:%02d:00Z" % (i//60, i%60)} for i in range(100)]))' > "$FAKE_GH_STATE/prs.json"
+python3 -c 'import json; print(json.dumps([{"number":100+i,"headRefName":"phil/hotfix/26-11-04/I%d-x" % i,"mergeCommit":{"oid":"c"*40},"mergedAt":"2026-11-04T%02d:%02d:00Z" % (i//60, i%60),"updatedAt":"2026-11-04T%02d:%02d:00Z" % (i//60, i%60)} for i in range(100)]))' > "$FAKE_GH_STATE/prs.json"
 run
-[ "$RC" = 4 ] && printf '%s' "$OUT" | grep -q '^PREVIOUS RELEASE: UNREADABLE no release among the newest 100' && ok "(17) a full page with no release in it is UNREADABLE, never NONE" || bad "(17) rc=$RC: $OUT"
+[ "$RC" = 4 ] && printf '%s' "$OUT" | grep -q '^PREVIOUS RELEASE: UNREADABLE cannot prove which release merged last' && ok "(17) a full page with no release in it is UNREADABLE, never NONE" || bad "(17) rc=$RC: $OUT"
+# (17b) full page: 99 hotfixes updated 05:00-06:38 plus an OLD release re-labelled at 07:00; the newest release is off the page
+fresh cut-to-deploy
+python3 - "$FAKE_GH_STATE" "$A" <<'PY'
+import json, sys
+rows = [{"number": 200 + i, "headRefName": "phil/hotfix/26-11-04/I%d-x" % i, "mergeCommit": {"oid": "c" * 40},
+         "mergedAt": "2026-11-04T%02d:%02d:00Z" % (5 + i // 60, i % 60), "updatedAt": "2026-11-04T%02d:%02d:00Z" % (5 + i // 60, i % 60)} for i in range(99)]
+rows.append({"number": 9, "headRefName": "release/26-11-01", "mergeCommit": {"oid": sys.argv[2]}, "mergedAt": "2026-11-01T10:00:00Z", "updatedAt": "2026-11-04T07:00:00Z"})
+open(sys.argv[1] + "/prs.json", "w").write(json.dumps(rows))
+PY
+status $A success; run
+[ "$RC" = 4 ] && printf '%s' "$OUT" | grep -q 'cannot prove which release merged last' && ok "(17b) a full page whose release merged before the page boundary is UNREADABLE, not that older release" || bad "(17b) rc=$RC: $OUT"
+# (17c) full page whose newest release merged after the boundary is read normally
+fresh cut-to-deploy
+python3 - "$FAKE_GH_STATE" "$A" <<'PY'
+import json, sys
+rows = [{"number": 200 + i, "headRefName": "phil/hotfix/26-11-04/I%d-x" % i, "mergeCommit": {"oid": "c" * 40},
+         "mergedAt": "2026-11-04T%02d:%02d:00Z" % (5 + i // 60, i % 60), "updatedAt": "2026-11-04T%02d:%02d:00Z" % (5 + i // 60, i % 60)} for i in range(99)]
+rows.append({"number": 300, "headRefName": "release/26-11-04", "mergeCommit": {"oid": sys.argv[2]}, "mergedAt": "2026-11-04T06:00:00Z", "updatedAt": "2026-11-04T06:00:00Z"})
+open(sys.argv[1] + "/prs.json", "w").write(json.dumps(rows))
+PY
+status $A success; run
+[ "$RC" = 0 ] && printf '%s' "$OUT" | grep -q 'SUCCESS release/26-11-04 (#300)' && ok "(17c) a full page whose release merged after the boundary is trusted" || bad "(17c) rc=$RC: $OUT"
 fresh cut-to-deploy; printf '{not json' > .claude/ds-config.json; run
 [ "$RC" = 4 ] && printf '%s' "$OUT" | grep -q '^PREVIOUS RELEASE: UNREADABLE' && ok "(18) a config file that is not JSON is UNREADABLE (4)" || bad "(18) rc=$RC: $OUT"
 fresh cut-to-deploy; prs "$TWO"; status $A success; printf 1 > "$FAKE_GH_STATE/status-down"; run --wait

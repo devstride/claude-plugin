@@ -163,21 +163,25 @@ def previous_release(name):
     hotfix = section(CONFIG, "releaseTower").get("hotfixPattern") or "*/hotfix/**"
     is_hotfix = pattern_regex(hotfix).match
     is_release = pattern_regex(pattern).match if isinstance(pattern, str) and pattern else (lambda head: head == source)
-    # Newest UPDATED first (gh's default is creation order): a merge updates a pull request, so the
-    # newest release merge falls off this page only when PAGE others changed after it, and then
-    # the page is full and reads UNREADABLE below; the local sort by mergedAt picks among them.
+    # Newest UPDATED first (gh's default is creation order). A merge updates its pull request, so
+    # any merge left off a FULL page was updated, and therefore merged, no later than the oldest
+    # update on the page: a candidate merged at or after that boundary is provably the newest
+    # release merge; one merged before it might not be, and reads UNREADABLE, never a pass.
     merged = json.loads(gh(["pr", "list", "--repo", name, "--base", production, "--state", "merged",
                             "--search", "sort:updated-desc",
-                            "--json", "number,headRefName,mergeCommit,mergedAt", "--limit", str(PAGE)]) or "[]")
-    full = len(merged) >= PAGE
-    merged = [pr for pr in merged if isinstance(pr, dict) and pr.get("mergedAt")]
+                            "--json", "number,headRefName,mergeCommit,mergedAt,updatedAt", "--limit", str(PAGE)]) or "[]")
+    merged = [pr for pr in merged if isinstance(pr, dict)]
+    boundary = min((pr.get("updatedAt") or "") for pr in merged) if len(merged) >= PAGE else None
+    merged = [pr for pr in merged if pr.get("mergedAt")]
     merged.sort(key=lambda pr: pr["mergedAt"], reverse=True)
     for pr in merged:
         head = pr.get("headRefName") or ""
         if not is_hotfix(head) and is_release(head) and (pr.get("mergeCommit") or {}).get("oid"):
+            if boundary is not None and pr["mergedAt"] < boundary:
+                break
             return pr
-    if full:
-        raise GhError("no release among the newest %d merges into %s; read it by hand" % (PAGE, production))
+    if boundary is not None:
+        raise GhError("cannot prove which release merged last from the newest %d merges into %s; read it by hand" % (PAGE, production))
     return None
 
 
