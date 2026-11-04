@@ -22,7 +22,7 @@ one-off: $ARGUMENTS
 - **`.claude/ds-config.json` wins over every literal here**; re-read it EVERY iteration. Commands
   (verify/test/lint, regen, local-environment, any pool or secrets CLI a repo documents) come from
   config or `conventionsDoc`, never from memory.
-- **Skill freshness.** Skill text remembered from an earlier iteration or across a compaction is
+- **Skill freshness.** Skill text remembered from an earlier iteration or a compaction is
   EXPIRED; re-invoke each composed skill when needed (cost: `references/progress-table.md`).
 - **Name the fields you read.** Default projections and `search_items` OMIT `relationships` and
   `description`; read them via `get_item(view: 'full')`. Absence is never data.
@@ -39,8 +39,8 @@ one-off: $ARGUMENTS
 - **Deploy safety travels with the diff.** Migrations are idempotent and rolling-deploy safe;
   reshaped durable events stay readable by both. `ultracode-build`'s focused verifier on auth,
   migration, irreversible-state or deployed-runtime changes fires from the DIFF, not the plan's
-  theme, under every profile (`extended` too), as does each matching `review.mandatoryLenses`
-  finder. Neither is skippable.
+  theme, under every profile, as does each matching `review.mandatoryLenses`
+  finder.
 - **Production merges are the owner's.** This loop merges only into the working base or
   `epicIntegrationBranches.releaseTarget`; it surfaces `/devstride:release`, which merges to
   `release.productionBranch` only on the owner's explicit yes.
@@ -254,11 +254,12 @@ is `review` step 7's; step 5 never reads `skipping` as green.
   (`release-train.md`), closed by `release`.
 - **The item points at its code**: 4b — confirm the PR auto-linked, else `link_pull_request`; 4a —
   that comment. Never invent a PR number.
-- **Reconcile as-built** on a material deviation: `add_comment` the `view: 'full'` description under "📋 Original spec (as planned) — superseded by the description below" (HTML via
-  `{ html }`), then rewrite it: italic as-built note naming what it shipped in, a
-  **Deviations** list with one-line rationales, an **As shipped** summary citing the artifact that
-  EXISTS (4b its PR; 4a merge SHA + branch). None → "shipped as specified".
-- **Release the claim** (`claims`): outcome `done`. Summary (`sessionSummary`): `references/session-summary.md`.
+- **Reconcile as-built** on a material deviation: `add_comment` the `view: 'full'` description
+  verbatim under "📋 Original spec (as planned) — superseded by the description below" (HTML: pass
+  `{ html }`, never Markdown), then rewrite it: italic as-built note naming what it shipped in, a
+  **Deviations** list with one-line rationales, an **As shipped** summary — citing the artifact that
+  EXISTS (4b its PR; 4a merge SHA + branch). None → "shipped as specified". Deviations are step 3/4's.
+- **Release the claim** (`claims` set): outcome `done`. Summary: `references/session-summary.md`.
 - **Report** item + `[N]`, status, dates, PR link or SHA + branch, profile + source, reconciled.
 
 ## 6.5 Capture untracked findings as tracked items

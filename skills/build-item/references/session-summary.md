@@ -19,7 +19,7 @@ One call per moment; a second call for the same item and session updates the rec
 fields it omits.
 
 1. **Story start** — right after the claim is won (or straight after selection when `claims` is
-   not set): item, session id, agent, start time, principal, model, intent, provider and credential
+   not set): item, session id, agent, start time, who directed it, model, intent, provider and credential
    name. No `outcome`: absent means still running.
 2. **Completion ritual (step 6)** — branch, pull request, files, tools, review engines, `endedAt`
    and `outcome: completed`.
@@ -33,8 +33,11 @@ From what the loop already knows; omit anything unavailable rather than guessing
 
 - `itemNumber` the item number; `sessionId` the agent's own session id; `agent` `{name, version?}`;
   `startedAt` ISO time the story began; `endedAt` ISO time.
-- `directedBy` the person the work is for: the username from the DevStride `whoami` tool. An email
-  only if that is all `whoami` returns.
+- `directedBy` the person who started or directed this session (not the account the agent signs in
+  with; the server records that itself): their DevStride `username` when the session knows it (for
+  example they named it), else the checkout's `git config user.email`, sent ONLY as
+  `directedBy.email` (the server resolves it to a member and never stores the address; anyone who is
+  not a member is dropped). Omit `directedBy` when neither is known.
 - `model` `{name?, version?}` the model the session runs on; `intent` at most 1000 characters in
   your own words: what this story is for, not its description pasted in.
 - `branch`; `pullRequest` `{number?, url?}`; `filesTouched` from
