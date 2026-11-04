@@ -92,6 +92,15 @@ paste variants into every skill.
   file pins to it. Rationale, worked examples, incident evidence and "observed live" anecdotes
   live in `skills/<owner>/references/<topic>.md`. Test for a paragraph: delete it and ask
   whether an agent would now do something different — if yes it is a rule and stays.
+- **Branch references — the one exception.** The imperatives of a branch only some runs take (a
+  step gated on a configured option, such as a cloud reviewer in scope, or on a state most runs
+  never reach, such as an epic's last story landing) may live in a branch reference, so the runs
+  that never take the branch never load it. Four conditions, all required: the body keeps the
+  branch's heading and step number, its GATE (the condition, the config keys it reads, and what
+  happens when it does not fire) and every scoped needle pinned to that gate; the pointer sits at
+  the gate in the form **Read `${CLAUDE_PLUGIN_ROOT}/skills/<owner>/references/<topic>.md` in full
+  before acting on <branch>**; the reference is `load: contract`; and every scoped needle that moved
+  is re-pinned to the reference, never deleted (T8). A step every run takes never qualifies.
 - **Pointer form.** Exactly one sentence, placed in the step it serves, path in the form the
   cache copy survives: **Read `${CLAUDE_PLUGIN_ROOT}/skills/<owner>/references/<topic>.md` when
   <step or condition>.** Two kinds are legal and both count as firing: a runtime pointer ("Read

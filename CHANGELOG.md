@@ -8,6 +8,19 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **Branch references: instructions only some runs need move out of the skill body.** A step that
+  only some runs reach (an epic release firing; a cloud reviewer in scope) may keep its heading,
+  step number, gate and gate phrases in the body and point, with "Read … in full before acting
+  on …", at a `load: contract` reference that holds the rest. CONTRIBUTING.md and invariant T3
+  state the four conditions; the rule-loss check re-pins every moved phrase to its new file. The
+  epic-release steps of `build-item` step 8 move to `references/epic-release-steps.md` and the
+  cloud-reviewer request and wait of `review` steps 1–2 to `references/cloud-reviewers.md`. No
+  behaviour changes: every run still reads the same instructions before acting. A story's fast
+  path reads about 1,100 fewer tokens; an epic release with cloud reviewers about 650 more.
+  `step-skills.sh` follows such a pointer when it looks for a step skill's call.
+
 ## [3.23.0] — 2026-11-03
 
 ### Added
