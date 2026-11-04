@@ -38,7 +38,10 @@ expect_invalid "a colour create_label does not offer is invalid" '{"activeAgents
 expect_invalid "an unknown key is reported" '{"activeAgents": {"bord": "x", "commands": {"start": "x <root>", "end": "y"}}}' "activeAgents.bord"
 cfg '{"activeAgents": {"staleMinutes": 0, "tagName": "", "commands": {"start": "x", "end": ""}}}'
 out="$(aa validate)"; [ "$(first "$out")" = "ACTIVE AGENTS: INVALID (4)" ] && ok "every problem is reported, not just the first" || bad "multi -> $out"
+expect_invalid "an unknown command key is reported" '{"activeAgents": {"commands": {"start": "x <root>", "end": "y", "extra": "z"}}}' "activeAgents.commands.extra"
 printf 'not json' > "$TMP/.claude/ds-config.json"; aa validate >/dev/null; [ $? = 2 ] && ok "an unreadable config exits 2" || bad "unreadable config"
+rm -f "$TMP/.claude/ds-config.json"; out="$(aa validate)"; rc=$?
+[ "$rc" = 0 ] && [ "$out" = "ACTIVE AGENTS: NOT CONFIGURED" ] && ok "no config file yet is not configured (setup agents can start a fresh repository)" || bad "no config -> rc=$rc $out"
 
 # merge-labels
 m() { printf '%s' "$1" | python3 "$SC" merge-labels; }

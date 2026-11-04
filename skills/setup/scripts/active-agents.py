@@ -10,7 +10,8 @@ The single implementation behind `skills/setup/references/agents-mode.md` (setup
       -> line 1: ACTIVE AGENTS: VALID | NOT CONFIGURED | INVALID (<n>)
          VALID: line 2 is the effective block, defaults filled, as JSON.
          INVALID: one `ERROR activeAgents.<key>: <problem>` line per problem.
-         Exit 0 valid or not configured, 1 invalid, 2 unreadable config.
+         Exit 0 valid or not configured (no config file yet counts as not configured), 1
+         invalid, 2 a config file that cannot be read.
   merge-labels   stdin {"labels": [<id>…], "tag": "<id>"}
       -> {"change": bool, "added": […], "before": […], "after": […]}  (existing order kept)
   render <start|end> <root> [--config <path>]
@@ -72,7 +73,10 @@ def option(args, name, default=None):
 
 
 def load_block(path):
-    """(block, problems): block None when absent or null."""
+    """(block, problems): block None when absent or null, or when there is no config file yet
+    (a fresh repository: setup agents creates both)."""
+    if not os.path.exists(path):
+        return None, []
     try:
         with open(path, encoding="utf-8") as f:
             config = json.load(f)
@@ -107,6 +111,9 @@ def load_block(path):
     if not isinstance(commands, dict):
         problems.append("ERROR activeAgents.commands: must be an object with start and end")
     else:
+        for key in sorted(set(commands) - {"start", "end"}):
+            if not key.startswith("_"):
+                problems.append("ERROR activeAgents.commands.%s: not a known key" % key)
         for verb in ("start", "end"):
             value = commands.get(verb)
             if not isinstance(value, str) or not value.strip():
