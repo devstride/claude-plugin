@@ -94,8 +94,9 @@ starting with `_` and `$schema` are never reported as unknown.
 | `epicIntegrationBranches.autoRelease` | boolean, string | `true`, `false`, ask | `false` | true, false or "ask": whether a finished release unit's pull request merges unasked | pre-registry |
 | `epicIntegrationBranches.deleteBranchAfterRelease` | boolean | — | `true` | delete the integration branch after its release | pre-registry |
 | `epicIntegrationBranches.mergedStatusName` | string, null | — | Review | the status a landed story moves to, by name | pre-registry |
-| `defects` | object | — | — | deferred-defect placement | pre-registry |
-| `defects.deferredContainerTitle` | string | — | Deferred defects | the container deferred defects are parked under | pre-registry |
+| `defects` | object | — | — | deferred-work placement | pre-registry |
+| `defects.deferredContainerTitle` | string | — | Deferred | the title of the plan root's one deferred container | pre-registry |
+| `defects.deferredContainerLegacyTitles` | string[] | — | Deferred defects | earlier container titles still matched; only adds to the built-in Deferred defects | unreleased |
 | `commitConventions` | object | — | — | commit message formats | pre-registry |
 | `commitConventions.messageFormat` | string | — | — | the commit message format | pre-registry |
 | `commitConventions.reviewFixFormat` | string | — | — | the review-fix commit format | pre-registry |

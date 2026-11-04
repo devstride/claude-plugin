@@ -84,11 +84,12 @@ is always captured — missing scope has no likelihood to weigh. The same applie
 out-of-scope capture — left as PR prose it is invisible to the loop forever, because nothing
 downstream reads a PR comment looking for work.
 
-The route differs by what the finding IS. A defect goes to `create-defect` in DEFERRED
-placement, which parks it in a container directly under the plan root and records a related-to
-edge back to the item whose review produced it — no `blocked_by`, no execution-order number, so
-no build agent ever picks it up and no release unit is held away from zero remaining leaves by
-work that was explicitly deferred. Discovered SCOPE is the exception: a story the plan actually
+The route differs by what the finding IS. A bug goes to `create-defect` in DEFERRED placement,
+any other postponed follow-up to `create-story` in DEFERRED placement; both park it in the plan
+root's ONE container (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`)
+and record a related-to edge back to the item whose review produced it — no `blocked_by`, no
+execution-order number, so no build agent ever picks it up and no release unit is held away from
+zero remaining leaves by work that was explicitly deferred. Discovered SCOPE is the exception: a story the plan actually
 needs belongs in the dependency chain, so it splices in through `insert-story`. Driven runs
 hand both kinds back on the untracked-deferral list instead of filing them inline, because
 `build-item` step 6.5 is the single place that files them — one writer, one shape.

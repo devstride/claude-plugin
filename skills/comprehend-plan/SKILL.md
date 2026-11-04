@@ -62,6 +62,11 @@ Organize by the tree's own hierarchy (root → grouping items → leaves), not a
   path, and the item `/devstride:build-item` would pick next per the canonical rule in
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`.
 - **Deferrals and known gaps** — anything flagged deferred, blocked on a human, or a known compromise.
+- **Deferred container** — its own section, apart from the value tree, the status distribution and
+  "what runs next": the plan root's container
+  (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`, "Finding it"; its
+  members never count as open plan work), any duplicates, and **Still open in Deferred** — number,
+  title, kind and the item each relates to. No container → say so.
 - **Sub-plan shape** — which grouping items and release units exist (this org: Capabilities/Epics)
   and roughly what each owns.
 - A focus question gets a direct, explicit answer backed by evidence — not buried in the synthesis.

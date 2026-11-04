@@ -172,9 +172,9 @@ L-NNN** (step 6.5 takes marks as authoritative); REFUTED never bumps. One bucket
   `all-confirmed`, from each verdict's likelihood and impact; security is material) → fix now.
 - **In scope BELOW the floor, or out of scope and untracked** → dismiss with a POSTED one-line
   rationale; one **worth filing** (a P1, a security finding, or one both likely and material) is
-  CAPTURED instead — to its owning item, else the untracked-deferral list (driven) or an offer of
-  `/devstride:create-defect deferred <item#>` (standalone; the item under review) — and discovered
-  scope ALWAYS through `insert-story`.
+  CAPTURED instead — to its owning item, else the untracked-deferral list (driven) or offering
+  `create-defect deferred <item#>` (a bug) or `create-story deferred <item#>`
+  (standalone; the item under review) — and discovered scope ALWAYS through `insert-story`.
 - **Ambiguous / risky / unverifiable** → ask — the only bucket that stalls a run.
 
 ## 5. Fix, push, follow up

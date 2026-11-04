@@ -8,6 +8,39 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **One deferred container, for follow-ups as well as bugs.** `create-story deferred <item#>`
+  parks a postponed follow-up that is not a bug (tech debt, a clean-up, hardening, a dated
+  after-deploy step) beside `create-defect deferred <item#>`, in the same container directly under
+  the plan root. The rules live in one place, `skills/build-item/references/deferred-container.md`,
+  which every caller cites: how the container is found (its title, or a legacy title, compared
+  after trimming, collapsing whitespace and ignoring case), what happens when two match (the
+  lowest number is used, the others are reported and never filed into), that a closed container
+  is reopened and reused rather than duplicated, and the repair procedure that merges a duplicate.
+  `skills/build-item/scripts/deferred-container.py` decides the match and the container's members,
+  so no caller decides by eye.
+- **`defects.deferredContainerLegacyTitles`**, an array of earlier container titles that still
+  identify the container. The built-in `Deferred defects` is always matched; a configured list
+  only adds to it. Doctor's config check warns about an empty title and notes a current title
+  that is also listed as a legacy one.
+- **Deferred items are dated after the plan.** `rationalize-gantt` keeps the container's members
+  out of the cascade and the violation pass, then dates each open one on its own day after the
+  plan's last value leaf (`skills/rationalize-gantt/scripts/deferred-dates.py`), keeping the date
+  of an item that already starts later. Filing never writes a date.
+- **"Still open in Deferred."** When a plan reaches zero remaining stories, `build-item`'s closing
+  report lists the container's open items; `comprehend-plan` reports the container in its own
+  section. `plan` and `rebalance` skip its members in their no-orphans checks, and `rebalance`
+  never merges, splits, renumbers or archives one.
+
+### Changed
+
+- **The default container title is now `Deferred`** (it was `Deferred defects`). Containers created
+  under the old title keep being found, because `Deferred defects` is a built-in legacy title, so
+  no running plan gets a second container. An older plugin ignores
+  `defects.deferredContainerLegacyTitles` and keeps looking for its own default, so a repository
+  that sets either key, or relies on the new default, must require this release.
+
 ## [3.23.1] — 2026-11-03
 
 ### Changed

@@ -88,6 +88,9 @@ $ARGUMENTS
 - Partition every leaf into exactly one set: **Done** and **In Progress**, landed leaves (merged
   status or a "merged onto" comment, awaiting their epic's release) counted with In Progress (both
   UNTOUCHABLE; their edges are read, never rewritten) and **Not started** (the only candidates).
+  Every member of the plan root's deferred container
+  (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`) is UNTOUCHABLE
+  whatever its status: never merged, split, renumbered, re-dated or archived here.
   Dates are not frozen: 3f re-dates every not-Done item but a landed one, In Progress included, and
   build-item's ritual stamps the real dates when it merges.
 - **Current profile** — the nearest EFFECTIVE marker per the contract: the item's own, else the
@@ -184,7 +187,8 @@ restore); it is the only write before 3a, and an overwritten probe date stops th
   both directions — archiving does not detach edges; add before remove, so no live item is ever
   edgeless. **Orphan gate — hard, exactly as in `plan` step 5**: re-read the edges of EVERY still-live
   not-started leaf (successors + untouched; fan out for a large tree) and assert each has ≥ 1
-  `blocked_by` OR `blocks` edge; absorbed originals are excluded (deliberately edgeless).
+  `blocked_by` OR `blocks` edge; absorbed originals and deferred-container members are excluded
+  (deliberately edgeless).
   Do not proceed to 3c with one standing.
 - **3c. Number** — per the CANONICAL NUMBERING CONVENTION,
   `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/execution-order-numbering.md`, and nothing else:

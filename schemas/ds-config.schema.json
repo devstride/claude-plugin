@@ -345,15 +345,25 @@
       "properties": {
         "deferredContainerTitle": {
           "type": "string",
-          "default": "Deferred defects",
-          "description": "the container deferred defects are parked under"
+          "default": "Deferred",
+          "description": "the title of the plan root's one deferred container"
+        },
+        "deferredContainerLegacyTitles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "Deferred defects"
+          ],
+          "description": "earlier container titles still matched; only adds to the built-in Deferred defects"
         }
       },
       "patternProperties": {
         "^_": {}
       },
       "additionalProperties": false,
-      "description": "deferred-defect placement"
+      "description": "deferred-work placement"
     },
     "commitConventions": {
       "type": "object",

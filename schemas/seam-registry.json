@@ -863,15 +863,24 @@
     {
       "key": "defects",
       "type": "object",
-      "description": "deferred-defect placement",
+      "description": "deferred-work placement",
       "since": "pre-registry"
     },
     {
       "key": "defects.deferredContainerTitle",
       "type": "string",
-      "default": "Deferred defects",
-      "description": "the container deferred defects are parked under",
+      "default": "Deferred",
+      "description": "the title of the plan root's one deferred container",
       "since": "pre-registry"
+    },
+    {
+      "key": "defects.deferredContainerLegacyTitles",
+      "type": "string[]",
+      "default": [
+        "Deferred defects"
+      ],
+      "description": "earlier container titles still matched; only adds to the built-in Deferred defects",
+      "since": "unreleased"
     },
     {
       "key": "commitConventions",
