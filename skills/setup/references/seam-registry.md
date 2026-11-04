@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.27.0.
+`.claude/ds-config.json` against. Schema version: 3.28.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -120,7 +120,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `preShipChecks[].pathGlobs` | string[] | — | — | the paths that select the check | pre-registry |
 | `preShipChecks[].timeoutNote` | string | — | — | surfaced before the check runs | pre-registry |
 | `preShipChecks[].onlyWhenTouched` | boolean | — | — | a releaseOnly check runs only when the release touches its pathGlobs | pre-registry |
-| `preShipChecks[].runAt` | string | train | — | a releaseOnly check with runAt train runs on the release-train snapshot before the train merges, outside release clearance, and is not repeated at the release's step 2b when it passed there on the same snapshot; only valid with when releaseOnly | unreleased |
+| `preShipChecks[].runAt` | string | train | — | a releaseOnly check with runAt train runs on the release-train snapshot before the train merges, outside release clearance, and is not repeated at the release's step 2b when it passed there on the same snapshot; only valid with when releaseOnly | 3.28.0 |
 | `preCommitWiringChecks` | array | — | — | repository-specific wiring assertions | pre-registry |
 | `verify` | object | — | — | the verification commands | pre-registry |
 | `verify.testDir` | string | — | — | where tests live | pre-registry |

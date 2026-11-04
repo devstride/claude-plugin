@@ -8,9 +8,49 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.28.0] — 2026-11-04
+
 ### Added
 
 - A `releaseOnly` pre-ship check with `runAt: "train"` runs on the release-train snapshot before the train merges, outside release clearance, and is not repeated at the release's step 2b when it passed there on the same snapshot.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.27.0 @ 6f266a5, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.27.0 | tokens@devstride--v3.27.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/release/SKILL.md | 23,985 | 7,995 | 23,980 | 7,994 | -1 | 8,000 |
+| skills/plan/SKILL.md | 23,967 | 7,989 | 23,967 | 7,989 | +0 | 8,000 |
+| skills/doctor/SKILL.md | 23,870 | 7,957 | 23,870 | 7,957 | +0 | 7,960 |
+| skills/review/SKILL.md | 23,290 | 7,764 | 23,290 | 7,764 | +0 | 7,770 |
+| skills/build-item/SKILL.md | 22,009 | 7,337 | 22,009 | 7,337 | +0 | 7,340 |
+| skills/rebalance/SKILL.md | 17,724 | 5,908 | 17,724 | 5,908 | +0 | 5,910 |
+| skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,655 | 4,885 | +0 | 4,900 |
+| skills/pr/SKILL.md | 10,837 | 3,613 | 10,837 | 3,613 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-defect/SKILL.md | 6,202 | 2,068 | 6,202 | 2,068 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 5,793 | 1,931 | 5,793 | 1,931 | +0 | 1,940 |
+| skills/comprehend-plan/SKILL.md | 5,099 | 1,700 | 5,099 | 1,700 | +0 | 1,700 |
+| skills/insert-defect/SKILL.md | 4,714 | 1,572 | 4,714 | 1,572 | +0 | 1,600 |
+| skills/insert-story/SKILL.md | 4,037 | 1,346 | 4,037 | 1,346 | +0 | 1,400 |
+| skills/pre-ship/SKILL.md | 2,901 | 967 | 3,550 | 1,184 | +217 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 270,432 | 90,153 | 271,076 | 90,369 | +216 | |
 
 ## [3.27.0] — 2026-11-04
 
@@ -3061,7 +3101,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.27.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.28.0...HEAD
+[3.28.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.27.0...devstride--v3.28.0
 [3.27.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.26.0...devstride--v3.27.0
 [3.26.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.25.0...devstride--v3.26.0
 [3.25.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.24.0...devstride--v3.25.0
