@@ -375,7 +375,7 @@ Only when Phase D said yes. Copy
 `chmod +x` it, and MERGE into `.claude/settings.json` — never replace the document:
 
 ```json
-{ "statusLine": { "type": "command", "command": "bash .claude/statusline.sh", "padding": 0 } }
+{ "statusLine": { "type": "command", "command": "bash .claude/statusline.sh", "padding": 0, "refreshInterval": 30 } }
 ```
 
 **Copy it verbatim — nothing is substituted**: it reads the repository's config at runtime, and
