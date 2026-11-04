@@ -288,6 +288,7 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
 | Key | Shape | Absent means |
 | --- | --- | --- |
 | `release.clearance` | `null`, `{ "provider": "github" }` (optional `ref`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), `{ "provider": "devstride" }` (optional `credentialsFile`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), or `{ "commands": { "claim", "status", "heartbeat", "release", "adopt", "owed"? } }` | no clearance: `release` runs as before, the `release` status-line segment never renders |
+| `sessionSummary` | `null`, `{ "provider": "devstride" }`, or `{ "commands": { "write" } }` | no summary: `build-item` writes nothing and says nothing |
 | `claims` | `null`, `{ "provider": "devstride" }`, or `{ "commands": { "claim", "heartbeat", "release", "get"?, "list"? } }`, each with optional `expiryMinutes` | no claims: `build-item` claims nothing and says nothing |
 | `releaseTower` | `{ "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" }` | those two defaults |
 
@@ -323,6 +324,12 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   other kinds the server's default (the release permit: `staleMinutes`); a value outside 1..1440 is warned about and
   ignored. An unreachable, unsupported or forbidden store means no claims, said once. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`.
+- **`sessionSummary`** — a short agent session summary for each story: `build-item` writes one at the
+  start, one at the completion ritual and one when a story stops or fails, after scrubbing it
+  (`provider: devstride` calls the agent's own DevStride tool `record_agent_session`; `commands.write`
+  runs a repository command with the JSON on stdin; both is a config error). A failure is said once
+  and never stops delivery. Contract:
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/session-summary.md`.
 
 ## Lists a repository fills in for itself
 

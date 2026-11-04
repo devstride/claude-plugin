@@ -8,6 +8,16 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Optional agent session summaries.** A new config setting, `sessionSummary`, lets the delivery
+  loop leave a short record on each work item: which agent session worked it, for whom, on what
+  branch and pull request, which review engines ran and how it ended (completed, failed or
+  interrupted). It is written when a story starts, when it completes and when it stops. Every free-text
+  field is scrubbed first by a bundled script that redacts keys, tokens, passwords and email
+  addresses and caps lengths; no transcript is ever sent. Unset, nothing is written and nothing is
+  said; a failed write is mentioned once and never stops a story.
+
 ## [3.22.0] — 2026-11-03
 
 ### Changed

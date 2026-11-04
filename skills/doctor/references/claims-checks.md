@@ -15,6 +15,14 @@ All read-only. Never print a credential or a holder; say only whether it is pres
 - **`commands`** → each command's first token resolves (§4's rule); never run one.
 - **`expiryMinutes`** values outside 1..1440 are the validator's WARN: the default stands.
 
+## `sessionSummary`
+
+- **Absent or null** → "sessionSummary: not configured" (N/A, not a gap).
+- **`provider: devstride`** → the agent's own DevStride connection must offer `record_agent_session`:
+  ToolSearch for it, never call it. Missing → FAIL: the server has no session summaries yet, or the
+  key's user lacks permission; `build-item` then writes none and says so once.
+- **`commands`** → `write`'s first token resolves (§4's rule); never run it.
+
 ## `release.clearance` with `provider: devstride`
 
 - **Status** → run `${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/clearance-devstride.sh status`

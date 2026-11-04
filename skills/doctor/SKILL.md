@@ -308,6 +308,7 @@ release safety hooks …), each against its registry `contract`:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`.
 - **`claims`** — absent or null → N/A: "claims: not configured". Set → shape as above; check the
   provider per that file. Never call `claim_work` here.
+- **`sessionSummary`** — as `claims`, per that file. Never call `record_agent_session`.
 - **Say the release-notes default** — notes only on `--release-notes`; the loop never decides a
   release "deserves" one.
 
