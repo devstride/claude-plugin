@@ -7,11 +7,11 @@ description: "Step: select or run the repository's local pre-ship checks (preShi
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
-Arguments: $ARGUMENTS — `pr|release|train` (train: no class, no `--skip`), `select|run`, the final diff's base and head SHAs, and:
+Arguments: $ARGUMENTS — `pr|release|train` (`train`: no class or `--skip`), `select|run`, the final diff's base and head SHAs, and:
 
 - `release run`: the class `classify-release` printed for THIS head (none → `full`).
 - `--only <names>`: re-run just those selected entries — review 7.1b's failed/affected re-run.
-- `--ran-at-train <names>@<sha>` (`release`): those `runAt: train` entries passed at `<sha>`; skipped only if `<sha>` is the commit the release branch was cut from or has the head's tree, else they run. `train` takes the snapshot head SHA like `pr` and `release`.
+- `--ran-at-train <names>@<sha>` (`release`): those `runAt: train` entries passed at `<sha>`; skipped only if `<sha>` is the commit the release branch was cut from or has the head's tree, else they run.
 - `--skip <name>` (repeatable, `release` only): the owner's explicit waiver of that entry.
 
 ## Verdict
@@ -27,9 +27,9 @@ Names in array order; no `preShipChecks` → `NOTHING TO RUN` (an explicit no-op
   pull-files (both capped) — renames on BOTH source and destination; empty → every PR.
   **Never narrow a glob to skip a run.**
 - **`train`**: every entry with `when` = `releaseOnly` AND `runAt` = `train`, in array order,
-  run unconditionally at the train snapshot head, as `release run` does (`pathGlobs` unread).
+  run unconditionally at the snapshot head (`pathGlobs` unread).
 - **`release`**: EVERY entry with `when` ∈ {`releaseOnly`, `always`} is selected, so the hold fires whenever one exists; a `runAt: "train"` entry
-  is dropped only per `--ran-at-train` (`release-branch.md` §1 step 4); each dropped prints `skip <name>: passed at the train, <sha>`. **Run each selected entry UNCONDITIONALLY** — except
+  is dropped only per `--ran-at-train` (`release-branch.md` §1 step 4b), its one automatic skip (`runAt` with `onlyWhenTouched` is a config error); each dropped prints `skip <name>: passed at the train, <sha>`. **Run each selected entry UNCONDITIONALLY** — except
   a `releaseOnly` entry with `onlyWhenTouched: true`: it runs only when the release diff matches
   its `pathGlobs` (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/review-once.md`); a diff that
   cannot be computed runs it. Each that will not run prints as evidence: `skip <name>: the

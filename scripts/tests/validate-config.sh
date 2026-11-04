@@ -123,6 +123,9 @@ expect "(33e) any other runAt value is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR
 cfg '{"preShipChecks": [{"command": "make db", "when": "perPr", "runAt": "train"}]}'
 expect "(33f) runAt on an entry that is not releaseOnly is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR preShipChecks\[0\].runAt: is only valid"
 
+cfg '{"preShipChecks": [{"command": "make db", "when": "releaseOnly", "runAt": "train", "onlyWhenTouched": true}]}'
+expect "(33g) runAt train with onlyWhenTouched is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR preShipChecks\\[0\\].runAt: cannot be combined"
+
 # slow cloud suites: a closed object with its mapping required
 cfg '{"verify": {"skipDuringStoryBuilds": [{"name": "e2e", "ciChecksByBase": {"baseBranch": ["e2e"]}, "runWhenChangedPaths": ["web/**"]}]}}'
 expect "(34a) a minimal slow-suite entry is clean" 0 "$CLEAN"

@@ -183,8 +183,8 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 ## 2b. Pre-ship checks — the release's mandatory local gates
 
 Run **`classify-release`** again at the head 2b tests (a merge, fix or hotfix changes the delta),
-then **`pre-ship release run`** on the release diff with THAT class. Add `--ran-at-train <names>@<sha>` only from THIS release's `PRE-SHIP TRAIN: PASS`
-line; otherwise omit it and every `runAt: train` entry runs here. Step 4 reports the class.
+then **`pre-ship release run`** with THAT class. Add `--ran-at-train <names>@<sha>` only from THIS release's
+`PRE-SHIP TRAIN: PASS` line, else every `runAt: train` entry runs here. Step 4 reports the class.
 
 - **`PRE-SHIP: FAIL` is a STOP** — fix it or surface it as a release blocker naming every failed
   entry and spec. Never present a release green over a red or unrun check, or say "covered by CI".
@@ -224,8 +224,8 @@ the deploy.
   - **Name the deploy stage** when the repo has one: run `stage.resolve` and quote "this merge
     deploys to `<stage>`" beside `autoDeployOnMerge`. No `stage` block or an empty result → say
     nothing; never guess one, never substitute `localEnvironment.instanceName`.
-  - Never let the owner infer CI covered a pre-ship suite; the true answer is "the local run in
-    step 2b".
+  - Never let the owner infer CI covered a pre-ship suite; report each entry as passed at the
+    train on <sha>, passed at step 2b, skipped by path, or waived.
 - **On a release branch, before merging**: a hotfix that reached `productionBranch` meanwhile →
   `release-branch.md` §4, then back to step 2. With clearance, append the provider's `status`
   to the recap: a `Hotfix landed` line goes to §4 first; a `Waiting` line names who is next; and

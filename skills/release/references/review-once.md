@@ -46,8 +46,8 @@ selection is recomputed whenever the head moves (a fix commit, a hotfix merge). 
 be computed runs the check.
 
 A `releaseOnly` entry may also set `"runAt": "train"`: it then runs at the release train
-(`release-branch.md` §1 step 4) on the snapshot head; 2b skips it only when the train step passed it on the snapshot the release was cut from, else 2b runs it. `runAt` on
-any other `when` is a config error.
+(`release-branch.md` §1 step 4b) on the snapshot head; the only automatic 2b skip for it is same-snapshot train evidence, else 2b runs it. `runAt` on
+any other `when`, or together with `onlyWhenTouched`, is a config error.
 
 ## A train that carries reviewed release units
 

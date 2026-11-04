@@ -474,7 +474,7 @@
         "properties": {
           "command": {
             "type": "string",
-            "description": "command hook — none; selected by the entry's when and pathGlobs"
+            "description": "command hook — none; selected by the entry's when, pathGlobs and runAt (a releaseOnly entry with runAt train is selected at the release-train step, and at release 2b unless it passed at the train on the same snapshot)"
           },
           "name": {
             "type": "string",
@@ -509,7 +509,7 @@
             "enum": [
               "train"
             ],
-            "description": "a releaseOnly check with runAt train runs on the release-train snapshot before the train merges, outside release clearance, and is not repeated at the release's step 2b when it passed there on the same snapshot; only valid with when releaseOnly"
+            "description": "a releaseOnly check with runAt train runs on the release-train snapshot before the train merges (outside release clearance under release.clearance.scope cut-to-deploy), and is not repeated at the release's step 2b when it passed there on the same snapshot; only valid with when releaseOnly, never with onlyWhenTouched"
           }
         },
         "patternProperties": {

@@ -12,15 +12,15 @@ for what each version component means here and how a release is cut.
 
 ### Added
 
-- A `releaseOnly` pre-ship check with `runAt: "train"` runs on the release-train snapshot before the train merges, outside release clearance, and is not repeated at the release's step 2b when it passed there on the same snapshot.
+- A `releaseOnly` pre-ship check with `runAt: "train"` runs on the release-train snapshot before the train merges (outside release clearance under `release.clearance.scope: "cut-to-deploy"`), and is not repeated at the release's step 2b when it passed there on the same snapshot.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.27.0 @ 6f266a5, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.27.0 @ 6139da5, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.27.0 | tokens@devstride--v3.27.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
-| skills/release/SKILL.md | 23,985 | 7,995 | 23,980 | 7,994 | -1 | 8,000 |
+| skills/release/SKILL.md | 23,985 | 7,995 | 23,994 | 7,998 | +3 | 8,000 |
 | skills/plan/SKILL.md | 23,967 | 7,989 | 23,967 | 7,989 | +0 | 8,000 |
 | skills/doctor/SKILL.md | 23,870 | 7,957 | 23,870 | 7,957 | +0 | 7,960 |
 | skills/review/SKILL.md | 23,290 | 7,764 | 23,290 | 7,764 | +0 | 7,770 |
@@ -36,7 +36,7 @@ for what each version component means here and how a release is cut.
 | skills/comprehend-plan/SKILL.md | 5,099 | 1,700 | 5,099 | 1,700 | +0 | 1,700 |
 | skills/insert-defect/SKILL.md | 4,714 | 1,572 | 4,714 | 1,572 | +0 | 1,600 |
 | skills/insert-story/SKILL.md | 4,037 | 1,346 | 4,037 | 1,346 | +0 | 1,400 |
-| skills/pre-ship/SKILL.md | 2,901 | 967 | 3,550 | 1,184 | +217 | 1,200 |
+| skills/pre-ship/SKILL.md | 2,901 | 967 | 3,537 | 1,179 | +212 | 1,200 |
 | skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
 | skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
 | skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
@@ -50,7 +50,7 @@ for what each version component means here and how a release is cut.
 | skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
-| **total (bodies)** | 270,432 | 90,153 | 271,076 | 90,369 | +216 | |
+| **total (bodies)** | 270,432 | 90,153 | 271,077 | 90,368 | +215 | |
 
 ## [3.27.0] — 2026-11-04
 
