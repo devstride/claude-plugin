@@ -22,5 +22,6 @@ The block and what it needs: `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/agen
   - `leaf-on-board` — leaf items (Stories, Defects) on the board: the count, then the first five
     numbers. `tag-on-done` — the tag on a Done item: the numbers. Fix: those items, by hand.
   - `tag-group` — a plan-root type with no tag group: INFO, skipped by setup.
-- **The commands** — both present, `<root>` in `start`, and each command's first word found on
-  the path or in the repository (`command -v`), **never executed**.
+- **The commands** — both present, `<root>` in `start`, and each resolves by doctor's §4 rule
+  (every `&&` and `;` segment's first word, shell builtins skipped, `command -v`),
+  **never executed**.

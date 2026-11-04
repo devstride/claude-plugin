@@ -35,8 +35,11 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 
 DEFAULTS = {"boardId": None, "tagName": "agent active", "tagColor": "green", "staleMinutes": 20}
+COLOURS = ("gray-medium-dark", "red", "pink", "orange", "yellow", "lime", "green", "teal", "blue",
+           "blue-medium", "purple")  # create_label's colours; the registry carries the same enum
 KEYS = set(DEFAULTS) | {"commands"}
 ROOT_RE = re.compile(r"^[IF][0-9]+$")
 
@@ -94,6 +97,9 @@ def load_block(path):
     for key in ("tagName", "tagColor"):
         if key in block and (not isinstance(block[key], str) or not block[key].strip()):
             problems.append("ERROR activeAgents.%s: must be a non-empty string" % key)
+    if isinstance(block.get("tagColor"), str) and block["tagColor"].strip() \
+            and block["tagColor"] not in COLOURS:
+        problems.append("ERROR activeAgents.tagColor: must be one of " + ", ".join(COLOURS))
     stale = block.get("staleMinutes", DEFAULTS["staleMinutes"])
     if isinstance(stale, bool) or not isinstance(stale, int) or stale < 1:
         problems.append("ERROR activeAgents.staleMinutes: must be a positive whole number")
@@ -200,24 +206,28 @@ def cmd_run(args):
         seconds = float(timeout)
     except ValueError:
         fail("--timeout must be a number of seconds")
-    try:
-        child = subprocess.Popen(command, shell=True, cwd=top, env=env, stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE, text=True, start_new_session=True)
-    except OSError as error:
-        print("%s: FAILED %s" % (label, error))
-        return 0
-    try:
-        out, err = child.communicate(timeout=seconds)
-    except subprocess.TimeoutExpired:
-        try:  # the whole group: a shell's own children must not outlive the limit
-            os.killpg(child.pid, signal.SIGKILL)
-        except OSError:
-            pass
-        child.communicate()
-        print("%s: FAILED timed out after %gs" % (label, seconds))
-        return 0
+    # Output goes to a temporary file, never a pipe: a descendant that leaves the process group
+    # and keeps the output open cannot then hold this call past the limit.
+    with tempfile.TemporaryFile() as output:
+        try:
+            child = subprocess.Popen(command, shell=True, cwd=top, env=env, stdin=subprocess.DEVNULL,
+                                     stdout=output, stderr=output, start_new_session=True)
+        except OSError as error:
+            print("%s: FAILED %s" % (label, error))
+            return 0
+        try:
+            child.wait(timeout=seconds)
+        except subprocess.TimeoutExpired:
+            try:  # the whole group: a shell's own children must not outlive the limit
+                os.killpg(child.pid, signal.SIGKILL)
+            except OSError:
+                pass
+            print("%s: FAILED timed out after %gs" % (label, seconds))
+            return 0
+        output.seek(0)
+        said = output.read().decode("utf-8", errors="replace")
     if child.returncode != 0:
-        said = (err or out).strip().splitlines()
+        said = said.strip().splitlines()
         print("%s: FAILED exit %d%s" % (label, child.returncode, (": " + said[-1]) if said else ""))
         return 0
     print("%s: DONE" % label)

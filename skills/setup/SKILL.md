@@ -170,8 +170,8 @@ is then the local gate.
   `review.localCommand` and optional `review.localAssistCommand`; for an engine the user names,
   build one to the contract and confirm it. Found → `ambiguous` until confirmed; carry
   `review.localReviewerName`. Existing base-only/literal-effort commands get a migration
-  proposal with that reference's tradeoff — never a silent rewrite, and **never when the
-  effective `maxLocalReviewRounds` is 1**. **Not found → `unknown`, never detected
+  proposal with that reference's tradeoff, never a silent rewrite — the base-only one **never
+  when the effective `maxLocalReviewRounds` is 1**. **Not found → `unknown`, never detected
   `null`** — report what was probed.
 - **Cloud reviewers** (`review.automatedReviewers`) — possible when origin is GitHub and
   `gh auth status` succeeds. **An entry is more than a name**: a `requested_reviewer` bot is

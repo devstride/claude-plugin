@@ -34,6 +34,7 @@ expect_invalid "a boolean staleMinutes is invalid" '{"activeAgents": {"staleMinu
 expect_invalid "a start command without <root> is invalid" '{"activeAgents": {"commands": {"start": "x", "end": "y"}}}' "must contain the <root> placeholder"
 expect_invalid "a missing end command is invalid" '{"activeAgents": {"commands": {"start": "x <root>"}}}' "activeAgents.commands.end"
 expect_invalid "missing commands are invalid" '{"activeAgents": {}}' "activeAgents.commands:"
+expect_invalid "a colour create_label does not offer is invalid" '{"activeAgents": {"tagColor": "chartreuse", "commands": {"start": "x <root>", "end": "y"}}}' "activeAgents.tagColor: must be one of"
 expect_invalid "an unknown key is reported" '{"activeAgents": {"bord": "x", "commands": {"start": "x <root>", "end": "y"}}}' "activeAgents.bord"
 cfg '{"activeAgents": {"staleMinutes": 0, "tagName": "", "commands": {"start": "x", "end": ""}}}'
 out="$(aa validate)"; [ "$(first "$out")" = "ACTIVE AGENTS: INVALID (4)" ] && ok "every problem is reported, not just the first" || bad "multi -> $out"
@@ -71,6 +72,11 @@ out="$(aa run end I44)"; rc=$?
 cfg '{"activeAgents": {"commands": {"start": "sleep 5; echo <root>", "end": "true"}}}'
 T0=$(date +%s); out="$(aa run start I1 --timeout 0.5)"; rc=$?; T1=$(date +%s)
 [ "$rc" = 0 ] && printf '%s' "$out" | grep -q "FAILED timed out" && [ $((T1 - T0)) -lt 4 ] && ok "a hanging command is killed at the limit with its children, exit 0" || bad "timeout -> rc=$rc $out"
+cfg '{"activeAgents": {"commands": {"start": "python3 -c \"import os,time; os.setsid(); time.sleep(4)\" & sleep 5; echo <root>", "end": "printf \"\\377\\376 bad\"; exit 4"}}}'
+T0=$(date +%s); out="$(aa run start I1 --timeout 0.5)"; rc=$?; T1=$(date +%s)
+[ "$rc" = 0 ] && printf '%s' "$out" | grep -q "FAILED timed out" && [ $((T1 - T0)) -lt 3 ] && ok "a descendant that leaves the group does not hold run past the limit" || bad "detached -> rc=$rc $out $((T1 - T0))s"
+out="$(aa run end I1)"; rc=$?
+[ "$rc" = 0 ] && printf '%s' "$out" | grep -q "FAILED exit 4" && ok "output that is not UTF-8 still gives one FAILED line, exit 0" || bad "non-utf8 -> rc=$rc $out"
 cfg '{"activeAgents": {"commands": {"start": "no-such-command-xyz <root>", "end": "true"}}}'
 out="$(aa run start I1)"; rc=$?
 [ "$rc" = 0 ] && printf '%s' "$out" | grep -q "FAILED exit 127" && ok "a missing command is reported, exit 0" || bad "missing cmd -> rc=$rc $out"

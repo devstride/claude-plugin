@@ -19,7 +19,9 @@ decided by eye. The build loop's half is
 commands: { start, end } }`. `commands.start` must contain `<root>`; `commands.end` may. Both are
 the repository's own commands; the plugin never writes or guesses them, and asks for them when the
 block has none. `boardId: null` means "not adopted yet": the build loop places no root until this
-mode sets it. **An absent or null block writes nothing and runs nothing, ever.**
+mode sets it. **An absent or null block writes nothing and runs nothing, ever** — in the build loop
+and doctor. This mode is how a block comes to exist: with none, it asks for the two commands
+first and writes nothing anywhere until they and the plan get the typed yes.
 
 ## 1. Inventory — read-only
 
@@ -48,10 +50,14 @@ naming this plan; anything else writes nothing.
    `update_label_collection`. That call REPLACES the whole list —
    **never replace a tag group with only the new tag**. A plan-root type with no tag group is
    reported and skipped; creating a tag group is out of scope.
-3. **The board.** The configured id, else the board labelled "Active Agents", else
-   `create_board`, asking once for the board folder and status collection it needs.
-4. **The view.** A shared table view of the board (`createStoredView`, visibility `internal`) with
-   the columns Item, Status, Progress, Priority and Tags. The view's data has a versioned format
+3. **The board.** The configured id when that board exists and is not archived; else a
+   non-archived board labelled "Active Agents"; else `create_board` labelled "Active Agents",
+   asking once for the board folder and status collection it needs. A configured board that is
+   missing or archived is named in the plan, and the board that replaces it is written to
+   `boardId` in step 5; this mode never unarchives a board.
+4. **The view.** A shared table view of the board named "Active Agents" (`createStoredView`,
+   visibility `internal`) with the columns Item, Status, Progress, Priority and Tags. An internal
+   view of that name already on the board is the view: never a second one. The view's data has a versioned format
    the plugin must not guess: copy the shape and version of an existing internal table view of
    the same kind (`findStoredViews`) and change only its column list. **No view to learn from →
    create everything else, report the view NOT created with that reason, and name it as the one
