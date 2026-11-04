@@ -179,12 +179,12 @@ the release skill calls it does.
 
 - **0a moves.** 0b (the train) runs uncleared, with no `heartbeat train`. `claim --wait --purpose
   release` runs just before 0c, with the exits handled as above; the first heartbeat is `cut
-  --branch <b>`. Until a one-winner train claim exists, 0b's train pull request body carries
+  --branch <b>`. 0b's train pull request body carries
   `<!-- devstride:release-train-holder <digest> on <machine> -->` (`<digest>`: the first 12 hex
   characters of the SHA-256 of `identity`'s answer; the holder itself is never written). An open
   train pull request whose marker names another holder is never adopted silently: STOP, name it,
   adopt only on the owner's yes. Its own marker is adopted as before. With a `claims` block the
-  `release-train` claim replaces this marker (`auto-start.md`).
+  `release-train` claim comes first and decides which markers are adoptable (`auto-start.md`).
 - **Step 4 gates the merge on the previous release.** Before the recap, and again on the yes
   before merging: `${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/previous-release-gate.sh --wait`.
   `0` continue; `2` (still pending after its 45-minute wait) STOP, naming that release and

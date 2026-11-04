@@ -144,6 +144,8 @@ def auto_start_checks(v, config):
     light = release.get("lightRelease")
     if isinstance(light, dict) and light.get("standingYes") is True and not release.get("classifySkill"):
         v.add("WARN", "release.lightRelease.standingYes", "has no effect without `release.classifySkill`: no release is ever classified LIGHT")
+    if isinstance(light, dict) and light.get("standingYes") is True and not release.get("clearance"):
+        v.add("WARN", "release.lightRelease.standingYes", "has no effect without `release.clearance`: no tower status can show the release On final")
 
 
 class Validator:

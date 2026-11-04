@@ -1,10 +1,10 @@
 #!/bin/bash
 # Tests for skills/release/scripts/auto-start.py — the precondition half of release.autoStart.
-# A temporary repository with a bare origin carries a release source and a train; a stub `gh` on
-# PATH answers the open-pull-request search. Each switch that is off answers SKIP; a train holding
-# real work answers START with the claim key and, when one is open, the train pull request to
-# adopt; two starters racing for a stand-in claims store (an atomic mkdir) produce one winner.
-# No network.
+# A temporary repository with a bare origin carries a release source and a train; a `gh` on PATH
+# that always fails proves the check never calls it. Each switch that is off answers SKIP; a train
+# holding real work answers START with the lower-cased claim key; two starters racing for a
+# stand-in claims store (an atomic mkdir) produce one winner; and story-claim.py decide shows why
+# the release-train claim is released non-final. No network.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 HELPER="$ROOT/skills/release/scripts/auto-start.py"
@@ -24,11 +24,10 @@ g "$WORK/repo" config remote.origin.pushurl "$WORK/origin.git"
 g "$WORK/repo" config url."$WORK/origin.git".insteadOf "git@github.com:acme/widgets.git"
 mkdir -p "$WORK/repo/.claude" "$WORK/bin"
 
-# a stub gh: GH_ANSWER holds the JSON it prints, GH_FAIL=1 makes it fail
+# a gh that fails: the check must not need it
 cat > "$WORK/bin/gh" <<'SH'
 #!/bin/bash
-[ "${GH_FAIL:-0}" = 1 ] && { echo "gh: not signed in" >&2; exit 1; }
-printf '%s\n' "${GH_ANSWER:-[]}"
+echo "gh: must not be called" >&2; exit 1
 SH
 chmod +x "$WORK/bin/gh"
 export PATH="$WORK/bin:$PATH"
@@ -64,16 +63,20 @@ expect "(5) a train holding only a merge of the source → SKIP" 0 '^SKIP the tr
 g "$WORK/seed" commit -q --allow-empty -m "one-off A"
 g "$WORK/seed" commit -q --allow-empty -m "one-off B"
 g "$WORK/seed" push -q origin t:train/release
-GH_FAIL=1 expect "(6) two one-offs on the train → START with the key and the count; a failed gh drops only the hint" 0 \
+expect "(6) two one-offs on the train → START with the key and the count, gh never called" 0 \
   '^START acme/widgets \(2 commit\(s\) on train/release not on develop\)$'
 
-export GH_ANSWER='[{"number": 31, "title": "Release train: 2 one-off(s) for release 26-01-15"}, {"number": 12, "title": "Release train: 1 one-off(s) for release 26-01-14"}, {"number": 7, "title": "Not a release train"}]'
-expect "(7) an open train pull request → the lowest-numbered one is named for adoption" 0 \
-  '^START acme/widgets \(2 commit\(s\) on train/release not on develop\); adopt #12$'
-unset GH_ANSWER
+cfg '{"baseBranch": "develop", "claims": {"provider": "devstride"}, "supportTrain": {"branch": "train/release"}, "release": {"releaseSource": "develop", "mergeTrainBeforeCut": true, "autoStart": {"enabled": true}}}'
+expect "(7) the old name supportTrain is honoured" 0 '^START acme/widgets '
+cfg '{"claims": {"provider": "devstride"}, "releaseTrain": {"branch": "train/release"}, "supportTrain": {"branch": "train/release"}, "release": {"mergeTrainBeforeCut": true, "autoStart": {"enabled": true}}}'
+expect "(7b) both releaseTrain and supportTrain → ERROR, exit 1" 1 '^ERROR both releaseTrain and supportTrain are set'
+cfg "$ON"
 
 out="$(run key)"; [ "$out" = "acme/widgets" ] && ok "(8) key reads <owner>/<repo> from origin" || bad "(8) $out"
 out="$(AUTO_START_REPO=other/thing run key)"; [ "$out" = "other/thing" ] && ok "(9) AUTO_START_REPO overrides the key" || bad "(9) $out"
+g "$WORK/repo" config remote.origin.url "https://github.com/Acme/Widgets.git"
+out="$(run key)"; [ "$out" = "acme/widgets" ] && ok "(9b) another spelling of the same remote claims the same lower-cased key" || bad "(9b) $out"
+g "$WORK/repo" config remote.origin.url "git@github.com:acme/widgets.git"
 
 printf '{not json' > "$WORK/repo/.claude/ds-config.json"
 out="$(run check)"; code=$?
@@ -95,11 +98,16 @@ starter one & starter two & wait
 got="$(cat "$WORK/starter-one" "$WORK/starter-two" | sort | tr '\n' ' ')"
 [ "$got" = "LOST WON " ] && ok "(12) two starters at one trigger → exactly one wins the release-train claim" || bad "(12) $got"
 
-# (13) the winner releases NON-final at the cut; the next cycle's check starts again and can claim
-rmdir "$STORE/release-train:acme_widgets" 2>/dev/null
-g "$WORK/seed" commit -q --allow-empty -m "one-off C"
-g "$WORK/seed" push -q origin t:train/release
-starter three
-[ "$(cat "$WORK/starter-three")" = WON ] && ok "(13) after a non-final release at the cut the next cycle claims again" || bad "(13) $(cat "$WORK/starter-three")"
+# (13)-(14) why the claim is released NON-final at the cut: through story-claim.py decide, a
+# release-train claim released with outcome done answers every later claim with "already finished"
+# (skip: no release could ever start again), while a released non-final claim is won again.
+DECIDE="$ROOT/skills/build-item/scripts/story-claim.py"
+ask() { printf '{"mode":"select","item":"the release train","response":%s,"me":"bb","now":"2026-01-15T18:00:00Z","tz":"America/Chicago"}' "$1" | python3 "$DECIDE" decide; }
+final='{"won": false, "final": true, "claim": {"kind": "release-train", "key": "acme/widgets", "holderDigest": "aa", "machine": "m", "sessionName": "s", "releasedAt": "x", "outcome": "done"}}'
+again='{"won": true, "claim": {"kind": "release-train", "key": "acme/widgets", "holderDigest": "bb"}}'
+ask "$final" | grep -q '"action": "skip"' && ok "(13) a final release-train claim would block every later release (so it is never released final)" || bad "(13) $(ask "$final")"
+ask "$again" | grep -q '"action": "proceed"' && ok "(14) after a non-final release the next cycle wins the claim again" || bad "(14) $(ask "$again")"
+grep -q 'NON-final' "$ROOT/skills/release/references/auto-start.md" && ! grep -Eq 'release-train.*outcome `?done' "$ROOT/skills/release/references/auto-start.md" \
+  && ok "(15) the contract releases the train claim non-final, never done" || bad "(15) auto-start.md"
 
 exit "$FAIL"

@@ -5,18 +5,20 @@ The rules are in `skills/release/references/auto-start.md`. A trigger (a one-off
 release train, an epic release merging onto it, or a release finishing) runs this, and only a
 `START` goes on to claim the `release-train` claim; the claim, not this check, decides who wins.
 
-  check   START <owner>/<repo> (<n> commit(s) on <train> not on <source>)[; adopt #<pr>]   exit 0
+  check   START <owner>/<repo> (<n> commit(s) on <train> not on <source>)                   exit 0
           SKIP <reason>                                                                   exit 0
           ERROR <reason>                                                                  exit 1
   key     prints <owner>/<repo>, the claim key                                            exit 0 | 1
 
 `check` says START only when ALL hold: `release.autoStart.enabled` is true, a `claims` block is
-configured, `release.mergeTrainBeforeCut` is true with a `releaseTrain.branch`, and after a fetch
-`git log --no-merges origin/<releaseSource>..origin/<train>` is non-empty. An open release-train
-pull request (title `Release train:`, the release skill's own search) is named so the winner adopts
-it; a `gh` that cannot answer only drops that hint. No network beyond `git fetch` and that one `gh`.
+configured, `release.mergeTrainBeforeCut` is true with a train branch (`releaseTrain.branch`, or by
+its old name `supportTrain.branch`; both set is an ERROR), and after a fetch
+`git log --no-merges origin/<releaseSource>..origin/<train>` is non-empty. It never looks for an
+open train pull request: the winner's release step 0b runs that search itself, after the claim.
+No network beyond `git fetch`.
 
-Test seams: AUTO_START_REPO (owner/name, else parsed from `origin`), AUTO_START_NO_FETCH=1.
+The key is lower-cased (GitHub names are case-insensitive), so every spelling of one remote claims
+one key. Test seams: AUTO_START_REPO (owner/name, else parsed from `origin`), AUTO_START_NO_FETCH=1.
 """
 import json
 import os
@@ -59,29 +61,12 @@ def git(root, *args):
 def repo_key(root):
     forced = os.environ.get("AUTO_START_REPO")
     if forced:
-        return forced
+        return forced.lower()
     url = git(root, "config", "--get", "remote.origin.url").stdout.strip()   # raw: insteadOf never moves the key
     match = re.search(r"[:/]([^/:]+)/([^/]+?)(?:\.git)?/?$", url)
     if not match:
         out("ERROR cannot read <owner>/<repo> from the origin remote (%r)" % url, 1)
-    return "%s/%s" % (match.group(1), match.group(2))
-
-
-def open_train_pr(root):
-    try:
-        done = subprocess.run(["gh", "pr", "list", "--state", "open", "--search", 'in:title "Release train:"',
-                               "--json", "number,title", "--limit", "20"],
-                              cwd=root, capture_output=True, text=True, timeout=60)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    if done.returncode != 0:
-        return None
-    try:
-        rows = json.loads(done.stdout or "[]")
-    except ValueError:
-        return None
-    numbers = sorted(r["number"] for r in rows if isinstance(r, dict) and str(r.get("title", "")).startswith("Release train:"))
-    return numbers[0] if numbers else None
+    return ("%s/%s" % (match.group(1), match.group(2))).lower()
 
 
 def check():
@@ -91,7 +76,9 @@ def check():
         out("SKIP release.autoStart.enabled is not true")
     if not isinstance(config.get("claims"), dict):
         out("SKIP release.autoStart needs a claims block; without one it does nothing")
-    train = section(config, "releaseTrain").get("branch")
+    if isinstance(config.get("releaseTrain"), dict) and isinstance(config.get("supportTrain"), dict):
+        out("ERROR both releaseTrain and supportTrain are set; supportTrain is the old name of releaseTrain", 1)
+    train = (section(config, "releaseTrain") or section(config, "supportTrain")).get("branch")
     if release.get("mergeTrainBeforeCut") is not True or not isinstance(train, str) or not train:
         out("SKIP no release train (release.mergeTrainBeforeCut and releaseTrain.branch)")
     source = release.get("releaseSource") or config.get("baseBranch") or "develop"
@@ -107,9 +94,7 @@ def check():
     commits = [line for line in ahead.stdout.splitlines() if line.strip()]
     if not commits:
         out("SKIP the train holds nothing beyond %s" % source)
-    line = "START %s (%d commit(s) on %s not on %s)" % (repo_key(root), len(commits), train, source)
-    pr = open_train_pr(root)
-    out(line + ("; adopt #%d" % pr if pr else ""))
+    out("START %s (%d commit(s) on %s not on %s)" % (repo_key(root), len(commits), train, source))
 
 
 def main(argv):

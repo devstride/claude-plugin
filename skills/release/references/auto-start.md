@@ -15,7 +15,13 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart` and
   references) with this kind and key; decide with its `story-claim.py decide`, item `the release
   train`, mode `named` for a hand-started run and `select` for an auto start. Expiry:
   `claims.expiryMinutes["release-train"]`, else 30.
-- **Heartbeat** at each step transition and at most every 10 minutes while review and CI poll
+- **Never degrades.** `decide` answering `degrade` (the store unreachable, unsupported or
+  forbidden) does NOT mean "carry on without it" here: an auto start does nothing, saying so once;
+  a hand-started run falls back to the holder-marker rule of `clearance.md` for this run, as with no
+  `claims` block. No train pull request is opened, adopted or pushed to without a won claim or,
+  in that fallback, the marker check.
+- **Heartbeat** at each step transition and through EVERY wait until the release — review, CI, the
+  train's pre-ship suites, the clearance wait — at least every `min(10, expiry ÷ 3)` minutes
   (phase: the step). NOT HOLDER or LOST to a live holder → STOP: another session owns the train
   phase now.
 - **Release it NON-final** (never outcome `done` or `final`, so the next cycle can claim it) right
@@ -25,8 +31,12 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart` and
   on with its caller's loop, logging no failure.
 - **Won with an open train pull request present** (its previous holder lapsed): `release-branch.md`
   §1 step 2 ADOPTS it, never opens a second. The old session learns at its next heartbeat and stops.
-- **It replaces the holder marker.** With a `claims` block no `release-train-holder` marker is
-  written or read; the claim decides adoption. Without one, `clearance.md`'s marker rule stands.
+- **The holder marker stays, and the claim decides it.** The train pull request body still carries
+  `clearance.md`'s `release-train-holder` marker, written from this session's identity. On a won
+  claim a marker is adoptable when it is this session's, absent, or names the holder whose lapsed
+  claim this one took over (the marker's digest is a prefix of that claim's `holderDigest`). Any
+  other marker belongs to a session that never held the claim (one on an older plugin): STOP, name
+  it, adopt only on the owner's yes and their word that it stopped.
 
 ## Auto start — `release.autoStart.enabled`
 
@@ -40,8 +50,8 @@ Honoured only with a `claims` block (doctor: an ERROR; at run time it does nothi
 At a trigger run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/auto-start.py check`
 (it fetches the train and the release source). `SKIP <reason>` → carry on, saying nothing; `ERROR`
 → say it once and carry on. `START …` → claim the train (above, mode `select`): lost → carry on
-silently; won → invoke **`release`** in this session, declaring `started-by: auto` (`; adopt #<n>`
-names the open train pull request step 0b adopts). When that release stops — at the owner's yes,
+silently; won → invoke **`release`** in this session, declaring `started-by: auto`; its step 0b
+finds and adopts any open train pull request itself. When that release stops — at the owner's yes,
 or merged — return to the caller's own loop. Never resume, message or adopt another session's
 release; the fleet's hourly machine check never starts one. No batching wait: each release carries
 whatever landed during the previous cycle, and there is never a second concurrent release.
@@ -57,14 +67,17 @@ holding the tower as any release does.
 
 At step 4, after the pre-merge check and the recap, run
 `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/standing-yes.py --pr <n> --head <head>
---reviewed-tree <tree> --class "<classify-release line>" --checks green|red --unresolved <count>
+--reviewed-head <sha> --class "<classify-release line>" --checks green|red --unresolved <count>
 --pre-ship "<2b verdict line>" --previous-release <gate exit> [--dev-deploy <exit>] --tower
-"<provider status output>"`. `<tree>` is `git rev-parse <the train pull request's merged head>^{tree}`,
-recorded at 0b; `--dev-deploy` only when the dev-deploy wait applies. `MERGE` only when all of its
-nine conditions hold (the script's header lists them); anything else prints `ASK <reason>`.
+"<provider status output>"`. `--head` is the release pull request's head; `--reviewed-head` the train
+pull request's merged head, recorded at 0b; the script reads the pull request's live head and
+computes both trees itself. `--dev-deploy` only when the dev-deploy wait applies. `MERGE <sha>` only
+when all of its nine conditions hold (the script's header lists them); anything else prints
+`ASK <reason>`. Without `release.clearance` there is no `On final` line, so it always asks.
 
-- **`MERGE`** is the owner's yes for this pull request and this head: run step 4's "On the yes"
-  checks, merge, and 5a approves the deploy on the same yes. Post ONE comment on the pull request:
+- **`MERGE <sha>`** is the owner's yes for this pull request at exactly `<sha>`: run step 4's "On
+  the yes" checks, merge with `gh pr merge --match-head-commit <sha>`, and 5a approves the deploy on
+  the same yes. Post ONE comment on the pull request:
   "Merged on the standing yes for light releases identical to the reviewed train
   (release.lightRelease.standingYes, owner decision <the date the owner set it>)."
 - **`ASK` or `ERROR`** → the owner's in-the-moment yes, exactly as before. A FULL release, a tree
