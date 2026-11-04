@@ -412,6 +412,20 @@ headless runs. The recipe and the record it writes are in
 - **`build-item`'s loop over many stories is ONE job**, not a new one per story: the gate never
   blocks the loop as it walks a plan.
 
+## Active Agents
+
+Optional, and only `/devstride:setup agents` writes it, after a typed yes:
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/agents-mode.md`.
+
+| Key | Shape | Absent means |
+| --- | --- | --- |
+| `activeAgents` | `null`, or `{ "boardId": <id> \| null, "tagName"?: "agent active", "tagColor"?: "green", "staleMinutes"?: 20, "commands": { "start": "… <root> …", "end": "…" } }` | nothing on any board, no tag, no command: the plugin writes nothing to DevStride for this feature |
+
+- **The commands are the repository's** — its presence implementation (what "active" means, how a
+  session heartbeats and expires) is its own; the plugin only renders `<root>` (an item number,
+  nothing else) and runs them through the build loop:
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`.
+
 ## Local environment
 
 ```json

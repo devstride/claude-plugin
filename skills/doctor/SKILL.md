@@ -1,12 +1,12 @@
 ---
 name: doctor
-description: Diagnose delivery-loop prerequisites read-only — environment, plugin, DevStride, config, CI, merge gates and docs — then offer only approved safe repairs.
+description: Diagnose delivery-loop prerequisites read-only — environment, plugin, DevStride, config, CI, merge gates, docs and the Active Agents board — then offer only approved safe repairs.
 ---
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
 Diagnose whether this checkout can run the delivery loop; give exact repairs. Optional section:
-`env`, `plugin`, `devstride`, `config`, `ci`, `gates`, or `docs`: $ARGUMENTS
+`env`, `plugin`, `devstride`, `config`, `ci`, `gates`, `docs`, or `agents`: $ARGUMENTS
 With a repo root, run §4's status-line check on every invocation regardless of section; otherwise N/A.
 
 **Two-phase contract:**
@@ -310,6 +310,10 @@ release safety hooks …), each against its registry `contract`:
   provider per that file. Never call `claim_work` here.
 - **Say the release-notes default** — notes only on `--release-notes`; the loop never decides a
   release "deserves" one.
+
+## 8. Active Agents (`agents`)
+
+Read-only, by `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/agents.md`; no block → N/A.
 
 ## Closing — the report, then the offer
 

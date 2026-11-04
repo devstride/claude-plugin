@@ -145,6 +145,9 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   session appears active. Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`.
 - **Plan root**: `$ARGUMENTS`, else handoff memory; not ONE unambiguous root while several plans are
   open → STOP and ask.
+- **Active Agents** (`activeAgents` set, plan mode only): once the root resolves, place it on the
+  board and run `start`, once per run; every terminal exit (step 0's, step 7's, a STOP) runs `end`
+  first — `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`. Fails open.
 - A given story number IS the story; merged or Done → never step 1 (`next-unblocked.md`).
   Otherwise apply `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full
   (projection warning too). **Never auto-select from the deferred container.** Surface the
