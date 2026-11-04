@@ -6,11 +6,20 @@ restart, so after an update the two disagree and nothing in the session says so.
 own hooks receive `CLAUDE_PLUGIN_ROOT` (the loaded copy), and the status-line payload carries no
 plugin data, so the loaded copy writes down what it is:
 
-  record   (SessionStart, every source, and every UserPromptSubmit) reads the hook payload on stdin
-           and writes ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/sessions/<session_id>.json =
-           {schema: 1, running, root, transcript, at}. Rewritten on every prompt, so the first
-           prompt after a reload records what was actually loaded. Records older than 7 days are
+  record   (SessionStart, every source) reads the hook payload on stdin and writes
+           ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/sessions/<session_id>.json =
+           {schema: 1, running, root, transcript, at[, nudged]}. Records older than 7 days are
            pruned at session start.
+  prompt   (every UserPromptSubmit) rewrites the same record, so the first prompt after a reload
+           records what was actually loaded; refreshes the newest-release cache IN THE BACKGROUND
+           when it is older than 30 minutes (so a release published mid-session reaches the status
+           line and this prompt check without a restart); then, when this session runs an older
+           plugin than it could, prints ONE context line asking Claude to tell or ask the person:
+           once per session per target version (`nudged`), never on a loop or scheduled prompt,
+           never for a repository that pins or switches the check off. It changes nothing itself:
+           an update stays the person's own `/devstride:update`, a reload their `/reload-plugins`.
+  refresh-newest  the background half of `prompt`: one bounded `update-plugin.py latest` and an
+           atomic write of newest.json in the session-start check's own format.
   check --session <id> [--repo <dir>]
            prints one JSON line {running, installed, newest, verdict}: `reload` when the session
            runs an older version than the install that applies to this repository, `update` when it
@@ -28,6 +37,7 @@ import os
 import re
 import secrets
 import stat
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -39,6 +49,11 @@ SOURCE = "https://github.com/devstride/claude-plugin"
 NEWEST_TTL = 21600            # the session-start check's six hours
 KEEP = 7 * 24 * 3600          # session records older than this are pruned
 TAIL = 131072                 # the transcript tail read for a reload
+REFRESH_AFTER = 1800          # a prompt refreshes a newest-release cache older than this
+REFRESH_LOCK = 300            # one background refresh at a time; a dead one's lock lapses
+FETCH_TIMEOUT = 30            # the background fetch's own bound
+NUDGED = re.compile(r"^(reload|update):[0-9]+\.[0-9]+\.[0-9]+$")
+LOOP_PROMPT = re.compile(r"^\s*(/loop\b|/devstride:update\b|/reload-plugins\b|<<autonomous-loop)")
 
 
 def cache_dir():
@@ -105,25 +120,44 @@ def prune(directory, now):
             pass
 
 
-def record():
+def read_payload():
     try:
         payload = json.loads(sys.stdin.read(65536) or "{}")
-        sid = payload.get("session_id") or ""
-        root = os.environ.get("CLAUDE_PLUGIN_ROOT") or ""
-        if not isinstance(sid, str) or not SESSION_ID.match(sid) or not root:
-            return
-        running = running_version(root)
-        if not running:
-            return
-        transcript = payload.get("transcript_path")
-        directory = private_dir(os.path.join(private_dir(cache_dir()), "sessions"))
-        now = time.time()
-        write_atomic(directory, sid + ".json", {
-            "schema": 1, "running": running, "root": os.path.realpath(root),
-            "transcript": transcript if isinstance(transcript, str) else None, "at": round(now, 3),
-        })
-        if payload.get("hook_event_name") == "SessionStart":
-            prune(directory, now)
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+
+
+def write_record(payload):
+    """Write this session's record from the loaded copy; (directory, session id, entry) or None.
+    A `nudged` marker already in the record is carried over, so a prompt never asks twice."""
+    sid = payload.get("session_id") or ""
+    root = os.environ.get("CLAUDE_PLUGIN_ROOT") or ""
+    if not isinstance(sid, str) or not SESSION_ID.match(sid) or not root:
+        return None
+    running = running_version(root)
+    if not running:
+        return None
+    transcript = payload.get("transcript_path")
+    directory = private_dir(os.path.join(private_dir(cache_dir()), "sessions"))
+    entry = {
+        "schema": 1, "running": running, "root": os.path.realpath(root),
+        "transcript": transcript if isinstance(transcript, str) else None, "at": round(time.time(), 3),
+    }
+    previous = read_json(os.path.join(directory, sid + ".json"), limit=16384)
+    nudged = previous.get("nudged") if isinstance(previous, dict) else None
+    if isinstance(nudged, str) and NUDGED.match(nudged):
+        entry["nudged"] = nudged
+    write_atomic(directory, sid + ".json", entry)
+    return directory, sid, entry
+
+
+def record():
+    try:
+        payload = read_payload()
+        written = write_record(payload)
+        if written and payload.get("hook_event_name") == "SessionStart":
+            prune(written[0], time.time())
     except Exception:
         pass
 
@@ -259,9 +293,119 @@ def check(session, repo=None):
     return result
 
 
+def check_enabled():
+    return os.environ.get("DEVSTRIDE_PLUGIN_UPDATE_CHECK", "1") != "0"
+
+
+def refresh_due(now):
+    value = read_json(os.path.join(cache_dir(), "newest.json"), limit=4096)
+    fetched = value.get("fetchedAt") if isinstance(value, dict) and value.get("source") == SOURCE else None
+    return not (type(fetched) is int and 0 <= now - fetched < REFRESH_AFTER)
+
+
+def take_refresh_lock(now):
+    """One background refresh at a time across every session on this machine; a lock older than
+    REFRESH_LOCK (a refresh that died) is taken over."""
+    lock = os.path.join(private_dir(cache_dir()), "newest.refresh")
+    try:
+        info = os.lstat(lock)
+        if stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and -60 < now - info.st_mtime < REFRESH_LOCK:
+            return False
+        os.unlink(lock)
+    except FileNotFoundError:
+        pass
+    try:
+        os.close(os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
+        return True
+    except OSError:
+        return False
+
+
+def spawn_refresh():
+    """Start `refresh-newest` detached: the prompt never waits on the network."""
+    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    subprocess.Popen([sys.executable, os.path.realpath(__file__), "refresh-newest"],
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     close_fds=True, start_new_session=True, env=env)
+
+
+def refresh_newest():
+    """Fetch the newest published release once and store it as the session-start check does."""
+    lock = os.path.join(cache_dir(), "newest.refresh")
+    try:
+        helper = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                              "skills/update/scripts/update-plugin.py")
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+        done = subprocess.run([sys.executable, helper, "latest"], stdin=subprocess.DEVNULL, capture_output=True,
+                              text=True, timeout=FETCH_TIMEOUT, env=env)
+        newest = done.stdout.strip()
+        if done.returncode == 0 and SEMVER.match(newest):
+            write_atomic(private_dir(cache_dir()), "newest.json",
+                         {"schema": 2, "source": SOURCE, "newest": newest, "fetchedAt": int(time.time())})
+    except Exception:
+        pass
+    finally:
+        try:
+            os.unlink(lock)
+        except OSError:
+            pass
+
+
+def nudge_text(result):
+    """(kind, target version, the one context line) for a session behind what it could run."""
+    verdict, running = result.get("verdict"), result.get("running")
+    if verdict == "reload":
+        target = result.get("installed")
+        return "reload", target, ("devstride plugin: this session is still running %s, and %s is installed on this machine. "
+                        "Tell the user so in one short line at the start of your reply: they load it by typing "
+                        "/reload-plugins themselves (you cannot run it). Then carry on with their request." % (running, target))
+    if verdict == "update" and check_enabled():
+        target = result.get("newest")
+        return "update", target, ("devstride plugin: this session runs %s and %s is published. Ask the user once whether to "
+                        "update now: on yes, run /devstride:update and follow its handoff (they then type "
+                        "/reload-plugins); on no, carry on. If you are part-way through a multi-step task, finish "
+                        "the step you are on and ask before the next one. If no person is at the keyboard (a scheduled "
+                        "or unattended run), do not ask: carry on and mention it in your final report." % (running, target))
+    return None, None, None
+
+
+def prompt():
+    try:
+        payload = read_payload()
+        written = write_record(payload)
+        if not written:
+            return
+        directory, sid, entry = written
+        cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else os.getcwd()
+        top = git_common_dir(cwd)[0]
+        now = int(time.time())
+        if check_enabled() and updates_wanted(top) and refresh_due(now) and take_refresh_lock(time.time()):
+            spawn_refresh()
+        text = payload.get("prompt")
+        if isinstance(text, str) and LOOP_PROMPT.match(text):
+            return
+        kind, target, line = nudge_text(check(sid, cwd))
+        if not line or not isinstance(target, str) or not SEMVER.match(target):
+            return
+        marker = "%s:%s" % (kind, target)
+        if entry.get("nudged") == marker:
+            return
+        entry["nudged"] = marker
+        write_atomic(directory, sid + ".json", entry)
+        print(line)
+    except Exception:
+        pass
+
+
 def main(argv):
     if argv[:1] == ["record"]:
         record()
+        return 0
+    if argv[:1] == ["prompt"]:
+        prompt()
+        return 0
+    if argv[:1] == ["refresh-newest"]:
+        refresh_newest()
         return 0
     if argv[:1] == ["check"]:
         options = dict(zip(argv[1::2], argv[2::2]))

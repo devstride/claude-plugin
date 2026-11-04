@@ -8,6 +8,30 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **The status line is two lines, labelled with symbols.** Line 1 says where you are
+  (`◆` model, `↯` effort, `▣` repository, `⑂` checkout, `⎇` branch); line 2 what is in flight
+  (`⊞` plugin, `▲` stage, `⇄` pull request, `⚑` release), printed only when it has something on
+  it. Segment keys in `statusLine.hiddenSegments` are unchanged. The plugin segment now always
+  shows the version this session runs, dim while current. The managed status line moves to v3.26.0
+  and replaces marked copies at the next session start as before.
+- **The status line redraws every 30 seconds.** Setup and the doctor repair write
+  `"refreshInterval": 30` in the `statusLine` setting (an existing setting gets only that key);
+  doctor reports a shared setting without it.
+
+### Added
+
+- **A running session hears about a newer plugin.** Every prompt now refreshes the
+  newest-release cache in the background when it is older than 30 minutes (one bounded fetch at a
+  time per machine), so a release published mid-session reaches the status line without a restart.
+  When the session runs an older plugin than it could, the prompt hook adds one line asking Claude
+  to tell you (a newer copy is installed: you type `/reload-plugins`) or to ask you (a newer
+  release is published: on yes it runs `/devstride:update`). Once per session per version; never on
+  a `/loop` or autonomous wakeup, never in a repository that pins the plugin or turns the check
+  off, never with `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`. It changes nothing on its own: automatic
+  updates still happen only at session start.
+
 ## [3.25.0] — 2026-11-04
 
 ### Added

@@ -176,11 +176,11 @@ next action. For each failure symptom, read
   works, a user fallback is INFO.
 
   Require the canonical shared pair regular, unignored, committed in `HEAD`, clean in index/tree,
-  and rendering non-empty output from `bash .claude/statusline.sh`. No shared/personal setting is
-  N/A; one shared half FAILs. Phase 2 repairs shared first, then asks separately per personal key.
-  After removal restart, rerun `doctor config`, inspect `/status`, and report rendered segments.
-  Only structural `stage` absence becomes a question; never ask about transient model, effort,
-  branch, or PR blanks. Details:
+  rendering non-empty output from `bash .claude/statusline.sh`, with `refreshInterval` (else
+  WARN). No shared/personal setting is N/A; one shared half FAILs. Phase 2 repairs shared first,
+  then asks separately per personal key. After removal restart, rerun `doctor config`, inspect
+  `/status`, report rendered segments. Only structural `stage` absence becomes a question; never
+  ask about transient blanks. Details:
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
   **array**, so iterate it — `review.localCommand`, `review.localAssistCommand`,

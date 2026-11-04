@@ -1,16 +1,27 @@
 #!/bin/bash
-# ds-statusline: managed v3.21.0 — installed and kept up to date by the devstride
+# ds-statusline: managed v3.26.0 — installed and kept up to date by the devstride
 # plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
 # replaces a file that still carries it, and never touches one that does not.
 #
 # Claude Code status line for a repository running the DevStride delivery loop.
 #
-#   Model: Opus 5 · Effort: high · Repo: acme · Checkout: ⑂ i123-widget ·
-#   Branch: phil/08-28-26/widget · Stage: phil-mac · PR: #412 draft · Release: release/26-10-17 · alice · ci
+# Two lines, each segment led by a one-character symbol instead of a word:
 #
-# and, only while this session runs an older devstride plugin than it could,
-#   Plugin: 3.15.0 → 3.16.0 · /reload-plugins      (red: the newer copy is installed, not loaded)
-#   Plugin: 3.16.0 (3.16.1 out · /devstride:update) (yellow: a newer release is published)
+#   ◆ Opus 5 · ↯ high · ▣ acme · ⑂ i123-widget · ⎇ phil/26-08-28/widget
+#   ⊞ 3.16.0 · ▲ phil-mac · ⇄ #412 draft · ⚑ release/26-10-17 · alice · ci
+#
+#   ◆ model   ↯ effort   ▣ repository   ⑂ checkout (a worktree's name, or main)   ⎇ branch
+#   ⊞ devstride plugin this session runs   ▲ stage   ⇄ pull request   ⚑ release in flight
+#
+# The plugin segment is dim while current, and loud while this session runs an older plugin than
+# it could:
+#   ⊞ 3.15.0 → 3.16.0 · /reload-plugins        (red: the newer copy is installed, not loaded)
+#   ⊞ 3.16.0 (3.16.1 out · /devstride:update)  (yellow: a newer release is published)
+# The second line is printed only when one of its segments has a value.
+#
+# `statusLine.refreshInterval` (30 seconds, as setup writes it) redraws the bar on a timer as well
+# as on Claude Code's own events, so an update installed or published mid-session shows within
+# half a minute.
 #
 # `setup` copies this into the consuming repository as `.claude/statusline.sh`
 # and points `statusLine.command` at it. It is deliberately repo-AGNOSTIC: every
@@ -20,7 +31,7 @@
 #
 # NO VALUE MEANS NO SEGMENT. Every segment is emitted through `seg`, which drops
 # it when its guard is empty, so a fact this repository does not have never
-# renders as a label with nothing after it ("Checkout:    "). A dangling label is
+# renders as a symbol with nothing after it ("⑂    "). A dangling label is
 # worse than a missing one: it reads as a value that failed to load, and sends
 # people looking for a break that is not there. `statusLine.hiddenSegments` in
 # ds-config.json suppresses a segment that DOES resolve but is not wanted.
@@ -98,7 +109,7 @@ roots = installed_roots()
 # The plugin THIS session runs, against the install that applies here and the newest release:
 # hooks/session-runtime.py (whose hooks, run by the loaded copy, record what was loaded; its check owns the
 # rule) is imported in-process, so the verdict costs no second python start. "reload|A|B" or
-# "update|A|B"; nothing for current, unknown, no session id or no helper.
+# "update|A|B"; "current|A|" whenever the running version is known; nothing otherwise.
 plugin_state = ""
 if d.get("session_id"):
     for root in roots:
@@ -119,6 +130,8 @@ if d.get("session_id"):
                 plugin_state = "reload|%s|%s" % (verdict["running"], verdict["installed"])
             elif verdict.get("verdict") == "update":
                 plugin_state = "update|%s|%s" % (verdict["running"], verdict["newest"])
+            elif verdict.get("running"):
+                plugin_state = "current|%s|" % verdict["running"]
         except Exception:
             plugin_state = ""
         break
@@ -155,7 +168,7 @@ emit("SL_CLEARANCE_CMD", clearance_cmd)
 # NOTHING USES ANSI BRIGHT BLACK (90). It is the one palette slot themes are
 # free to set AT the background - it is where most of them put comment text -
 # so a value rendered in it can come out invisible while its DIM label still
-# renders. That failure is worse than a wrong colour: "Checkout:" with nothing
+# renders. That failure is worse than a wrong colour: "⑂" with nothing
 # after it reads as a lookup that broke, which is exactly the dangling label
 # this file's header promises never to emit, and it is invisible to the person
 # who chose the theme's author rather than the theme.
@@ -173,20 +186,27 @@ MAGENTA=$'\033[35m'; RED=$'\033[31m'; BLUE=$'\033[34m'
 OSC8=$'\033]8;;'; OSC8_END=$'\033\\'
 
 # --- segment assembly ------------------------------------------------------
-# seg <key> <label> <guard> <body>
-#   Appends "Label: body" only when <guard> is non-empty and <key> is not
-#   suppressed. <guard> is the RAW value and <body> the rendered one, because a
-#   rendered body is never empty - it always carries colour escapes - so testing
-#   it would defeat the whole check.
-out=""
+# seg <line> <key> <symbol> <guard> <body>
+#   Appends "symbol body" to line 1 or 2 only when <guard> is non-empty and
+#   <key> is not suppressed. <guard> is the RAW value and <body> the rendered
+#   one, because a rendered body is never empty - it always carries colour
+#   escapes - so testing it would defeat the whole check. <key> stays the
+#   segment's name in `statusLine.hiddenSegments`.
+out=""; out2=""
 seg() {
-  [ -n "$3" ] || return 0
-  case " $SL_HIDDEN " in *" $1 "*) return 0 ;; esac
-  [ -n "$out" ] && out="$out ${DIM}·${RESET} "
-  out="$out${DIM}${2}:${RESET} ${4}"
+  [ -n "$4" ] || return 0
+  case " $SL_HIDDEN " in *" $2 "*) return 0 ;; esac
+  local piece="${DIM}${3}${RESET} ${5}"
+  if [ "$1" = 2 ]; then
+    [ -n "$out2" ] && out2="$out2 ${DIM}·${RESET} "; out2="$out2$piece"
+  else
+    [ -n "$out" ] && out="$out ${DIM}·${RESET} "; out="$out$piece"
+  fi
 }
+# Line 2 only when it has something on it: a bare newline would be an empty row.
+finish() { printf '%s' "$out"; [ -n "$out2" ] && printf '\n%s' "$out2"; exit 0; }
 
-seg model "Model" "$SL_MODEL" "${BLUE}${SL_MODEL}${RESET}"
+seg 1 model "◆" "$SL_MODEL" "${BLUE}${SL_MODEL}${RESET}"
 
 # --- effort ----------------------------------------------------------------
 # The status-line payload carries no effort field, and the persisted
@@ -212,26 +232,27 @@ if [ -n "$effort" ]; then
     medium)    ec=$YELLOW ;;
     *)         ec=$DIM ;;
   esac
-  seg effort "Effort" "$effort" "${ec}${effort}${RESET}"
+  seg 1 effort "↯" "$effort" "${ec}${effort}${RESET}"
 fi
 
-# --- plugin: this session runs an older devstride plugin than it could ------
-# Red when a newer copy is INSTALLED but this session has not loaded it (/reload-plugins fixes it);
-# yellow when this session runs the installed copy and a newer release is published. Silent
-# otherwise, and silent whenever the running version cannot be read.
+# --- plugin: the devstride plugin this session runs -------------------------
+# Dim while current. Red when a newer copy is INSTALLED but this session has not loaded it
+# (/reload-plugins fixes it); yellow when this session runs the installed copy and a newer release
+# is published. Silent whenever the running version cannot be read.
 if [ -n "$SL_PLUGIN" ]; then
   IFS='|' read -r pverdict pfrom pto <<<"$SL_PLUGIN"
   case "$pverdict" in
-    reload) seg plugin "Plugin" "$pfrom" "${RED}${pfrom} → ${pto} · /reload-plugins${RESET}" ;;
-    update) seg plugin "Plugin" "$pfrom" "${YELLOW}${pfrom} (${pto} out · /devstride:update)${RESET}" ;;
+    reload)  seg 2 plugin "⊞" "$pfrom" "${RED}${pfrom} → ${pto} · /reload-plugins${RESET}" ;;
+    update)  seg 2 plugin "⊞" "$pfrom" "${YELLOW}${pfrom} (${pto} out · /devstride:update)${RESET}" ;;
+    current) seg 2 plugin "⊞" "$pfrom" "${DIM}${pfrom}${RESET}" ;;
   esac
 fi
 
 toplevel=$(git rev-parse --show-toplevel 2>/dev/null)
 if [ -z "$toplevel" ]; then
   [ -n "$out" ] && out="$out ${DIM}·${RESET} "
-  printf '%s' "${out}${DIM}—not a git repo—${RESET}"
-  exit 0
+  out="${out}${DIM}—not a git repo—${RESET}"
+  finish
 fi
 
 # --- checkout: main or a linked worktree -----------------------------------
@@ -244,7 +265,7 @@ gitdir=$(git rev-parse --absolute-git-dir 2>/dev/null)
 worktree=""
 if [ "${gitdir}" != "${gitdir%/.git/worktrees/*}" ]; then
   worktree=$(basename "$toplevel")
-  # Name the REPO in the Repo segment, not the worktree directory:
+  # Name the REPO in the repo segment, not the worktree directory:
   # --show-toplevel points at the worktree, so basename would render the repo
   # as "i123-widget". That is actively misleading when the whole point of the
   # indicator is to say where you are.
@@ -253,26 +274,26 @@ else
   repo=$(basename "$toplevel")
 fi
 
-seg repo "Repo" "$repo" "${CYAN}${repo}${RESET}"
+seg 1 repo "▣" "$repo" "${CYAN}${repo}${RESET}"
 
-# ⑂ and yellow mark a linked worktree, because "you are not in the main
-# checkout" is exactly what you want to notice before you commit. The main
-# checkout stays dim so the loud colour keeps meaning the unusual case.
+# Yellow marks a linked worktree, because "you are not in the main checkout" is
+# exactly what you want to notice before you commit. The main checkout stays
+# dim so the loud colour keeps meaning the unusual case.
 if [ -n "$worktree" ]; then
-  seg checkout "Checkout" "$worktree" "${YELLOW}⑂ ${worktree}${RESET}"
+  seg 1 checkout "⑂" "$worktree" "${YELLOW}${worktree}${RESET}"
 else
-  seg checkout "Checkout" "main" "${DIM}main${RESET}"
+  seg 1 checkout "⑂" "main" "${DIM}main${RESET}"
 fi
 
 # A detached HEAD with no commit yet resolves to no sha at all; rendering
-# "Branch: (detached)" with nothing in front of it is the dangling label this
+# "⎇ (detached)" with nothing in front of it is the dangling label this
 # file exists to avoid, so the fallback only applies when there IS a sha.
 branch=$(git branch --show-current 2>/dev/null)
 if [ -z "$branch" ]; then
   sha=$(git rev-parse --short HEAD 2>/dev/null)
   [ -n "$sha" ] && branch="$sha (detached)"
 fi
-seg branch "Branch" "$branch" "${GREEN}${branch}${RESET}"
+seg 1 branch "⎇" "$branch" "${GREEN}${branch}${RESET}"
 
 # --- stage -----------------------------------------------------------------
 # Only repositories that deploy per-environment infrastructure have a stage, so
@@ -304,7 +325,7 @@ if [ -n "$stage" ]; then
   for p in $SL_PROD_STAGES; do
     [ "$stage" = "$p" ] && sc=$RED && break
   done
-  seg stage "Stage" "$stage" "${sc}${stage}${RESET}"
+  seg 2 stage "▲" "$stage" "${sc}${stage}${RESET}"
 fi
 
 # --- PR (cached, refreshed in the background) ------------------------------
@@ -349,10 +370,10 @@ if [ -n "$pr" ]; then
     link="$num"
   fi
   # A truncated cache line can yield a number with no state; guard on the number
-  # and render only the parts that resolved, rather than "PR: #412 ".
+  # and render only the parts that resolved, rather than "⇄ #412 ".
   body="${c}${link}${RESET}"
   [ -n "$state" ] && body="${c}${link} ${state}${RESET}"
-  seg pr "PR" "$num" "$body"
+  seg 2 pr "⇄" "$num" "$body"
 fi
 
 # --- release clearance (cached, refreshed in the background) ----------------
@@ -385,8 +406,8 @@ if [ -n "$SL_CLEARANCE_CMD" ]; then
     # A stale clearance (its session may be gone) or a stuck one (alive, not moving) is the
     # one worth noticing.
     case "$rel" in *STALE*|*STUCK*) rc=$RED ;; *) rc=$MAGENTA ;; esac
-    seg release "Release" "$rel" "${rc}${rel}${RESET}"
+    seg 2 release "⚑" "$rel" "${rc}${rel}${RESET}"
   fi
 fi
 
-printf '%s' "$out"
+finish

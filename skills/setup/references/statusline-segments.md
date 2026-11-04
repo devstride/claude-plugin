@@ -3,10 +3,15 @@ load: contract
 ---
 # Status-line segments: what each one needs, and what to do when it is blank
 
-The status line renders `Model · Effort · Plugin · Repo · Checkout · Branch · Stage · PR · Release`. **A segment with
-no value is not rendered at all** — `seg` in `statusline.sh` drops it, separator and label
-together. A label printed with nothing after it ("`Checkout:    `") reads as a value that failed to
-load and sends people hunting for a break that is not there, so it never happens.
+The status line renders two lines, each segment led by its symbol:
+
+```
+◆ Opus 5 · ↯ high · ▣ acme · ⑂ i123-widget · ⎇ phil/26-11-04/widget
+⊞ 3.26.0 · ▲ phil-mac · ⇄ #412 draft · ⚑ release/26-11-04 · alice · ci
+```
+
+Line 2 prints only when it has a value; `"refreshInterval": 30` redraws every 30 seconds.
+**A segment with no value is not rendered**: a bare symbol reads as a failed load.
 
 That leaves one real question, and it is the one `setup` and `doctor` ask: **is this segment blank
 because the repository genuinely has no such fact, or because something that should be configured
@@ -14,17 +19,17 @@ is not?**
 
 ## The segments
 
-| Key | Label | Where the value comes from | Blank means |
+| Key | Symbol | Where the value comes from | Blank means |
 | --- | --- | --- | --- |
-| `model` | Model | `model.display_name` in the status-line payload | The payload did not carry it — **transient** |
-| `effort` | Effort | the last `"effort"` in the session transcript's tail | No assistant record yet — **transient**, fills in on the first reply |
-| `plugin` | Plugin | `hooks/session-runtime.py check`: red `3.15.0 → 3.16.0 · /reload-plugins` (newer copy installed than loaded), yellow `3.16.0 (3.16.1 out · /devstride:update)` | This session runs the newest copy it could, or its running version cannot be read — **never a finding** |
-| `repo` | Repo | basename of `git rev-parse --show-toplevel` | Not a git repository — already an §1 finding |
-| `checkout` | Checkout | linked worktree name, else the word `main` | Not a git repository — already an §1 finding |
-| `branch` | Branch | `git branch --show-current`, else `<sha> (detached)` | A repository with no commit yet — **transient** |
-| `stage` | Stage | stdout of `stage.resolve`, cached ~10s | **Structural** — no `stage` block, or a `resolve` that prints nothing |
-| `pr` | PR | `gh pr view` for the current branch, cached ~45s | This branch has no pull request (**transient**), or `gh` is missing/unauthenticated (an §1 finding) |
-| `release` | Release | the clearance provider's `status --short` (`release.clearance`), cached ~45s: `release/26-10-17 · alice · ci`, `· STALE` past the stale threshold, `· STUCK` past the phase budget (both red); with nothing held, `close-out owed · <release> · <items>` while this machine owes close-out work | No release holds clearance (**transient**), `release.clearance` is null (by design, never asked), or no provider could be found (`doctor` config reports a `provider: github` with no installed plugin) |
+| `model` | ◆ | `model.display_name` in the status-line payload | The payload did not carry it — **transient** |
+| `effort` | ↯ | the last `"effort"` in the session transcript's tail | No assistant record yet — **transient**, fills in on the first reply |
+| `plugin` | ⊞ | `hooks/session-runtime.py check`: the running version, dim; red `3.15.0 → 3.16.0 · /reload-plugins` (newer copy installed), yellow `3.16.0 (3.16.1 out · /devstride:update)` (newer published) | No record yet — **never a finding** |
+| `repo` | ▣ | basename of `git rev-parse --show-toplevel` | Not a git repository — already an §1 finding |
+| `checkout` | ⑂ | linked worktree name, else the word `main` | Not a git repository — already an §1 finding |
+| `branch` | ⎇ | `git branch --show-current`, else `<sha> (detached)` | A repository with no commit yet — **transient** |
+| `stage` | ▲ | stdout of `stage.resolve`, cached ~10s | **Structural** — no `stage` block, or a `resolve` that prints nothing |
+| `pr` | ⇄ | `gh pr view` for the current branch, cached ~45s | This branch has no pull request (**transient**), or `gh` is missing/unauthenticated (an §1 finding) |
+| `release` | ⚑ | the clearance provider's `status --short` (`release.clearance`), cached ~45s: `release/26-10-17 · alice · ci`, `· STALE` past the stale threshold, `· STUCK` past the phase budget (both red); with nothing held, `close-out owed · <release> · <items>` while this machine owes close-out work | No release holds clearance (**transient**), `release.clearance` is null (by design, never asked), or no provider could be found (`doctor` config reports a `provider: github` with no installed plugin) |
 
 ## Which blanks are worth asking about
 
@@ -37,7 +42,7 @@ into an interrogation, and trains people to skip the answers that matter. Concre
 - **Never ask about `pr` merely because the current branch has no pull request.** That is the
   normal state of a branch and it is right for the segment to be absent. It is worth raising only
   when §1 found `gh` missing or unauthenticated — and then the fix is `gh`, not the status line.
-- **Never ask about `plugin`**: blank is the goal.
+- **Never ask about `plugin`**: it fills itself in at the first prompt, and its colour is the finding.
 - **Never ask about `release`.** Clear is the normal state of a repository, and a null
   `release.clearance` is a decision already recorded in the config; the segment exists to show a
   release in flight, nothing more.

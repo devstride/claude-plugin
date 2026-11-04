@@ -77,12 +77,12 @@ if [ $KEPT = 1 ] && [ ! -e "$SESSIONS/old.json" ] && [ -e "$SESSIONS/fresh.json"
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'
 import json, sys
 hooks = json.load(open(sys.argv[1]))["hooks"]
-def runtime(groups, matcherless):
+def runtime(groups, matcherless, mode):
     return [h for g in groups if (not matcherless or "matcher" not in g) for h in g["hooks"]
-            if "hooks/session-runtime.py\" record" in h["command"] and h.get("timeout") == 5]
-assert runtime(hooks["SessionStart"], True) and runtime(hooks["UserPromptSubmit"], False)
+            if ('hooks/session-runtime.py" %s;' % mode) in h["command"] and h.get("timeout") == 5]
+assert runtime(hooks["SessionStart"], True, "record") and runtime(hooks["UserPromptSubmit"], False, "prompt")
 PY
-then ok "(5) hooks.json records on every SessionStart (no matcher) and every UserPromptSubmit, 5 s timeout"; else bad "(5) hooks.json registration"; fi
+then ok "(5) hooks.json records on every SessionStart (no matcher) and runs the prompt mode on every UserPromptSubmit, 5 s timeout"; else bad "(5) hooks.json registration"; fi
 
 # --- check ---------------------------------------------------------------------------------
 registry "\"devstride@devstride\":[$(project_row "$R" 3.16.0)]"
@@ -138,5 +138,67 @@ if [ -x /usr/bin/python3 ]; then
   V="$(/usr/bin/python3 "$HELPER" check --session r1 --repo "$R" | python3 -c 'import json,sys; print(json.load(sys.stdin)["verdict"])')"
   [ "$V" = reload ] && ok "(11) /usr/bin/python3 gives the same verdict" || bad "(11) $V"
 fi
+
+# --- prompt: the once-per-version ask, and the background refresh ---------------------------
+# prompt ROOT SESSION REPO [PROMPT] — run the UserPromptSubmit hook as Claude Code does
+prompt() {
+  printf '{"session_id":"%s","cwd":"%s","prompt":"%s","hook_event_name":"UserPromptSubmit"}' "$2" "$3" "${4:-hello}" \
+    | CLAUDE_PLUGIN_ROOT="$1" DEVSTRIDE_PLUGIN_UPDATE_CHECK="${UC:-1}" python3 "${RUNTIME:-$HELPER}" prompt 2>&1
+}
+: > "$T"; registry "\"devstride@devstride\":[$(project_row "$R" 3.16.0),$(project_row "$P" 3.16.0),$(project_row "$OFF" 3.16.0)]"
+newest 3.16.0 0   # fresh: no background fetch from these cases
+# (12) running older than installed → ONE reload line, then silence for the same version; the
+#      marker survives the record rewrite every prompt does
+N1="$(prompt "$P15" n1 "$R")"; N2="$(prompt "$P15" n1 "$R")"
+if printf '%s' "$N1" | grep -q 'still running 3.15.0, and 3.16.0 is installed' && printf '%s' "$N1" | grep -q '/reload-plugins' \
+   && [ -z "$N2" ] && grep -q '"nudged":"reload:3.16.0"' "$SESSIONS/n1.json"; then
+  ok "(12) reload: one context line naming /reload-plugins, then silent for that version (nudged kept)"; else bad "(12) [$N1] [$N2]"; fi
+
+# (13) a loop or scheduled prompt, and /devstride:update itself, never get the line
+L1="$(prompt "$P15" n2 "$R" '/loop /devstride:build-item')"; L2="$(prompt "$P15" n2 "$R" '<<autonomous-loop-dynamic>>')"
+L3="$(prompt "$P15" n2 "$R" '/devstride:update')"; L4="$(prompt "$P15" n2 "$R")"
+if [ -z "$L1$L2$L3" ] && printf '%s' "$L4" | grep -q '3.16.0 is installed'; then
+  ok "(13) /loop, an autonomous-loop wakeup and /devstride:update → no line; the next ordinary prompt gets it"; else bad "(13) [$L1|$L2|$L3|$L4]"; fi
+
+# (14) running the installed copy with a newer release → ONE ask to update; never for a pinned or
+#      opted-out repository, nor with DEVSTRIDE_PLUGIN_UPDATE_CHECK=0; a newer target asks again
+newest 3.16.1 0
+U1="$(prompt "$P16" n3 "$R")"; U2="$(prompt "$P16" n3 "$R")"
+U3="$(prompt "$P16" n4 "$P")$(prompt "$P16" n5 "$OFF")$(UC=0 prompt "$P16" n6 "$R")"
+newest 3.16.2 0; U4="$(prompt "$P16" n3 "$R")"
+if printf '%s' "$U1" | grep -q 'runs 3.16.0 and 3.16.1 is published' && printf '%s' "$U1" | grep -q '/devstride:update' \
+   && printf '%s' "$U1" | grep -q 'do not ask' && [ -z "$U2" ] && [ -z "$U3" ] && printf '%s' "$U4" | grep -q '3.16.2 is published'; then
+  ok "(14) update: asked once per published version; pinned, opted-out and check-off repos are never asked"; else bad "(14) [$U1] [$U2] [$U3] [$U4]"; fi
+
+# (15) current → silent; no record (no plugin root) → silent, exit 0
+newest 3.16.0 0
+C1="$(prompt "$P16" n7 "$R")"; C2="$(printf '{"session_id":"n8"}' | python3 "$HELPER" prompt 2>&1)"; RC=$?
+if [ -z "$C1$C2" ] && [ $RC -eq 0 ]; then ok "(15) current, or nothing to record → silent, exit 0"; else bad "(15) [$C1|$C2] rc=$RC"; fi
+
+# (16) the background refresh: a stale cache starts ONE detached fetch that writes newest.json in
+#      the session-start check's format and drops its lock; a held lock, a pin, the check switched
+#      off or a cache under 30 minutes old starts none. A copy of the helper in a fixture plugin
+#      tree fetches from a fake, so nothing reaches the network.
+FP="$WORK/fakeplugin"; mkdir -p "$FP/hooks" "$FP/skills/update/scripts"; cp "$HELPER" "$FP/hooks/"
+printf 'print("3.17.0")\n' > "$FP/skills/update/scripts/update-plugin.py"
+NJ="$XDG_CACHE_HOME/devstride-plugin/newest.json"; LOCK="$XDG_CACHE_HOME/devstride-plugin/newest.refresh"
+wait_newest() { for _ in $(seq 1 30); do grep -q "$1" "$NJ" 2>/dev/null && [ ! -e "$LOCK" ] && return 0; sleep 0.1; done; return 1; }
+newest 3.16.0 4000; RUNTIME="$FP/hooks/session-runtime.py" prompt "$P16" n9 "$R" >/dev/null
+wait_newest 3.17.0 && FETCHED=1 || FETCHED=0
+FMT="$(python3 -c '
+import json, os, stat, sys, time
+v = json.load(open(sys.argv[1]))
+ok = (v["schema"] == 2 and v["source"] == "https://github.com/devstride/claude-plugin" and v["newest"] == "3.17.0"
+      and abs(time.time() - v["fetchedAt"]) < 60 and stat.S_IMODE(os.stat(sys.argv[1]).st_mode) == 0o600)
+print("1" if ok else "0")' "$NJ")"
+newest 3.16.0 4000; : > "$LOCK"; RUNTIME="$FP/hooks/session-runtime.py" prompt "$P16" n9 "$R" >/dev/null; sleep 1; grep -q 3.16.0 "$NJ" && D1=1 || D1=0
+rm -f "$LOCK"; RUNTIME="$FP/hooks/session-runtime.py" prompt "$P16" n10 "$P" >/dev/null; sleep 1; grep -q 3.16.0 "$NJ" && D2=1 || D2=0
+UC=0 RUNTIME="$FP/hooks/session-runtime.py" prompt "$P16" n11 "$R" >/dev/null; sleep 1
+grep -q '3.16.0' "$NJ" && NONE=1 || NONE=0
+newest 3.16.0 600; RUNTIME="$FP/hooks/session-runtime.py" prompt "$P16" n12 "$R" >/dev/null; sleep 1
+grep -q '3.16.0' "$NJ" && FRESH=1 || FRESH=0
+if [ $FETCHED = 1 ] && [ "$FMT" = 1 ] && [ "$D1$D2$NONE" = 111 ] && [ $FRESH = 1 ] && [ ! -d "$FP/hooks/__pycache__" ]; then
+  ok "(16) stale cache → one detached fetch, newest.json in the session-start format, lock dropped; held lock / pin / check off / a 10-minute-old cache → no fetch"
+else bad "(16) d1=$D1 d2=$D2 fetched=$FETCHED fmt=$FMT none=$NONE fresh=$FRESH"; fi
 
 exit $FAIL
