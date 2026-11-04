@@ -503,6 +503,13 @@
           "onlyWhenTouched": {
             "type": "boolean",
             "description": "a releaseOnly check runs only when the release touches its pathGlobs"
+          },
+          "runAt": {
+            "type": "string",
+            "enum": [
+              "train"
+            ],
+            "description": "a releaseOnly check with runAt train runs on the release-train snapshot before the train merges, outside release clearance, and is not repeated at the release's step 2b; only valid with when releaseOnly"
           }
         },
         "patternProperties": {

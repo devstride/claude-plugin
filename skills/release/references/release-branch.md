@@ -93,6 +93,14 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    the source by its own pull request); once cut (and again on an adopted pull request) run the
    exclusion check with `--source-before <sourceBefore> --head <snapshot head>` and put each
    `allowedRenumbers` entry in the body.
+   **Train-run pre-ship checks.** When `pr` has settled the train pull request's review and its CI is
+   running, before step 5, run **`pre-ship train run`** at the snapshot head: every `preShipChecks`
+   entry with `when: "releaseOnly"` and `runAt: "train"`, in the background, printing the evidence
+   lines `pre-ship` prints (`NOTHING TO RUN` is an explicit no-op, said so). **A red result STOPS
+   the train merge** exactly as a red pre-ship check does; fix it on the snapshot, or the owner
+   waives it in words. A fix that moves the head re-runs it at the new head. This phase holds no
+   release clearance (scope `cut-to-deploy` claims it only at the cut), and step 2b of `release`
+   does not repeat these entries.
 4a. **Late landings.** Each progress report runs `git fetch origin <releaseSource> <train>` and
    names any late one-offs in `git log --no-merges --oneline <trainSnapshot>..origin/<train>`. To
    ABSORB them: resolve `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said

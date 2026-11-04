@@ -1064,6 +1064,15 @@
       "since": "pre-registry"
     },
     {
+      "key": "preShipChecks[].runAt",
+      "type": "string",
+      "enum": [
+        "train"
+      ],
+      "description": "a releaseOnly check with runAt train runs on the release-train snapshot before the train merges, outside release clearance, and is not repeated at the release's step 2b; only valid with when releaseOnly",
+      "since": "unreleased"
+    },
+    {
       "key": "preCommitWiringChecks",
       "type": "array",
       "description": "repository-specific wiring assertions",

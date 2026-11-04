@@ -45,6 +45,10 @@ sets `"onlyWhenTouched": true`. Then it runs only when the release diff touches 
 selection is recomputed whenever the head moves (a fix commit, a hotfix merge). A diff that cannot
 be computed runs the check.
 
+A `releaseOnly` entry may also set `"runAt": "train"`: it then runs at the release train
+(`release-branch.md` §1 step 4) on the snapshot head instead of at 2b, which skips it. `runAt` on
+any other `when` is a config error.
+
 ## A train that carries reviewed release units
 
 Only when `release.productionReview` is set and `epicIntegrationBranches.releaseTarget` is the release train's branch: a finished epic reaches the

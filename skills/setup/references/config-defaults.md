@@ -114,6 +114,10 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   check): absent by default; each lets a repository that reviews and tests
   fully on the way into `releaseSource` skip repeating that on the way to production. Contract:
   `skills/release/references/review-once.md`.
+- **`preShipChecks[].runAt`**: `"train"`, valid only on a `when: "releaseOnly"` entry (anything else
+  is a config error). The check runs on the release-train snapshot before the train merges, outside
+  release clearance, and is not repeated at the release's step 2b. Absent, a `releaseOnly` check
+  runs at 2b as before.
 - **A story is Done when its release unit reaches `releaseTarget`**, not when it merges onto the
   integration branch. Until then it is *landed*
   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`): it satisfies blockers

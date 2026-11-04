@@ -7,7 +7,7 @@ description: "Step: select or run the repository's local pre-ship checks (preShi
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
-Arguments: $ARGUMENTS — `pr|release`, `select|run`, the final diff's base and head SHAs, and:
+Arguments: $ARGUMENTS — `pr|release|train` (train: no class, no `--skip`), `select|run`, the final diff's base and head SHAs, and:
 
 - `release run`: the class `classify-release` printed for THIS head (none → `full`).
 - `--only <names>`: re-run just those selected entries — review 7.1b's failed/affected re-run.
@@ -25,8 +25,10 @@ Names in array order; no `preShipChecks` → `NOTHING TO RUN` (an explicit no-op
   files from a **SHA-pinned three-dot local diff** — never `gh pr view --json files` or REST
   pull-files (both capped) — renames on BOTH source and destination; empty → every PR.
   **Never narrow a glob to skip a run.**
-- **`release`**: EVERY entry with `when` ∈ {`releaseOnly`, `always`} is selected, so the
-  release's hold fires whenever one exists. **Run each selected entry UNCONDITIONALLY** — except
+- **`train`**: every entry with `when` = `releaseOnly` AND `runAt` = `train`, in array order,
+  run unconditionally at the train snapshot head, as `release run` does (`pathGlobs` unread).
+- **`release`**: EVERY entry with `when` ∈ {`releaseOnly`, `always`} EXCEPT `runAt: "train"` ones
+  (run at the train, `release-branch.md` §1 step 4) is selected, so the hold fires whenever one remains. **Run each selected entry UNCONDITIONALLY** — except
   a `releaseOnly` entry with `onlyWhenTouched: true`: it runs only when the release diff matches
   its `pathGlobs` (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/review-once.md`); a diff that
   cannot be computed runs it. Each that will not run prints as evidence: `skip <name>: the
@@ -35,7 +37,7 @@ Names in array order; no `preShipChecks` → `NOTHING TO RUN` (an explicit no-op
 ## Run
 
 Re-select at this head. `--only` keeps just those names; one not selected → `FAIL <name>`, run
-nothing. `--skip` on `pr` → refuse; on `release` that entry does not run and prints `WAIVED
+nothing. `--skip` on `pr` or `train` → refuse; on `release` that entry does not run and prints `WAIVED
 <name> — the owner's explicit skip, recorded`: only on the owner's words, never assumed. Run the
 rest **sequentially, in array order** (no dedup, no short-circuit), each in the BACKGROUND with a
 long timeout (a foreground kill looks like a clean pass), `timeoutNote` first. `pr`: after

@@ -8,6 +8,10 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- A `releaseOnly` pre-ship check with `runAt: "train"` runs on the release-train snapshot before the train merges, outside release clearance, and is not repeated at the release's step 2b.
+
 ## [3.27.0] — 2026-11-04
 
 ### Added

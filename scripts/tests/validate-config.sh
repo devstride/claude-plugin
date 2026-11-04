@@ -115,6 +115,14 @@ expect "(33b) a pre-ship check without command is an ERROR" 1 "^CONFIG: 1 error(
 cfg '{"preShipChecks": [{"command": "make db", "when": "perPr"}]}'
 expect "(33c) name is optional" 0 "$CLEAN"
 
+# pre-ship runAt: only "train", and only on a releaseOnly entry
+cfg '{"preShipChecks": [{"command": "make db", "when": "releaseOnly", "runAt": "train"}]}'
+expect "(33d) runAt train on a releaseOnly entry is clean" 0 "$CLEAN"
+cfg '{"preShipChecks": [{"command": "make db", "when": "releaseOnly", "runAt": "cut"}]}'
+expect "(33e) any other runAt value is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR preShipChecks\[0\].runAt: "cut" is not one of "train"$'
+cfg '{"preShipChecks": [{"command": "make db", "when": "perPr", "runAt": "train"}]}'
+expect "(33f) runAt on an entry that is not releaseOnly is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR preShipChecks\[0\].runAt: is only valid"
+
 # slow cloud suites: a closed object with its mapping required
 cfg '{"verify": {"skipDuringStoryBuilds": [{"name": "e2e", "ciChecksByBase": {"baseBranch": ["e2e"]}, "runWhenChangedPaths": ["web/**"]}]}}'
 expect "(34a) a minimal slow-suite entry is clean" 0 "$CLEAN"

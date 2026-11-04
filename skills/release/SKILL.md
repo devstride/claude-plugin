@@ -182,10 +182,10 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 
 ## 2b. Pre-ship checks — the release's mandatory local gates
 
-Immediately before, run **`classify-release`** again at the head 2b tests (a merge, fix or hotfix
+Before it, run **`classify-release`** again at the head 2b tests (a merge, fix or hotfix
 since step 0 changes the delta); then **`pre-ship release run`** on the release diff with THAT class
-— the only thing validating those suites before production (`PRE-SHIP: NOTHING TO RUN` is an
-explicit no-op, said so). Step 4 reports that class.
+— the only validation of those suites before production (`PRE-SHIP: NOTHING TO RUN` is an
+explicit no-op; `runAt: train` entries already ran). Step 4 reports that class.
 
 - **`PRE-SHIP: FAIL` is a STOP** — fix it or surface it as a release blocker naming every failed
   entry and spec. Never present a release green over a red or unrun check, or say "covered by CI".
