@@ -52,7 +52,28 @@ request's base.
   push, then the story branch deleted. The full review, the configured engines and CI move to the
   train's pull request into `baseBranch`, which `release` opens before every cut. 4a's floor holds:
   no completed risk check or receipt → 4b.
+- **A small, clean fix skips its own review pass.** With `releaseTrain.smallFixes` set, on the fast
+  path only, after the build run `git diff --numstat -z --no-renames origin/<train>...HEAD |
+  python3 -c 'import json,sys; print(json.dumps({"config": json.load(open(".claude/ds-config.json")),
+  "numstat": sys.stdin.read()}))' | python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/routing.py
+  small` — never through a shell variable, which drops the NULs (exit 2 → STOP naming the error). `small: true`, AND
+  the risk check raised no finding, launched no immediate-risk verifier and matched no mandatory
+  lens → 4a's `review` LOCAL-ONLY call does not run: with no finding there is nothing to triage
+  or distill into lessons. The progress table's review row reads "covered by the train's release
+  review (small fix: N files, M lines)". Everything else in 4a holds: the floor, the local gate,
+  the merge-commit body. Otherwise 4a runs as usual (a risk-check finding still reaches the lessons
+  store through it), the reason said once. The train's pull request into `baseBranch` is the
+  batch's one full review and one CI run.
 - **Otherwise → 4b with the train as the base.**
+
+## Settings
+
+- `releaseTrain.smallFixes` — `{maxFiles, maxChangedLines}`, both required, each at least 1; lines
+  are added plus removed. Absent → no fix counts as small. The high-risk list is
+  `release.productionReview.highRiskPaths` plus `release.releaseBranchFixExclusions`.
+- `releaseTrain.lateArrivals` — `"restart"` or `"offer"` (absent: `"offer"`); what `release` does
+  with a one-off that lands while the train's review is running
+  (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` step 4a).
 
 ## Completion ritual (step 6) for a one-off on the train
 

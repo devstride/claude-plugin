@@ -237,6 +237,8 @@ work lands, which is the operator's decision. Absent, the loop behaves as before
 | `release.devDeployVerification` | a shell command (exit 0 deployed, 2 not yet, 1 failed) | the release does not wait for a development deploy |
 | `releaseTrain.branch` | a branch name, e.g. `"train/support"` | one-offs use `baseBranch` |
 | `releaseTrain.fastMerges` | boolean | `false`: a one-off on the train takes the full per-story pull-request ritual, into the train |
+| `releaseTrain.smallFixes` | `{ "maxFiles": 5, "maxChangedLines": 500 }` | no fix counts as small: every fast one-off gets its own local review pass |
+| `releaseTrain.lateArrivals` | `"restart"` or `"offer"` | `"offer"`: a one-off landing during the train's review joins only on the owner's word, before the ready-flip |
 | `protectedBranches` entries | exact names or patterns, e.g. `"release/*"` | exact names only |
 
 `releaseTrain` was called `supportTrain` before this release. The plugin reads `releaseTrain` first and,

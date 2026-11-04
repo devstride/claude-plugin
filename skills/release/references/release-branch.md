@@ -82,26 +82,40 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    `review` takes the FULL diff (a one-off merged fast onto the train had no full review yet — this
    is its first and only full review before production; with `release.productionReview` set, a
    release unit that joined through its own reviewed pull request is excluded, `review-once.md`),
-   and declaring `merge-only: true` and
-   `fix-exclusions: true`. `pr` owns the draft hold, the pre-ship checks its step 2 selects and the
+   and declaring `merge-only: true`,
+   `fix-exclusions: true` and, when `releaseTrain.lateArrivals` is `"restart"`, `late-arrivals`. `pr` owns the draft hold, the pre-ship checks its step 2 selects and the
    ready-flip that releases CI once; the untracked-deferral list it returns (an adopted run's too)
    goes to `release` step 2, never spliced. Fixes are committed on the snapshot, each passing §3's
    staged-file check first (a migration or deploy-configuration fix leaves the train: merge it to
    the source by its own pull request); once cut (and again on an adopted pull request) run the
    exclusion check with `--source-before <sourceBefore> --head <snapshot head>` and put each
    `allowedRenumbers` entry in the body.
-4a. **Absorb late landings — before the ready-flip only.** While the snapshot pull request is a
-   draft (an adopted one included), each progress report runs `git fetch origin <releaseSource> <train>` and
-   names any late one-offs in `git log --no-merges --oneline <trainSnapshot>..origin/<train>`.
-   On the owner's instruction — applied before `review` step 7's ready-flip, never after — it
-   resolves `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said back): `<trainSnapshot>` must be its ancestor (else STOP); the exclusion check over the NEW train
-   work only, `--start-on train --source-before <trainSnapshot> --head <absorbAt>` (source merges are not train
-   work; exit 1 STOPS); `git merge --no-ff <absorbAt>` into the snapshot (a conflict
-   STOPS) and push; rewrite the marker to `snapshot <absorbAt>`, the title's count and the body's
-   list, so step 6 closes exactly what shipped. The absorbed range then gets its first full
-   review before the flip: one FULL-scope cycle of every configured engine with the ledger,
-   outside the cycle budget (a required engine that cannot run STOPS). Later landings ship next time, said so. After the ready-flip the offer closes
-   (a push would restart CI).
+4a. **Late landings.** Each progress report runs `git fetch origin <releaseSource> <train>` and
+   names any late one-offs in `git log --no-merges --oneline <trainSnapshot>..origin/<train>`. To
+   ABSORB them: resolve `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said
+   back); `<trainSnapshot>` must be its ancestor (else STOP); run the exclusion check over the NEW
+   train work only, `--start-on train --source-before <trainSnapshot> --head <absorbAt>` (source
+   merges are not train work; exit 1 STOPS); `git merge --no-ff <absorbAt>` into the snapshot (a
+   conflict STOPS) and push; rewrite the marker to `snapshot <absorbAt>`, the title's count and the
+   body's list, and from then on read `<trainSnapshot>` as `<absorbAt>` for detection and step 6.
+   When to absorb follows `releaseTrain.lateArrivals`:
+   - **`"restart"`** — automatically, up to `review` step 7's ready-flip: a late arrival is meant to
+     supersede what is there. `late-arrivals` is declared to `pr`, which passes it to `review` with
+     `<train>` and `<trainSnapshot>`: before each cycle and before the flip, review fetches the
+     train and on a late one-off STOPS, returning `LATE-ARRIVAL` with the pull request still a
+     draft, any running engine stopped and its partial result dropped, the cumulative ledger and
+     the lessons tally (no step 6.5 for the cancelled cycle); `pr` returns it to this step at once,
+     running no pre-ship check. Absorb, then run `pr` steps 2–2c on it again (the pull request
+     exists), driven, with step 4's declarations and scope and the carried ledger as caller evidence: a fresh cycle 1 over the
+     full snapshot diff, the cycle target counted afresh (the one exception to never resetting it),
+     the pre-ship hold re-decided for the new tree. At most THREE restarts per release: the third restart's
+     run, and the first ready-flip, end the window — `late-arrivals` is no longer declared and later
+     landings ship next time, said so — so CI runs once and a busy train cannot hold the release
+     open.
+   - **`"offer"`** (absent) — only on the owner's instruction, and only before `review` step 7's
+     ready-flip; the absorbed range then gets one FULL-scope cycle of every configured engine
+     with the ledger, outside the cycle budget (a required engine that cannot run STOPS). Later
+     landings ship next time, said so; after the flip the offer closes (a push would restart CI).
 5. **Merge** — first `git fetch origin <releaseSource>` and run the exclusion check with
    `--source-before <sourceBefore> --head <reviewedHead>` (source merges are not train work, and a
    reviewed release unit is allowed; exit 1 STOPS); then `gh pr merge <n> --merge --match-head-commit <reviewedHead>

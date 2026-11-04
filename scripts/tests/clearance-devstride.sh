@@ -322,7 +322,13 @@ export CLEARANCE_NO_KEEPER=1 CLEARANCE_NOW=2026-10-18T10:05:00Z; unset CLEARANCE
 
 # (11) a claim lost to a concurrent taker: two sessions take over one lapsed claim; exactly one wins
 fresh two-takers; held claude:other cut release/26-10-17 - 2026-10-18T09:30:00Z
-OUT1="$(CLAUDE_CODE_SESSION_ID=me-1 bash "$P" claim 2>&1 & CLAUDE_CODE_SESSION_ID=me-2 CLEARANCE_RECORD="$WORK/two-takers.record2.json" bash "$P" claim 2>&1; wait)"
+# Both takers run from THIS shell, each writing its own file, and the wait names the one pid it
+# started: a bare `wait` inside a command substitution can spin forever on Linux bash ("pid N is
+# not a child of this shell"), which hung the whole release-guard job.
+CLAUDE_CODE_SESSION_ID=me-1 bash "$P" claim > "$WORK/taker1.out" 2>&1 & TAKER1=$!
+CLAUDE_CODE_SESSION_ID=me-2 CLEARANCE_RECORD="$WORK/two-takers.record2.json" bash "$P" claim > "$WORK/taker2.out" 2>&1
+wait "$TAKER1"
+OUT1="$(cat "$WORK/taker1.out" "$WORK/taker2.out")"
 printf '%s\n' "$OUT1" >> "$LOG"
 WINS="$(printf '%s\n' "$OUT1" | grep -c '^CLEARED')"; BUSY="$(printf '%s\n' "$OUT1" | grep -c '^BUSY')"
 if [ "$WINS" -eq 1 ] && [ "$BUSY" -eq 1 ]; then ok "(11) two concurrent takeovers of one lapsed claim → one CLEARED, one BUSY (the server decides)"; else bad "(11) wins=$WINS busy=$BUSY: $OUT1"; fi

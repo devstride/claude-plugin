@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.22.0.
+`.claude/ds-config.json` against. Schema version: 3.23.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -200,9 +200,17 @@ starting with `_` and `$schema` are never reported as unknown.
 | `releaseTrain` | object, null | — | — | one long-lived branch one-off work batches on; null reads as absent | pre-registry |
 | `releaseTrain.branch` | string | — | — | the train's branch | pre-registry |
 | `releaseTrain.fastMerges` | boolean | — | `false` | a one-off merges onto the train without its own pull request | pre-registry |
+| `releaseTrain.smallFixes` | object, null | — | — | limits under which a fast one-off is a small fix and skips its own local review pass; null reads as absent | 3.23.0 |
+| `releaseTrain.smallFixes.maxFiles` | integer | >= 1 | — | **Required.** at most this many changed files | 3.23.0 |
+| `releaseTrain.smallFixes.maxChangedLines` | integer | >= 1 | — | **Required.** at most this many changed lines, added plus removed | 3.23.0 |
+| `releaseTrain.lateArrivals` | string | restart, offer | offer | restart: a one-off landing during the train's review restarts that review over the whole snapshot; offer: it joins only on the owner's word | 3.23.0 |
 | `supportTrain` | object, null | — | — | the old name of releaseTrain, still read when releaseTrain is absent (doctor notes it; both together is an error) | 3.22.0 |
 | `supportTrain.branch` | string | — | — | the old name of releaseTrain.branch | 3.22.0 |
 | `supportTrain.fastMerges` | boolean | — | — | the old name of releaseTrain.fastMerges | 3.22.0 |
+| `supportTrain.smallFixes` | object, null | — | — | limits under which a fast one-off is a small fix and skips its own local review pass; null reads as absent (the old name, read when releaseTrain is absent) | 3.23.0 |
+| `supportTrain.smallFixes.maxFiles` | integer | >= 1 | — | **Required.** at most this many changed files (the old name, read when releaseTrain is absent) | 3.23.0 |
+| `supportTrain.smallFixes.maxChangedLines` | integer | >= 1 | — | **Required.** at most this many changed lines, added plus removed (the old name, read when releaseTrain is absent) | 3.23.0 |
+| `supportTrain.lateArrivals` | string | restart, offer | offer | restart: a one-off landing during the train's review restarts that review over the whole snapshot; offer: it joins only on the owner's word (the old name, read when releaseTrain is absent) | 3.23.0 |
 | `releaseTower` | object | — | — | the release-tower check's settings | pre-registry |
 | `releaseTower.overrideLabel` | string | — | release-tower-override | the label passing an owner-approved pull request | pre-registry |
 | `releaseTower.hotfixPattern` | string | — | */hotfix/** | heads never held | pre-registry |

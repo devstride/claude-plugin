@@ -212,7 +212,8 @@ I7. Close+reopen does not clear a GitHub mergeability stall (`mergeable_state: u
     `--allow-empty` does not guarantee that — require a clean index and verify the tree. Push to the
     PR's own head ref; local HEAD is not always it.
 I8. Real-CI code repair stays bounded to two pushes for one settle and never resets adversarial
-    target/safety accounting; a second still-red result stops with evidence.
+    target/safety accounting; a second still-red result stops with evidence. The one reset is a
+    release-train late-arrival restart before the first ready-flip (`release-branch.md` §1 4a).
 I9. `ci.expectedRunsPerPullRequest` is PER WORKFLOW under `ci.workflowGlobs`: several workflows
     executing once each on one pull request is the design; the excess is a SECOND executed run of
     the SAME workflow, attributed by pull request number (never branch name alone), and an empty
