@@ -30,4 +30,6 @@ kept for step 8. Standalone may ask to keep waiting. Details:
 
 ## Cited by
 
-- `skills/review/SKILL.md` — step 1's Cloud bullet and step 2.
+- `skills/review/SKILL.md` — step 1's Cloud bullet (also before any re-request, steps 5 and 7)
+  and step 2.
+- `skills/review/references/final-head-request.md` — point 2, for a `final-head` entry.

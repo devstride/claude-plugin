@@ -19,8 +19,8 @@ this key decides only WHEN an in-scope entry is asked.
    roster announcement says so plainly: "<name>: requested once at the final head".
 2. **Request it at step 7's entry** — every other finding fixed, pushed, replied-to and resolved —
    after 7.1's refresh, so the head is final, and before 7.1b's hold or the flip. Request it per its
-   `how`, prove a NEW `review_requested` event and apply the registration window exactly as step 1
-   does, wait with step 2's script, then take its findings through steps 3–6.5 like any other. A
+   `how`, prove a NEW `review_requested` event and apply the registration window exactly as
+   `cloud-reviewers.md` "Requesting" says, wait as its "Waiting" says, then take its findings through steps 3–6.5 like any other. A
    draft does not block an explicit request.
 3. **One more pass after a fix it caused.** A finding of its that leads to a fix commit: fix and
    push per step 5 (the local streams get their contextual follow-up), come back to step 7's entry,

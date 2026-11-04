@@ -130,7 +130,7 @@ reports. In one turn:
   `targetAdversarialCycles`); safety cycles override both.
 - **Cloud** — none configured or in scope → no request, no step 2 (step 6 still runs for human
   threads). In scope → **read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/cloud-reviewers.md`
-  in full before acting on it**: each `every-round` entry requested and a NEW `review_requested`
+  in full before acting on it, and before any re-request (steps 5, 7)**: each `every-round` entry requested and a NEW `review_requested`
   event proven, or DROPPED unproven within `reviewerRegistrationWindowMinutes`.
 - **Roster fell to Claude-only on a PR path:** configured-but-FAILED (cloud never
   registered/responded AND the local engine failed) → **STOP for a human GitHub-UI review before
@@ -139,8 +139,9 @@ reports. In one turn:
 
 ## 2. Wait for the cloud reviewer
 
-Nothing registered → skip. Otherwise wait exactly as `cloud-reviewers.md` "Waiting" says: one
-self-terminating background call — never Monitor or a foreground sleep.
+Nothing registered → skip. Otherwise **read
+`${CLAUDE_PLUGIN_ROOT}/skills/review/references/cloud-reviewers.md` in full before acting on the
+wait**: one self-terminating background call — never Monitor or a foreground sleep.
 
 ## 3. Collect findings — BOTH halves, this cycle only
 

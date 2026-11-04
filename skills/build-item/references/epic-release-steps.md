@@ -6,7 +6,7 @@ load: contract
 A branch reference (CONTRIBUTING.md, "Branch references"): `build-item` step 8 keeps the gate —
 zero remaining leaves, working base the unit's integration branch, auto-release on per
 `epicIntegrationBranches.autoRelease` — and reads this file in full before acting on a release
-that fires. Every bullet is an instruction. The reasoning behind them is
+that fires, or on step 0's recovery close-out after an owner merged the release. Every bullet is an instruction. The reasoning behind them is
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md`.
 
 ## Steps
@@ -44,4 +44,6 @@ that fires. Every bullet is an instruction. The reasoning behind them is
 
 ## Cited by
 
-- `skills/build-item/SKILL.md` — step 8, once its gate fires.
+- `skills/build-item/SKILL.md` — step 8, once its gate fires or for step 0's recovery close-out.
+- `skills/build-item/references/next-unblocked.md` — the Close-out bullet, for the release unit's
+  comment and Done.

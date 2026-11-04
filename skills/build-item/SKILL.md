@@ -303,6 +303,6 @@ the owner once per unit, cutting nothing until answered; unanswerable → `false
 unit at zero and before cutting the release PR.**
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release-steps.md` in full before
-acting on a release that fires** — refresh, verification plan, the EPIC RELEASE PR cut, review
+acting on a release that fires, or on step 0's recovery close-out** — refresh, verification plan, the EPIC RELEASE PR cut, review
 scope, merge and close-out, docs staging and the `Merged / Released` recap live there. New
 findings → 6.5.

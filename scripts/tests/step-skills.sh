@@ -98,10 +98,10 @@ for skill, head, call in SITES:
     elif call not in sec:
         # a branch reference (CONTRIBUTING.md, "Branch references") the section points to with
         # "Read … in full before acting" may hold the call; it must be a load: contract file
-        refs = re.findall(r"Read `\$\{CLAUDE_PLUGIN_ROOT\}/(skills/%s/references/[a-z0-9-]+\.md)` in full before" % skill, sec)
+        refs = re.findall(r"Read `\$\{CLAUDE_PLUGIN_ROOT\}/(skills/%s/references/[a-z0-9-]+\.md)` in full before acting on" % skill, sec)
         held = False
         for ref in refs:
-            text = open("%s/%s" % (root, ref), encoding="utf-8").read()
+            text = open("%s/%s" % (root, ref), encoding="utf-8").read().split("\n## Cited by", 1)[0]
             if text.startswith("---\nload: contract\n") and call in " ".join(text.split()):
                 held = True
         if not held:

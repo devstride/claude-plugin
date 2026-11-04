@@ -82,7 +82,10 @@ carries the landed comment.
   `mergeCommit`, from
   `gh pr list --head <integration branch> --base <release target> --state merged --json number,mergeCommit`:
   `git log --first-parent --merges --format=%s <merge>^1..<merge>^2`. **The release unit first**
-  (step 8's `add_comment` and Done), **then its leaves**, last, so an open leaf keeps recovery armed
+  (step 8's close-out: read
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release-steps.md` in full before acting
+  on it — the unit's comment names the release PR, leaves and date; Done only if its status is
+  tracked), **then its leaves**, last, so an open leaf keeps recovery armed
   until the whole close-out is done. For each number: `get_item`; keep only a not-Done
   `hierarchyRoles.leaf` under this release unit; `update_item` → Done (it works off-board;
   `mark_done` does not), writing NO dates — they stay step 6's, so no auto-scheduler check — then
