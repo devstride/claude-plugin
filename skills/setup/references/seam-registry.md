@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.24.0.
+`.claude/ds-config.json` against. Schema version: 3.25.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -28,8 +28,8 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.devDeployVerification` | command | string or null | — | RELEASE_COMMIT in the environment (the head the release merges from the source) | exit 0 deployed to the development environment; 2 not deployed yet; 1 the development deploy failed | release 4 | the release does not wait for a development deploy | `skills/release/SKILL.md` | 3.22.0 |
 | `release.clearance` | provider-or-commands | object or null | claim, status, heartbeat, release, adopt, owed | each verb's own arguments appended (--wait, --short, <phase> --branch <b> --pr <n>, --force, --yes) | the verdict is stdout's first line; exit codes 0-5 per the provider contract | release 0, release 5b, branch-hotfix rules, doctor 7 | no clearance: release runs as before and nothing is claimed | `skills/release/references/clearance.md` | pre-registry |
 | `claims` | provider-or-commands | object or null | claim, heartbeat, release, get, list | <kind> <key>, then the verb's options (claim: --purpose, --phase, --expiry, --takeover; heartbeat: --phase; release: --outcome; list: --kind); the holder in CLAIM_HOLDER, never on argv | stdout's first line (WON, LOST, OK, NOT HOLDER, ABSENT, FORBIDDEN, UNREACHABLE, ERROR), then the claim JSON; exit 0 won or ok, 2 lost, 4 not the holder, 1 anything else | build-item 0, build-item 6, doctor 7 | no claims: build-item selects and builds exactly as before and claims nothing | `skills/build-item/references/story-claims.md` | 3.21.0 |
-| `activeAgents.commands.start` | command | **Required.** string | — | <root>, the plan root's item number (only ^[IF][0-9]+$ is ever substituted); ACTIVE_AGENTS_ROOT, ACTIVE_AGENTS_TAG and ACTIVE_AGENTS_STALE_MINUTES exported | exit 0 marked the session active on that root; any other exit, or more than 10 seconds, is one FAILED line and the loop goes on | build-item 0 | the whole activeAgents block is absent: nothing is placed and nothing runs | `skills/build-item/references/active-agents.md` | unreleased |
-| `activeAgents.commands.end` | command | **Required.** string | — | <root> optional; the same environment as start | exit 0 cleared the session's presence; any other exit is one FAILED line, never a stop | build-item 0, build-item 7 | the whole activeAgents block is absent: nothing runs | `skills/build-item/references/active-agents.md` | unreleased |
+| `activeAgents.commands.start` | command | **Required.** string | — | <root>, the plan root's item number (only ^[IF][0-9]+$ is ever substituted); ACTIVE_AGENTS_ROOT, ACTIVE_AGENTS_TAG and ACTIVE_AGENTS_STALE_MINUTES exported | exit 0 marked the session active on that root; any other exit, or more than 10 seconds, is one FAILED line and the loop goes on | build-item 0 | the whole activeAgents block is absent: nothing is placed and nothing runs | `skills/build-item/references/active-agents.md` | 3.25.0 |
+| `activeAgents.commands.end` | command | **Required.** string | — | <root> optional; the same environment as start | exit 0 cleared the session's presence; any other exit is one FAILED line, never a stop | build-item 0, build-item 7 | the whole activeAgents block is absent: nothing runs | `skills/build-item/references/active-agents.md` | 3.25.0 |
 | `verify.typecheck` | command | string[] | — | none; run from the repository root, in array order | exit 0 passes; an error outside generated.paths fails | ultracode-build 2, push rules, build-item 4a, setup G | push asks for a command; fast story merges stay off | `skills/build-item/references/verification-receipts.md` | pre-registry |
 | `verify.typecheckCombined` | command | string or null | — | none | exit 0 passes | push rules | the verify.typecheck array is used; this legacy single command is read only when that array is absent | `skills/build-item/references/verification-receipts.md` | pre-registry |
 | `verify.test` | command | string or null | — | none | exit 0 is green; red is a stop | ultracode-build 2, build-item 8, setup G | no full-suite gate; fast story merges stay off | `skills/build-item/references/verification-receipts.md` | pre-registry |
@@ -199,12 +199,12 @@ starting with `_` and `$schema` are never reported as unknown.
 | `claims.commands.release` | string | — | — | **Required.** the release command | 3.21.0 |
 | `claims.commands.get` | string | — | — | the optional get command | 3.21.0 |
 | `claims.commands.list` | string | — | — | the optional list command | 3.21.0 |
-| `activeAgents` | object, null | — | — | the Active Agents board, tag and the repository's presence commands; absent or null means the plugin writes nothing to DevStride for this feature and runs nothing | unreleased |
-| `activeAgents.boardId` | string, null | — | `null` | the board plan roots are placed on; null until /devstride:setup agents adopts or creates it, and build-item places no root meanwhile | unreleased |
-| `activeAgents.tagName` | string | — | agent active | the tag that marks a root an agent is working under, allowed on every plan-root type | unreleased |
-| `activeAgents.tagColor` | string | gray-medium-dark, red, pink, orange, yellow, lime, green, teal, blue, blue-medium, purple | green | the tag's colour | unreleased |
-| `activeAgents.staleMinutes` | integer | >= 1 | `20` | minutes without a heartbeat after which the repository's presence implementation treats a session as gone; exported to both commands | unreleased |
-| `activeAgents.commands` | object | — | — | **Required.** the repository's own start and end commands | unreleased |
+| `activeAgents` | object, null | — | — | the Active Agents board, tag and the repository's presence commands; absent or null means the plugin writes nothing to DevStride for this feature and runs nothing | 3.25.0 |
+| `activeAgents.boardId` | string, null | — | `null` | the board plan roots are placed on; null until /devstride:setup agents adopts or creates it, and build-item places no root meanwhile | 3.25.0 |
+| `activeAgents.tagName` | string | — | agent active | the tag that marks a root an agent is working under, allowed on every plan-root type | 3.25.0 |
+| `activeAgents.tagColor` | string | gray-medium-dark, red, pink, orange, yellow, lime, green, teal, blue, blue-medium, purple | green | the tag's colour | 3.25.0 |
+| `activeAgents.staleMinutes` | integer | >= 1 | `20` | minutes without a heartbeat after which the repository's presence implementation treats a session as gone; exported to both commands | 3.25.0 |
+| `activeAgents.commands` | object | — | — | **Required.** the repository's own start and end commands | 3.25.0 |
 | `release.docsRepo` | any | — | — | **Deprecated (error):** retired pre-1.0 shape the release skill never acts on; run /devstride:setup docs to migrate it into the docs block | pre-registry |
 | `releaseTrain` | object, null | — | — | one long-lived branch one-off work batches on; null reads as absent | pre-registry |
 | `releaseTrain.branch` | string | — | — | the train's branch | pre-registry |

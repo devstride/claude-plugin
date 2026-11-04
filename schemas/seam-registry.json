@@ -259,7 +259,7 @@
       ],
       "unset": "the whole activeAgents block is absent: nothing is placed and nothing runs",
       "contract": "skills/build-item/references/active-agents.md",
-      "since": "unreleased"
+      "since": "3.25.0"
     },
     {
       "key": "activeAgents.commands.end",
@@ -275,7 +275,7 @@
       ],
       "unset": "the whole activeAgents block is absent: nothing runs",
       "contract": "skills/build-item/references/active-agents.md",
-      "since": "unreleased"
+      "since": "3.25.0"
     },
     {
       "key": "verify.typecheck",
@@ -1594,7 +1594,7 @@
         "null"
       ],
       "description": "the Active Agents board, tag and the repository's presence commands; absent or null means the plugin writes nothing to DevStride for this feature and runs nothing",
-      "since": "unreleased"
+      "since": "3.25.0"
     },
     {
       "key": "activeAgents.boardId",
@@ -1604,14 +1604,14 @@
       ],
       "default": null,
       "description": "the board plan roots are placed on; null until /devstride:setup agents adopts or creates it, and build-item places no root meanwhile",
-      "since": "unreleased"
+      "since": "3.25.0"
     },
     {
       "key": "activeAgents.tagName",
       "type": "string",
       "default": "agent active",
       "description": "the tag that marks a root an agent is working under, allowed on every plan-root type",
-      "since": "unreleased"
+      "since": "3.25.0"
     },
     {
       "key": "activeAgents.tagColor",
@@ -1631,7 +1631,7 @@
       ],
       "default": "green",
       "description": "the tag's colour",
-      "since": "unreleased"
+      "since": "3.25.0"
     },
     {
       "key": "activeAgents.staleMinutes",
@@ -1639,14 +1639,14 @@
       "minimum": 1,
       "default": 20,
       "description": "minutes without a heartbeat after which the repository's presence implementation treats a session as gone; exported to both commands",
-      "since": "unreleased"
+      "since": "3.25.0"
     },
     {
       "key": "activeAgents.commands",
       "type": "object",
       "required": true,
       "description": "the repository's own start and end commands",
-      "since": "unreleased"
+      "since": "3.25.0"
     },
     {
       "key": "release.docsRepo",
