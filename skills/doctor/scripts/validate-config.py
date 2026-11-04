@@ -121,6 +121,18 @@ def deferred_container_checks(v, config):
                   "the current title is matched already")
 
 
+def pre_ship_checks(v, config):
+    """What the schema cannot say: `runAt` belongs only to a `releaseOnly` entry, and never with `onlyWhenTouched`."""
+    entries = config.get("preShipChecks") if isinstance(config, dict) else None
+    if not isinstance(entries, list):
+        return
+    for i, entry in enumerate(entries):
+        if isinstance(entry, dict) and "runAt" in entry and entry.get("when") != "releaseOnly":
+            v.add("ERROR", "preShipChecks[%d].runAt" % i, "is only valid on an entry whose `when` is \"releaseOnly\"")
+        elif isinstance(entry, dict) and "runAt" in entry and entry.get("onlyWhenTouched") is True:
+            v.add("ERROR", "preShipChecks[%d].runAt" % i, "cannot be combined with `onlyWhenTouched: true`: a train check is skipped only by same-snapshot train evidence, never by path")
+
+
 class Validator:
     def __init__(self, schema, local_prefixes):
         self.findings = []
@@ -314,6 +326,7 @@ def main(argv):
     elif isinstance(config, dict) and config.get("supportTrain") is not None:
         v.add("NOTE", "supportTrain", "supportTrain is the old name of releaseTrain; rename it")
     deferred_container_checks(v, config)
+    pre_ship_checks(v, config)
     errors = [f for f in v.findings if f[0] == "ERROR"]
     warns = [f for f in v.findings if f[0] == "WARN"]
     notes = [f for f in v.findings if f[0] == "NOTE"]

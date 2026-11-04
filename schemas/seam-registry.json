@@ -363,11 +363,12 @@
       "shape": "command",
       "valueType": "string",
       "nullable": false,
-      "payload": "none; selected by the entry's when and pathGlobs",
-      "verdict": "exit 0 is green; red blocks the pull request or the release",
+      "payload": "none; selected by the entry's when, pathGlobs and runAt (a releaseOnly entry with runAt train is selected at the release-train step, and at release 2b unless it passed at the train on the same snapshot)",
+      "verdict": "exit 0 is green; red blocks the pull request, the train merge or the release",
       "calledBy": [
         "pre-ship",
         "pr 2b",
+        "release train step 4b",
         "release 2b"
       ],
       "unset": "no pre-ship checks: an explicit no-op",
@@ -1062,6 +1063,15 @@
       "type": "boolean",
       "description": "a releaseOnly check runs only when the release touches its pathGlobs",
       "since": "pre-registry"
+    },
+    {
+      "key": "preShipChecks[].runAt",
+      "type": "string",
+      "enum": [
+        "train"
+      ],
+      "description": "a releaseOnly check with runAt train runs on the release-train snapshot before the train merges (outside release clearance under release.clearance.scope cut-to-deploy), and is not repeated at the release's step 2b when it passed there on the same snapshot; only valid with when releaseOnly, never with onlyWhenTouched",
+      "since": "3.28.0"
     },
     {
       "key": "preCommitWiringChecks",

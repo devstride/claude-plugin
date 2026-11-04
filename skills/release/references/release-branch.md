@@ -68,7 +68,8 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    steps 3–4, check out its head (`gh pr checkout <n>`, then confirm `HEAD` equals the pull
    request's `headRefOid`, so the local engine and pre-ship suites see that tree), and run `pr`
    steps 2–2c on it, driven — pre-ship selection, hold, `review` with the step-4 declarations,
-   discharge — then continue at step 5.
+   discharge — then run step 4b (unless this session holds `PRE-SHIP TRAIN: PASS` for that exact
+   head), then continue at step 5.
 3. `git fetch origin <releaseSource> <train>`. No one-off on the train beyond the source
    (`git log --no-merges --oneline origin/<releaseSource>..origin/<train>` is empty — merges of the
    source alone are not work) → report "release train: nothing to ship" and stop here. Otherwise
@@ -119,6 +120,20 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
      ready-flip; the absorbed range then gets one FULL-scope cycle of every configured engine
      with the ledger, outside the cycle budget (a required engine that cannot run STOPS). Later
      landings ship next time, said so; after the flip the offer closes (a push would restart CI).
+4b. **Train-run pre-ship checks** (a new and an adopted train pull request both run this before
+   step 5). Once `pr` has settled the pull request's review and its CI is running, run
+   **`pre-ship train run`** at the snapshot head: every `preShipChecks` entry with `when:
+   "releaseOnly"` and `runAt: "train"`, in the background, printing `pre-ship`'s evidence lines
+   plus, on all passing, `PRE-SHIP TRAIN: PASS <names> at <sha>` (`NOTHING TO RUN` is an explicit
+   no-op, said so). Step 2b gets `--ran-at-train <names>@<sha>` from that line; it is the only
+   automatic 2b skip for such an entry. **A red result STOPS the train merge.** The fix path: the
+   owner may instead waive it in words; otherwise commit the fix on the snapshot, convert the pull
+   request to draft, re-enter `pr` steps 2–2c at the new head, in their order (`pre-ship pr select` declares
+   the hold, `review`'s step 5 follow-up with the cumulative ledger settles to 7.1b, every
+   selected check runs on that final head, then PRE-SHIP RESUME flips it ready and settles CI),
+   and rerun this step at that head; step 5's `<reviewedHead>` pin is that new head. Under scope `release` the clearance is
+   already held (step 0a); under `cut-to-deploy` it is not claimed until the cut. With no train
+   pull request, no passing line or a different tree, step 2b runs these entries itself.
 5. **Merge** — first `git fetch origin <releaseSource>` and run the exclusion check with
    `--source-before <sourceBefore> --head <reviewedHead>` (source merges are not train work, and a
    reviewed release unit is allowed; exit 1 STOPS); then `gh pr merge <n> --merge --match-head-commit <reviewedHead>

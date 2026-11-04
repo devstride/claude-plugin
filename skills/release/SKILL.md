@@ -115,7 +115,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   whenever PR workflows exist (the draft holds CI via `ci.draftGateCondition`); no CI → omit
   `--draft` and report `no pull-request CI`. Never `--fill`. Leave cloud requests to `review` (it
   captures each baseline/request hand-off while local review starts); `review` step 7 flips it
-  ready. `preShipChecks` suites are NOT in CI — they run in 2b.
+  ready. `preShipChecks` run in 2b (`runAt: train`: 4b), never CI.
 - **Release-flavored body** — `prBodyTemplate.sections` in order (the file wins over the fallback),
   flavor by POSITION: 1st (fallback `## Simple Description`) — what consumers get in this deploy, in
   plain language, then the constituent epics/items (`I##### — title`); 2nd (`## Technical
@@ -182,10 +182,9 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 
 ## 2b. Pre-ship checks — the release's mandatory local gates
 
-Immediately before, run **`classify-release`** again at the head 2b tests (a merge, fix or hotfix
-since step 0 changes the delta); then **`pre-ship release run`** on the release diff with THAT class
-— the only thing validating those suites before production (`PRE-SHIP: NOTHING TO RUN` is an
-explicit no-op, said so). Step 4 reports that class.
+Run **`classify-release`** again at the head 2b tests (a merge, fix or hotfix changes the delta),
+then **`pre-ship release run`** with THAT class. Add `--ran-at-train <names>@<sha>` only from THIS release's
+`PRE-SHIP TRAIN: PASS` line, else every `runAt: train` entry runs here. Step 4 reports the class.
 
 - **`PRE-SHIP: FAIL` is a STOP** — fix it or surface it as a release blocker naming every failed
   entry and spec. Never present a release green over a red or unrun check, or say "covered by CI".
@@ -225,8 +224,8 @@ the deploy.
   - **Name the deploy stage** when the repo has one: run `stage.resolve` and quote "this merge
     deploys to `<stage>`" beside `autoDeployOnMerge`. No `stage` block or an empty result → say
     nothing; never guess one, never substitute `localEnvironment.instanceName`.
-  - Never let the owner infer CI covered a pre-ship suite; the true answer is "the local run in
-    step 2b".
+  - Never let the owner infer CI covered a pre-ship suite; report each entry as passed at the
+    train on <sha>, passed at step 2b, skipped by path, or waived.
 - **On a release branch, before merging**: a hotfix that reached `productionBranch` meanwhile →
   `release-branch.md` §4, then back to step 2. With clearance, append the provider's `status`
   to the recap: a `Hotfix landed` line goes to §4 first; a `Waiting` line names who is next; and

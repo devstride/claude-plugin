@@ -14,7 +14,8 @@ wall-clock — the config's `_preShipChecks_readme` records each repo's reason).
 covers them, so an absent CI check for one is EXPECTED and CORRECT, never pending. Local gating
 did not lower the bar; it MOVED it: a regression in one of these suites reaches production
 unnoticed unless the release runs them — which is why step 2b is mandatory rather than
-advisory, why entries run unconditionally at the release boundary (path arguments are exactly
+advisory (a `runAt: train` entry may instead have passed at the train, step 4b, on the same
+snapshot; with no such evidence 2b runs it), why entries run unconditionally at the release boundary (path arguments are exactly
 what the rule overrides), and why "covered by CI" is the one false assurance never to give an
 owner. If a cloud job is ever restored for such a suite, its `verify.skipDuringStoryBuilds`
 entry and workflow job are added together and the `preShipChecks` entry dropped — otherwise it
