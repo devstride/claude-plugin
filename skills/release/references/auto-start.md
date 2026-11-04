@@ -24,9 +24,12 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart` and
   train's pre-ship suites, the clearance wait — at least every `min(10, expiry ÷ 3)` minutes
   (phase: the step). NOT HOLDER or LOST to a live holder → STOP: another session owns the train
   phase now.
-- **Release it NON-final** (never outcome `done` or `final`, so the next cycle can claim it) right
-  after the tower `claim` at the cut succeeds, so the next train phase can begin while this release
-  holds the tower; also when the train holds nothing to ship, and when the run stops.
+- **Release it NON-final**: `release` with outcome `handed-on`, never `done` and never final
+  (`final: true`, `--final`), so the next cycle can claim it. It is handed on right after the tower
+  `claim` at the cut succeeds, so the next train phase runs while this release holds the tower, but
+  ONLY with `release.clearance` and `release.releaseBranchPattern` both set; without either, the
+  release pull request has no tower or its own branch to protect it, so the claim is held until the
+  run ends. Also released when the train holds nothing to ship, and when the run stops.
 - **Lost to a live holder**: a hand-started run names who holds it and STOPs; an auto start carries
   on with its caller's loop, logging no failure.
 - **Won with an open train pull request present** (its previous holder lapsed): `release-branch.md`
@@ -67,11 +70,11 @@ holding the tower as any release does.
 
 At step 4, after the pre-merge check and the recap, run
 `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/standing-yes.py --pr <n> --head <head>
---reviewed-head <sha> --class "<classify-release line>" --checks green|red --unresolved <count>
+--train-pr <n> --class "<classify-release line>" --checks green|red --unresolved <count>
 --pre-ship "<2b verdict line>" --previous-release <gate exit> [--dev-deploy <exit>] --tower
-"<provider status output>"`. `--head` is the release pull request's head; `--reviewed-head` the train
-pull request's merged head, recorded at 0b; the script reads the pull request's live head and
-computes both trees itself. `--dev-deploy` only when the dev-deploy wait applies. `MERGE <sha>` only
+"<provider status output>"`. `--head` is the release pull request's head; `--train-pr` the release-train
+pull request this release merged at 0b; the script reads both pull requests itself (the live head;
+the train's state, title, base and reviewed head) and computes both trees. `--dev-deploy` only when the dev-deploy wait applies. `MERGE <sha>` only
 when all of its nine conditions hold (the script's header lists them); anything else prints
 `ASK <reason>`. Without `release.clearance` there is no `On final` line, so it always asks.
 

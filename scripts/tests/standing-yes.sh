@@ -16,6 +16,8 @@ TRAIN="$(g rev-parse HEAD)"                                     # the reviewed t
 g commit -q --allow-empty -m "release branch cut"; RELEASE="$(g rev-parse HEAD)"   # same tree, another commit
 echo b > "$WORK/repo/f"; g commit -q -am "a fix on the release branch"; FIXED="$(g rev-parse HEAD)"   # another tree
 export STANDING_YES_PR_HEAD="$RELEASE"
+trainjson() { printf '{"state": "%s", "title": "%s", "baseRefName": "%s", "headRefOid": "%s"}' "${1:-MERGED}" "${2:-Release train: 2 one-off(s) for release 26-01-15}" "${3:-develop}" "${4:-$TRAIN}"; }
+export STANDING_YES_TRAIN_PR="$(trainjson)"
 mkdir -p "$WORK/repo/.claude"
 cfg() { printf '%s\n' "$1" > "$WORK/repo/.claude/ds-config.json"; }
 cfg '{"release": {"classifySkill": "classify", "lightRelease": {"standingYes": true}}}'
@@ -23,12 +25,12 @@ cfg '{"release": {"classifySkill": "classify", "lightRelease": {"standingYes": t
 TOWER=$'Tower: clear\nOn final: #42 release/26-01-15 (draft)\nWaiting: #43 release/26-01-15-2'
 # the passing argument set; each case overrides one value
 base() {
-  PR=42 HEAD_ARG="$RELEASE" REVIEWED="$TRAIN" CLASS="RELEASE CLASS: LIGHT" CHECKS=green UNRESOLVED=0
+  PR=42 HEAD_ARG="$RELEASE" TRAIN_PR=40 CLASS="RELEASE CLASS: LIGHT" CHECKS=green UNRESOLVED=0
   PRESHIP="PRE-SHIP: PASS (2 ran, 0 waived)" PREV=0 DEV="" TOWER_ARG="$TOWER"
 }
 run() {
   local extra=(); [ -n "$DEV" ] && extra=(--dev-deploy "$DEV")
-  (cd "$WORK/repo" && python3 "$HELPER" --pr "$PR" --head "$HEAD_ARG" --reviewed-head "$REVIEWED" --class "$CLASS" \
+  (cd "$WORK/repo" && python3 "$HELPER" --pr "$PR" --head "$HEAD_ARG" --train-pr "$TRAIN_PR" --class "$CLASS" \
     --checks "$CHECKS" --unresolved "$UNRESOLVED" --pre-ship "$PRESHIP" --previous-release "$PREV" ${extra[@]+"${extra[@]}"} --tower "$TOWER_ARG" 2>&1)
 }
 expect() { # label, expected exit, regex
@@ -50,19 +52,29 @@ base; CLASS="RELEASE CLASS: FULL"; expect "(3) a full release → ASK" 0 '^ASK n
 base; CLASS=""; expect "(3b) no class line → ASK" 0 '^ASK not a light release \(no class line\)$'
 STANDING_YES_PR_HEAD="$FIXED"; base; HEAD_ARG="$FIXED"; expect "(4) a fix on the release branch changed the tree → ASK" 0 '^ASK the head.s tree .* differs from the reviewed train tree'
 STANDING_YES_PR_HEAD="$FIXED"; base; expect "(4a) the pull request moved past the head given (a stale head) → ASK" 0 '^ASK pull request #42 is at .* not the head'
-STANDING_YES_PR_HEAD="$RELEASE"; base; HEAD_ARG="$TRAIN"; REVIEWED="$TRAIN"; expect "(4c) the train head passed as the release head → ASK" 0 '^ASK pull request #42 is at .* not the head'
+STANDING_YES_PR_HEAD="$RELEASE"; base; HEAD_ARG="$TRAIN"; expect "(4c) the train head passed as the release head → ASK" 0 '^ASK pull request #42 is at .* not the head'
+STANDING_YES_PR_HEAD="$FIXED"; base; HEAD_ARG="$FIXED"; expect "(4f) a release-branch fix F can never stand in for the reviewed train (F/F) → ASK" 0 '^ASK the head.s tree .* differs from the reviewed train tree'
+STANDING_YES_PR_HEAD="$RELEASE"
+base; TRAIN_PR=42; expect "(4g) --train-pr naming the release pull request itself → ASK" 0 '^ASK --train-pr names the release pull request itself'
+base; STANDING_YES_TRAIN_PR="$(trainjson OPEN)" expect "(4h) a train pull request not merged → ASK" 0 '^ASK #40 is not a merged release-train pull request into develop$'
+base; STANDING_YES_TRAIN_PR="$(trainjson MERGED "release/26-01-15 into master")" expect "(4i) a pull request that is not a train → ASK" 0 '^ASK #40 is not a merged release-train'
+base; STANDING_YES_TRAIN_PR="$(trainjson MERGED "" master)" expect "(4j) a train merged into another base → ASK" 0 '^ASK #40 is not a merged release-train'
+base; STANDING_YES_TRAIN_PR="not json" expect "(4k) an unreadable train pull request → ASK" 0 '^ASK the train pull request #40 cannot be read$'
 STANDING_YES_PR_HEAD=""; base; expect "(4d) the pull request head cannot be read → ASK" 0 '^ASK the current head of pull request #42 cannot be read$'
 export STANDING_YES_PR_HEAD="$RELEASE"
 base; HEAD_ARG="deadbeef"; expect "(4b) an unreadable head → ASK" 0 '^ASK the head deadbeef cannot be read$'
-base; REVIEWED="feedface"; expect "(4e) an unreadable reviewed head → ASK" 0 '^ASK the reviewed train head feedface cannot be read$'
+base; STANDING_YES_TRAIN_PR="$(trainjson MERGED "" develop feedface)" expect "(4e) an unreadable reviewed head → ASK" 0 '^ASK the reviewed train head of #40 cannot be read$'
 base; CHECKS=red; expect "(5) a required check not green → ASK" 0 '^ASK a required check on the head is not green$'
 base; UNRESOLVED=1; expect "(6) an unresolved thread → ASK" 0 '^ASK 1 review thread\(s\) unresolved$'
 base; PRESHIP="PRE-SHIP: PASS (2 ran, 1 waived)"; expect "(7) a waived pre-ship check → ASK" 0 '^ASK the pre-ship checks did not all pass unwaived'
 base; PRESHIP="PRE-SHIP: FAIL golden"; expect "(7b) a failed pre-ship check → ASK" 0 '^ASK the pre-ship checks did not all pass unwaived'
 base; PREV=2; expect "(8) the previous release still pending → ASK" 0 '^ASK the previous-release gate answered 2, not 0$'
 base; DEV=2; expect "(9) the dev deploy not yet done → ASK" 0 '^ASK the dev-deploy wait answered 2, not 0$'
-base; TOWER_ARG=$'Tower: clear\nOn final: #41 release/26-01-14\nWaiting: #42 release/26-01-15'; expect "(10) another release is on final → ASK" 0 '^ASK pull request #42 is not On final'
-base; TOWER_ARG=$'On final: #421 release/x'; expect "(10b) #421 on final does not match #42 → ASK" 0 '^ASK pull request #42 is not On final'
+base; TOWER_ARG=$'Tower: clear\nOn final: #41 release/26-01-14\nWaiting: #42 release/26-01-15'; expect "(10) another release is on final → ASK" 0 '^ASK pull request #42 is not the one release On final'
+base; TOWER_ARG=$'On final: #421 release/x'; expect "(10b) #421 on final does not match #42 → ASK" 0 '^ASK pull request #42 is not the one release On final'
+base; TOWER_ARG=$'On final: #42-old release/x'; expect "(10c) #42-old is not #42 → ASK" 0 '^ASK pull request #42 is not the one release On final'
+base; TOWER_ARG=$'On final: #42 release/old\nOn final: #43 release/current'; expect "(10d) two On final lines → ASK" 0 '^ASK pull request #42 is not the one release On final'
+base; TOWER_ARG=$'On final: #42'; expect "(10e) an On final line with no head → ASK" 0 '^ASK pull request #42 is not the one release On final'
 
 base; CLASS="RELEASE CLASS: FULL"; CHECKS=red
 expect "(11) several failures → the first in order is named" 0 '^ASK not a light release'

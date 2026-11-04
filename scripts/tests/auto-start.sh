@@ -98,16 +98,42 @@ starter one & starter two & wait
 got="$(cat "$WORK/starter-one" "$WORK/starter-two" | sort | tr '\n' ' ')"
 [ "$got" = "LOST WON " ] && ok "(12) two starters at one trigger → exactly one wins the release-train claim" || bad "(12) $got"
 
-# (13)-(14) why the claim is released NON-final at the cut: through story-claim.py decide, a
-# release-train claim released with outcome done answers every later claim with "already finished"
-# (skip: no release could ever start again), while a released non-final claim is won again.
-DECIDE="$ROOT/skills/build-item/scripts/story-claim.py"
-ask() { printf '{"mode":"select","item":"the release train","response":%s,"me":"bb","now":"2026-01-15T18:00:00Z","tz":"America/Chicago"}' "$1" | python3 "$DECIDE" decide; }
-final='{"won": false, "final": true, "claim": {"kind": "release-train", "key": "acme/widgets", "holderDigest": "aa", "machine": "m", "sessionName": "s", "releasedAt": "x", "outcome": "done"}}'
-again='{"won": true, "claim": {"kind": "release-train", "key": "acme/widgets", "holderDigest": "bb"}}'
-ask "$final" | grep -q '"action": "skip"' && ok "(13) a final release-train claim would block every later release (so it is never released final)" || bad "(13) $(ask "$final")"
-ask "$again" | grep -q '"action": "proceed"' && ok "(14) after a non-final release the next cycle wins the claim again" || bad "(14) $(ask "$again")"
-grep -q 'NON-final' "$ROOT/skills/release/references/auto-start.md" && ! grep -Eq 'release-train.*outcome `?done' "$ROOT/skills/release/references/auto-start.md" \
-  && ok "(15) the contract releases the train claim non-final, never done" || bad "(15) auto-start.md"
+# (13)-(15) the claim is released NON-final at the cut. The contract's exact release outcome is
+# read from auto-start.md and run through a stand-in store with the server's rule (a final release,
+# or outcome done, blocks the key for good); story-claim.py decide then judges the next claim.
+OUTCOME="$(grep -A1 'Release it NON-final' "$ROOT/skills/release/references/auto-start.md" | grep -o 'with outcome `[a-z-]*`' | head -1 | sed 's/.*`\(.*\)`/\1/')"
+[ -n "$OUTCOME" ] && [ "$OUTCOME" != done ] && ok "(13) the contract names one non-final outcome ($OUTCOME)" || bad "(13) outcome '$OUTCOME'"
+OUT="$(python3 - "$ROOT/skills/build-item/scripts/story-claim.py" "$OUTCOME" <<'PY'
+import json, subprocess, sys
+helper, outcome = sys.argv[1], sys.argv[2]
+rows = {}
+def claim(key, me):
+    row = rows.get(key)
+    if row and row["releasedAt"] and (row["final"] or row["outcome"] == "done"):
+        return {"won": False, "final": True, "claim": row}
+    if row and not row["releasedAt"] and row["holderDigest"] != me:
+        return {"won": False, "claim": row}
+    rows[key] = {"kind": "release-train", "key": key, "holderDigest": me, "machine": "m", "sessionName": "s",
+                 "claimedAt": "2026-01-15T18:00:00Z", "heartbeatAt": "2026-01-15T18:00:00Z",
+                 "expiresAt": "2026-01-15T18:30:00Z", "releasedAt": None, "outcome": None, "final": False}
+    return {"won": True, "claim": rows[key]}
+def release(key, outcome, final=False):
+    rows[key].update(releasedAt="2026-01-15T18:10:00Z", outcome=outcome, final=final)
+def decide(resp, me):
+    req = {"mode": "select", "item": "the release train", "response": resp, "me": me, "now": "2026-01-15T18:11:00Z", "tz": "America/Chicago"}
+    return json.loads(subprocess.run([sys.executable, helper, "decide"], input=json.dumps(req), capture_output=True, text=True).stdout)["action"]
+k = "acme/widgets"
+first = decide(claim(k, "aa"), "aa")
+held = decide(claim(k, "bb"), "bb")
+release(k, outcome)
+second = decide(claim(k, "bb"), "bb")
+rows.clear(); claim(k, "aa"); release(k, "done")
+blocked = decide(claim(k, "bb"), "bb")
+print(first, held, second, blocked)
+PY
+)"
+set -- $OUT
+[ "$1 $2" = "proceed skip" ] && ok "(14) the first claim proceeds and a second session is held off" || bad "(14) $OUT"
+[ "$3" = proceed ] && [ "$4" = skip ] && ok "(15) released with '$OUTCOME' the next cycle claims again; released done it never could" || bad "(15) $OUT"
 
 exit "$FAIL"
