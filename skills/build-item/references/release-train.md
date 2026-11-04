@@ -53,8 +53,10 @@ request's base.
   train's pull request into `baseBranch`, which `release` opens before every cut. 4a's floor holds:
   no completed risk check or receipt → 4b.
 - **A small, clean fix skips its own review pass.** With `releaseTrain.smallFixes` set, on the fast
-  path only, pass `git diff --numstat -z --no-renames origin/<train>...HEAD` and the config to
-  `routing.py small` after the build (exit 2 → STOP naming the config error). `small: true`, AND
+  path only, after the build run `git diff --numstat -z --no-renames origin/<train>...HEAD |
+  python3 -c 'import json,sys; print(json.dumps({"config": json.load(open(".claude/ds-config.json")),
+  "numstat": sys.stdin.read()}))' | python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/routing.py
+  small` — never through a shell variable, which drops the NULs (exit 2 → STOP naming the error). `small: true`, AND
   the risk check raised no finding, launched no immediate-risk verifier and matched no mandatory
   lens → 4a's `review` LOCAL-ONLY call does not run: with no finding there is nothing to triage
   or distill into lessons. The progress table's review row reads "covered by the train's release

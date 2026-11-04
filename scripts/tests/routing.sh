@@ -99,6 +99,8 @@ for label, config, numstat, small, files, lines in cases:
 for label, config, numstat in [
   ("maxFiles 0 is refused", {"releaseTrain": {"smallFixes": {"maxFiles": 0, "maxChangedLines": 5}}}, "1\t0\ta\0"),
   ("a malformed numstat line is refused", base, "nonsense\0"),
+  ("numstat cut at its first NUL is refused", base, "1\t0\ta.ts\x001\t0\tsrc/auth/x.ts"),
+  ("numstat with its NULs dropped is refused", base, "1\t0\ta.ts1\t0\tsrc/auth/x.ts"),
   ("both train names together are refused", {"releaseTrain": {"branch": "a"}, "supportTrain": {"branch": "b"}}, ""),
 ]:
     rc, out = run(config, numstat)
@@ -108,7 +110,7 @@ PY2
 )"
 printf '%s\n' "$SMALL" | sed 's/^/  /'
 printf '%s\n' "$SMALL" | grep -q '^FAIL' && FAIL=1
-[ "$(printf '%s\n' "$SMALL" | grep -c '^ok')" = 14 ] || { echo "  FAIL small: expected 14 cases"; FAIL=1; }
+[ "$(printf '%s\n' "$SMALL" | grep -c '^ok')" = 16 ] || { echo "  FAIL small: expected 16 cases"; FAIL=1; }
 
 # dependency-free: standard library only
 MODS="$(python3 -c 'import ast,sys; t=ast.parse(open(sys.argv[1]).read()); print(" ".join(sorted({a.name for n in ast.walk(t) if isinstance(n, ast.Import) for a in n.names} | {n.module for n in ast.walk(t) if isinstance(n, ast.ImportFrom)})))' "$HELPER")"

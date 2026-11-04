@@ -105,12 +105,13 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
      train and on a late one-off STOPS, returning `LATE-ARRIVAL` with the pull request still a
      draft, any running engine stopped and its partial result dropped, the cumulative ledger and
      the lessons tally (no step 6.5 for the cancelled cycle); `pr` returns it to this step at once,
-     running no pre-ship check. Absorb, then run step 4's `pr` again, driven, with the same
-     declarations and scope and the carried ledger as caller evidence: a fresh cycle 1 over the
+     running no pre-ship check. Absorb, then run `pr` steps 2–2c on it again (the pull request
+     exists), driven, with step 4's declarations and scope and the carried ledger as caller evidence: a fresh cycle 1 over the
      full snapshot diff, the cycle target counted afresh (the one exception to never resetting it),
-     the pre-ship hold re-decided for the new tree. At most THREE restarts per release; after the
-     third, and once the pull request is ready, later landings ship next time, said so — so CI
-     runs once and the release cannot be held open by a busy train.
+     the pre-ship hold re-decided for the new tree. At most THREE restarts per release: the third restart's
+     run, and the first ready-flip, end the window — `late-arrivals` is no longer declared and later
+     landings ship next time, said so — so CI runs once and a busy train cannot hold the release
+     open.
    - **`"offer"`** (absent) — only on the owner's instruction, and only before `review` step 7's
      ready-flip; the absorbed range then gets one FULL-scope cycle of every configured engine
      with the ledger, outside the cycle budget (a required engine that cannot run STOPS). Later

@@ -38,7 +38,9 @@ repository's `epicIntegrationBranches.slugRule`; absent, the title is kebab-case
 
 `small` says whether a one-off on the release train is a SMALL fix (`references/release-train.md`):
 `numstat` is the text of `git diff --numstat -z --no-renames origin/<train>...HEAD` (NUL-separated,
-so paths arrive unquoted). Small means
+so paths arrive unquoted). It must arrive intact: a non-empty value that does not end in NUL was cut
+or had its NULs dropped on the way (a shell variable does both), and is refused. Pipe it straight
+into the request (`references/release-train.md` gives the command). Small means
 `releaseTrain.smallFixes` is set, the diff changes at most `maxFiles` files and at most
 `maxChangedLines` lines (added plus removed), holds no binary file, and touches no path matching
 `release.productionReview.highRiskPaths` or `release.releaseBranchFixExclusions`. An empty diff is
@@ -203,6 +205,8 @@ def cmd_small(req):
     numstat = req.get("numstat")
     if not isinstance(numstat, str):
         fail("small: numstat must be the text of git diff --numstat")
+    if numstat and not numstat.endswith("\0"):
+        fail("small: numstat does not end in NUL — it was cut or lost its NULs on the way; pipe git diff --numstat -z straight in")
     limits = train_section(config).get("smallFixes")
     if limits is None:
         return {"small": False, "files": 0, "lines": 0, "riskFiles": [], "reason": "releaseTrain.smallFixes is not set"}

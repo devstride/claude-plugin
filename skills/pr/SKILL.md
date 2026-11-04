@@ -137,7 +137,7 @@ it exists because a change there breaks the check invisibly.
 ## 2c. Discharge the pre-ship hold
 
 **Only when step 2 declared a hold.** Re-invoke **`review` in PRE-SHIP RESUME mode, naming that
-mode** — it re-enters at 7.1, re-checks the base and unresolved threads, flips the PR ready and
+mode** and step 2's declarations (a `LATE-ARRIVAL` returns to the caller, as from step 2) — it re-enters at 7.1, re-checks the base and unresolved threads, flips the PR ready and
 settles CI. A plain re-invocation restarts at step 0, re-requesting cloud reviewers and corrupting
 the lessons store. **Never leave a declared hold undischarged** — the PR is stranded as a permanent
 draft; if the pre-ship checks cannot go green, say so and surface the held state.

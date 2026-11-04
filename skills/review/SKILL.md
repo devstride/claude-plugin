@@ -90,16 +90,15 @@ definition or a deferral route.**
 ## Modes — callers name them
 
 - **Driven**: on poll timeout proceed; never notify; return the findings
-  summary + untracked-deferral list; capture per step 4, never ask. `late-arrivals` →
-  check the train before each cycle and the flip; a late one-off returns `LATE-ARRIVAL`. **Standalone**: keep
+  summary + untracked-deferrals; capture per step 4, never ask. `late-arrivals` →
+  until the first flip, check the train before each cycle and flip; arrivals → `LATE-ARRIVAL`. **Standalone**: keep
   the ask-gates; notify per `review.notifyWhenSettled`.
 - **LOCAL-ONLY** (fast develop mode, `build-item` step 4a; a base REF, no PR): no routine second
   review. Consume the hand-off — story review ledger and risk-check findings, SHA-keyed verification
   receipt, dismissed-findings list (imported dispositions, never re-raised without new evidence),
   untracked-deferral list — run steps 3–5 for triage and fixes, then **step 6.5, which this path
   MUST write**; return the triaged findings, the untracked-deferral list **and the lessons tally**.
-  The caller owns the merge. Never launch `review.localAssistCommand` here. Missing risk-screen evidence → the full PR path. Runs with no CLI engine
-  too. Skips 0–2 and 6–8.
+  The caller owns the merge. Never launch `review.localAssistCommand` here. Missing risk-screen evidence → the full PR path. Runs without a CLI engine. Skips 0–2 and 6–8.
 - **PRE-SHIP RESUME** (`pr`/`release` step 2c) — the return from a **7.1b** hold. **Start at 7.1**:
   re-resolve the PR, re-run 7.1's base/patch check and the paginated zero-unresolved check, flip,
   settle. A changed patch → step 5's contextual wave through 3–6.5, back to 7.1, zero threads, flip.

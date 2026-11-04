@@ -19,26 +19,30 @@ for what each version component means here and how a release is cut.
   keeps its build-time risk check and local gate but skips the separate local-only review pass; the
   train's pull request is the batch's one full review and one CI run. `routing.py small` decides it.
 - **A late one-off can restart the train's review.** Optional `releaseTrain.lateArrivals`:
-  `"restart"` absorbs a one-off that lands while the train's pull request is under review as soon as
-  it is seen, cancels the review in progress (a ready pull request goes back to draft) and restarts
-  the review over the whole snapshot, so the late work never gets a review round of its own.
-  Absent or `"offer"` keeps today's behaviour: it joins only on the owner's word, before the
-  ready-flip.
+  `"restart"` absorbs a one-off that lands while the train's pull request is under review: review
+  stops with `LATE-ARRIVAL`, the release absorbs it and runs the review again over the whole
+  snapshot, so the late work never gets a review round of its own. The window closes at the first
+  ready-flip or after three restarts, whichever comes first; later landings ship with the next
+  release, so CI still runs once. Absent or `"offer"` keeps today's behaviour: it joins only on the
+  owner's word, before the ready-flip.
+- **Small fixes skip their own review pass only when their risk check found nothing**, so every
+  finding still reaches the lessons store; `routing.py small` reads NUL-separated `git diff
+  --numstat -z` and refuses input whose NULs were lost.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.22.0 @ 69ae9bf, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.22.0 @ 49fcdf8, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.22.0 | tokens@devstride--v3.22.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,094 | 10,698 | 32,094 | 10,698 | +0 | 10,700 |
-| skills/review/SKILL.md | 23,994 | 7,998 | 23,997 | 7,999 | +1 | 8,000 |
+| skills/review/SKILL.md | 23,994 | 7,998 | 23,999 | 8,000 | +2 | 8,000 |
 | skills/build-item/SKILL.md | 23,995 | 7,999 | 23,991 | 7,997 | -2 | 8,000 |
 | skills/release/SKILL.md | 23,975 | 7,992 | 23,975 | 7,992 | +0 | 8,000 |
 | skills/plan/SKILL.md | 23,891 | 7,964 | 23,891 | 7,964 | +0 | 8,000 |
 | skills/doctor/SKILL.md | 23,700 | 7,900 | 23,700 | 7,900 | +0 | 7,900 |
 | skills/rebalance/SKILL.md | 17,409 | 5,803 | 17,409 | 5,803 | +0 | 5,900 |
 | skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,655 | 4,885 | +0 | 4,900 |
-| skills/pr/SKILL.md | 10,669 | 3,557 | 10,686 | 3,562 | +5 | 3,600 |
+| skills/pr/SKILL.md | 10,669 | 3,557 | 10,837 | 3,613 | +56 | 3,700 |
 | skills/rationalize-gantt/SKILL.md | 7,902 | 2,634 | 7,902 | 2,634 | +0 | 2,700 |
 | skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
 | skills/create-defect/SKILL.md | 7,483 | 2,495 | 7,483 | 2,495 | +0 | 2,500 |
@@ -61,7 +65,7 @@ for what each version component means here and how a release is cut.
 | skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,368 | 1,790 | 5,368 | 1,790 | +0 | 1,800 |
-| **total (bodies)** | 269,680 | 89,901 | 269,696 | 89,905 | +4 | |
+| **total (bodies)** | 269,680 | 89,901 | 269,849 | 89,957 | +56 | |
 
 ## [3.22.0] — 2026-11-03
 

@@ -91,7 +91,8 @@ replace a legacy literal tier in the template exactly as the route would.
 ## Cycle accounting
 
 `targetAdversarialCycles` normally allows two useful cycles across Claude, local CLI, cloud, rebase,
-pre-ship and code-changing CI repair rechecks; no event resets the count. The first wave spends
+pre-ship and code-changing CI repair rechecks; no event resets the count (one exception: a release-train late-arrival restart,
+`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` §1 step 4a). The first wave spends
 cycle 1; each concurrent contextual wave spends one more; `none` spends nothing. At the normal
 target, lower findings get their `fixFloor` disposition, affected checks and one main-agent ledger
 inspection. A verified P1/serious P2 instead requires another contextual cycle after its fix; repeat
