@@ -115,7 +115,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   whenever PR workflows exist (the draft holds CI via `ci.draftGateCondition`); no CI → omit
   `--draft` and report `no pull-request CI`. Never `--fill`. Leave cloud requests to `review` (it
   captures each baseline/request hand-off while local review starts); `review` step 7 flips it
-  ready. `preShipChecks` suites are NOT in CI — they run in 2b.
+  ready. `preShipChecks` run in 2b (`runAt: train`: 4b), never CI.
 - **Release-flavored body** — `prBodyTemplate.sections` in order (the file wins over the fallback),
   flavor by POSITION: 1st (fallback `## Simple Description`) — what consumers get in this deploy, in
   plain language, then the constituent epics/items (`I##### — title`); 2nd (`## Technical

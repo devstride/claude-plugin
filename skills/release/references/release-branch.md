@@ -128,9 +128,9 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    no-op, said so). Step 2b gets `--ran-at-train <names>@<sha>` from that line; it is the only
    automatic 2b skip for such an entry. **A red result STOPS the train merge.** The fix path: the
    owner may instead waive it in words; otherwise commit the fix on the snapshot, convert the pull
-   request to draft, run the fix through `review` (its step 5 contextual follow-up with the
-   cumulative ledger), re-flip it ready, re-settle CI at the new head, and rerun this step at that
-   head; step 5's `<reviewedHead>` pin is that new head. Under scope `release` the clearance is
+   request to draft, re-enter `pr` steps 2–2c at the new head (its `pre-ship pr select` and every selected
+   check rerun, then `review`'s step 5 contextual follow-up with the cumulative ledger, the
+   ready-flip and CI at that head), and rerun this step there; step 5's `<reviewedHead>` pin is that new head. Under scope `release` the clearance is
    already held (step 0a); under `cut-to-deploy` it is not claimed until the cut. With no train
    pull request, no passing line or a different tree, step 2b runs these entries itself.
 5. **Merge** — first `git fetch origin <releaseSource>` and run the exclusion check with
