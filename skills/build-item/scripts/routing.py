@@ -14,6 +14,7 @@ Every subcommand reads one JSON object on stdin and writes one JSON object on st
   slug         {"title", "words"?}                            -> {"slug"}
   branch-name  {"config", "item", "title"|"slug", "prefix", "date"} -> {"branch"}
   excluded     {"config", "files":[…]}                        -> {"excluded":[…]}
+  small        {"config", "numstat"}                          -> {"small", "files", "lines", "riskFiles":[…]}
   target       {"config", "chain":[{"number","title","workType"}…], "heads":[…], "prefix", "date",
                 "explicit"?, "changedFiles"?, "oneOff"?, "roles"?, "epicSlug"?}
                -> {"kind": explicit|integration|epic|train|base|ask|refuse, "branch"?, "create"?,
@@ -34,6 +35,13 @@ release-unit ancestor is a one-off. `roles` ({"leaf":[…], "releaseUnit"}) carr
 from the organization's work-type hierarchy and is used only when the config has no
 `hierarchyRoles`; neither → an error, never a guess. `epicSlug` is the epic's title slug under the
 repository's `epicIntegrationBranches.slugRule`; absent, the title is kebab-cased to six words.
+
+`small` says whether a one-off on the release train is a SMALL fix (`references/release-train.md`):
+`numstat` is the text of `git diff --numstat --no-renames origin/<train>...HEAD`. Small means
+`releaseTrain.smallFixes` is set, the diff changes at most `maxFiles` files and at most
+`maxChangedLines` lines (added plus removed), holds no binary file, and touches no path matching
+`release.productionReview.highRiskPaths` or `release.releaseBranchFixExclusions`. An empty diff is
+not small: there is nothing to batch.
 
 `config` is the repository's `.claude/ds-config.json` (only the keys below are read). `chain` runs
 from the item itself up to the root, each entry carrying its work-type NAME (a workstream has
@@ -181,6 +189,61 @@ def epic_branch_candidates(config, epic_number, epic_slug, heads):
     return pattern, found, older
 
 
+def positive(value, what):
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        fail("config: %s must be a positive whole number" % what)
+    return value
+
+
+def cmd_small(req):
+    config = req.get("config")
+    if not isinstance(config, dict):
+        fail("small: config must be an object")
+    numstat = req.get("numstat")
+    if not isinstance(numstat, str):
+        fail("small: numstat must be the text of git diff --numstat")
+    limits = train_section(config).get("smallFixes")
+    if limits is None:
+        return {"small": False, "files": 0, "lines": 0, "riskFiles": [], "reason": "releaseTrain.smallFixes is not set"}
+    if not isinstance(limits, dict):
+        fail("config: releaseTrain.smallFixes must be an object")
+    max_files = positive(limits.get("maxFiles"), "releaseTrain.smallFixes.maxFiles")
+    max_lines = positive(limits.get("maxChangedLines"), "releaseTrain.smallFixes.maxChangedLines")
+    release = section(config, "release")
+    risky = list(section(release, "productionReview").get("highRiskPaths") or []) + list(release.get("releaseBranchFixExclusions") or [])
+    paths, lines, binary = [], 0, []
+    for row in numstat.splitlines():
+        if not row.strip():
+            continue
+        parts = row.split("\t", 2)
+        if len(parts) != 3:
+            fail("small: %r is not a numstat line" % row)
+        added, removed, path = parts
+        paths.append(path)
+        if added == "-" or removed == "-":
+            binary.append(path)
+        elif added.isdigit() and removed.isdigit():
+            lines += int(added) + int(removed)
+        else:
+            fail("small: %r is not a numstat line" % row)
+    risk = [f for f in paths if first_match(f, risky)]
+    out = {"files": len(paths), "lines": lines, "riskFiles": risk}
+    if not paths:
+        reason = "the diff is empty"
+    elif risk:
+        reason = "it touches %s, on the high-risk list" % ", ".join(risk)
+    elif binary:
+        reason = "it changes a binary file (%s)" % ", ".join(binary)
+    elif len(paths) > max_files:
+        reason = "%d files, over the %d-file limit" % (len(paths), max_files)
+    elif lines > max_lines:
+        reason = "%d changed lines, over the %d-line limit" % (lines, max_lines)
+    else:
+        reason = "%d file(s), %d changed line(s)" % (len(paths), lines)
+        return dict(out, small=True, reason=reason)
+    return dict(out, small=False, reason=reason)
+
+
 # ── subcommands ──
 
 def cmd_target(req):
@@ -266,7 +329,7 @@ def cmd_target(req):
 
 def main():
     if len(sys.argv) != 2:
-        fail("usage: routing.py match|prefix|slug|branch-name|excluded|target < request.json")
+        fail("usage: routing.py match|prefix|slug|branch-name|excluded|target|small < request.json")
     try:
         req = json.load(sys.stdin)
     except ValueError as error:
@@ -297,6 +360,8 @@ def main():
         out = {"excluded": [f for f in files if first_match(f, exclusions)]}
     elif command == "target":
         out = cmd_target(req)
+    elif command == "small":
+        out = cmd_small(req)
     else:
         fail("unknown subcommand %r" % command)
     sys.stdout.write(json.dumps(out, sort_keys=True) + "\n")

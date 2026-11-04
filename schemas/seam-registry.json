@@ -1580,6 +1580,38 @@
       "since": "pre-registry"
     },
     {
+      "key": "releaseTrain.smallFixes",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "limits under which a fast one-off is a small fix and skips its own local review pass; null reads as absent",
+      "since": "unreleased"
+    },
+    {
+      "key": "releaseTrain.smallFixes.maxFiles",
+      "type": "integer",
+      "description": "at most this many changed files",
+      "since": "unreleased"
+    },
+    {
+      "key": "releaseTrain.smallFixes.maxChangedLines",
+      "type": "integer",
+      "description": "at most this many changed lines, added plus removed",
+      "since": "unreleased"
+    },
+    {
+      "key": "releaseTrain.lateArrivals",
+      "type": "string",
+      "enum": [
+        "restart",
+        "offer"
+      ],
+      "default": "offer",
+      "description": "restart: a one-off landing during the train's review restarts that review over the whole snapshot; offer: it joins only on the owner's word",
+      "since": "unreleased"
+    },
+    {
       "key": "supportTrain",
       "type": [
         "object",
@@ -1599,6 +1631,38 @@
       "type": "boolean",
       "description": "the old name of releaseTrain.fastMerges",
       "since": "3.22.0"
+    },
+    {
+      "key": "supportTrain.smallFixes",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "limits under which a fast one-off is a small fix and skips its own local review pass; null reads as absent (the old name, read when releaseTrain is absent)",
+      "since": "unreleased"
+    },
+    {
+      "key": "supportTrain.smallFixes.maxFiles",
+      "type": "integer",
+      "description": "at most this many changed files (the old name, read when releaseTrain is absent)",
+      "since": "unreleased"
+    },
+    {
+      "key": "supportTrain.smallFixes.maxChangedLines",
+      "type": "integer",
+      "description": "at most this many changed lines, added plus removed (the old name, read when releaseTrain is absent)",
+      "since": "unreleased"
+    },
+    {
+      "key": "supportTrain.lateArrivals",
+      "type": "string",
+      "enum": [
+        "restart",
+        "offer"
+      ],
+      "default": "offer",
+      "description": "restart: a one-off landing during the train's review restarts that review over the whole snapshot; offer: it joins only on the owner's word (the old name, read when releaseTrain is absent)",
+      "since": "unreleased"
     },
     {
       "key": "releaseTower",

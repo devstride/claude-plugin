@@ -8,6 +8,21 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Small fixes on the release train skip their own review pass.** Optional
+  `releaseTrain.smallFixes` (`{maxFiles, maxChangedLines}`) marks a fast one-off as small when its
+  diff stays within both limits, holds no binary file and touches nothing on the high-risk list
+  (`release.productionReview.highRiskPaths` plus `release.releaseBranchFixExclusions`). A small fix
+  keeps its build-time risk check and local gate but skips the separate local-only review pass; the
+  train's pull request is the batch's one full review and one CI run. `routing.py small` decides it.
+- **A late one-off can restart the train's review.** Optional `releaseTrain.lateArrivals`:
+  `"restart"` absorbs a one-off that lands while the train's pull request is under review as soon as
+  it is seen, cancels the review in progress (a ready pull request goes back to draft) and restarts
+  the review over the whole snapshot, so the late work never gets a review round of its own.
+  Absent or `"offer"` keeps today's behaviour: it joins only on the owner's word, before the
+  ready-flip.
+
 ## [3.22.0] — 2026-11-03
 
 ### Changed

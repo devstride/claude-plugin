@@ -200,9 +200,17 @@ starting with `_` and `$schema` are never reported as unknown.
 | `releaseTrain` | object, null | — | — | one long-lived branch one-off work batches on; null reads as absent | pre-registry |
 | `releaseTrain.branch` | string | — | — | the train's branch | pre-registry |
 | `releaseTrain.fastMerges` | boolean | — | `false` | a one-off merges onto the train without its own pull request | pre-registry |
+| `releaseTrain.smallFixes` | object, null | — | — | limits under which a fast one-off is a small fix and skips its own local review pass; null reads as absent | unreleased |
+| `releaseTrain.smallFixes.maxFiles` | integer | — | — | at most this many changed files | unreleased |
+| `releaseTrain.smallFixes.maxChangedLines` | integer | — | — | at most this many changed lines, added plus removed | unreleased |
+| `releaseTrain.lateArrivals` | string | restart, offer | offer | restart: a one-off landing during the train's review restarts that review over the whole snapshot; offer: it joins only on the owner's word | unreleased |
 | `supportTrain` | object, null | — | — | the old name of releaseTrain, still read when releaseTrain is absent (doctor notes it; both together is an error) | 3.22.0 |
 | `supportTrain.branch` | string | — | — | the old name of releaseTrain.branch | 3.22.0 |
 | `supportTrain.fastMerges` | boolean | — | — | the old name of releaseTrain.fastMerges | 3.22.0 |
+| `supportTrain.smallFixes` | object, null | — | — | limits under which a fast one-off is a small fix and skips its own local review pass; null reads as absent (the old name, read when releaseTrain is absent) | unreleased |
+| `supportTrain.smallFixes.maxFiles` | integer | — | — | at most this many changed files (the old name, read when releaseTrain is absent) | unreleased |
+| `supportTrain.smallFixes.maxChangedLines` | integer | — | — | at most this many changed lines, added plus removed (the old name, read when releaseTrain is absent) | unreleased |
+| `supportTrain.lateArrivals` | string | restart, offer | offer | restart: a one-off landing during the train's review restarts that review over the whole snapshot; offer: it joins only on the owner's word (the old name, read when releaseTrain is absent) | unreleased |
 | `releaseTower` | object | — | — | the release-tower check's settings | pre-registry |
 | `releaseTower.overrideLabel` | string | — | release-tower-override | the label passing an owner-approved pull request | pre-registry |
 | `releaseTower.hotfixPattern` | string | — | */hotfix/** | heads never held | pre-registry |

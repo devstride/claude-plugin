@@ -66,7 +66,7 @@ workflows SUPPORT** — no profile bypasses a supported hold.
   AND its first token resolves (`command -v`). `null` is legal. Present, it reviews every
   PR-boundary run under every profile (release, one-off, hotfix); fast stories defer it with the
   rest of the roster.
-- **Cloud** — exactly `review.automatedReviewers`; `[]` is legal (absent reviews are correct). An
+- **Cloud** — exactly `review.automatedReviewers`; `[]` is legal. An
   entry's `baseBranches` (absent or malformed → every base) admits only a PR whose LIVE `baseRefName`
   matches EXACTLY, re-read every run; else SCOPED OUT: announced, never requested, not degradation.
   `requestPolicy` `"final-head"` (absent: every round) → asked once, at step 7 — read
@@ -82,23 +82,23 @@ design. A missing engine narrows the roster, never a hard stop — except a fast
 completed local risk screen (`build-item` step 4). **No config file → CLAUDE-ONLY**, said.
 Substitute `<effort>` from the task/risk route (or `review.localEffort`, `delta-re-review.md`);
 a legacy Codex template's literal
-`model_reasoning_effort` is replaced per invocation (stale config never pins every task to `xhigh`;
-never pick its model). **Read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/roster-and-modes.md`
+`model_reasoning_effort` is replaced per invocation (stale config never pins `xhigh`; never pick
+its model). **Read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/roster-and-modes.md`
 when a roster resolves to fewer engines than the config declares, or before changing a mode
 definition or a deferral route.**
 
 ## Modes — callers name them
 
 - **Driven** (the caller says so): on poll timeout proceed; never notify; return the findings
-  summary + untracked-deferral list; capture per step 4, never ask. **Standalone**: keep
+  summary + untracked-deferral list; capture per step 4, never ask. `late-arrivals` declared →
+  fetch the train each cycle; a late one-off hands back. **Standalone**: keep
   the ask-gates; notify per `review.notifyWhenSettled`.
 - **LOCAL-ONLY** (fast develop mode, `build-item` step 4a; a base REF, no PR): no routine second
   review. Consume the hand-off — story review ledger and risk-check findings, SHA-keyed verification
   receipt, dismissed-findings list (imported dispositions, never re-raised without new evidence),
   untracked-deferral list — run steps 3–5 for triage and fixes, then **step 6.5, which this path
   MUST write**; return the triaged findings, the untracked-deferral list **and the lessons tally**.
-  The caller owns the merge. Never launch `review.localAssistCommand` here (that opinion is
-  `ultracode-build`'s). Missing risk-screen evidence → the full PR path. Runs with no CLI engine
+  The caller owns the merge. Never launch `review.localAssistCommand` here. Missing risk-screen evidence → the full PR path. Runs with no CLI engine
   too. Skips 0–2 and 6–8.
 - **PRE-SHIP RESUME** (`pr`/`release` step 2c) — the return from a **7.1b** hold. **Start at 7.1**:
   re-resolve the PR, re-run 7.1's base/patch check and the paginated zero-unresolved check, flip,
