@@ -95,11 +95,12 @@ merged); read `args` defensively — `const items = Array.isArray(args) ? args :
 Pipe `{"today", "valueLeaves": [{"number", "dueDate"}], "deferred": [{"number", "done",
 "startDate", "dueDate"}]}` to `python3 ${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/scripts/deferred-dates.py`
 — `valueLeaves` the dates step 3 just computed for every leaf outside the container (plus the
-existing dates of Done leaves in not-done-only mode), `deferred` every member leaf. It returns the
+existing dates of Done leaves in not-done-only mode), `deferred` every member leaf with its
+`groups` (the matched containers and intermediate nodes above it). It returns the
 `boundary` (the last value due date), `assignments` (`scheduled`: start = due = one day after the
 boundary, then the next, in item-number order; `kept`: an item already starting after the boundary
 keeps its dates),
-`untouchedDone` and the `containerSpan`. Write every `scheduled` entry and the container's span
+`untouchedDone` and `groupSpans`. Write every `scheduled` entry and every group's span
 with step 4's chunked `bulk_update_items`, under step 1's check, `staticMode` omitted; a `kept`
 entry writes nothing. Related-only items cannot trigger propagation. No member → skip.
 

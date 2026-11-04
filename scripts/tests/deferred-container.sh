@@ -19,9 +19,10 @@ expect "a configured title matches, a leftover Deferred does not" match '{"title
 expect "a title that only contains the word is not a match" match '{"title":"Deferred","children":[{"number":"I35","title":"Phase 2 - Deferred Cleanups & Tech-Debt Retirement"},{"number":"I36","title":"Deferred and later"}]}' '[d["container"],d["create"]]' '[null, true]'
 expect "two matches: the lower number wins, numerically (I9 before I10)" match '{"title":"Deferred","children":[{"number":"I10","title":"Deferred"},{"number":"I9","title":"Deferred defects"}]}' '[d["container"],d["duplicates"],d["all"],d["matchedBy"]]' '["I9", ["I10"], ["I9", "I10"], "legacy"]'
 expect "no match: create" match '{"title":"Deferred","children":[]}' '[d["container"],d["all"],d["duplicates"],d["matchedBy"],d["create"]]' '[null, [], [], null, true]'
+expect "an empty legacy entry is skipped, never a refusal" match '{"title":"Deferred","legacyTitles":["Deferred defects",""],"children":[{"number":"I38","title":"Deferred"}]}' 'd["container"]' '"I38"'
 expect "a configured list never removes the built-in legacy title" match '{"title":"Deferred","legacyTitles":["Something else"],"children":[{"number":"I37","title":"Deferred defects"}]}' 'd["container"]' '"I37"'
 
-for bad_input in 'not json' '{"children":[]}' '{"title":"Deferred","children":"x"}' '{"title":"Deferred","legacyTitles":"x","children":[]}' '{"title":"Deferred","legacyTitles":[""],"children":[]}'; do
+for bad_input in 'not json' '{"children":[]}' '{"title":"Deferred","children":"x"}' '{"title":"Deferred","legacyTitles":"x","children":[]}' '{"title":"Deferred","legacyTitles":[5],"children":[]}' '{"title":"Deferred","children":[{"number":5,"title":"Deferred"}]}'; do
   out="$(run match "$bad_input")"; rc=$?
   if [ "$rc" = 2 ] && printf '%s' "$out" | python3 -c 'import json,sys; assert "error" in json.load(sys.stdin)' 2>/dev/null; then ok "malformed match input exits 2 with a JSON error ($bad_input)"; else bad "malformed $bad_input -> rc=$rc $out"; fi
 done

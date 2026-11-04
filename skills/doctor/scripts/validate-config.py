@@ -115,7 +115,8 @@ def deferred_container_checks(v, config):
             if isinstance(entry, str) and not entry.strip():
                 v.add("WARN", "defects.deferredContainerLegacyTitles[%d]" % i, "an empty title matches nothing")
         norm = lambda t: " ".join(t.split()).casefold()
-        if isinstance(title, str) and title.strip() and norm(title) in {norm(t) for t in legacy if isinstance(t, str)}:
+        effective = title if isinstance(title, str) and title.strip() else ("Deferred" if title is None else "")
+        if effective and norm(effective) in {norm(t) for t in legacy if isinstance(t, str)}:
             v.add("NOTE", "defects.deferredContainerLegacyTitles", "lists the current title too; "
                   "the current title is matched already")
 

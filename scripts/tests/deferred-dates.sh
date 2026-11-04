@@ -29,6 +29,15 @@ expect "a Done item is untouched and listed" \
 expect "no value leaves: the block starts today" \
   '{"today":"2026-11-04","valueLeaves":[],"deferred":[{"number":"I9"}]}' \
   "[d['boundary'],$DATES]" '["2026-11-03", [["I9", "2026-11-04", "2026-11-04", "scheduled"]]]'
+expect "a future start with no due date is scheduled, not kept" \
+  "{\"today\":\"2026-10-01\",\"valueLeaves\":$LEAVES,\"deferred\":[{\"number\":\"I9\",\"startDate\":\"2026-12-15\"}]}" \
+  "$DATES" '[["I9", "2026-11-02", "2026-11-02", "scheduled"]]'
+expect "an inverted range (due before start) is scheduled, not kept" \
+  "{\"today\":\"2026-10-01\",\"valueLeaves\":$LEAVES,\"deferred\":[{\"number\":\"I9\",\"startDate\":\"2026-12-15\",\"dueDate\":\"2026-12-01\"}]}" \
+  "$DATES" '[["I9", "2026-11-02", "2026-11-02", "scheduled"]]'
+expect "group spans cover only each group's own items" \
+  "{\"today\":\"2026-10-01\",\"valueLeaves\":$LEAVES,\"deferred\":[{\"number\":\"I9\",\"groups\":[\"I5\"]},{\"number\":\"I10\",\"groups\":[\"I6\",\"I7\"]}]}" \
+  "d['groupSpans']" '{"I5": {"startDate": "2026-11-02", "dueDate": "2026-11-02"}, "I6": {"startDate": "2026-11-03", "dueDate": "2026-11-03"}, "I7": {"startDate": "2026-11-03", "dueDate": "2026-11-03"}}'
 expect "the container span is the min and max of the assignments" \
   "{\"today\":\"2026-10-01\",\"valueLeaves\":$LEAVES,\"deferred\":[{\"number\":\"I9\",\"startDate\":\"2026-12-15\",\"dueDate\":\"2026-12-16\"},{\"number\":\"I10\"}]}" \
   "d['containerSpan']" '{"startDate": "2026-11-02", "dueDate": "2026-12-16"}'
@@ -45,7 +54,7 @@ expect "a later boundary reschedules items the previous run placed" \
   '{"today":"2026-10-01","valueLeaves":[{"number":"I1","dueDate":"2026-11-05"}],"deferred":[{"number":"I9","startDate":"2026-11-02","dueDate":"2026-11-02"},{"number":"I10","startDate":"2026-11-03","dueDate":"2026-11-03"}]}' \
   "$DATES" '[["I9", "2026-11-06", "2026-11-06", "scheduled"], ["I10", "2026-11-07", "2026-11-07", "scheduled"]]'
 
-for bad_input in 'not json' '{"valueLeaves":[],"deferred":[]}' '{"today":"2026-13-40","deferred":[]}' '{"today":"2026-11-04","deferred":"x"}' '{"today":"2026-11-04","deferred":[{"startDate":"2026-11-01"}]}'; do
+for bad_input in 'not json' '{"valueLeaves":[],"deferred":[]}' '{"today":"2026-13-40","deferred":[]}' '{"today":"2026-11-04","deferred":"x"}' '{"today":"2026-11-04","deferred":[{"startDate":"2026-11-01"}]}' '{"today":"2026-11-04","deferred":[{"number":5}]}' '{"today":"2026-11-04","deferred":[{"number":"I1","groups":"I0"}]}'; do
   out="$(run "$bad_input")"; rc=$?
   if [ "$rc" = 2 ] && printf '%s' "$out" | python3 -c 'import json,sys; assert "error" in json.load(sys.stdin)' 2>/dev/null; then ok "malformed input exits 2 with a JSON error ($bad_input)"; else bad "malformed $bad_input -> rc=$rc $out"; fi
 done

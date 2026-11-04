@@ -11,15 +11,15 @@
     "ci-audit": 2600,
     "comprehend-plan": 1670,
     "create-defect": 2500,
-    "create-story": 1890,
+    "create-story": 1940,
     "doctor": 7900,
     "insert-defect": 1600,
     "insert-story": 1400,
     "plan": 8000,
     "pr": 3700,
     "push": 1100,
-    "rationalize-gantt": 3170,
-    "rebalance": 5900,
+    "rationalize-gantt": 3200,
+    "rebalance": 5910,
     "release": 8000,
     "review": 7770,
     "setup": 10700,
@@ -65,7 +65,7 @@
     "skills/release/references/release-gates.md": 1300,
     "skills/release/references/review-once.md": 1100,
     "skills/review/references/ci-settle.md": 1800,
-    "skills/review/references/delivery-loop-invariants.md": 22180,
+    "skills/review/references/delivery-loop-invariants.md": 22300,
     "skills/review/references/delta-re-review.md": 2300,
     "skills/review/references/final-head-request.md": 910,
     "skills/review/references/github-review-api.md": 4700,
@@ -95,15 +95,16 @@
     "skills/doctor/references/claims-checks.md": 450,
     "skills/build-item/references/epic-release-steps.md": 1220,
     "skills/review/references/cloud-reviewers.md": 700,
-    "skills/build-item/references/deferred-container.md": 2030
+    "skills/build-item/references/deferred-container.md": 2280
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 77340,
+      "budget": 79620,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
         "skills/build-item/references/next-unblocked.md",
+        "skills/build-item/references/deferred-container.md",
         "skills/build-item/references/story-claims.md",
         "skills/build-item/references/plain-language-output.md",
         "skills/build-item/references/verification-receipts.md",
@@ -135,10 +136,11 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 62700,
+      "budget": 64970,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
+        "skills/build-item/references/deferred-container.md",
         "skills/build-item/references/story-claims.md",
         "skills/build-item/references/plain-language-output.md",
         "skills/build-item/references/progress-table.md",

@@ -7,16 +7,19 @@ on stdin, writes one JSON line on stdout:
 
   {"today": "YYYY-MM-DD",
    "valueLeaves": [{"number", "dueDate"}…],
-   "deferred": [{"number", "done", "startDate", "dueDate"}…]}
+   "deferred": [{"number", "done", "startDate", "dueDate", "groups"?: […]}…]}
   -> {"boundary", "assignments": [{"number", "startDate", "dueDate", "reason": "scheduled"|"kept"}…],
-      "untouchedDone": […], "containerSpan": {"startDate", "dueDate"} | null}
+      "untouchedDone": […], "containerSpan": {"startDate", "dueDate"} | null,
+      "groupSpans": {"<number>": {"startDate", "dueDate"}}}
 
 `valueLeaves` carry the dates the cascade just computed for every non-deferred leaf (plus the
 existing dates of Done leaves in not-done-only mode). The boundary is their latest `dueDate`, or
-the day before `today` when there is none. An open item starting after the boundary keeps both
-dates ("kept") and uses up no day; every other open item gets start = due = boundary + 1, + 2, …
-in ascending item-number order ("scheduled"). Done items are never assigned. Weekends are not
-special-cased. Re-running on its own output changes nothing. Exit 0 on a decision; 2 on bad
+the day before `today` when there is none. An open item whose start is after the boundary and
+whose due date is present and not before it keeps both dates ("kept") and uses up no day; every
+other open item gets start = due = boundary + 1, + 2, … in ascending item-number order
+("scheduled"). Done items are never assigned. `groups` names the container and intermediate nodes
+above an item; `groupSpans` gives each its span over the assignments of its own items. Weekends
+are not special-cased. Re-running on its own output changes nothing. Exit 0 on a decision; 2 on bad
 input with one `{"error": …}` line.
 """
 import datetime
@@ -40,6 +43,7 @@ def day(value, what, optional=False):
 
 
 def number_key(number):
+    number = str(number)
     digits = re.sub(r"\D", "", number)
     return (int(digits) if digits else 0, number)
 
@@ -59,18 +63,21 @@ def main():
     dues = [d for d in dues if d]
     boundary = max(dues) if dues else today - datetime.timedelta(days=1)
 
-    assignments, done, cursor = [], [], boundary
-    for item in sorted(deferred, key=lambda i: number_key(i.get("number", "")) if isinstance(i, dict) else (0, "")):
+    for item in deferred:
         if not isinstance(item, dict) or not isinstance(item.get("number"), str) or not item["number"]:
             fail("every deferred item needs a number")
+        if not isinstance(item.get("groups", []), list):
+            fail("groups must be an array of item numbers")
+    assignments, done, cursor = [], [], boundary
+    for item in sorted(deferred, key=lambda i: number_key(i["number"])):
         if item.get("done"):
             done.append(item["number"])
             continue
         start = day(item.get("startDate"), "a deferred startDate", optional=True)
         due = day(item.get("dueDate"), "a deferred dueDate", optional=True)
-        if start and start > boundary:
+        if start and due and start > boundary and due >= start:
             assignments.append({"number": item["number"], "startDate": start.isoformat(),
-                                "dueDate": (due or start).isoformat(), "reason": "kept"})
+                                "dueDate": due.isoformat(), "reason": "kept"})
             continue
         cursor += datetime.timedelta(days=1)
         assignments.append({"number": item["number"], "startDate": cursor.isoformat(),
@@ -80,8 +87,15 @@ def main():
     if assignments:
         span = {"startDate": min(a["startDate"] for a in assignments),
                 "dueDate": max(a["dueDate"] for a in assignments)}
+    groups_of = {i["number"]: i.get("groups", []) for i in deferred}
+    group_spans = {}
+    for a in assignments:
+        for g in groups_of.get(a["number"], []):
+            cur = group_spans.setdefault(g, {"startDate": a["startDate"], "dueDate": a["dueDate"]})
+            cur["startDate"] = min(cur["startDate"], a["startDate"])
+            cur["dueDate"] = max(cur["dueDate"], a["dueDate"])
     print(json.dumps({"boundary": boundary.isoformat(), "assignments": assignments,
-                      "untouchedDone": done, "containerSpan": span}))
+                      "untouchedDone": done, "containerSpan": span, "groupSpans": group_spans}))
 
 
 if __name__ == "__main__":

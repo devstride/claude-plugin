@@ -90,7 +90,8 @@ $ARGUMENTS
   UNTOUCHABLE; their edges are read, never rewritten) and **Not started** (the only candidates).
   Every member of the plan root's deferred container
   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`) is UNTOUCHABLE
-  whatever its status: never merged, split, renumbered, re-dated or archived here.
+  whatever its status: never merged, split, renumbered or archived here, and dated only by
+  `rationalize-gantt`'s deferred pass (3f).
   Dates are not frozen: 3f re-dates every not-Done item but a landed one, In Progress included, and
   build-item's ritual stamps the real dates when it merges.
 - **Current profile** — the nearest EFFECTIVE marker per the contract: the item's own, else the

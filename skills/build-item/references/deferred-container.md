@@ -21,7 +21,7 @@ beside the plan").
   list only adds to the built-in). Exact after normalising: a title that merely contains the word
   is NOT a match, and an archived item never is. Matching an old NAME is the only legacy rule.
 - **Never by eye.** List the root's descendants (`search_items` with `hierarchy: [root]`, every
-  page), keep those whose `parentNumber` is the root, and pipe
+  page), drop archived items, keep those whose `parentNumber` is the root, and pipe
   `{"title", "legacyTitles", "children": [{"number", "title"}]}` to
   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/deferred-container.py match`. It prints
   `container` (the lowest matching number), `all`, `duplicates`, `matchedBy` and `create`.
@@ -40,7 +40,8 @@ beside the plan").
   intermediate level the `parentWorkTypeId` chain requires, titled `defects.deferredContainerTitle`,
   with a one-paragraph description: a parking container whose items are never built from here
   automatically, carry no execution-order number and no blocking links, and link back to what
-  produced them.
+  produced them. `plan` step 2 provisions it up front this same way; otherwise the first filing
+  does.
 
 ## Filing into it
 
@@ -49,16 +50,20 @@ beside the plan").
   hardening with nothing wrong yet, a dated after-deploy step, a follow-up — is a Story, filed by
   `/devstride:create-story deferred <item#>`. The leaf work type is resolved at run time
   (`get_work_type_hierarchy`), never assumed.
-- **The item.** `create_item` with the container as `parentNumber` and an honest spec as its
-  description; NO execution-order `[N]` prefix; NO `blocked_by` or `blocks` edge in either
+- **The item.** `create_item` with an honest spec as its description and, as `parentNumber`, the
+  container — or, when the hierarchy does not allow a leaf directly under its type, the node of
+  the leaf's parent type beneath it (reuse the one there, else create the chain down to it, each
+  titled `defects.deferredContainerTitle`; everything under the container is a member); NO execution-order `[N]` prefix; NO `blocked_by` or `blocks` edge in either
   direction; one `add_relationship` related-to edge to the item whose review or planning produced
   it (the story under build, or the release unit for an epic-release review) — the relationship
   type read from the `add_relationship` schema, never assumed. No board, status, priority or
-  assignee interview — filing normally runs unattended inside a build loop; set one only when a
-  user is present and asks — no date, never built, never given a delivery phase. A person who names one
-  by number can still build it as a one-off.
-- **What does not widen.** Only a verified P1, a security finding, or a finding both likely and
-  material is filed; anything below that bar is dismissed with a one-line reason. Discovered scope
+  assignee interview: filing normally runs unattended inside a build loop, so set one only when a
+  user is present and asks. Filing writes no date; the item is never built and never given a
+  delivery phase. A person who names one by number can still build it as a one-off.
+- **What does not widen.** The bar is the CALLERS' (`review` step 4, `build-item` 6.5, `release`
+  step 2): only a verified P1, a security finding, or a finding both likely and material is filed;
+  anything below it is dismissed with a one-line reason. A person's explicit `deferred` request is
+  filed as asked. Discovered scope
   the plan genuinely needs is not deferred work: it splices into the chain with `insert-story`.
 - **No plan root** (a one-off outside any plan) → noted for the owner, not filed.
 
@@ -67,15 +72,17 @@ beside the plan").
 - **Selection and counts** (`build-item` steps 0 and 7, `next-unblocked.md`): every `members`
   number is excluded — never a candidate, never remaining, never a release unit.
 - **Planning gates** (`plan` step 5, `rebalance` step 3b): members are edge-free by rule, so the
-  orphan gates skip them; `rebalance` never merges, splits, renumbers or archives one.
+  orphan gates skip them; `rebalance` never merges, splits, renumbers or archives one, and only
+  `rationalize-gantt`'s deferred pass moves their dates.
 - **`comprehend-plan`** reports the container in its own section, apart from the value tree.
 - **Dating** (`rationalize-gantt`): members stay out of the graph, the cascade and the violation
   pass, then are dated after the plan's last value leaf. Filing never writes a date.
 - **The closing report.** When the plan root reaches zero remaining value leaves, `build-item`
   (step 7, and step 0's "plan complete") and `comprehend-plan` list **Still open in Deferred**: for
-  every open member, its number, title, kind (Defect when `isBug`, else Story) and the item its
-  related-to edge points at (`get_item` with `fields: ["number", "title", "isBug",
-  "relationships"]`).
+  every member of a leaf work type (never a container or an intermediate node) that is not Done
+  and not closed, its number, title, kind (Defect when `isBug`, else Story) and the item its
+  related-to edge points at (`get_item` with `fields: ["number", "title", "workType", "status",
+  "isBug", "completedAt", "endedOutcome", "relationships"]`).
 
 ## Repair procedure — merging duplicates
 

@@ -8,7 +8,7 @@ description: Create a one-off Story (inbound request / ad-hoc work not in a sequ
 **Goal.** Create a NEW Story (the one-day leaf role — this org's Story type) outside any sequenced `/devstride:plan` roadmap, in one of two PLACEMENT modes — decide the mode FIRST:
 
 - **ONE-OFF** (default, steps 0–2): an inbound request or ad-hoc work — file it in the map, put it on a board, assign it, then deliver it with the SAME build loop `/devstride:build-item` runs, exactly ONCE.
-- **DEFERRED** (section D, replacing steps 0–2 entirely): park a postponed follow-up that is not a bug (tech debt, a clean-up, hardening, a dated after-deploy step) under the plan root, relate it back, and STOP — never built. A bug goes to `/devstride:create-defect deferred <item#>`.
+- **DEFERRED** (section D, replacing steps 0–2 entirely): park a postponed follow-up that is not a bug (tech debt, a clean-up, hardening, a dated after-deploy step) under the plan root, relate it back, and STOP — never built. A bug goes to `/devstride:create-defect deferred <item#>`. Its callers (`review` step 4, `build-item` 6.5) dismiss a finding not worth filing; a person's explicit `deferred` request is filed as asked.
 
 Use **`/devstride:insert-story`** instead when the work belongs in a sequenced plan — it splices into the dependency chain, numbers it, and lets the loop pick it up in order.
 

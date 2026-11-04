@@ -15,8 +15,8 @@ Every subcommand reads one JSON object on stdin and writes one JSON line on stdo
 
 `children` are the plan root's DIRECT children only (archived items left out by the caller). A
 title matches when, trimmed, inner whitespace collapsed and case ignored, it equals `title` or a
-legacy title; the legacy set is the built-in "Deferred defects" plus `legacyTitles`, so a
-configured list can only add to it. The lowest item number is the container; the rest are
+legacy title; the legacy set is the built-in "Deferred defects" plus `legacyTitles` (an empty entry
+is skipped), so a configured list can only add to it. The lowest item number is the container; the rest are
 `duplicates`. `members` is every node whose parent chain reaches a listed container, the
 containers included, cycle-safe. Exit 0 on a decision; 2 on bad input with one
 `{"error": …}` line.
@@ -38,6 +38,7 @@ def norm(title):
 
 
 def number_key(number):
+    number = str(number)
     digits = re.sub(r"\D", "", number)
     return (int(digits) if digits else 0, number)
 
@@ -53,7 +54,10 @@ def match(request):
     legacy = request.get("legacyTitles", [])
     if not isinstance(legacy, list):
         fail("legacyTitles must be an array of strings")
-    legacy_set = {norm(BUILT_IN_LEGACY)} | {norm(text(t, "a legacy title")) for t in legacy}
+    if not all(isinstance(t, str) for t in legacy):
+        fail("legacyTitles must be an array of strings")
+    # an empty entry matches nothing and is skipped (doctor warns about it), never a refusal
+    legacy_set = {norm(BUILT_IN_LEGACY)} | {norm(t) for t in legacy if t.strip()}
     children = request.get("children")
     if not isinstance(children, list):
         fail("children must be an array")

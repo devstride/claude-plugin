@@ -820,6 +820,13 @@ skills/build-item/references/next-unblocked.md|The release unit first
 skills/release/SKILL.md|create-defect deferred
 skills/release/SKILL.md|create-story deferred
 skills/build-item/references/next-unblocked.md|deferredContainerLegacyTitles
+skills/create-defect/SKILL.md|deferred-container.md
+skills/create-story/SKILL.md|deferred-container.md
+skills/plan/SKILL.md|deferred-container.md
+skills/rebalance/SKILL.md|deferred-container.md
+skills/comprehend-plan/SKILL.md|deferred-container.md
+skills/rationalize-gantt/SKILL.md|deferred-container.md
+skills/build-item/SKILL.md|deferred-container.md
 skills/push/SKILL.md|branch-patterns.md
 skills/release/references/branch-patterns.md|protected by the key
 skills/review/SKILL.md|merge-only

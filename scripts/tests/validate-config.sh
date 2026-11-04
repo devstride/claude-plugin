@@ -165,6 +165,8 @@ cfg '{"defects": {"deferredContainerLegacyTitles": ["Deferred defects", ""]}}'
 expect "(38h) an empty legacy title is a WARN" 0 "^CONFIG: 0 error(s), 1 warning(s)" "^WARN defects.deferredContainerLegacyTitles\\[1\\]: an empty title matches nothing"
 cfg '{"defects": {"deferredContainerTitle": "Deferred", "deferredContainerLegacyTitles": ["  deferred "]}}'
 expect "(38i) the current title also listed as legacy is a NOTE" 0 "^CONFIG: 0 error(s), 0 warning(s)" "^NOTE defects.deferredContainerLegacyTitles: lists the current title too"
+cfg '{"defects": {"deferredContainerLegacyTitles": ["Deferred"]}}'
+expect "(38k) the default title listed as legacy is a NOTE when the title key is absent" 0 "^CONFIG: 0 error(s), 0 warning(s)" "^NOTE defects.deferredContainerLegacyTitles: lists the current title too"
 cfg '{"defects": {"deferredContainerLegacyTitles": "Deferred defects"}}'
 expect "(38j) a legacy-titles string instead of an array is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR defects.deferredContainerLegacyTitles: expected array"
 
