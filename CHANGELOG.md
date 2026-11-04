@@ -21,20 +21,20 @@ for what each version component means here and how a release is cut.
   cloud-reviewer request and wait of `review` steps 1–2 to `references/cloud-reviewers.md`. No
   behaviour changes: every run still reads the same instructions before acting, including
   step 0's recovery close-out after an owner merged an epic release and every cloud re-request. A
-  story's fast path reads about 1,000 fewer tokens; an epic release with cloud reviewers about 900
-  more and a production release about 400 more, for the pointers.
+  story's fast path reads about 1,000 fewer tokens; an epic release with cloud reviewers about 1,000
+  more and a production release about 400 more, because those runs now also read the moved files.
   `step-skills.sh` follows such a pointer when it looks for a step skill's call.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.23.0 @ 057157b, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.23.0 @ d695701, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.23.0 | tokens@devstride--v3.23.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,094 | 10,698 | 32,094 | 10,698 | +0 | 10,700 |
 | skills/release/SKILL.md | 23,975 | 7,992 | 23,975 | 7,992 | +0 | 8,000 |
 | skills/plan/SKILL.md | 23,891 | 7,964 | 23,891 | 7,964 | +0 | 8,000 |
 | skills/doctor/SKILL.md | 23,700 | 7,900 | 23,700 | 7,900 | +0 | 7,900 |
-| skills/review/SKILL.md | 23,999 | 8,000 | 23,158 | 7,720 | -280 | 7,730 |
+| skills/review/SKILL.md | 23,999 | 8,000 | 23,261 | 7,754 | -246 | 7,760 |
 | skills/build-item/SKILL.md | 23,991 | 7,997 | 21,640 | 7,214 | -783 | 7,300 |
 | skills/rebalance/SKILL.md | 17,409 | 5,803 | 17,409 | 5,803 | +0 | 5,900 |
 | skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,655 | 4,885 | +0 | 4,900 |
@@ -61,7 +61,7 @@ for what each version component means here and how a release is cut.
 | skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,368 | 1,790 | 5,368 | 1,790 | +0 | 1,800 |
-| **total (bodies)** | 269,849 | 89,957 | 266,657 | 88,894 | -1063 | |
+| **total (bodies)** | 269,849 | 89,957 | 266,760 | 88,928 | -1029 | |
 
 ## [3.23.0] — 2026-11-03
 

@@ -188,7 +188,8 @@ exact-head receipt it may legally reuse.
 **One contextual follow-up at a time**: ONE scope per `delta-re-review.md` — explicit `full`, else
 `rereview-scope.sh` from the prior cycle anchor (`none` spends nothing); freeze the next anchor;
 every stream reviews that exact range with the ledger, the PR context comment updated before any
-cloud re-request.
+cloud re-request (read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/cloud-reviewers.md` in full
+before acting on it).
 Findings return through steps 3–6.5 and
 the paginated zero-thread check before any flip.
 
