@@ -78,13 +78,14 @@ base = {"releaseTrain": {"branch": "train/x", "smallFixes": {"maxFiles": 5, "max
 def run(config, numstat):
     p = subprocess.run([sys.executable, helper, "small"], input=json.dumps({"config": config, "numstat": numstat}), capture_output=True, text=True)
     return p.returncode, (json.loads(p.stdout) if p.returncode == 0 else p.stderr)
-def rows(*r): return "".join("%s\t%s\t%s\n" % x for x in r)
+def rows(*r): return "".join("%s\t%s\t%s\0" % x for x in r)
 cases = [
   ("two files, 120 lines -> small", base, rows((100, 10, "a.ts"), (5, 5, "b.ts")), True, 2, 120),
   ("exactly 5 files and 500 lines -> small", base, rows(*[(100, 0, "f%d.ts" % i) for i in range(5)]), True, 5, 500),
   ("6 files -> not small", base, rows(*[(1, 0, "f%d.ts" % i) for i in range(6)]), False, 6, 6),
   ("501 lines -> not small", base, rows((501, 0, "a.ts")), False, 1, 501),
   ("a high-risk path -> not small", base, rows((1, 0, "src/auth/login.ts")), False, 1, 1),
+  ("a high-risk path with a non-ASCII name and a space -> not small", base, rows((1, 0, "src/auth/café login.ts")), False, 1, 1),
   ("a fix exclusion -> not small", base, rows((1, 0, "migrations/0001.sql")), False, 1, 1),
   ("a binary file -> not small", base, rows(("-", "-", "logo.png")), False, 1, 0),
   ("empty diff -> not small", base, "", False, 0, 0),
@@ -96,8 +97,8 @@ for label, config, numstat, small, files, lines in cases:
     good = rc == 0 and out["small"] is small and out["files"] == files and out["lines"] == lines and out["reason"]
     print(("ok   " if good else "FAIL ") + "small: " + label + ("" if good else " -> rc=%s %r" % (rc, out)))
 for label, config, numstat in [
-  ("maxFiles 0 is refused", {"releaseTrain": {"smallFixes": {"maxFiles": 0, "maxChangedLines": 5}}}, "1\t0\ta\n"),
-  ("a malformed numstat line is refused", base, "nonsense\n"),
+  ("maxFiles 0 is refused", {"releaseTrain": {"smallFixes": {"maxFiles": 0, "maxChangedLines": 5}}}, "1\t0\ta\0"),
+  ("a malformed numstat line is refused", base, "nonsense\0"),
   ("both train names together are refused", {"releaseTrain": {"branch": "a"}, "supportTrain": {"branch": "b"}}, ""),
 ]:
     rc, out = run(config, numstat)
@@ -107,7 +108,7 @@ PY2
 )"
 printf '%s\n' "$SMALL" | sed 's/^/  /'
 printf '%s\n' "$SMALL" | grep -q '^FAIL' && FAIL=1
-[ "$(printf '%s\n' "$SMALL" | grep -c '^ok')" = 13 ] || { echo "  FAIL small: expected 13 cases"; FAIL=1; }
+[ "$(printf '%s\n' "$SMALL" | grep -c '^ok')" = 14 ] || { echo "  FAIL small: expected 14 cases"; FAIL=1; }
 
 # dependency-free: standard library only
 MODS="$(python3 -c 'import ast,sys; t=ast.parse(open(sys.argv[1]).read()); print(" ".join(sorted({a.name for n in ast.walk(t) if isinstance(n, ast.Import) for a in n.names} | {n.module for n in ast.walk(t) if isinstance(n, ast.ImportFrom)})))' "$HELPER")"

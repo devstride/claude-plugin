@@ -1592,13 +1592,17 @@
       "key": "releaseTrain.smallFixes.maxFiles",
       "type": "integer",
       "description": "at most this many changed files",
-      "since": "3.23.0"
+      "since": "3.23.0",
+      "minimum": 1,
+      "required": true
     },
     {
       "key": "releaseTrain.smallFixes.maxChangedLines",
       "type": "integer",
       "description": "at most this many changed lines, added plus removed",
-      "since": "3.23.0"
+      "since": "3.23.0",
+      "minimum": 1,
+      "required": true
     },
     {
       "key": "releaseTrain.lateArrivals",
@@ -1645,13 +1649,17 @@
       "key": "supportTrain.smallFixes.maxFiles",
       "type": "integer",
       "description": "at most this many changed files (the old name, read when releaseTrain is absent)",
-      "since": "3.23.0"
+      "since": "3.23.0",
+      "minimum": 1,
+      "required": true
     },
     {
       "key": "supportTrain.smallFixes.maxChangedLines",
       "type": "integer",
       "description": "at most this many changed lines, added plus removed (the old name, read when releaseTrain is absent)",
-      "since": "3.23.0"
+      "since": "3.23.0",
+      "minimum": 1,
+      "required": true
     },
     {
       "key": "supportTrain.lateArrivals",

@@ -119,7 +119,7 @@ alone; `PRE-SHIP: NOTHING TO RUN` → no hold, skip 2c. Read
 
 Invoke **`review`** on the PR, saying driven or standalone and **passing the resolved profile**
 (with its source), the reviewer hand-off from step 1, any caller ledger or receipt, and any caller
-declaration (`merge-only`, `release-branch`, `late-arrivals`). It owns the engine: registration proof concurrent with
+declaration (`merge-only`, `release-branch`, `late-arrivals`; its `LATE-ARRIVAL` returns to the caller at once, skipping 2b–2c). It owns the engine: registration proof concurrent with
 local review, every configured pass, triage, fixes, reply-then-resolve and — when CI is held — the
 ready-flip and settlement. Driven, carry its untracked-deferral list back to the caller.
 

@@ -90,29 +90,32 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    the source by its own pull request); once cut (and again on an adopted pull request) run the
    exclusion check with `--source-before <sourceBefore> --head <snapshot head>` and put each
    `allowedRenumbers` entry in the body.
-4a. **Late landings.** Each progress report, and the start of every `review` cycle on the snapshot
-   pull request, runs `git fetch origin <releaseSource> <train>` and names any late one-offs in
-   `git log --no-merges --oneline <trainSnapshot>..origin/<train>`. To ABSORB them: resolve
-   `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said back);
-   `<trainSnapshot>` must be its ancestor (else STOP); run the exclusion check over the NEW train
-   work only, `--start-on train --source-before <trainSnapshot> --head <absorbAt>` (source merges
-   are not train work; exit 1 STOPS); `git merge --no-ff <absorbAt>` into the snapshot (a conflict
-   STOPS) and push; rewrite the marker to `snapshot <absorbAt>`, the title's count and the body's
-   list, so step 6 closes exactly what shipped. When to absorb follows `releaseTrain.lateArrivals`:
-   - **`"restart"`** — at once, with no instruction needed, at any point before step 5's merge: a
-     late arrival is meant to supersede what is there. First CANCEL the review in progress: stop a
-     running engine and discard its partial result, and put a ready pull request back to draft
-     (`gh pr ready --undo`) so the CI it started is not counted. Then absorb and RESTART `review`
-     at cycle 1 over the FULL snapshot diff, with the cumulative ledger (settled findings stay
-     settled unless the new work changes them), the cycle target counted afresh and the pre-ship
-     selection redone for the new tree; CI is released once, at the end. Step 5 fetches again
-     before it merges, and a new arrival restarts once more. Landings after the merge ship next time.
+4a. **Late landings.** Each progress report runs `git fetch origin <releaseSource> <train>` and
+   names any late one-offs in `git log --no-merges --oneline <trainSnapshot>..origin/<train>`. To
+   ABSORB them: resolve `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said
+   back); `<trainSnapshot>` must be its ancestor (else STOP); run the exclusion check over the NEW
+   train work only, `--start-on train --source-before <trainSnapshot> --head <absorbAt>` (source
+   merges are not train work; exit 1 STOPS); `git merge --no-ff <absorbAt>` into the snapshot (a
+   conflict STOPS) and push; rewrite the marker to `snapshot <absorbAt>`, the title's count and the
+   body's list, and from then on read `<trainSnapshot>` as `<absorbAt>` for detection and step 6.
+   When to absorb follows `releaseTrain.lateArrivals`:
+   - **`"restart"`** — automatically, up to `review` step 7's ready-flip: a late arrival is meant to
+     supersede what is there. `late-arrivals` is declared to `pr`, which passes it to `review` with
+     `<train>` and `<trainSnapshot>`: before each cycle and before the flip, review fetches the
+     train and on a late one-off STOPS, returning `LATE-ARRIVAL` with the pull request still a
+     draft, any running engine stopped and its partial result dropped, the cumulative ledger and
+     the lessons tally (no step 6.5 for the cancelled cycle); `pr` returns it to this step at once,
+     running no pre-ship check. Absorb, then run step 4's `pr` again, driven, with the same
+     declarations and scope and the carried ledger as caller evidence: a fresh cycle 1 over the
+     full snapshot diff, the cycle target counted afresh (the one exception to never resetting it),
+     the pre-ship hold re-decided for the new tree. At most THREE restarts per release; after the
+     third, and once the pull request is ready, later landings ship next time, said so — so CI
+     runs once and the release cannot be held open by a busy train.
    - **`"offer"`** (absent) — only on the owner's instruction, and only before `review` step 7's
      ready-flip; the absorbed range then gets one FULL-scope cycle of every configured engine
      with the ledger, outside the cycle budget (a required engine that cannot run STOPS). Later
      landings ship next time, said so; after the flip the offer closes (a push would restart CI).
-5. **Merge** — first `git fetch origin <releaseSource> <train>` (with `"restart"`, a late one-off
-   → 4a) and run the exclusion check with
+5. **Merge** — first `git fetch origin <releaseSource>` and run the exclusion check with
    `--source-before <sourceBefore> --head <reviewedHead>` (source merges are not train work, and a
    reviewed release unit is allowed; exit 1 STOPS); then `gh pr merge <n> --merge --match-head-commit <reviewedHead>
    --delete-branch` (the snapshot is disposable). **Never a direct push to `releaseSource`**: its

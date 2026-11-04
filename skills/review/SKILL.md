@@ -89,9 +89,9 @@ definition or a deferral route.**
 
 ## Modes — callers name them
 
-- **Driven** (the caller says so): on poll timeout proceed; never notify; return the findings
-  summary + untracked-deferral list; capture per step 4, never ask. `late-arrivals` declared →
-  fetch the train each cycle; a late one-off hands back. **Standalone**: keep
+- **Driven**: on poll timeout proceed; never notify; return the findings
+  summary + untracked-deferral list; capture per step 4, never ask. `late-arrivals` →
+  check the train before each cycle and the flip; a late one-off returns `LATE-ARRIVAL`. **Standalone**: keep
   the ask-gates; notify per `review.notifyWhenSettled`.
 - **LOCAL-ONLY** (fast develop mode, `build-item` step 4a; a base REF, no PR): no routine second
   review. Consume the hand-off — story review ledger and risk-check findings, SHA-keyed verification

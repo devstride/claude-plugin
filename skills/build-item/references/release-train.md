@@ -52,21 +52,22 @@ request's base.
   push, then the story branch deleted. The full review, the configured engines and CI move to the
   train's pull request into `baseBranch`, which `release` opens before every cut. 4a's floor holds:
   no completed risk check or receipt → 4b.
-- **A small fix skips its own review pass.** With `releaseTrain.smallFixes` set, on the fast path
-  only, run `git diff --numstat --no-renames origin/<train>...HEAD` after the build and pass it,
-  with the config, to `routing.py small`. `small: true` — and the risk check launched no
-  immediate-risk verifier and matched no mandatory lens — → 4a's `review` LOCAL-ONLY call does not
-  run: the risk check's own triage stands, its fixes are already committed, and lessons wait for
-  the train's review. The progress table's review row reads "covered by the train's release review
-  (small fix: N files, M lines)". Everything else in 4a holds: the floor, the local gate, the
-  merge-commit body. `small: false` → 4a as usual, its `reason` said once. The train's pull request
-  into `baseBranch` is the batch's one full review and one CI run.
+- **A small, clean fix skips its own review pass.** With `releaseTrain.smallFixes` set, on the fast
+  path only, pass `git diff --numstat -z --no-renames origin/<train>...HEAD` and the config to
+  `routing.py small` after the build (exit 2 → STOP naming the config error). `small: true`, AND
+  the risk check raised no finding, launched no immediate-risk verifier and matched no mandatory
+  lens → 4a's `review` LOCAL-ONLY call does not run: with no finding there is nothing to triage
+  or distill into lessons. The progress table's review row reads "covered by the train's release
+  review (small fix: N files, M lines)". Everything else in 4a holds: the floor, the local gate,
+  the merge-commit body. Otherwise 4a runs as usual (a risk-check finding still reaches the lessons
+  store through it), the reason said once. The train's pull request into `baseBranch` is the
+  batch's one full review and one CI run.
 - **Otherwise → 4b with the train as the base.**
 
 ## Settings
 
-- `releaseTrain.smallFixes` — `{maxFiles, maxChangedLines}`, both positive whole numbers; lines are
-  added plus removed. Absent → no fix counts as small. The high-risk list is
+- `releaseTrain.smallFixes` — `{maxFiles, maxChangedLines}`, both required, each at least 1; lines
+  are added plus removed. Absent → no fix counts as small. The high-risk list is
   `release.productionReview.highRiskPaths` plus `release.releaseBranchFixExclusions`.
 - `releaseTrain.lateArrivals` — `"restart"` or `"offer"` (absent: `"offer"`); what `release` does
   with a one-off that lands while the train's review is running

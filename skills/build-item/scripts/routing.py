@@ -37,7 +37,8 @@ from the organization's work-type hierarchy and is used only when the config has
 repository's `epicIntegrationBranches.slugRule`; absent, the title is kebab-cased to six words.
 
 `small` says whether a one-off on the release train is a SMALL fix (`references/release-train.md`):
-`numstat` is the text of `git diff --numstat --no-renames origin/<train>...HEAD`. Small means
+`numstat` is the text of `git diff --numstat -z --no-renames origin/<train>...HEAD` (NUL-separated,
+so paths arrive unquoted). Small means
 `releaseTrain.smallFixes` is set, the diff changes at most `maxFiles` files and at most
 `maxChangedLines` lines (added plus removed), holds no binary file, and touches no path matching
 `release.productionReview.highRiskPaths` or `release.releaseBranchFixExclusions`. An empty diff is
@@ -212,8 +213,9 @@ def cmd_small(req):
     release = section(config, "release")
     risky = list(section(release, "productionReview").get("highRiskPaths") or []) + list(release.get("releaseBranchFixExclusions") or [])
     paths, lines, binary = [], 0, []
-    for row in numstat.splitlines():
-        if not row.strip():
+    for row in numstat.split("\0"):
+        row = row.strip("\n")
+        if not row:
             continue
         parts = row.split("\t", 2)
         if len(parts) != 3:

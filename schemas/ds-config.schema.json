@@ -1116,10 +1116,12 @@
           "properties": {
             "maxFiles": {
               "type": "integer",
+              "minimum": 1,
               "description": "at most this many changed files"
             },
             "maxChangedLines": {
               "type": "integer",
+              "minimum": 1,
               "description": "at most this many changed lines, added plus removed"
             }
           },
@@ -1127,7 +1129,11 @@
             "^_": {}
           },
           "additionalProperties": false,
-          "description": "limits under which a fast one-off is a small fix and skips its own local review pass; null reads as absent"
+          "description": "limits under which a fast one-off is a small fix and skips its own local review pass; null reads as absent",
+          "required": [
+            "maxFiles",
+            "maxChangedLines"
+          ]
         },
         "lateArrivals": {
           "type": "string",
@@ -1167,10 +1173,12 @@
           "properties": {
             "maxFiles": {
               "type": "integer",
+              "minimum": 1,
               "description": "at most this many changed files (the old name, read when releaseTrain is absent)"
             },
             "maxChangedLines": {
               "type": "integer",
+              "minimum": 1,
               "description": "at most this many changed lines, added plus removed (the old name, read when releaseTrain is absent)"
             }
           },
@@ -1178,7 +1186,11 @@
             "^_": {}
           },
           "additionalProperties": false,
-          "description": "limits under which a fast one-off is a small fix and skips its own local review pass; null reads as absent (the old name, read when releaseTrain is absent)"
+          "description": "limits under which a fast one-off is a small fix and skips its own local review pass; null reads as absent (the old name, read when releaseTrain is absent)",
+          "required": [
+            "maxFiles",
+            "maxChangedLines"
+          ]
         },
         "lateArrivals": {
           "type": "string",
