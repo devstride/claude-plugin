@@ -1485,7 +1485,7 @@
       ],
       "default": "release",
       "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check) or cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge)",
-      "since": "unreleased"
+      "since": "3.27.0"
     },
     {
       "key": "release.clearance.credentialsFile",
