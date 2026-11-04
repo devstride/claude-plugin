@@ -50,6 +50,9 @@ expect "(3) no release train → SKIP" 0 '^SKIP no release train'
 
 cfg "$ON"
 expect "(4) a train level with the source → SKIP, no claim" 0 '^SKIP the train holds nothing beyond develop$'
+cfg '{"baseBranch": "main", "claims": {"provider": "devstride"}, "releaseTrain": {"branch": "train/release"}, "release": {"mergeTrainBeforeCut": true, "autoStart": {"enabled": true}}}'
+expect "(4b) releaseSource absent → develop, never baseBranch (main, which does not exist here)" 0 '^SKIP the train holds nothing beyond develop$'
+cfg "$ON"
 
 # a merge of the source alone is not work
 g "$WORK/seed" checkout -q -b side develop
@@ -98,18 +101,21 @@ starter one & starter two & wait
 got="$(cat "$WORK/starter-one" "$WORK/starter-two" | sort | tr '\n' ' ')"
 [ "$got" = "LOST WON " ] && ok "(12) two starters at one trigger → exactly one wins the release-train claim" || bad "(12) $got"
 
-# (13)-(15) the claim is released NON-final at the cut. The contract's exact release outcome is
-# read from auto-start.md and run through a stand-in store with the server's rule (a final release,
-# or outcome done, blocks the key for good); story-claim.py decide then judges the next claim.
-OUTCOME="$(grep -A1 'Release it NON-final' "$ROOT/skills/release/references/auto-start.md" | grep -o 'with outcome `[a-z-]*`' | head -1 | sed 's/.*`\(.*\)`/\1/')"
-[ -n "$OUTCOME" ] && [ "$OUTCOME" != done ] && ok "(13) the contract names one non-final outcome ($OUTCOME)" || bad "(13) outcome '$OUTCOME'"
-OUT="$(python3 - "$ROOT/skills/build-item/scripts/story-claim.py" "$OUTCOME" <<'PY'
+# (13)-(15) the claim is released NON-final at the cut. The contract's release call (outcome and
+# final flag) is read from auto-start.md and run through a stand-in store with the server's rule —
+# only `final: true` blocks a key for good, the outcome is a free string — and story-claim.py decide
+# then judges the next claim.
+BULLET="$(awk '/Release it NON-final/{f=1} f&&/^- \*\*/&&!/NON-final/{exit} f{print}' "$ROOT/skills/release/references/auto-start.md" | tr '\n' ' ')"
+OUTCOME="$(printf '%s' "$BULLET" | grep -o 'with outcome `[a-z-]*`' | head -1 | sed 's/.*`\(.*\)`/\1/')"
+FINAL=true; printf '%s' "$BULLET" | grep -q 'never final' && ! printf '%s' "$BULLET" | grep -Eq 'with `?final: true|`--final` set' && FINAL=false
+[ -n "$OUTCOME" ] && [ "$FINAL" = false ] && ok "(13) the contract releases with outcome $OUTCOME and never final" || bad "(13) outcome '$OUTCOME' final '$FINAL'"
+OUT="$(python3 - "$ROOT/skills/build-item/scripts/story-claim.py" "$OUTCOME" "$FINAL" <<'PY'
 import json, subprocess, sys
-helper, outcome = sys.argv[1], sys.argv[2]
+helper, outcome, final = sys.argv[1], sys.argv[2], sys.argv[3] == "true"
 rows = {}
 def claim(key, me):
     row = rows.get(key)
-    if row and row["releasedAt"] and (row["final"] or row["outcome"] == "done"):
+    if row and row["releasedAt"] and row["final"]:
         return {"won": False, "final": True, "claim": row}
     if row and not row["releasedAt"] and row["holderDigest"] != me:
         return {"won": False, "claim": row}
@@ -125,15 +131,15 @@ def decide(resp, me):
 k = "acme/widgets"
 first = decide(claim(k, "aa"), "aa")
 held = decide(claim(k, "bb"), "bb")
-release(k, outcome)
+release(k, outcome, final)
 second = decide(claim(k, "bb"), "bb")
-rows.clear(); claim(k, "aa"); release(k, "done")
+rows.clear(); claim(k, "aa"); release(k, outcome, True)
 blocked = decide(claim(k, "bb"), "bb")
 print(first, held, second, blocked)
 PY
 )"
 set -- $OUT
 [ "$1 $2" = "proceed skip" ] && ok "(14) the first claim proceeds and a second session is held off" || bad "(14) $OUT"
-[ "$3" = proceed ] && [ "$4" = skip ] && ok "(15) released with '$OUTCOME' the next cycle claims again; released done it never could" || bad "(15) $OUT"
+[ "$3" = proceed ] && [ "$4" = skip ] && ok "(15) released as the contract says the next cycle claims again; released final it never could" || bad "(15) $OUT"
 
 exit "$FAIL"

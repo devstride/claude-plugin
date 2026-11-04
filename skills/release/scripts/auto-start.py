@@ -81,7 +81,7 @@ def check():
     train = (section(config, "releaseTrain") or section(config, "supportTrain")).get("branch")
     if release.get("mergeTrainBeforeCut") is not True or not isinstance(train, str) or not train:
         out("SKIP no release train (release.mergeTrainBeforeCut and releaseTrain.branch)")
-    source = release.get("releaseSource") or config.get("baseBranch") or "develop"
+    source = release.get("releaseSource") or "develop"   # the schema's default, never baseBranch
     if os.environ.get("AUTO_START_NO_FETCH") != "1":
         fetched = git(root, "fetch", "-q", "origin",
                       "+refs/heads/%s:refs/remotes/origin/%s" % (train, train),

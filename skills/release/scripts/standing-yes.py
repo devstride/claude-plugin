@@ -7,7 +7,7 @@ yes, anything else goes to the owner exactly as before.
 
   standing-yes.py --pr <n> --head <sha> --train-pr <n> --class "<RELEASE CLASS line>"
                   --checks green|red --unresolved <count> --pre-ship "<PRE-SHIP verdict line>"
-                  --previous-release <gate exit> [--dev-deploy <exit>] --tower "<status output>"
+                  --previous-release <gate exit> --dev-deploy <exit>|not-applicable --tower "<status output>"
       MERGE <head sha>          exit 0   (merge only that exact head: `gh pr merge --match-head-commit`)
       ASK <reason>              exit 0   (the first condition that fails, in the order below)
       ERROR <reason>            exit 1   (bad arguments or an unreadable config: treat as ASK)
@@ -23,7 +23,7 @@ MERGE needs ALL of, in this order:
   5. --unresolved is 0 (the paginated unresolved-thread count);
   6. the pre-ship line is `PRE-SHIP: PASS (<n> ran, 0 waived)` or `PRE-SHIP: NOTHING TO RUN`;
   7. --previous-release is 0 (the previous-release gate);
-  8. --dev-deploy, when given, is 0 (the dev-deploy wait, when it applies);
+  8. --dev-deploy is 0, or `not-applicable` (the dev-deploy wait, run BEFORE this check when it applies);
   9. the tower status has exactly one `On final:` line, and it reads `On final: #<pr> <head>` for
      this pull request (digits, then whitespace).
 """
@@ -57,33 +57,17 @@ def load_config():
         here = parent
 
 
-def pr_head(pr):
-    forced = os.environ.get("STANDING_YES_PR_HEAD")   # test seam
-    if forced is not None:
-        return forced.strip() or None
+def pr_view(number):
+    """`gh pr view <n>`: the live record of one pull request, or None."""
     try:
-        done = subprocess.run(["gh", "pr", "view", str(pr), "--json", "headRefOid", "--jq", ".headRefOid"],
+        done = subprocess.run(["gh", "pr", "view", str(number), "--json", "state,title,baseRefName,headRefOid"],
                               capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.TimeoutExpired):
         return None
-    return done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else None
-
-
-def train_pr(number):
-    forced = os.environ.get("STANDING_YES_TRAIN_PR")   # test seam: the JSON gh would print
-    if forced is not None:
-        raw = forced
-    else:
-        try:
-            done = subprocess.run(["gh", "pr", "view", str(number), "--json", "state,title,baseRefName,headRefOid"],
-                                  capture_output=True, text=True, timeout=60)
-        except (OSError, subprocess.TimeoutExpired):
-            return None
-        if done.returncode != 0:
-            return None
-        raw = done.stdout
+    if done.returncode != 0:
+        return None
     try:
-        found = json.loads(raw or "null")
+        found = json.loads(done.stdout or "null")
     except ValueError:
         return None
     return found if isinstance(found, dict) else None
@@ -114,7 +98,7 @@ def main():
     parser.add_argument("--unresolved", type=int, required=True)
     parser.add_argument("--pre-ship", required=True)
     parser.add_argument("--previous-release", type=int, required=True)
-    parser.add_argument("--dev-deploy", type=int)
+    parser.add_argument("--dev-deploy", required=True)
     parser.add_argument("--tower", required=True)
     a = parser.parse_args()
 
@@ -128,15 +112,16 @@ def main():
     head = full_sha(a.head)
     if head is None:
         say("ASK the head %s cannot be read" % a.head)
-    live = pr_head(a.pr)
-    if live is None:
+    release_pr = pr_view(a.pr)
+    live = str(release_pr.get("headRefOid") or "").strip() if release_pr else ""
+    if not live:
         say("ASK the current head of pull request #%d cannot be read" % a.pr)
     if live != head:
         say("ASK pull request #%d is at %s, not the head %s this check was given" % (a.pr, live[:12], head[:12]))
     if a.train_pr == a.pr:
         say("ASK --train-pr names the release pull request itself, not the reviewed train")
-    train = train_pr(a.train_pr)
-    source = (release.get("releaseSource") if isinstance(release, dict) else None) or config.get("baseBranch") or "develop"
+    train = pr_view(a.train_pr)
+    source = (release.get("releaseSource") if isinstance(release, dict) else None) or "develop"
     if train is None:
         say("ASK the train pull request #%d cannot be read" % a.train_pr)
     if train.get("state") != "MERGED" or not str(train.get("title", "")).startswith("Release train:") \
@@ -158,8 +143,8 @@ def main():
         say("ASK the pre-ship checks did not all pass unwaived (%s)" % (pre or "no verdict"))
     if a.previous_release != 0:
         say("ASK the previous-release gate answered %d, not 0" % a.previous_release)
-    if a.dev_deploy is not None and a.dev_deploy != 0:
-        say("ASK the dev-deploy wait answered %d, not 0" % a.dev_deploy)
+    if a.dev_deploy.strip() not in ("0", "not-applicable"):
+        say("ASK the dev-deploy wait answered %s, not 0" % (a.dev_deploy.strip() or "nothing"))
     finals = [line for line in a.tower.splitlines() if line.startswith("On final:")]
     parsed = re.match(r"^On final: #(\d+)\s+\S", finals[0]) if len(finals) == 1 else None
     if not parsed or int(parsed.group(1)) != a.pr:

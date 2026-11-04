@@ -179,7 +179,9 @@ the release skill calls it does.
 
 - **0a moves.** 0b (the train) runs uncleared, with no `heartbeat train`. `claim --wait --purpose
   release` runs just before 0c, with the exits handled as above; the first heartbeat is `cut
-  --branch <b>`. 0b's train pull request body carries
+  --branch <b>`. Step 0 adopts an open release pull request only when `status` shows no live
+  holder (clear, or stale under the adoption rules); a live holder's stays theirs: run 0b, wait at
+  the claim, and re-read step 0's shape once cleared, before cutting. 0b's train pull request body carries
   `<!-- devstride:release-train-holder <digest> on <machine> -->` (`<digest>`: the first 12 hex
   characters of the SHA-256 of `identity`'s answer; the holder itself is never written). An open
   train pull request whose marker names another holder is never adopted silently: STOP, name it,

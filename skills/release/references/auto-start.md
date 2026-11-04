@@ -29,7 +29,11 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart` and
   `claim` at the cut succeeds, so the next train phase runs while this release holds the tower, but
   ONLY with `release.clearance` and `release.releaseBranchPattern` both set; without either, the
   release pull request has no tower or its own branch to protect it, so the claim is held until the
-  run ends. Also released when the train holds nothing to ship, and when the run stops.
+  run ends. A train with nothing to ship changes neither point: the claim waits for the cut (or, held,
+  for the run's end). Released early only when the whole run ends: nothing to ship at all, or stopped.
+- **Another release in flight.** A live session holding the tower owns its release pull request:
+  this run never adopts it (step 0), but runs 0b under the train claim, then waits at the tower claim
+  and, once cleared, re-reads step 0's shape before cutting (`clearance.md`).
 - **Lost to a live holder**: a hand-started run names who holds it and STOPs; an auto start carries
   on with its caller's loop, logging no failure.
 - **Won with an open train pull request present** (its previous holder lapsed): `release-branch.md`
@@ -71,10 +75,11 @@ holding the tower as any release does.
 At step 4, after the pre-merge check and the recap, run
 `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/standing-yes.py --pr <n> --head <head>
 --train-pr <n> --class "<classify-release line>" --checks green|red --unresolved <count>
---pre-ship "<2b verdict line>" --previous-release <gate exit> [--dev-deploy <exit>] --tower
+--pre-ship "<2b verdict line>" --previous-release <gate exit> --dev-deploy <exit>|not-applicable --tower
 "<provider status output>"`. `--head` is the release pull request's head; `--train-pr` the release-train
 pull request this release merged at 0b; the script reads both pull requests itself (the live head;
-the train's state, title, base and reviewed head) and computes both trees. `--dev-deploy` only when the dev-deploy wait applies. `MERGE <sha>` only
+the train's state, title, base and reviewed head) and computes both trees. When the dev-deploy wait applies it runs BEFORE this check and passes its
+exit; otherwise `not-applicable` (omitting it is an ERROR). `MERGE <sha>` only
 when all of its nine conditions hold (the script's header lists them); anything else prints
 `ASK <reason>`. Without `release.clearance` there is no `On final` line, so it always asks.
 
