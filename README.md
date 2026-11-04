@@ -411,6 +411,16 @@ its closing report lists what is **Still open in Deferred**. Build one deliberat
 `/devstride:build-item <number>`. Missing scope a review uncovers is never dismissed: it becomes a
 story spliced into the plan.
 
+## Active Agents board
+
+Optional: to see which plans your agents are building, add an `activeAgents` block with your own
+start and end commands, then run `/devstride:setup agents`. It shows exactly what it will create,
+waits for a typed yes, then creates or adopts an **Active Agents** board, a green **agent active**
+tag allowed on every plan-root type, and a shared table view (Item, Status, Progress, Priority,
+Tags); running it again changes nothing. From then on `build-item` puts the plan root it works
+under on that board (never a story) and runs your commands as it starts and stops, failing open.
+`/devstride:doctor agents` reports drift without writing anything. No block, no writes.
+
 ## Your first plan
 
 With the plugin installed, DevStride connected, and a config file in place:
@@ -459,8 +469,8 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `branch-feature` / `branch-hotfix` | Cuts a working branch from the development or production branch |
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end; `create-story deferred <item>` / `create-defect deferred <item>` instead parks a follow-up or a bug in the plan's deferred container |
 | `release` | Promotes the release branch to production with a full gated review; with `release.clearance` set, claims one-release-at-a-time clearance first and hands it back last; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
-| `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it — including that the configured local review engine actually runs read-only |
-| `doctor` | Checks git, `gh`, the plugin, DevStride, config, CI gates, docs and personal status-line settings; after the shared replacement is committed and verified, it can separately remove only the personal `statusLine` key you approve while preserving every other setting and script |
+| `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it — including that the configured local review engine actually runs read-only; `setup agents` sets up the Active Agents board, tag and view after a typed yes |
+| `doctor` | Checks git, `gh`, the plugin, DevStride, config, CI gates, docs, the Active Agents board and personal status-line settings; after the shared replacement is committed and verified, it can separately remove only the personal `statusLine` key you approve while preserving every other setting and script |
 | `update` | Updates the exact loaded copy, verifies its official tag and files, then stops for a checked plugin reload (restart is the fallback) |
 | `ci-audit` | Measures what CI actually costs: executed runs per workflow per pull request (the design is one each), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
 

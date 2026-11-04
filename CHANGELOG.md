@@ -8,6 +8,28 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **`/devstride:setup agents` — the Active Agents board, tag and shared view.** A new opt-in setup
+  mode, the only one that writes to DevStride: it reads first, prints the organization and every
+  change (each tag group as its exact before and after), waits for a typed yes, then creates or
+  adopts the board, the tag, the tag's place in every plan-root type's tag group (always the
+  merged full list, never only the new tag), a shared table view copied from an existing view's
+  format (or reported as an owner step when there is none to learn from), and the
+  `activeAgents` block. It never moves, edits or untags an item. Running it again changes nothing.
+- **The `activeAgents` block** (`boardId`, `tagName`, `tagColor`, `staleMinutes`,
+  `commands.start` with `<root>`, `commands.end`). Absent or null, the plugin writes nothing to
+  DevStride for this feature and runs nothing.
+- **The build loop places the plan root and runs your commands.** In plan mode, `build-item`
+  moves the root (never a story) onto the board once per run with a comment naming the board it
+  came from, runs `start` once, and runs `end` at every terminal exit; each command gets only an
+  item number for `<root>`, a 10-second limit, and fails open.
+- **`/devstride:doctor agents`**, read-only: the block, the board, the tag, the tag allowed on
+  every plan-root type, stories on the board, the tag on a Done item, and both commands found
+  (never run).
+- `skills/setup/scripts/active-agents.py` does every check, merge, substitution and run for all
+  three, tested in `scripts/tests/active-agents.sh`.
+
 ## [3.24.0] — 2026-11-04
 
 ### Added

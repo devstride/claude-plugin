@@ -619,6 +619,8 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "sandbox_mode=read-only" "deferredContainerTitle" "Never auto-select from the deferred container" \
               "deferredContainerLegacyTitles" "deferred-container.md" \
               "Never splice a deferred finding" "third legal value" "jobClassGate" "same-session" \
+              "typed yes" "never replace a tag group with only the new tag" "Doctor writes nothing" \
+              "absent or null block writes nothing" "active-agents.py" \
               "describes a repository that no longer exists" "load: contract" "related-to" \
               "engineering-economy" "CI-last" "localAssistCommand" "review-settled" \
               "task/risk-sized" "effective scope" "fixable occurrence" \
@@ -830,6 +832,14 @@ skills/build-item/SKILL.md|deferred-container.md
 skills/push/SKILL.md|branch-patterns.md
 skills/release/references/branch-patterns.md|protected by the key
 skills/review/SKILL.md|merge-only
+skills/setup/SKILL.md|agents-mode.md
+skills/setup/SKILL.md|DevStride **write** tool outside `agents` mode
+skills/doctor/SKILL.md|skills/doctor/references/agents.md
+skills/build-item/SKILL.md|active-agents.md
+skills/setup/references/agents-mode.md|typed yes
+skills/setup/references/agents-mode.md|never moves, edits or removes an item
+skills/doctor/references/agents.md|never executed
+skills/build-item/references/active-agents.md|never a leaf
 PAIRS
 
 # DEAD-REFERENCE check: every reference must be REACHABLE from a root an agent actually reads

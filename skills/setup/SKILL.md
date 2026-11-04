@@ -29,17 +29,20 @@ Optional argument: $ARGUMENTS
   With `release.clearance` set, offer the fifth mechanic too, **release ordering** (§E). **Draft-gate diffs accepted while the three
   `review.*` CI-ordering booleans are `false` → propose flipping them `true` in the same
   change.** Run Phase G's CI checks; offer `/devstride:ci-audit` first.
+- **`agents`** — the Active Agents mode, the only run that writes to DevStride: A1, then
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/agents-mode.md` end to end (inventory, plan, a
+  typed yes, apply).
 - **Nothing** — the full run: inspect, ask, write, scaffold, validate.
 
 **Run each mode's prerequisites silently — A1 always, A2–A3 before A4.** A narrowed run reports
-fewer keys, never worse ones, and **stops after Phase B, writing nothing**; a full run writes. **`docs` and
-`ci` are the exceptions by design** — each writes exactly the keys its own questions answer.
+fewer keys, never worse ones, and **stops after Phase B, writing nothing**; a full run writes. **`docs`,
+`ci` and `agents` are the exceptions by design** — each writes exactly what its own questions answer.
 
 **The write boundary — the whole of it**: `.claude/ds-config.json`; in E2 only, the scaffolded
 skills (never overwriting); in `ci` mode only, the pull-request workflows under
 `ci.workflowGlobs` and the release-tower pair (each change a diff, applied on an explicit yes).
 Nothing else, ever — no git
-mutation, no installs, no DevStride **write** tool. **Phases A–D are strictly read-only**:
+mutation, no installs, no DevStride **write** tool outside `agents` mode. **Phases A–D are strictly read-only**:
 `git status --porcelain` stays byte-identical until the write.
 
 ## Why detection comes before questions
@@ -166,12 +169,9 @@ is then the local gate.
   another** — the default is never the only option. Offer that engine's catalogued template as
   `review.localCommand` and optional `review.localAssistCommand`; for an engine the user names,
   build one to the contract and confirm it. Found → `ambiguous` until confirmed; carry
-  `review.localReviewerName`. Existing base-only/literal-effort commands remain supported but
-  get a migration proposal carrying the tradeoff, never a silent rewrite: context mode is not
-  strictly better, and a repository extracting structured findings loses them. **Never propose
-  the migration when the effective `maxLocalReviewRounds` is 1** (the profile's value, or
-  `profileOverrides.maxLocalReviewRounds`) — the cumulative ledger context mode exists to carry
-  has nothing to carry. **Not found → `unknown`, never detected
+  `review.localReviewerName`. Existing base-only/literal-effort commands get a migration
+  proposal with that reference's tradeoff — never a silent rewrite, and **never when the
+  effective `maxLocalReviewRounds` is 1**. **Not found → `unknown`, never detected
   `null`** — report what was probed.
 - **Cloud reviewers** (`review.automatedReviewers`) — possible when origin is GitHub and
   `gh auth status` succeeds. **An entry is more than a name**: a `requested_reviewer` bot is

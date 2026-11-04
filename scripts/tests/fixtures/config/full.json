@@ -114,5 +114,9 @@
   "pool": { "checkout": "pool checkout <member> --purpose <purpose>", "checkin": "pool checkin <member>" },
   "stage": { "resolve": "cat .stage", "productionStages": ["prod"] },
   "statusLine": { "hiddenSegments": ["stage"], "autoUpdate": true },
-  "claims": { "provider": "devstride", "expiryMinutes": { "story": 240, "release-tower": 20 } }
+  "claims": { "provider": "devstride", "expiryMinutes": { "story": 240, "release-tower": 20 } },
+  "activeAgents": {
+    "boardId": "board-1", "tagName": "agent active", "tagColor": "green", "staleMinutes": 20,
+    "commands": { "start": "./tools/presence start <root>", "end": "./tools/presence end <root>" }
+  }
 }
