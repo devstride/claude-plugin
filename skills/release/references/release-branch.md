@@ -23,7 +23,9 @@ pull request's head is `release.releaseSource`, as before, and sections 2–4 an
 
 ## 1. Merge the release train (step 0b)
 
-Runs only when `release.mergeTrainBeforeCut` is `true`, `releaseTrain.branch` exists on origin, and
+Runs only when `release.mergeTrainBeforeCut` is `true`, `releaseTrain.branch` exists on origin (absent
+while another `train/*` branch is there → STOP and name the cutover, `routing.py`'s rule: one-offs
+ride that branch until it is renamed; never release around it), and
 step 0 adopted no open release pull request headed by a release BRANCH (one cut earlier, so the
 train would not ship with it). Otherwise a no-op, reported in one line ("release train: not
 configured", or "skipped — adopted release").
@@ -73,9 +75,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    steps 2–2c on it, driven — pre-ship selection, hold, `review` with the step-4 declarations,
    discharge — then run step 4b (unless this session holds `PRE-SHIP TRAIN: PASS` for that exact
    head), then continue at step 5.
-3. `git fetch origin <releaseSource> <train>`. The train missing from origin while exactly one
-   other `train/*` branch is there → STOP and name the cutover (`routing.py`'s rule: one-offs ride
-   that branch until it is renamed); never release around it. No one-off on the train beyond the source
+3. `git fetch origin <releaseSource> <train>`. No one-off on the train beyond the source
    (`git log --no-merges --oneline origin/<releaseSource>..origin/<train>` is empty — merges of the
    source alone are not work) → report "release train: nothing to ship" and stop here. Otherwise
    record `<sourceBefore>` (the `origin/<releaseSource>` SHA) and `<trainSnapshot>` (the

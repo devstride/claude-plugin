@@ -166,14 +166,14 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   when the chain ran out; never invoke it.
 - **Every exit from step 0** (DRY-CHAIN/TERMINAL, ambiguous root, a given item merged or Done, any
   other stop before step 1) → **`return-checkout`** first when this run leased.
+- **Summary** (`sessionSummary` set): once a candidate is selected, read
+  `references/session-summary.md` — the start write after the claim, one owed before every STOP.
 - **GATING CHECK** (a decision that is the user's → flag, next candidate), **SCOPE CHECK**
   (buildable now vs deferred, recorded), **VALIDATE THE SPEC** (re-fetch with `view: 'full'`; confirm
   paths, symbols and assumptions against the code).
 - Resolve the profile; report item, title, ready-set, profile with source, buildable-now line.
 - **Claim it** (`claims` set) BEFORE step 1; heartbeat each step; held → next candidate, named →
   STOP (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`).
-- **Summary** (`sessionSummary` set): read `references/session-summary.md` now — the start write,
-  and one owed before every later STOP.
 
 ## 1. Mark In Progress
 

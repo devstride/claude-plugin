@@ -41,6 +41,9 @@ secrets = {
     "lowercase bearer header": "authorization: bearer abcdefghijklmn",
     "token in backticks": "`Abcdefghijklmnopqrstuvwxyz0123456789ABCD`",
     "32-hex key": "0123456789abcdef" * 2,
+    "any authorization scheme": "Authorization: ApiKey supersecretcredentialvalue",
+    "digest header": 'Authorization: Digest username="u", response="6629fae49393a05397450978507c4ef1"',
+    "secret_key assignment": "SECRET_KEY=hunter2",
 }
 for name, text in secrets.items():
     rc, o = run({"intent": "note: " + text + " end"})
@@ -48,7 +51,7 @@ for name, text in secrets.items():
     leaked = [frag for frag in ("hunter2", "abc123def456ghi", "dXNlcjpwYXNzMTIzNDU2", "a" * 20, "ABCDEFGH12345678",
               "abcdgh12345678", "123456789012", "SflKxwRJSMeKKF2QT4", "correcthorse", "zzz999", "bob@example.com",
               "MIIabc", "Abcdefghijklmnopqrstuvwxyz0123456789ABCD", "dXNlcjpwYXNz", "abcdefghijklmn",
-              "0123456789abcdef" * 2) if frag in s]
+              "0123456789abcdef" * 2, "supersecretcredentialvalue", "6629fae4") if frag in s]
     check("redacts " + name, rc == 0 and "[redacted]" in s and not leaked)
 
 rc, o = run({"intent": "password=correcthorse and https://u:p@host.example/x"})

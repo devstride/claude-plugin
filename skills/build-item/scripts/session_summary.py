@@ -22,8 +22,7 @@ R = "[redacted]"
 BASIC = [
     (re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|\Z)", re.S), R),
     (re.compile(r"\b([A-Za-z][A-Za-z0-9+.-]*://)[^\s/@:]+:[^\s/@]+@"), r"\1" + R + "@"),
-    (re.compile(r"(?i)\b(authorization\s*[:=]\s*)(?:(bearer|basic|token)\s+)?[^\s\"']+"),
-     lambda m: m.group(1) + (m.group(2) + " " if m.group(2) else "") + R),
+    (re.compile(r"(?i)\b(authorization\s*[:=]\s*)[^\r\n\"']+"), r"\1" + R),  # every scheme, to the line's end
     (re.compile(r"(?i)\b(Bearer|Basic)\s+(?=[A-Za-z0-9._~+/=-]*\d)[A-Za-z0-9._~+/=-]{8,}"), r"\1 " + R),
     (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}"), R),
     (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"), R),
@@ -33,7 +32,7 @@ BASIC = [
     (re.compile(r"\bxox[abposr]-[A-Za-z0-9-]{8,}"), R),
     (re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"), R),
     (re.compile(
-        r"(?i)\b([A-Za-z0-9_.-]*(?:password|secret|token|api[_-]?key|access[_-]?key|private[_-]?key))"
+        r"(?i)\b([A-Za-z0-9_.-]*(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)[A-Za-z0-9_.-]*)"
         r"(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|\S+)"), r"\1\2" + R),
 ]
 EMAIL = (re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+"), R)

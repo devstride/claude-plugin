@@ -200,9 +200,10 @@ def resolve_train(train, heads):
         old = others[0]
         return {"branch": old, "create": False, "note": (
             "; the release train %s is not on origin but %s is, so it rides %s until the cutover %s → %s "
-            "(git fetch origin %s && git push origin %s && git push origin --delete %s)"
+            "(with no one-off in flight: git fetch origin %s && git push origin %s && "
+            "git push origin --force-with-lease=%s %s)"
             % (train, old, old, old, train, sh("+refs/heads/%s:refs/remotes/origin/%s" % (old, old)),
-               sh("refs/remotes/origin/%s:refs/heads/%s" % (old, train)), sh(old)))}
+               sh("refs/remotes/origin/%s:refs/heads/%s" % (old, train)), sh(old), sh(":" + old)))}
     if others:
         return {"kind": "ask", "candidates": others,
                 "reason": "the release train %s is not on origin and several other train branches are: "
@@ -447,7 +448,8 @@ def epic_release_target(facts):
         if "kind" in where:
             return where
         return {"kind": "train", "branch": where["branch"], "create": where["create"], "from": base,
-                "reason": "epicIntegrationBranches.releaseTarget is the release train" + where["note"]}
+                "reason": "epicIntegrationBranches.releaseTarget is the release train" + where["note"],
+                "note": where["note"]}
     if branch == base:
         return {"kind": "base", "branch": base, "create": False, "from": base, "reason": "the base branch"}
     return {"kind": "named", "branch": branch, "create": False, "from": branch,
@@ -483,6 +485,7 @@ def cmd_release_target(req):
     if refusal:
         return refusal
     target = epic_release_target(facts)
+    note = target.pop("note", "")
     if not facts["root"] or target["kind"] in ("refuse", "ask"):
         return target
     found = plan_branch(facts, req)
@@ -491,7 +494,7 @@ def cmd_release_target(req):
     # The plan branch is cut from, and the whole plan is released to, where the epic would have gone;
     # a release train not on origin yet is created off the base first (`fromCreate`, `fromBase`).
     answer = {"kind": "plan", "branch": found["branch"], "create": found["create"], "from": target["branch"],
-              "reason": "plan %s releases as one unit (Release scope: plan)" % facts["root"].get("number")}
+              "reason": "plan %s releases as one unit (Release scope: plan)%s" % (facts["root"].get("number"), note)}
     if target.get("create"):
         answer.update({"fromCreate": True, "fromBase": target["from"]})
     return answer
