@@ -1428,27 +1428,27 @@
       "key": "release.autoStart",
       "type": "object",
       "description": "releases that start themselves under a one-winner release-train claim; contract: skills/release/references/auto-start.md",
-      "since": "unreleased"
+      "since": "3.29.0"
     },
     {
       "key": "release.autoStart.enabled",
       "type": "boolean",
       "default": false,
       "description": "a train landing or a finished release starts the next release; needs a claims block",
-      "since": "unreleased"
+      "since": "3.29.0"
     },
     {
       "key": "release.lightRelease",
       "type": "object",
       "description": "rules for a light release (one the classify skill calls LIGHT)",
-      "since": "unreleased"
+      "since": "3.29.0"
     },
     {
       "key": "release.lightRelease.standingYes",
       "type": "boolean",
       "default": false,
       "description": "the owner's standing yes: a light release identical to its reviewed train merges and deploys without an in-the-moment yes; contract: skills/release/references/auto-start.md",
-      "since": "unreleased"
+      "since": "3.29.0"
     },
     {
       "key": "release.productionReview",

@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.28.0.
+`.claude/ds-config.json` against. Schema version: 3.29.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -175,10 +175,10 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.migrationRenumber.metaGlobs` | string[] | — | — | migration metadata files a renumber may change | 3.22.0 |
 | `release.syncWorkflow` | string | — | — | the workflow syncing production into the source | pre-registry |
 | `release.mergeTrainBeforeCut` | boolean | — | `false` | merge the release train into the source before each cut | pre-registry |
-| `release.autoStart` | object | — | — | releases that start themselves under a one-winner release-train claim; contract: skills/release/references/auto-start.md | unreleased |
-| `release.autoStart.enabled` | boolean | — | `false` | a train landing or a finished release starts the next release; needs a claims block | unreleased |
-| `release.lightRelease` | object | — | — | rules for a light release (one the classify skill calls LIGHT) | unreleased |
-| `release.lightRelease.standingYes` | boolean | — | `false` | the owner's standing yes: a light release identical to its reviewed train merges and deploys without an in-the-moment yes; contract: skills/release/references/auto-start.md | unreleased |
+| `release.autoStart` | object | — | — | releases that start themselves under a one-winner release-train claim; contract: skills/release/references/auto-start.md | 3.29.0 |
+| `release.autoStart.enabled` | boolean | — | `false` | a train landing or a finished release starts the next release; needs a claims block | 3.29.0 |
+| `release.lightRelease` | object | — | — | rules for a light release (one the classify skill calls LIGHT) | 3.29.0 |
+| `release.lightRelease.standingYes` | boolean | — | `false` | the owner's standing yes: a light release identical to its reviewed train merges and deploys without an in-the-moment yes; contract: skills/release/references/auto-start.md | 3.29.0 |
 | `release.productionReview` | object | — | — | review-once economy for the production pull request | pre-registry |
 | `release.productionReview.reviewIdenticalTree` | boolean | — | — | false skips re-reviewing a tree already reviewed | pre-registry |
 | `release.productionReview.highRiskPaths` | string[] | — | — | paths that still get one pass | pre-registry |
