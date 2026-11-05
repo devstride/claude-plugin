@@ -12,15 +12,24 @@ FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 
 g() { git -C "$WORK/repo" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "$@"; }
-git init -q -b develop "$WORK/repo"
-echo 0 > "$WORK/repo/f"; g add f; g commit -q -m base
-g checkout -q -b train; echo a > "$WORK/repo/f"; g commit -q -am "train snapshot, reviewed"
-TRAIN="$(g rev-parse HEAD)"                                                   # the reviewed train head
-g checkout -q develop; g merge -q --no-ff -m "Merge the train" train; MERGE="$(g rev-parse HEAD)"
-g commit -q --allow-empty -m "release branch cut"; RELEASE="$(g rev-parse HEAD)"   # same tree, another commit
-echo b > "$WORK/repo/f"; g commit -q -am "a fix on the release branch"; FIXED="$(g rev-parse HEAD)"   # another tree
-g checkout -q -b elsewhere "$TRAIN~1"; g commit -q --allow-empty -m "never merged"; STRAY="$(g rev-parse HEAD)"
-mkdir -p "$WORK/repo/.claude" "$WORK/bin" "$WORK/prs"
+mkdir -p "$WORK/bin" "$WORK/prs"
+# The configuration is COMMITTED: the helper reads it from the release head, never the working
+# folder. cfg() rebuilds the whole graph with that configuration in its base commit; after the
+# graph is built the working folder is left holding a config that turns everything ON, so a
+# helper that read the working folder would answer MERGE where the committed one says ASK.
+build() {
+  rm -rf "$WORK/repo"; git init -q -b develop "$WORK/repo"; mkdir -p "$WORK/repo/.claude"
+  printf '%s\n' "$1" > "$WORK/repo/.claude/ds-config.json"
+  echo 0 > "$WORK/repo/f"; g add -A; g commit -q -m base
+  g checkout -q -b train; echo a > "$WORK/repo/f"; g commit -q -am "train snapshot, reviewed"
+  TRAIN="$(g rev-parse HEAD)"                                                   # the reviewed train head
+  g checkout -q develop; g merge -q --no-ff -m "Merge the train" train; MERGE="$(g rev-parse HEAD)"
+  g commit -q --allow-empty -m "release branch cut"; RELEASE="$(g rev-parse HEAD)"   # same tree, another commit
+  echo b > "$WORK/repo/f"; g commit -q -am "a fix on the release branch"; FIXED="$(g rev-parse HEAD)"   # another tree
+  g checkout -q -b elsewhere "$TRAIN~1"; g commit -q --allow-empty -m "never merged"; STRAY="$(g rev-parse HEAD)"
+  printf '%s\n' "$AMBIENT" > "$WORK/repo/.claude/ds-config.json"
+}
+AMBIENT='{"release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
 
 # the fake gh: `gh pr view <n> --json ...` prints prs/<n>.json, or fails when there is none
 cat > "$WORK/bin/gh" <<SH
@@ -45,12 +54,14 @@ release_pr() { pr 42 "${2:-OPEN}" "Release 26-01-15" "${3:-master}" "${1:-$RELEA
 row() { # number title marker mergedAt head merge
   printf '{"number": %s, "title": "%s", "body": "<!-- %s range -->", "mergedAt": "%s", "headRefOid": "%s", "mergeCommit": {"oid": "%s"}}' "$@"
 }
-OLD="$(row 30 "Release train: 1 one-off(s) for release 26-01-14" devstride:release-train 2026-01-14T18:00:00Z "$STRAY" "$STRAY")"
-NEW="$(row 40 "Release train: 2 one-off(s) for release 26-01-15" devstride:release-train 2026-01-15T17:00:00Z "$TRAIN" "$MERGE")"
 trains() { printf '[%s]' "$1" > "$WORK/prs/list-release.json"; printf '[%s]' "${2:-}" > "$WORK/prs/list-support.json"; }
-fresh() { rm -f "$WORK/prs/"*; release_pr; trains "$OLD, $NEW"; }
+fresh() {
+  OLD="$(row 30 "Release train: 1 one-off(s) for release 26-01-14" devstride:release-train 2026-01-14T18:00:00Z "$STRAY" "$STRAY")"
+  NEW="$(row 40 "Release train: 2 one-off(s) for release 26-01-15" devstride:release-train 2026-01-15T17:00:00Z "$TRAIN" "$MERGE")"
+  rm -f "$WORK/prs/"*; release_pr; trains "$OLD, $NEW"
+}
 
-cfg() { printf '%s\n' "$1" > "$WORK/repo/.claude/ds-config.json"; }
+cfg() { build "$1"; }
 cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
 
 TOWER=$'Tower: clear\nOn final: #42 release/26-01-15 (draft)\nWaiting: #43 release/26-01-15-2'
@@ -77,6 +88,7 @@ base; expect "(1d) releaseSource absent → develop, not baseBranch (main)" 0 '^
 
 cfg '{"release": {"classifySkill": "classify"}}'
 base; expect "(2) the standing yes is off → ASK" 0 '^ASK the standing yes is off'
+[ "$(cat "$WORK/repo/.claude/ds-config.json")" = "$AMBIENT" ] && ok "(2h) ...even with the working folder's config switching everything on" || bad "(2h) the ambient config was not in place"
 cfg '{"release": {"classifySkill": "classify", "lightRelease": {"standingYes": "yes"}}}'
 base; expect "(2b) a non-boolean standingYes is off → ASK" 0 '^ASK the standing yes is off'
 cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
@@ -127,6 +139,10 @@ base; UNRESOLVED=1; expect "(6) an unresolved thread → ASK" 0 '^ASK 1 review t
 base; PRESHIP="PRE-SHIP: PASS (2 ran, 1 waived)"; expect "(7) a waived pre-ship check → ASK" 0 '^ASK the pre-ship checks did not all pass unwaived'
 base; PRESHIP="PRE-SHIP: FAIL golden"; expect "(7b) a failed pre-ship check → ASK" 0 '^ASK the pre-ship checks did not all pass unwaived'
 base; PREMERGE="PRE-MERGE: NOT CONFIGURED"; expect "(7c) no pre-merge hook configured → MERGE" 0 '^MERGE '
+cfg '{"release": {"classifySkill": "classify", "preMergeSkill": "checkpoint", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
+base; PREMERGE="PRE-MERGE: NOT CONFIGURED"; expect "(7g) NOT CONFIGURED while release.preMergeSkill is set → ASK" 0 '^ASK the pre-merge check did not clear \(PRE-MERGE: NOT CONFIGURED\)$'
+base; expect "(7h) the configured hook answered CLEAR → MERGE" 0 '^MERGE '
+cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
 base; PREMERGE="PRE-MERGE: NOT RUN"; expect "(7d) the pre-merge check did not run → ASK" 0 '^ASK the pre-merge check did not clear \(PRE-MERGE: NOT RUN\)$'
 base; PREMERGE="PRE-MERGE: HOLD checkpoint missing"; expect "(7e) a pre-merge hold → ASK" 0 '^ASK the pre-merge check did not clear'
 base; PREMERGE=""; expect "(7f) no pre-merge verdict → ASK" 0 '^ASK the pre-merge check did not clear \(no verdict\)$'
@@ -149,7 +165,7 @@ expect "(11) several failures → the first in order is named" 0 '^ASK not a lig
 base; CHECKS=amber; expect "(12) a bad argument → ERROR, exit 1" 1 '^ERROR '
 out="$(cd "$WORK/repo" && python3 "$HELPER" --pr 42 2>&1)"; code=$?
 [ "$code" = 1 ] && printf '%s\n' "$out" | grep -q '^ERROR ' && ok "(12b) missing arguments → ERROR, exit 1" || bad "(12b) (exit $code) $out"
-printf '{nope' > "$WORK/repo/.claude/ds-config.json"
-base; expect "(13) an unreadable config → ERROR, exit 1" 1 '^ERROR .*cannot be read as JSON'
+cfg '{nope'
+base; expect "(13) an unreadable committed config → ERROR, exit 1" 1 '^ERROR .*cannot be read as JSON'
 
 exit "$FAIL"

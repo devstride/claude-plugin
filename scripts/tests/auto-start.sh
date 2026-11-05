@@ -108,7 +108,7 @@ got="$(cat "$WORK/starter-one" "$WORK/starter-two" | sort | tr '\n' ' ')"
 BULLET="$(awk '/Release it NON-final/{f=1} f&&/^- \*\*/&&!/NON-final/{exit} f{print}' "$ROOT/skills/release/references/auto-start.md" | tr '\n' ' ')"
 OUTCOME="$(printf '%s' "$BULLET" | grep -o 'with outcome `[a-z-]*`' | head -1 | sed 's/.*`\(.*\)`/\1/')"
 FINAL=true; printf '%s' "$BULLET" | grep -q 'never final' && ! printf '%s' "$BULLET" | grep -Eq 'with `?final: true|`--final` set' && FINAL=false
-[ -n "$OUTCOME" ] && [ "$FINAL" = false ] && ok "(13) the contract releases with outcome $OUTCOME and never final" || bad "(13) outcome '$OUTCOME' final '$FINAL'"
+[ "$OUTCOME" = handed-on ] && [ "$FINAL" = false ] && ok "(13) the contract releases with outcome $OUTCOME and never final" || bad "(13) outcome '$OUTCOME' final '$FINAL'"
 OUT="$(python3 - "$ROOT/skills/build-item/scripts/story-claim.py" "$OUTCOME" "$FINAL" <<'PY'
 import json, subprocess, sys
 helper, outcome, final = sys.argv[1], sys.argv[2], sys.argv[3] == "true"
@@ -152,11 +152,14 @@ order_ok release-train.md "Step 7 terminates" && order_ok epic-release-steps.md 
 # (17) one lock order for every run: release step 0 takes the train claim before adopting a release
 # pull request and before 0a's tower claim, and the contract says so for hand and auto starts alike
 SK="$ROOT/skills/release/SKILL.md"
+flat() { tr '\n' ' ' < "$1" | tr -s ' '; }   # wrapped prose read as one line
 line_of() { grep -n -F -- "$2" "$1" | head -1 | cut -d: -f1; }
-T="$(line_of "$SK" 'the train claim before all below')"; S="$(line_of "$SK" '**Confirm the shape**')"; C="$(line_of "$SK" '**0a. Clearance**')"
+T="$(line_of "$SK" 'the train claim first**')"; S="$(line_of "$SK" '**Confirm the shape**')"; C="$(line_of "$SK" '**0a. Clearance**')"
 [ -n "$T" ] && [ -n "$S" ] && [ -n "$C" ] && [ "$T" -lt "$S" ] && [ "$S" -lt "$C" ] \
   && grep -q 'One lock order, train then' "$ROOT/skills/release/references/auto-start.md" \
   && grep -q "auto-start.md\`'s lock order" "$ROOT/skills/release/references/clearance.md" \
+  && ! flat "$SK" | grep -q 'claims it before anything else' \
+  && ! flat "$ROOT/skills/release/references/clearance.md" | grep -q 'purpose release` before anything else,' \
   && ok "(17) the train claim precedes release adoption and the tower claim, for every run" || bad "(17) lock order: train $T shape $S clearance $C"
 
 exit "$FAIL"

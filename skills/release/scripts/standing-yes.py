@@ -12,8 +12,11 @@ yes, anything else goes to the owner exactly as before.
       ASK <reason>              exit 0   (the first condition that fails, in the order below)
       ERROR <reason>            exit 1   (bad arguments or an unreadable config: treat as ASK)
 
+The configuration is read from the release head itself (`git show <head>:.claude/ds-config.json`),
+never from the working folder: the consent has to be part of what was reviewed.
+
 MERGE needs ALL of, in this order:
-  1. `release.lightRelease.standingYes` is true in .claude/ds-config.json, and `release.clearance` is
+  1. `release.lightRelease.standingYes` is true in the head's .claude/ds-config.json, and `release.clearance` is
      usable: `provider` `github` or `devstride` alone, or `commands` alone with claim, status,
      heartbeat, release and adopt each a non-empty string (only a live tower says who is On final),
      and `release.classifySkill` is a non-empty string (with no classifier, LIGHT is only a claim);
@@ -27,8 +30,8 @@ MERGE needs ALL of, in this order:
   4. --checks is `green` (every required check on the head succeeded);
   5. --unresolved is 0 (the paginated unresolved-thread count);
   6. the pre-ship line is `PRE-SHIP: PASS (<n> ran, 0 waived)` or `PRE-SHIP: NOTHING TO RUN`, and
-     the pre-merge line is `PRE-MERGE: CLEAR` or `PRE-MERGE: NOT CONFIGURED` (HOLD and NOT RUN are
-     the owner's decision);
+     the pre-merge line is `PRE-MERGE: CLEAR`, or `PRE-MERGE: NOT CONFIGURED` only when
+     `release.preMergeSkill` is absent or null (HOLD and NOT RUN are the owner's decision);
   7. --previous-release is 0 (the previous-release gate);
   8. --dev-deploy is 0 (the dev-deploy wait, run BEFORE this check); `not-applicable` only when
      `release.devDeployVerification` is not configured;
@@ -48,21 +51,16 @@ def say(line, code=0):
     sys.exit(code)
 
 
-def load_config():
-    here = os.path.abspath(os.getcwd())
-    while True:
-        candidate = os.path.join(here, ".claude", "ds-config.json")
-        if os.path.isfile(candidate):
-            try:
-                with open(candidate) as handle:
-                    loaded = json.load(handle)
-            except (OSError, ValueError) as error:
-                say("ERROR %s cannot be read as JSON (%s)" % (candidate, error), 1)
-            return loaded if isinstance(loaded, dict) else {}
-        parent = os.path.dirname(here)
-        if parent == here:
-            return {}
-        here = parent
+def load_config(head):
+    """The release head's own .claude/ds-config.json; {} when that commit has none."""
+    done = subprocess.run(["git", "show", "%s:.claude/ds-config.json" % head], capture_output=True, text=True)
+    if done.returncode != 0:
+        return {}
+    try:
+        loaded = json.loads(done.stdout)
+    except ValueError as error:
+        say("ERROR .claude/ds-config.json at %s cannot be read as JSON (%s)" % (head[:12], error), 1)
+    return loaded if isinstance(loaded, dict) else {}
 
 
 def pr_view(number):
@@ -155,7 +153,10 @@ def main():
     parser.add_argument("--tower", required=True)
     a = parser.parse_args()
 
-    config = load_config()
+    head = full_sha(a.head)
+    if head is None:
+        say("ASK the head %s cannot be read" % a.head)
+    config = load_config(head)
     release = config.get("release")
     light = release.get("lightRelease") if isinstance(release, dict) else None
     if not (isinstance(light, dict) and light.get("standingYes") is True):
@@ -167,9 +168,6 @@ def main():
         say("ASK no release.classifySkill is configured, so nothing has shown this release is light")
     if a.klass.strip() != "RELEASE CLASS: LIGHT":
         say("ASK not a light release (%s)" % (a.klass.strip() or "no class line"))
-    head = full_sha(a.head)
-    if head is None:
-        say("ASK the head %s cannot be read" % a.head)
     release_pr = pr_view(a.pr)
     live = str(release_pr.get("headRefOid") or "").strip() if release_pr else ""
     if not live:
@@ -203,7 +201,9 @@ def main():
     if not (pre == "PRE-SHIP: NOTHING TO RUN" or (passed and passed.group(2) == "0")):
         say("ASK the pre-ship checks did not all pass unwaived (%s)" % (pre or "no verdict"))
     merge_check = a.pre_merge.strip()
-    if merge_check not in ("PRE-MERGE: CLEAR", "PRE-MERGE: NOT CONFIGURED"):
+    hook = release.get("preMergeSkill")
+    allowed = ("PRE-MERGE: CLEAR",) if hook is not None else ("PRE-MERGE: CLEAR", "PRE-MERGE: NOT CONFIGURED")
+    if merge_check not in allowed:
         say("ASK the pre-merge check did not clear (%s)" % (merge_check or "no verdict"))
     if a.previous_release != 0:
         say("ASK the previous-release gate answered %d, not 0" % a.previous_release)

@@ -147,7 +147,7 @@ nothing on any failure. `gh` still serves pull-request facts.
 
 ## Where the release skill calls it
 
-Only when `release.clearance` is set; scope `cut-to-deploy` changes 0a, 4 and 5a–5b (below). **0a** `claim --wait --purpose release` before anything else,
+Only when `release.clearance` is set; scope `cut-to-deploy` changes 0a, 4 and 5a–5b (below). **0a** `claim --wait --purpose release` before anything else (with a `claims` block, after the `release-train` claim only: `auto-start.md`'s lock order),
 in the background with a long timeout: `0` continue (say who was waiting when stderr said so); `3`
 ask the owner once — adopt `<branch>` / `#<n>`, or keep waiting — and on adopt run `adopt --yes`
 and enter the adopted path (0b skips the train, 0c skips the cut, step 2 reviews the open pull

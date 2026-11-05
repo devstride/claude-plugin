@@ -60,7 +60,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`, never by substring.
 - **Clearance first, handed back at 5b** when `release.clearance` is set (contract and commands:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`): step 0a claims it before
-  anything else; `heartbeat <phase>` opens each phase BEFORE its first mutation (phases:
+  all but the train claim; `heartbeat <phase>` opens each phase BEFORE its first mutation (phases:
   `clearance.md`) — exit 4 is a STOP, another session owns this release now — and the
   provider's `release` ends 5b, before docs. Never proceed uncleared; a hotfix never claims.
   Scope `cut-to-deploy` moves 0a, 4 and 5a–5b: `clearance.md`.
@@ -69,7 +69,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 
 ## 0. Preconditions and the release delta
 
-- **`claims` set → the train claim before all below** (`auto-start.md`).
+- **`claims` set → the train claim first** (`auto-start.md`).
 - **Confirm the shape**: `releaseSource` (**develop**) → `productionBranch` (**master**), whatever
   branch the checkout is on. An open PR into `productionBranch` headed by a release branch (with
   `release.releaseBranchPattern` absent: headed by `releaseSource`) is ADOPTED, never duplicated —
