@@ -142,4 +142,11 @@ set -- $OUT
 [ "$1 $2" = "proceed skip" ] && ok "(14) the first claim proceeds and a second session is held off" || bad "(14) $OUT"
 [ "$3" = proceed ] && [ "$4" = skip ] && ok "(15) released as the contract says the next cycle claims again; released final it never could" || bad "(15) $OUT"
 
+# (16) both build-item trigger sites fire LAST, after the caller's own recap and close-out
+order_ok() { # file, a phrase that must come before the trigger
+  awk -v p="$2" 'index($0, p) {seen=NR} /autoStart.enabled/ {t=NR} END {exit !(seen && t && t > seen)}' "$ROOT/skills/build-item/references/$1"
+}
+order_ok release-train.md "Step 7 terminates" && order_ok epic-release-steps.md "Human recap" \
+  && ok "(16) the train and epic triggers come after the recap in both build-item references" || bad "(16) a trigger precedes its caller's close-out"
+
 exit "$FAIL"

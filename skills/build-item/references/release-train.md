@@ -82,10 +82,11 @@ request's base.
   epic branch, so no merged status — set `startDate`, set no `dueDate`. `release` marks it Done
   when the train's pull request reaches `baseBranch`.
 - The pull request link (4b) and the as-built reconciliation run as usual.
-- `release.autoStart.enabled` → its trigger after this ritual
-  (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`).
 - Step 7 terminates as for any one-off; the recap says it is on the release train and becomes Done
   when the next release ships it.
+- **Last, after step 7's recap and clean-up:** `release.autoStart.enabled` → its trigger
+  (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`), so nothing of this item's
+  close-out waits on, or is overtaken by, the release it may start.
 
 ## Why
 

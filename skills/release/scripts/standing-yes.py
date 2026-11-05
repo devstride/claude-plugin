@@ -14,9 +14,11 @@ yes, anything else goes to the owner exactly as before.
 
 MERGE needs ALL of, in this order:
   1. `release.lightRelease.standingYes` is true in .claude/ds-config.json, and `release.clearance` is
-     configured (a provider or commands block: only a live tower can say which release is On final);
+     usable: `provider` `github` or `devstride` alone, or `commands` alone with claim, status,
+     heartbeat, release and adopt each a non-empty string (only a live tower says who is On final);
   2. the class line is exactly `RELEASE CLASS: LIGHT`;
-  3. --head is the pull request's CURRENT head (`gh pr view <pr> --json headRefOid`, read here), and
+  3. the pull request is OPEN into `release.productionBranch` (default master), --head is its
+     CURRENT head (`gh pr view <pr>`, read here), and
      its tree equals the tree of the head the train review approved. That train is found here, never
      passed in: the latest merged release-train pull request into the release source, by the release
      skill's own search (both titles, `Release train:` and `Support train:`, each with its body
@@ -106,6 +108,21 @@ def is_ancestor(older, newer):
     return subprocess.run(["git", "merge-base", "--is-ancestor", older, newer], capture_output=True).returncode == 0
 
 
+CLEARANCE_VERBS = ("claim", "status", "heartbeat", "release", "adopt")
+
+
+def usable_clearance(clearance):
+    if not isinstance(clearance, dict):
+        return False
+    provider, commands = clearance.get("provider"), clearance.get("commands")
+    if provider is not None and commands is not None:
+        return False
+    if provider is not None:
+        return provider in ("github", "devstride")
+    return isinstance(commands, dict) and all(isinstance(commands.get(v), str) and commands[v].strip()
+                                              for v in CLEARANCE_VERBS)
+
+
 def full_sha(rev):
     done = subprocess.run(["git", "rev-parse", "--verify", "%s^{commit}" % rev], capture_output=True, text=True)
     return done.stdout.strip() if done.returncode == 0 else None
@@ -139,9 +156,8 @@ def main():
     light = release.get("lightRelease") if isinstance(release, dict) else None
     if not (isinstance(light, dict) and light.get("standingYes") is True):
         say("ASK the standing yes is off (release.lightRelease.standingYes is not true)")
-    clearance = release.get("clearance")
-    if not (isinstance(clearance, dict) and (clearance.get("provider") or isinstance(clearance.get("commands"), dict))):
-        say("ASK no release.clearance is configured, so no tower can show this release On final")
+    if not usable_clearance(release.get("clearance")):
+        say("ASK no usable release.clearance is configured, so no tower can show this release On final")
     if a.klass.strip() != "RELEASE CLASS: LIGHT":
         say("ASK not a light release (%s)" % (a.klass.strip() or "no class line"))
     head = full_sha(a.head)
@@ -151,6 +167,9 @@ def main():
     live = str(release_pr.get("headRefOid") or "").strip() if release_pr else ""
     if not live:
         say("ASK the current head of pull request #%d cannot be read" % a.pr)
+    production = release.get("productionBranch") or "master"
+    if release_pr.get("state") != "OPEN" or release_pr.get("baseRefName") != production:
+        say("ASK pull request #%d is not open into %s (%s into %s)" % (a.pr, production, release_pr.get("state"), release_pr.get("baseRefName")))
     if live != head:
         say("ASK pull request #%d is at %s, not the head %s this check was given" % (a.pr, live[:12], head[:12]))
     source = (release.get("releaseSource") if isinstance(release, dict) else None) or "develop"

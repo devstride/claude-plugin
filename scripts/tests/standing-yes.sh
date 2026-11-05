@@ -41,7 +41,7 @@ export PATH="$WORK/bin:$PATH"
 pr() { # number state title base head
   printf '{"state": "%s", "title": "%s", "baseRefName": "%s", "headRefOid": "%s"}' "$2" "$3" "$4" "$5" > "$WORK/prs/$1.json"
 }
-release_pr() { pr 42 OPEN "Release 26-01-15" master "${1:-$RELEASE}"; }
+release_pr() { pr 42 "${2:-OPEN}" "Release 26-01-15" "${3:-master}" "${1:-$RELEASE}"; }
 row() { # number title marker mergedAt head merge
   printf '{"number": %s, "title": "%s", "body": "<!-- %s range -->", "mergedAt": "%s", "headRefOid": "%s", "mergeCommit": {"oid": "%s"}}' "$@"
 }
@@ -82,10 +82,19 @@ base; expect "(2b) a non-boolean standingYes is off → ASK" 0 '^ASK the standin
 cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
 
 cfg '{"release": {"classifySkill": "classify", "lightRelease": {"standingYes": true}}}'
-base; expect "(2c) no release.clearance, even with a convincing On final line → ASK" 0 '^ASK no release.clearance is configured'
+base; expect "(2c) no release.clearance, even with a convincing On final line → ASK" 0 '^ASK no usable release.clearance is configured'
 cfg '{"release": {"classifySkill": "classify", "clearance": {"scope": "cut-to-deploy"}, "lightRelease": {"standingYes": true}}}'
-base; expect "(2d) a clearance block with neither provider nor commands → ASK" 0 '^ASK no release.clearance is configured'
+base; expect "(2d) a clearance block with neither provider nor commands → ASK" 0 '^ASK no usable release.clearance is configured'
+V='"claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a"'
+for bad_clearance in '{"provider": "bogus"}' '{"commands": {}}' "{\"commands\": {$V, \"adopt\": \"\"}}" "{\"provider\": \"github\", \"commands\": {$V}}"; do
+  cfg "{\"release\": {\"classifySkill\": \"classify\", \"clearance\": $bad_clearance, \"lightRelease\": {\"standingYes\": true}}}"
+  base; expect "(2e) an unusable clearance $bad_clearance → ASK" 0 '^ASK no usable release.clearance is configured'
+done
+cfg "{\"release\": {\"classifySkill\": \"classify\", \"clearance\": {\"commands\": {$V}}, \"lightRelease\": {\"standingYes\": true}}}"
+base; expect "(2f) a complete commands clearance → MERGE" 0 '^MERGE '
 cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
+base; release_pr "$RELEASE" CLOSED; expect "(3c) a closed release pull request → ASK" 0 '^ASK pull request #42 is not open into master'
+base; release_pr "$RELEASE" OPEN develop; expect "(3d) a release pull request retargeted away from production → ASK" 0 '^ASK pull request #42 is not open into master'
 base; CLASS="RELEASE CLASS: FULL"; expect "(3) a full release → ASK" 0 '^ASK not a light release \(RELEASE CLASS: FULL\)$'
 base; CLASS=""; expect "(3b) no class line → ASK" 0 '^ASK not a light release \(no class line\)$'
 
