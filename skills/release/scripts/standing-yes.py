@@ -13,7 +13,8 @@ yes, anything else goes to the owner exactly as before.
       ERROR <reason>            exit 1   (bad arguments or an unreadable config: treat as ASK)
 
 MERGE needs ALL of, in this order:
-  1. `release.lightRelease.standingYes` is true in .claude/ds-config.json;
+  1. `release.lightRelease.standingYes` is true in .claude/ds-config.json, and `release.clearance` is
+     configured (a provider or commands block: only a live tower can say which release is On final);
   2. the class line is exactly `RELEASE CLASS: LIGHT`;
   3. --head is the pull request's CURRENT head (`gh pr view <pr> --json headRefOid`, read here), and
      its tree equals the tree of the head the train review approved. That train is found here, never
@@ -138,6 +139,9 @@ def main():
     light = release.get("lightRelease") if isinstance(release, dict) else None
     if not (isinstance(light, dict) and light.get("standingYes") is True):
         say("ASK the standing yes is off (release.lightRelease.standingYes is not true)")
+    clearance = release.get("clearance")
+    if not (isinstance(clearance, dict) and (clearance.get("provider") or isinstance(clearance.get("commands"), dict))):
+        say("ASK no release.clearance is configured, so no tower can show this release On final")
     if a.klass.strip() != "RELEASE CLASS: LIGHT":
         say("ASK not a light release (%s)" % (a.klass.strip() or "no class line"))
     head = full_sha(a.head)

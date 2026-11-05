@@ -17,9 +17,9 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart` and
   `claims.expiryMinutes["release-train"]`, else 30.
 - **Never degrades.** `decide` answering `degrade` (the store unreachable, unsupported or
   forbidden) does NOT mean "carry on without it" here: an auto start does nothing, saying so once;
-  a hand-started run falls back to the holder-marker rule of `clearance.md` for this run, as with no
-  `claims` block, but ONLY at the first claim, before any train mutation. Once won, a heartbeat that
-  degrades cannot prove the claim is still held: STOP. No train pull request is opened, adopted or pushed to without a won claim or,
+  a hand-started run STOPs, naming the outage (another session may hold the claim it cannot read).
+  Once won, a heartbeat that degrades cannot prove the claim is still held: STOP too. The marker-only
+  rule of `clearance.md` is for repositories with no `claims` block. No train pull request is opened, adopted or pushed to without a won claim or,
   in that fallback, the marker check.
 - **Heartbeat** at each step transition and through EVERY wait until the release — review, CI, the
   train's pre-ship suites, the clearance wait — at least every `min(10, expiry ÷ 3)` minutes

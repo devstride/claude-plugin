@@ -26,6 +26,8 @@ mkdir -p "$WORK/repo/.claude" "$WORK/bin" "$WORK/prs"
 cat > "$WORK/bin/gh" <<SH
 #!/bin/bash
 if [ "\$1 \$2" = "pr list" ]; then
+  case " \$* " in *" --base develop "*) ;; *) echo "fake gh: only develop holds trains here" >&2; exit 1;; esac
+  case " \$* " in *" --state merged "*) ;; *) echo "fake gh: only merged trains are asked for" >&2; exit 1;; esac
   case "\$*" in *'"Release train:"'*) f=list-release;; *'"Support train:"'*) f=list-support;; *) exit 1;; esac
   [ -f "$WORK/prs/fail-list" ] && exit 1
   if [ -f "$WORK/prs/\$f.json" ]; then cat "$WORK/prs/\$f.json"; else echo '[]'; fi; exit 0
@@ -49,7 +51,7 @@ trains() { printf '[%s]' "$1" > "$WORK/prs/list-release.json"; printf '[%s]' "${
 fresh() { rm -f "$WORK/prs/"*; release_pr; trains "$OLD, $NEW"; }
 
 cfg() { printf '%s\n' "$1" > "$WORK/repo/.claude/ds-config.json"; }
-cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "lightRelease": {"standingYes": true}}}'
+cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
 
 TOWER=$'Tower: clear\nOn final: #42 release/26-01-15 (draft)\nWaiting: #43 release/26-01-15-2'
 # the passing argument set; each case overrides one value
@@ -77,8 +79,13 @@ cfg '{"release": {"classifySkill": "classify"}}'
 base; expect "(2) the standing yes is off → ASK" 0 '^ASK the standing yes is off'
 cfg '{"release": {"classifySkill": "classify", "lightRelease": {"standingYes": "yes"}}}'
 base; expect "(2b) a non-boolean standingYes is off → ASK" 0 '^ASK the standing yes is off'
-cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "lightRelease": {"standingYes": true}}}'
+cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
 
+cfg '{"release": {"classifySkill": "classify", "lightRelease": {"standingYes": true}}}'
+base; expect "(2c) no release.clearance, even with a convincing On final line → ASK" 0 '^ASK no release.clearance is configured'
+cfg '{"release": {"classifySkill": "classify", "clearance": {"scope": "cut-to-deploy"}, "lightRelease": {"standingYes": true}}}'
+base; expect "(2d) a clearance block with neither provider nor commands → ASK" 0 '^ASK no release.clearance is configured'
+cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
 base; CLASS="RELEASE CLASS: FULL"; expect "(3) a full release → ASK" 0 '^ASK not a light release \(RELEASE CLASS: FULL\)$'
 base; CLASS=""; expect "(3b) no class line → ASK" 0 '^ASK not a light release \(no class line\)$'
 
@@ -109,10 +116,10 @@ base; PRESHIP="PRE-SHIP: FAIL golden"; expect "(7b) a failed pre-ship check → 
 base; PREV=2; expect "(8) the previous release still pending → ASK" 0 '^ASK the previous-release gate answered 2, not 0$'
 base; DEV=2; expect "(9) the dev deploy not yet done → ASK" 0 '^ASK the dev-deploy wait answered 2, not 0$'
 base; NO_DEV=1; expect "(9b) the dev-deploy answer omitted → ERROR, never a MERGE" 1 '^ERROR .*--dev-deploy'
-cfg '{"release": {"classifySkill": "classify", "devDeployVerification": "verify-dev", "lightRelease": {"standingYes": true}}}'
+cfg '{"release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "devDeployVerification": "verify-dev", "lightRelease": {"standingYes": true}}}'
 base; expect "(9c) not-applicable while devDeployVerification is configured → ASK" 0 '^ASK release.devDeployVerification is configured'
 base; DEV=0; expect "(9d) the configured wait answered 0 → MERGE" 0 '^MERGE '
-cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "lightRelease": {"standingYes": true}}}'
+cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
 base; TOWER_ARG=$'Tower: clear\nOn final: #41 release/26-01-14\nWaiting: #42 release/26-01-15'; expect "(10) another release is on final → ASK" 0 '^ASK pull request #42 is not the one release On final'
 base; TOWER_ARG=$'On final: #421 release/x'; expect "(10b) #421 on final does not match #42 → ASK" 0 '^ASK pull request #42 is not the one release On final'
 base; TOWER_ARG=$'On final: #42-old release/x'; expect "(10c) #42-old is not #42 → ASK" 0 '^ASK pull request #42 is not the one release On final'
