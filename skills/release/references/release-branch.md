@@ -73,7 +73,9 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    steps 2–2c on it, driven — pre-ship selection, hold, `review` with the step-4 declarations,
    discharge — then run step 4b (unless this session holds `PRE-SHIP TRAIN: PASS` for that exact
    head), then continue at step 5.
-3. `git fetch origin <releaseSource> <train>`. No one-off on the train beyond the source
+3. `git fetch origin <releaseSource> <train>`. The train missing from origin while exactly one
+   other `train/*` branch is there → STOP and name the cutover (`routing.py`'s rule: one-offs ride
+   that branch until it is renamed); never release around it. No one-off on the train beyond the source
    (`git log --no-merges --oneline origin/<releaseSource>..origin/<train>` is empty — merges of the
    source alone are not work) → report "release train: nothing to ship" and stop here. Otherwise
    record `<sourceBefore>` (the `origin/<releaseSource>` SHA) and `<trainSnapshot>` (the

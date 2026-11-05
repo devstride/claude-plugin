@@ -184,6 +184,11 @@ def train_section(config):
     return new if new else section(config, "supportTrain")
 
 
+def sh(word):
+    """A branch name safe to paste into a shell: git allows `$`, `;`, backticks and the like."""
+    return word if re.match(r"^[A-Za-z0-9._/:+-]+$", word) else "'" + word.replace("'", "'\\''") + "'"
+
+
 def resolve_train(train, heads):
     """Where the configured release train is on origin: {"branch", "create", "note"}, or an `ask`.
     Absent with exactly one other `train/*` head → that head (a rename not yet cut over: creating the
@@ -195,8 +200,9 @@ def resolve_train(train, heads):
         old = others[0]
         return {"branch": old, "create": False, "note": (
             "; the release train %s is not on origin but %s is, so it rides %s until the cutover %s → %s "
-            "(git fetch origin %s && git push origin origin/%s:refs/heads/%s && git push origin --delete %s)"
-            % (train, old, old, old, train, old, old, train, old))}
+            "(git fetch origin %s && git push origin %s && git push origin --delete %s)"
+            % (train, old, old, old, train, sh("+refs/heads/%s:refs/remotes/origin/%s" % (old, old)),
+               sh("refs/remotes/origin/%s:refs/heads/%s" % (old, train)), sh(old)))}
     if others:
         return {"kind": "ask", "candidates": others,
                 "reason": "the release train %s is not on origin and several other train branches are: "

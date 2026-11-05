@@ -37,13 +37,18 @@ secrets = {
     "token colon": "api_key: zzz999",
     "email": "ask bob@example.com about it",
     "long mixed word": "Abcdefghijklmnopqrstuvwxyz0123456789ABCD",
+    "letters-only basic header": "Authorization: Basic dXNlcjpwYXNz",
+    "lowercase bearer header": "authorization: bearer abcdefghijklmn",
+    "token in backticks": "`Abcdefghijklmnopqrstuvwxyz0123456789ABCD`",
+    "32-hex key": "0123456789abcdef" * 2,
 }
 for name, text in secrets.items():
     rc, o = run({"intent": "note: " + text + " end"})
     s = o["intent"] if rc == 0 else ""
     leaked = [frag for frag in ("hunter2", "abc123def456ghi", "dXNlcjpwYXNzMTIzNDU2", "a" * 20, "ABCDEFGH12345678",
               "abcdgh12345678", "123456789012", "SflKxwRJSMeKKF2QT4", "correcthorse", "zzz999", "bob@example.com",
-              "MIIabc", "Abcdefghijklmnopqrstuvwxyz0123456789ABCD") if frag in s]
+              "MIIabc", "Abcdefghijklmnopqrstuvwxyz0123456789ABCD", "dXNlcjpwYXNz", "abcdefghijklmn",
+              "0123456789abcdef" * 2) if frag in s]
     check("redacts " + name, rc == 0 and "[redacted]" in s and not leaked)
 
 rc, o = run({"intent": "password=correcthorse and https://u:p@host.example/x"})
@@ -56,6 +61,9 @@ rc, o = run({"filesTouched": [path], "intent": "fixed in " + sha + " and see src
 check("mixed-case long file path survives", o["filesTouched"] == [path])
 check("40-hex sha survives in prose", sha in o["intent"] and "src/a-b.py" in o["intent"])
 check("branch survives", o["branch"] == "phil/26-01-01/x")
+prose = "Basic setup, then edit frontend/src/components/core/SelectChip2ComponentWithLongName.vue."
+rc, o = run({"intent": prose})
+check("ordinary prose and a long file path in prose survive", o["intent"] == prose)
 rc, o = run({"directedBy": {"email": "dev@example.com", "username": "dev"}})
 check("directedBy identity kept", o["directedBy"] == {"username": "dev", "email": "dev@example.com"})
 rc, o = run({"reviewEngines": [{"name": "codex", "outcome": "clean " + "ghp_" + "b" * 36}]})

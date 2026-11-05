@@ -22,7 +22,9 @@ R = "[redacted]"
 BASIC = [
     (re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|\Z)", re.S), R),
     (re.compile(r"\b([A-Za-z][A-Za-z0-9+.-]*://)[^\s/@:]+:[^\s/@]+@"), r"\1" + R + "@"),
-    (re.compile(r"\b(Bearer|Basic)\s+(?=[A-Za-z0-9._~+/=-]*\d)[A-Za-z0-9._~+/=-]{8,}"), r"\1 " + R),
+    (re.compile(r"(?i)\b(authorization\s*[:=]\s*)(?:(bearer|basic|token)\s+)?[^\s\"']+"),
+     lambda m: m.group(1) + (m.group(2) + " " if m.group(2) else "") + R),
+    (re.compile(r"(?i)\b(Bearer|Basic)\s+(?=[A-Za-z0-9._~+/=-]*\d)[A-Za-z0-9._~+/=-]{8,}"), r"\1 " + R),
     (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}"), R),
     (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}"), R),
     (re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"), R),
@@ -35,7 +37,10 @@ BASIC = [
         r"(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|\S+)"), r"\1\2" + R),
 ]
 EMAIL = (re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+"), R)
-LONG_WORD = re.compile(r"(?<![^\s])[A-Za-z0-9+/=_-]{32,}(?![^\s])")
+# Bounded by any non-token character (quotes, backticks, brackets), but a dot only ends a word at a
+# sentence's end: inside a file name it joins, so a long path is never redacted piecemeal.
+LONG_WORD = re.compile(r"(?<![A-Za-z0-9+/=_.-])[A-Za-z0-9+/=_-]{32,}(?![A-Za-z0-9+/=_-]|\.\w)")
+HEX = re.compile(r"^[0-9a-fA-F]+$")
 SHA = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
 
 
@@ -44,6 +49,8 @@ def _long_word(m):
     if SHA.match(w):
         return w
     if re.search(r"[A-Z]", w) and re.search(r"[a-z]", w) and re.search(r"\d", w):
+        return R
+    if HEX.match(w) and re.search(r"\d", w) and re.search(r"[a-fA-F]", w):  # a hex key, not a commit hash
         return R
     return w
 

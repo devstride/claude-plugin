@@ -172,6 +172,8 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
 - Resolve the profile; report item, title, ready-set, profile with source, buildable-now line.
 - **Claim it** (`claims` set) BEFORE step 1; heartbeat each step; held → next candidate, named →
   STOP (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`).
+- **Summary** (`sessionSummary` set): read `references/session-summary.md` now — the start write,
+  and one owed before every later STOP.
 
 ## 1. Mark In Progress
 
@@ -315,7 +317,7 @@ the owner once per unit, cutting nothing until answered; unanswerable → `false
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` when step 7 reports the release
 unit at zero and before cutting the release PR.**
 
-The release target is `routing.py release-target`'s `branch` (plan scope: `plan-scope.md`).
+The release target is `routing.py release-target`'s `branch` (`ask` → ask the owner which is live, set `releaseTrain.branch` or cut over, run it again; plan scope: `plan-scope.md`).
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release-steps.md` in full before
 acting on a release that fires, or on step 0's recovery close-out** — refresh, verification plan, the EPIC RELEASE PR cut, review

@@ -41,7 +41,8 @@ From what the loop already knows; omit anything unavailable rather than guessing
 - `model` `{name?, version?}` the model the session runs on; `intent` at most 1000 characters in
   your own words: what this story is for, not its description pasted in.
 - `branch`; `pullRequest` `{number?, url?}`; `filesTouched` from
-  `git diff --name-only <base>...HEAD` (at most 200); `toolsTouched` the names of the tool families
+  `git diff --name-only <base>...HEAD` taken on the story branch BEFORE it merges (after a fast
+  merge `HEAD` is the base and the diff is empty; at most 200); `toolsTouched` the names of the tool families
   used (at most 100); `reviewEngines` `[{name, outcome?}]` from the review ledger (at most 10);
   `errorReason` at most 500 characters.
 - `provider` the model provider; `credentialName` the NAME or id of the credential in use, never its

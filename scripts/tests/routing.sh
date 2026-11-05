@@ -69,8 +69,11 @@ WANT="$(python3 -c 'import json,sys; f=json.load(open(sys.argv[1])); print(sum(l
 # a missing train beside one other train branch: the reason names the cutover and its commands
 REQ='{"config":{"baseBranch":"develop","hierarchyRoles":{"leaf":["Defect"],"releaseUnit":"Epic"},"releaseTrain":{"branch":"train/new"},"release":{"mergeTrainBeforeCut":true}},"chain":[{"number":"I1","workType":"Defect"}],"heads":["develop","train/old"]}'
 WHY="$(printf '%s' "$REQ" | python3 "$HELPER" target | python3 -c 'import json,sys; print(json.load(sys.stdin)["reason"])')"
-case "$WHY" in *"train/old → train/new"*"git push origin origin/train/old:refs/heads/train/new"*"--delete train/old"*) ok "the train cutover reason names old → new and its commands";;
+case "$WHY" in *"train/old → train/new"*"git fetch origin +refs/heads/train/old:refs/remotes/origin/train/old"*"git push origin refs/remotes/origin/train/old:refs/heads/train/new"*"--delete train/old)"*) ok "the train cutover reason names old → new and its commands";;
   *) bad "train cutover reason: $WHY";; esac
+WHY="$(printf '%s' "${REQ/train\/old/train/o\$(id)}" | python3 "$HELPER" target | python3 -c 'import json,sys; print(json.load(sys.stdin)["reason"])')"
+case "$WHY" in *"--delete 'train/o\$(id)')"*) ok "a branch name with shell metacharacters is quoted in the cutover commands";;
+  *) bad "unquoted cutover command: $WHY";; esac
 
 # the refusal contract
 for args in "target|{\"config\":{\"baseBranch\":\"develop\",\"hierarchyRoles\":{\"leaf\":[\"Story\"],\"releaseUnit\":\"Epic\"}},\"chain\":[{\"number\":\"I1\",\"workType\":\"Story\"}],\"heads\":[null]}" "slug|{\"title\":5}" "match|{\"name\":\"a\",\"patterns\":\"a\"}" "target|not json" "nope|{}" "target|[]" "target|{\"config\":{\"baseBranch\":\"develop\"},\"chain\":[]}" "match|{\"name\":\"a\",\"patterns\":[\"\"]}" "release-target|{\"config\":{\"baseBranch\":\"develop\"},\"chain\":[]}" "epic-base|{\"config\":[]}"; do
