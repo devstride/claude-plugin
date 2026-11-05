@@ -165,4 +165,15 @@ T="$(line_of "$SK" 'the train claim first**')"; S="$(line_of "$SK" '**Confirm th
   && ! flat "$ROOT/skills/release/references/clearance.md" | grep -q 'purpose release` before anything else,' \
   && ok "(17) the train claim precedes release adoption and the tower claim, for every run" || bad "(17) lock order: train $T shape $S clearance $C"
 
+# (18) after the hand-on, a release pushes the train only under the train claim again; every train
+# pull request opened with a claims block carries the holder marker, and an absent one is never
+# adopted silently
+RB="$ROOT/skills/release/references/release-branch.md"; AS="$ROOT/skills/release/references/auto-start.md"
+flat "$RB" | grep -q 'it pushes the train only under that claim again: claim it (no wait); won → level, then release it `handed-on`; held by a live session → SKIP the leveling' \
+  && flat "$RB" | grep -q '(scope `cut-to-deploy` or a `claims` block: and the holder marker)' \
+  && flat "$AS" | grep -q 'an ABSENT marker is ambiguous' \
+  && ! flat "$AS" | grep -q "this session's, absent, or names" \
+  && ok "(18) 5b levels the train only under a re-won claim; the holder marker is always written with claims and an absent one stops" \
+  || bad "(18) the post-hand-on train push, the holder marker, or the absent-marker rule regressed"
+
 exit "$FAIL"

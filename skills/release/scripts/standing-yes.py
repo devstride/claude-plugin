@@ -25,8 +25,9 @@ MERGE needs ALL of, in this order:
      CURRENT head (`gh pr view <pr>`, read here), and
      its tree equals the tree of the head the train review approved. That train is found here, never
      passed in: the latest merged release-train pull request into the release source, by the release
-     skill's own search (both titles, `Release train:` and `Support train:`, each with its body
-     marker), whose merge commit is an ancestor of --head; its `headRefOid` is the reviewed head;
+     skill's own search (both titles, `Release train:` and `Support train:`, each with its complete
+     range marker `<!-- devstride:release-train source <sha> snapshot <sha> -->`, or the
+     support-train spelling; the holder marker is not one), whose merge commit is an ancestor of --head; its `headRefOid` is the reviewed head;
   4. --checks is `green` (every required check on the head succeeded);
   5. --unresolved is 0 (the paginated unresolved-thread count);
   6. the pre-ship line is `PRE-SHIP: PASS (<n> ran, 0 waived)` or `PRE-SHIP: NOTHING TO RUN`, and
@@ -80,7 +81,14 @@ def pr_view(number):
     return found if isinstance(found, dict) else None
 
 
-TRAIN_TITLES = (("Release train:", "devstride:release-train"), ("Support train:", "devstride:support-train"))
+TRAIN_TITLES = (("Release train:", "release-train"), ("Support train:", "support-train"))
+
+
+def has_range_marker(body, kind):
+    """The complete range marker `<!-- devstride:<kind> source <sha> snapshot <sha> -->`, never a
+    substring: the holder marker `devstride:release-train-holder` or prose naming it is not one."""
+    return re.search(r"<!--\s*devstride:%s source [0-9a-f]{7,40} snapshot [0-9a-f]{7,40}\s*-->" % re.escape(kind),
+                     body) is not None
 
 
 def latest_train(source):
@@ -101,7 +109,7 @@ def latest_train(source):
         except ValueError:
             return None
         rows += [r for r in found if isinstance(r, dict)]
-    trains = [r for r in rows if any(str(r.get("title", "")).startswith(t) and m in str(r.get("body", ""))
+    trains = [r for r in rows if any(str(r.get("title", "")).startswith(t) and has_range_marker(str(r.get("body", "")), m)
                                      for t, m in TRAIN_TITLES) and r.get("mergedAt")]
     return max(trains, key=lambda r: str(r["mergedAt"])) if trains else {}
 

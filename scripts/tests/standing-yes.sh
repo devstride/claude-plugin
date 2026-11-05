@@ -52,7 +52,7 @@ pr() { # number state title base head
 }
 release_pr() { pr 42 "${2:-OPEN}" "Release 26-01-15" "${3:-master}" "${1:-$RELEASE}"; }
 row() { # number title marker mergedAt head merge
-  printf '{"number": %s, "title": "%s", "body": "<!-- %s range -->", "mergedAt": "%s", "headRefOid": "%s", "mergeCommit": {"oid": "%s"}}' "$@"
+  printf '{"number": %s, "title": "%s", "body": "<!-- %s source 1111111 snapshot 2222222 -->", "mergedAt": "%s", "headRefOid": "%s", "mergeCommit": {"oid": "%s"}}' "$@"
 }
 trains() { printf '[%s]' "$1" > "$WORK/prs/list-release.json"; printf '[%s]' "${2:-}" > "$WORK/prs/list-support.json"; }
 fresh() {
@@ -125,6 +125,10 @@ base; trains "$OLD, $NEW, $(row 41 "Release train: x" devstride:release-train 20
 expect "(4g) a later train-looking pull request not merged into the head → ASK" 0 '^ASK the latest train #41 is not merged into the head'
 base; trains "$OLD, $NEW, $(row 41 "Release train: x" no-marker 2026-01-15T17:30:00Z "$STRAY" "$STRAY")"
 expect "(4h) a later train title without the body marker is ignored → MERGE" 0 '^MERGE '
+base; trains "$OLD, $NEW, $(printf '{"number": 41, "title": "Release train: x", "body": "<!-- devstride:release-train-holder abcdef012345 on m -->", "mergedAt": "2026-01-15T17:30:00Z", "headRefOid": "%s", "mergeCommit": {"oid": "%s"}}' "$STRAY" "$STRAY")"
+expect "(4m) a later train title carrying only the holder marker is not a reviewed train → MERGE" 0 '^MERGE '
+base; trains "$OLD, $NEW, $(printf '{"number": 41, "title": "Release train: x", "body": "see devstride:release-train for the range", "mergedAt": "2026-01-15T17:30:00Z", "headRefOid": "%s", "mergeCommit": {"oid": "%s"}}' "$STRAY" "$STRAY")"
+expect "(4n) prose naming the marker is not a marker → MERGE" 0 '^MERGE '
 base; trains "$OLD, $(row 41 "Ship it" devstride:release-train 2026-01-15T17:30:00Z "$STRAY" "$STRAY"), $NEW"
 expect "(4i) a later pull request whose title is not a train is ignored → MERGE" 0 '^MERGE '
 base; trains "$OLD" "$(row 40 "Support train: 2 one-off(s)" devstride:support-train 2026-01-15T17:00:00Z "$TRAIN" "$MERGE")"

@@ -31,7 +31,8 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart` and
 - **Release it NON-final**: `release` with outcome `handed-on`, never `done` and never final
   (`final: true`, `--final`), so the next cycle can claim it. It is handed on once 0c has cut the
   release branch while this run holds the tower, so the next train phase runs during the deploy, but
-  ONLY with `release.clearance` and `release.releaseBranchPattern` both set; without either, the
+  ONLY with `release.clearance` and `release.releaseBranchPattern` both set (5b's train leveling
+  later re-claims it, `release-branch.md` §2 step 3); without either, the
   release pull request has no tower or its own branch to protect it, so the claim is held until the
   run ends. A train with nothing to ship changes neither point: the claim waits for the cut (or, held,
   for the run's end). Released early only when the whole run ends: nothing to ship at all, or stopped.
@@ -44,10 +45,11 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart` and
   §1 step 2 ADOPTS it, never opens a second. The old session learns at its next heartbeat and stops.
 - **The holder marker stays, and the claim decides it.** The train pull request body still carries
   `clearance.md`'s `release-train-holder` marker, written from this session's identity. On a won
-  claim a marker is adoptable when it is this session's, absent, or names the holder whose lapsed
-  claim this one took over (the marker's digest is a prefix of that claim's `holderDigest`). Any
-  other marker belongs to a session that never held the claim (one on an older plugin): STOP, name
-  it, adopt only on the owner's yes and their word that it stopped.
+  claim a marker is adoptable when it is this session's or names the holder whose lapsed claim this
+  one took over (the marker's digest is a prefix of that claim's `holderDigest`). Every train pull
+  request opened with a `claims` block carries it (`release-branch.md` §1 step 4), so an ABSENT
+  marker is ambiguous, as is any other: a session that never held the claim (one on an older
+  plugin) may own it. STOP, name it, adopt only on the owner's yes and their word that it stopped.
 
 ## Auto start — `release.autoStart.enabled`
 

@@ -52,8 +52,10 @@ renumbered NNNN → MMMM (the source took NNNN)".
 title, because `gh pr list --search` has no reliable OR across quoted phrases: `gh pr list --base
 <releaseSource> --state <state> --search 'in:title "Release train:" sort:created-desc' --json
 number,title,body,mergedAt --limit 50` and the same with `"Support train:"`. Merge the results and
-keep only titles starting `Release train:` OR `Support train:` whose body carries
-`devstride:release-train` OR `devstride:support-train` (the marker written before the rename), so an
+keep only titles starting `Release train:` OR `Support train:` whose body carries the complete
+range marker, `devstride:release-train` OR `devstride:support-train` (the marker written before
+the rename) followed by `source <sha> snapshot <sha>` — never a substring, which the holder marker
+`devstride:release-train-holder` would also match — so an
 interrupted run, or an open train pull request from before the update, is still finished or adopted;
 for merged ones take the latest `mergedAt`. Never trust best-match ranking or a body match alone.
 
@@ -81,7 +83,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    land on the live train from now on ship in the next release.
 4. **Open it through `pr` in driven mode** — base `<releaseSource>`, title `Release train: <n>
    one-off(s) for release <date>`, the body listing each one-off and carrying the range marker
-   (scope `cut-to-deploy`: and the holder marker) —
+   (scope `cut-to-deploy` or a `claims` block: and the holder marker) —
    flagged as a release-unit pull request exactly as `build-item` step 8 flags an epic release, so
    `review` takes the FULL diff (a one-off merged fast onto the train had no full review yet — this
    is its first and only full review before production; with `release.productionReview` set, a
@@ -238,7 +240,11 @@ hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
 3. **Bring the release train up to date** when `releaseTrain.branch` is set and exists on origin (a
    train not yet created is skipped, said so; leave it out of the fetch above), by §1 step 7's rule
    (fast-forward when it is an ancestor of the source, else merge the source into it), so the
-   release's own fixes reach it too; report how many unreleased one-offs it carries.
+   release's own fixes reach it too; report how many unreleased one-offs it carries. With a
+   `claims` block and the train claim already handed on, it pushes the train only under that claim
+   again: claim it (no wait); won → level, then release it `handed-on`; held by a live session →
+   SKIP the leveling, said so (that holder's own step 7 levels the train from a source that already
+   holds this release), never a push beside it.
 4. **Hand clearance back** (`release.clearance` set): the provider's `release --owed <item>` for
    each later step still to run (`post-deploy-check` under scope `cut-to-deploy`, then `docs`,
    `close-out`, `release-notes` — only those that will run),
