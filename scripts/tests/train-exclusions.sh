@@ -21,7 +21,8 @@ config() {
 import json, sys
 c = {"release": {"releaseSource": "develop", "releaseBranchFixExclusions": ["db/migrations/**", "infra/**"]},
      "releaseTrain": {"branch": "train"},
-     "epicIntegrationBranches": {"pattern": "<prefix>/<YY-MM-DD>/epic-<epic-title-slug>"}}
+     "epicIntegrationBranches": {"pattern": "<prefix>/<YY-MM-DD>/epic-<epic-title-slug>"},
+     "planIntegrationBranches": {"pattern": "<prefix>/<YY-MM-DD>/plan-<plan-number>-<plan-title-slug>"}}
 if sys.argv[2]:
     c["release"]["migrationRenumber"] = {"sqlGlobs": ["db/migrations/*.sql"], "metaGlobs": ["db/migrations/meta/**"]}
 json.dump(c, open(sys.argv[1], "w"))
@@ -230,4 +231,40 @@ git checkout -q develop; echo d > infra/z/d; echo dev > src/a.txt; git add -A; g
 git checkout -q train; git merge -q --no-ff --no-commit develop >/dev/null 2>&1; M22=$?; [ "$M22" = 1 ] || bad "(22) setup: the merge did not stop ($M22)"
 git checkout -q --ours src/a.txt; git add -A; git commit -qm "merge the source"; run t22
 [ "$RC" = 2 ] && ok "(22) a directory-rename split beside an ordinary conflict stops the check (exit 2)" || bad "(22) exit $RC: $OUT"
+# (23) plan scope: an epic reviewed onto the plan branch, then the plan released onto the train
+PLAN=jane/26-10-01/plan-I303-checkout
+plan_repo() {
+  repo "$1"; git checkout -q -b plan train
+  git checkout -q -b epic plan; mkdir -p db/migrations; echo "epic" > db/migrations/0002_col.sql; git add -A; git commit -qm "story"
+  git checkout -q plan; git merge -q --no-ff -m "Merge pull request #11 from acme/jane/26-10-01/epic-checkout" epic
+  stub 11 "${2:-$PLAN}" MERGED "$(git rev-parse HEAD)"
+  git checkout -q train; echo t > src/t.txt; git add -A; git commit -qm "train moves"
+  git checkout -q plan; git merge -q --no-ff -m "refresh from the train" train
+  if [ -n "${3:-}" ]; then echo direct > "$3"; git add -A; git commit -qm "direct commit"; fi
+  git checkout -q train; git merge -q --no-ff -m "Merge pull request #13 from acme/$PLAN" plan
+  stub 13 train MERGED "$(git rev-parse HEAD)"
+}
+plan_repo t23; run t23
+expect "(23) a reviewed plan release carrying an epic's reviewed migration is allowed, both units listed" 0 "d['refused']==[] and 13 in d['reviewedUnits'] and 11 in d['reviewedUnits']"
+plan_repo t23b "" infra/direct.tf; run t23b
+expect "(23b) a commit on the plan branch that no pull request reviewed is still checked" 1 "d['refused']==['infra/direct.tf']"
+plan_repo t23c train; run t23c
+expect "(23c) an epic pull request on the plan branch that was based elsewhere is not a reviewed unit" 1 "d['refused']==['db/migrations/0002_col.sql']"
+# (24) the shipped default patterns, where a plan head also fits the epic pattern: a plan release is
+#      still judged as a plan, so a direct commit on the plan branch is checked
+PLAN=jane/11-05-26/plan-I303-checkout
+repo t24; git checkout -q -b plan train
+git checkout -q -b epic plan; echo e > src/e.txt; git add -A; git commit -qm story
+git checkout -q plan; git merge -q --no-ff -m "Merge pull request #11 from acme/jane/11-05-26/I302-faster-checkout" epic
+stub 11 "$PLAN" MERGED "$(git rev-parse HEAD)"; echo direct > infra/direct.tf; git add -A; git commit -qm "direct commit"
+git checkout -q train; git merge -q --no-ff -m "Merge pull request #13 from acme/$PLAN" plan; stub 13 train MERGED "$(git rev-parse HEAD)"
+python3 - "$WORK/c-t24.json" <<'PY2'
+import json, sys
+json.dump({"release": {"releaseSource": "develop", "releaseBranchFixExclusions": ["db/migrations/**", "infra/**"]},
+           "releaseTrain": {"branch": "train"},
+           "epicIntegrationBranches": {"pattern": "<prefix>/<MM-DD-YY>/<epic-number>-<epic-title-slug>"},
+           "planIntegrationBranches": {"pattern": "<prefix>/<MM-DD-YY>/plan-<plan-number>-<plan-title-slug>"}}, open(sys.argv[1], "w"))
+PY2
+OUT="$(python3 "$TOOL" --config "$WORK/c-t24.json" --source-before "$SB" --head train --repo "$WORK/t24" 2>&1)"; RC=$?
+expect "(24) with the default patterns a plan release is judged as a plan, its direct commit checked" 1 "d['refused']==['infra/direct.tf'] and d['reviewedUnits']==[13, 11]"
 exit $FAIL

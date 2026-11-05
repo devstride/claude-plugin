@@ -206,3 +206,4 @@ are reported and ignored.
 - The SKILL.md of `plan`, `ultracode-build`, `review`, `build-item`, `setup` (plus
   `setup/references/config-defaults.md`), `doctor` and `rebalance` — each for the knobs listed
   against it in the table above.
+- `build-item/references/plan-scope.md` — the `Release scope:` marker is read on the root-marker walk.

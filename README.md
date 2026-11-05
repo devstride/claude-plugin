@@ -500,7 +500,9 @@ is the loop's rule for where an item lands and what its branches are called, as 
 Python 3 file: JSON in on stdin, JSON out. `target` answers "which branch does this item land on"
 (its epic's integration branch, the release train, or the base branch), `branch-name` names the
 feature branch, `match` applies the branch-pattern rule, and `excluded` lists changed files that may
-not ride the release train. Pass `oneOff: true` for an item delivered outside a plan, and `roles`
+not ride the release train; `release-target` and `epic-base` say where a release unit's release
+pull request goes and what a new integration branch is cut from, honouring a plan root's
+`Release scope: plan` line. Pass `oneOff: true` for an item delivered outside a plan, and `roles`
 when your config has no `hierarchyRoles`. `routing-fixtures.json` beside it holds the canonical examples; if your
 repository implements the rule itself, run those examples against your implementation in its tests.
 
@@ -516,7 +518,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.29.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.30.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

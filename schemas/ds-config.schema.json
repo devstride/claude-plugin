@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.29.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.30.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -339,6 +339,24 @@
       },
       "additionalProperties": false,
       "description": "per-release-unit integration branches"
+    },
+    "planIntegrationBranches": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "the plan integration branch name pattern (<prefix>, the date token, <plan-number>, <plan-title-slug>); unset, no plan can release as one unit"
+        },
+        "example": {
+          "type": "string",
+          "description": "descriptive only: a sample plan integration branch name; nothing reads it"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "the plan integration branch a plan marked Release scope: plan releases its epics onto"
     },
     "defects": {
       "type": "object",

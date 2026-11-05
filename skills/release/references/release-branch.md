@@ -41,7 +41,8 @@ check is `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/train_exclusions.
 .claude/ds-config.json --source-before <from> --head <to>` (its header documents the rules): over
 each first-parent commit in the range it leaves out merges of `releaseSource` and merges of a pull
 request that `gh` confirms was merged onto the train as a release unit, and checks every other commit
-(a fast-merged one-off, a direct commit, a snapshot fix). Exit 1 → STOP, naming each file in
+(a fast-merged one-off, a direct commit, a snapshot fix). A plan's release pull request (plan scope)
+is not exempt whole: its plan branch's epic pull requests are the reviewed units, the rest is checked. Exit 1 → STOP, naming each file in
 `refused` and saying: "this touches deploy configuration or database migrations without a reviewed
 pull request; merge it to <releaseSource> through a normal pull request, then re-run." Exit 2 → STOP
 on the error. `allowedRenumbers` (only with `release.migrationRenumber` set) lists each migration

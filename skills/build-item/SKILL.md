@@ -42,7 +42,7 @@ one-off: $ARGUMENTS
   theme, under every profile (`extended` too), as does each matching `review.mandatoryLenses`
   finder. Neither is skippable.
 - **Production merges are the owner's.** This loop merges only into the working base or
-  `epicIntegrationBranches.releaseTarget`; it surfaces `/devstride:release`, which merges to
+  `routing.py release-target`'s branch (a plan release: its `from`); it surfaces `/devstride:release`, which merges to
   `release.productionBranch` only on the owner's explicit yes.
 - **Checkout pool — lease, never mint.** When the repo's `conventionsDoc` or config declares a fixed
   checkout pool, work only in a member held under a lease — with `pool.checkout` set, taken by
@@ -110,6 +110,9 @@ Read "the working base" wherever a step says develop; re-derive it per RELEASE U
 **This precedence is code**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/routing.py
 target` (pass `oneOff`, and `roles` when resolved); follow its answer.
 
+**Plan scope.** The profile's marker walk also records each ancestor's `Release scope:` line; **read
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md` when one says `plan`.**
+
 Stories merge into it (`references/epic-release.md`), skipping `verify.skipDuringStoryBuilds`
 suites; the last leaf's merge triggers step 8. **The working base and the effective
 `perStoryPullRequest` pick the path** — integration branch → fast mode (4a), train → 4a
@@ -145,6 +148,11 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   session appears active. Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`.
 - **Plan root**: `$ARGUMENTS`, else handoff memory; not ONE unambiguous root while several plans are
   open → STOP and ask.
+- **Release scope**: once the root resolves, BEFORE selection, read any `Release scope:` line on it,
+  its ancestors and the grouping items above each release unit (`view: 'full'`). The nearest one
+  above a unit decides, any case: `plan` → read
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md` now; `epic` or none → default;
+  another value → STOP.
 - **Active Agents** (`activeAgents` set, plan mode only): once the root resolves, place it on the
   board and run `start`, once per run; every terminal exit (step 0's, step 7's, a STOP) runs `end`
   first — `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`. Fails open.
@@ -293,7 +301,8 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 - **Human recap.** After a direct pull-request merge (5b), lead with `Merged / Released`: item and
   effect, destination and live state, checks/CI, risk, next action. Otherwise
   `Built / Checked / Next`: outcomes, checks run or skipped, link or SHA, CI, profile, remaining counts, next action.
-- Release unit at **zero** on its integration branch → **run step 8 now**; then step 0. DRY-CHAIN →
+- Release unit at **zero** on its integration branch → **run step 8 now**; then step 0. Plan scope
+  with the plan at zero → `plan-scope.md`'s plan release. DRY-CHAIN →
   exit and report.
 
 ## 8. EPIC RELEASE — epic branch → develop, fully reviewed
@@ -301,10 +310,12 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 **Gate**: zero remaining leaves, working base the unit's integration branch, **auto-release on** —
 `epicIntegrationBranches.autoRelease` when PRESENT, the profile default only when ABSENT. Off →
 cut nothing; report release-ready and stop — after the owner merges it, one
-`/devstride:build-item <root>` run marks its stories Done. **`"ask"` is a third legal value**: ask
+`/devstride:build-item <root>` run marks its stories Done (plan scope: landed, `plan-scope.md`). **`"ask"` is a third legal value**: ask
 the owner once per unit, cutting nothing until answered; unanswerable → `false`, SAYING so. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` when step 7 reports the release
 unit at zero and before cutting the release PR.**
+
+The release target is `routing.py release-target`'s `branch` (plan scope: `plan-scope.md`).
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release-steps.md` in full before
 acting on a release that fires, or on step 0's recovery close-out** — refresh, verification plan, the EPIC RELEASE PR cut, review

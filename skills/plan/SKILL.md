@@ -170,7 +170,8 @@ tree in one message (no specs) and get an explicit **"yes, build this"**. Then, 
   root already carries the resolved profile's marker. **On the EXTEND path never rewrite an existing
   marker** — that silently re-gates and re-grains leaves sliced under the old profile; it is
   `rebalance`'s job (marker AND re-slice). "Use the argument's profile" → stop, run `rebalance`,
-  re-invoke; "keep the marker" → plan under it.
+  re-invoke; "keep the marker" → plan under it. A `Release scope: plan` line: only when the owner
+  asks (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md`).
 - **Batch the auto-scheduler heads-up here**, not at the end: step 6 needs the organization-wide
   dependency propagation OFF. Run the canonical Enable Link Mode check now
   (`${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/references/auto-scheduler-off.md`) — read the

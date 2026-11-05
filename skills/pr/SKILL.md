@@ -43,7 +43,7 @@ number): $ARGUMENTS
   carrying the docs hooks and an owner-gated merge. **Invoke `/devstride:release` instead.** A `hotfix → master` PR is
   a single fix, not a promotion, and stays here.
 - **EPIC RELEASE PR** (the caller says so; `build-item` step 8): head = the epic integration
-  branch, base = `baseBranch`. The body's FIRST configured section (fallback `## Simple
+  branch, base = `routing.py release-target`'s branch (the plan branch in plan scope). The body's FIRST configured section (fallback `## Simple
   Description`) leads with the EPIC (number, title, what a consumer can now do) and lists its stories
   (`[N] I##### — title`); the rest describes the epic-level delta, the caller's verification plan
   and aggregate risk-check ledger included. No story-level slow-gate exemption. Never

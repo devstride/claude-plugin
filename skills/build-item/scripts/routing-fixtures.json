@@ -1,5 +1,5 @@
 {
-  "_readme": "Canonical examples of the routing and naming rule that skills/build-item/scripts/routing.py implements. scripts/tests/routing.sh runs every case through the helper. A repository with its own implementation of the rule should vendor this file and run every case through that implementation, so the two can never silently disagree. A target case's `config` is deep-merged over the top-level `config` (a null replaces); `expect` is the helper's output without its `reason`. A case with `error: true` must be refused as malformed (the helper exits 2), which is different from `kind: refuse`, a valid answer. A case marked `inputValidation: true` tests only the helper's JSON input checks; an implementation whose types already rule that input out may skip it.",
+  "_readme": "Canonical examples of the routing and naming rule that skills/build-item/scripts/routing.py implements. scripts/tests/routing.sh runs every case through the helper. A repository with its own implementation of the rule should vendor this file and run every case through that implementation, so the two can never silently disagree. A target, releaseTarget or epicBase case's `config` is deep-merged over the top-level `config` (a null replaces); `expect` is the helper's output without its `reason`. A case with `error: true` must be refused as malformed (the helper exits 2), which is different from `kind: refuse`, a valid answer. A case marked `inputValidation: true` tests only the helper's JSON input checks; an implementation whose types already rule that input out may skip it. The releaseTarget and epicBase arrays run through the helper's release-target and epic-base subcommands with the same defaults (targetDefaults) and the same merge.",
   "config": {
     "baseBranch": "develop",
     "integrationBranch": null,
@@ -14,7 +14,11 @@
     },
     "epicIntegrationBranches": {
       "enabled": true,
-      "pattern": "<prefix>/<YY-MM-DD>/epic-<epic-number>-<epic-title-slug>"
+      "pattern": "<prefix>/<YY-MM-DD>/epic-<epic-number>-<epic-title-slug>",
+      "releaseTarget": "train/support"
+    },
+    "planIntegrationBranches": {
+      "pattern": "<prefix>/<YY-MM-DD>/plan-<plan-number>-<plan-title-slug>"
     },
     "hierarchyRoles": {
       "releaseUnit": "Epic",
@@ -1242,6 +1246,931 @@
         "kind": "epic",
         "branch": "epic/I200",
         "create": true
+      }
+    }
+  ],
+  "releaseTarget": [
+    {
+      "name": "no Release scope marker anywhere: the epic's release goes to the configured release target, the train",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability"
+        },
+        {
+          "number": "I300",
+          "title": "[1] Commerce revamp",
+          "workType": "Solution"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "train",
+        "branch": "train/support",
+        "create": false,
+        "from": "develop"
+      }
+    },
+    {
+      "name": "Release scope: plan on the plan root with no plan branch yet: create it, off the release train",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "plan",
+        "branch": "jane/26-10-02/plan-I303-checkout",
+        "create": true,
+        "from": "train/support"
+      }
+    },
+    {
+      "name": "the plan branch exists on origin: reuse it",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support",
+        "jane/26-10-01/plan-I303-checkout"
+      ],
+      "expect": {
+        "kind": "plan",
+        "branch": "jane/26-10-01/plan-I303-checkout",
+        "create": false,
+        "from": "train/support"
+      }
+    },
+    {
+      "name": "Release scope: epic is today's behaviour: the train",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "epic"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support",
+        "jane/26-10-01/plan-I303-checkout"
+      ],
+      "expect": {
+        "kind": "train",
+        "branch": "train/support",
+        "create": false,
+        "from": "develop"
+      }
+    },
+    {
+      "name": "any other Release scope value is refused, never guessed",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": " plan later "
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "refuse"
+      }
+    },
+    {
+      "name": "a marker on a higher ancestor than the nearest one above the epic: that ancestor is the plan root and names the branch",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability"
+        },
+        {
+          "number": "I300",
+          "title": "[1] Commerce revamp",
+          "workType": "Solution",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "plan",
+        "branch": "jane/26-10-02/plan-I300-commerce-revamp",
+        "create": true,
+        "from": "train/support"
+      }
+    },
+    {
+      "name": "an ancestor whose description has no marker (null) is passed over",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": null
+        },
+        {
+          "number": "I300",
+          "title": "[1] Commerce revamp",
+          "workType": "Solution",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "plan",
+        "branch": "jane/26-10-02/plan-I300-commerce-revamp",
+        "create": true,
+        "from": "train/support"
+      }
+    },
+    {
+      "name": "the NEAREST marker above the epic wins: epic below plan is today's behaviour",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "epic"
+        },
+        {
+          "number": "I300",
+          "title": "[1] Commerce revamp",
+          "workType": "Solution",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "train",
+        "branch": "train/support",
+        "create": false,
+        "from": "develop"
+      }
+    },
+    {
+      "name": "a marker on the epic itself is not a plan root: only ancestors above it count",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic",
+          "releaseScope": "plan"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "train",
+        "branch": "train/support",
+        "create": false,
+        "from": "develop"
+      }
+    },
+    {
+      "name": "the marker is read case-insensitively",
+      "chain": [
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "Plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "plan",
+        "branch": "jane/26-10-02/plan-I303-checkout",
+        "create": true,
+        "from": "train/support"
+      }
+    },
+    {
+      "name": "no release train configured, plan scope: still the plan branch, and the plan's own release target is the base branch",
+      "config": {
+        "releaseTrain": null,
+        "epicIntegrationBranches": {
+          "releaseTarget": "baseBranch"
+        }
+      },
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "expect": {
+        "kind": "plan",
+        "branch": "jane/26-10-02/plan-I303-checkout",
+        "create": true,
+        "from": "develop"
+      }
+    },
+    {
+      "name": "a plan branch in another naming: ask, never cut a second",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support",
+        "jane/plan-I303-checkout"
+      ],
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "jane/plan-I303-checkout"
+        ]
+      }
+    },
+    {
+      "name": "several plan branches: ask",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support",
+        "jane/26-10-01/plan-I303-checkout",
+        "jane/26-10-03/plan-I303-checkout-again"
+      ],
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "jane/26-10-01/plan-I303-checkout",
+          "jane/26-10-03/plan-I303-checkout-again"
+        ]
+      }
+    },
+    {
+      "name": "a caller-resolved plan slug is used for the new branch",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "planSlug": "checkout-v2",
+      "expect": {
+        "kind": "plan",
+        "branch": "jane/26-10-02/plan-I303-checkout-v2",
+        "create": true,
+        "from": "train/support"
+      }
+    },
+    {
+      "name": "the default release target (baseBranch) without plan scope: the base branch",
+      "config": {
+        "epicIntegrationBranches": {
+          "releaseTarget": "baseBranch"
+        }
+      },
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "base",
+        "branch": "develop",
+        "create": false,
+        "from": "develop"
+      }
+    },
+    {
+      "name": "a release target naming another branch is that branch, as before plan scope",
+      "config": {
+        "epicIntegrationBranches": {
+          "releaseTarget": "staging"
+        }
+      },
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support",
+        "staging"
+      ],
+      "expect": {
+        "kind": "named",
+        "branch": "staging",
+        "create": false,
+        "from": "staging"
+      }
+    },
+    {
+      "name": "the release train missing from origin is created off the base branch",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "expect": {
+        "kind": "train",
+        "branch": "train/support",
+        "create": true,
+        "from": "develop"
+      }
+    },
+    {
+      "name": "an item with no release unit above it has no release of its own",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "refuse"
+      }
+    },
+    {
+      "name": "plan scope with epic integration branches off is refused",
+      "config": {
+        "epicIntegrationBranches": {
+          "enabled": false
+        }
+      },
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "refuse"
+      }
+    },
+    {
+      "name": "plan scope with no planIntegrationBranches.pattern is malformed config",
+      "config": {
+        "planIntegrationBranches": null
+      },
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "error": true
+    },
+    {
+      "name": "without plan scope a missing planIntegrationBranches is never read",
+      "config": {
+        "planIntegrationBranches": null
+      },
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "train",
+        "branch": "train/support",
+        "create": false,
+        "from": "develop"
+      }
+    },
+    {
+      "name": "a releaseScope that is not text is malformed",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": true
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "error": true,
+      "inputValidation": true
+    },
+    {
+      "name": "plan scope with the release train not on origin yet: the train is created off the base branch before the plan branch is cut from it",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        },
+        {
+          "number": "I300",
+          "title": "[1] Commerce revamp",
+          "workType": "Solution"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "expect": {
+        "kind": "plan",
+        "branch": "jane/26-10-02/plan-I303-checkout",
+        "create": true,
+        "from": "train/support",
+        "fromCreate": true,
+        "fromBase": "develop"
+      }
+    }
+  ],
+  "epicBase": [
+    {
+      "name": "plan scope with the plan branch on origin: a new epic branch is cut from it",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support",
+        "jane/26-10-01/plan-I303-checkout"
+      ],
+      "expect": {
+        "kind": "plan",
+        "branch": "jane/26-10-01/plan-I303-checkout"
+      }
+    },
+    {
+      "name": "plan scope before the plan branch exists: from the base branch",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "base",
+        "branch": "develop"
+      }
+    },
+    {
+      "name": "no marker: from the base branch, whatever plan branches exist",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support",
+        "jane/26-10-01/plan-I303-checkout"
+      ],
+      "expect": {
+        "kind": "base",
+        "branch": "develop"
+      }
+    },
+    {
+      "name": "Release scope: epic: from the base branch",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "epic"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support",
+        "jane/26-10-01/plan-I303-checkout"
+      ],
+      "expect": {
+        "kind": "base",
+        "branch": "develop"
+      }
+    },
+    {
+      "name": "a bad Release scope value is refused",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "planned"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support"
+      ],
+      "expect": {
+        "kind": "refuse"
+      }
+    },
+    {
+      "name": "several plan branches: ask",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/support",
+        "jane/26-10-01/plan-I303-checkout",
+        "jane/26-10-03/plan-I303-checkout-again"
+      ],
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "jane/26-10-01/plan-I303-checkout",
+          "jane/26-10-03/plan-I303-checkout-again"
+        ]
       }
     }
   ],
