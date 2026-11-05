@@ -42,7 +42,7 @@ one-off: $ARGUMENTS
   theme, under every profile (`extended` too), as does each matching `review.mandatoryLenses`
   finder. Neither is skippable.
 - **Production merges are the owner's.** This loop merges only into the working base or
-  `routing.py release-target`'s branch; it surfaces `/devstride:release`, which merges to
+  `routing.py release-target`'s branch (a plan release: its `from`); it surfaces `/devstride:release`, which merges to
   `release.productionBranch` only on the owner's explicit yes.
 - **Checkout pool — lease, never mint.** When the repo's `conventionsDoc` or config declares a fixed
   checkout pool, work only in a member held under a lease — with `pool.checkout` set, taken by
@@ -149,8 +149,10 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
 - **Plan root**: `$ARGUMENTS`, else handoff memory; not ONE unambiguous root while several plans are
   open → STOP and ask.
 - **Release scope**: once the root resolves, BEFORE selection, read any `Release scope:` line on it,
-  its ancestors and the grouping items above each release unit (`view: 'full'`); `plan` → read
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md` now, another value → STOP.
+  its ancestors and the grouping items above each release unit (`view: 'full'`). The nearest one
+  above a unit decides, any case: `plan` → read
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md` now; `epic` or none → default;
+  another value → STOP.
 - **Active Agents** (`activeAgents` set, plan mode only): once the root resolves, place it on the
   board and run `start`, once per run; every terminal exit (step 0's, step 7's, a STOP) runs `end`
   first — `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`. Fails open.
