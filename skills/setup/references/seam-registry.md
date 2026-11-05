@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.29.0.
+`.claude/ds-config.json` against. Schema version: 3.30.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -96,9 +96,9 @@ starting with `_` and `$schema` are never reported as unknown.
 | `epicIntegrationBranches.autoRelease` | boolean, string | `true`, `false`, ask | `false` | true, false or "ask": whether a finished release unit's pull request merges unasked | pre-registry |
 | `epicIntegrationBranches.deleteBranchAfterRelease` | boolean | — | `true` | delete the integration branch after its release | pre-registry |
 | `epicIntegrationBranches.mergedStatusName` | string, null | — | Review | the status a landed story moves to, by name | pre-registry |
-| `planIntegrationBranches` | object | — | — | the plan integration branch a plan marked Release scope: plan releases its epics onto | unreleased |
-| `planIntegrationBranches.pattern` | string | — | — | the plan integration branch name pattern (<prefix>, the date token, <plan-number>, <plan-title-slug>); unset, no plan can release as one unit | unreleased |
-| `planIntegrationBranches.example` | string | — | — | descriptive only: a sample plan integration branch name; nothing reads it | unreleased |
+| `planIntegrationBranches` | object | — | — | the plan integration branch a plan marked Release scope: plan releases its epics onto | 3.30.0 |
+| `planIntegrationBranches.pattern` | string | — | — | the plan integration branch name pattern (<prefix>, the date token, <plan-number>, <plan-title-slug>); unset, no plan can release as one unit | 3.30.0 |
+| `planIntegrationBranches.example` | string | — | — | descriptive only: a sample plan integration branch name; nothing reads it | 3.30.0 |
 | `defects` | object | — | — | deferred-work placement | pre-registry |
 | `defects.deferredContainerTitle` | string | — | Deferred | the title of the plan root's one deferred container | pre-registry |
 | `defects.deferredContainerLegacyTitles` | string[] | — | Deferred defects | earlier container titles still matched; only adds to the built-in Deferred defects | 3.24.0 |
