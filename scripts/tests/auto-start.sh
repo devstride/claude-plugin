@@ -149,4 +149,14 @@ order_ok() { # file, a phrase that must come before the trigger
 order_ok release-train.md "Step 7 terminates" && order_ok epic-release-steps.md "Human recap" \
   && ok "(16) the train and epic triggers come after the recap in both build-item references" || bad "(16) a trigger precedes its caller's close-out"
 
+# (17) one lock order for every run: release step 0 takes the train claim before adopting a release
+# pull request and before 0a's tower claim, and the contract says so for hand and auto starts alike
+SK="$ROOT/skills/release/SKILL.md"
+line_of() { grep -n -F -- "$2" "$1" | head -1 | cut -d: -f1; }
+T="$(line_of "$SK" 'the train claim before all below')"; S="$(line_of "$SK" '**Confirm the shape**')"; C="$(line_of "$SK" '**0a. Clearance**')"
+[ -n "$T" ] && [ -n "$S" ] && [ -n "$C" ] && [ "$T" -lt "$S" ] && [ "$S" -lt "$C" ] \
+  && grep -q 'One lock order, train then' "$ROOT/skills/release/references/auto-start.md" \
+  && grep -q "auto-start.md\`'s lock order" "$ROOT/skills/release/references/clearance.md" \
+  && ok "(17) the train claim precedes release adoption and the tower claim, for every run" || bad "(17) lock order: train $T shape $S clearance $C"
+
 exit "$FAIL"

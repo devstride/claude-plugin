@@ -69,6 +69,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 
 ## 0. Preconditions and the release delta
 
+- **`claims` set → the train claim before all below** (`auto-start.md`).
 - **Confirm the shape**: `releaseSource` (**develop**) → `productionBranch` (**master**), whatever
   branch the checkout is on. An open PR into `productionBranch` headed by a release branch (with
   `release.releaseBranchPattern` absent: headed by `releaseSource`) is ADOPTED, never duplicated —
@@ -91,7 +92,6 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   was adopted (else nothing merges first): a snapshot of the train in
   its own draft PR into `releaseSource`, fully reviewed, CI once, merged, and every one-off it
   carried closed — `release-branch.md` §1 (nothing ahead → a reported no-op; late landings: §1 4a).
-  A `claims` block → the train claim first (`auto-start.md`).
 - `git fetch origin master develop`; `origin/develop` not ahead of `origin/master` → STOP, nothing to
   release.
 - **No freeze.** Open PRs into `releaseSource` are never settled, parked or waited for; a leftover

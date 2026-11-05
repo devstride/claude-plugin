@@ -7,7 +7,7 @@ yes, anything else goes to the owner exactly as before.
 
   standing-yes.py --pr <n> --head <sha> --class "<RELEASE CLASS line>"
                   --checks green|red --unresolved <count> --pre-ship "<PRE-SHIP verdict line>"
-                  --previous-release <gate exit> --dev-deploy <exit>|not-applicable --tower "<status output>"
+                  --pre-merge "<PRE-MERGE verdict line>" --previous-release <gate exit> --dev-deploy <exit>|not-applicable --tower "<status output>"
       MERGE <head sha>          exit 0   (merge only that exact head: `gh pr merge --match-head-commit`)
       ASK <reason>              exit 0   (the first condition that fails, in the order below)
       ERROR <reason>            exit 1   (bad arguments or an unreadable config: treat as ASK)
@@ -15,7 +15,8 @@ yes, anything else goes to the owner exactly as before.
 MERGE needs ALL of, in this order:
   1. `release.lightRelease.standingYes` is true in .claude/ds-config.json, and `release.clearance` is
      usable: `provider` `github` or `devstride` alone, or `commands` alone with claim, status,
-     heartbeat, release and adopt each a non-empty string (only a live tower says who is On final);
+     heartbeat, release and adopt each a non-empty string (only a live tower says who is On final),
+     and `release.classifySkill` is a non-empty string (with no classifier, LIGHT is only a claim);
   2. the class line is exactly `RELEASE CLASS: LIGHT`;
   3. the pull request is OPEN into `release.productionBranch` (default master), --head is its
      CURRENT head (`gh pr view <pr>`, read here), and
@@ -25,7 +26,9 @@ MERGE needs ALL of, in this order:
      marker), whose merge commit is an ancestor of --head; its `headRefOid` is the reviewed head;
   4. --checks is `green` (every required check on the head succeeded);
   5. --unresolved is 0 (the paginated unresolved-thread count);
-  6. the pre-ship line is `PRE-SHIP: PASS (<n> ran, 0 waived)` or `PRE-SHIP: NOTHING TO RUN`;
+  6. the pre-ship line is `PRE-SHIP: PASS (<n> ran, 0 waived)` or `PRE-SHIP: NOTHING TO RUN`, and
+     the pre-merge line is `PRE-MERGE: CLEAR` or `PRE-MERGE: NOT CONFIGURED` (HOLD and NOT RUN are
+     the owner's decision);
   7. --previous-release is 0 (the previous-release gate);
   8. --dev-deploy is 0 (the dev-deploy wait, run BEFORE this check); `not-applicable` only when
      `release.devDeployVerification` is not configured;
@@ -146,6 +149,7 @@ def main():
     parser.add_argument("--checks", choices=["green", "red"], required=True)
     parser.add_argument("--unresolved", type=int, required=True)
     parser.add_argument("--pre-ship", required=True)
+    parser.add_argument("--pre-merge", required=True)
     parser.add_argument("--previous-release", type=int, required=True)
     parser.add_argument("--dev-deploy", required=True)
     parser.add_argument("--tower", required=True)
@@ -158,6 +162,9 @@ def main():
         say("ASK the standing yes is off (release.lightRelease.standingYes is not true)")
     if not usable_clearance(release.get("clearance")):
         say("ASK no usable release.clearance is configured, so no tower can show this release On final")
+    classifier = release.get("classifySkill")
+    if not (isinstance(classifier, str) and classifier.strip()):
+        say("ASK no release.classifySkill is configured, so nothing has shown this release is light")
     if a.klass.strip() != "RELEASE CLASS: LIGHT":
         say("ASK not a light release (%s)" % (a.klass.strip() or "no class line"))
     head = full_sha(a.head)
@@ -195,6 +202,9 @@ def main():
     passed = re.match(r"^PRE-SHIP: PASS \((\d+) ran, (\d+) waived\)$", pre)
     if not (pre == "PRE-SHIP: NOTHING TO RUN" or (passed and passed.group(2) == "0")):
         say("ASK the pre-ship checks did not all pass unwaived (%s)" % (pre or "no verdict"))
+    merge_check = a.pre_merge.strip()
+    if merge_check not in ("PRE-MERGE: CLEAR", "PRE-MERGE: NOT CONFIGURED"):
+        say("ASK the pre-merge check did not clear (%s)" % (merge_check or "no verdict"))
     if a.previous_release != 0:
         say("ASK the previous-release gate answered %d, not 0" % a.previous_release)
     dev = a.dev_deploy.strip()

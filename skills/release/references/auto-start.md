@@ -9,8 +9,11 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart` and
 ## The train claim — every release, when a `claims` block is configured
 
 - **Kind `release-train`, key `<owner>/<repo>`** (`python3
-  ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/auto-start.py key`). Step 0b claims it BEFORE it
-  opens or adopts a train pull request, for a hand-started and an auto-started run alike. The
+  ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/auto-start.py key`). **One lock order, train then
+  tower, for every run:** step 0 claims it FIRST — before it adopts an open release pull request,
+  before 0a's tower claim, and before 0b opens or adopts a train pull request — for a hand-started
+  and an auto-started run alike, so neither ever holds the tower while waiting for the train. (An
+  auto start already holds it from its trigger; step 0's claim by the same session refreshes it.) The
   calls, holder, verdicts and takeover of a lapsed holder are `story-claims.md`'s (build-item's
   references) with this kind and key; decide with its `story-claim.py decide`, item `the release
   train`, mode `named` for a hand-started run and `select` for an auto start. Expiry:
@@ -26,14 +29,14 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart` and
   (phase: the step). NOT HOLDER or LOST to a live holder → STOP: another session owns the train
   phase now.
 - **Release it NON-final**: `release` with outcome `handed-on`, never `done` and never final
-  (`final: true`, `--final`), so the next cycle can claim it. It is handed on right after the tower
-  `claim` at the cut succeeds, so the next train phase runs while this release holds the tower, but
+  (`final: true`, `--final`), so the next cycle can claim it. It is handed on once 0c has cut the
+  release branch while this run holds the tower, so the next train phase runs during the deploy, but
   ONLY with `release.clearance` and `release.releaseBranchPattern` both set; without either, the
   release pull request has no tower or its own branch to protect it, so the claim is held until the
   run ends. A train with nothing to ship changes neither point: the claim waits for the cut (or, held,
   for the run's end). Released early only when the whole run ends: nothing to ship at all, or stopped.
 - **Another release in flight.** A live session holding the tower owns its release pull request:
-  this run never adopts it (step 0), but runs 0b under the train claim, then waits at the tower claim
+  this run never adopts it (step 0) and, under `cut-to-deploy`, runs 0b under the train claim, then waits at the tower claim
   and, once cleared, re-reads step 0's shape before cutting (`clearance.md`).
 - **Lost to a live holder**: a hand-started run names who holds it and STOPs; an auto start carries
   on with its caller's loop, logging no failure.
@@ -76,13 +79,14 @@ holding the tower as any release does.
 At step 4, after the pre-merge check and the recap, run
 `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/standing-yes.py --pr <n> --head <head>
 --class "<classify-release line>" --checks green|red --unresolved <count>
---pre-ship "<2b verdict line>" --previous-release <gate exit> --dev-deploy <exit>|not-applicable --tower
+--pre-ship "<2b verdict line>" --pre-merge "<pre-merge-check verdict line>" --previous-release <gate exit> --dev-deploy <exit>|not-applicable --tower
 "<provider status output>"`. `--head` is the release pull request's head. The script reads its live head
 and finds the reviewed train itself: the latest merged train pull request into the release source
 (`release-branch.md`'s two-title search), merged into that head; it computes both trees. With
 `release.devDeployVerification` set the dev-deploy wait runs BEFORE this check, whatever the delta,
 and passes its exit; unset, `not-applicable` (omitting it is an ERROR). `MERGE <sha>` only
-when all of its nine conditions hold (the script's header lists them); anything else prints
+when all of its nine conditions hold (a classifier configured, and the pre-merge check `CLEAR` or
+`NOT CONFIGURED`, among them) (the script's header lists them); anything else prints
 `ASK <reason>`. Without `release.clearance` there is no `On final` line, so it always asks.
 
 - **`MERGE <sha>`** is the owner's yes for this pull request at exactly `<sha>`: run step 4's "On
@@ -91,5 +95,5 @@ when all of its nine conditions hold (the script's header lists them); anything 
   "Merged on the standing yes for light releases identical to the reviewed train
   (release.lightRelease.standingYes, owner decision <the date the owner set it>)."
 - **`ASK` or `ERROR`** → the owner's in-the-moment yes, exactly as before. A FULL release, a tree
-  that differs from the reviewed one, a waived pre-ship check or a failed previous release always
-  asks. A return to step 2 voids it like any yes.
+  that differs from the reviewed one, a waived pre-ship check, a pre-merge `HOLD` or `NOT RUN`, or a
+  failed previous release always asks. A return to step 2 voids it like any yes.

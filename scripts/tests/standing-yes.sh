@@ -58,12 +58,12 @@ TOWER=$'Tower: clear\nOn final: #42 release/26-01-15 (draft)\nWaiting: #43 relea
 base() {
   fresh
   PR=42 HEAD_ARG="$RELEASE" CLASS="RELEASE CLASS: LIGHT" CHECKS=green UNRESOLVED=0
-  PRESHIP="PRE-SHIP: PASS (2 ran, 0 waived)" PREV=0 DEV=not-applicable TOWER_ARG="$TOWER" NO_DEV=""
+  PRESHIP="PRE-SHIP: PASS (2 ran, 0 waived)" PREMERGE="PRE-MERGE: CLEAR" PREV=0 DEV=not-applicable TOWER_ARG="$TOWER" NO_DEV=""
 }
 run() {
   local dev=(--dev-deploy "$DEV"); [ -n "$NO_DEV" ] && dev=()
   (cd "$WORK/repo" && python3 "$HELPER" --pr "$PR" --head "$HEAD_ARG" --class "$CLASS" \
-    --checks "$CHECKS" --unresolved "$UNRESOLVED" --pre-ship "$PRESHIP" --previous-release "$PREV" ${dev[@]+"${dev[@]}"} --tower "$TOWER_ARG" 2>&1)
+    --checks "$CHECKS" --unresolved "$UNRESOLVED" --pre-ship "$PRESHIP" --pre-merge "$PREMERGE" --previous-release "$PREV" ${dev[@]+"${dev[@]}"} --tower "$TOWER_ARG" 2>&1)
 }
 expect() { # label, expected exit, regex
   local out code; out="$(run)"; code=$?
@@ -92,6 +92,10 @@ for bad_clearance in '{"provider": "bogus"}' '{"commands": {}}' "{\"commands\": 
 done
 cfg "{\"release\": {\"classifySkill\": \"classify\", \"clearance\": {\"commands\": {$V}}, \"lightRelease\": {\"standingYes\": true}}}"
 base; expect "(2f) a complete commands clearance → MERGE" 0 '^MERGE '
+for bad_classifier in '' ', "classifySkill": ""' ', "classifySkill": true'; do
+  cfg "{\"release\": {\"clearance\": {\"provider\": \"github\"}, \"lightRelease\": {\"standingYes\": true}$bad_classifier}}"
+  base; expect "(2g) no usable classifySkill ($bad_classifier) with a caller's LIGHT line → ASK" 0 '^ASK no release.classifySkill is configured'
+done
 cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
 base; release_pr "$RELEASE" CLOSED; expect "(3c) a closed release pull request → ASK" 0 '^ASK pull request #42 is not open into master'
 base; release_pr "$RELEASE" OPEN develop; expect "(3d) a release pull request retargeted away from production → ASK" 0 '^ASK pull request #42 is not open into master'
@@ -122,6 +126,10 @@ base; CHECKS=red; expect "(5) a required check not green → ASK" 0 '^ASK a requ
 base; UNRESOLVED=1; expect "(6) an unresolved thread → ASK" 0 '^ASK 1 review thread\(s\) unresolved$'
 base; PRESHIP="PRE-SHIP: PASS (2 ran, 1 waived)"; expect "(7) a waived pre-ship check → ASK" 0 '^ASK the pre-ship checks did not all pass unwaived'
 base; PRESHIP="PRE-SHIP: FAIL golden"; expect "(7b) a failed pre-ship check → ASK" 0 '^ASK the pre-ship checks did not all pass unwaived'
+base; PREMERGE="PRE-MERGE: NOT CONFIGURED"; expect "(7c) no pre-merge hook configured → MERGE" 0 '^MERGE '
+base; PREMERGE="PRE-MERGE: NOT RUN"; expect "(7d) the pre-merge check did not run → ASK" 0 '^ASK the pre-merge check did not clear \(PRE-MERGE: NOT RUN\)$'
+base; PREMERGE="PRE-MERGE: HOLD checkpoint missing"; expect "(7e) a pre-merge hold → ASK" 0 '^ASK the pre-merge check did not clear'
+base; PREMERGE=""; expect "(7f) no pre-merge verdict → ASK" 0 '^ASK the pre-merge check did not clear \(no verdict\)$'
 base; PREV=2; expect "(8) the previous release still pending → ASK" 0 '^ASK the previous-release gate answered 2, not 0$'
 base; DEV=2; expect "(9) the dev deploy not yet done → ASK" 0 '^ASK the dev-deploy wait answered 2, not 0$'
 base; NO_DEV=1; expect "(9b) the dev-deploy answer omitted → ERROR, never a MERGE" 1 '^ERROR .*--dev-deploy'
