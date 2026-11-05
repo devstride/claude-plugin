@@ -23,7 +23,9 @@ pull request's head is `release.releaseSource`, as before, and sections 2–4 an
 
 ## 1. Merge the release train (step 0b)
 
-Runs only when `release.mergeTrainBeforeCut` is `true`, `releaseTrain.branch` exists on origin, and
+Runs only when `release.mergeTrainBeforeCut` is `true`, `releaseTrain.branch` exists on origin (absent
+while another `train/*` branch is there → STOP and name the cutover, `routing.py`'s rule: one-offs
+ride that branch until it is renamed; never release around it), and
 step 0 adopted no open release pull request headed by a release BRANCH (one cut earlier, so the
 train would not ship with it). Otherwise a no-op, reported in one line ("release train: not
 configured", or "skipped — adopted release").

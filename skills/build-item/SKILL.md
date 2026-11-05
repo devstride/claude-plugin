@@ -104,7 +104,7 @@ Read "the working base" wherever a step says develop; re-derive it per RELEASE U
    handoff memory → `git ls-remote --heads origin` → the helper below (`create` → off a fresh
    `baseBranch`, pushed). Cache per epic; **announce reused or created.**
 3. **A one-off AND `releaseTrain.branch` set** → the train, unless `release-train.md` routes it to
-   `baseBranch` (announced).
+   `baseBranch` (announced); a train missing beside one other `train/*` branch rides that one.
 4. **Otherwise** → `baseBranch`. A disabled flag falls back.
 
 **This precedence is code**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/routing.py
@@ -315,7 +315,7 @@ the owner once per unit, cutting nothing until answered; unanswerable → `false
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` when step 7 reports the release
 unit at zero and before cutting the release PR.**
 
-The release target is `routing.py release-target`'s `branch` (plan scope: `plan-scope.md`).
+The release target is `routing.py release-target`'s `branch` (`ask` → ask the owner which is live, set `releaseTrain.branch` or cut over, run it again; plan scope: `plan-scope.md`).
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release-steps.md` in full before
 acting on a release that fires, or on step 0's recovery close-out** — refresh, verification plan, the EPIC RELEASE PR cut, review
