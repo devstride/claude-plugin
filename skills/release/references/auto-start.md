@@ -18,7 +18,8 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart` and
 - **Never degrades.** `decide` answering `degrade` (the store unreachable, unsupported or
   forbidden) does NOT mean "carry on without it" here: an auto start does nothing, saying so once;
   a hand-started run falls back to the holder-marker rule of `clearance.md` for this run, as with no
-  `claims` block. No train pull request is opened, adopted or pushed to without a won claim or,
+  `claims` block, but ONLY at the first claim, before any train mutation. Once won, a heartbeat that
+  degrades cannot prove the claim is still held: STOP. No train pull request is opened, adopted or pushed to without a won claim or,
   in that fallback, the marker check.
 - **Heartbeat** at each step transition and through EVERY wait until the release — review, CI, the
   train's pre-ship suites, the clearance wait — at least every `min(10, expiry ÷ 3)` minutes
@@ -74,12 +75,13 @@ holding the tower as any release does.
 
 At step 4, after the pre-merge check and the recap, run
 `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/standing-yes.py --pr <n> --head <head>
---train-pr <n> --class "<classify-release line>" --checks green|red --unresolved <count>
+--class "<classify-release line>" --checks green|red --unresolved <count>
 --pre-ship "<2b verdict line>" --previous-release <gate exit> --dev-deploy <exit>|not-applicable --tower
-"<provider status output>"`. `--head` is the release pull request's head; `--train-pr` the release-train
-pull request this release merged at 0b; the script reads both pull requests itself (the live head;
-the train's state, title, base and reviewed head) and computes both trees. When the dev-deploy wait applies it runs BEFORE this check and passes its
-exit; otherwise `not-applicable` (omitting it is an ERROR). `MERGE <sha>` only
+"<provider status output>"`. `--head` is the release pull request's head. The script reads its live head
+and finds the reviewed train itself: the latest merged train pull request into the release source
+(`release-branch.md`'s two-title search), merged into that head; it computes both trees. With
+`release.devDeployVerification` set the dev-deploy wait runs BEFORE this check, whatever the delta,
+and passes its exit; unset, `not-applicable` (omitting it is an ERROR). `MERGE <sha>` only
 when all of its nine conditions hold (the script's header lists them); anything else prints
 `ASK <reason>`. Without `release.clearance` there is no `On final` line, so it always asks.
 

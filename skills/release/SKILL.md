@@ -95,7 +95,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 - `git fetch origin master develop`; `origin/develop` not ahead of `origin/master` → STOP, nothing to
   release.
 - **No freeze.** Open PRs into `releaseSource` are never settled, parked or waited for; a leftover
-  freeze switch under `ci` is ignored whatever its value (say so). A later merge ships in the next
+  freeze switch under `ci` is ignored (say so). A later merge ships in the next
   release (release branch), or advances this PR's head and step 2 re-reviews.
 - **Record `<sourceHead>`** — the SHA the delta is computed from: an adopted release branch's cut
   point, else the `origin/<releaseSource>` tip (where 0c cuts). Every later integrity check compares
@@ -152,8 +152,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   PR/item, and seed prior dispositions so production does not rediscover settled findings. Local
   Claude and a context-capable CLI review that surface; cloud reviewers may cover the whole PR.
   **Enforce the release-surface scope with that manifest**, not narrative alone; never blindly
-  re-read approved code (why: `release-gates.md`). Pre-ship checks stay non-negotiable whatever the
-  scope. Consume its findings summary and untracked-deferral list before step 4.
+  re-read approved code (why: `release-gates.md`). Pre-ship checks stay non-negotiable. Consume its findings summary and untracked-deferral list before step 4.
 - **Declare a PRE-SHIP HOLD in that same invocation whenever any `preShipChecks` entry has `when`
   ∈ {`releaseOnly`, `always`}** (`pre-ship release select` prints `PRE-SHIP SELECTED`): `review`
   settles, STOPS at its **7.1b** and hands back; run 2b, then discharge at 2c. The release head is
@@ -233,7 +232,8 @@ the deploy.
   on the yes this pull request must be the one `On final`, else STOP.
 - **Scope `cut-to-deploy`**: run the previous-release gate first and on the yes (`clearance.md`).
 - **Dev deploy wait** (`release.devDeployVerification` set, delta touching a fix-exclusion path):
-  named in the recap; after the yes, before the checks below, run per `docs-hooks.md`.
+  named in the recap; after the yes (a standing yes: before it), before the checks below, per
+  `docs-hooks.md`.
 - **On the yes**, confirm: the head equals `<reviewedHead>` (the only tolerated advance is `review`
   7.3's same-tree empty re-trigger commit; anything else → back to step 2); CI is green at that
   head; in a draft-hold repo the PR is non-draft (still draft means CI never ran — do NOT merge; a

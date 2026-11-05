@@ -1,8 +1,8 @@
 #!/bin/bash
 # Tests for skills/release/scripts/standing-yes.py — the owner's standing yes for light releases.
-# A fake `gh` on PATH answers `gh pr view <n>` from one file per pull-request number, so the
-# release head is read from the release pull request (#42) and the reviewed train from the train
-# pull request (#40), never the other way round. One passing case, then one case per condition,
+# A fake `gh` on PATH answers `gh pr view <n>` from one file per pull-request number (the release
+# pull request is #42) and `gh pr list` for each train title from its own file, so the reviewed
+# train is found by the helper (the latest merged one, merged into the head), never passed in. One passing case, then one case per condition,
 # each failing only that condition: the first failed condition is what the script names, and
 # nothing but all nine conditions answers MERGE. No network.
 set -u
@@ -12,16 +12,24 @@ FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 
 g() { git -C "$WORK/repo" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false "$@"; }
-git init -q "$WORK/repo"
-echo a > "$WORK/repo/f"; g add f; g commit -q -m "train, reviewed"
+git init -q -b develop "$WORK/repo"
+echo 0 > "$WORK/repo/f"; g add f; g commit -q -m base
+g checkout -q -b train; echo a > "$WORK/repo/f"; g commit -q -am "train snapshot, reviewed"
 TRAIN="$(g rev-parse HEAD)"                                                   # the reviewed train head
+g checkout -q develop; g merge -q --no-ff -m "Merge the train" train; MERGE="$(g rev-parse HEAD)"
 g commit -q --allow-empty -m "release branch cut"; RELEASE="$(g rev-parse HEAD)"   # same tree, another commit
 echo b > "$WORK/repo/f"; g commit -q -am "a fix on the release branch"; FIXED="$(g rev-parse HEAD)"   # another tree
+g checkout -q -b elsewhere "$TRAIN~1"; g commit -q --allow-empty -m "never merged"; STRAY="$(g rev-parse HEAD)"
 mkdir -p "$WORK/repo/.claude" "$WORK/bin" "$WORK/prs"
 
 # the fake gh: `gh pr view <n> --json ...` prints prs/<n>.json, or fails when there is none
 cat > "$WORK/bin/gh" <<SH
 #!/bin/bash
+if [ "\$1 \$2" = "pr list" ]; then
+  case "\$*" in *'"Release train:"'*) f=list-release;; *'"Support train:"'*) f=list-support;; *) exit 1;; esac
+  [ -f "$WORK/prs/fail-list" ] && exit 1
+  if [ -f "$WORK/prs/\$f.json" ]; then cat "$WORK/prs/\$f.json"; else echo '[]'; fi; exit 0
+fi
 [ "\$1 \$2" = "pr view" ] || { echo "fake gh: unexpected \$*" >&2; exit 1; }
 [ -f "$WORK/prs/\$3.json" ] || { echo "no pull request \$3" >&2; exit 1; }
 cat "$WORK/prs/\$3.json"
@@ -32,8 +40,13 @@ pr() { # number state title base head
   printf '{"state": "%s", "title": "%s", "baseRefName": "%s", "headRefOid": "%s"}' "$2" "$3" "$4" "$5" > "$WORK/prs/$1.json"
 }
 release_pr() { pr 42 OPEN "Release 26-01-15" master "${1:-$RELEASE}"; }
-train_pr() { pr 40 "${1:-MERGED}" "${2:-Release train: 2 one-off(s) for release 26-01-15}" "${3:-develop}" "${4:-$TRAIN}"; }
-fresh() { release_pr; train_pr; }
+row() { # number title marker mergedAt head merge
+  printf '{"number": %s, "title": "%s", "body": "<!-- %s range -->", "mergedAt": "%s", "headRefOid": "%s", "mergeCommit": {"oid": "%s"}}' "$@"
+}
+OLD="$(row 30 "Release train: 1 one-off(s) for release 26-01-14" devstride:release-train 2026-01-14T18:00:00Z "$STRAY" "$STRAY")"
+NEW="$(row 40 "Release train: 2 one-off(s) for release 26-01-15" devstride:release-train 2026-01-15T17:00:00Z "$TRAIN" "$MERGE")"
+trains() { printf '[%s]' "$1" > "$WORK/prs/list-release.json"; printf '[%s]' "${2:-}" > "$WORK/prs/list-support.json"; }
+fresh() { rm -f "$WORK/prs/"*; release_pr; trains "$OLD, $NEW"; }
 
 cfg() { printf '%s\n' "$1" > "$WORK/repo/.claude/ds-config.json"; }
 cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "lightRelease": {"standingYes": true}}}'
@@ -42,12 +55,12 @@ TOWER=$'Tower: clear\nOn final: #42 release/26-01-15 (draft)\nWaiting: #43 relea
 # the passing argument set; each case overrides one value
 base() {
   fresh
-  PR=42 HEAD_ARG="$RELEASE" TRAIN_PR=40 CLASS="RELEASE CLASS: LIGHT" CHECKS=green UNRESOLVED=0
+  PR=42 HEAD_ARG="$RELEASE" CLASS="RELEASE CLASS: LIGHT" CHECKS=green UNRESOLVED=0
   PRESHIP="PRE-SHIP: PASS (2 ran, 0 waived)" PREV=0 DEV=not-applicable TOWER_ARG="$TOWER" NO_DEV=""
 }
 run() {
   local dev=(--dev-deploy "$DEV"); [ -n "$NO_DEV" ] && dev=()
-  (cd "$WORK/repo" && python3 "$HELPER" --pr "$PR" --head "$HEAD_ARG" --train-pr "$TRAIN_PR" --class "$CLASS" \
+  (cd "$WORK/repo" && python3 "$HELPER" --pr "$PR" --head "$HEAD_ARG" --class "$CLASS" \
     --checks "$CHECKS" --unresolved "$UNRESOLVED" --pre-ship "$PRESHIP" --previous-release "$PREV" ${dev[@]+"${dev[@]}"} --tower "$TOWER_ARG" 2>&1)
 }
 expect() { # label, expected exit, regex
@@ -74,14 +87,20 @@ base; release_pr "$FIXED"; expect "(4a) the pull request moved past the head giv
 base; HEAD_ARG="$TRAIN"; expect "(4c) the train head passed as the release head → ASK" 0 '^ASK pull request #42 is at .* not the head'
 base; rm "$WORK/prs/42.json"; expect "(4d) the release pull request cannot be read → ASK" 0 '^ASK the current head of pull request #42 cannot be read$'
 base; HEAD_ARG="deadbeef"; expect "(4b) an unreadable head → ASK" 0 '^ASK the head deadbeef cannot be read$'
-base; release_pr "$FIXED"; HEAD_ARG="$FIXED"; pr 41 MERGED "Release train: x" develop "$FIXED"; expect "(4f) the release head's own tree is never the reviewed one (F/F) → ASK" 0 '^ASK the head.s tree .* differs from the reviewed train tree'
-base; TRAIN_PR=42; expect "(4g) --train-pr naming the release pull request itself → ASK" 0 '^ASK --train-pr names the release pull request itself'
-base; train_pr OPEN; expect "(4h) a train pull request not merged → ASK" 0 '^ASK #40 is not a merged release-train pull request into develop$'
-base; train_pr MERGED "release/26-01-15 into master"; expect "(4i) a pull request that is not a train → ASK" 0 '^ASK #40 is not a merged release-train'
-base; train_pr MERGED "Release train: x" main; expect "(4j) a train merged into baseBranch, not the release source → ASK" 0 '^ASK #40 is not a merged release-train'
-base; rm "$WORK/prs/40.json"; expect "(4k) an unreadable train pull request → ASK" 0 '^ASK the train pull request #40 cannot be read$'
-base; train_pr MERGED "Release train: x" develop feedface; expect "(4e) an unreadable reviewed head → ASK" 0 '^ASK the reviewed train head of #40 cannot be read$'
-base; pr 42 OPEN "Release" master "$RELEASE"; pr 40 MERGED "Release train: x" develop "$FIXED"; expect "(4l) the train is read from #40, the head from #42 (a swapped query fails)" 0 '^ASK the head.s tree .* differs from the reviewed train tree'
+base; release_pr "$FIXED"; HEAD_ARG="$FIXED"; trains "$OLD, $NEW, $(row 41 "Release train: x" devstride:release-train 2026-01-15T16:00:00Z "$FIXED" "$MERGE")"
+expect "(4f) a lookalike train at the fix's own head (F/F) is not the latest merged train → ASK" 0 '^ASK the head.s tree .* differs from the reviewed train tree'
+base; trains "$OLD, $NEW, $(row 41 "Release train: x" devstride:release-train 2026-01-15T17:30:00Z "$RELEASE" "$STRAY")"
+expect "(4g) a later train-looking pull request not merged into the head → ASK" 0 '^ASK the latest train #41 is not merged into the head'
+base; trains "$OLD, $NEW, $(row 41 "Release train: x" no-marker 2026-01-15T17:30:00Z "$STRAY" "$STRAY")"
+expect "(4h) a later train title without the body marker is ignored → MERGE" 0 '^MERGE '
+base; trains "$OLD, $(row 41 "Ship it" devstride:release-train 2026-01-15T17:30:00Z "$STRAY" "$STRAY"), $NEW"
+expect "(4i) a later pull request whose title is not a train is ignored → MERGE" 0 '^MERGE '
+base; trains "$OLD" "$(row 40 "Support train: 2 one-off(s)" devstride:support-train 2026-01-15T17:00:00Z "$TRAIN" "$MERGE")"
+expect "(4j) the old Support train: spelling is found → MERGE" 0 '^MERGE '
+base; trains ""; expect "(4k) no merged train at all → ASK" 0 '^ASK no merged release-train pull request into develop'
+base; touch "$WORK/prs/fail-list"; expect "(4l) gh cannot list the trains → ASK" 0 '^ASK the merged release-train pull requests into develop cannot be read$'
+base; trains "$OLD, $(row 40 "Release train: x" devstride:release-train 2026-01-15T17:00:00Z feedface "$MERGE")"
+expect "(4e) an unreadable reviewed head → ASK" 0 '^ASK the reviewed train head of #40 cannot be read$'
 
 base; CHECKS=red; expect "(5) a required check not green → ASK" 0 '^ASK a required check on the head is not green$'
 base; UNRESOLVED=1; expect "(6) an unresolved thread → ASK" 0 '^ASK 1 review thread\(s\) unresolved$'
@@ -90,6 +109,10 @@ base; PRESHIP="PRE-SHIP: FAIL golden"; expect "(7b) a failed pre-ship check → 
 base; PREV=2; expect "(8) the previous release still pending → ASK" 0 '^ASK the previous-release gate answered 2, not 0$'
 base; DEV=2; expect "(9) the dev deploy not yet done → ASK" 0 '^ASK the dev-deploy wait answered 2, not 0$'
 base; NO_DEV=1; expect "(9b) the dev-deploy answer omitted → ERROR, never a MERGE" 1 '^ERROR .*--dev-deploy'
+cfg '{"release": {"classifySkill": "classify", "devDeployVerification": "verify-dev", "lightRelease": {"standingYes": true}}}'
+base; expect "(9c) not-applicable while devDeployVerification is configured → ASK" 0 '^ASK release.devDeployVerification is configured'
+base; DEV=0; expect "(9d) the configured wait answered 0 → MERGE" 0 '^MERGE '
+cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "lightRelease": {"standingYes": true}}}'
 base; TOWER_ARG=$'Tower: clear\nOn final: #41 release/26-01-14\nWaiting: #42 release/26-01-15'; expect "(10) another release is on final → ASK" 0 '^ASK pull request #42 is not the one release On final'
 base; TOWER_ARG=$'On final: #421 release/x'; expect "(10b) #421 on final does not match #42 → ASK" 0 '^ASK pull request #42 is not the one release On final'
 base; TOWER_ARG=$'On final: #42-old release/x'; expect "(10c) #42-old is not #42 → ASK" 0 '^ASK pull request #42 is not the one release On final'

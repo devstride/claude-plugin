@@ -5,7 +5,7 @@ The rules are in `skills/release/references/auto-start.md`. Release step 4 runs 
 pre-merge check and recap, with the evidence it already gathered; MERGE replaces the in-the-moment
 yes, anything else goes to the owner exactly as before.
 
-  standing-yes.py --pr <n> --head <sha> --train-pr <n> --class "<RELEASE CLASS line>"
+  standing-yes.py --pr <n> --head <sha> --class "<RELEASE CLASS line>"
                   --checks green|red --unresolved <count> --pre-ship "<PRE-SHIP verdict line>"
                   --previous-release <gate exit> --dev-deploy <exit>|not-applicable --tower "<status output>"
       MERGE <head sha>          exit 0   (merge only that exact head: `gh pr merge --match-head-commit`)
@@ -16,14 +16,16 @@ MERGE needs ALL of, in this order:
   1. `release.lightRelease.standingYes` is true in .claude/ds-config.json;
   2. the class line is exactly `RELEASE CLASS: LIGHT`;
   3. --head is the pull request's CURRENT head (`gh pr view <pr> --json headRefOid`, read here), and
-     its tree equals the tree of the head the train review approved: --train-pr is the release-train
-     pull request this release merged (a different number, read here: MERGED, title `Release train:`,
-     base the release source), and its `headRefOid` is that head; both trees are computed here;
+     its tree equals the tree of the head the train review approved. That train is found here, never
+     passed in: the latest merged release-train pull request into the release source, by the release
+     skill's own search (both titles, `Release train:` and `Support train:`, each with its body
+     marker), whose merge commit is an ancestor of --head; its `headRefOid` is the reviewed head;
   4. --checks is `green` (every required check on the head succeeded);
   5. --unresolved is 0 (the paginated unresolved-thread count);
   6. the pre-ship line is `PRE-SHIP: PASS (<n> ran, 0 waived)` or `PRE-SHIP: NOTHING TO RUN`;
   7. --previous-release is 0 (the previous-release gate);
-  8. --dev-deploy is 0, or `not-applicable` (the dev-deploy wait, run BEFORE this check when it applies);
+  8. --dev-deploy is 0 (the dev-deploy wait, run BEFORE this check); `not-applicable` only when
+     `release.devDeployVerification` is not configured;
   9. the tower status has exactly one `On final:` line, and it reads `On final: #<pr> <head>` for
      this pull request (digits, then whitespace).
 """
@@ -73,6 +75,36 @@ def pr_view(number):
     return found if isinstance(found, dict) else None
 
 
+TRAIN_TITLES = (("Release train:", "devstride:release-train"), ("Support train:", "devstride:support-train"))
+
+
+def latest_train(source):
+    """The latest merged release-train pull request into `source`, or None when gh cannot answer."""
+    rows = []
+    for title, _marker in TRAIN_TITLES:
+        try:
+            done = subprocess.run(["gh", "pr", "list", "--base", source, "--state", "merged", "--search",
+                                   'in:title "%s" sort:created-desc' % title, "--json",
+                                   "number,title,body,mergedAt,headRefOid,mergeCommit", "--limit", "50"],
+                                  capture_output=True, text=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if done.returncode != 0:
+            return None
+        try:
+            found = json.loads(done.stdout or "[]")
+        except ValueError:
+            return None
+        rows += [r for r in found if isinstance(r, dict)]
+    trains = [r for r in rows if any(str(r.get("title", "")).startswith(t) and m in str(r.get("body", ""))
+                                     for t, m in TRAIN_TITLES) and r.get("mergedAt")]
+    return max(trains, key=lambda r: str(r["mergedAt"])) if trains else {}
+
+
+def is_ancestor(older, newer):
+    return subprocess.run(["git", "merge-base", "--is-ancestor", older, newer], capture_output=True).returncode == 0
+
+
 def full_sha(rev):
     done = subprocess.run(["git", "rev-parse", "--verify", "%s^{commit}" % rev], capture_output=True, text=True)
     return done.stdout.strip() if done.returncode == 0 else None
@@ -92,7 +124,6 @@ def main():
     parser = Parser(prog="standing-yes.py")
     parser.add_argument("--pr", type=int, required=True)
     parser.add_argument("--head", required=True)
-    parser.add_argument("--train-pr", type=int, required=True)
     parser.add_argument("--class", dest="klass", required=True)
     parser.add_argument("--checks", choices=["green", "red"], required=True)
     parser.add_argument("--unresolved", type=int, required=True)
@@ -118,18 +149,18 @@ def main():
         say("ASK the current head of pull request #%d cannot be read" % a.pr)
     if live != head:
         say("ASK pull request #%d is at %s, not the head %s this check was given" % (a.pr, live[:12], head[:12]))
-    if a.train_pr == a.pr:
-        say("ASK --train-pr names the release pull request itself, not the reviewed train")
-    train = pr_view(a.train_pr)
     source = (release.get("releaseSource") if isinstance(release, dict) else None) or "develop"
+    train = latest_train(source)
     if train is None:
-        say("ASK the train pull request #%d cannot be read" % a.train_pr)
-    if train.get("state") != "MERGED" or not str(train.get("title", "")).startswith("Release train:") \
-            or train.get("baseRefName") != source:
-        say("ASK #%d is not a merged release-train pull request into %s" % (a.train_pr, source))
+        say("ASK the merged release-train pull requests into %s cannot be read" % source)
+    if not train:
+        say("ASK no merged release-train pull request into %s: nothing reviewed to compare with" % source)
+    merge = str((train.get("mergeCommit") or {}).get("oid") or "")
+    if not merge or not is_ancestor(merge, head):
+        say("ASK the latest train #%s is not merged into the head %s" % (train.get("number"), head[:12]))
     reviewed = tree_of(str(train.get("headRefOid") or ""))
     if reviewed is None:
-        say("ASK the reviewed train head of #%d cannot be read" % a.train_pr)
+        say("ASK the reviewed train head of #%s cannot be read" % train.get("number"))
     tree = tree_of(head)
     if tree != reviewed:
         say("ASK the head's tree %s differs from the reviewed train tree %s" % (tree[:12], reviewed[:12]))
@@ -143,8 +174,12 @@ def main():
         say("ASK the pre-ship checks did not all pass unwaived (%s)" % (pre or "no verdict"))
     if a.previous_release != 0:
         say("ASK the previous-release gate answered %d, not 0" % a.previous_release)
-    if a.dev_deploy.strip() not in ("0", "not-applicable"):
-        say("ASK the dev-deploy wait answered %s, not 0" % (a.dev_deploy.strip() or "nothing"))
+    dev = a.dev_deploy.strip()
+    configured = isinstance(release, dict) and bool(release.get("devDeployVerification"))
+    if dev == "not-applicable" and configured:
+        say("ASK release.devDeployVerification is configured: run the dev-deploy wait and pass its exit")
+    if dev not in ("0", "not-applicable"):
+        say("ASK the dev-deploy wait answered %s, not 0" % (dev or "nothing"))
     finals = [line for line in a.tower.splitlines() if line.startswith("On final:")]
     parsed = re.match(r"^On final: #(\d+)\s+\S", finals[0]) if len(finals) == 1 else None
     if not parsed or int(parsed.group(1)) != a.pr:
