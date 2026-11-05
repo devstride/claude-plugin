@@ -13,7 +13,7 @@ unit in plan scope").
 - A plan root opts in with one description line, in the contract's exact form
   `<p><strong>Release scope:</strong> plan</p>`. `plan` writes it only when the owner raises it,
   never by default; no skill switches a plan on its own.
-- Read it on the same walk as the delivery profile's root marker
+- Read it at step 0, BEFORE selection, on the same walk as the delivery profile's root marker
   (`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`, "The root marker"): every
   ancestor ABOVE the item's release unit, with `get_item(view: 'full')` — a summary omits the
   description, and a missing description is never read as "no marker". Pass the text after
@@ -55,22 +55,28 @@ The gate is unchanged. Then, in `epic-release-steps.md`'s order, with these diff
   plan branch into the epic branch in place of `baseBranch`. A conflict STOPS; a migration number
   taken on both sides STOPS for the owner.
 - **Cut** the EPIC RELEASE PR with base = the plan branch; review the full diff as today.
-- **Close out**: comment on the release unit ("reached <plan branch> with #<n>") and leave its leaves
-  landed. They are NOT Done yet: Done comes with the plan's release. Delete the epic branch per
+- **Close out** — step 8's, a recovery's and the run after an owner merged it (autoRelease off) —
+  comments on the release unit and each leaf ("reached <plan branch> with #<n>") and marks NOTHING
+  Done: Done comes with the plan's release. Delete the epic branch per
   `epicIntegrationBranches.deleteBranchAfterRelease`.
-- **Age guard**: when the plan branch is more than 7 days old (its oldest commit in
-  `origin/<from>..origin/<plan branch>`) or its diff against `from` matches
-  `release.releaseBranchFixExclusions`, ask the owner ONCE per plan, recorded in handoff memory,
-  whether to release the plan now. Never release early unasked. Yes → the plan release below,
-  remaining epics included later on a fresh plan branch (the release deletes this one).
+- **Age guard**: when the plan branch's first first-parent commit
+  (`git log --first-parent --reverse --format=%cI origin/<from>..origin/<plan branch> | head -1`) is
+  more than 7 days old, or its diff against `from` matches `release.releaseBranchFixExclusions`, ask
+  the owner ONCE per trigger per plan, recorded in handoff memory, whether to release the plan now.
+  Never release early unasked. Yes → the plan release below, remaining epics later on a fresh plan
+  branch (the release deletes this one).
 
 ## Selection and counting
 
+- **An epic's landed set** reads `origin/<plan branch>..` — `origin/<from>..` while release-target
+  still says `create`.
 - **The plan's landed set**: each merge in
   `git log --first-parent --merges --format='%H %P' origin/<from>..origin/<plan branch>` whose
-  second parent is NOT an ancestor of `origin/<from>` (that skips the refreshes) is an epic release;
-  its stories are the merges in `git log --first-parent --merges --format=%s <merge>^1..<merge>^2`,
-  numbers parsed as `next-unblocked.md` parses landed subjects.
+  second parent is NOT an ancestor of `origin/<from>` (that skips the refreshes) is an epic release
+  (no plan branch yet → empty); its stories are the merges in
+  `git log --first-parent --merges --format=%s <merge>^1..<merge>^2`, numbers parsed as
+  `next-unblocked.md` parses landed subjects. **A leaf in it is landed** — never selected, never
+  recovered — and its recovery test reads `origin/<from>`, so only the plan's release closes it.
 - **`blocked_by`** is also satisfied when the target is in the plan's landed set AND the dependent is
   under the same plan root. A blocker outside the plan still waits for Done.
 - **Remaining**: the plan's leaf descendants neither Done nor landed (in any epic's landed set or
@@ -80,7 +86,7 @@ The gate is unchanged. Then, in `epic-release-steps.md`'s order, with these diff
 
 ## The plan's release
 
-When the plan's remaining count reaches zero:
+When the plan's remaining count reaches zero (step 7):
 
 - Gate: `epicIntegrationBranches.autoRelease`, read exactly as step 8 reads it (present wins;
   `"ask"` asks once).
@@ -90,10 +96,13 @@ When the plan's remaining count reaches zero:
 - **Review scope**: only what no pull request reviewed — the refresh merges' conflict resolutions
   and every commit with no settled reviewed-head record, passed as the scope manifest. Each epic was
   fully reviewed on its PR onto the plan branch.
-- **Merge, then close out every epic of the plan**: the unit first, then its leaves, each → Done,
-  linking the plan release PR ("reached <from> with the plan release pull request #<n>"). Delete the
-  plan branch. Then `epic-release-steps.md`'s last bullet (the auto-start trigger) when `from` is
-  the release train.
+- **Capture the plan's landed set BEFORE the merge.** After an owner's merge, or on recovery, take it
+  from the merge commit `<merge>` (`gh pr list --head <plan branch> --base <from> --state merged
+  --json number,mergeCommit`): the same read over `<merge>^1..<merge>^2`.
+- **Close out the epics in that set** — never one not yet released onto the plan branch: the unit
+  first, then its leaves, each → Done, linking the plan release PR ("reached <from> with the plan
+  release pull request #<n>"). Delete the plan branch. Then `epic-release-steps.md`'s last bullet
+  (the auto-start trigger) when `from` is the release train.
 
 ## Cited by
 

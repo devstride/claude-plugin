@@ -20,7 +20,7 @@ Every subcommand reads one JSON object on stdin and writes one JSON object on st
                -> {"kind": explicit|integration|epic|train|base|ask|refuse, "branch"?, "create"?,
                    "candidates"?, "reason"}
   release-target {"config", "chain":[{…, "releaseScope"?}…], "heads", "prefix", "date", "roles"?, "planSlug"?}
-               -> {"kind": plan|train|base|ask|refuse, "branch"?, "create"?, "from"?, "candidates"?, "reason"}
+               -> {"kind": plan|train|base|named|ask|refuse, "branch"?, "create"?, "from"?, "candidates"?, "reason"}
   epic-base    the same request -> {"kind": plan|base|ask|refuse, "branch"?, "candidates"?, "reason"}
 
 `target` precedence: the item must be a leaf type (else refuse) → an explicit branch (refused when
@@ -411,8 +411,8 @@ def epic_release_target(facts):
                 "reason": "epicIntegrationBranches.releaseTarget is the release train"}
     if branch == base:
         return {"kind": "base", "branch": base, "create": False, "from": base, "reason": "the base branch"}
-    return {"kind": "refuse", "reason": "epicIntegrationBranches.releaseTarget names %s, which is neither "
-            "the base branch nor the release train" % branch}
+    return {"kind": "named", "branch": branch, "create": False, "from": branch,
+            "reason": "epicIntegrationBranches.releaseTarget names %s" % branch}
 
 
 def plan_branch(facts, req):

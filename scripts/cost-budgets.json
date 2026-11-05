@@ -7,7 +7,7 @@
   "bodies": {
     "branch-feature": 900,
     "branch-hotfix": 2200,
-    "build-item": 7440,
+    "build-item": 7470,
     "ci-audit": 2600,
     "comprehend-plan": 1740,
     "create-defect": 2500,
@@ -39,7 +39,7 @@
   "references": {
     "skills/build-item/references/epic-release.md": 3200,
     "skills/build-item/references/ground-truth-at-start.md": 1900,
-    "skills/build-item/references/next-unblocked.md": 3380,
+    "skills/build-item/references/next-unblocked.md": 3410,
     "skills/build-item/references/plain-language-output.md": 2300,
     "skills/build-item/references/progress-table.md": 1330,
     "skills/build-item/references/release-train.md": 2380,
@@ -61,7 +61,7 @@
     "skills/release/references/clearance.md": 6830,
     "skills/release/references/docs-hooks.md": 4420,
     "skills/release/references/post-deploy-check.md": 1620,
-    "skills/release/references/release-branch.md": 7280,
+    "skills/release/references/release-branch.md": 7330,
     "skills/release/references/release-gates.md": 1350,
     "skills/release/references/review-once.md": 1210,
     "skills/review/references/ci-settle.md": 1800,
@@ -100,11 +100,11 @@
     "skills/doctor/references/agents.md": 620,
     "skills/build-item/references/active-agents.md": 540,
     "skills/release/references/auto-start.md": 2750,
-    "skills/build-item/references/plan-scope.md": 2210
+    "skills/build-item/references/plan-scope.md": 2480
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 81340,
+      "budget": 81410,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -142,7 +142,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 65970,
+      "budget": 66030,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",

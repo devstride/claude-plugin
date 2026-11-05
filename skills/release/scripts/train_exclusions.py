@@ -13,7 +13,8 @@ Usage:
 
   --config         the repository's `.claude/ds-config.json`. Read: `release.releaseBranchFixExclusions`,
                    `release.releaseSource` (default `develop` only when the key is missing), `releaseTrain.branch` (the old name `supportTrain.branch`
-                   when only that is present), `epicIntegrationBranches.pattern` and the optional
+                   when only that is present), `epicIntegrationBranches.pattern`, the optional
+                   `planIntegrationBranches.pattern` and the optional
                    `release.migrationRenumber` ({"sqlGlobs": [...], "metaGlobs": [...]}).
   --source-before  the release source's SHA when the train snapshot was cut (the range start); it
                    must be an ancestor of --head and of `origin/<releaseSource>` (--start-on source,
@@ -35,6 +36,12 @@ Checked set: the files each FIRST-PARENT commit in `<source-before>..<head>` cha
        token a wildcard), AND `gh pr view <n> --json baseRefName,state,mergeCommit` says the pull
        request is MERGED, based on the train, with exactly that commit as its merge commit. A
        hand-written subject gh does not confirm is checked like any other commit.
+  (iii) a merge that brought a REVIEWED plan release onto the train (plan scope): the same test with
+       `<head>` matching `planIntegrationBranches.pattern`. It is not exempt whole: the plan
+       branch's own first-parent commits are judged instead — each epic pull request merged onto
+       the plan branch and confirmed by gh as based on it is a reviewed unit; a refresh merge of the
+       train into the plan branch is checked only for what it changed beyond the train; everything
+       else is checked exactly.
 A merge with more than two parents (octopus) is never exempt and never expanded: its whole diff
 against its first parent is checked. Migration metadata (`migrationRenumber.metaGlobs`) that only a
 merge changed is allowed when the range also yields an allowed renumber. Every merge, exempt or not, also has what it ITSELF changed (beyond git's own merge of its
@@ -100,12 +107,19 @@ def matches(path, patterns):
     return routing.first_match(path, patterns) is not None
 
 
-def reviewed_unit(repo, commit, subject, epic_regex, train):
-    """The pull request number when `commit` is the confirmed merge of a reviewed release unit."""
+def pull_request_head(subject):
+    """`(number, head)` from GitHub's merge subject, or None."""
     m = re.match(r"^Merge pull request #([0-9]+) from [^/\s]+/(\S+)$", subject)
-    if not m or not epic_regex.match(m.group(2)):
+    return (m.group(1), m.group(2)) if m else None
+
+
+def reviewed_unit(repo, commit, subject, head_regex, train):
+    """The pull request number when `commit` is the confirmed merge of a pull request whose head
+    matches `head_regex` into `train` (the base it must have been reviewed against)."""
+    found = pull_request_head(subject)
+    if not found or not head_regex.match(found[1]):
         return None
-    number = m.group(1)
+    number = found[0]
     try:
         p = subprocess.run(["gh", "pr", "view", number, "--json", "baseRefName,state,mergeCommit"],
                            cwd=repo, capture_output=True, text=True)
@@ -183,6 +197,8 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
     if not isinstance(source, str) or not source:
         fail("config: release.releaseSource must be a non-empty string when present")
     epic_regex = routing.template_regex(epic_pattern, {}) if isinstance(epic_pattern, str) and epic_pattern else None
+    plan_pattern = (config.get("planIntegrationBranches") or {}).get("pattern")
+    plan_regex = routing.template_regex(plan_pattern, {}) if isinstance(plan_pattern, str) and plan_pattern else None
     renumber = release.get("migrationRenumber")
     sql_globs = meta_globs = None
     if isinstance(renumber, dict):
@@ -241,6 +257,35 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
     def names(a, b):
         return set(zlist(git(repo, "diff", "--name-only", "--no-renames", "-z", a, b).stdout.decode("utf-8", "surrogateescape")))
 
+    def accept_unit(number, c, first):
+        reviewed.append(number)
+        added = git(repo, "diff", "--name-only", "--no-renames", "-z", "--diff-filter=A", first, c)
+        introduced.update(zlist(added.stdout.decode("utf-8", "surrogateescape")))
+
+    def walk_plan(commits, plan_branch, train_side):
+        """A plan release (plan scope): what its plan branch carried, commit by commit. An epic's
+        reviewed pull request onto the plan branch is a reviewed unit; a refresh merge of the train
+        into it is checked only for what it changed beyond what the train brought; the rest exactly."""
+        for c in commits:
+            parents = git_text(repo, "rev-list", "--parents", "-n", "1", c).split()[1:]
+            if not parents:
+                continue
+            if len(parents) == 2:
+                for p in merge_only_changes(repo, c, parents):
+                    flag_merge_path(p)
+                if is_ancestor(repo, parents[1], train_side):
+                    bases = git_text(repo, "merge-base", "--all", parents[0], parents[1]).split()
+                    brought = set().union(*(names(b, parents[1]) for b in bases)) if bases else set()
+                    for p in names(parents[0], c) - brought:
+                        flag_merge_path(p)
+                    continue
+                number = reviewed_unit(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip(),
+                                       epic_regex, plan_branch) if epic_regex else None
+                if number is not None:
+                    accept_unit(number, c, parents[0])
+                    continue
+            check_commit(c, parents[0])
+
     def walk(commits):
         for c in commits:
             parents = git_text(repo, "rev-list", "--parents", "-n", "1", c).split()[1:]
@@ -267,9 +312,14 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
                 number = reviewed_unit(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip(), epic_regex, train) \
                     if epic_regex else None
                 if number is not None:
-                    reviewed.append(number)
-                    added = git(repo, "diff", "--name-only", "--no-renames", "-z", "--diff-filter=A", parents[0], c)
-                    introduced.update(zlist(added.stdout.decode("utf-8", "surrogateescape")))
+                    accept_unit(number, c, parents[0])
+                    continue
+                subject = git_text(repo, "log", "-1", "--format=%s", c).strip()
+                plan = reviewed_unit(repo, c, subject, plan_regex, train) if plan_regex else None
+                if plan is not None:
+                    reviewed.append(plan)
+                    walk_plan(git_text(repo, "rev-list", "--first-parent", "--reverse", parents[1], "^" + parents[0]).split(),
+                              pull_request_head(subject)[1], parents[0])
                     continue
                 if is_ancestor(repo, parents[1], origin_train):
                     # a late absorption of train commits: judge what it brought, commit by commit

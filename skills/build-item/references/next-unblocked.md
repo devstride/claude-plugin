@@ -63,7 +63,8 @@ carries the landed comment.
   identifying number — at `<itemNumber>` in `commitConventions.epicMergeFormat` (fallback
   `^merge: (I[0-9]+)\b`) for a fast merge, `from [^ ]+/(I[0-9]+)-` for a pull-request merge — as
   `release` reads the train (`release-branch.md` §1 step 6); merges of the base branch carry no
-  number. **A leaf is landed when its number is in that landed set.** The merged status is only
+  number. **A leaf is landed when its number is in that landed set** (plan scope: or the plan's,
+  and `plan-scope.md` overrides recovery and close-out). The merged status is only
   the visible signal and never stands in for the set. A pull-request merge subject names the
   branch only because `build-item` 5b passes GitHub's default subject with `--subject` (into an
   integration branch or the train): a repository set to use the pull-request title as the merge

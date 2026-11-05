@@ -1745,7 +1745,7 @@
       }
     },
     {
-      "name": "a release target naming neither the base branch nor the train is refused",
+      "name": "a release target naming another branch is that branch, as before plan scope",
       "config": {
         "epicIntegrationBranches": {
           "releaseTarget": "staging"
@@ -1774,7 +1774,10 @@
         "staging"
       ],
       "expect": {
-        "kind": "refuse"
+        "kind": "named",
+        "branch": "staging",
+        "create": false,
+        "from": "staging"
       }
     },
     {
