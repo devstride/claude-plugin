@@ -4,6 +4,7 @@
 user.login            a GitHub API field (review-thread authors)
 github.actor          a GitHub Actions context value
 attachment.id         a DevStride API field in a worked example
+directedBy.email      a field of the agent session summary payload, not a config key
 statusLine.command    a Claude Code settings.json key, not a ds-config key
 ci.concurrency        a per-workflow fact setup's CI detection records in its report
 ci.productionTreeSkip a per-workflow fact setup's CI detection records in its report

@@ -104,7 +104,7 @@ Read "the working base" wherever a step says develop; re-derive it per RELEASE U
    handoff memory → `git ls-remote --heads origin` → the helper below (`create` → off a fresh
    `baseBranch`, pushed). Cache per epic; **announce reused or created.**
 3. **A one-off AND `releaseTrain.branch` set** → the train, unless `release-train.md` routes it to
-   `baseBranch` (announced).
+   `baseBranch` (announced); a train missing beside one other `train/*` branch rides that one.
 4. **Otherwise** → `baseBranch`. A disabled flag falls back.
 
 **This precedence is code**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/routing.py

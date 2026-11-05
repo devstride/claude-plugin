@@ -18,6 +18,15 @@ for what each version component means here and how a release is cut.
   addresses and caps lengths; no transcript is ever sent. Unset, nothing is written and nothing is
   said; a failed write is mentioned once and never stops a story.
 
+### Fixed
+
+- **A renamed release train is no longer created beside the old one.** When the configured
+  `releaseTrain.branch` is not on origin but exactly one other `train/*` branch is, the routing
+  helper (`target` and `release-target`) now uses that branch instead of creating a second, empty
+  train that would strand the one-offs the first one carries, and its reason names the cutover
+  (old → configured name) with the commands that perform it. With several other `train/*` branches
+  it asks which one is live.
+
 ## [3.30.0] — 2026-11-05
 
 ### Added

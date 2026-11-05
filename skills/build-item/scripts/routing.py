@@ -33,6 +33,11 @@ one-off, the release train when `releaseTrain.branch` (or, by its old name, `sup
 true, unless a changed file matches `release.releaseBranchFixExclusions` (then the base branch, by
 its own pull request) → `baseBranch`. `create: true` means: create it on origin off `baseBranch`.
 
+A configured train that is not on origin is created only when no other `train/*` branch is. Exactly
+one other → that branch, `create: false`: a rename not yet cut over, and a second train beside it
+would strand what the first one carries; the reason names the cutover and its commands. Several →
+`ask`, with them as `candidates`. `release-target` resolves the train the same way.
+
 `oneOff` is the caller's classification — pass it whenever you know it (build-item's one-off mode
 always does: a one-off under an Epic still never uses that epic's branch); absent, an item with no
 release-unit ancestor is a one-off. `roles` ({"leaf":[…], "releaseUnit"}) carries the roles resolved
@@ -179,6 +184,26 @@ def train_section(config):
     return new if new else section(config, "supportTrain")
 
 
+def resolve_train(train, heads):
+    """Where the configured release train is on origin: {"branch", "create", "note"}, or an `ask`.
+    Absent with exactly one other `train/*` head → that head (a rename not yet cut over: creating the
+    configured name beside it would strand what the old branch carries); several → ask; none → create."""
+    if train in heads:
+        return {"branch": train, "create": False, "note": ""}
+    others = sorted(h for h in heads if h.startswith("train/") and h != train)
+    if len(others) == 1:
+        old = others[0]
+        return {"branch": old, "create": False, "note": (
+            "; the release train %s is not on origin but %s is, so it rides %s until the cutover %s → %s "
+            "(git fetch origin %s && git push origin origin/%s:refs/heads/%s && git push origin --delete %s)"
+            % (train, old, old, old, train, old, old, train, old))}
+    if others:
+        return {"kind": "ask", "candidates": others,
+                "reason": "the release train %s is not on origin and several other train branches are: "
+                          "which one is live?" % train}
+    return {"branch": train, "create": True, "note": ""}
+
+
 def need(value, what):
     if not isinstance(value, str) or not value:
         fail("config: %s is missing" % what)
@@ -305,11 +330,13 @@ def cmd_target(req):
     if not isinstance(files, list) or not all(isinstance(f, str) for f in files):
         fail("target: changedFiles must be a list of paths")
     train = train_section(config).get("branch")
+    where = resolve_train(train, heads) if train else {}
+    trains = {train, where.get("branch")} - {None}
     blocked = [f for f in files if first_match(f, release.get("releaseBranchFixExclusions") or [])]
 
     def landing(kind, branch, create, reason):
         # Deploy configuration and migrations never ride the train, however the train was chosen.
-        if train and branch == train and blocked:
+        if branch in trains and blocked:
             return {"kind": "base", "branch": base, "create": False,
                     "reason": "it touches %s, which never rides the release train" % ", ".join(blocked)}
         return {"kind": kind, "branch": branch, "create": create, "reason": reason}
@@ -356,7 +383,9 @@ def cmd_target(req):
         return {"kind": "base", "branch": base, "create": False,
                 "reason": "%s integration branches are off" % unit if epic else "not a one-off, and no %s above it" % unit}
     if train and release.get("mergeTrainBeforeCut") is True:
-        return landing("train", train, train not in heads, "a one-off")
+        if "kind" in where:  # which train is live is moot when the change may not ride any of them
+            return landing("train", train, False, "") if blocked else where
+        return landing("train", where["branch"], where["create"], "a one-off" + where["note"])
     reason = "a one-off"
     if train:
         reason += " (release train set, but releases do not merge it)"
@@ -408,8 +437,11 @@ def epic_release_target(facts):
     branch = base if named in (None, "baseBranch") else named
     train = train_section(config).get("branch")
     if train and branch == train:
-        return {"kind": "train", "branch": train, "create": train not in facts["heads"], "from": base,
-                "reason": "epicIntegrationBranches.releaseTarget is the release train"}
+        where = resolve_train(train, facts["heads"])
+        if "kind" in where:
+            return where
+        return {"kind": "train", "branch": where["branch"], "create": where["create"], "from": base,
+                "reason": "epicIntegrationBranches.releaseTarget is the release train" + where["note"]}
     if branch == base:
         return {"kind": "base", "branch": base, "create": False, "from": base, "reason": "the base branch"}
     return {"kind": "named", "branch": branch, "create": False, "from": branch,
@@ -445,7 +477,7 @@ def cmd_release_target(req):
     if refusal:
         return refusal
     target = epic_release_target(facts)
-    if not facts["root"] or target["kind"] == "refuse":
+    if not facts["root"] or target["kind"] in ("refuse", "ask"):
         return target
     found = plan_branch(facts, req)
     if "kind" in found:

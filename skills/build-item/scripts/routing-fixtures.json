@@ -538,6 +538,92 @@
       }
     },
     {
+      "name": "the configured release train is not on origin but one other train branch is: the one-off rides that branch and nothing is created",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/release"
+      ],
+      "expect": {
+        "kind": "train",
+        "branch": "train/release",
+        "create": false
+      }
+    },
+    {
+      "name": "the configured release train is not on origin and several other train branches are: ask which one is live",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/release",
+        "train/hotfixes"
+      ],
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "train/hotfixes",
+          "train/release"
+        ]
+      }
+    },
+    {
+      "name": "riding the one other train branch does not let deploy configuration ride it",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/release"
+      ],
+      "changedFiles": [
+        "stacks/api.ts"
+      ],
+      "expect": {
+        "kind": "base",
+        "branch": "develop",
+        "create": false
+      }
+    },
+    {
+      "name": "with several other train branches, deploy configuration still goes to the base branch without asking",
+      "chain": [
+        {
+          "number": "I400",
+          "title": "A support defect",
+          "workType": "Defect"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/release",
+        "train/hotfixes"
+      ],
+      "changedFiles": [
+        "stacks/api.ts"
+      ],
+      "expect": {
+        "kind": "base",
+        "branch": "develop",
+        "create": false
+      }
+    },
+    {
       "name": "a one-off touching deploy configuration or migrations ships to the base branch by its own pull request",
       "chain": [
         {
@@ -1807,6 +1893,132 @@
         "branch": "train/support",
         "create": true,
         "from": "develop"
+      }
+    },
+    {
+      "name": "the configured release train is not on origin but one other train branch is: the epic's release goes to that branch",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/release"
+      ],
+      "expect": {
+        "kind": "train",
+        "branch": "train/release",
+        "create": false,
+        "from": "develop"
+      }
+    },
+    {
+      "name": "the configured release train is not on origin and several other train branches are: ask",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/release",
+        "train/hotfixes"
+      ],
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "train/hotfixes",
+          "train/release"
+        ]
+      }
+    },
+    {
+      "name": "plan scope with the one other train branch on origin: the plan branch is cut from it and no train is created",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/release"
+      ],
+      "expect": {
+        "kind": "plan",
+        "branch": "jane/26-10-02/plan-I303-checkout",
+        "create": true,
+        "from": "train/release"
+      }
+    },
+    {
+      "name": "plan scope with several other train branches: ask before any plan branch is named",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        }
+      ],
+      "heads": [
+        "develop",
+        "train/release",
+        "train/hotfixes"
+      ],
+      "expect": {
+        "kind": "ask",
+        "candidates": [
+          "train/hotfixes",
+          "train/release"
+        ]
       }
     },
     {

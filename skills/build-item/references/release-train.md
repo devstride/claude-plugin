@@ -21,9 +21,13 @@ request's base.
   nothing ever merges the train into `baseBranch`, so route the one-off to `baseBranch` instead and
   announce why ("release train set, but releases do not merge it").
 - **One-off AND `releaseTrain.branch` set (and the train ships) → the working base is the train.**
-  Resolve it with `git ls-remote --exit-code --heads origin <train>`: present → reuse; absent →
-  create it off a freshly fetched `origin/<baseBranch>` and push. Announce "release train <name>:
-  reused" or "created".
+  Resolve it with `git ls-remote --heads origin`: present → reuse; absent → create it off a freshly
+  fetched `origin/<baseBranch>` and push. Announce "release train <name>: reused" or "created".
+- **A renamed train is never created beside the old one.** Configured train absent and exactly one
+  other `train/*` branch on origin → that branch IS the train until the rename is cut over: the
+  one-off rides it (nothing created), and the announcement names the cutover and its commands, as
+  `routing.py`'s reason gives them, for the owner to run. Several other `train/*` branches → ask
+  which one is live. An epic's release to the train resolves it the same way.
 - **One-offs touching deploy configuration or migrations never ride the train; a reviewed release unit may.** A one-off whose change touches a
   path matching an entry of `release.releaseBranchFixExclusions` (absent → nothing is excluded;
   matching per `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`) ships to
