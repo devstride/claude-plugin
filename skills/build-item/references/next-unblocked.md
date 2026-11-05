@@ -22,7 +22,9 @@ set (below) AND has the SAME nearest release-unit ancestor as the dependent leaf
 integration branch. The merged status alone never satisfies one — a column of that name often
 holds an open code review; only a caller without git (below) stands in with it. A target landed
 under a different release unit is satisfied only when Done, so the next release unit waits until
-the previous one reaches its release target.
+the previous one reaches its release target — except in plan scope, where a target in the plan's
+landed set satisfies a dependent under the same plan root
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md`).
 
 **A release-unit cycle is never plain "blocked"**: a leaf of unit A waits on a leaf of unit B
 while a leaf of B waits on a not-yet-Done leaf of A, so neither unit can release. Report it as a
@@ -56,7 +58,7 @@ carries the landed comment.
   this merge.
 - **The git history is the record.** `git fetch origin`, then once per integration branch:
   `git log --first-parent --merges --format=%s origin/<release target>..origin/<integration
-  branch>` (release target = `epicIntegrationBranches.releaseTarget`; branch resolved as
+  branch>` (release target = `routing.py release-target`'s branch — the plan branch in plan scope; branch resolved as
   `build-item`'s working base does; none on origin → the set is empty). Take ONLY each merge's
   identifying number — at `<itemNumber>` in `commitConventions.epicMergeFormat` (fallback
   `^merge: (I[0-9]+)\b`) for a fast merge, `from [^ ]+/(I[0-9]+)-` for a pull-request merge — as
@@ -133,3 +135,4 @@ the ready-set lets a HUMAN fan the waves out deliberately; the loop itself stays
   next pick)
 - `setup/references/config-defaults.md` (`releaseTarget` — when a story is Done)
 - `plan` SKILL.md (the execution-order walk)
+- `build-item/references/plan-scope.md` (the landed-subject parsing, for the plan's landed set)

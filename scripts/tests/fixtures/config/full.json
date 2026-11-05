@@ -30,6 +30,7 @@
     "deleteBranchAfterRelease": true,
     "mergedStatusName": "Review"
   },
+  "planIntegrationBranches": { "pattern": "<prefix>/<YY-MM-DD>/plan-<plan-number>-<plan-title-slug>", "example": "jane/26-10-01/plan-I20100-checkout" },
   "defects": { "deferredContainerTitle": "Deferred", "deferredContainerLegacyTitles": ["Deferred defects"] },
   "commitConventions": { "messageFormat": "<type>: <summary>", "reviewFixFormat": "fix: <summary>", "epicMergeFormat": "merge: <scope>" },
   "prBodyTemplate": { "sections": [ { "heading": "## Summary", "guidance": "What and why." } ], "noAiAttribution": true },

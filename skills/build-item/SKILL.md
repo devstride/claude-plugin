@@ -110,6 +110,9 @@ Read "the working base" wherever a step says develop; re-derive it per RELEASE U
 **This precedence is code**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/routing.py
 target` (pass `oneOff`, and `roles` when resolved); follow its answer.
 
+**Plan scope.** The profile's marker walk also records each ancestor's `Release scope:` line; **read
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md` when one says `plan`.**
+
 Stories merge into it (`references/epic-release.md`), skipping `verify.skipDuringStoryBuilds`
 suites; the last leaf's merge triggers step 8. **The working base and the effective
 `perStoryPullRequest` pick the path** — integration branch → fast mode (4a), train → 4a
@@ -305,6 +308,8 @@ cut nothing; report release-ready and stop — after the owner merges it, one
 the owner once per unit, cutting nothing until answered; unanswerable → `false`, SAYING so. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` when step 7 reports the release
 unit at zero and before cutting the release PR.**
+
+The release target is `routing.py release-target`'s `branch` (plan scope: `plan-scope.md`).
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release-steps.md` in full before
 acting on a release that fires, or on step 0's recovery close-out** — refresh, verification plan, the EPIC RELEASE PR cut, review

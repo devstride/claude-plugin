@@ -500,7 +500,9 @@ is the loop's rule for where an item lands and what its branches are called, as 
 Python 3 file: JSON in on stdin, JSON out. `target` answers "which branch does this item land on"
 (its epic's integration branch, the release train, or the base branch), `branch-name` names the
 feature branch, `match` applies the branch-pattern rule, and `excluded` lists changed files that may
-not ride the release train. Pass `oneOff: true` for an item delivered outside a plan, and `roles`
+not ride the release train; `release-target` and `epic-base` say where a release unit's release
+pull request goes and what a new integration branch is cut from, honouring a plan root's
+`Release scope: plan` line. Pass `oneOff: true` for an item delivered outside a plan, and `roles`
 when your config has no `hierarchyRoles`. `routing-fixtures.json` beside it holds the canonical examples; if your
 repository implements the rule itself, run those examples against your implementation in its tests.
 

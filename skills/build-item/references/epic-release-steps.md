@@ -13,6 +13,9 @@ instruction for a release that fires; a recovery close-out applies only the Merg
 
 ## Steps
 
+In plan scope, the refresh source, the cut base and the close-out change as
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md` says; read it with this file.
+
 - **Refresh**: pull the epic branch, fetch `baseBranch`, merge its captured tip `<baseOid>` — merge,
   NEVER rebase shared story SHAs; non-mechanical conflicts STOP. Push.
 - **One verification plan for the merged tree**: aggregate story receipts, invalidating only what the
@@ -21,7 +24,7 @@ instruction for a release that fires; a recovery close-out applies only the Merg
   reviewed head; `preShipChecks` stay local; a firing `verify.skipDuringStoryBuilds` entry stays
   cloud-only. Record where each runs; never infer coverage from a job name.
 - **Cut via `/devstride:pr`** autonomously, declaring `merge-only: true`: head = epic branch, base =
-  `epicIntegrationBranches.releaseTarget`, flagged **EPIC RELEASE PR** (body leads with the epic and
+  `routing.py release-target`'s branch (`epicIntegrationBranches.releaseTarget` without plan scope), flagged **EPIC RELEASE PR** (body leads with the epic and
   lists its stories), with the profile, the verification plan and the aggregate risk-check ledger.
   Full review → uncovered pre-ship checks → ready flip → CI.
 - **Review scope.** Fast mode used (`fastStoryMerges.epicReleaseIsFirstCloudPass`) → **review the
@@ -52,3 +55,4 @@ instruction for a release that fires; a recovery close-out applies only the Merg
 - `skills/build-item/SKILL.md` — step 8, once its gate fires or for step 0's recovery close-out.
 - `skills/build-item/references/next-unblocked.md` — the Close-out bullet, for the release unit's
   comment and Done.
+- `skills/build-item/references/plan-scope.md` — the plan's release reuses these steps.

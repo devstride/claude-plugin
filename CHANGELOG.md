@@ -8,6 +8,10 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in plan-scope release: a `Release scope: plan` line on a plan root sends each epic's release to a plan integration branch (`planIntegrationBranches.pattern`), satisfies cross-epic blockers once landed there, and releases the whole plan to the release train when nothing non-deferred remains; new routing helpers `release-target` and `epic-base` with shared examples.
+
 ## [3.29.0] — 2026-11-04
 
 ### Added

@@ -61,7 +61,8 @@ Organize by the tree's own hierarchy (root → grouping items → leaves), not a
 - **Where it stands** — status distribution (Done / landed / In Progress / open; landed = in the
   merged status or carrying a "merged onto" comment, awaiting its epic's release), the critical
   path, and the item `/devstride:build-item` would pick next per the canonical rule in
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`.
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`, and any `Release scope:`
+  line (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md`).
 - **Deferrals and known gaps** — anything flagged deferred, blocked on a human, or a known compromise.
 - **Deferred container** — its own section, apart from the value tree, the status distribution and
   "what runs next": the plan root's container

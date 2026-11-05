@@ -61,6 +61,15 @@ The count step 7 uses to trigger step 8 is the release unit, never the direct pa
 intermediate grouping item can read zero while sibling stories elsewhere in the unit are still
 open, and would publish a partially complete unit.
 
+## Why the plan is the safety unit in plan scope
+
+When a plan's epics depend on each other, waiting for each to reach production stalls the plan
+behind one deploy. `Release scope: plan` moves the safety unit up a level: each epic still gets its
+one full review, on its pull request onto the plan branch, and a blocker in a sibling epic counts once
+landed there; nothing reaches the train until the whole plan is complete. The cost: one held epic
+holds the plan — hence opt-in, the owner asked once when the plan branch ages or carries a
+migration, and never a way to hide unfinished features (a stored setting does that).
+
 ## Why the story branch is deleted only after the epic push succeeds
 
 A rejected push of the integration branch means the story's merge exists only locally. Deleting
@@ -126,6 +135,8 @@ take fast mode, exactly as an epic story does.
 ## Cited by
 
 - `skills/build-item/references/epic-release-steps.md` — its opening paragraph, for the reasoning.
+- `skills/build-item/references/plan-scope.md` — its opening paragraph ("Why the plan is the safety
+  unit in plan scope").
 - `skills/build-item/SKILL.md` — the step-8 pointer ("Read … when step 7 reports the release
   unit at zero") and the one-off section's pointer ("Read … before changing the one-off
   classification or its step-0 delta").

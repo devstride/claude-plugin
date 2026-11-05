@@ -897,6 +897,24 @@
       "since": "pre-registry"
     },
     {
+      "key": "planIntegrationBranches",
+      "type": "object",
+      "description": "the plan integration branch a plan marked Release scope: plan releases its epics onto",
+      "since": "unreleased"
+    },
+    {
+      "key": "planIntegrationBranches.pattern",
+      "type": "string",
+      "description": "the plan integration branch name pattern (<prefix>, the date token, <plan-number>, <plan-title-slug>); unset, no plan can release as one unit",
+      "since": "unreleased"
+    },
+    {
+      "key": "planIntegrationBranches.example",
+      "type": "string",
+      "description": "descriptive only: a sample plan integration branch name; nothing reads it",
+      "since": "unreleased"
+    },
+    {
       "key": "defects",
       "type": "object",
       "description": "deferred-work placement",

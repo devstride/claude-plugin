@@ -40,6 +40,7 @@ engine actually registered would have surfaced that in one glance.
 
 ```
 | Profile | standard — from the plan root I20100 |
+| Release scope | plan — from the plan root I20100; held by I20102 until it lands |
 | 4a · Fast review (no PR) | epic branch — cloud gate deferred to step 8 |
 | — Story risk screen | ✅ 2 findings found and fixed |
 | — Configured local review | ✅ 4 findings → 3 fixed, 1 captured |

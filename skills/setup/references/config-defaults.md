@@ -130,6 +130,21 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   `null` → the story keeps its status. An organization with no status of that name keeps the
   story's status too, and the loop says so; the comment and the git history still record it.
 
+### Plan integration branches
+
+```json
+{
+  "planIntegrationBranches": {
+    "pattern": "<prefix>/<MM-DD-YY>/plan-<plan-number>-<plan-title-slug>"
+  }
+}
+```
+
+Absent by default, and setup never writes it unasked. It names the branch a plan whose root carries
+a `Release scope: plan` line releases its epics onto, then releases as one unit into
+`releaseTarget` (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md`). Unset, a plan carrying that line stops with a config gap; without the line
+nothing reads it. Its slug follows `epicIntegrationBranches.slugRule`.
+
 ## Deferred work
 
 ```json
