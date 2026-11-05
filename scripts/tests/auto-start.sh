@@ -178,6 +178,22 @@ flat "$RB" | grep -q 'it pushes the train only under that claim again: one claim
   && ok "(18) 5b levels the train only under a re-won claim; the holder marker is always written with claims and an absent one stops" \
   || bad "(18) the post-hand-on train push, the holder marker, or the absent-marker rule regressed"
 
+# (20) a lapsed successor at 5b: select answers takeover, and the takeover claim then proceeds
+T="$(python3 - "$ROOT/skills/build-item/scripts/story-claim.py" <<'PY3'
+import json, subprocess, sys
+lapsed = {"won": False, "claim": {"kind": "release-train", "key": "acme/widgets", "holderDigest": "bb", "machine": "m2",
+          "sessionName": "next", "claimedAt": "2026-01-15T17:00:00Z", "heartbeatAt": "2026-01-15T17:05:00Z",
+          "expiresAt": "2026-01-15T17:35:00Z", "releasedAt": None, "outcome": None, "final": False}}
+won = {"won": True, "claim": dict(lapsed["claim"], holderDigest="aa", expiresAt="2026-01-15T18:40:00Z")}
+def decide(resp):
+    req = {"mode": "select", "item": "the release train", "response": resp, "me": "aa", "now": "2026-01-15T18:10:00Z", "tz": "America/Chicago"}
+    return json.loads(subprocess.run([sys.executable, sys.argv[1], "decide"], input=json.dumps(req), capture_output=True, text=True).stdout)
+first = decide(lapsed)
+print(first["action"], first.get("takeoverDigest"), decide(won)["action"])
+PY3
+)"
+[ "$T" = "takeover bb proceed" ] && ok "(20) a lapsed successor at 5b: takeover with its digest, then the won takeover proceeds" || bad "(20) decide answered '$T'"
+
 # (19) the decision itself: 5b's re-claim of a train another live session holds is decided in mode
 # select, which skips; mode named would stop while this release still holds the tower
 D="$(python3 - "$ROOT/skills/build-item/scripts/story-claim.py" <<'PY2'
@@ -192,6 +208,7 @@ for mode in ("select", "named"):
 print(" ".join(out))
 PY2
 )"
-[ "$D" = "skip stop" ] && ok "(19) a live holder at 5b: select skips (the contract's mode), named would stop" || bad "(19) decide answered '$D'"
+[ "$D" = "skip stop" ] && flat "$RB" | grep -q '`takeover` (its holder lapsed) → ONE immediate takeover claim with that digest, decided the same way, never a third' \
+  && flat "$ROOT/skills/release/references/auto-start.md" | grep -q 'on the owner.s answer, heartbeat it before anything else; NOT HOLDER or LOST → with the tower held, carry on under the tower' && ok "(19) a live holder at 5b: select skips (the contract's mode), named would stop" || bad "(19) decide answered '$D'"
 
 exit "$FAIL"

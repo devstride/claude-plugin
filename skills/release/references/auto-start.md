@@ -27,7 +27,11 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart` and
 - **Heartbeat** at each step transition and through EVERY wait until the release — review, CI, the
   train's pre-ship suites, the clearance wait — at least every `min(10, expiry ÷ 3)` minutes
   (phase: the step). NOT HOLDER or LOST to a live holder → STOP: another session owns the train
-  phase now.
+  phase now. A wait for a person (step 4's yes) cannot heartbeat, so a claim still held there (no
+  hand-on, below) may lapse: on the owner's answer, heartbeat it before anything else; NOT HOLDER or
+  LOST → with the tower held, carry on under the tower (it protects this release pull request, and
+  the new holder waits at the tower), else STOP before merging (another session may have adopted
+  the pull request).
 - **Release it NON-final**: `release` with outcome `handed-on`, never `done` and never final
   (`final: true`, `--final`), so the next cycle can claim it. It is handed on once 0c has cut the
   release branch while this run holds the tower, so the next train phase runs during the deploy, but
