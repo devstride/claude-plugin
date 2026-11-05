@@ -63,7 +63,9 @@ At a trigger run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/auto-star
 → say it once and carry on. `START …` → claim the train (above, mode `select`): lost → carry on
 silently; won → invoke **`release`** in this session, declaring `started-by: auto`; its step 0b
 finds and adopts any open train pull request itself. When that release stops — at the owner's yes,
-or merged — return to the caller's own loop. Never resume, message or adopt another session's
+or merged — return to the caller's own loop. The caller keeps its checkout lease until then and
+the release runs in that checkout; it is returned only after (a pool member handed back mid-release
+could be leased by another session while the release still uses it). Never resume, message or adopt another session's
 release; the fleet's hourly machine check never starts one. No batching wait: each release carries
 whatever landed during the previous cycle, and there is never a second concurrent release.
 

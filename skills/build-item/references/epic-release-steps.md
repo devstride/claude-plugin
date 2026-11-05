@@ -45,6 +45,7 @@ instruction for a release that fires; a recovery close-out applies only the Merg
   perform, the owner-cut promotion (`/devstride:release`). New findings → 6.5.
 - **Last, after the recap:** merged onto the train with `release.autoStart.enabled` → its trigger
   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`), after docs staged `live: false`.
+  The checkout lease is KEPT through it: `return-checkout` waits until the trigger answers SKIP or ERROR, loses the claim, or the release it starts stops, and that release runs in this same leased checkout.
 
 ## Cited by
 

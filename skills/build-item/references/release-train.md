@@ -86,7 +86,7 @@ request's base.
   when the next release ships it.
 - **Last, after step 7's recap and clean-up:** `release.autoStart.enabled` → its trigger
   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`), so nothing of this item's
-  close-out waits on, or is overtaken by, the release it may start.
+  close-out waits on, or is overtaken by, the release it may start. The checkout lease is KEPT through it: `return-checkout` waits until the trigger answers SKIP or ERROR, loses the claim, or the release it starts stops, and that release runs in this same leased checkout.
 
 ## Why
 

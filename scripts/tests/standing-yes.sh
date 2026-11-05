@@ -152,6 +152,8 @@ base; NO_DEV=1; expect "(9b) the dev-deploy answer omitted → ERROR, never a ME
 cfg '{"release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "devDeployVerification": "verify-dev", "lightRelease": {"standingYes": true}}}'
 base; expect "(9c) not-applicable while devDeployVerification is configured → ASK" 0 '^ASK release.devDeployVerification is configured'
 base; DEV=0; expect "(9d) the configured wait answered 0 → MERGE" 0 '^MERGE '
+cfg '{"release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "devDeployVerification": "", "lightRelease": {"standingYes": true}}}'
+base; expect "(9e) an empty devDeployVerification still counts as configured → ASK" 0 '^ASK release.devDeployVerification is configured'
 cfg '{"baseBranch": "main", "release": {"classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
 base; TOWER_ARG=$'Tower: clear\nOn final: #41 release/26-01-14\nWaiting: #42 release/26-01-15'; expect "(10) another release is on final → ASK" 0 '^ASK pull request #42 is not the one release On final'
 base; TOWER_ARG=$'On final: #421 release/x'; expect "(10b) #421 on final does not match #42 → ASK" 0 '^ASK pull request #42 is not the one release On final'

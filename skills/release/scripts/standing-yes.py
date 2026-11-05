@@ -34,7 +34,8 @@ MERGE needs ALL of, in this order:
      `release.preMergeSkill` is absent or null (HOLD and NOT RUN are the owner's decision);
   7. --previous-release is 0 (the previous-release gate);
   8. --dev-deploy is 0 (the dev-deploy wait, run BEFORE this check); `not-applicable` only when
-     `release.devDeployVerification` is not configured;
+     `release.devDeployVerification` is absent or null (any other value, an empty string included,
+     is configured);
   9. the tower status has exactly one `On final:` line, and it reads `On final: #<pr> <head>` for
      this pull request (digits, then whitespace).
 """
@@ -208,7 +209,7 @@ def main():
     if a.previous_release != 0:
         say("ASK the previous-release gate answered %d, not 0" % a.previous_release)
     dev = a.dev_deploy.strip()
-    configured = isinstance(release, dict) and bool(release.get("devDeployVerification"))
+    configured = isinstance(release, dict) and release.get("devDeployVerification") is not None
     if dev == "not-applicable" and configured:
         say("ASK release.devDeployVerification is configured: run the dev-deploy wait and pass its exit")
     if dev not in ("0", "not-applicable"):

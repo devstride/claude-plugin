@@ -146,8 +146,11 @@ set -- $OUT
 order_ok() { # file, a phrase that must come before the trigger
   awk -v p="$2" 'index($0, p) {seen=NR} /autoStart.enabled/ {t=NR} END {exit !(seen && t && t > seen)}' "$ROOT/skills/build-item/references/$1"
 }
+lease_kept() { awk '/autoStart.enabled/{f=1} f' "$ROOT/skills/build-item/references/$1" | tr '\n' ' ' | tr -s ' ' | grep -q 'checkout lease is KEPT through it: `return-checkout` waits'; }
 order_ok release-train.md "Step 7 terminates" && order_ok epic-release-steps.md "Human recap" \
-  && ok "(16) the train and epic triggers come after the recap in both build-item references" || bad "(16) a trigger precedes its caller's close-out"
+  && lease_kept release-train.md && lease_kept epic-release-steps.md \
+  && grep -q 'The caller keeps its checkout lease until then' "$ROOT/skills/release/references/auto-start.md" \
+  && ok "(16) both triggers come after the recap and keep the checkout lease through the release they start" || bad "(16) a trigger precedes its caller's close-out, or the lease is returned before it"
 
 # (17) one lock order for every run: release step 0 takes the train claim before adopting a release
 # pull request and before 0a's tower claim, and the contract says so for hand and auto starts alike
