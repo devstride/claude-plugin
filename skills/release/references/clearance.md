@@ -147,7 +147,7 @@ nothing on any failure. `gh` still serves pull-request facts.
 
 ## Where the release skill calls it
 
-Only when `release.clearance` is set; scope `cut-to-deploy` changes 0a, 4 and 5a–5b (below). **0a** `claim --wait --purpose release` before anything else,
+Only when `release.clearance` is set; scope `cut-to-deploy` changes 0a, 4 and 5a–5b (below). **0a** `claim --wait --purpose release` before anything else (with a `claims` block, after the `release-train` claim only: `auto-start.md`'s lock order),
 in the background with a long timeout: `0` continue (say who was waiting when stderr said so); `3`
 ask the owner once — adopt `<branch>` / `#<n>`, or keep waiting — and on adopt run `adopt --yes`
 and enter the adopted path (0b skips the train, 0c skips the cut, step 2 reviews the open pull
@@ -179,11 +179,17 @@ the release skill calls it does.
 
 - **0a moves.** 0b (the train) runs uncleared, with no `heartbeat train`. `claim --wait --purpose
   release` runs just before 0c, with the exits handled as above; the first heartbeat is `cut
-  --branch <b>`. Until a one-winner train claim exists, 0b's train pull request body carries
+  --branch <b>`. Step 0 adopts an open release pull request only when `status` shows no live
+  holder (clear, or stale under the adoption rules); a live holder's stays theirs: run 0b, wait at
+  the claim, and re-read step 0's shape once cleared, before cutting — with a `claims` block, also
+  re-level the train by `release-branch.md` §1 step 7's rule under the train claim it still holds,
+  since the release it waited on may have synced fixes into the source and skipped its own leveling. With a `claims` block the
+  `release-train` claim is taken before any of this (`auto-start.md`'s lock order). 0b's train pull request body carries
   `<!-- devstride:release-train-holder <digest> on <machine> -->` (`<digest>`: the first 12 hex
   characters of the SHA-256 of `identity`'s answer; the holder itself is never written). An open
   train pull request whose marker names another holder is never adopted silently: STOP, name it,
-  adopt only on the owner's yes. Its own marker is adopted as before.
+  adopt only on the owner's yes. Its own marker is adopted as before. With a `claims` block the
+  `release-train` claim comes first and decides which markers are adoptable (`auto-start.md`).
 - **Step 4 gates the merge on the previous release.** Before the recap, and again on the yes
   before merging: `${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/previous-release-gate.sh --wait`.
   `0` continue; `2` (still pending after its 45-minute wait) STOP, naming that release and

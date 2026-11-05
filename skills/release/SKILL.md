@@ -10,7 +10,7 @@ description: "Promote the release source branch to production — the release th
 (that merge triggers `release.autoDeployOnMerge`), then, once the deploy is confirmed: the
 post-deploy health check, the documentation update by default, and release notes only when asked.
 With `release.releaseBranchPattern` set, the unit promoted is a protected release branch cut from
-`releaseSource`, not `releaseSource` itself (absent → `releaseSource`, unchanged).
+`releaseSource`, not `releaseSource` itself.
 
 Optional arguments — documentation switches and a scope: $ARGUMENTS
 
@@ -36,15 +36,15 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 - **Hooks run through step skills** (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md`):
   call each by name, read its first-line verdict, decide what follows; never inline its logic.
 - **Steps 0–3 run autonomously**, surfacing only genuine forks (an ambiguous/risky/unverifiable finding, an unresolvable conflict, an infra/secret gate the owner must provision).
-- **The production merge is a human gate.** NEVER merge the release PR into `master` without an
-  explicit, in-the-moment owner go-ahead — it deploys production. Invoking `/devstride:release` is
-  intent to PREPARE, never standing consent to deploy.
+- **The production merge is a human gate**, except a light release identical to its reviewed tree
+  when the owner set the standing yes (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`).
+  Otherwise NEVER merge into `master` without an explicit, in-the-moment owner go-ahead — it deploys
+  production. Invoking `/devstride:release` is never standing consent for anything else.
 - **Docs are on by default and still outward-facing.** With `docs.updateSkill` registered the
   update is pre-authorized, runs only after the deploy is confirmed (5c), and "no docs" suppresses
   it and the knowledge-base sync. **This skill never edits documentation or writes notes**; it
   translates its steps' results, links exact.
-- **Release notes are NEVER written without `--release-notes`.** No size or scope threshold is
-  interpreted on the owner's behalf; if a release seems to deserve one, say so in step 4's recap.
+- **Release notes are NEVER written without `--release-notes`** (`docs-hooks.md`).
 - **CI last, once.** The release PR is a draft whenever PR workflows exist; review and the
   release-gating pre-ship checks settle first; `review`'s ready-flip releases CI once on the final
   reviewed head.
@@ -60,7 +60,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`, never by substring.
 - **Clearance first, handed back at 5b** when `release.clearance` is set (contract and commands:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`): step 0a claims it before
-  anything else; `heartbeat <phase>` opens each phase BEFORE its first mutation (phases:
+  all but the train claim; `heartbeat <phase>` opens each phase BEFORE its first mutation (phases:
   `clearance.md`) — exit 4 is a STOP, another session owns this release now — and the
   provider's `release` ends 5b, before docs. Never proceed uncleared; a hotfix never claims.
   Scope `cut-to-deploy` moves 0a, 4 and 5a–5b: `clearance.md`.
@@ -69,6 +69,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 
 ## 0. Preconditions and the release delta
 
+- **`claims` set → the train claim first** (`auto-start.md`).
 - **Confirm the shape**: `releaseSource` (**develop**) → `productionBranch` (**master**), whatever
   branch the checkout is on. An open PR into `productionBranch` headed by a release branch (with
   `release.releaseBranchPattern` absent: headed by `releaseSource`) is ADOPTED, never duplicated —
@@ -94,7 +95,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 - `git fetch origin master develop`; `origin/develop` not ahead of `origin/master` → STOP, nothing to
   release.
 - **No freeze.** Open PRs into `releaseSource` are never settled, parked or waited for; a leftover
-  freeze switch under `ci` is ignored whatever its value (say so). A later merge ships in the next
+  freeze switch under `ci` is ignored (say so). A later merge ships in the next
   release (release branch), or advances this PR's head and step 2 re-reviews.
 - **Record `<sourceHead>`** — the SHA the delta is computed from: an adopted release branch's cut
   point, else the `origin/<releaseSource>` tip (where 0c cuts). Every later integrity check compares
@@ -116,7 +117,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   `--draft` and report `no pull-request CI`. Never `--fill`. Leave cloud requests to `review` (it
   captures each baseline/request hand-off while local review starts); `review` step 7 flips it
   ready. `preShipChecks` run in 2b (`runAt: train`: 4b), never CI.
-- **Release-flavored body** — `prBodyTemplate.sections` in order (the file wins over the fallback),
+- **Release-flavored body** — `prBodyTemplate.sections` in order,
   flavor by POSITION: 1st (fallback `## Simple Description`) — what consumers get in this deploy, in
   plain language, then the constituent epics/items (`I##### — title`); 2nd (`## Technical
   Description`) — the aggregate technical delta (subsystems, design changes, migrations); 3rd (`##
@@ -124,8 +125,8 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   permission and migration changes across the release (the docs pass mines it; "None" only if truly
   none); 4th (`## Testing Steps`) — how the release was validated and any post-deploy smoke. AI
   attribution only when `prBodyTemplate.noAiAttribution` is false (shipped default true → none). End
-  with `<!-- devstride:loop -->`, as `pr` does — it identifies a loop-managed PR to the
-  convention-only workflow and never authorizes bypassing the draft hold — and, on a release branch,
+  with `<!-- devstride:loop -->`, as `pr` does (the convention-only workflow's marker, never a
+  bypass of the draft hold) and, on a release branch,
   a second marker line `<!-- devstride:release-branch <name> cut <sha> -->` (the cut point, read
   back on adoption).
 - **Never `--delete-branch`** a PR headed by `develop` or a `protectedBranches` match. Report the
@@ -151,8 +152,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   PR/item, and seed prior dispositions so production does not rediscover settled findings. Local
   Claude and a context-capable CLI review that surface; cloud reviewers may cover the whole PR.
   **Enforce the release-surface scope with that manifest**, not narrative alone; never blindly
-  re-read approved code (why: `release-gates.md`). Pre-ship checks stay non-negotiable whatever the
-  scope. Consume its findings summary and untracked-deferral list before step 4.
+  re-read approved code (why: `release-gates.md`). Pre-ship checks stay non-negotiable. Consume its findings summary and untracked-deferral list before step 4.
 - **Declare a PRE-SHIP HOLD in that same invocation whenever any `preShipChecks` entry has `when`
   ∈ {`releaseOnly`, `always`}** (`pre-ship release select` prints `PRE-SHIP SELECTED`): `review`
   settles, STOPS at its **7.1b** and hands back; run 2b, then discharge at 2c. The release head is
@@ -219,20 +219,21 @@ the deploy.
   delta and 2b's release class, the pre-merge verdict, **each 2b result (or its waiver)**, the
   documentation plan (the steps 5c will call / "none registered" / "suppressed"), the release-notes
   decision (default "not requested — none will be
-  written"), and what merging triggers, quoted from `release.autoDeployOnMerge`. **Then ASK; never
-  proceed without the yes.**
-  - **Name the deploy stage** when the repo has one: run `stage.resolve` and quote "this merge
-    deploys to `<stage>`" beside `autoDeployOnMerge`. No `stage` block or an empty result → say
-    nothing; never guess one, never substitute `localEnvironment.instanceName`.
-  - Never let the owner infer CI covered a pre-ship suite; report each entry as passed at the
-    train on <sha>, passed at step 2b, skipped by path, or waived.
+  written"), and what merging triggers, quoted from `release.autoDeployOnMerge`. **Then ASK** (standing
+  yes: `auto-start.md`); **never proceed without a yes.**
+  - **Name the deploy stage**: `stage.resolve` set → quote "this merge deploys to `<stage>`" beside
+    `autoDeployOnMerge`; no `stage` block or empty result → nothing, never a guess (nor
+    `localEnvironment.instanceName`).
+  - Report each pre-ship entry as passed at the train on <sha>, at 2b, skipped by path, or waived,
+    never "covered by CI".
 - **On a release branch, before merging**: a hotfix that reached `productionBranch` meanwhile →
   `release-branch.md` §4, then back to step 2. With clearance, append the provider's `status`
   to the recap: a `Hotfix landed` line goes to §4 first; a `Waiting` line names who is next; and
   on the yes this pull request must be the one `On final`, else STOP.
 - **Scope `cut-to-deploy`**: run the previous-release gate first and on the yes (`clearance.md`).
 - **Dev deploy wait** (`release.devDeployVerification` set, delta touching a fix-exclusion path):
-  named in the recap; after the yes, before the checks below, run per `docs-hooks.md`.
+  named in the recap; after the yes (a standing yes: before it), before the checks below, per
+  `docs-hooks.md`.
 - **On the yes**, confirm: the head equals `<reviewedHead>` (the only tolerated advance is `review`
   7.3's same-tree empty re-trigger commit; anything else → back to step 2); CI is green at that
   head; in a draft-hold repo the PR is non-draft (still draft means CI never ran — do NOT merge; a
@@ -311,4 +312,4 @@ never decides a release deserves one. Otherwise call **`write-release-notes`**
   early), anything still `owed`, and any owner action left (a docs draft awaiting a look, a PR to
   merge).
 - Update any project memory tracking release/plan state: epics that reached production, the date,
-  docs/release-note status.
+  docs/release-note status. Then `release.autoStart.enabled` → its trigger (`auto-start.md`).

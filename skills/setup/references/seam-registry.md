@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.28.0.
+`.claude/ds-config.json` against. Schema version: 3.29.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -175,6 +175,10 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.migrationRenumber.metaGlobs` | string[] | — | — | migration metadata files a renumber may change | 3.22.0 |
 | `release.syncWorkflow` | string | — | — | the workflow syncing production into the source | pre-registry |
 | `release.mergeTrainBeforeCut` | boolean | — | `false` | merge the release train into the source before each cut | pre-registry |
+| `release.autoStart` | object | — | — | releases that start themselves under a one-winner release-train claim; contract: skills/release/references/auto-start.md | 3.29.0 |
+| `release.autoStart.enabled` | boolean | — | `false` | a train landing or a finished release starts the next release; needs a claims block | 3.29.0 |
+| `release.lightRelease` | object | — | — | rules for a light release (one the classify skill calls LIGHT) | 3.29.0 |
+| `release.lightRelease.standingYes` | boolean | — | `false` | the owner's standing yes: a light release identical to its reviewed train merges and deploys without an in-the-moment yes; contract: skills/release/references/auto-start.md | 3.29.0 |
 | `release.productionReview` | object | — | — | review-once economy for the production pull request | pre-registry |
 | `release.productionReview.reviewIdenticalTree` | boolean | — | — | false skips re-reviewing a tree already reviewed | pre-registry |
 | `release.productionReview.highRiskPaths` | string[] | — | — | paths that still get one pass | pre-registry |
@@ -194,7 +198,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.clearance.commands.adopt` | string | — | — | **Required.** the adopt command | pre-registry |
 | `release.clearance.commands.owed` | string | — | — | the optional owed command | pre-registry |
 | `claims.provider` | string | devstride | — | **Required.** the built-in provider: the agent's own DevStride MCP connection | 3.21.0 |
-| `claims.expiryMinutes` | object | each value integer, 1..1440, else warned and the default stands | — | kind to minutes a claim lives without a heartbeat; an unset story takes 240, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here | 3.21.0 |
+| `claims.expiryMinutes` | object | each value integer, 1..1440, else warned and the default stands | — | kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here | 3.21.0 |
 | `claims.commands` | object | — | — | **Required.** a claims store the repository supplies | 3.21.0 |
 | `claims.commands.claim` | string | — | — | **Required.** the claim command | 3.21.0 |
 | `claims.commands.heartbeat` | string | — | — | **Required.** the heartbeat command | 3.21.0 |

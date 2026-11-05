@@ -270,4 +270,21 @@ expect "(50) a provider clearance with scope release is clean" 0 "$CLEAN"
 cfg '{"release": {"clearance": {"provider": "github", "scope": "deploy-only"}}}'
 expect "(51) any other scope is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR release.clearance.scope: "deploy-only" is not one of "release", "cut-to-deploy"$'
 
+# (52)-(56) release.autoStart needs a claims block; the standing yes without a classify skill is a WARN
+cfg '{"claims": {"provider": "devstride", "expiryMinutes": {"release-train": 30}}, "release": {"autoStart": {"enabled": true}, "classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
+expect "(52) autoStart with claims and the standing yes with a classify skill and clearance is clean" 0 "$CLEAN"
+cfg '{"release": {"autoStart": {"enabled": true}}}'
+expect "(53) autoStart enabled without claims is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR release.autoStart.enabled: needs a \`claims\` block"
+cfg '{"claims": null, "release": {"autoStart": {"enabled": true}}}'
+expect "(54) autoStart enabled with a null claims block is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR release.autoStart.enabled: needs a \`claims\` block"
+cfg '{"release": {"autoStart": {"enabled": false}, "lightRelease": {"standingYes": false}}}'
+expect "(55) both switches off is clean" 0 "$CLEAN"
+cfg '{"release": {"clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'
+expect "(56) the standing yes without release.classifySkill is a WARN, exit 0" 0 "^CONFIG: 0 error(s), 1 warning(s)" \
+  "^WARN release.lightRelease.standingYes: has no effect without \`release.classifySkill\`"
+
+cfg '{"release": {"classifySkill": "classify", "lightRelease": {"standingYes": true}}}'
+expect "(57) the standing yes without release.clearance is a WARN, exit 0" 0 "^CONFIG: 0 error(s), 1 warning(s)" \
+  "^WARN release.lightRelease.standingYes: has no effect without \`release.clearance\`"
+
 exit "$FAIL"

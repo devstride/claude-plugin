@@ -34,7 +34,7 @@ cites it rather than restating it.
 | `docs.releaseNotesSkill` | Name of the local skill that writes and publishes a release note. `null` or absent: release notes cannot be requested; `--release-notes` on `release` reports itself unavailable rather than improvising. |
 | `docs.updateOnEpicRelease` | `false` by default. `true` makes `build-item` step 8 invoke `docs.updateSkill` after a release-unit (epic) release pull request merges, so documentation moves with each release unit rather than only at the production cut. |
 | `release.deployApproval` | Optional command approving a waiting deploy after the merge, on the owner's yes (`RELEASE_COMMIT`): 0 = approved and read back, 2 = not waiting yet, else STOP. |
-| `release.devDeployVerification` | Optional shell command, given `RELEASE_COMMIT` (the head the release pull request merges from the source: the cut `<sourceHead>` with a release branch, else `<reviewedHead>`): exit 0 the development environment serves it, 2 not deployed yet, 1 the development deploy failed. `release` runs it at step 4, after the owner's yes and before the production merge, only when the release delta touches a `release.releaseBranchFixExclusions` path. Poll every 60 s on exit 2 for at most 45 minutes, then STOP; on exit 1 STOP and never merge production over a failed development deploy. The run recap names the wait. Unset: no wait. |
+| `release.devDeployVerification` | Optional shell command, given `RELEASE_COMMIT` (the head the release pull request merges from the source: the cut `<sourceHead>` with a release branch, else `<reviewedHead>`): exit 0 the development environment serves it, 2 not deployed yet, 1 the development deploy failed. `release` runs it at step 4, after the owner's yes and before the production merge, only when the release delta touches a `release.releaseBranchFixExclusions` path; for a standing yes, before that decision and whatever the delta (`auto-start.md`). Poll every 60 s on exit 2 for at most 45 minutes, then STOP; on exit 1 STOP and never merge production over a failed development deploy. The run recap names the wait. Unset: no wait. |
 | `release.deployVerification` | Optional shell command that exits 0 only when production is actually serving the merge commit, given as the `RELEASE_COMMIT` environment variable. `release` runs it to prove the deploy is live before release notes are written. `null`: the owner confirms the deploy by hand instead. |
 
 `release.docsRepo` is the pre-1.0 shape — a sibling docs checkout the plugin operated on directly.
@@ -50,7 +50,8 @@ none).
   production merge is confirmed and the deploy verified, never before. The owner suppresses it per
   run with `no docs`.
 - **Release notes are written only when the owner asks** — `--release-notes true|draft` on
-  `release`, per invocation — and only after the production deploy is confirmed live.
+  `release`, per invocation — and only after the production deploy is confirmed live. If a release
+  seems to deserve one, say so in step 4's recap.
 - **No skill in this plugin decides on its own that a delta "warrants" a note, is "large", or is
   "user-facing enough".** Those are the owner's words to say, never adjectives for the loop to
   interpret: a loop that judges a release note-worthy will eventually publish one the owner did
