@@ -169,11 +169,29 @@ T="$(line_of "$SK" 'the train claim first**')"; S="$(line_of "$SK" '**Confirm th
 # pull request opened with a claims block carries the holder marker, and an absent one is never
 # adopted silently
 RB="$ROOT/skills/release/references/release-branch.md"; AS="$ROOT/skills/release/references/auto-start.md"
-flat "$RB" | grep -q 'it pushes the train only under that claim again: claim it (no wait); won → level, then release it `handed-on`; held by a live session → SKIP the leveling' \
+flat "$RB" | grep -q 'it pushes the train only under that claim again: one claim, no wait, decided in mode `select` however the release started' \
+  && flat "$RB" | grep -q 'held by a live session → SKIP the leveling' \
+  && flat "$ROOT/skills/release/references/clearance.md" | grep -q 'also re-level the train by `release-branch.md` §1 step 7' \
   && flat "$RB" | grep -q '(scope `cut-to-deploy` or a `claims` block: and the holder marker)' \
   && flat "$AS" | grep -q 'an ABSENT marker is ambiguous' \
   && ! flat "$AS" | grep -q "this session's, absent, or names" \
   && ok "(18) 5b levels the train only under a re-won claim; the holder marker is always written with claims and an absent one stops" \
   || bad "(18) the post-hand-on train push, the holder marker, or the absent-marker rule regressed"
+
+# (19) the decision itself: 5b's re-claim of a train another live session holds is decided in mode
+# select, which skips; mode named would stop while this release still holds the tower
+D="$(python3 - "$ROOT/skills/build-item/scripts/story-claim.py" <<'PY2'
+import json, subprocess, sys
+held = {"won": False, "claim": {"kind": "release-train", "key": "acme/widgets", "holderDigest": "bb", "machine": "m2",
+        "sessionName": "next", "claimedAt": "2026-01-15T18:00:00Z", "heartbeatAt": "2026-01-15T18:09:00Z",
+        "expiresAt": "2026-01-15T18:39:00Z", "releasedAt": None, "outcome": None, "final": False}}
+out = []
+for mode in ("select", "named"):
+    req = {"mode": mode, "item": "the release train", "response": held, "me": "aa", "now": "2026-01-15T18:10:00Z", "tz": "America/Chicago"}
+    out.append(json.loads(subprocess.run([sys.executable, sys.argv[1], "decide"], input=json.dumps(req), capture_output=True, text=True).stdout)["action"])
+print(" ".join(out))
+PY2
+)"
+[ "$D" = "skip stop" ] && ok "(19) a live holder at 5b: select skips (the contract's mode), named would stop" || bad "(19) decide answered '$D'"
 
 exit "$FAIL"

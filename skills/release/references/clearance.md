@@ -181,7 +181,9 @@ the release skill calls it does.
   release` runs just before 0c, with the exits handled as above; the first heartbeat is `cut
   --branch <b>`. Step 0 adopts an open release pull request only when `status` shows no live
   holder (clear, or stale under the adoption rules); a live holder's stays theirs: run 0b, wait at
-  the claim, and re-read step 0's shape once cleared, before cutting. With a `claims` block the
+  the claim, and re-read step 0's shape once cleared, before cutting — with a `claims` block, also
+  re-level the train by `release-branch.md` §1 step 7's rule under the train claim it still holds,
+  since the release it waited on may have synced fixes into the source and skipped its own leveling. With a `claims` block the
   `release-train` claim is taken before any of this (`auto-start.md`'s lock order). 0b's train pull request body carries
   `<!-- devstride:release-train-holder <digest> on <machine> -->` (`<digest>`: the first 12 hex
   characters of the SHA-256 of `identity`'s answer; the holder itself is never written). An open

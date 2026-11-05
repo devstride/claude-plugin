@@ -242,9 +242,11 @@ hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
    (fast-forward when it is an ancestor of the source, else merge the source into it), so the
    release's own fixes reach it too; report how many unreleased one-offs it carries. With a
    `claims` block and the train claim already handed on, it pushes the train only under that claim
-   again: claim it (no wait); won → level, then release it `handed-on`; held by a live session →
-   SKIP the leveling, said so (that holder's own step 7 levels the train from a source that already
-   holds this release), never a push beside it.
+   again: one claim, no wait, decided in mode `select` however the release started (the one
+   exception to `auto-start.md`'s train-then-tower order, safe because it never waits); won →
+   level, then release it `handed-on`; held by a live session → SKIP the leveling, said so (that
+   holder re-levels once it holds the tower, `clearance.md`); `degrade` → STOP. Never a push beside
+   a live holder.
 4. **Hand clearance back** (`release.clearance` set): the provider's `release --owed <item>` for
    each later step still to run (`post-deploy-check` under scope `cut-to-deploy`, then `docs`,
    `close-out`, `release-notes` — only those that will run),
