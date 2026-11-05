@@ -19,6 +19,9 @@ Every subcommand reads one JSON object on stdin and writes one JSON object on st
                 "explicit"?, "changedFiles"?, "oneOff"?, "roles"?, "epicSlug"?}
                -> {"kind": explicit|integration|epic|train|base|ask|refuse, "branch"?, "create"?,
                    "candidates"?, "reason"}
+  release-target {"config", "chain":[{…, "releaseScope"?}…], "heads", "prefix", "date", "roles"?, "planSlug"?}
+               -> {"kind": plan|train|base|ask|refuse, "branch"?, "create"?, "from"?, "candidates"?, "reason"}
+  epic-base    the same request -> {"kind": plan|base|ask|refuse, "branch"?, "candidates"?, "reason"}
 
 `target` precedence: the item must be a leaf type (else refuse) → an explicit branch (refused when
 it is the production branch or the release source, matches `protectedBranches` or
@@ -35,6 +38,20 @@ release-unit ancestor is a one-off. `roles` ({"leaf":[…], "releaseUnit"}) carr
 from the organization's work-type hierarchy and is used only when the config has no
 `hierarchyRoles`; neither → an error, never a guess. `epicSlug` is the epic's title slug under the
 repository's `epicIntegrationBranches.slugRule`; absent, the title is kebab-cased to six words.
+
+`release-target` says where a release unit's release pull request goes, and `epic-base` what a NEW
+integration branch for it is cut from. `chain` runs from the item (a leaf or the release unit) up to
+the root; an entry's `releaseScope` is the text after `Release scope:` in that item's description,
+absent when the description has no such line (read the description in full — a summary omits it).
+The NEAREST marker above the release unit decides, case-insensitively: `plan` makes that ancestor the
+plan root, `epic` (or no marker anywhere) is the default, anything else is refused. Default: the
+release goes to `epicIntegrationBranches.releaseTarget` (`baseBranch`, the default, is the base
+branch; the release train is created off it when missing) and new integration branches are cut from
+the base branch. Plan scope: the release goes to the plan's integration branch
+(`planIntegrationBranches.pattern`, found and named as an epic's is; `planSlug` is the plan root's
+title slug, absent the title is kebab-cased to six words), created off `from` — the default release
+target, which is also where the whole plan is released — and a new integration branch is cut from the
+plan branch once it exists, else from the base branch.
 
 `small` says whether a one-off on the release train is a SMALL fix (`references/release-train.md`):
 `numstat` is the text of `git diff --numstat -z --no-renames origin/<train>...HEAD` (NUL-separated,
@@ -192,6 +209,18 @@ def epic_branch_candidates(config, epic_number, epic_slug, heads):
     return pattern, found, older
 
 
+def plan_branch_candidates(config, plan_number, plan_slug, heads):
+    """The plan's integration branches on origin, found exactly as `epic_branch_candidates` finds an
+    epic's: by the configured pattern (keyed on the plan number, or on `plan_slug()` when the
+    pattern has none), and any other head whose LAST path segment starts `plan-<plan-number>-`."""
+    pattern = need(section(config, "planIntegrationBranches").get("pattern"), "planIntegrationBranches.pattern")
+    key = {"plan-number": plan_number} if "<plan-number>" in pattern else {"plan-title-slug": plan_slug()}
+    current = template_regex(pattern, key)
+    found = [h for h in heads if current.match(h)]
+    older = [h for h in heads if h not in found and h.rsplit("/", 1)[-1].startswith("plan-" + plan_number + "-")]
+    return pattern, found, older
+
+
 def positive(value, what):
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         fail("config: %s must be a positive whole number" % what)
@@ -333,9 +362,117 @@ def cmd_target(req):
     return {"kind": "base", "branch": base, "create": False, "reason": reason}
 
 
+def scope_request(req, command):
+    """What `release-target` and `epic-base` share: the checked request, the release unit the item
+    belongs to, and the nearest `Release scope:` marker ABOVE it. Returns (facts, None) or
+    (None, a refusal)."""
+    config = req.get("config")
+    if not isinstance(config, dict):
+        fail("%s: config must be an object" % command)
+    chain, heads = req.get("chain"), req.get("heads") or []
+    if not isinstance(chain, list) or not chain or not all(isinstance(n, dict) for n in chain):
+        fail("%s: chain must be a non-empty list of {number, title, workType, releaseScope?} objects" % command)
+    if not isinstance(heads, list) or not all(isinstance(h, str) for h in heads):
+        fail("%s: heads must be a list of branch names" % command)
+    for n in chain:
+        if n.get("releaseScope") is not None and not isinstance(n["releaseScope"], str):
+            fail("%s: chain[].releaseScope must be the marker's text" % command)
+    base = need(config.get("baseBranch"), "baseBranch")
+    roles = section(config, "hierarchyRoles") or (req.get("roles") if isinstance(req.get("roles"), dict) else {})
+    unit = roles.get("releaseUnit")
+    if not isinstance(unit, str) or not unit:
+        fail("%s: no hierarchyRoles in config — pass roles {leaf, releaseUnit} resolved from the work-type hierarchy" % command)
+    at = next((i for i, n in enumerate(chain) if n.get("workType") == unit), None)
+    if at is None:
+        return None, {"kind": "refuse", "reason": "%s has no %s above it, and only a %s is released" % (
+            chain[0].get("number"), unit, unit)}
+    marked = next((n for n in chain[at + 1:] if n.get("releaseScope") is not None), None)
+    value = marked["releaseScope"].strip().lower() if marked else "epic"
+    if value not in ("plan", "epic"):
+        return None, {"kind": "refuse", "reason": "%s says \"Release scope: %s\" — the value is plan or epic" % (
+            marked.get("number"), marked["releaseScope"].strip())}
+    facts = {"config": config, "heads": heads, "base": base, "unit": unit, "epic": chain[at],
+             "root": marked if value == "plan" else None}
+    if facts["root"] and section(config, "epicIntegrationBranches").get("enabled") is not True:
+        return None, {"kind": "refuse", "reason": "%s releases as a plan, which needs %s integration branches, "
+                      "and they are off" % (marked.get("number"), unit)}
+    return facts, None
+
+
+def epic_release_target(facts):
+    """Where an epic's release goes without plan scope: `epicIntegrationBranches.releaseTarget`
+    (`baseBranch`, the default, means the base branch itself)."""
+    config, base = facts["config"], facts["base"]
+    named = section(config, "epicIntegrationBranches").get("releaseTarget")
+    branch = base if named in (None, "baseBranch") else named
+    train = train_section(config).get("branch")
+    if train and branch == train:
+        return {"kind": "train", "branch": train, "create": train not in facts["heads"], "from": base,
+                "reason": "epicIntegrationBranches.releaseTarget is the release train"}
+    if branch == base:
+        return {"kind": "base", "branch": base, "create": False, "from": base, "reason": "the base branch"}
+    return {"kind": "refuse", "reason": "epicIntegrationBranches.releaseTarget names %s, which is neither "
+            "the base branch nor the release train" % branch}
+
+
+def plan_branch(facts, req):
+    root = facts["root"]
+    number = need(root.get("number"), "chain[].number")
+    plan_slug = req.get("planSlug")
+    if plan_slug is not None and (not isinstance(plan_slug, str) or not plan_slug):
+        fail("planSlug must be a non-empty string")
+    slug = lambda: plan_slug or slugify(root.get("title", ""))
+    pattern, found, older = plan_branch_candidates(facts["config"], number, slug, facts["heads"])
+    if len(found) == 1:
+        return {"branch": found[0], "create": False}
+    if found:
+        return {"kind": "ask", "candidates": sorted(found), "reason": "plan %s has several integration branches" % number}
+    if older:
+        return {"kind": "ask", "candidates": sorted(older),
+                "reason": "plan %s already has an integration branch in another naming" % number}
+    values = {"prefix": need(req.get("prefix"), "prefix"), "plan-number": number}
+    if "<plan-title-slug>" in pattern:
+        values["plan-title-slug"] = slug()
+    token = date_token(pattern)
+    if token:
+        values[token] = need(req.get("date"), "date")
+    return {"branch": fill(pattern, values), "create": True}
+
+
+def cmd_release_target(req):
+    facts, refusal = scope_request(req, "release-target")
+    if refusal:
+        return refusal
+    target = epic_release_target(facts)
+    if not facts["root"] or target["kind"] == "refuse":
+        return target
+    found = plan_branch(facts, req)
+    if "kind" in found:
+        return found
+    # The plan branch is cut from, and the whole plan is released to, where the epic would have gone.
+    return {"kind": "plan", "branch": found["branch"], "create": found["create"], "from": target["branch"],
+            "reason": "plan %s releases as one unit (Release scope: plan)" % facts["root"].get("number")}
+
+
+def cmd_epic_base(req):
+    facts, refusal = scope_request(req, "epic-base")
+    if refusal:
+        return refusal
+    if facts["root"]:
+        found = plan_branch(facts, req)
+        if "kind" in found:
+            return found
+        if not found["create"]:
+            return {"kind": "plan", "branch": found["branch"],
+                    "reason": "plan %s's integration branch" % facts["root"].get("number")}
+        return {"kind": "base", "branch": facts["base"],
+                "reason": "plan %s has no integration branch yet" % facts["root"].get("number")}
+    return {"kind": "base", "branch": facts["base"], "reason": "the base branch"}
+
+
 def main():
     if len(sys.argv) != 2:
-        fail("usage: routing.py match|prefix|slug|branch-name|excluded|target|small < request.json")
+        fail("usage: routing.py match|prefix|slug|branch-name|excluded|target|release-target|epic-base|small < request.json")
     try:
         req = json.load(sys.stdin)
     except ValueError as error:
@@ -366,6 +503,10 @@ def main():
         out = {"excluded": [f for f in files if first_match(f, exclusions)]}
     elif command == "target":
         out = cmd_target(req)
+    elif command == "release-target":
+        out = cmd_release_target(req)
+    elif command == "epic-base":
+        out = cmd_epic_base(req)
     elif command == "small":
         out = cmd_small(req)
     else:

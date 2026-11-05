@@ -52,16 +52,22 @@ for c in fixtures["target"]:
     req.update({k: v for k, v in c.items() if k not in ("name", "config", "expect", "error")})
     req["config"] = merge(config, c.get("config", {}))
     check("target: " + c["name"], "target", req, c.get("expect"), c.get("error", False))
+for array, command in (("releaseTarget", "release-target"), ("epicBase", "epic-base")):
+    for c in fixtures[array]:
+        req = dict(fixtures["targetDefaults"])
+        req.update({k: v for k, v in c.items() if k not in ("name", "config", "expect", "error", "inputValidation")})
+        req["config"] = merge(config, c.get("config", {}))
+        check(command + ": " + c["name"], command, req, c.get("expect"), c.get("error", False))
 PY
 )"; RC=$?
 printf '%s\n' "$OUT" | sed 's/^/  /'
 if [ $RC -ne 0 ] || printf '%s\n' "$OUT" | grep -q '^FAIL'; then FAIL=1; fi
 N="$(printf '%s\n' "$OUT" | grep -c '^ok')"
-WANT="$(python3 -c 'import json,sys; f=json.load(open(sys.argv[1])); print(sum(len(f[k]) for k in ("match","prefix","slug","branchName","excluded","target")))' "$FIX")"
+WANT="$(python3 -c 'import json,sys; f=json.load(open(sys.argv[1])); print(sum(len(f[k]) for k in ("match","prefix","slug","branchName","excluded","target","releaseTarget","epicBase")))' "$FIX")"
 [ "$N" = "$WANT" ] && [ "$N" -ge 50 ] && ok "(all $N fixture cases passed)" || bad "$N of $WANT fixture cases passed"
 
 # the refusal contract
-for args in "target|{\"config\":{\"baseBranch\":\"develop\",\"hierarchyRoles\":{\"leaf\":[\"Story\"],\"releaseUnit\":\"Epic\"}},\"chain\":[{\"number\":\"I1\",\"workType\":\"Story\"}],\"heads\":[null]}" "slug|{\"title\":5}" "match|{\"name\":\"a\",\"patterns\":\"a\"}" "target|not json" "nope|{}" "target|[]" "target|{\"config\":{\"baseBranch\":\"develop\"},\"chain\":[]}" "match|{\"name\":\"a\",\"patterns\":[\"\"]}"; do
+for args in "target|{\"config\":{\"baseBranch\":\"develop\",\"hierarchyRoles\":{\"leaf\":[\"Story\"],\"releaseUnit\":\"Epic\"}},\"chain\":[{\"number\":\"I1\",\"workType\":\"Story\"}],\"heads\":[null]}" "slug|{\"title\":5}" "match|{\"name\":\"a\",\"patterns\":\"a\"}" "target|not json" "nope|{}" "target|[]" "target|{\"config\":{\"baseBranch\":\"develop\"},\"chain\":[]}" "match|{\"name\":\"a\",\"patterns\":[\"\"]}" "release-target|{\"config\":{\"baseBranch\":\"develop\"},\"chain\":[]}" "epic-base|{\"config\":[]}"; do
   CMD="${args%%|*}"; IN="${args#*|}"
   ERR="$(printf '%s' "$IN" | python3 "$HELPER" "$CMD" 2>&1 >/dev/null)"; RC=$?
   if [ $RC -eq 2 ] && printf '%s' "$ERR" | grep -q '^routing: ' && ! printf '%s' "$ERR" | grep -q Traceback; then
