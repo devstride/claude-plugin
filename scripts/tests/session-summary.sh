@@ -47,6 +47,10 @@ secrets = {
     "quoted json key": '{"api_key":"hunter2"}',
     "quoted authorization": '{"Authorization":"ApiKey hunter2"}',
     "digest with short quoted values": 'Authorization: Digest username="alice", nonce="hunter2"',
+    "comma-separated assignment": "api_keys=hunter2,hunter2b",
+    "escaped json in an error": 'payload="{\\"password\\":\\"hunter2\\"}"',
+    "indexed authorization": 'headers["Authorization"] = "ApiKey supersecretcredentialvalue"',
+    "indexed secret": "config['api_key'] = 'hunter2'",
 }
 for name, text in secrets.items():
     rc, o = run({"intent": "note: " + text + " end"})
