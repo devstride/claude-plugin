@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.30.0.
+`.claude/ds-config.json` against. Schema version: 3.31.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -27,7 +27,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.deployVerification` | command | string or null | — | RELEASE_COMMIT in the environment | exit 0 only when production serves RELEASE_COMMIT | release 5a, doctor 7 | the owner confirms the deploy by hand | `skills/release/references/docs-hooks.md` | pre-registry |
 | `release.devDeployVerification` | command | string or null | — | RELEASE_COMMIT in the environment (the head the release merges from the source) | exit 0 deployed to the development environment; 2 not deployed yet; 1 the development deploy failed | release 4 | the release does not wait for a development deploy | `skills/release/SKILL.md` | 3.22.0 |
 | `release.clearance` | provider-or-commands | object or null | claim, status, heartbeat, release, adopt, owed | each verb's own arguments appended (--wait, --short, <phase> --branch <b> --pr <n>, --force, --yes) | the verdict is stdout's first line; exit codes 0-5 per the provider contract | release 0, release 5b, branch-hotfix rules, doctor 7 | no clearance: release runs as before and nothing is claimed | `skills/release/references/clearance.md` | pre-registry |
-| `sessionSummary` | provider-or-commands | object or null | write | one scrubbed agent session summary as JSON on stdin (itemNumber, sessionId, agent, startedAt, then the optional fields the loop knows) | stdout's first line (WROTE, ABSENT, FORBIDDEN, UNREACHABLE, ERROR); exit 0 wrote, 1 anything else; a failure never stops delivery | build-item 0, build-item 6 | no summary: build-item writes nothing and says nothing | `skills/build-item/references/session-summary.md` | unreleased |
+| `sessionSummary` | provider-or-commands | object or null | write | one scrubbed agent session summary as JSON on stdin (itemNumber, sessionId, agent, startedAt, then the optional fields the loop knows) | stdout's first line (WROTE, ABSENT, FORBIDDEN, UNREACHABLE, ERROR); exit 0 wrote, 1 anything else; a failure never stops delivery | build-item 0, build-item 6 | no summary: build-item writes nothing and says nothing | `skills/build-item/references/session-summary.md` | 3.31.0 |
 | `claims` | provider-or-commands | object or null | claim, heartbeat, release, get, list | <kind> <key>, then the verb's options (claim: --purpose, --phase, --expiry, --takeover; heartbeat: --phase; release: --outcome; list: --kind); the holder in CLAIM_HOLDER, never on argv | stdout's first line (WON, LOST, OK, NOT HOLDER, ABSENT, FORBIDDEN, UNREACHABLE, ERROR), then the claim JSON; exit 0 won or ok, 2 lost, 4 not the holder, 1 anything else | build-item 0, build-item 6, doctor 7 | no claims: build-item selects and builds exactly as before and claims nothing | `skills/build-item/references/story-claims.md` | 3.21.0 |
 | `activeAgents.commands.start` | command | **Required.** string | — | <root>, the plan root's item number (only ^[IF][0-9]+$ is ever substituted); ACTIVE_AGENTS_ROOT, ACTIVE_AGENTS_TAG and ACTIVE_AGENTS_STALE_MINUTES exported | exit 0 marked the session active on that root; any other exit, or more than 10 seconds, is one FAILED line and the loop goes on | build-item 0 | the whole activeAgents block is absent: nothing is placed and nothing runs | `skills/build-item/references/active-agents.md` | 3.25.0 |
 | `activeAgents.commands.end` | command | **Required.** string | — | <root> optional; the same environment as start | exit 0 cleared the session's presence; any other exit is one FAILED line, never a stop | build-item 0, build-item 7 | the whole activeAgents block is absent: nothing runs | `skills/build-item/references/active-agents.md` | 3.25.0 |
@@ -215,9 +215,9 @@ starting with `_` and `$schema` are never reported as unknown.
 | `activeAgents.tagColor` | string | gray-medium-dark, red, pink, orange, yellow, lime, green, teal, blue, blue-medium, purple | green | the tag's colour | 3.25.0 |
 | `activeAgents.staleMinutes` | integer | >= 1 | `20` | minutes without a heartbeat after which the repository's presence implementation treats a session as gone; exported to both commands | 3.25.0 |
 | `activeAgents.commands` | object | — | — | **Required.** the repository's own start and end commands | 3.25.0 |
-| `sessionSummary.provider` | string | devstride | — | **Required.** the built-in provider: the agent's own DevStride MCP connection (record_agent_session) | unreleased |
-| `sessionSummary.commands` | object | — | — | **Required.** a summary store the repository supplies | unreleased |
-| `sessionSummary.commands.write` | string | — | — | **Required.** the write command; the scrubbed summary JSON arrives on stdin | unreleased |
+| `sessionSummary.provider` | string | devstride | — | **Required.** the built-in provider: the agent's own DevStride MCP connection (record_agent_session) | 3.31.0 |
+| `sessionSummary.commands` | object | — | — | **Required.** a summary store the repository supplies | 3.31.0 |
+| `sessionSummary.commands.write` | string | — | — | **Required.** the write command; the scrubbed summary JSON arrives on stdin | 3.31.0 |
 | `release.docsRepo` | any | — | — | **Deprecated (error):** retired pre-1.0 shape the release skill never acts on; run /devstride:setup docs to migrate it into the docs block | pre-registry |
 | `releaseTrain` | object, null | — | — | one long-lived branch one-off work batches on; null reads as absent | pre-registry |
 | `releaseTrain.branch` | string | — | — | the train's branch | pre-registry |

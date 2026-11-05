@@ -240,7 +240,7 @@
       ],
       "unset": "no summary: build-item writes nothing and says nothing",
       "contract": "skills/build-item/references/session-summary.md",
-      "since": "unreleased"
+      "since": "3.31.0"
     },
     {
       "key": "claims",
@@ -1743,21 +1743,21 @@
       ],
       "required": true,
       "description": "the built-in provider: the agent's own DevStride MCP connection (record_agent_session)",
-      "since": "unreleased"
+      "since": "3.31.0"
     },
     {
       "key": "sessionSummary.commands",
       "type": "object",
       "required": true,
       "description": "a summary store the repository supplies",
-      "since": "unreleased"
+      "since": "3.31.0"
     },
     {
       "key": "sessionSummary.commands.write",
       "type": "string",
       "required": true,
       "description": "the write command; the scrubbed summary JSON arrives on stdin",
-      "since": "unreleased"
+      "since": "3.31.0"
     },
     {
       "key": "release.docsRepo",
