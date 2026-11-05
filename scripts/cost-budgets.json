@@ -7,7 +7,7 @@
   "bodies": {
     "branch-feature": 900,
     "branch-hotfix": 2200,
-    "build-item": 7470,
+    "build-item": 7570,
     "ci-audit": 2600,
     "comprehend-plan": 1740,
     "create-defect": 2500,
@@ -100,11 +100,11 @@
     "skills/doctor/references/agents.md": 620,
     "skills/build-item/references/active-agents.md": 540,
     "skills/release/references/auto-start.md": 2750,
-    "skills/build-item/references/plan-scope.md": 2480
+    "skills/build-item/references/plan-scope.md": 2500
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 81410,
+      "budget": 81520,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -142,7 +142,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 66030,
+      "budget": 66150,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",

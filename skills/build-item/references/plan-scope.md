@@ -35,7 +35,7 @@ unit in plan scope").
   `{kind: "plan", branch, create, from}`. `from` is where the epic would have gone without plan
   scope (`epicIntegrationBranches.releaseTarget`): the plan branch is cut from it and the whole plan
   is released into it. `create` → at the plan's FIRST epic release, fetch `from` and push
-  `refs/remotes/origin/<from>:refs/heads/<branch>`. `ask` → ask the owner with the candidates;
+  `refs/remotes/origin/<from>:refs/heads/<branch>` (`fromCreate` → create `from` off `fromBase` first). `ask` → ask the owner with the candidates;
   `refuse` → STOP with its reason.
 - Merge-only: never rebased, amended or force-pushed, and deleted only by the plan release.
 

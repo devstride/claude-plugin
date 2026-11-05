@@ -309,18 +309,21 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
                     for p in names(parents[0], c) - brought:
                         flag_merge_path(p)
                     continue
-                number = reviewed_unit(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip(), epic_regex, train) \
-                    if epic_regex else None
-                if number is not None:
-                    accept_unit(number, c, parents[0])
-                    continue
                 subject = git_text(repo, "log", "-1", "--format=%s", c).strip()
-                plan = reviewed_unit(repo, c, subject, plan_regex, train) if plan_regex else None
-                if plan is not None:
-                    reviewed.append(plan)
-                    walk_plan(git_text(repo, "rev-list", "--first-parent", "--reverse", parents[1], "^" + parents[0]).split(),
-                              pull_request_head(subject)[1], parents[0])
-                    continue
+                head_name = (pull_request_head(subject) or (None, ""))[1]
+                # a plan head is judged as a plan, never as an epic: default patterns can match both
+                if plan_regex and plan_regex.match(head_name):
+                    plan = reviewed_unit(repo, c, subject, plan_regex, train)
+                    if plan is not None:
+                        reviewed.append(plan)
+                        walk_plan(git_text(repo, "rev-list", "--first-parent", "--reverse", parents[1], "^" + parents[0]).split(),
+                                  head_name, parents[0])
+                        continue
+                else:
+                    number = reviewed_unit(repo, c, subject, epic_regex, train) if epic_regex else None
+                    if number is not None:
+                        accept_unit(number, c, parents[0])
+                        continue
                 if is_ancestor(repo, parents[1], origin_train):
                     # a late absorption of train commits: judge what it brought, commit by commit
                     walk(git_text(repo, "rev-list", "--first-parent", "--reverse", parents[1], "^" + parents[0]).split())

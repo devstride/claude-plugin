@@ -20,7 +20,8 @@ Every subcommand reads one JSON object on stdin and writes one JSON object on st
                -> {"kind": explicit|integration|epic|train|base|ask|refuse, "branch"?, "create"?,
                    "candidates"?, "reason"}
   release-target {"config", "chain":[{…, "releaseScope"?}…], "heads", "prefix", "date", "roles"?, "planSlug"?}
-               -> {"kind": plan|train|base|named|ask|refuse, "branch"?, "create"?, "from"?, "candidates"?, "reason"}
+               -> {"kind": plan|train|base|named|ask|refuse, "branch"?, "create"?, "from"?, "fromCreate"?,
+                   "fromBase"?, "candidates"?, "reason"}
   epic-base    the same request -> {"kind": plan|base|ask|refuse, "branch"?, "candidates"?, "reason"}
 
 `target` precedence: the item must be a leaf type (else refuse) → an explicit branch (refused when
@@ -449,9 +450,13 @@ def cmd_release_target(req):
     found = plan_branch(facts, req)
     if "kind" in found:
         return found
-    # The plan branch is cut from, and the whole plan is released to, where the epic would have gone.
-    return {"kind": "plan", "branch": found["branch"], "create": found["create"], "from": target["branch"],
-            "reason": "plan %s releases as one unit (Release scope: plan)" % facts["root"].get("number")}
+    # The plan branch is cut from, and the whole plan is released to, where the epic would have gone;
+    # a release train not on origin yet is created off the base first (`fromCreate`, `fromBase`).
+    answer = {"kind": "plan", "branch": found["branch"], "create": found["create"], "from": target["branch"],
+              "reason": "plan %s releases as one unit (Release scope: plan)" % facts["root"].get("number")}
+    if target.get("create"):
+        answer.update({"fromCreate": True, "fromBase": target["from"]})
+    return answer
 
 
 def cmd_epic_base(req):

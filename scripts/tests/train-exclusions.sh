@@ -250,4 +250,21 @@ plan_repo t23b "" infra/direct.tf; run t23b
 expect "(23b) a commit on the plan branch that no pull request reviewed is still checked" 1 "d['refused']==['infra/direct.tf']"
 plan_repo t23c train; run t23c
 expect "(23c) an epic pull request on the plan branch that was based elsewhere is not a reviewed unit" 1 "d['refused']==['db/migrations/0002_col.sql']"
+# (24) the shipped default patterns, where a plan head also fits the epic pattern: a plan release is
+#      still judged as a plan, so a direct commit on the plan branch is checked
+PLAN=jane/11-05-26/plan-I303-checkout
+repo t24; git checkout -q -b plan train
+git checkout -q -b epic plan; echo e > src/e.txt; git add -A; git commit -qm story
+git checkout -q plan; git merge -q --no-ff -m "Merge pull request #11 from acme/jane/11-05-26/I302-faster-checkout" epic
+stub 11 "$PLAN" MERGED "$(git rev-parse HEAD)"; echo direct > infra/direct.tf; git add -A; git commit -qm "direct commit"
+git checkout -q train; git merge -q --no-ff -m "Merge pull request #13 from acme/$PLAN" plan; stub 13 train MERGED "$(git rev-parse HEAD)"
+python3 - "$WORK/c-t24.json" <<'PY2'
+import json, sys
+json.dump({"release": {"releaseSource": "develop", "releaseBranchFixExclusions": ["db/migrations/**", "infra/**"]},
+           "releaseTrain": {"branch": "train"},
+           "epicIntegrationBranches": {"pattern": "<prefix>/<MM-DD-YY>/<epic-number>-<epic-title-slug>"},
+           "planIntegrationBranches": {"pattern": "<prefix>/<MM-DD-YY>/plan-<plan-number>-<plan-title-slug>"}}, open(sys.argv[1], "w"))
+PY2
+OUT="$(python3 "$TOOL" --config "$WORK/c-t24.json" --source-before "$SB" --head train --repo "$WORK/t24" 2>&1)"; RC=$?
+expect "(24) with the default patterns a plan release is judged as a plan, its direct commit checked" 1 "d['refused']==['infra/direct.tf'] and d['reviewedUnits']==[13, 11]"
 exit $FAIL

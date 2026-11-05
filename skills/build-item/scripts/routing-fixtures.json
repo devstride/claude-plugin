@@ -1953,6 +1953,43 @@
       ],
       "error": true,
       "inputValidation": true
+    },
+    {
+      "name": "plan scope with the release train not on origin yet: the train is created off the base branch before the plan branch is cut from it",
+      "chain": [
+        {
+          "number": "I301",
+          "title": "A story",
+          "workType": "Story"
+        },
+        {
+          "number": "I302",
+          "title": "Faster checkout",
+          "workType": "Epic"
+        },
+        {
+          "number": "I303",
+          "title": "Checkout",
+          "workType": "Capability",
+          "releaseScope": "plan"
+        },
+        {
+          "number": "I300",
+          "title": "[1] Commerce revamp",
+          "workType": "Solution"
+        }
+      ],
+      "heads": [
+        "develop"
+      ],
+      "expect": {
+        "kind": "plan",
+        "branch": "jane/26-10-02/plan-I303-checkout",
+        "create": true,
+        "from": "train/support",
+        "fromCreate": true,
+        "fromBase": "develop"
+      }
     }
   ],
   "epicBase": [
