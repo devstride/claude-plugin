@@ -1,5 +1,5 @@
 {
- "_about": "Shared fixtures for skills/build-item/scripts/review-gate.py, git-free (numstat, tree and mergeBase supplied). For each case, write each `receipts` entry to <tmp>/<its head>.json under the CASE's head filename (the request's head), pass receiptsDir=<tmp>, run `check`; `expect` is the answer minus `reason`. An `errors` case must exit 2 with one review-gate: line containing `contains`. A `record` case runs `record` with receiptsDir=<tmp>; with `refuses` null it must exit 0 and `check` on the same head with the first `cases` entry's over-limit numstat must then answer reviewed with the second case's mergeBody. Tooling that re-implements the gate, or calls it, should run these against the installed script.",
+ "_about": "Shared fixtures for skills/build-item/scripts/review-gate.py, git-free (numstat, tree, mergeBase and config supplied). For each case, write each `receipts` entry to <tmp>/<its head>.json under the CASE's head filename (the request's head), pass receiptsDir=<tmp>, run `check`; `expect` is the answer minus `reason`. An `errors` case must exit 2 with one review-gate: line containing `contains`. A `record` case runs `record` with receiptsDir=<tmp>; with `refuses` null it must exit 0 and `check` on the same head with the second `cases` entry's config and over-limit numstat (the record request's head, tree and merge base) must then answer reviewed with that case's mergeBody. Tooling that re-implements the gate, or calls it, should run these against the installed script.",
  "cases": [
   {
    "name": "a small fix lands",
@@ -576,6 +576,245 @@
    },
    "receipts": [],
    "contains": "NUL"
+  },
+  {
+   "name": "a receipt that is not LOCAL-FULL",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "10\t0\tf0.ts\u000010\t0\tf1.ts\u000010\t0\tf2.ts\u000010\t0\tf3.ts\u000010\t0\tf4.ts\u000010\t0\tf5.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 1,
+     "mode": "LOCAL-ONLY",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      "claude",
+      "codex"
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ]
+    }
+   ],
+   "contains": "not a settled LOCAL-FULL review"
+  },
+  {
+   "name": "a receipt with a finding still open",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "10\t0\tf0.ts\u000010\t0\tf1.ts\u000010\t0\tf2.ts\u000010\t0\tf3.ts\u000010\t0\tf4.ts\u000010\t0\tf5.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 1,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      "claude",
+      "codex"
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      },
+      {
+       "id": "R009",
+       "severity": "P1",
+       "disposition": "open"
+      }
+     ]
+    }
+   ],
+   "contains": "settle it first"
+  },
+  {
+   "name": "a Claude-only receipt when a CLI engine is configured",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    },
+    "numstat": "10\t0\tf0.ts\u000010\t0\tf1.ts\u000010\t0\tf2.ts\u000010\t0\tf3.ts\u000010\t0\tf4.ts\u000010\t0\tf5.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 1,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      "claude"
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ]
+    }
+   ],
+   "contains": "configured CLI engine"
+  },
+  {
+   "name": "a receipt with no cycles",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "10\t0\tf0.ts\u000010\t0\tf1.ts\u000010\t0\tf2.ts\u000010\t0\tf3.ts\u000010\t0\tf4.ts\u000010\t0\tf5.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 1,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 0,
+     "engines": [
+      "claude",
+      "codex"
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ]
+    }
+   ],
+   "contains": "at least 1"
   }
  ],
  "record": [
@@ -603,7 +842,29 @@
       "severity": "P3",
       "disposition": "dismissed"
      }
-    ]
+    ],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
    },
    "refuses": null
   },
@@ -625,7 +886,29 @@
       "severity": "P1",
       "disposition": "open"
      }
-    ]
+    ],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
    },
    "refuses": "settle it first"
   },
@@ -640,7 +923,29 @@
     "engines": [
      "codex"
     ],
-    "findings": []
+    "findings": [],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
    },
    "refuses": "must include claude"
   },
@@ -653,9 +958,32 @@
     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "cycles": 0,
     "engines": [
-     "claude"
+     "claude",
+     "codex"
     ],
-    "findings": []
+    "findings": [],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
    },
    "refuses": "at least 1"
   },
@@ -668,7 +996,8 @@
     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "cycles": 1,
     "engines": [
-     "claude"
+     "claude",
+     "codex"
     ],
     "findings": [
      {
@@ -677,9 +1006,80 @@
       "disposition": "fixed",
       "note": "a\nb"
      }
-    ]
+    ],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
    },
    "refuses": "one line"
+  },
+  {
+   "name": "record refuses a Claude-only review when a CLI engine is configured",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "cycles": 2,
+    "engines": [
+     "claude"
+    ],
+    "findings": [
+     {
+      "id": "R001",
+      "severity": "P2",
+      "disposition": "fixed",
+      "note": "null check on the retry path"
+     },
+     {
+      "id": "R002",
+      "severity": "P3",
+      "disposition": "dismissed"
+     }
+    ],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
+   },
+   "refuses": "configured CLI engine"
   }
  ]
 }

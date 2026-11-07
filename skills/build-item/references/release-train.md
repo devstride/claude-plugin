@@ -72,11 +72,13 @@ request's base.
   **LOCAL-FULL** mode: Claude and the configured CLI engine at merge-boundary depth, the full cycle
   target and P1 continuation; no pull request, no cloud reviewer, no CI. 4a's gate runs at
   `storyVerify: full` (a touched-suite receipt never counts). A missing risk check or receipt is
-  made good here, never by 4b, which would spend a CI run. **The landing gate:** before every 5a
-  merge onto the train, `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/review-gate.py
-  check` with `{"base": "origin/<train>"}` must answer `small`, `reviewed` or `not-applicable`, and
-  its `mergeBody` goes in the merge-commit body. Exit 2 → LOCAL-FULL (or its follow-up), which
-  records the review, then check again; never merge on a non-zero exit. Why local: cloud
+  made good here, never by 4b, which would spend a CI run. **The landing gate:** in the story's checkout, before 5a
+  switches branches, `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/review-gate.py
+  check` with `{"base": "origin/<train>", "head": "<story head SHA>"}` must answer `small`,
+  `reviewed` or `not-applicable`; 5a merges exactly that SHA, with the `mergeBody` in the
+  merge-commit body. A moved train merged into the story is a new head: check again. Exit 2 →
+  LOCAL-FULL (or its follow-up), which records the review, then check again; never merge on a
+  non-zero exit. Why local: cloud
   runners are paid per run, so the train's pull request into `baseBranch` stays the batch's one CI
   run, while a late find on a large fix is caught here before it can hold up a release.
 - **Otherwise → 4b with the train as the base.**

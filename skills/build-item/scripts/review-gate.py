@@ -12,14 +12,14 @@ tool that lands one-offs (a repository's own CLI) runs this file, never a copy. 
           stdout {"verdict": "small"|"reviewed"|"not-applicable", "files", "lines", "riskFiles",
                   "reason", "mergeBody"}
   record  stdin {"base", "head"?, "cycles", "engines": [...], "findings": [{"id", "severity",
-                 "disposition", "note"?}], "receiptsDir"?, "tree"?, "mergeBase"?} (tree and
-                 mergeBase together, with head, or both from git)
+                 "disposition", "note"?}], "config"?, "receiptsDir"?, "tree"?, "mergeBase"?}
+                 (tree, mergeBase and config together, with head, or all from git)
           stdout {"receipt", "mergeBody"}
 
 `base` is the ref the one-off lands on (e.g. `origin/train/release`); `head` defaults to `HEAD`.
 Run in the repository: the config (`.claude/ds-config.json`), the diff
 (`git diff --numstat -z --no-renames <base>...<head>`), the head's tree and the merge base come
-from git unless the request supplies `config`, `numstat`, `tree` and `mergeBase` (all three
+from git unless the request supplies `config`, `numstat`, `tree` and `mergeBase` (all four
 together, with `head`: the fixtures' git-free mode).
 
 `check`:
@@ -27,13 +27,15 @@ together, with `head`: the fixtures' git-free mode).
   review at the epic's release pull request.
 - `releaseTrain.smallFixes` not set -> `not-applicable`: the repository set no size rule.
 - `small: true` -> `small`.
-- else a receipt for this head whose tree and merge base match -> `reviewed`.
+- else a receipt for this head whose tree and merge base match, and which is itself settled (the
+  same rules `record` applies) -> `reviewed`.
 - else exit 2, one line naming the review to run. Never merge on a non-zero exit.
 
 `record` (LOCAL-FULL, once it settled) writes the receipt `<receiptsDir>/<head>.json`; receiptsDir
 defaults to `<git common dir>/devstride/reviews/local-full`, shared by every worktree of the
 repository on this machine and never committed. It refuses a finding still open, an engine list
-without `claude`, or fewer than one cycle. A receipt is evidence for exactly one head, tree and
+without `claude` (or, with `review.localCommand` set, with nothing but `claude`), or fewer than one
+cycle. A receipt is evidence for exactly one head, tree and
 merge base: any new commit, or a train merged into the branch, needs a new review.
 
 Exit 0 with an answer, 2 with one `review-gate: <reason>` line on stderr, 1 for anything else.
@@ -84,10 +86,10 @@ def small_rule(config, numstat):
 def subject(req, with_diff=True):
     need(isinstance(req, dict), "the request must be a JSON object")
     need(text(req.get("base")), "base is required: the ref the one-off lands on")
-    keys = ("numstat", "tree", "mergeBase") if with_diff else ("tree", "mergeBase")
+    keys = ("numstat", "tree", "mergeBase", "config") if with_diff else ("tree", "mergeBase", "config")
     pure = [k for k in keys if k in req]
     if pure:
-        need(len(pure) == len(keys) and text(req.get("head")), "%s come together, with head" % " and ".join(keys))
+        need(len(pure) == len(keys) and text(req.get("head")), "%s come together, with head" % ", ".join(keys))
         for key in ("head", "tree", "mergeBase"):
             need(SHA.match(req[key] or ""), "%s must be a full commit or tree id" % key)
         need(not with_diff or isinstance(req["numstat"], str), "numstat must be the text of git diff --numstat -z")
@@ -121,6 +123,27 @@ def receipts_dir(req):
         return req["receiptsDir"]
     common = git("rev-parse", "--path-format=absolute", "--git-common-dir").strip()
     return os.path.join(common, "devstride", "reviews", "local-full")
+
+
+def settled(r, config):
+    """The receipt's own claims: a settled LOCAL-FULL review. Raises Refuse naming what is wrong."""
+    need(isinstance(r, dict) and r.get("schema") == 1 and r.get("mode") == "LOCAL-FULL", "not a schema-1 LOCAL-FULL receipt")
+    cycles, engines, findings = r.get("cycles"), r.get("engines"), r.get("findings")
+    need(isinstance(cycles, int) and not isinstance(cycles, bool) and cycles >= 1, "cycles must be a whole number, at least 1")
+    need(isinstance(engines, list) and engines and all(text(e) for e in engines), "engines must list the engines that ran")
+    need("claude" in engines, "engines must include claude: LOCAL-FULL always runs the Claude review")
+    review = config.get("review") if isinstance(config.get("review"), dict) else {}
+    need(not text(review.get("localCommand")) or any(e != "claude" for e in engines),
+         "engines must include the configured CLI engine (review.localCommand): a Claude-only LOCAL-FULL is never recorded")
+    need(isinstance(findings, list), "findings must be a list (empty when there were none)")
+    clean = []
+    for f in findings:
+        need(isinstance(f, dict) and text(f.get("id")) and text(f.get("severity")), "each finding needs an id and a severity")
+        need(f.get("disposition") in CLOSED, "finding %s is %r: settle it first (%s)" % (f.get("id"), f.get("disposition"), ", ".join(CLOSED)))
+        note = f.get("note")
+        need(note is None or (isinstance(note, str) and "\n" not in note and len(note) <= 200), "finding %s: note must be one line of at most 200 characters" % f["id"])
+        clean.append({k: f[k] for k in ("id", "severity", "disposition", "note") if f.get(k) is not None})
+    return clean
 
 
 def body(receipt):
@@ -163,26 +186,19 @@ def check(req):
     need(isinstance(receipt, dict) and receipt.get("head") == head, "the receipt %s names another head: %s" % (path, run))
     need(receipt.get("tree") == tree and receipt.get("mergeBase") == merge_base,
          "the LOCAL-FULL review at %s covered another diff (tree or merge base changed): %s" % (head[:12], run))
+    try:
+        settled(receipt, config)
+    except Refuse as err:
+        raise Refuse("the receipt %s is not a settled LOCAL-FULL review (%s): %s" % (path, err, run))
     return dict(shape, verdict="reviewed", reason="%s; LOCAL-FULL settled at %s" % (small["reason"], head[:12]),
                 mergeBody=body(receipt))
 
 
 def record(req):
     head, tree, merge_base, _ = subject(req, with_diff=False)
-    cycles, engines, findings = req.get("cycles"), req.get("engines"), req.get("findings")
-    need(isinstance(cycles, int) and not isinstance(cycles, bool) and cycles >= 1, "cycles must be a whole number, at least 1")
-    need(isinstance(engines, list) and engines and all(text(e) for e in engines), "engines must list the engines that ran")
-    need("claude" in engines, "engines must include claude: LOCAL-FULL always runs the Claude review")
-    need(isinstance(findings, list), "findings must be a list (empty when there were none)")
-    clean = []
-    for f in findings:
-        need(isinstance(f, dict) and text(f.get("id")) and text(f.get("severity")), "each finding needs an id and a severity")
-        need(f.get("disposition") in CLOSED, "finding %s is %r: settle it first (%s)" % (f.get("id"), f.get("disposition"), ", ".join(CLOSED)))
-        note = f.get("note")
-        need(note is None or (isinstance(note, str) and "\n" not in note and len(note) <= 200), "finding %s: note must be one line of at most 200 characters" % f["id"])
-        clean.append({k: f[k] for k in ("id", "severity", "disposition", "note") if f.get(k) is not None})
     receipt = {"schema": 1, "mode": "LOCAL-FULL", "base": req["base"], "head": head, "tree": tree, "mergeBase": merge_base,
-               "cycles": cycles, "engines": engines, "findings": clean}
+               "cycles": req.get("cycles"), "engines": req.get("engines"), "findings": req.get("findings")}
+    receipt["findings"] = settled(receipt, config_of(req))
     folder = receipts_dir(req)
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, head + ".json")

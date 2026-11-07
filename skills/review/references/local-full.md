@@ -13,8 +13,8 @@ request into the base stays the batch's one CI run (why: `release-train.md`).
 
 1. **Streams:** step 1's Claude adversarial route and the Local CLI engine, over
    `<base>...HEAD`, generated files excluded, with the matched mandatory lenses. No cloud request.
-   The CLI engine configured but failed, or unavailable → STOP for a human, as step 1's
-   Claude-only rule: a Claude-only LOCAL-FULL is never recorded.
+   With `review.localCommand` set, that engine failed or missing → STOP for a human, as step 1's
+   Claude-only rule: `record` refuses a Claude-only LOCAL-FULL then, and `check` a receipt like it.
 2. **Settle:** steps 3–5: verify, triage, fix, with step 5's cycle target (two) and P1/serious-P2
    continuation without a cap. Then step 6.5, the lessons write. Steps 0, 2 and 6–8 never run: no
    thread, no flip, no CI.
