@@ -361,7 +361,8 @@ M15. A one-off merged onto the release train (`releaseTrain.branch`) is NOT Done
      a FULL-diff review, as an epic release pull request is. A one-off that is not a small fix
      (`small: false`) gets a full review first, on the landing machine: `review` LOCAL-FULL (Claude
      and the CLI engine, no pull request, no CI), so a large fix's late find never holds a release
-     and the train's pull request stays the batch's only CI run.
+     and the train's pull request stays the batch's only CI run. `review-gate.py check` admits a train
+     merge only as small, or reviewed at exactly that head, tree and merge base.
 M16. A story merged onto its release unit's integration branch is LANDED, not Done: it is Done only
      when the release unit's release pull request reaches the release target, marked by
      `build-item` step 8's close-out from the landed set captured BEFORE that merge (the git range
@@ -817,6 +818,8 @@ skills/build-item/references/release-train.md|`small: false`
 skills/build-item/references/release-train.md|LOCAL-FULL
 skills/build-item/SKILL.md|LOCAL-FULL
 skills/review/SKILL.md|LOCAL-FULL
+skills/build-item/references/release-train.md|review-gate.py
+skills/review/references/local-full.md|review-gate.py record
 skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor
 skills/build-item/references/next-unblocked.md|landed set BEFORE the merge
 skills/build-item/SKILL.md|neither Done nor landed

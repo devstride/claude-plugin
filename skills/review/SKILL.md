@@ -99,13 +99,10 @@ definition or a deferral route.**
   untracked-deferral list — run steps 3–5 for triage and fixes, then **step 6.5, which this path
   MUST write**; return the triaged findings, the untracked-deferral list **and the lessons tally**.
   The caller owns the merge. Never launch `review.localAssistCommand` here. Missing risk-screen evidence → the full PR path. Runs without a CLI engine. Skips 0–2 and 6–8.
-- **LOCAL-FULL** (`build-item` 4a, a train one-off that is not a small fix; a base REF, no PR):
-  the merge-boundary review with no PR, cloud reviewer or CI. Step 1's Claude and Local CLI
-  streams over `origin/<base>...HEAD`, then 3–5 with step 5's cycle target and safety continuation,
-  then 6.5, returning what LOCAL-ONLY returns plus the cycle count, the reviewed head and the
-  ledger. A later change to the patch (a base refresh's conflict resolution, a fix) gets step 5's
-  contextual follow-up, ledger carried, before the merge. The CLI engine configured but failed →
-  STOP for a human, as step 1's Claude-only rule. Skips 0, 2 and 6–8.
+- **LOCAL-FULL** (`build-item` 4a for a train one-off that is not a small fix, or the argument
+  `local-full <base>`; no PR): the merge-boundary review with no PR, cloud reviewer or CI, recorded
+  for the landing gate. **Read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/local-full.md`
+  before running it.**
 - **PRE-SHIP RESUME** (`pr`/`release` step 2c) — the return from a **7.1b** hold. **Start at 7.1**:
   re-resolve the PR, re-run 7.1's base/patch check and the paginated zero-unresolved check, flip,
   settle. A changed patch → step 5's contextual wave through 3–6.5, back to 7.1, zero threads, flip.
