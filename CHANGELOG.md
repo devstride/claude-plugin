@@ -8,6 +8,20 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **One landing gate for the release train, usable outside Claude.** A new dependency-free helper,
+  `skills/build-item/scripts/review-gate.py`, decides whether a one-off may merge onto the train:
+  `check` answers `small` (the small-fix rule, reused from `routing.py`), `reviewed` (a LOCAL-FULL
+  review was recorded at exactly this head, tree and merge base) or `not-applicable` (not a train
+  landing, or no `releaseTrain.smallFixes`), with the text for the merge commit; anything else exits
+  2 with one line naming `/devstride:review local-full <base>`. `record` writes the receipt a
+  settled LOCAL-FULL review leaves under the repository's git directory, shared by its worktrees
+  on that machine. `build-item` runs `check` before every fast merge onto the train, and a
+  repository's own landing command can run the same file. Fixtures beside it hold the canonical
+  cases. LOCAL-FULL can now also be run on its own as `/devstride:review local-full <base>`; its
+  procedure moved to `skills/review/references/local-full.md`.
+
 ## [3.34.0] — 2026-11-07
 
 ### Changed

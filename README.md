@@ -512,6 +512,12 @@ as its build starts (In Progress) and lands (the merged status on an epic branch
 train, Done on the base branch) and which comment to post. It makes no DevStride call itself; the
 caller applies the answer. `item-status-fixtures.json` holds its examples.
 
+`skills/build-item/scripts/review-gate.py check` is the landing gate for a one-off on the release
+train: it answers whether the change is a small fix, or was given a full local review
+(`/devstride:review local-full <base>`, recorded with `review-gate.py record`) at exactly this
+commit, and gives the text for the merge commit. Exit 2 means: do not merge yet; its one line names
+the review to run. `review-gate-fixtures.json` holds its examples.
+
 ```bash
 jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], prefix: "jane", date: "26-10-02",
   chain: [{number: "I201", title: "A story", workType: "Story"}, {number: "I200", title: "Release trains", workType: "Epic"}]}' \
