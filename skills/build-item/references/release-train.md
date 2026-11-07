@@ -65,9 +65,18 @@ request's base.
   lens → 4a's `review` LOCAL-ONLY call does not run: with no finding there is nothing to triage
   or distill into lessons. The progress table's review row reads "covered by the train's release
   review (small fix: N files, M lines)". Everything else in 4a holds: the floor, the local gate,
-  the merge-commit body. Otherwise 4a runs as usual (a risk-check finding still reaches the lessons
-  store through it), the reason said once. The train's pull request into `baseBranch` is the
-  batch's one full review and one CI run.
+  the merge-commit body. `small: true` with a finding → 4a runs as usual (the finding still reaches
+  the lessons store through it), the reason said once.
+- **A larger or riskier fix gets its full review before it lands, on this machine.** `small: false`
+  (over either limit, a binary file, or a high-risk path; computed only with `smallFixes` set) → 4a's `review` call runs in
+  **LOCAL-FULL** mode: Claude and the configured CLI engine at merge-boundary depth, the full cycle
+  target and P1 continuation; no pull request, no cloud reviewer, no CI. 4a's gate runs at
+  `storyVerify: full` (a touched-suite receipt never counts), and the merge-commit body names the
+  mode, the cycles, the reviewed head and every finding's disposition. A missing risk check or
+  receipt is made good here, never by 4b, which would spend a CI run. `small` runs again on the
+  final diff before every 5a merge: newly false → LOCAL-FULL first. Why local: cloud
+  runners are paid per run, so the train's pull request into `baseBranch` stays the batch's one CI
+  run, while a late find on a large fix is caught here before it can hold up a release.
 - **Otherwise → 4b with the train as the base.**
 
 ## Settings
