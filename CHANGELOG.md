@@ -8,6 +8,15 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A story merged onto a branch that is not the base is never marked Done by item-status.** Routing's
+  `explicit` target (for example an epic branch in an older naming) and `integration` target now
+  land like an epic merge: the merged status plus "merged onto <branch> at <sha>; Done when it
+  reaches <release target>". Only the item's own pull request into the base branch is Done; a wrong
+  Done could never be undone, since nothing moves an item out of a done-type status. The
+  reference now names the item's team's status collection for an item on no board.
+
 ## [3.32.0] — 2026-11-07
 
 ### Added
