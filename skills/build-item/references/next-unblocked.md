@@ -48,14 +48,13 @@ DevStride but never git (`comprehend-plan`, `splice-mechanics.md`, `rationalize-
 `rebalance`) has no landed set: it counts a leaf as landed when it sits in the merged status or
 carries the landed comment.
 
-- **At the merge (`build-item` step 6)** — not Done. Move it to the **merged status**: the status
-  named `epicIntegrationBranches.mergedStatusName` (absent → `"Review"`; `null` → none), resolved
-  BY NAME from the leaf's work-type status collection (`get_workspace_context`, as step 1 resolves
-  In Progress), never a hard-coded id; no status of that name, or a move that fails → leave its
-  status and say so. ALWAYS `add_comment` the **landed comment** "merged onto <integration branch>
-  at <merge SHA> (<pull request link, if any>); Done when the <release unit> release pull request
-  reaches <release target>", and write step 6's dates: `startDate`/`dueDate` = branch creation →
-  this merge.
+- **At the merge (`build-item` step 6)** — not Done. `item-status.py decide` (`item-status.md`)
+  gives the **merged status** — `epicIntegrationBranches.mergedStatusName` (absent → `"Review"`;
+  `null` → none), by name in the leaf's status collection, never a hard-coded id; none, or a move
+  that fails → leave its status and say so — and the **landed comment**, ALWAYS posted: "merged
+  onto <integration branch> at <merge SHA> (<pull request link, if any>); Done when the <release
+  unit> release pull request reaches <release target>". Write step 6's dates: `startDate`/`dueDate`
+  = branch creation → this merge.
 - **The git history is the record.** `git fetch origin`, then once per integration branch:
   `git log --first-parent --merges --format=%s origin/<release target>..origin/<integration
   branch>` (release target = `routing.py release-target`'s branch — the plan branch in plan scope; branch resolved as

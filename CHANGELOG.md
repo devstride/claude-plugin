@@ -8,6 +8,23 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **One rule for an item's status as its build starts and lands.** A new dependency-free helper,
+  `skills/build-item/scripts/item-status.py decide`, answers which status a leaf item moves to and
+  which comment it gets: In Progress at the start; the merged status (`Review` by default) plus the
+  landed comment when it lands on an epic or plan integration branch or on the release train; Done
+  when its own pull request reaches the base branch. It never moves an item out of a done-type
+  status, resolves statuses by name inside the item's collection, and makes no network call; the
+  caller applies its answer and reads the item back. `build-item` steps 1 and 6 use it, and other
+  tools (a repository's own CLI) can run the same file. Fixtures beside it hold the canonical cases.
+
+### Changed
+
+- **A one-off merged onto the release train now moves to the merged status**, as a story merged
+  onto an epic branch does, so the board shows it is waiting for a release instead of leaving it
+  In Progress. It still becomes Done only when the release ships it.
+
 ### Fixed
 
 - **A release no longer tries to start itself from a train that isn't on origin.** The auto-start

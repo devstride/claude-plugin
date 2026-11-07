@@ -506,6 +506,12 @@ pull request goes and what a new integration branch is cut from, honouring a pla
 when your config has no `hierarchyRoles`. `routing-fixtures.json` beside it holds the canonical examples; if your
 repository implements the rule itself, run those examples against your implementation in its tests.
 
+`skills/build-item/scripts/item-status.py decide` is the same kind of file for status: given the
+item, the workspace's statuses and where the work landed, it answers which status the item moves to
+as its build starts (In Progress) and lands (the merged status on an epic branch or the release
+train, Done on the base branch) and which comment to post. It makes no DevStride call itself; the
+caller applies the answer. `item-status-fixtures.json` holds its examples.
+
 ```bash
 jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], prefix: "jane", date: "26-10-02",
   chain: [{number: "I201", title: "A story", workType: "Story"}, {number: "I200", title: "Release trains", workType: "Epic"}]}' \
