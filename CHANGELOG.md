@@ -8,6 +8,14 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **A release records when it starts waiting for the owner.** With `release.clearance` set, step 4
+  now heartbeats the phase `final` as it presents READY, before the owner's yes; `merging` follows
+  on the yes. The owner's wait is then its own phase instead of the tail of `pre-ship`, so a measure
+  of how long releases wait for a go-ahead has a reliable start, and the `pre-ship` stuck alarm no
+  longer counts the wait. `final` has no stuck budget by default.
+
 ### Fixed
 
 - **A story merged onto a branch that is not the base is never marked Done by item-status.** Routing's
