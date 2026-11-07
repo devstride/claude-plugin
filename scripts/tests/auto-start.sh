@@ -211,4 +211,23 @@ PY2
 [ "$D" = "skip stop" ] && flat "$RB" | grep -q '`takeover` (its holder lapsed) → ONE immediate takeover claim with that digest, decided the same way, never a third' \
   && flat "$ROOT/skills/release/references/auto-start.md" | grep -q 'on the owner.s answer, heartbeat it before anything else; NOT HOLDER or LOST → with the tower held, carry on under the tower' && ok "(19) a live holder at 5b: select skips (the contract's mode), named would stop" || bad "(19) decide answered '$D'"
 
+# (21)-(24) the configured train looked up on origin first, with routing.py's rule. Renamed and not
+# yet cut over: origin has train/support, not train/release.
+cfg "$ON"
+g "$WORK/seed" push -q origin t:train/support
+g "$WORK/seed" push -q origin :train/release
+expect "(21) configured train missing, exactly one other train/* → ERROR naming the rename and its commands, no fetch of the missing branch" 1 \
+  '^ERROR a release reads only train/release, so none can start until the rename is cut over; .*train/support → train/release .*--force-with-lease'
+out="$(run check)"; printf '%s\n' "$out" | grep -q "couldn't find remote ref" && bad "(21b) still fetched the missing train: $out" || ok "(21b) the missing train is never fetched"
+g "$WORK/seed" push -q origin t:train/other
+expect "(22) several other train/* branches → ERROR asking which one is live" 1 '^ERROR the release train train/release is not on origin and several other train branches are'
+g "$WORK/seed" push -q origin :train/support :train/other
+expect "(23) no train on origin at all → SKIP, nothing has landed yet" 0 '^SKIP the release train train/release is not on origin yet'
+g "$WORK/repo" fetch -q --prune origin
+g "$WORK/repo" update-ref refs/remotes/origin/train/support refs/remotes/origin/develop
+out="$(cd "$WORK/repo" && AUTO_START_NO_FETCH=1 python3 "$HELPER" check 2>&1)"; code=$?
+[ "$code" = 1 ] && printf '%s\n' "$out" | grep -q '^ERROR a release reads only train/release' \
+  && ok "(24) offline (AUTO_START_NO_FETCH=1) the heads come from the remote-tracking refs, same rule" || bad "(24) (exit $code) $out"
+g "$WORK/seed" push -q origin t:train/release
+
 exit "$FAIL"
