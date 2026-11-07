@@ -175,8 +175,9 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
 
 ## 1. Mark In Progress
 
-`item-status.py decide` with `event: start` (`references/item-status.md`): its `statusId` →
-`update_item`; confirm it moved before branching.
+`item-status.py decide`, `event: start`
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/item-status.md`): `statusId` → `update_item`;
+confirm it moved before branching.
 
 ## 2. Branch
 
