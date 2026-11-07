@@ -726,7 +726,7 @@
    "expect": {}
   },
   {
-   "name": "routing's integration target lands as the base does: Done",
+   "name": "routing's integration target lands: merged status and a Done-when comment, never Done",
    "request": {
     "event": "landed",
     "item": {
@@ -735,16 +735,19 @@
     },
     "target": {
      "kind": "integration",
-     "branch": "staging"
+     "branch": "staging",
+     "sha": "abc1234",
+     "releaseTarget": "develop"
     }
    },
    "expect": {
-    "statusId": "s-done",
-    "statusName": "Done"
+    "statusId": "s-rev",
+    "statusName": "Review",
+    "comment": "merged onto staging at abc1234; Done when it reaches develop"
    }
   },
   {
-   "name": "routing's explicit target lands as the base does: Done",
+   "name": "routing's explicit target lands the same way, with its pull request",
    "request": {
     "event": "landed",
     "item": {
@@ -753,12 +756,16 @@
     },
     "target": {
      "kind": "explicit",
-     "branch": "feature/shared"
+     "branch": "epic/old-name",
+     "sha": "abc1234",
+     "pullRequest": "https://github.com/o/r/pull/7",
+     "releaseTarget": "develop"
     }
    },
    "expect": {
-    "statusId": "s-done",
-    "statusName": "Done"
+    "statusId": "s-rev",
+    "statusName": "Review",
+    "comment": "merged onto epic/old-name at abc1234 (https://github.com/o/r/pull/7); Done when it reaches develop"
    }
   }
  ],
@@ -922,6 +929,36 @@
      "pullRequest": "https://github.com/o/r/pull/8"
     },
     "mergedStatusName": ""
+   }
+  },
+  {
+   "name": "explicit landing without a SHA",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "explicit",
+     "branch": "x",
+     "releaseTarget": "develop"
+    }
+   }
+  },
+  {
+   "name": "integration landing without its release target",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "integration",
+     "branch": "staging",
+     "sha": "abc1234"
+    }
    }
   }
  ]

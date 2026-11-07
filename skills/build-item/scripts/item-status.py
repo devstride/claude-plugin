@@ -25,12 +25,15 @@ Rules:
 - start  -> `startStatusName` (absent: "In Progress").
 - landed on an epic or plan integration branch, or on the release train -> the merged status,
   `mergedStatusName` (absent: "Review"; null: none), plus the landed comment. `target` is required.
-- landed on the base branch (`kind: base`, its own pull request), or on routing's `integration` or
-  `explicit` branch -> a done-type status ("Done" by name among them, else the collection's only
-  one). No comment: the pull request links itself.
+- landed on routing's `integration` or `explicit` branch -> the merged status plus "merged onto
+  <branch> at <sha> (<pull request>); Done when it reaches <releaseTarget>": a branch that is not
+  the base is not live, and a wrong Done could never be undone. A caller that knows the explicit
+  branch is the item's epic branch passes `kind: epic` instead.
+- landed on the base branch (`kind: base`, its own pull request) -> a done-type status ("Done" by
+  name among them, else the collection's only one). No comment: the pull request links itself.
 - A status resolves BY NAME, exactly, and only inside the item's status collection: the one
-  `statusCollectionId` names (an item on a board: that board's `statusCollectionId`), else the
-  organization's default collection (`"default": true`), which must hold the item's current
+  `statusCollectionId` names (an item on a board: that board's `statusCollectionId`; off every
+  board: its team's, if it has a team), else the organization's default collection (`"default": true`), which must hold the item's current
   status. Missing, ambiguous or already current -> no move, with the reason in `message`.
 
 Exit 0 with a decision (a move or none), 2 with one `item-status: <reason>` line on stderr for a
@@ -40,7 +43,7 @@ import json
 import sys
 
 KINDS = ("epic", "plan", "train", "base", "integration", "explicit")
-DONE_KINDS = ("base", "integration", "explicit")
+DONE_KINDS = ("base",)
 
 
 class Refuse(Exception):
@@ -90,10 +93,12 @@ def landed_comment(target):
         need(text(pr) or text(sha), "a train landing needs target.pullRequest or target.sha")
         return "merged to the release train %s (%s); ships with the next release" % (branch, pr if text(pr) else sha)
     need(text(sha), "an %s landing needs target.sha" % kind)
-    need(text(target.get("releaseUnit")) and text(target.get("releaseTarget")),
-         "an %s landing needs target.releaseUnit and target.releaseTarget" % kind)
-    return "merged onto %s at %s%s; Done when the %s release pull request reaches %s" % (
-        branch, sha, " (%s)" % pr if text(pr) else "", target["releaseUnit"], target["releaseTarget"])
+    need(text(target.get("releaseTarget")), "an %s landing needs target.releaseTarget" % kind)
+    where = "merged onto %s at %s%s" % (branch, sha, " (%s)" % pr if text(pr) else "")
+    if kind in ("integration", "explicit"):
+        return "%s; Done when it reaches %s" % (where, target["releaseTarget"])
+    need(text(target.get("releaseUnit")), "an %s landing needs target.releaseUnit" % kind)
+    return "%s; Done when the %s release pull request reaches %s" % (where, target["releaseUnit"], target["releaseTarget"])
 
 
 def decide(request):

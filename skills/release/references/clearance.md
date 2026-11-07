@@ -157,7 +157,8 @@ push notification where there is one) the line's phase, minutes, machine and ses
 --original-stopped` and the adopted path; `1` STOP as a release blocker. **`heartbeat <phase>` at
 the START of each phase**, before its first mutation — `train` before 0b merges anything, `cut
 --branch <b>` before 0c pushes, `pr --pr <n>` after step 1 opens it, `review` before 2, `pre-ship`
-before 2b, `merging` on the owner's yes BEFORE the merge, `deploy` before 5a, `close-out` before
+before 2b, `final` as step 4 presents READY and waits for the yes (the owner-wait measure reads
+it), `merging` on the owner's yes BEFORE the merge, `deploy` before 5a, `close-out` before
 5b — so a lost clearance (exit 4) stops the release before it touches anything. **Step 4**
 appends `status` to the go-ahead: a `Hotfix landed` line goes to `release-branch.md` §4 first; a
 `Waiting` line names who is next; on the yes, the release pull request must be the one `On final`,
