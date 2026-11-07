@@ -8,6 +8,15 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A release no longer tries to start itself from a train that isn't on origin.** The auto-start
+  check (`auto-start.py check`) now looks the configured `releaseTrain.branch` up on origin before
+  fetching it, by the same rule the routing helper uses. When nothing has landed yet it skips
+  quietly. When the train was renamed and the old `train/*` branch is still the only one on origin,
+  it names the rename and the commands that cut it over, instead of failing on a fetch of a branch
+  that doesn't exist. When several other `train/*` branches exist, it asks which one is live.
+
 ## [3.31.0] — 2026-11-05
 
 ### Fixed

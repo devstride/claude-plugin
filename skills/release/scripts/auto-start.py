@@ -15,16 +15,36 @@ configured, `release.mergeTrainBeforeCut` is true with a train branch (`releaseT
 its old name `supportTrain.branch`; both set is an ERROR), and after a fetch
 `git log --no-merges origin/<releaseSource>..origin/<train>` is non-empty. It never looks for an
 open train pull request: the winner's release step 0b runs that search itself, after the claim.
-No network beyond `git fetch`.
+No network beyond `git ls-remote` and `git fetch`.
+
+The train is looked up on origin first, the way routing.py's `resolve_train` does (one rule, reused):
+not there and no other `train/*` branch → SKIP, nothing has landed yet; not there but exactly one
+other `train/*` branch → ERROR naming the rename not yet cut over and its commands, because a
+release reads only the configured train and would stop on it; several others → ERROR asking which
+one is live. Never a fetch of a branch that is not there.
 
 The key is lower-cased (GitHub names are case-insensitive), so every spelling of one remote claims
-one key. Test seams: AUTO_START_REPO (owner/name, else parsed from `origin`), AUTO_START_NO_FETCH=1.
+one key. Test seams: AUTO_START_REPO (owner/name, else parsed from `origin`), AUTO_START_NO_FETCH=1 (no
+network: the heads are read from the local `refs/remotes/origin/*`).
 """
+import importlib.util
 import json
 import os
 import re
 import subprocess
 import sys
+
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROUTING = os.path.join(os.path.dirname(os.path.dirname(HERE)), "build-item/scripts/routing.py")
+
+
+def load_routing():
+    """Where the train is on origin is routing.py's `resolve_train`; reuse it, never a second copy."""
+    spec = importlib.util.spec_from_file_location("routing", ROUTING)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def out(line, code=0):
@@ -69,6 +89,22 @@ def repo_key(root):
     return ("%s/%s" % (match.group(1), match.group(2))).lower()
 
 
+def origin_heads(root):
+    """The branch names on origin: one `git ls-remote`, or the local remote-tracking refs offline."""
+    offline = os.environ.get("AUTO_START_NO_FETCH") == "1"
+    listed = (git(root, "for-each-ref", "--format=%(refname)", "refs/remotes/origin/") if offline
+              else git(root, "ls-remote", "--heads", "origin"))
+    if listed.returncode != 0:
+        out("ERROR listing origin's branches failed: %s" % (listed.stderr or "").strip()[:200], 1)
+    prefix = "refs/remotes/origin/" if offline else "refs/heads/"
+    heads = set()
+    for record in listed.stdout.split("\n"):   # "\n" only: git allows other Unicode breaks in a name
+        ref = record if offline else record.partition("\t")[2]
+        if ref.startswith(prefix) and ref != prefix + "HEAD":
+            heads.add(ref[len(prefix):])
+    return heads
+
+
 def check():
     config, root = load_config()
     release = section(config, "release")
@@ -82,6 +118,14 @@ def check():
     if release.get("mergeTrainBeforeCut") is not True or not isinstance(train, str) or not train:
         out("SKIP no release train (release.mergeTrainBeforeCut and releaseTrain.branch)")
     source = release.get("releaseSource") or "develop"   # the schema's default, never baseBranch
+    where = load_routing().resolve_train(train, origin_heads(root))
+    if "kind" in where:
+        out("ERROR %s" % where["reason"], 1)
+    if where["create"]:
+        out("SKIP the release train %s is not on origin yet: nothing has landed on it" % train)
+    if where["branch"] != train:
+        out("ERROR a release reads only %s, so none can start until the rename is cut over%s"
+            % (train, where["note"]), 1)
     if os.environ.get("AUTO_START_NO_FETCH") != "1":
         fetched = git(root, "fetch", "-q", "origin",
                       "+refs/heads/%s:refs/remotes/origin/%s" % (train, train),
