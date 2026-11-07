@@ -79,6 +79,7 @@
   },
   "release": {
     "productionBranch": "main",
+    "holdTimeZone": "America/Chicago",
     "releaseSource": "develop",
     "autoDeployOnMerge": "Merging to main deploys production.",
     "releaseBranchPattern": "release/<YY-MM-DD>[-n]",

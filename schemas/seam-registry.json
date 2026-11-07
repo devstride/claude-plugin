@@ -1381,6 +1381,13 @@
       "since": "pre-registry"
     },
     {
+      "key": "release.holdTimeZone",
+      "type": "string",
+      "default": "UTC",
+      "description": "the IANA time zone a release hold's date is read in (\"America/Chicago\")",
+      "since": "3.36.0"
+    },
+    {
       "key": "release.releaseSource",
       "type": "string",
       "default": "develop",

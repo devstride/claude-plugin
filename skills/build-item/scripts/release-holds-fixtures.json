@@ -1,0 +1,438 @@
+{
+ "_about": "Shared fixtures for skills/build-item/scripts/release-holds.py, git-free (`live` supplied; `config` and `now` supplied). Run `decide` on each case's request; `expect` is the answer with each hold's `reason` and the top-level `reason` removed. An `errors` case must exit 2 with one release-holds: line containing `contains`. Tooling that re-implements the rule, or calls it, should run these against the installed script.",
+ "cases": [
+  {
+   "name": "no hold line: not held",
+   "request": {
+    "items": [
+     {
+      "number": "I20110",
+      "description": "<h2>Plan</h2>\n<p>Ships the thing.</p>\n<p>[48] on or after 2026-12-06</p>\n"
+     }
+    ],
+    "now": "2026-11-08T23:30:00-06:00",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "expect": {
+    "held": false,
+    "holds": []
+   }
+  },
+  {
+   "name": "a date hold the evening before, Chicago time, still holds",
+   "request": {
+    "items": [
+     {
+      "number": "I20100",
+      "description": "<h2>Plan</h2>\n<p>Release hold: not before 2026-11-09</p>\n"
+     }
+    ],
+    "now": "2026-11-08T23:30:00-06:00",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "expect": {
+    "held": true,
+    "holds": [
+     {
+      "item": "I20100",
+      "kind": "notBefore",
+      "value": "2026-11-09T00:00:00-06:00",
+      "satisfied": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "the same hold at 00:00 Chicago lifts",
+   "request": {
+    "items": [
+     {
+      "number": "I20100",
+      "description": "<h2>Plan</h2>\n<p>Release hold: not before 2026-11-09</p>\n"
+     }
+    ],
+    "now": "2026-11-09T06:00:00Z",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "expect": {
+    "held": false,
+    "holds": [
+     {
+      "item": "I20100",
+      "kind": "notBefore",
+      "value": "2026-11-09T00:00:00-06:00",
+      "satisfied": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "a UTC machine one hour earlier still holds (one zone for every machine)",
+   "request": {
+    "items": [
+     {
+      "number": "I20100",
+      "description": "<h2>Plan</h2>\n<p>Release hold: not before 2026-11-09</p>\n"
+     }
+    ],
+    "now": "2026-11-09T05:00:00Z",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "expect": {
+    "held": true,
+    "holds": [
+     {
+      "item": "I20100",
+      "kind": "notBefore",
+      "value": "2026-11-09T00:00:00-06:00",
+      "satisfied": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "no holdTimeZone: UTC",
+   "request": {
+    "items": [
+     {
+      "number": "I20100",
+      "description": "<h2>Plan</h2>\n<p>Release hold: not before 2026-11-09</p>\n"
+     }
+    ],
+    "now": "2026-11-09T00:00:00Z",
+    "config": {}
+   },
+   "expect": {
+    "held": false,
+    "holds": [
+     {
+      "item": "I20100",
+      "kind": "notBefore",
+      "value": "2026-11-09T00:00:00+00:00",
+      "satisfied": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "an instant with its offset",
+   "request": {
+    "items": [
+     {
+      "number": "I20103",
+      "description": "<h2>Plan</h2>\n<p>Release hold: not before 2026-11-11T08:00-06:00</p>\n"
+     }
+    ],
+    "now": "2026-11-11T07:59:00-06:00",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "expect": {
+    "held": true,
+    "holds": [
+     {
+      "item": "I20103",
+      "kind": "notBefore",
+      "value": "2026-11-11T08:00:00-06:00",
+      "satisfied": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "after an item that is live",
+   "request": {
+    "items": [
+     {
+      "number": "I20102",
+      "description": "<h2>Plan</h2>\n<p>Release hold: after I20101 is live</p>\n"
+     }
+    ],
+    "now": "2026-11-08T23:30:00-06:00",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    },
+    "live": [
+     "I20101"
+    ]
+   },
+   "expect": {
+    "held": false,
+    "holds": [
+     {
+      "item": "I20102",
+      "kind": "after",
+      "value": "I20101",
+      "satisfied": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "after an item that is not live",
+   "request": {
+    "items": [
+     {
+      "number": "I20102",
+      "description": "<h2>Plan</h2>\n<p>Release hold: after I20101 is live</p>\n"
+     }
+    ],
+    "now": "2026-11-08T23:30:00-06:00",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    },
+    "live": []
+   },
+   "expect": {
+    "held": true,
+    "holds": [
+     {
+      "item": "I20102",
+      "kind": "after",
+      "value": "I20101",
+      "satisfied": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "a hold on an ancestor holds the item; get_item's html object; entities and case",
+   "request": {
+    "items": [
+     {
+      "number": "I20104",
+      "description": "<h2>Plan</h2>\n<p>A one-off.</p>\n"
+     },
+     {
+      "number": "I20100",
+      "description": {
+       "html": "<ul><li>release HOLD:&nbsp;not before 2026-11-09</li><li>Release hold: after i20101 is live.</li></ul>"
+      }
+     }
+    ],
+    "now": "2026-11-08T23:30:00-06:00",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    },
+    "live": [
+     "I20101"
+    ]
+   },
+   "expect": {
+    "held": true,
+    "holds": [
+     {
+      "item": "I20100",
+      "kind": "notBefore",
+      "value": "2026-11-09T00:00:00-06:00",
+      "satisfied": false
+     },
+     {
+      "item": "I20100",
+      "kind": "after",
+      "value": "I20101",
+      "satisfied": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "every hold met",
+   "request": {
+    "items": [
+     {
+      "number": "I1",
+      "description": "<h2>Plan</h2>\n<p>Release hold: not before 2026-11-01</p>\n<p>Release hold: after I2 is live</p>\n"
+     }
+    ],
+    "now": "2026-11-08T23:30:00-06:00",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    },
+    "live": [
+     "I2"
+    ]
+   },
+   "expect": {
+    "held": false,
+    "holds": [
+     {
+      "item": "I1",
+      "kind": "notBefore",
+      "value": "2026-11-01T00:00:00-05:00",
+      "satisfied": true
+     },
+     {
+      "item": "I1",
+      "kind": "after",
+      "value": "I2",
+      "satisfied": true
+     }
+    ]
+   }
+  }
+ ],
+ "errors": [
+  {
+   "name": "a misspelt hold fails closed, naming the item and the line",
+   "request": {
+    "items": [
+     {
+      "number": "I1234",
+      "description": "<h2>Plan</h2>\n<p>Release hold: not befor 2026-11-09</p>\n"
+     }
+    ],
+    "now": "2026-11-08T00:00:00Z",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "contains": "I1234: \"Release hold: not befor 2026-11-09\" does not parse"
+  },
+  {
+   "name": "a time with no offset fails closed",
+   "request": {
+    "items": [
+     {
+      "number": "I1",
+      "description": "<h2>Plan</h2>\n<p>Release hold: not before 2026-11-09T08:00</p>\n"
+     }
+    ],
+    "now": "2026-11-08T00:00:00Z",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "contains": "does not parse"
+  },
+  {
+   "name": "an impossible date",
+   "request": {
+    "items": [
+     {
+      "number": "I1",
+      "description": "<h2>Plan</h2>\n<p>Release hold: not before 2026-02-30</p>\n"
+     }
+    ],
+    "now": "2026-11-08T00:00:00Z",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "contains": "not a real date"
+  },
+  {
+   "name": "an unknown hold zone",
+   "request": {
+    "items": [
+     {
+      "number": "I1",
+      "description": "<h2>Plan</h2>\n<p>Release hold: not before 2026-11-09</p>\n"
+     }
+    ],
+    "now": "2026-11-08T00:00:00Z",
+    "config": {
+     "release": {
+      "holdTimeZone": "Central"
+     }
+    }
+   },
+   "contains": "IANA time zone"
+  },
+  {
+   "name": "now without an offset",
+   "request": {
+    "items": [
+     {
+      "number": "I1",
+      "description": "<h2>Plan</h2>\n<p>Release hold: not before 2026-11-09</p>\n"
+     }
+    ],
+    "now": "2026-11-08T00:00:00",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "contains": "offset"
+  },
+  {
+   "name": "no items",
+   "request": {
+    "items": [],
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "contains": "items must list"
+  },
+  {
+   "name": "a bad item number",
+   "request": {
+    "items": [
+     {
+      "number": "12988",
+      "description": ""
+     }
+    ],
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "contains": "number like I20100"
+  }
+ ]
+}

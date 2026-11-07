@@ -8,6 +8,19 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Release holds are data on the item.** A line `Release hold: not before <date>` (or an instant
+  with its offset) or `Release hold: after <item> is live` in an item's description keeps that work
+  off the release path. A new dependency-free helper, `skills/build-item/scripts/release-holds.py`,
+  decides it from the item and its ancestors, with fixtures beside it. Dates are read in one zone,
+  the new setting `release.holdTimeZone` (IANA, default UTC). "Live" means deployed and checked:
+  `release/post-deploy` success on the production merge (`cut-to-deploy`; other scopes count the
+  merge). A hold line that does not parse holds, naming the item and the line. `build-item` checks
+  before a one-off merges onto the train or the base branch and before an epic releases; held work
+  waits on its own branch. `release` checks every item before the train snapshot and before the cut,
+  and stops naming the held item and how to take it out.
+
 ## [3.35.0] — 2026-11-07
 
 ### Added

@@ -169,6 +169,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `review.mandatoryLenses[].question` | string | — | — | **Required.** the question the lens's finder answers | pre-registry |
 | `release` | object | — | — | production release settings | pre-registry |
 | `release.productionBranch` | string | — | master | the production release target | pre-registry |
+| `release.holdTimeZone` | string | — | UTC | the IANA time zone a release hold's date is read in ("America/Chicago") | 3.36.0 |
 | `release.releaseSource` | string | — | develop | the branch promoted in a release | pre-registry |
 | `release.autoDeployOnMerge` | string, null | — | — | one plain-English sentence on what merging to production does | pre-registry |
 | `release.releaseBranchPattern` | string | — | — | cut each release as its own protected branch | pre-registry |

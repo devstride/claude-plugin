@@ -385,6 +385,11 @@ M16. A story merged onto its release unit's integration branch is LANDED, not Do
      the record); a story pull request merged into an integration branch or the release train
      passes GitHub's default merge subject with `--subject`; the close-out writes no dates, keeping
      step 6's.
+M17. A release hold is DATA on the item (a `Release hold:` line), never memory: `release-holds.py`
+     decides it, in one zone (`release.holdTimeZone`), "live" meaning deployed and checked, and a
+     line it cannot parse holds. It is checked on the item and its ancestors before a one-off lands
+     on the train or the base and before an epic releases (held work waits on its own branch), and
+     over every item before the train snapshot and the cut, which STOP naming the held item.
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
 N1. ONE profile word — `prototype` / `standard` / `extended` — moves every rigor knob together; the
@@ -820,6 +825,10 @@ skills/build-item/SKILL.md|LOCAL-FULL
 skills/review/SKILL.md|LOCAL-FULL
 skills/build-item/references/release-train.md|review-gate.py
 skills/review/references/local-full.md|review-gate.py record
+skills/build-item/SKILL.md|release-holds.md
+skills/release/SKILL.md|release-holds.md
+skills/release/references/release-branch.md|Release holds.
+skills/build-item/references/release-holds.md|scripts/release-holds.py
 skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor
 skills/build-item/references/next-unblocked.md|landed set BEFORE the merge
 skills/build-item/SKILL.md|neither Done nor landed

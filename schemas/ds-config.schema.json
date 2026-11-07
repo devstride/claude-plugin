@@ -1054,6 +1054,11 @@
           "default": "master",
           "description": "the production release target"
         },
+        "holdTimeZone": {
+          "type": "string",
+          "default": "UTC",
+          "description": "the IANA time zone a release hold's date is read in (\"America/Chicago\")"
+        },
         "releaseSource": {
           "type": "string",
           "default": "develop",
