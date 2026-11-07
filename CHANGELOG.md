@@ -8,6 +8,19 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **A one-off over the small-fix limit gets its full review before it lands on the release train,
+  on the landing machine.** With `releaseTrain.smallFixes` set, a train one-off that is not a small
+  fix (over either limit, a binary file, or a high-risk path) now runs `review` in a new
+  **LOCAL-FULL** mode at build-item step 4a: Claude and the configured CLI engine at merge-boundary
+  depth, with the full cycle target and P1 continuation, and the local gate at
+  `storyVerify: full`, with no pull request, no cloud reviewer and no CI run. The merge-commit body
+  records the mode, the cycles and every finding's disposition. Previously such a fix got only
+  the bounded story risk check, and its first full review was the train's pull request at release
+  time, where a late find held up the whole release. The train's pull request into the base stays
+  the batch's one CI run, so the change adds no cloud runner cost.
+
 ## [3.33.0] — 2026-11-07
 
 ### Changed

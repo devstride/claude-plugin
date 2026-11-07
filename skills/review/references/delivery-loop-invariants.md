@@ -358,7 +358,10 @@ M15. A one-off merged onto the release train (`releaseTrain.branch`) is NOT Done
      it is Done only when the train's pull request reaches the release source, closed by `release`
      from looked-up item numbers in the train's merge subjects — never a guessed number. With
      `releaseTrain.fastMerges` the train's pull request is the one-offs' first full review, so it is
-     a FULL-diff review, as an epic release pull request is.
+     a FULL-diff review, as an epic release pull request is. A one-off that is not a small fix
+     (`small: false`) gets a full review first, on the landing machine: `review` LOCAL-FULL (Claude
+     and the CLI engine, no pull request, no CI), so a large fix's late find never holds a release
+     and the train's pull request stays the batch's only CI run.
 M16. A story merged onto its release unit's integration branch is LANDED, not Done: it is Done only
      when the release unit's release pull request reaches the release target, marked by
      `build-item` step 8's close-out from the landed set captured BEFORE that merge (the git range
@@ -810,6 +813,10 @@ skills/pr/SKILL.md|requestPolicy
 skills/pr/SKILL.md|releaseBranchPattern
 skills/build-item/SKILL.md|releaseTrain.branch
 skills/build-item/references/release-train.md|NOT Done
+skills/build-item/references/release-train.md|`small: false`
+skills/build-item/references/release-train.md|LOCAL-FULL
+skills/build-item/SKILL.md|LOCAL-FULL
+skills/review/SKILL.md|LOCAL-FULL
 skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor
 skills/build-item/references/next-unblocked.md|landed set BEFORE the merge
 skills/build-item/SKILL.md|neither Done nor landed
