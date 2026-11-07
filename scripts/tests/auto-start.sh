@@ -95,11 +95,13 @@ STORE="$WORK/claims"; mkdir -p "$STORE"
 starter() {
   local line; line="$(run check | head -1)"
   case "$line" in START*) ;; *) echo "SKIPPED" > "$WORK/starter-$1"; return;; esac
-  if mkdir "$STORE/release-train:$(run key | tr / _)" 2>/dev/null; then echo WON > "$WORK/starter-$1"; else echo LOST > "$WORK/starter-$1"; fi
+  local key; key="$(run key)" || { echo "KEYFAIL $key" > "$WORK/starter-$1"; return; }
+  if mkdir "$STORE/release-train:$(printf '%s' "$key" | tr / _)" 2>/dev/null; then echo "WON $key" > "$WORK/starter-$1"; else echo "LOST $key" > "$WORK/starter-$1"; fi
 }
 starter one & starter two & wait
-got="$(cat "$WORK/starter-one" "$WORK/starter-two" | sort | tr '\n' ' ')"
-[ "$got" = "LOST WON " ] && ok "(12) two starters at one trigger → exactly one wins the release-train claim" || bad "(12) $got"
+got="$(cut -d' ' -f1 "$WORK/starter-one" "$WORK/starter-two" | sort | tr '\n' ' ')"
+[ "$got" = "LOST WON " ] && ok "(12) two starters at one trigger → exactly one wins the release-train claim" \
+  || bad "(12) $got — $(cat "$WORK/starter-one" "$WORK/starter-two" | tr '\n' '|')"
 
 # (13)-(15) the claim is released NON-final at the cut. The contract's release call (outcome and
 # final flag) is read from auto-start.md and run through a stand-in store with the server's rule —
@@ -210,5 +212,36 @@ PY2
 )"
 [ "$D" = "skip stop" ] && flat "$RB" | grep -q '`takeover` (its holder lapsed) → ONE immediate takeover claim with that digest, decided the same way, never a third' \
   && flat "$ROOT/skills/release/references/auto-start.md" | grep -q 'on the owner.s answer, heartbeat it before anything else; NOT HOLDER or LOST → with the tower held, carry on under the tower' && ok "(19) a live holder at 5b: select skips (the contract's mode), named would stop" || bad "(19) decide answered '$D'"
+
+# (21)-(24) the configured train looked up on origin first, with routing.py's rule. Renamed and not
+# yet cut over: origin has train/support, not train/release.
+cfg "$ON"
+g "$WORK/seed" push -q origin t:train/support
+g "$WORK/seed" push -q origin :train/release
+expect "(21) configured train missing, exactly one other train/* → ERROR naming the rename and its commands, no fetch of the missing branch" 1 \
+  '^ERROR a release reads only train/release, so none can start until the rename is cut over; .*train/support → train/release .*--force-with-lease'
+out="$(run check)"; printf '%s\n' "$out" | grep -q "couldn't find remote ref" && bad "(21b) still fetched the missing train: $out" || ok "(21b) the missing train is never fetched"
+g "$WORK/seed" push -q origin t:train/other
+expect "(22) several other train/* branches → ERROR asking which one is live" 1 '^ERROR the release train train/release is not on origin and several other train branches are'
+g "$WORK/seed" push -q origin :train/support :train/other
+expect "(23) no train on origin at all → SKIP, nothing has landed yet" 0 '^SKIP the release train train/release is not on origin yet'
+g "$WORK/repo" fetch -q --prune origin
+g "$WORK/repo" update-ref refs/remotes/origin/train/support refs/remotes/origin/develop
+out="$(cd "$WORK/repo" && AUTO_START_NO_FETCH=1 python3 "$HELPER" check 2>&1)"; code=$?
+[ "$code" = 1 ] && printf '%s\n' "$out" | grep -q '^ERROR a release reads only train/release' \
+  && ok "(24) offline (AUTO_START_NO_FETCH=1) the heads come from the remote-tracking refs, same rule" || bad "(24) (exit $code) $out"
+g "$WORK/seed" push -q origin t:train/release
+mkdir -p "$WORK/nogit/.claude"; printf '%s\n' "$ON" > "$WORK/nogit/.claude/ds-config.json"
+out="$(cd "$WORK/nogit" && GIT_CEILING_DIRECTORIES="$WORK" AUTO_START_NO_FETCH=1 python3 "$HELPER" check 2>&1)"; code=$?
+[ "$code" = 1 ] && printf '%s\n' "$out" | grep -q "^ERROR listing origin's branches failed" \
+  && ok "(25) branches that cannot be listed → ERROR, never a quiet SKIP" || bad "(25) (exit $code) $out"
+NAME="$(printf 'train/release\302\240candidate')"
+g "$WORK/seed" push -q origin "t:refs/heads/$NAME"
+g "$WORK/repo" fetch -q --prune origin
+out="$(cd "$WORK/repo" && AUTO_START_NO_FETCH=1 python3 -c 'import importlib.util,sys;s=importlib.util.spec_from_file_location("a",sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);print(chr(10).join(sorted(m.origin_heads("."))))' "$HELPER")"
+on="$(cd "$WORK/repo" && python3 -c 'import importlib.util,sys;s=importlib.util.spec_from_file_location("a",sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);print(chr(10).join(sorted(m.origin_heads("."))))' "$HELPER")"
+[ "$out" = "$on" ] && printf "%s\n" "$out" | grep -qxF "$NAME" \
+  && ok "(26) a branch name holding a no-break space is one name, online and offline" || bad "(26) offline $out online $on"
+g "$WORK/seed" push -q origin ":refs/heads/$NAME"
 
 exit "$FAIL"

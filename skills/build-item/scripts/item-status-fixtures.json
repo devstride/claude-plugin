@@ -1,0 +1,928 @@
+{
+ "_about": "Shared fixtures for skills/build-item/scripts/item-status.py decide. Each case's request is merged over `workspace` (a case's own workspace keys replace the base's). `expect` is the answer minus `message`; an `errors` case must exit 2 with one item-status: line. Tooling that re-implements the rule should run these against itself.",
+ "workspace": {
+  "statuses": [
+   {
+    "id": "s-new",
+    "name": "New",
+    "type": "new"
+   },
+   {
+    "id": "s-disc",
+    "name": "Discovery",
+    "type": "custom"
+   },
+   {
+    "id": "s-prog",
+    "name": "In Progress",
+    "type": "custom"
+   },
+   {
+    "id": "s-rev",
+    "name": "Review",
+    "type": "custom"
+   },
+   {
+    "id": "s-done",
+    "name": "Done",
+    "type": "done"
+   },
+   {
+    "id": "s-pend",
+    "name": "Pending Release",
+    "type": "custom"
+   },
+   {
+    "id": "s-closed",
+    "name": "Closed",
+    "type": "done"
+   },
+   {
+    "id": "s-act",
+    "name": "Active",
+    "type": "custom"
+   }
+  ],
+  "statusCollections": [
+   {
+    "id": "c-default",
+    "statusIds": [
+     "s-new",
+     "s-disc",
+     "s-prog",
+     "s-rev",
+     "s-done"
+    ],
+    "default": true
+   },
+   {
+    "id": "c-eng",
+    "statusIds": [
+     "s-new",
+     "s-prog",
+     "s-rev",
+     "s-done"
+    ]
+   },
+   {
+    "id": "c-gtm",
+    "statusIds": [
+     "s-new",
+     "s-prog",
+     "s-done"
+    ]
+   },
+   {
+    "id": "c-raid",
+    "statusIds": [
+     "s-new",
+     "s-closed"
+    ]
+   },
+   {
+    "id": "c-sales",
+    "statusIds": [
+     "s-new",
+     "s-act",
+     "s-done"
+    ]
+   }
+  ]
+ },
+ "cases": [
+  {
+   "name": "start moves New to In Progress",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-new"
+    }
+   },
+   "expect": {
+    "statusId": "s-prog",
+    "statusName": "In Progress"
+   }
+  },
+  {
+   "name": "start with the item already In Progress moves nothing",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    }
+   },
+   "expect": {}
+  },
+  {
+   "name": "start never moves a Done item",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-done"
+    }
+   },
+   "expect": {}
+  },
+  {
+   "name": "start never moves an item in any done-type status",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-closed"
+    }
+   },
+   "expect": {}
+  },
+  {
+   "name": "start honours startStatusName",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-new"
+    },
+    "startStatusName": "Discovery"
+   },
+   "expect": {
+    "statusId": "s-disc",
+    "statusName": "Discovery"
+   }
+  },
+  {
+   "name": "start: no such status in the collection moves nothing",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-new",
+     "statusCollectionId": "c-raid"
+    }
+   },
+   "expect": {}
+  },
+  {
+   "name": "start: name is exact, never case-folded",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-new"
+    },
+    "startStatusName": "in progress"
+   },
+   "expect": {}
+  },
+  {
+   "name": "epic landing moves to Review with the landed comment",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "epic",
+     "branch": "epic/I200-sync",
+     "sha": "abc1234",
+     "pullRequest": "https://github.com/o/r/pull/7",
+     "releaseUnit": "I200 epic",
+     "releaseTarget": "develop"
+    }
+   },
+   "expect": {
+    "statusId": "s-rev",
+    "statusName": "Review",
+    "comment": "merged onto epic/I200-sync at abc1234 (https://github.com/o/r/pull/7); Done when the I200 epic release pull request reaches develop"
+   }
+  },
+  {
+   "name": "plan landing is the same rule",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "plan",
+     "branch": "epic/I200-sync",
+     "sha": "abc1234",
+     "pullRequest": "https://github.com/o/r/pull/7",
+     "releaseUnit": "I200 epic",
+     "releaseTarget": "develop"
+    }
+   },
+   "expect": {
+    "statusId": "s-rev",
+    "statusName": "Review",
+    "comment": "merged onto epic/I200-sync at abc1234 (https://github.com/o/r/pull/7); Done when the I200 epic release pull request reaches develop"
+   }
+  },
+  {
+   "name": "epic landing without a pull request names only the SHA",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "epic",
+     "branch": "epic/I200-sync",
+     "sha": "abc1234",
+     "releaseUnit": "I200 epic",
+     "releaseTarget": "develop"
+    }
+   },
+   "expect": {
+    "statusId": "s-rev",
+    "statusName": "Review",
+    "comment": "merged onto epic/I200-sync at abc1234; Done when the I200 epic release pull request reaches develop"
+   }
+  },
+  {
+   "name": "train landing moves to Review with the train comment",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "train",
+     "branch": "train/release",
+     "pullRequest": "https://github.com/o/r/pull/8"
+    }
+   },
+   "expect": {
+    "statusId": "s-rev",
+    "statusName": "Review",
+    "comment": "merged to the release train train/release (https://github.com/o/r/pull/8); ships with the next release"
+   }
+  },
+  {
+   "name": "train landing without a pull request names the SHA",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "train",
+     "branch": "train/release",
+     "sha": "def5678"
+    }
+   },
+   "expect": {
+    "statusId": "s-rev",
+    "statusName": "Review",
+    "comment": "merged to the release train train/release (def5678); ships with the next release"
+   }
+  },
+  {
+   "name": "mergedStatusName null: no move, the comment still posts",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "train",
+     "branch": "train/release",
+     "pullRequest": "https://github.com/o/r/pull/8"
+    },
+    "mergedStatusName": null
+   },
+   "expect": {
+    "comment": "merged to the release train train/release (https://github.com/o/r/pull/8); ships with the next release"
+   }
+  },
+  {
+   "name": "mergedStatusName names another status",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog",
+     "statusCollectionId": "c-doc"
+    },
+    "target": {
+     "kind": "train",
+     "branch": "train/release",
+     "pullRequest": "https://github.com/o/r/pull/8"
+    },
+    "mergedStatusName": "Pending Release",
+    "workspace": {
+     "statusCollections": [
+      {
+       "id": "c-doc",
+       "statusIds": [
+        "s-new",
+        "s-prog",
+        "s-rev",
+        "s-pend",
+        "s-done"
+       ]
+      }
+     ]
+    }
+   },
+   "expect": {
+    "statusId": "s-pend",
+    "statusName": "Pending Release",
+    "comment": "merged to the release train train/release (https://github.com/o/r/pull/8); ships with the next release"
+   }
+  },
+  {
+   "name": "merged status missing from the collection: no move, the comment still posts",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog",
+     "statusCollectionId": "c-gtm"
+    },
+    "target": {
+     "kind": "epic",
+     "branch": "epic/I200-sync",
+     "sha": "abc1234",
+     "pullRequest": "https://github.com/o/r/pull/7",
+     "releaseUnit": "I200 epic",
+     "releaseTarget": "develop"
+    }
+   },
+   "expect": {
+    "comment": "merged onto epic/I200-sync at abc1234 (https://github.com/o/r/pull/7); Done when the I200 epic release pull request reaches develop"
+   }
+  },
+  {
+   "name": "no statusCollectionId and the current status is outside the default collection: no move",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-act"
+    },
+    "target": {
+     "kind": "epic",
+     "branch": "epic/I200-sync",
+     "sha": "abc1234",
+     "pullRequest": "https://github.com/o/r/pull/7",
+     "releaseUnit": "I200 epic",
+     "releaseTarget": "develop"
+    }
+   },
+   "expect": {
+    "comment": "merged onto epic/I200-sync at abc1234 (https://github.com/o/r/pull/7); Done when the I200 epic release pull request reaches develop"
+   }
+  },
+  {
+   "name": "statusCollectionId given decides the collection",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog",
+     "statusCollectionId": "c-eng"
+    },
+    "target": {
+     "kind": "epic",
+     "branch": "epic/I200-sync",
+     "sha": "abc1234",
+     "pullRequest": "https://github.com/o/r/pull/7",
+     "releaseUnit": "I200 epic",
+     "releaseTarget": "develop"
+    },
+    "workspace": {
+     "statusCollections": [
+      {
+       "id": "c-eng",
+       "statusIds": [
+        "s-new",
+        "s-prog",
+        "s-rev",
+        "s-done"
+       ]
+      },
+      {
+       "id": "c-gtm",
+       "statusIds": [
+        "s-new",
+        "s-prog",
+        "s-done"
+       ]
+      }
+     ]
+    }
+   },
+   "expect": {
+    "statusId": "s-rev",
+    "statusName": "Review",
+    "comment": "merged onto epic/I200-sync at abc1234 (https://github.com/o/r/pull/7); Done when the I200 epic release pull request reaches develop"
+   }
+  },
+  {
+   "name": "no collection holds the current status: no move",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-pend"
+    },
+    "target": {
+     "kind": "epic",
+     "branch": "epic/I200-sync",
+     "sha": "abc1234",
+     "pullRequest": "https://github.com/o/r/pull/7",
+     "releaseUnit": "I200 epic",
+     "releaseTarget": "develop"
+    }
+   },
+   "expect": {
+    "comment": "merged onto epic/I200-sync at abc1234 (https://github.com/o/r/pull/7); Done when the I200 epic release pull request reaches develop"
+   }
+  },
+  {
+   "name": "unknown current status: no move",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-gone"
+    }
+   },
+   "expect": {}
+  },
+  {
+   "name": "landing an item already in Review: no move, the comment still posts",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-rev"
+    },
+    "target": {
+     "kind": "epic",
+     "branch": "epic/I200-sync",
+     "sha": "abc1234",
+     "pullRequest": "https://github.com/o/r/pull/7",
+     "releaseUnit": "I200 epic",
+     "releaseTarget": "develop"
+    }
+   },
+   "expect": {
+    "comment": "merged onto epic/I200-sync at abc1234 (https://github.com/o/r/pull/7); Done when the I200 epic release pull request reaches develop"
+   }
+  },
+  {
+   "name": "landing a Done item: no move, the landed comment still posts",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-done"
+    },
+    "target": {
+     "kind": "train",
+     "branch": "train/release",
+     "pullRequest": "https://github.com/o/r/pull/8"
+    }
+   },
+   "expect": {
+    "comment": "merged to the release train train/release (https://github.com/o/r/pull/8); ships with the next release"
+   }
+  },
+  {
+   "name": "base landing moves to Done, no comment",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "base",
+     "branch": "develop",
+     "pullRequest": "https://github.com/o/r/pull/9"
+    }
+   },
+   "expect": {
+    "statusId": "s-done",
+    "statusName": "Done"
+   }
+  },
+  {
+   "name": "base landing falls back to the only done-type status",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-new",
+     "statusCollectionId": "c-raid"
+    },
+    "target": {
+     "kind": "base",
+     "branch": "develop"
+    }
+   },
+   "expect": {
+    "statusId": "s-closed",
+    "statusName": "Closed"
+   }
+  },
+  {
+   "name": "base landing ignores mergedStatusName",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "base",
+     "branch": "develop"
+    },
+    "mergedStatusName": null
+   },
+   "expect": {
+    "statusId": "s-done",
+    "statusName": "Done"
+   }
+  },
+  {
+   "name": "an epic landing on a Done item keeps Done and posts the landed comment",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-done"
+    },
+    "target": {
+     "kind": "epic",
+     "branch": "epic/I200-sync",
+     "sha": "abc1234",
+     "pullRequest": "https://github.com/o/r/pull/7",
+     "releaseUnit": "I200 epic",
+     "releaseTarget": "develop"
+    }
+   },
+   "expect": {
+    "comment": "merged onto epic/I200-sync at abc1234 (https://github.com/o/r/pull/7); Done when the I200 epic release pull request reaches develop"
+   }
+  },
+  {
+   "name": "no statusCollectionId and no single default collection: no move",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-new"
+    },
+    "workspace": {
+     "statusCollections": [
+      {
+       "id": "c-a",
+       "default": true,
+       "statusIds": [
+        "s-new",
+        "s-prog"
+       ]
+      },
+      {
+       "id": "c-b",
+       "default": true,
+       "statusIds": [
+        "s-new",
+        "s-prog"
+       ]
+      }
+     ]
+    }
+   },
+   "expect": {}
+  },
+  {
+   "name": "a statusCollectionId without the target never borrows it from another collection",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog",
+     "statusCollectionId": "c-gtm"
+    },
+    "target": {
+     "kind": "train",
+     "branch": "train/release",
+     "sha": "def5678"
+    }
+   },
+   "expect": {
+    "comment": "merged to the release train train/release (def5678); ships with the next release"
+   }
+  },
+  {
+   "name": "base landing picks a done-type status over a custom one named Done",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "x-prog"
+    },
+    "target": {
+     "kind": "base",
+     "branch": "develop"
+    },
+    "workspace": {
+     "statuses": [
+      {
+       "id": "x-new",
+       "name": "New",
+       "type": "new"
+      },
+      {
+       "id": "x-prog",
+       "name": "In Progress",
+       "type": "custom"
+      },
+      {
+       "id": "x-done",
+       "name": "Done",
+       "type": "custom"
+      },
+      {
+       "id": "x-closed",
+       "name": "Closed",
+       "type": "done"
+      }
+     ],
+     "statusCollections": [
+      {
+       "id": "c-x",
+       "default": true,
+       "statusIds": [
+        "x-new",
+        "x-prog",
+        "x-done",
+        "x-closed"
+       ]
+      }
+     ]
+    }
+   },
+   "expect": {
+    "statusId": "x-closed",
+    "statusName": "Closed"
+   }
+  },
+  {
+   "name": "base landing with two done-type statuses and none named Done: no move",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "x-prog"
+    },
+    "target": {
+     "kind": "base",
+     "branch": "develop"
+    },
+    "workspace": {
+     "statuses": [
+      {
+       "id": "x-prog",
+       "name": "In Progress",
+       "type": "custom"
+      },
+      {
+       "id": "x-a",
+       "name": "Shipped",
+       "type": "done"
+      },
+      {
+       "id": "x-b",
+       "name": "Closed",
+       "type": "done"
+      }
+     ],
+     "statusCollections": [
+      {
+       "id": "c-x",
+       "default": true,
+       "statusIds": [
+        "x-prog",
+        "x-a",
+        "x-b"
+       ]
+      }
+     ]
+    }
+   },
+   "expect": {}
+  },
+  {
+   "name": "routing's integration target lands as the base does: Done",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "integration",
+     "branch": "staging"
+    }
+   },
+   "expect": {
+    "statusId": "s-done",
+    "statusName": "Done"
+   }
+  },
+  {
+   "name": "routing's explicit target lands as the base does: Done",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "explicit",
+     "branch": "feature/shared"
+    }
+   },
+   "expect": {
+    "statusId": "s-done",
+    "statusName": "Done"
+   }
+  }
+ ],
+ "errors": [
+  {
+   "name": "unknown event",
+   "request": {
+    "event": "merge",
+    "item": {
+     "number": "I101",
+     "statusId": "s-new"
+    }
+   }
+  },
+  {
+   "name": "item without a statusId",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101"
+    }
+   }
+  },
+  {
+   "name": "landing without a target",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    }
+   }
+  },
+  {
+   "name": "unknown target kind",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "hotfix",
+     "branch": "x"
+    }
+   }
+  },
+  {
+   "name": "target without a branch",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "train",
+     "sha": "a"
+    }
+   }
+  },
+  {
+   "name": "epic landing without a SHA",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "epic",
+     "branch": "epic/I200-sync",
+     "pullRequest": "https://github.com/o/r/pull/7",
+     "releaseUnit": "I200 epic",
+     "releaseTarget": "develop"
+    }
+   }
+  },
+  {
+   "name": "epic landing without its release unit",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "epic",
+     "branch": "epic/I200-sync",
+     "sha": "abc1234",
+     "pullRequest": "https://github.com/o/r/pull/7",
+     "releaseTarget": "develop"
+    }
+   }
+  },
+  {
+   "name": "train landing with neither pull request nor SHA",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "train",
+     "branch": "train/release"
+    }
+   }
+  },
+  {
+   "name": "a status without a type",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-new"
+    },
+    "workspace": {
+     "statuses": [
+      {
+       "id": "s-new",
+       "name": "New"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "statusCollectionId not in the workspace",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-new",
+     "statusCollectionId": "c-none"
+    }
+   }
+  },
+  {
+   "name": "startStatusName null",
+   "request": {
+    "event": "start",
+    "item": {
+     "number": "I101",
+     "statusId": "s-new"
+    },
+    "startStatusName": null
+   }
+  },
+  {
+   "name": "mergedStatusName empty",
+   "request": {
+    "event": "landed",
+    "item": {
+     "number": "I101",
+     "statusId": "s-prog"
+    },
+    "target": {
+     "kind": "train",
+     "branch": "train/release",
+     "pullRequest": "https://github.com/o/r/pull/8"
+    },
+    "mergedStatusName": ""
+   }
+  }
+ ]
+}

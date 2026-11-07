@@ -65,8 +65,8 @@ Honoured only with a `claims` block (doctor: an ERROR; at run time it does nothi
 3. `release`, at the end of step 6, after its own close-out.
 
 At a trigger run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/auto-start.py check`
-(it fetches the train and the release source). `SKIP <reason>` → carry on, saying nothing; `ERROR`
-→ say it once and carry on. `START …` → claim the train (above, mode `select`): lost → carry on
+(it fetches the train and the release source; a renamed train is an `ERROR` naming the cutover). `SKIP <reason>` → carry on, saying nothing;
+`ERROR` → say it once and carry on. `START …` → claim the train (above, mode `select`): lost → carry on
 silently; won → invoke **`release`** in this session, declaring `started-by: auto`; its step 0b
 finds and adopts any open train pull request itself. When that release stops — at the owner's yes,
 or merged — return to the caller's own loop. The caller keeps its checkout lease until then and
