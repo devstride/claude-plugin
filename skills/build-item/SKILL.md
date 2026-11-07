@@ -175,8 +175,8 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
 
 ## 1. Mark In Progress
 
-`update_item` → In Progress (status id from the work type's collection in
-`get_workspace_context`); confirm it moved before branching.
+`item-status.py decide` with `event: start` (`references/item-status.md`): its `statusId` →
+`update_item`; confirm it moved before branching.
 
 ## 2. Branch
 
@@ -259,10 +259,9 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 
 ## 6. Completion ritual
 
-- `update_item` → **Done** (never `mark_done`); `startDate`/`dueDate` = branch creation → merge.
-  **NOT Done** after an epic-branch merge — LANDED (merged status, landed comment, same dates;
-  `next-unblocked.md`), closed by step 8 — or a train merge — its comment, status unchanged
-  (`release-train.md`), closed by `release`.
+- `item-status.py decide`, `event: landed`, sets status and comment (never `mark_done`);
+  `startDate`/`dueDate` = branch creation → merge. Base → **Done**; an epic-branch merge is LANDED
+  (`next-unblocked.md`), closed by step 8; a train merge too (`release-train.md`), closed by `release`.
 - **The item points at its code**: 4b — confirm the PR auto-linked, else `link_pull_request`; 4a —
   that comment. Never invent a PR number.
 - **Reconcile as-built** on a material deviation: `add_comment` the `view: 'full'` description
