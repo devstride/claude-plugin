@@ -229,5 +229,17 @@ out="$(cd "$WORK/repo" && AUTO_START_NO_FETCH=1 python3 "$HELPER" check 2>&1)"; 
 [ "$code" = 1 ] && printf '%s\n' "$out" | grep -q '^ERROR a release reads only train/release' \
   && ok "(24) offline (AUTO_START_NO_FETCH=1) the heads come from the remote-tracking refs, same rule" || bad "(24) (exit $code) $out"
 g "$WORK/seed" push -q origin t:train/release
+mkdir -p "$WORK/nogit/.claude"; printf '%s\n' "$ON" > "$WORK/nogit/.claude/ds-config.json"
+out="$(cd "$WORK/nogit" && GIT_CEILING_DIRECTORIES="$WORK" AUTO_START_NO_FETCH=1 python3 "$HELPER" check 2>&1)"; code=$?
+[ "$code" = 1 ] && printf '%s\n' "$out" | grep -q "^ERROR listing origin's branches failed" \
+  && ok "(25) branches that cannot be listed → ERROR, never a quiet SKIP" || bad "(25) (exit $code) $out"
+NAME="$(printf 'train/release\302\240candidate')"
+g "$WORK/seed" push -q origin "t:refs/heads/$NAME"
+g "$WORK/repo" fetch -q --prune origin
+out="$(cd "$WORK/repo" && AUTO_START_NO_FETCH=1 python3 -c 'import importlib.util,sys;s=importlib.util.spec_from_file_location("a",sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);print(chr(10).join(sorted(m.origin_heads("."))))' "$HELPER")"
+on="$(cd "$WORK/repo" && python3 -c 'import importlib.util,sys;s=importlib.util.spec_from_file_location("a",sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);print(chr(10).join(sorted(m.origin_heads("."))))' "$HELPER")"
+[ "$out" = "$on" ] && printf "%s\n" "$out" | grep -qxF "$NAME" \
+  && ok "(26) a branch name holding a no-break space is one name, online and offline" || bad "(26) offline $out online $on"
+g "$WORK/seed" push -q origin ":refs/heads/$NAME"
 
 exit "$FAIL"

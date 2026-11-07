@@ -91,13 +91,18 @@ def repo_key(root):
 
 def origin_heads(root):
     """The branch names on origin: one `git ls-remote`, or the local remote-tracking refs offline."""
-    if os.environ.get("AUTO_START_NO_FETCH") == "1":
-        listed = git(root, "for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin/")
-        return {name for name in listed.stdout.split() if name and name != "HEAD"}
-    listed = git(root, "ls-remote", "--heads", "origin")
+    offline = os.environ.get("AUTO_START_NO_FETCH") == "1"
+    listed = (git(root, "for-each-ref", "--format=%(refname)", "refs/remotes/origin/") if offline
+              else git(root, "ls-remote", "--heads", "origin"))
     if listed.returncode != 0:
-        out("ERROR git ls-remote of origin failed: %s" % (listed.stderr or "").strip()[:200], 1)
-    return {line.split("refs/heads/", 1)[1] for line in listed.stdout.splitlines() if "refs/heads/" in line}
+        out("ERROR listing origin's branches failed: %s" % (listed.stderr or "").strip()[:200], 1)
+    prefix = "refs/remotes/origin/" if offline else "refs/heads/"
+    heads = set()
+    for record in listed.stdout.split("\n"):   # "\n" only: git allows other Unicode breaks in a name
+        ref = record if offline else record.partition("\t")[2]
+        if ref.startswith(prefix) and ref != prefix + "HEAD":
+            heads.add(ref[len(prefix):])
+    return heads
 
 
 def check():
