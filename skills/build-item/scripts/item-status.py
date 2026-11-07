@@ -12,7 +12,7 @@ does the `update_item` / `add_comment` itself and reads the item back.
                  "item": {"number", "statusId", "statusCollectionId"?},
                  "workspace": {"statuses": [{"id", "name", "type"}…],
                                "statusCollections": [{"id", "statusIds": […]}…]},
-                 "target"?: {"kind": "epic"|"plan"|"train"|"base", "branch",
+                 "target"?: {"kind": "epic"|"plan"|"train"|"base"|"integration"|"explicit", "branch",
                              "sha"?, "pullRequest"?, "releaseUnit"?, "releaseTarget"?},
                  "mergedStatusName"?: str|null, "startStatusName"?: str}
           stdout {"statusId"?, "statusName"?, "comment"?, "message"}
@@ -21,17 +21,17 @@ No `statusId` in the answer means: leave the status as it is. A `comment` is pos
 status does — on an epic, plan or train landing it is the landed record recovery reads.
 
 Rules:
-- An item in a done-type status never moves and gets no comment.
+- An item in a done-type status never moves; it still gets the landed comment below.
 - start  -> `startStatusName` (absent: "In Progress").
 - landed on an epic or plan integration branch, or on the release train -> the merged status,
   `mergedStatusName` (absent: "Review"; null: none), plus the landed comment. `target` is required.
-- landed on the base branch (`kind: base`, its own pull request) -> the done-type status ("Done"
-  by name, else the collection's only done-type status). No comment: the pull request links itself.
+- landed on the base branch (`kind: base`, its own pull request), or on routing's `integration` or
+  `explicit` branch -> a done-type status ("Done" by name among them, else the collection's only
+  one). No comment: the pull request links itself.
 - A status resolves BY NAME, exactly, and only inside the item's status collection: the one
-  `statusCollectionId` names when given (pass it whenever the work type's collection is known);
-  else any collection that holds the item's current status (the DevStride tools do not say which
-  collection a work type uses, and a status name is unique in an organization). Missing, ambiguous
-  or already current -> no move, with the reason in `message`.
+  `statusCollectionId` names (an item on a board: that board's `statusCollectionId`), else the
+  organization's default collection (`"default": true`), which must hold the item's current
+  status. Missing, ambiguous or already current -> no move, with the reason in `message`.
 
 Exit 0 with a decision (a move or none), 2 with one `item-status: <reason>` line on stderr for a
 bad request, 1 for anything else. A caller never moves the item on a non-zero exit.
@@ -39,7 +39,8 @@ bad request, 1 for anything else. A caller never moves the item on a non-zero ex
 import json
 import sys
 
-KINDS = ("epic", "plan", "train", "base")
+KINDS = ("epic", "plan", "train", "base", "integration", "explicit")
+DONE_KINDS = ("base", "integration", "explicit")
 
 
 class Refuse(Exception):
@@ -100,17 +101,19 @@ def decide(request):
     by_id = {s["id"]: s for s in statuses}
     current = by_id.get(item["statusId"])
     current_name = current["name"] if current else "an unknown status"
-    if current and current.get("type") == "done":
-        return {"message": "%s is already %s, a done status: left as it is" % (item["number"], current_name)}
-
     comment = None
-    if event == "landed" and target["kind"] != "base":
+    if event == "landed" and target["kind"] not in DONE_KINDS:
         comment = landed_comment(target)
+    if current and current.get("type") == "done":
+        out = {"message": "%s is already %s, a done status: left as it is" % (item["number"], current_name)}
+        if comment:
+            out["comment"] = comment
+        return out
 
     wanted_done = False
     if event == "start":
         wanted = request.get("startStatusName", "In Progress")
-    elif target["kind"] == "base":
+    elif target["kind"] in DONE_KINDS:
         wanted, wanted_done = "Done", True
     else:
         wanted = request.get("mergedStatusName", "Review")
@@ -132,18 +135,17 @@ def decide(request):
         scope = [c for c in collections if c["id"] == given]
         need(scope, "item.statusCollectionId %s is not in workspace.statusCollections" % given)
     else:
-        scope = [c for c in collections if item["statusId"] in c["statusIds"]]
-        if not scope:
-            return answer("%s's status collection is unknown (no collection holds its current status): left as it is"
-                          % item["number"])
-    allowed = set()
-    for c in scope:
-        allowed |= set(c["statusIds"])
-    inside = [by_id[i] for i in sorted(allowed) if i in by_id]
+        scope = [c for c in collections if c.get("default") is True]
+        if len(scope) != 1 or item["statusId"] not in scope[0]["statusIds"]:
+            return answer("%s's status collection is unknown (pass its board's statusCollectionId): left as %s"
+                          % (item["number"], current_name))
+    inside = [by_id[i] for i in scope[0]["statusIds"] if i in by_id]
 
+    if wanted_done:
+        inside = [s for s in inside if s.get("type") == "done"]
     found = [s for s in inside if s["name"] == wanted]
     if not found and wanted_done:
-        found = [s for s in inside if s.get("type") == "done"]
+        found = inside
     if len(found) != 1:
         why = "no status named %s" % wanted if not found else "%d statuses named %s" % (len(found), wanted)
         return answer("%s in %s's status collection: left as %s" % (why, item["number"], current_name))
