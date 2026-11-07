@@ -95,11 +95,13 @@ STORE="$WORK/claims"; mkdir -p "$STORE"
 starter() {
   local line; line="$(run check | head -1)"
   case "$line" in START*) ;; *) echo "SKIPPED" > "$WORK/starter-$1"; return;; esac
-  if mkdir "$STORE/release-train:$(run key | tr / _)" 2>/dev/null; then echo WON > "$WORK/starter-$1"; else echo LOST > "$WORK/starter-$1"; fi
+  local key; key="$(run key)" || { echo "KEYFAIL $key" > "$WORK/starter-$1"; return; }
+  if mkdir "$STORE/release-train:$(printf '%s' "$key" | tr / _)" 2>/dev/null; then echo "WON $key" > "$WORK/starter-$1"; else echo "LOST $key" > "$WORK/starter-$1"; fi
 }
 starter one & starter two & wait
-got="$(cat "$WORK/starter-one" "$WORK/starter-two" | sort | tr '\n' ' ')"
-[ "$got" = "LOST WON " ] && ok "(12) two starters at one trigger → exactly one wins the release-train claim" || bad "(12) $got"
+got="$(cut -d' ' -f1 "$WORK/starter-one" "$WORK/starter-two" | sort | tr '\n' ' ')"
+[ "$got" = "LOST WON " ] && ok "(12) two starters at one trigger → exactly one wins the release-train claim" \
+  || bad "(12) $got — $(cat "$WORK/starter-one" "$WORK/starter-two" | tr '\n' '|')"
 
 # (13)-(15) the claim is released NON-final at the cut. The contract's release call (outcome and
 # final flag) is read from auto-start.md and run through a stand-in store with the server's rule —
