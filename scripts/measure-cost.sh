@@ -32,7 +32,7 @@
 #                the sum over SKILL.md files of "- devstride:<name>: <description>\n"
 #                from each frontmatter. Budgeted (alwaysOnContext).
 #   alwaysOn.executed  hooks/hooks.json + hooks/version-check.sh + hooks/session-gate.sh +
-#                hooks/session-runtime.py + .claude-plugin/plugin.json in bytes — parsed or executed by the
+#                hooks/session-runtime.py + hooks/presence.py + .claude-plugin/plugin.json in bytes — parsed or executed by the
 #                harness, never read as context.
 #
 # Flags:
@@ -154,11 +154,11 @@ for name, b in bodies.items():
         fm = frontmatter(f.read())
     if not fm: early_problems.append("NO-FRONTMATTER %s" % b["path"])
     if listed(fm): ctx_bytes += len(listing_line(fm, name).encode("utf-8"))
-EXECUTED = ("hooks/hooks.json", "hooks/version-check.sh", "hooks/session-gate.sh", "hooks/session-runtime.py", ".claude-plugin/plugin.json")
+EXECUTED = ("hooks/hooks.json", "hooks/version-check.sh", "hooks/session-gate.sh", "hooks/session-runtime.py", "hooks/presence.py", ".claude-plugin/plugin.json")
 executed_bytes = 0
 for p in EXECUTED:
     if os.path.exists(os.path.join(ROOT, p)): executed_bytes += nbytes(os.path.join(ROOT, p))
-    else: early_problems.append("MISSING %s (alwaysOn.executed is defined as exactly five files)" % p)
+    else: early_problems.append("MISSING %s (alwaysOn.executed is defined as exactly six files)" % p)
 always = {"context": {"bytes": ctx_bytes, "tokens": tokens(ctx_bytes)}, "executed": {"bytes": executed_bytes}}
 
 # --- budgets --------------------------------------------------------------------------------
@@ -334,7 +334,7 @@ for name, path in sorted(composed_paths.items()):
 print("\n%-40s %9s   (executed, not loaded)" % ("script", "bytes"))
 for p, s in sorted(scripts.items()): print("%-40s %9s" % (p, fmt(s["bytes"])))
 print("\nalwaysOn.context   %s bytes / %s tokens  budget %s — the skill listing every session loads; the session-start hook adds at most two lines of stdout, and only when it speaks" % (fmt(ctx_bytes), fmt(always["context"]["tokens"]), fmt(always["context"].get("budget", 0)) if not budget_error else "—"))
-print("alwaysOn.executed  %s bytes — hooks/hooks.json + hooks/version-check.sh + hooks/session-gate.sh + hooks/session-runtime.py + .claude-plugin/plugin.json: parsed or executed by the harness, never read as context" % fmt(executed_bytes))
+print("alwaysOn.executed  %s bytes — hooks/hooks.json + hooks/version-check.sh + hooks/session-gate.sh + hooks/session-runtime.py + hooks/presence.py + .claude-plugin/plugin.json: parsed or executed by the harness, never read as context" % fmt(executed_bytes))
 print("\ntotals: %d bodies %s bytes / %s tokens; %d references %s tokens" % (len(bodies), fmt(sum(b["bytes"] for b in bodies.values())), fmt(sum(b["tokens"] for b in bodies.values())), len(refs), fmt(sum(r["tokens"] for r in refs.values()))))
 for p in problems: print(p)
 sys.exit(1 if problems else 0)

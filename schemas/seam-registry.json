@@ -282,6 +282,21 @@
       "since": "3.25.0"
     },
     {
+      "key": "presence.command",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": false,
+      "required": true,
+      "payload": "PRESENCE_EVENT (start, beat or end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE, PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM, PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON, CLAUDE_CODE_SESSION_ID and CLAUDE_PID exported; run from the repository root through the shell",
+      "verdict": "none read: the exit code is kept in the session's local record; more than 20 seconds is killed; nothing ever blocks a turn",
+      "calledBy": [
+        "hooks/presence.py"
+      ],
+      "unset": "the whole presence block is absent: no hook sends anything and no keeper starts",
+      "contract": "skills/setup/references/session-presence.md",
+      "since": "3.42.0"
+    },
+    {
       "key": "verify.typecheck",
       "shape": "command",
       "valueType": "string[]",
@@ -1802,6 +1817,24 @@
       "required": true,
       "description": "the repository's own start and end commands",
       "since": "3.25.0"
+    },
+    {
+      "key": "presence",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "the repository's own presence command, run by the plugin's hooks for every session (start, each prompt, each finished turn, a keeper every intervalMinutes, session end); absent or null runs nothing and writes nothing",
+      "since": "3.42.0"
+    },
+    {
+      "key": "presence.intervalMinutes",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 60,
+      "default": 5,
+      "description": "minutes between the keeper's beats while the session's process lives; out of range reads as 5",
+      "since": "3.42.0"
     },
     {
       "key": "release.docsRepo",

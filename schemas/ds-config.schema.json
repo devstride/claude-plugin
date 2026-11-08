@@ -1343,6 +1343,32 @@
         "commands"
       ]
     },
+    "presence": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "command hook — PRESENCE_EVENT (start, beat or end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE, PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM, PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON, CLAUDE_CODE_SESSION_ID and CLAUDE_PID exported; run from the repository root through the shell"
+        },
+        "intervalMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "minutes between the keeper's beats while the session's process lives; out of range reads as 5"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "the repository's own presence command, run by the plugin's hooks for every session (start, each prompt, each finished turn, a keeper every intervalMinutes, session end); absent or null runs nothing and writes nothing",
+      "required": [
+        "command"
+      ]
+    },
     "releaseTrain": {
       "type": [
         "object",

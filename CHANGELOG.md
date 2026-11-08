@@ -8,6 +8,21 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Every running session reports itself, not only the ones holding a claim.** A repository that
+  names a presence command in `.claude/ds-config.json` (`presence.command`, with an optional
+  `presence.intervalMinutes`, default 5) gets one report per session from the plugin's hooks: at
+  session start, on prompts, when a turn finishes and Claude waits for its person, and at session
+  end (with its reason, such as `clear`). A small detached keeper per session reports every
+  interval while the session's Claude Code process lives, so a session working through one long
+  turn stays visible, and reports `end` (reason `gone`) when that process is killed or crashes.
+  Each report runs the repository's own command with the event, the state (`starting`, `working`,
+  `waiting`, `ended`), the session id, machine, checkout, branch, the item number the branch
+  carries, the plugin version and the interval in its environment. The plugin contacts no tracker
+  itself and changes nothing when the block is absent. New hook: `hooks/presence.py` (fails open,
+  prints nothing); contract: `skills/setup/references/session-presence.md`.
+
 ## [3.41.0] — 2026-11-08
 
 ### Added
