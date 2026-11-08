@@ -25,7 +25,8 @@ request into the base stays the batch's one CI run (why: `release-train.md`).
    note?}]}` into
    `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/review-gate.py record`. Use `fixed`,
    `dismissed`, `refuted`, `deferred` or `captured`; each note is one line in your own words, never
-   an engine's text. Each engine's `result` is the final cycle's: `findings`, `no-findings` or
+   an engine's text. Each engine's `result` is its latest across the review (the last cycle it ran; a Claude-only
+   follow-up keeps the CLI engine's earlier result): `findings`, `no-findings` or
    `failed` with a one-line `reason` (an `engine` answer of `returned` is read first, then mapped); `claude` and, with `review.localCommand` set, another engine
    must have returned one. Exit 2 → fix what it names. It writes a receipt for exactly this head, tree
    and merge base, kept under the repository's git directory on this machine.

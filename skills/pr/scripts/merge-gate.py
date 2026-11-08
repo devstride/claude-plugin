@@ -41,12 +41,15 @@ The rule (an approver's admin merge exactly when every required check is green, 
 - A base that requires branches to be up to date (a ruleset's strict policy, or classic `strict`)
   is checked with the compare API: a head behind its base is a REFUSE, so `--admin` never merges
   an out-of-date head even when GitHub reads the pull request BLOCKED rather than BEHIND.
+- No bypassed approval: when the merge would need `--admin`, a REVIEW_REQUIRED decision or an
+  unmet approval requirement of the base's pull_request rule (approving count, code owners, last
+  push, required reviewers) is a REFUSE: `--admin` would skip the approval.
 - No open conversation: a CHANGES_REQUESTED decision, any reviewer whose latest review requests
   changes (even when reviews are not required and the decision is empty), or any unresolved
   review thread is a REFUSE.
 - `--admin` only when GitHub reads the pull request BLOCKED with all of the above true, at least
   one required check, and no rule on the base this gate cannot judge (KNOWN_RULES; a
-  `workflows`, `code_scanning`, `required_deployments`, `merge_queue` or other rule would be
+  `workflows`, `code_scanning`, `required_deployments`, `merge_queue`, `required_signatures` or other rule would be
   bypassed silently, so it refuses): the base's rules let only an admin's merge through. CLEAN, HAS_HOOKS or
   UNSTABLE (a failing check that is not required) merges without it. DIRTY, BEHIND, UNKNOWN and
   any other state is a REFUSE: an admin merge never bypasses a conflict, an out-of-date branch or
@@ -67,7 +70,10 @@ NO_PROTECTION = ("Branch not protected", "Required status checks not enabled")
 # Rule types an admin merge may pass knowing what it bypasses: required checks are judged here;
 # reviews by the open-thread and change-request checks; the rest guard pushes, not merges.
 KNOWN_RULES = ("required_status_checks", "pull_request", "copilot_code_review", "update", "deletion",
-               "non_fast_forward", "creation", "required_signatures")
+               "non_fast_forward", "creation")
+# A pull_request rule's approval requirements: an admin merge would bypass any of these unmet.
+APPROVALS = ("required_approving_review_count", "require_code_owner_review", "require_last_push_approval",
+             "required_reviewers")
 PLAIN = ("CLEAN", "HAS_HOOKS", "UNSTABLE")
 
 PR_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: String) {
@@ -124,6 +130,10 @@ class Refuse(Exception):
 
 class Unreadable(Exception):
     pass
+
+
+class Retry(Exception):
+    """The base or head moved while the gate was reading: one fresh read, then a REFUSE."""
 
 
 def gh(*args):
@@ -187,7 +197,7 @@ def pull_request(owner, name, number):
         if after is None:
             pr["_oid"] = commit.get("oid")
         elif commit.get("oid") != pr["_oid"]:
-            raise Unreadable("the head moved while its checks were being read: ask again")
+            raise Retry("the head moved while its checks were being read")
         rollup = (commit.get("statusCheckRollup") or {}).get("contexts") or {"nodes": [], "pageInfo": {}}
         contexts += rollup.get("nodes") or []
         info = rollup.get("pageInfo") or {}
@@ -207,7 +217,7 @@ def merge_commit_contexts(owner, name, number, oid):
         if not commit:
             return []
         if commit.get("oid") != oid:
-            raise Unreadable("the test merge commit changed while its checks were being read: ask again")
+            raise Retry("the base moved while the test merge commit's checks were being read")
         rollup = (commit.get("statusCheckRollup") or {}).get("contexts") or {"nodes": [], "pageInfo": {}}
         contexts += rollup.get("nodes") or []
         info = rollup.get("pageInfo") or {}
@@ -238,6 +248,7 @@ def app_of(value):
 def ruleset_checks(owner, name, base):
     """The base's ruleset requirements: (required checks with their apps, strict?, rule types)."""
     required, strict, types, page = set(), False, set(), 1
+    approvals = []
     while True:
         rules = gh_json("api", "repos/%s/%s/rules/branches/%s?per_page=100&page=%d" % (owner, name, quote(base, safe=""), page))
         if not isinstance(rules, list):
@@ -246,6 +257,9 @@ def ruleset_checks(owner, name, base):
             if not isinstance(rule, dict):
                 continue
             types.add(rule.get("type"))
+            if rule.get("type") == "pull_request":
+                params = rule.get("parameters") or {}
+                approvals += [k for k in APPROVALS if params.get(k) not in (None, False, 0, [])]
             if rule.get("type") == "required_status_checks":
                 params = rule.get("parameters") or {}
                 strict = strict or params.get("strict_required_status_checks_policy") is True
@@ -253,7 +267,7 @@ def ruleset_checks(owner, name, base):
                     if isinstance(check, dict) and check.get("context"):
                         required.add((check["context"], app_of(check.get("integration_id"))))
         if len(rules) < 100:
-            return required, strict, types
+            return required, strict, types, approvals
         page += 1
 
 
@@ -392,7 +406,7 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     if not isinstance(base, str) or not base:
         raise Unreadable("#%d names no base branch" % number)
     runs = runs_at_head(pr["_contexts"])
-    ruled, ruled_strict, types = ruleset_checks(owner, name, base)
+    ruled, ruled_strict, types, approvals = ruleset_checks(owner, name, base)
     protected, protected_strict = protection_checks(owner, name, base)
     required = ruled | protected | {(k[1], None) for k, (_, req) in runs.items() if req}
     problems = problems_with(required, runs)
@@ -422,6 +436,9 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     if admin and not required:
         raise Refuse("#%d is blocked and %s requires no check, so nothing proves this head green: "
                      "an admin merge would bypass a block it cannot name" % (number, base))
+    if admin and (pr.get("reviewDecision") == "REVIEW_REQUIRED" or (approvals and pr.get("reviewDecision") != "APPROVED")):
+        raise Refuse("#%d still needs an approving review (%s): an admin merge would bypass it"
+                     % (number, ", ".join(sorted(set(approvals))) or "GitHub reads REVIEW_REQUIRED"))
     unknown = sorted(t for t in types if t not in KNOWN_RULES)
     if admin and unknown:
         raise Refuse("#%d is blocked and %s has rule(s) this gate cannot judge (%s): an admin merge would bypass them"
@@ -463,7 +480,13 @@ def main(argv):
             if code != 0 or not REPO.match(repo):
                 raise Unreadable("the repository could not be resolved: %s" % (err or out).strip()[:200])
         owner, name = repo.split("/")
-        command, why = decide(number, expected, owner, name, delete_branch, subject, all_green)
+        try:
+            command, why = decide(number, expected, owner, name, delete_branch, subject, all_green)
+        except Retry:
+            try:
+                command, why = decide(number, expected, owner, name, delete_branch, subject, all_green)
+            except Retry as again:
+                raise Refuse("%s twice: run the gate again once it settles" % again)
     except Refuse as err:
         print("REFUSE %s" % str(err).replace("\n", " "))
         return 2

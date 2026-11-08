@@ -31,6 +31,11 @@ if a[:2] == ["api", "graphql"]:
         sys.exit(0)
     if "potentialMergeCommit { oid statusCheckRollup" in q:
         m = s.get("mergeCommit")
+        if s.get("mergeCommitMoves"):
+            n = int(open(os.environ["GH_LOG"] + ".mc", "a+").seek(0, 2) or 0)
+            open(os.environ["GH_LOG"] + ".mc", "a").write("x")
+            if n < s["mergeCommitMoves"]:
+                m = dict(m, oid="e" * 40)
         commit = None if m is None else {"oid": m["oid"], "statusCheckRollup": {"contexts": {"pageInfo": {"hasNextPage": False}, "nodes": m["nodes"]}}}
         print(json.dumps({"data": {"repository": {"pullRequest": {"potentialMergeCommit": commit}}}})); sys.exit(0)
     if s.get("pr") is None:
@@ -50,7 +55,8 @@ if a[0] == "api" and "/rules/branches/" in a[1]:
     extra = [{"type": k} for k in s.get("ruleTypes", [])]
     print(json.dumps([{"type": "required_status_checks", "parameters": {"required_status_checks": objs,
                        "strict_required_status_checks_policy": bool(s.get("strict"))}},
-                      {"type": "pull_request", "parameters": {}}, {"type": "update"}] + extra)); sys.exit(0)
+                      {"type": "pull_request", "parameters": s.get("prRule", {"required_approving_review_count": 0, "require_code_owner_review": False})},
+                      {"type": "update"}] + extra)); sys.exit(0)
 if a[0] == "api" and "/compare/" in a[1]:
     print(json.dumps({"behind_by": s.get("behindBy", 0), "ahead_by": 3})); sys.exit(0)
 if a[0] == "api" and a[1].endswith("/protection/required_status_checks"):
@@ -201,6 +207,15 @@ merge("(27e) classic 404 'Required status checks not enabled' is no protection",
 refuse("(27f) any other classic 404 is ERROR, never 'no protection'", sc(protection={"code": 404, "message": "Not Found"}), "not one of GitHub's no-protection answers", code_wanted=1)
 refuse("(27g) a strict base: a head behind it -> REFUSE even though GitHub reads BLOCKED", sc(strict=True, behindBy=2), "2 commit(s) behind develop")
 merge("(27h) a strict base: a head up to date with it merges", sc(strict=True, behindBy=0), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(27m) blocked, one approval required and none given -> REFUSE: --admin would skip it",
+       sc(prRule={"required_approving_review_count": 1}, reviewDecision="REVIEW_REQUIRED"), "still needs an approving review")
+refuse("(27n) blocked, code-owner review required, decision empty -> REFUSE", sc(prRule={"require_code_owner_review": True}), "require_code_owner_review")
+merge("(27o) blocked, approval required and given -> MERGE --admin",
+      sc(prRule={"required_approving_review_count": 1}, reviewDecision="APPROVED"), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(27p) signed commits required: never bypassed with --admin", sc(ruleTypes=["required_signatures"]), "required_signatures")
+merge("(27q) the base moves once during the read: one fresh read, then MERGE",
+      sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, mergeCommitMoves=1), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(27r) the base keeps moving: REFUSE asking to run again", sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, mergeCommitMoves=9), "run the gate again")
 refuse("(27i) blocked with a rule the gate cannot judge -> REFUSE, never a silent admin bypass", sc(ruleTypes=["workflows"]), "rule(s) this gate cannot judge (workflows)")
 merge("(27j) the same unknown rule on a clean pull request: GitHub enforces it, no --admin",
       sc(ruleTypes=["code_scanning"], mergeStateStatus="CLEAN"), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s" % H)
@@ -222,7 +237,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 61 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 67 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.

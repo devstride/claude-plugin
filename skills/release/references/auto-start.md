@@ -114,7 +114,7 @@ header lists them); anything else prints `ASK <reason>`. Without `release.cleara
   approval. The script cannot tell who wrote an entry, so step 4's recap and the merge comment name
   every approved migration the release carries, and the owner sees each one.
 - **`MERGE <sha>`** is the owner's yes for this pull request at exactly `<sha>`: run step 4's "On
-  the yes" checks, merge with the `MERGE` line of `merge-gate.py <n> <sha>` (step 4), and 5a approves the deploy on
+  the yes" checks, merge with the `MERGE` line of `merge-gate.py <n> <sha> --all-green` (step 4), and 5a approves the deploy on
   the same yes. Post the `COMMENT` line's text as ONE comment on the pull request.
 - **`ASK` or `ERROR`** → the owner's in-the-moment yes, exactly as before. A waived pre-ship check,
   a pre-merge `HOLD` or `NOT RUN`, a failed previous release or an unapproved migration always

@@ -43,6 +43,9 @@ is `failed` (unparseable). `round` exits 2 (FAILED) when no engine returned a re
 settles, merges or counts as reviewed. A bare engine name says nothing about whether it returned,
 so `record` refuses one, and `check` refuses a receipt written before results were kept (schema 1).
 
+Each engine's result in `record` is its latest across the review, from the last cycle it ran: a
+Claude-only follow-up cycle keeps the CLI engine's earlier result.
+
 `record` (LOCAL-FULL, once it settled) writes the receipt `<receiptsDir>/<head>.json`; receiptsDir
 defaults to `<git common dir>/devstride/reviews/local-full`, shared by every worktree of the
 repository on this machine and never committed. It refuses a finding still open, a round with no

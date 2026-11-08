@@ -415,7 +415,7 @@ M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exac
      no unresolved thread, and no reviewer whose latest review requests changes (the aggregate
      decision is empty when reviews are not required). A strict base is compared: behind refuses.
      `--admin` only when GitHub reads it BLOCKED with all of that true and at least one required
-     check and no rule type it cannot judge: an admin merge never bypasses a conflict, an
+     check, no unmet approval it would skip, and no rule type it cannot judge: an admin merge never bypasses a conflict, an
      out-of-date branch or a red check. Production uses `--all-green` (every check). A check
      is one (name, app, workflow) or one commit status; a same-name check elsewhere must pass too,
      and a rule's app restriction is kept. The printed command names `--repo`. No skill
@@ -862,7 +862,8 @@ skills/build-item/scripts/review-gate.py|a bare name does not say whether it ret
 skills/release/SKILL.md|merge-gate.py <n> <reviewedHead> --all-green
 skills/release/references/release-branch.md|merge-gate.py <n> <reviewedHead> --delete-branch
 skills/release/references/release-branch.md|merge-gate.py <n> <settled head>
-skills/release/references/auto-start.md|merge-gate.py <n> <sha>
+skills/release/references/auto-start.md|merge-gate.py <n> <sha> --all-green
+skills/build-item/SKILL.md|never the live one
 skills/build-item/SKILL.md|merge-gate.py <n> <head>
 skills/build-item/references/epic-release-steps.md|merge-gate.py
 skills/pr/scripts/merge-gate.py|an admin merge would bypass a block it cannot name
