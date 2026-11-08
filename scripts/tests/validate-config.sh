@@ -297,6 +297,10 @@ cfg '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standing
 expect "(60) no ownerDecision and no migrationGlobs are two WARNs" 0 "^CONFIG: 0 error(s), 2 warning(s)" \
   "^WARN release.fullRelease.standingYes: has no effect without \`release.fullRelease.ownerDecision\`"
 cfg '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true, "ownerDecision": "2026-11-07", "migrationGlobs": ["db/*.sql"], "approvedMigrations": [{"blob": "abc"}]}}}'
-expect "(61) a malformed approval is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR release.fullRelease.approvedMigrations\[0\]: needs blob, path, item and approved"
+expect "(61) a malformed approval is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR release.fullRelease.approvedMigrations\[0\]: needs blob"
+cfg '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true, "ownerDecision": "2999-02-30", "migrationGlobs": ["db/*.sql"], "approvedMigrations": [{"blob": "abc", "path": "p", "item": "not-an-item", "approved": "nonsense"}]}}}'
+expect "(62) an impossible ownerDecision is a WARN, a shaped-but-wrong approval an ERROR" 1 "^CONFIG: 1 error(s), 1 warning(s)" "ownerDecision. (YYYY-MM-DD, a real date"
+cfg '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true, "ownerDecision": "2026-11-07", "migrationGlobs": ["db/*.sql"], "approvedMigrations": 7}}}'
+if printf '%s\n' "$OUT" | grep -q Traceback || ! printf '%s\n' "$OUT" | head -1 | grep -q '^CONFIG: [1-9]'; then bad "(63) approvedMigrations: 7 — exit $RC: $OUT"; else ok "(63) approvedMigrations: 7 → a schema finding, never a crash"; fi
 
 exit "$FAIL"

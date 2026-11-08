@@ -48,8 +48,9 @@ cat "$WORK/prs/\$3.json"
 SH
 chmod +x "$WORK/bin/gh"
 export PATH="$WORK/bin:$PATH"
-pr() { # number state title base head [isDraft]
-  printf '{"state": "%s", "title": "%s", "baseRefName": "%s", "headRefOid": "%s", "isDraft": %s}' "$2" "$3" "$4" "$5" "${6:-false}" > "$WORK/prs/$1.json"
+pr() { # number state title base head [isDraft] — baseRefOid: wherever origin/master points now (the live base)
+  local base_oid; base_oid="$(g rev-parse -q --verify refs/remotes/origin/master 2>/dev/null)"
+  printf '{"state": "%s", "title": "%s", "baseRefName": "%s", "baseRefOid": "%s", "headRefOid": "%s", "isDraft": %s}' "$2" "$3" "$4" "$base_oid" "$5" "${6:-false}" > "$WORK/prs/$1.json"
 }
 release_pr() { pr 42 "${2:-OPEN}" "Release 26-01-15" "${3:-master}" "${1:-$RELEASE}" "${4:-false}"; }
 row() { # number title marker mergedAt head merge
@@ -222,8 +223,24 @@ HEAD_ARG="$DROP" REVIEWED="$DROP"; release_pr "$DROP"; expect "(F2e) a release t
 g update-ref refs/remotes/origin/master master
 fbase; g update-ref -d refs/remotes/origin/master; expect "(F2f) production cannot be read → ASK" 0 '^ASK origin/master cannot be read'
 g update-ref refs/remotes/origin/master master
+fbase; g update-ref refs/remotes/origin/master "$FULLHEAD"; expect "(F2g) a stale origin/master (not the pull request's live base) → ASK" 0 '^ASK origin/master is at .* but the pull request.s base is at'
+g update-ref refs/remotes/origin/master master
+refull "$(approved "$FIRSTBLOB" | sed 's/"approved": "2026-11-07"/"approved": "2999-01-01"/')"
+fbase; expect "(F2h) an approval dated in the future → ASK" 0 '^ASK release.fullRelease.approvedMigrations\[0\] is dated 2999-01-01, after today'
+refull ""
+mkdir -p "$WORK/repo/sub"; fbase; g config diff.relative true
+out="$(cd "$WORK/repo/sub" && python3 "$HELPER" --pr 42 --head "$FULLHEAD" --class "RELEASE CLASS: FULL" --checks green --unresolved 0 --pre-ship "PRE-SHIP: NOTHING TO RUN" --pre-merge "PRE-MERGE: CLEAR" --previous-release 0 --dev-deploy not-applicable --tower "$TOWER" --reviewed-head "$FULLHEAD" 2>&1)"
+printf '%s\n' "$out" | grep -q "^ASK the migration $MIG" && ok "(F2i) diff.relative set, run from a subfolder → the unapproved migration is still found" || bad "(F2i) $out"
+g config --unset diff.relative
+fullgraph "$(FULLCFG "" ', "migrationGlobs": ["db/**"]' | sed 's/"migrationGlobs": \["db\/migrations\/sql\/\*.sql"\], //')"
+g checkout -q rel; printf 'x\n' > "$WORK/repo/db/migrations/001
+new.sql"; g add db; g commit -q -m "newline name"; NL="$(g rev-parse HEAD)"; g checkout -q develop
+fbase; HEAD_ARG="$NL" REVIEWED="$NL"; release_pr "$NL"; expect "(F2j) a file name holding a newline → ASK, never classified" 0 '^ASK the release changes a file whose name holds a control character'
 
-fbase; REVIEWED=""; expect "(F3) no --reviewed-head → ASK" 0 '^ASK no readable --reviewed-head'
+fbase; REVIEWED=""; expect "(F3) no --reviewed-head → ASK" 0 '^ASK no --reviewed-head as a full commit id'
+fbase; REVIEWED="HEAD"; (cd "$WORK/repo" && g checkout -q "$FULLHEAD"); expect "(F3f) a moving ref as --reviewed-head (HEAD at the head) → ASK, never resolved" 0 '^ASK no --reviewed-head as a full commit id'
+(cd "$WORK/repo" && g checkout -q develop)
+fbase; REVIEWED="${FULLHEAD:0:12}"; expect "(F3g) an abbreviated reviewed head → ASK" 0 '^ASK no --reviewed-head as a full commit id'
 fbase; REVIEWED="$RELEASE"; expect "(F3b) the reviewed head is an older, different tree → ASK" 0 '^ASK the head [0-9a-f]{12} is not the reviewed head'
 fbase; release_pr "$FULLHEAD" OPEN master true; expect "(F3c) the release pull request is still a draft → ASK" 0 '^ASK pull request #42 is still a draft'
 fbase; release_pr "$RELEASE"; expect "(F3d) the pull request moved past the head given → ASK" 0 '^ASK pull request #42 is at'

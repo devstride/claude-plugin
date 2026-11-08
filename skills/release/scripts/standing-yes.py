@@ -54,14 +54,17 @@ gate green, any class) needs, in this order:
       `migrationGlobs` a non-empty list of patterns (`branch-patterns.md` syntax);
   F2. the class line is `RELEASE CLASS: LIGHT` or `RELEASE CLASS: FULL`;
   F3. the pull request is OPEN into the production branch, not a draft, and at --head;
-  F4. --reviewed-head is given and is --head, or an ancestor of it with the same tree (review's
-      one empty re-trigger commit);
+  F4. --reviewed-head is a full commit id (never a ref) and is --head, or an ancestor of it with
+      the same tree (review's one empty re-trigger commit);
   F5. conditions 4 to 9 above;
   F6. every file matching `migrationGlobs` that the release adds or changes against
-      `origin/<productionBranch>` (from their merge base, renames split) has its content approved:
+      `origin/<productionBranch>` (which must equal the pull request's live base; from their merge
+      base, renames split, repository-root paths) has its content approved:
       its blob id at --head is the `blob` of an `approvedMigrations` entry (`{"blob", "path",
-      "item", "approved"}`, written on the owner's own yes). A deleted migration file, or an
-      entry with a bad shape, asks. The same content under a new number (a renumber) stays
+      "item", "approved"}`, written on the owner's own yes, dated no later than today). A deleted
+      migration file, a file name with a control character, or an entry with a bad shape, asks.
+      The helper cannot tell who wrote an entry: provenance is the owner's words, the entry's own
+      commit and the recap and comment that name every approved migration a release carries. The same content under a new number (a renumber) stays
       approved; any change to the content needs a new approval.
 """
 import argparse
@@ -94,7 +97,7 @@ def load_config(head):
 def pr_view(number):
     """`gh pr view <n>`: the live record of one pull request, or None."""
     try:
-        done = subprocess.run(["gh", "pr", "view", str(number), "--json", "state,title,baseRefName,headRefOid,isDraft"],
+        done = subprocess.run(["gh", "pr", "view", str(number), "--json", "state,title,baseRefName,baseRefOid,headRefOid,isDraft"],
                               capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -237,7 +240,10 @@ def light_route(a, head, release):
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 BLOB = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")
 ITEM = re.compile(r"^I\d+$")
-ROUTING = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "build-item", "scripts", "routing.py")
+CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+SHA = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")
+SKILLS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROUTING = os.path.join(SKILLS, "build-item/scripts/routing.py")
 
 
 def a_date(value):
@@ -270,23 +276,28 @@ def approvals(full):
             and isinstance(e.get("path"), str) and e["path"].strip()
             and isinstance(e.get("item"), str) and ITEM.match(e["item"]) and a_date(e.get("approved")),
             "release.fullRelease.approvedMigrations[%d] needs blob (the file's git blob id), path, item (I#####) and approved (YYYY-MM-DD)" % i)
+        ask(a_date(e["approved"]) <= datetime.date.today(),
+            "release.fullRelease.approvedMigrations[%d] is dated %s, after today: an approval is given, never planned" % (i, e["approved"]))
         found.setdefault(e["blob"], e)
     return found
 
 
-def migrations(head, production, full):
+def migrations(head, production, full, live_base):
     """The release's migration files, each approved by content; Ask names the first that is not."""
     is_migration = glob_matcher(full["migrationGlobs"])
     approved = approvals(full)
     base = full_sha("origin/%s" % production)
     ask(base, "origin/%s cannot be read: fetch it first" % production)
+    ask(base == live_base, "origin/%s is at %s but the pull request's base is at %s: fetch it first"
+        % (production, base[:12], (live_base or "unreadable")[:12]))
     done = subprocess.run(["git", "merge-base", base, head], capture_output=True, text=True)
     ask(done.returncode == 0, "no merge base between origin/%s and the head" % production)
-    diff = subprocess.run(["git", "diff", "--name-status", "-z", "--no-renames", done.stdout.strip(), head], capture_output=True)
+    diff = subprocess.run(["git", "diff", "--name-status", "-z", "--no-renames", "--no-relative", "--no-ext-diff", done.stdout.strip(), head], capture_output=True)
     ask(diff.returncode == 0, "the release diff cannot be read")
     fields = diff.stdout.decode("utf-8", "surrogateescape").split("\0")
     shipped = []
     for status, path in zip(fields[0::2], fields[1::2]):
+        ask(not CONTROL.search(path), "the release changes a file whose name holds a control character (%r): no glob can be trusted to classify it" % path)
         if not path or not is_migration(path):
             continue
         ask(status != "D", "the release deletes the migration %s" % path)
@@ -308,12 +319,14 @@ def full_route(a, head, release, full):
     production = release.get("productionBranch") or "master"
     found = open_at_head(a.pr, head, production)
     ask(found.get("isDraft") is False, "pull request #%d is still a draft: CI has not run on the reviewed head" % a.pr)
-    reviewed = full_sha(a.reviewed_head) if a.reviewed_head else None
-    ask(reviewed, "no readable --reviewed-head: the full route needs the head release step 2 settled on")
+    given = (a.reviewed_head or "").strip()
+    ask(SHA.match(given), "no --reviewed-head as a full commit id: the full route needs the exact head release step 2 settled on, never a ref")
+    reviewed = full_sha(given)
+    ask(reviewed == given, "the reviewed head %s cannot be read" % given[:12])
     ask(reviewed == head or (is_ancestor(reviewed, head) and tree_of(reviewed) == tree_of(head)),
         "the head %s is not the reviewed head %s (or its same-tree re-trigger)" % (head[:12], reviewed[:12]))
     gates(a, release)
-    shipped = migrations(head, production, full)
+    shipped = migrations(head, production, full, str(found.get("baseRefOid") or "").strip())
     return ("Merged on the owner's written standing yes for releases with every gate green "
             "(release.fullRelease.standingYes, owner decision %s). Migrations: %s." % (full["ownerDecision"], "; ".join(shipped) or "none"))
 

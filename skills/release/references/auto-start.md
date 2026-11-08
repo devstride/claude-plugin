@@ -109,8 +109,10 @@ header lists them); anything else prints `ASK <reason>`. Without `release.cleara
   hook), the previous-release gate 0, the dev-deploy wait 0, and this pull request alone `On final`.
 - **Approving a migration** happens only on the owner's own words, in the moment, never on a
   relayed yes: add `{"blob": "<git rev-parse HEAD:<path>>", "path", "item": "I#####", "approved":
-  "<date>"}` to `release.fullRelease.approvedMigrations` in a reviewed commit. The blob pins the
-  content: a renumber keeps it; any edit needs a new approval.
+  "<today>"}` to `release.fullRelease.approvedMigrations` in a commit of its own (`approve
+  migration <path> [I#####]`). The blob pins the content: a renumber keeps it; any edit needs a new
+  approval. The script cannot tell who wrote an entry, so step 4's recap and the merge comment name
+  every approved migration the release carries, and the owner sees each one.
 - **`MERGE <sha>`** is the owner's yes for this pull request at exactly `<sha>`: run step 4's "On
   the yes" checks, merge with `gh pr merge --match-head-commit <sha>`, and 5a approves the deploy on
   the same yes. Post the `COMMENT` line's text as ONE comment on the pull request.
