@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.35.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.36.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -1053,6 +1053,11 @@
           "type": "string",
           "default": "master",
           "description": "the production release target"
+        },
+        "holdTimeZone": {
+          "type": "string",
+          "default": "UTC",
+          "description": "the IANA time zone a release hold's date is read in (\"America/Chicago\")"
         },
         "releaseSource": {
           "type": "string",

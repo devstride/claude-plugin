@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.35.0.
+`.claude/ds-config.json` against. Schema version: 3.36.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -169,6 +169,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `review.mandatoryLenses[].question` | string | — | — | **Required.** the question the lens's finder answers | pre-registry |
 | `release` | object | — | — | production release settings | pre-registry |
 | `release.productionBranch` | string | — | master | the production release target | pre-registry |
+| `release.holdTimeZone` | string | — | UTC | the IANA time zone a release hold's date is read in ("America/Chicago") | 3.36.0 |
 | `release.releaseSource` | string | — | develop | the branch promoted in a release | pre-registry |
 | `release.autoDeployOnMerge` | string, null | — | — | one plain-English sentence on what merging to production does | pre-registry |
 | `release.releaseBranchPattern` | string | — | — | cut each release as its own protected branch | pre-registry |
