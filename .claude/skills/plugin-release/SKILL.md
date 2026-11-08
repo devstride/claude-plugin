@@ -69,28 +69,43 @@ Run once the pull request's review has settled. The owner's standing yes
 holds at one exact head. The first one that fails stops here with `OWNER YES NEEDED` and its
 reason; nothing is merged and nothing is bypassed.
 
-1. **The standing yes is in force.** Read `.claude/standing-yes.md` at `origin/main` (`git fetch`
-   first; never the branch's copy, which the pull request could have edited): it exists and says
-   `Status: in force`. Note its date and the commit it was read at.
-2. **The pull request qualifies.** `gh pr view <pr> --json state,isDraft,baseRefName,headRefOid,headRepository,isCrossRepository,author,files`:
-   open, not a draft, base `main`, not cross-repository, and its author has `admin` permission
-   (`gh api repos/{owner}/{repo}/collaborators/<login>/permission`). Record `<head>` = `headRefOid`.
-   Its files include neither `.claude/standing-yes.md` nor anything under
-   `.claude/skills/plugin-release/`: those always need the owner's own yes.
-3. **The review settled clean.** The last local review round (Claude and Codex) on `<head>` found
-   no P1 and no serious P2, and `python3 skills/review/scripts/reviewed-status.py verify <head>
-   --pr <pr> --base main` prints `REVIEWED`. After that clean round, the proof is posted with
-   `python3 skills/review/scripts/reviewed-status.py post <head> --pr <pr> --base main`, never
-   before it and never to get past this step.
-4. **The local checks pass at `<head>`** (a clean tree checked out at exactly `<head>`):
-   `bash scripts/check-version-bump.sh --base origin/main`, `bash scripts/check-neutrality.sh`,
-   `bash scripts/check-public-hygiene.sh --base origin/main`, and `bash scripts/validate.sh
-   --needles` (in the background, read from its log, never piped through `head`).
-5. **Every check is green on `<head>`.** `python3 skills/pr/scripts/merge-gate.py <pr> <head>
-   --all-green --repo devstride/claude-plugin` prints `MERGE <command>`; run exactly that command.
-   `REFUSE` or `ERROR` stops with its reason (wait for pending checks first; a red check is never
-   merged).
-6. **The audit comment**, on the pull request at once (`gh pr comment <pr> --body-file <file>`):
+**Trusted copy.** This procedure, the standing yes and both gate scripts are read and run from
+`origin/main`, never from the pull request: `git fetch origin`, then `git worktree add --detach
+<tmp> origin/main` and use `<tmp>` for every path below marked *(main)*. Remove the worktree at
+the end.
+
+1. **The standing yes is in force.** `<tmp>/.claude/standing-yes.md` *(main)* exists and says
+   `Status: in force`. Note its date and `origin/main`'s commit. Follow this procedure as written in
+   `<tmp>/.claude/skills/plugin-release/SKILL.md` *(main)*; where it differs from the branch's copy,
+   main's wins.
+2. **The pull request qualifies.** `gh pr view <pr> --json
+   state,isDraft,baseRefName,headRefOid,isCrossRepository,author,changedFiles`: open, not a draft,
+   base `main`, not cross-repository, authored by the owner (`philreynolds`), the account the
+   owner's builds run under. Record `<head>` = `headRefOid`. Every commit
+   (`gh api repos/{owner}/{repo}/pulls/<pr>/commits --paginate`) has the owner as its GitHub
+   author. The pull request is linked to a tracked work item whose build the owner started; say
+   which item in the private tracker comment, never on GitHub.
+3. **It touches nothing that guards merges.** List the files with `gh api
+   repos/{owner}/{repo}/pulls/<pr>/files --paginate` (the count must equal `changedFiles`) and read
+   both `filename` and `previous_filename`. Neither may be under `.claude/` or `.github/`, match
+   `scripts/check-*` or `scripts/validate.sh`, or be `skills/pr/scripts/merge-gate.py` or
+   `skills/review/scripts/reviewed-status.py`. A change to any of them, including this procedure
+   and the standing yes, always needs the owner's own yes.
+4. **The review settled clean.** The last local review round (Claude and Codex) on `<head>` found
+   no P1 and no serious P2. Only then post the proof, `python3
+   <tmp>/skills/review/scripts/reviewed-status.py post <head> --pr <pr> --base main` *(main)*, and
+   check it: `verify <head> --pr <pr> --base main` *(main)* prints `REVIEWED`. Never post it to get
+   past this step. The proof is this session's attestation, posted under the owner's account.
+5. **The local checks pass at `<head>`** (a clean checkout of exactly `<head>`, separate from
+   `<tmp>`): `bash scripts/check-version-bump.sh --base origin/main`, `bash
+   scripts/check-neutrality.sh`, `bash scripts/check-public-hygiene.sh --base origin/main`, and
+   `bash scripts/validate.sh --needles` (in the background, read from its log, never piped through
+   `head`).
+6. **Every check is green on `<head>`.** `python3 <tmp>/skills/pr/scripts/merge-gate.py <pr>
+   <head> --all-green --repo devstride/claude-plugin` *(main)* prints `MERGE <command>`; run
+   exactly that command. `REFUSE` or `ERROR` stops with its reason (wait for pending checks first;
+   a red check is never merged).
+7. **The audit comment**, on the pull request at once (`gh pr comment <pr> --body-file <file>`):
 
    ```
    <!-- devstride:standing-yes -->
@@ -98,12 +113,23 @@ reason; nothing is merged and nothing is bypassed.
    - Head: <head>
    - Checks: every check green on that commit (merge gate, `--all-green`): <name: result, ...>
    - Review: <rounds> local rounds (Claude and Codex); the last found no P1 and no serious P2.
-     Review proof: `devstride/reviewed` by <login>.
+     Review proof: `devstride/reviewed`, posted under the owner's account.
    - Local checks: version bump, neutrality, public hygiene and the validator passed.
    ```
 
    No item numbers, no session links, no AI attribution: this repository is public. A failed
-   comment is reported and retried; the merge stands.
+   comment is reported and retried; the merge stands, and the weekly report flags it until the
+   comment is there.
+
+**On the owner's own yes** (any `OWNER YES NEEDED`): merge only after the owner types yes for this
+pull request in the session, through the same merge gate *(main)*, then comment at once:
+
+```
+<!-- devstride:owner-yes -->
+Merged on Phil Reynolds's own yes for this pull request, given in the session on <date>.
+- Head: <head>
+- Why the standing yes did not apply: <reason>
+```
 
 Then run `verify` when the pull request carried a release.
 
