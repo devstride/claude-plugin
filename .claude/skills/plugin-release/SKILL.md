@@ -104,18 +104,23 @@ fresh worktree of the then-current `main`.
    `skills/pr/scripts/merge-gate.py`, `skills/review/scripts/reviewed-status.py`,
    `skills/update/scripts/update-plugin.py`, `skills/doctor/scripts/validate-config.py`,
    `skills/build-item/scripts/routing.py` (the merge-path check runs it) or
-   `skills/review/references/delivery-loop-invariants.md`. A change to any
-   of them, including this procedure and the standing yes, always needs the owner's own yes.
+   `skills/review/references/delivery-loop-invariants.md`; nor any `CLAUDE.md`, `CLAUDE.local.md`,
+   `AGENTS.md` or `.mcp.json`, anywhere (the instructions and tools a merging session loads). A
+   change to any of them, including this procedure and the standing yes, always needs the owner's
+   own yes.
 4. **The review settled clean.** The last local review round (Claude and Codex) on `<head>` found
    no P1 and no serious P2. Only then post the proof, `python3 -I
    <tmp>/skills/review/scripts/reviewed-status.py post <head> --pr <pr> --base main` *(main)*, and
    check it: `verify <head> --pr <pr> --base main` *(main)* prints `REVIEWED`. Never post it to get
    past this step. The proof is this session's attestation, posted under the owner's account.
-5. **The local checks pass at `<head>`** (a clean checkout of exactly `<head>`, separate from
-   `<tmp>`): `bash scripts/check-version-bump.sh --base origin/main`, `bash
-   scripts/check-neutrality.sh`, `bash scripts/check-public-hygiene.sh --base origin/main`, and
-   `bash scripts/validate.sh --needles` (in the background, read from its log, never piped through
-   `head`).
+5. **The local checks passed at `<head>`.** The build ran them in its own checkout before review:
+   `bash scripts/check-version-bump.sh --base origin/main`, `bash scripts/check-neutrality.sh`,
+   `bash scripts/check-public-hygiene.sh --base origin/main`, and `bash scripts/validate.sh
+   --needles` (in the background, read from its log, never piped through `head`); the required
+   checks run them again on `<head>`. The merge session itself never runs the pull request's code:
+   it would share a machine with `<tmp>`. If they weren't run on `<head>`, stop with `OWNER YES
+   NEEDED`. Then confirm `<tmp>` is untouched: `git -C <tmp> status --porcelain --ignored` prints
+   nothing and `git -C <tmp> rev-parse HEAD` is `<trusted>`.
 6. **Every check is green on `<head>`.** `python3 -I <tmp>/skills/pr/scripts/merge-gate.py <pr>
    <head> --all-green --repo devstride/claude-plugin` *(main)* prints `MERGE <command>`. Right
    before running it, `git fetch origin` and compare `origin/main` with `<trusted>`. If it moved (a
