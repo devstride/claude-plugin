@@ -10,7 +10,7 @@ yes, anything else goes to the owner exactly as before.
                   --checks green|red --unresolved <count> --pre-ship "<PRE-SHIP verdict line>"
                   --pre-merge "<PRE-MERGE verdict line>" --previous-release <gate exit> --dev-deploy <exit>|not-applicable --tower "<status output>"
                   [--reviewed-head <sha>]   (the head release step 2 settled on: the full route)
-      MERGE <head sha>          exit 0   (merge only that exact head: `gh pr merge --match-head-commit`)
+      MERGE <head sha>          exit 0   (merge only that exact head, through skills/pr/scripts/merge-gate.py)
       COMMENT <text>                     (second line after MERGE: the one comment to post on the pull request)
       ASK <reason>              exit 0   (the first condition that fails, in the order below)
       ERROR <reason>            exit 1   (bad arguments or an unreadable config: treat as ASK)

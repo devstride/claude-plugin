@@ -8,6 +8,24 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **One merge gate for every merge: `skills/pr/scripts/merge-gate.py <n> <head>`.** Before, the
+  rule that an approver's admin merge happens only when every required check is green on that
+  exact commit was a habit, and an admin merge could bypass a red check. Now `release` (step 4 and
+  the release branch's train merge), the standing-yes route and `build-item` (story, train and
+  epic-release merges) run the gate and then exactly the command it prints. It prints `MERGE gh pr
+  merge <n> --merge --match-head-commit <head>` only for an open, non-draft pull request still at
+  that head, with every required check completed green on its newest run there. The required
+  checks are the base's rulesets, its classic protection and whatever GitHub marks required.
+  Pending, failed, cancelled, skipped or missing refuses and names the check. An unresolved
+  review thread or a change request also refuses. It adds `--admin` only when GitHub reads the
+  pull request BLOCKED with all of that true and at least one required check, so an admin merge
+  never bypasses a conflict, an out-of-date branch or a red check. `REFUSE` exits 2 and `ERROR`
+  (GitHub unreadable) exits 1; neither merges. `--delete-branch` and a train merge's `--subject`
+  carry through, quoted so the line runs as printed. A test fails the build if any skill text
+  carries its own `--admin`. Invariant M19.
+
 ### Changed
 
 - **A review in which no engine returned a result fails, on every path.** Before, if Claude's
@@ -25,7 +43,9 @@ for what each version component means here and how a release is cut.
   returned, so a one-off reviewed before this release is reviewed again before it lands. The merge
   body names each engine's result. The shared fixtures carry the new cases. Invariant F11.
 - Review body, LOCAL-FULL reference, invariants and three composed-path budgets raised by what
-  this rule costs (review body 7,870 → 7,994 tokens, under the 8,000 ceiling).
+  this rule costs (review body 7,870 → 7,994 tokens, under the 8,000 ceiling). The merge gate
+  raises the build-item body (7,790 → 7,820), three references and the composed paths; the release
+  body fell (7,989 → 7,987) because step 4 now leaves the draft and green-head checks to the gate.
 
 ### Fixed
 

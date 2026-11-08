@@ -148,8 +148,9 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    pull request, no passing line or a different tree, step 2b runs these entries itself.
 5. **Merge** — first `git fetch origin <releaseSource>` and run the exclusion check with
    `--source-before <sourceBefore> --head <reviewedHead>` (source merges are not train work, and a
-   reviewed release unit is allowed; exit 1 STOPS); then `gh pr merge <n> --merge --match-head-commit <reviewedHead>
-   --delete-branch` (the snapshot is disposable). **Never a direct push to `releaseSource`**: its
+   reviewed release unit is allowed; exit 1 STOPS); then run the `MERGE` line of
+   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/pr/scripts/merge-gate.py <n> <reviewedHead> --delete-branch`
+   (the snapshot is disposable); `REFUSE` or `ERROR` STOPS. **Never a direct push to `releaseSource`**: its
    own required checks run on the pull request. A verified P1 or serious P2 that is not fixed STOPS
    the release.
 6. **Close every one-off it carried.** Candidates come from the subjects of `git log --first-parent

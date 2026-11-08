@@ -403,6 +403,14 @@ M18. The production merge waits for the owner's in-the-moment yes unless `standi
      MERGE from the config at the release head: light (a LIGHT tree equal to its reviewed train) or
      full (the owner's written, dated yes; the exact reviewed head; every gate green; every
      migration it adds or changes approved by content, its blob id, on the owner's own words).
+M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exactly its `MERGE`
+     line; `REFUSE` or `ERROR` stops. It merges only an open, non-draft pull request at the
+     expected head, pinned with `--match-head-commit`, with every required check (rulesets,
+     classic protection, and what GitHub marks required) completed SUCCESS on its newest run there
+     (pending, failed, skipped or missing refuses), no unresolved thread and no changes requested.
+     `--admin` only when GitHub reads it BLOCKED with all of that true and at least one required
+     check: an admin merge never bypasses a conflict, an out-of-date branch or a red check. No skill
+     text carries its own `--admin` (`scripts/tests/merge-gate.sh` greps for one).
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
 N1. ONE profile word — `prototype` / `standard` / `extended` — moves every rigor knob together; the
@@ -842,6 +850,12 @@ skills/review/SKILL.md|No result, no review
 skills/review/SKILL.md|through `round`
 skills/review/references/local-full.md|no engine returned a result
 skills/build-item/scripts/review-gate.py|a bare name does not say whether it returned a result
+skills/release/SKILL.md|merge-gate.py <n> <reviewedHead>
+skills/release/references/release-branch.md|merge-gate.py <n> <reviewedHead> --delete-branch
+skills/release/references/auto-start.md|merge-gate.py <n> <sha>
+skills/build-item/SKILL.md|merge-gate.py <n> <head>
+skills/build-item/references/epic-release-steps.md|merge-gate.py
+skills/pr/scripts/merge-gate.py|an admin merge would bypass a block it cannot name
 skills/build-item/SKILL.md|release-holds.md
 skills/release/SKILL.md|release-holds.md
 skills/release/references/release-branch.md|Release holds.
@@ -964,7 +978,7 @@ step. That is the moment a rule goes missing, and it is the only moment this fil
 
 ---
 
-**Total: 147 rule entries (A–T) + 6 editing disciplines (U) = 153.** (The previous total claimed 144
+**Total: 148 rule entries (A–T) + 6 editing disciplines (U) = 154.** (The previous total claimed 144
 while 146 were enumerated — M17 and M18 were added without a recount: the seventh miscount,
 corrected here. Before it, 142 claimed while 143 were enumerated, when M16 was added.)
 The round-by-round revision enumerated 154 facts; 20 of them were near-duplicates stated in two to

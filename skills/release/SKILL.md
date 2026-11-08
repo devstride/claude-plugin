@@ -234,12 +234,12 @@ the deploy.
   named in the recap; after the yes (a standing yes: before it), before the checks below, per
   `docs-hooks.md`.
 - **On the yes**, confirm: the head equals `<reviewedHead>` (the only tolerated advance is `review`
-  7.3's same-tree empty re-trigger commit; anything else → back to step 2); CI is green at that
-  head; in a draft-hold repo the PR is non-draft (still draft means CI never ran — do NOT merge; a
-  CI-on-draft repo needs only green at the final SHA); every 2b check passed or was waived; the
+  7.3's same-tree empty re-trigger commit; anything else → back to step 2); the PR is non-draft
+  (a draft-hold PR still draft never ran CI) and green at that head (the gate below proves both);
+  every 2b check passed or was waived; the
   paginated **zero-unresolved-threads** check still reads zero (a late comment is replied-to AND
-  resolved via `review` step 6 first, never merged over). Then `gh pr merge <n> --merge` — a merge
-  commit, never `--delete-branch`.
+  resolved via `review` step 6 first, never merged over). Then run the `MERGE` line of
+  `python3 ${CLAUDE_PLUGIN_ROOT}/skills/pr/scripts/merge-gate.py <n> <reviewedHead>`; else STOP.
 - The deploy then runs on its own (with `release.deployApproval`, 5a approves it on this yes):
   note it is in flight; never trigger or gate it otherwise.
 
