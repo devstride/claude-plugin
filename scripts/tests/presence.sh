@@ -42,9 +42,21 @@ wait_sent() { # wait_sent N — until the log holds N lines (detached sends), at
 field() { sed -n "${1}p" "$LOG" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(sys.argv[1],""))' "$2"; }
 age() { # age SESSION SECONDS — pretend the last send was SECONDS ago
   python3 - "$RECORDS/$1.json" "$2" <<'PY'
-import json, sys, time
-p = sys.argv[1]; r = json.load(open(p)); r["sent"] = time.time() - float(sys.argv[2]); json.dump(r, open(p, "w"))
+import json, os, sys, time
+p = sys.argv[1]; r = json.load(open(p)); r["sent"] = time.time() - float(sys.argv[2])
+json.dump(r, open(p + ".t", "w")); os.replace(p + ".t", p)   # atomic, as a running keeper may read it
 PY
+}
+edit() { # edit SESSION PYTHON — change the record atomically (r is the record)
+  python3 - "$RECORDS/$1.json" "$2" <<'PY'
+import json, os, sys
+p = sys.argv[1]; r = json.load(open(p)); exec(sys.argv[2])
+json.dump(r, open(p + ".t", "w")); os.replace(p + ".t", p)
+PY
+}
+stop_keeper() { # stop_keeper SESSION — kill its keeper and wait until the lock is free
+  pkill -f "presence.py keeper $1\$" 2>/dev/null
+  local i=0; while keeper_alive "$1" && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
 }
 keeper_alive() { # keeper_alive SESSION — is a keeper holding the session's keeper lock?
   python3 - "$RECORDS/$1.keeper.lock" <<'PY'
@@ -68,7 +80,7 @@ R="$(mkrepo repo "$(config)" "phil/26-01-01/$ITEM_NO-some-story")"
 N="$(mkrepo plain '{"presence":null}')"; mkdir -p "$WORK/loose"
 OUT="$(fire SessionStart s0 "$WORK/$(basename "$(mkrepo none)")")$(fire SessionStart s0 "$N")$(fire UserPromptSubmit s0 "$WORK/loose")"
 sleep 0.5
-if [ -z "$OUT" ] && [ ! -e "$RECORDS/s0.json" ] && [ "$(sent)" = 0 ]; then ok "(1) no presence block / null / no repository → silent, nothing written or sent"
+if [ -z "$OUT" ] && [ ! -e "$XDG_CACHE_HOME/devstride-plugin" ] && [ "$(sent)" = 0 ]; then ok "(1) no presence block / null / no repository → silent, no directory or file created, nothing sent"
 else bad "(1) out=$OUT sent=$(sent)"; fi
 
 # (2) session start sends `start` with every documented variable; the record is owner-only
@@ -102,11 +114,12 @@ else bad "(4) b=$B $(cat "$LOG")"; fi
 # (5) session end sends `end` with the reason, once; a resumed session starts again
 : > "$LOG"
 fire SessionEnd s1 "$R" clear >/dev/null; fire SessionEnd s1 "$R" clear >/dev/null
-wait_sent 1; sleep 0.5; C="$(sent)"
+age s1 61; fire Stop s1 "$R" >/dev/null                           # a finished turn after the end: nothing
+wait_sent 1; sleep 0.5; C="$(sent)"; ST="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["state"])' "$RECORDS/s1.json")"
 fire SessionStart s1 "$R" >/dev/null
-if [ "$C" = 1 ] && [ "$(field 1 PRESENCE_EVENT)" = end ] && [ "$(field 1 PRESENCE_END_REASON)" = clear ] \
+if [ "$C" = 1 ] && [ "$ST" = ended ] && [ "$(field 1 PRESENCE_EVENT)" = end ] && [ "$(field 1 PRESENCE_END_REASON)" = clear ] \
   && [ "$(field 1 PRESENCE_STATE)" = ended ] && wait_sent 2 && [ "$(field 2 PRESENCE_EVENT)" = start ]; then
-  ok "(5) SessionEnd → end (reason clear) once; resume after it → start"
+  ok "(5) SessionEnd → end (reason clear) once; Stop after it → nothing; resume after it → start"
 else bad "(5) c=$C $(cat "$LOG")"; fi
 
 # (6) Stop or SessionEnd for a session never reported here sends nothing
@@ -164,8 +177,9 @@ done
 chmod 500 "$RECORDS"
 O="$O$(fire SessionStart s11 "$R" 2>&1)"; RC=$((RC + $?))
 chmod 700 "$RECORDS"
-O="$O$(python3 "$HOOK" 2>&1)$(python3 "$HOOK" send bogus s1 1 2>&1)$(python3 "$HOOK" send beat s1 notanumber 2>&1)$(DEVSTRIDE_PRESENCE_MINUTE=x python3 "$HOOK" keeper nobody 2>&1)"; RC=$((RC + $?))
-if [ "$RC" = 0 ] && [ -z "$O" ] && [ ! -e "$XDG_CACHE_HOME/devstride-plugin/x.json" ] && [ ! -e "$RECORDS/s11.json" ]; then
+O="$O$(python3 "$HOOK" 2>&1)$(python3 "$HOOK" send bogus starting s1 9 1 2>&1)$(python3 "$HOOK" send beat working s1 x 1 2>&1)$(python3 "$HOOK" send beat bogus s1 9 1 2>&1)$(DEVSTRIDE_PRESENCE_MINUTE=x python3 "$HOOK" keeper nobody 2>&1)"; RC=$((RC + $?))
+if [ "$RC" = 0 ] && [ -z "$O" ] && [ ! -e "$XDG_CACHE_HOME/devstride-plugin/x.json" ] && [ ! -e "$RECORDS/s11.json" ] \
+  && [ ! -e "$RECORDS/nobody.keeper.lock" ]; then
   ok "(11) malformed payload / bad session id / unknown event / unwritable cache / bad args → exit 0, silent"
 else bad "(11) rc=$RC out=$O"; fi
 
@@ -211,13 +225,12 @@ else bad "(16) $(cat "$LOG")"; fi
 
 # (17) a keeper lock nobody holds (a stale record from before a reboot) does not stop a new keeper
 : > "$LOG"; O17="$(owner)"
-fire SessionStart s17 "$K" >/dev/null; wait_sent 1
-python3 - "$RECORDS/s17.json" <<'PY'
-import json, sys
-p = sys.argv[1]; r = json.load(open(p)); r["keeper"] = 99998; r["owner"] = 99998; json.dump(r, open(p, "w"))
-PY
-DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O17" fire SessionStart s17 "$K" resume >/dev/null; sleep 0.5
-if keeper_alive s17 && [ "$(field 2 PRESENCE_EVENT)" = start ] && [ "$(field 2 CLAUDE_PID)" = "$O17" ]; then
+CLAUDE_PID="$O17" fire SessionStart s17 "$K5" >/dev/null; wait_sent 1
+stop_keeper s17; KBEFORE=0; keeper_alive s17 && KBEFORE=1
+edit s17 'r["owner"] = 99998; r["ownerStarted"] = "then"'
+CLAUDE_PID="$O17" fire SessionStart s17 "$K5" resume >/dev/null; wait_sent 2
+i=0; while ! keeper_alive s17 && [ $i -lt 30 ]; do sleep 0.1; i=$((i + 1)); done
+if [ "$KBEFORE" = 0 ] && keeper_alive s17 && [ "$(field 2 PRESENCE_EVENT)" = start ] && [ "$(field 2 CLAUDE_PID)" = "$O17" ]; then
   ok "(17) stale record → resume sends start with the live process and starts a keeper"
 else bad "(17) $(cat "$LOG")"; fi
 
@@ -230,6 +243,45 @@ wait_sent 2; sleep 0.3
 if [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = beat ] && [ "$(field 2 PRESENCE_STATE)" = working ]; then
   ok "(18) SessionStart source compact → ignored; a 200 KB prompt → beat (working)"
 else bad "(18) $(cat "$LOG")"; fi
+
+# (19) the keeper sends a held state change once 30 seconds pass, with no hook firing
+: > "$LOG"; O19="$(owner)"
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O19" fire SessionStart s19 "$K5" >/dev/null; wait_sent 1
+fire Stop s19 "$K5" >/dev/null; sleep 0.5; H="$(sent)"            # held: within 30 s of the start
+age s19 31; wait_sent 2; sleep 0.3
+if [ "$H" = 1 ] && [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = beat ] && [ "$(field 2 PRESENCE_STATE)" = waiting ]; then
+  ok "(19) Stop held within 30 s → the keeper sends it (beat, waiting) once 30 s pass"
+else bad "(19) h=$H $(cat "$LOG")"; fi
+
+# (20) a report overtaken by a newer one is dropped: an old end after a resume's start never runs
+: > "$LOG"
+fire SessionStart s20 "$R" >/dev/null; wait_sent 1; stop_keeper s20
+NOW_MS="$(python3 -c 'import time; print(int(time.time()*1000))')"
+python3 "$HOOK" send start starting s20 3 "$NOW_MS"; python3 "$HOOK" send end ended s20 2 "$NOW_MS"
+python3 "$HOOK" send beat working s20 3 "$NOW_MS"; sleep 0.3
+if [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = start ] && [ "$(field 1 PRESENCE_AT)" -gt 1000000000000 ]; then
+  ok "(20) sequence 3 (start) ran → sequence 2 (end) and a repeat of 3 dropped; PRESENCE_AT in milliseconds"
+else bad "(20) $(cat "$LOG")"; fi
+
+# (21) a resume re-reads the process start time even when the process id is the same number
+: > "$LOG"; O21="$(owner)"
+CLAUDE_PID="$O21" fire SessionStart s21 "$R" >/dev/null; wait_sent 1
+edit s21 'r["ownerStarted"] = "Thu Jan  1 00:00:00 1970"'
+CLAUDE_PID="$O21" fire SessionStart s21 "$R" resume >/dev/null; wait_sent 2
+W="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["ownerStarted"])' "$RECORDS/s21.json")"
+if [ "$W" = "$(ps -o lstart= -p "$O21" | sed 's/^ *//;s/ *$//')" ]; then
+  ok "(21) resume with the same process id → its start time re-read (no false gone after a reboot)"
+else bad "(21) ownerStarted=$W"; fi
+
+# (22) a failing `ps` never reads as a replaced process: the keeper keeps beating, no end
+: > "$LOG"; O22="$(owner)"; mkdir -p "$WORK/badps"; printf '#!/bin/sh\nexit 1\n' > "$WORK/badps/ps"; chmod +x "$WORK/badps/ps"
+CLAUDE_PID="$O22" fire SessionStart s22 "$K" >/dev/null; wait_sent 1; stop_keeper s22
+(DEVSTRIDE_PRESENCE_MINUTE=0.4 PATH="$WORK/badps:$PATH" python3 "$HOOK" keeper s22 >/dev/null 2>&1 &)
+wait_sent 3; sleep 0.2
+if [ "$(sent)" -ge 3 ] && ! grep -q '"PRESENCE_EVENT": "end"' "$LOG" && keeper_alive s22; then
+  ok "(22) ps failing → the keeper keeps beating, no false end"
+else bad "(22) $(cat "$LOG")"; fi
+stop_keeper s22
 
 # (12) hooks.json registers the hook on all four events, bounded and failing open
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'

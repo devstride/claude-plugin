@@ -14,27 +14,27 @@ whatever it is doing, through ONE command the repository names. The hook is
 `presence`: `{ "command": "<the repository's own command>", "intervalMinutes"?: 5 }`.
 **An absent or null block, or a blank `command`, runs nothing and writes nothing.** The plugin
 never contacts a tracker for presence: what a report means, where it is stored and when it
-expires are the repository's, behind its command. `intervalMinutes` (1 to 60; anything else reads as 5, and doctor warns) is
-the keeper's beat.
+expires are the repository's, behind its command. `intervalMinutes` (an integer, 1 to 60; one out
+of range reads as 5, and doctor warns) is the keeper's beat.
 
 ## When the command runs
 
 | When | `PRESENCE_EVENT` | `PRESENCE_STATE` |
 | --- | --- | --- |
-| Session start (new, resumed, after `/clear`; not an automatic compaction) | `start` | `starting` |
+| Session start (new, resumed, after `/clear`; not after a compaction) | `start` | `starting` |
 | A prompt, with no report yet in this session, or after an `end` | `start` | `working` |
 | A prompt, a minute or more after the last report, or from another checkout | `beat` | `working` |
-| A finished turn (Claude waits for its person) | `beat` | `waiting` |
-| The keeper, when the last report is `intervalMinutes` old | `beat` | the latest |
+| A finished turn (Claude waits for its person); nothing after an `end` | `beat` | `waiting` |
+| The keeper, when the last report is `intervalMinutes` old, or a held change is 30 seconds old | `beat` | the latest |
 | Session end (`PRESENCE_END_REASON`: `clear`, `logout`, …) | `end` | `ended` |
 | The keeper finds the session's process gone (killed, crashed) | `end` (reason `gone`) | `ended` |
 
 A state change within 30 seconds of the last report is held and carried by the next report.
-Reports for one session run one at a time, in order, and nothing but a new `start` follows an
-`end`. The keeper is one detached process per session; it checks every 10 seconds and exits once
-the session ends, its record goes or the block is removed. It is what keeps a session visible
-through a long turn with no prompt. A session that moves to a checkout without the block keeps
-reporting under the checkout it came from.
+Reports for one session run one at a time; each is numbered when queued, and one overtaken by a
+newer report is dropped, so a late `end` never follows a resumed session's `start`. The keeper,
+one detached process per session, checks every 10 seconds, keeps a long turn visible and exits
+once the session ends, its record goes or the block is removed. A session that moves to a
+checkout without the block keeps reporting under the one it came from.
 
 ## What the command receives
 
@@ -44,7 +44,7 @@ clock (the hook spawns it and returns). Exported: `PRESENCE_EVENT`, `PRESENCE_ST
 root), `PRESENCE_BRANCH`, `PRESENCE_ITEM` (an item number the branch name carries as its own
 segment, such as `I20100` in `jane/03-14-26/I20100-attachment-storage`; else empty),
 `PRESENCE_PLUGIN_VERSION`, `PRESENCE_INTERVAL_MINUTES`, `PRESENCE_END_REASON` (on `end` only),
-`PRESENCE_AT` (when the report was queued, in epoch seconds, to drop one older than what is
+`PRESENCE_AT` (when the report was queued, in epoch milliseconds, to drop one older than what is
 stored), and `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PID`, so the repository can resolve the session's own
 name. Its exit code is kept in the session's local record; nothing reads it as a verdict.
 

@@ -14,7 +14,8 @@ the repository's. The contract: skills/setup/references/session-presence.md.
 
   hook     (the hook command; the event comes from the payload's hook_event_name)
            SessionStart     -> state "starting", sends `start`, starts this session's keeper
-                               (source `compact`, an automatic mid-turn compaction, is ignored)
+                               (source `compact`, the session carrying on after a compaction, is
+                               ignored); the session's process and its start time are always re-read
            UserPromptSubmit -> state "working"; sends `beat` on a state change, when the last send
                                is a minute old, or when the session moved to another checkout; with
                                no record yet (a session that began before the block existed or the
@@ -22,33 +23,42 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            Stop             -> state "waiting"; sends `beat` on a state change
            SessionEnd       -> state "ended", sends `end` (PRESENCE_END_REASON = the payload's
                                reason, such as `clear` or `logout`)
+           Stop or SessionEnd for a session with no record, or one already ended, does nothing.
            A state change within 30 seconds of the last send is held: the next hook or keeper send
-           carries it (a hook compares against the last state REPORTED, so a held change is not lost).
+           carries it, and the keeper sends it once those 30 seconds pass (both compare against the
+           last state REPORTED, so a held change is not lost).
            The record follows the session, not the checkout: a session that moves to a checkout
            without the block keeps reporting under the one it came from, and Stop or SessionEnd is
            never dropped for a session that has a record. The session's process (CLAUDE_PID, else
            the parent of the hook's shell) and its start time are refreshed whenever they change.
+           Every read-modify-write of the record holds the session's state lock (never while the
+           command runs), and every queued report takes the next number in the record's sequence.
   keeper <session>  (detached, one per session, holding the session's keeper lock, which is how a
            hook knows one runs) checks every 10 seconds: it exits once the session has ended, its
-           record is gone or the block is removed; when the session's process is gone, or its
-           process id now belongs to a process with another start time, it sends `end` (reason
-           `gone`) and exits; and it sends `beat` when the last send is `intervalMinutes` old. It
-           covers a long turn with no prompt, and a killed session.
-  send <event> <session> <at>  (detached) runs the command once, holding the session's send lock so
-           reports run one at a time and in order: nothing but `start` is sent after an `end`, and
-           a second `end` is not sent. From the repository root, through the shell, at most 20
-           seconds, its exit code kept in the record. It exports
+           record is gone or the block is removed, releasing its lock under the state lock so a
+           resume never sees a keeper that is leaving; when the session's process is gone, or its
+           process id now belongs to a process with another known start time, it sends `end`
+           (reason `gone`) and exits; and it sends `beat` when the last send is `intervalMinutes`
+           old or a held change is due. It covers a long turn with no prompt, and a killed session.
+  send <event> <state> <session> <sequence> <at>  (detached) runs the command once, holding the
+           session's send lock so reports run one at a time, and only when its sequence number is
+           above the last one sent: a report overtaken by a newer one is dropped, so an old `end`
+           never follows a resumed session's `start`. From the repository root, through the shell,
+           at most 20 seconds, its exit code kept in the record. It exports
            PRESENCE_EVENT (start|beat|end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE,
            PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM (an item number the branch name carries,
            else empty), PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON,
-           PRESENCE_AT (when the hook or keeper queued the report, epoch seconds, so a repository
-           can drop a report older than one it already stored), and CLAUDE_CODE_SESSION_ID and CLAUDE_PID so the repository can resolve the session's name.
+           PRESENCE_AT (when the hook or keeper queued the report, epoch milliseconds, so a
+           repository can drop a report older than one it already stored), and
+           CLAUDE_CODE_SESSION_ID and CLAUDE_PID so the repository can resolve the session's name.
 
 DEVSTRIDE_PRESENCE_MINUTE (seconds in a keeper minute, default 60) exists for the tests only.
 Records: ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/presence/<session>.json (and the session's
-two lock files), owner-only, pruned after 7 days untouched. FAILS OPEN: every hook exits 0 and prints nothing (a prompt hook's stdout would become
+three lock files), owner-only, pruned after 7 days untouched; nothing is created for a session whose
+checkout has no block. FAILS OPEN: every hook exits 0 and prints nothing (a prompt hook's stdout would become
 context), whatever goes wrong. python3 and the standard library only.
 """
+import contextlib
 import fcntl
 import json
 import os
@@ -76,6 +86,7 @@ try:
 except ValueError:
     MINUTE = 60.0
 STATES = {"SessionStart": "starting", "UserPromptSubmit": "working", "Stop": "waiting", "SessionEnd": "ended"}
+EVENTS = ("start", "beat", "end")
 
 
 def cache_dir():
@@ -90,7 +101,12 @@ def private_dir(path):
     return path
 
 
+def records_path():
+    return os.path.join(cache_dir(), "presence")
+
+
 def records_dir():
+    """The records directory, created owner-only when missing: only once a report is due."""
     return private_dir(os.path.join(private_dir(cache_dir()), "presence"))
 
 
@@ -123,7 +139,8 @@ def write_atomic(directory, name, payload):
 
 
 def load(sid):
-    record = read_json(os.path.join(records_dir(), sid + ".json"), limit=65536)
+    """The session's record, or None; read-only, so it never creates a directory."""
+    record = read_json(os.path.join(records_path(), sid + ".json"), limit=65536)
     return record if isinstance(record, dict) and record.get("schema") == 1 else None
 
 
@@ -231,6 +248,25 @@ def lock(sid, kind, block_until_free):
     return fd
 
 
+@contextlib.contextmanager
+def state_lock(sid):
+    """Held around every read-modify-write of the record, never while the command runs."""
+    fd = lock(sid, "state", True)
+    if fd is None:
+        raise OSError("state lock")
+    try:
+        yield
+    finally:
+        os.close(fd)
+
+
+def queue(record, now):
+    """Mark a report as queued now and return its sequence number (the state lock is held)."""
+    sequence = int(record.get("queued") or 0) + 1
+    record.update({"queued": sequence, "sent": round(now, 3), "reported": record.get("state")})
+    return sequence
+
+
 def keeper_running(sid):
     fd = lock(sid, "keeper", False)
     if fd is None:
@@ -259,7 +295,7 @@ def item_of(branch):
     return match.group(1) if match else ""
 
 
-def run_command(sid, record, event, at):
+def run_command(sid, record, event, state, at):
     top = record.get("top")
     settings = block(top) if isinstance(top, str) else None
     if not settings:
@@ -267,7 +303,7 @@ def run_command(sid, record, event, at):
     branch = branch_of(top)
     env = dict(os.environ)
     env.update({
-        "PRESENCE_EVENT": event, "PRESENCE_STATE": str(record.get("state") or ""),
+        "PRESENCE_EVENT": event, "PRESENCE_STATE": state,
         "PRESENCE_SESSION_ID": sid, "PRESENCE_MACHINE": socket.gethostname().split(".")[0],
         "PRESENCE_CHECKOUT": top, "PRESENCE_BRANCH": branch, "PRESENCE_ITEM": item_of(branch),
         "PRESENCE_PLUGIN_VERSION": str(record.get("version") or ""),
@@ -290,28 +326,26 @@ def run_command(sid, record, event, at):
         return "error"
 
 
-def send(event, sid, at):
-    """Run the repository's command once for this session, one report at a time, in order."""
-    if event not in ("start", "beat", "end"):
+def send(event, state, sid, sequence, at):
+    """Run the repository's command once for this session: one report at a time, and only when no
+    newer report has already been sent."""
+    if event not in EVENTS or state not in STATES.values():
         return
     fd = lock(sid, "send", True)
     if fd is None:
         return
     try:
-        record = load(sid)
-        if not record:
-            return
-        ended = record.get("state") == "ended"
-        if (event == "beat" and ended) or (event == "start" and ended) or (event == "end" and record.get("endSent")):
-            return
-        code = run_command(sid, record, event, at)
-        if code is None:
-            return
-        latest = load(sid) or record
-        latest["last"] = {"event": event, "exit": code, "at": round(time.time(), 3)}
-        if event == "end":
-            latest["endSent"] = latest.get("state") == "ended"  # a start queued since then re-arms it
-        save(sid, latest)
+        with state_lock(sid):
+            record = load(sid)
+            if not record or sequence <= int(record.get("done") or 0):
+                return  # overtaken: a newer report for this session already ran
+        code = run_command(sid, record, event, state, at)
+        with state_lock(sid):
+            latest = load(sid) or record
+            latest["done"] = max(sequence, int(latest.get("done") or 0))
+            if code is not None:
+                latest["last"] = {"event": event, "exit": code, "at": round(time.time(), 3)}
+            save(sid, latest)
     finally:
         os.close(fd)
 
@@ -332,77 +366,107 @@ def hook():
     if event not in STATES or not isinstance(sid, str) or not SESSION_ID.match(sid):
         return
     if event == "SessionStart" and payload.get("source") == "compact":
-        return  # an automatic compaction mid-turn: the session is still working
+        return  # the session carries on after a compaction
     cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else os.getcwd()
     top = repo_top(cwd)
-    record = load(sid)
-    if not block(top):
-        if record and block(record.get("top")):
-            top = record["top"]  # moved to a checkout without the block: keep reporting under the old one
-        else:
-            return
+    here = block(top)
+    peek = load(sid)
+    if not here and not (peek and block(peek.get("top"))):
+        return  # nothing to report, and nothing written
+    if event in ("Stop", "SessionEnd") and (peek is None or peek.get("state") == "ended"):
+        return  # never reported here, or already ended
+    owner = owner_pid() if event == "SessionStart" else env_owner()
+    owner_started = started(owner) if owner else ""
     now = time.time()
-    fresh = record is None
-    if fresh:
-        if event in ("Stop", "SessionEnd"):
-            return  # nothing was ever reported for this session
-        record = {"schema": 1, "top": top, "state": None, "sent": 0, "owner": 0}
-        if event == "SessionStart":
-            prune(now)
-    moved = not fresh and record.get("top") != top
-    previous, sent, state = record.get("state"), record.get("sent") or 0, STATES[event]
-    record.update({"top": top, "state": state, "version": running_version() or record.get("version") or ""})
-    owner = env_owner() or (owner_pid() if event == "SessionStart" or not alive(record.get("owner")) else 0)
-    if owner and owner != record.get("owner"):
-        record.update({"owner": owner, "ownerStarted": started(owner)})
-    if event == "SessionEnd":
-        record["reason"] = str(payload.get("reason") or "")
-        verb = "end" if previous != "ended" else None
-    elif event == "SessionStart" or fresh or previous == "ended":
-        verb = "start"
-    elif event == "UserPromptSubmit" and (now - sent >= BEAT_AFTER or moved):
-        verb = "beat"
-    elif (state != record.get("reported") or moved) and now - sent >= CHANGE_AFTER:
-        verb = "beat"
-    else:
-        verb = None
-    if verb:
-        record.update({"sent": round(now, 3), "reported": state})
-        if verb == "start":
-            record["endSent"] = False
-    save(sid, record)
-    if verb:
-        spawn("send", verb, sid, str(int(now)))
-    if event in ("SessionStart", "UserPromptSubmit") and record.get("owner") and not keeper_running(sid):
-        spawn("keeper", sid)
+    with state_lock(sid):
+        record = load(sid)
+        if not here:
+            if not (record and block(record.get("top"))):
+                return
+            top = record["top"]  # moved to a checkout without the block: keep reporting under the old one
+        fresh = record is None
+        previous = None if fresh else record.get("state")
+        if event in ("Stop", "SessionEnd") and (fresh or previous == "ended"):
+            return
+        if fresh:
+            record = {"schema": 1, "top": top, "state": None, "sent": 0, "owner": 0}
+            if event == "SessionStart":
+                prune(now)
+        moved = not fresh and record.get("top") != top
+        sent, state = record.get("sent") or 0, STATES[event]
+        record.update({"top": top, "state": state, "version": running_version() or record.get("version") or ""})
+        if not owner and not alive(record.get("owner")):
+            owner = owner_pid()
+            owner_started = started(owner) if owner else ""
+        if owner and (event == "SessionStart" or owner != record.get("owner")):
+            record.update({"owner": owner, "ownerStarted": owner_started})  # a resume re-reads both
+        if event == "SessionEnd":
+            record["reason"] = str(payload.get("reason") or "")
+            verb = "end"
+        elif event == "SessionStart" or fresh or previous == "ended":
+            verb = "start"
+        elif event == "UserPromptSubmit" and (now - sent >= BEAT_AFTER or moved):
+            verb = "beat"
+        elif (state != record.get("reported") or moved) and now - sent >= CHANGE_AFTER:
+            verb = "beat"
+        else:
+            verb = None
+        sequence = queue(record, now) if verb else 0
+        save(sid, record)
+        if verb:
+            spawn("send", verb, state, sid, str(sequence), str(int(now * 1000)))
+        if event in ("SessionStart", "UserPromptSubmit") and record.get("owner") and not keeper_running(sid):
+            spawn("keeper", sid)
+
+
+def replaced(record):
+    """Whether the session's process id now belongs to another process: only a known start time
+    that differs counts, never a failed look-up."""
+    was = record.get("ownerStarted")
+    now = started(record.get("owner")) if was else ""
+    return bool(was and now and now != was)
 
 
 def keeper(sid):
+    if load(sid) is None:
+        return  # no session to keep
     fd = lock(sid, "keeper", False)
     if fd is None:
         return  # another keeper runs for this session
     poll = 10 * MINUTE / 60
-    while True:
-        time.sleep(poll)
-        os.utime(fd)
-        record = load(sid)
-        if not record or record.get("state") == "ended":
-            return
-        settings = block(record.get("top"))
-        if not settings:
-            return
-        owner, now = record.get("owner"), time.time()
-        due = now - (record.get("sent") or 0) >= settings["intervalMinutes"] * MINUTE
-        gone = not alive(owner) or (due and record.get("ownerStarted") and started(owner) != record["ownerStarted"])
-        if gone:
-            record.update({"state": "ended", "reason": "gone", "sent": round(now, 3), "reported": "ended"})
-            save(sid, record)
-            send("end", sid, int(now))
-            return
-        if due:
-            record.update({"sent": round(now, 3), "reported": record.get("state")})
-            save(sid, record)
-            send("beat", sid, int(now))
+    try:
+        while fd is not None:
+            time.sleep(poll)
+            os.utime(fd)
+            peek = load(sid) or {}
+            settings = block(peek.get("top"))
+            due = bool(settings) and time.time() - (peek.get("sent") or 0) >= settings["intervalMinutes"] * MINUTE
+            reused = due and replaced(peek)  # `ps` runs outside the state lock
+            job = None
+            with state_lock(sid):
+                record = load(sid)
+                settings = block(record.get("top")) if record else None
+                if not settings or record.get("state") == "ended":
+                    os.close(fd)  # released under the state lock: a resume then starts a new keeper
+                    fd = None
+                    continue
+                owner, now = record.get("owner"), time.time()
+                due = now - (record.get("sent") or 0) >= settings["intervalMinutes"] * MINUTE
+                held = record.get("state") != record.get("reported") and now - (record.get("sent") or 0) >= CHANGE_AFTER
+                if not alive(owner) or (reused and owner == peek.get("owner")):
+                    record.update({"state": "ended", "reason": "gone"})
+                    job = ("end", "ended", queue(record, now), now)
+                    save(sid, record)
+                    os.close(fd)
+                    fd = None
+                elif due or held:
+                    job = ("beat", record["state"], queue(record, now), now)
+                    save(sid, record)
+            if job:
+                send(job[0], job[1], sid, job[2], int(job[3] * 1000))
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def main(argv):
@@ -411,8 +475,9 @@ def main(argv):
             hook()
         elif argv[:1] == ["keeper"] and len(argv) == 2 and SESSION_ID.match(argv[1]):
             keeper(argv[1])
-        elif argv[:1] == ["send"] and len(argv) == 4 and SESSION_ID.match(argv[2]) and argv[3].isdigit():
-            send(argv[1], argv[2], int(argv[3]))
+        elif (argv[:1] == ["send"] and len(argv) == 6 and SESSION_ID.match(argv[3]) and argv[4].isdigit()
+              and argv[5].isdigit()):
+            send(argv[1], argv[2], argv[3], int(argv[4]), int(argv[5]))
     except Exception:
         pass
     return 0
