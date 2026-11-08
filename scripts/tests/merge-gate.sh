@@ -29,6 +29,10 @@ if a[:2] == ["api", "graphql"]:
         nodes = [{"isResolved": r} for r in s.get("threads", [])]
         print(json.dumps({"data": {"repository": {"pullRequest": {"reviewThreads": {"pageInfo": {"hasNextPage": False}, "nodes": nodes}}}}}))
         sys.exit(0)
+    if "potentialMergeCommit { oid statusCheckRollup" in q:
+        m = s.get("mergeCommit")
+        commit = None if m is None else {"oid": m["oid"], "statusCheckRollup": {"contexts": {"pageInfo": {"hasNextPage": False}, "nodes": m["nodes"]}}}
+        print(json.dumps({"data": {"repository": {"pullRequest": {"potentialMergeCommit": commit}}}})); sys.exit(0)
     if s.get("pr") is None:
         print(json.dumps({"data": {"repository": {"pullRequest": None}}, "errors": [{"type": "NOT_FOUND", "path": ["repository", "pullRequest"], "message": "Could not resolve to a PullRequest"}]}))
         sys.exit(1)
@@ -36,6 +40,8 @@ if a[:2] == ["api", "graphql"]:
     i = int(after[1:]) if after else 0
     more = i + 1 < len(pages)
     pr = dict(s["pr"])
+    pr["latestOpinionatedReviews"] = {"pageInfo": {"hasNextPage": False}, "nodes": s.get("opinions", [])}
+    pr["potentialMergeCommit"] = {"oid": s["mergeCommit"]["oid"]} if s.get("mergeCommit") else None
     pr["commits"] = {"nodes": [{"commit": {"oid": s.get("oid", pr["headRefOid"]), "statusCheckRollup": {"contexts": {
         "pageInfo": {"hasNextPage": more, "endCursor": "p%d" % (i + 1) if more else None}, "nodes": pages[i]}}}}]}
     print(json.dumps({"data": {"repository": {"pullRequest": pr}}})); sys.exit(0)
@@ -137,6 +143,19 @@ refuse("(14) behind a base that must be current -> REFUSE", sc(mergeStateStatus=
 refuse("(15) GitHub still computing -> REFUSE", sc(mergeStateStatus="UNKNOWN"), "finished computing")
 refuse("(16) an unresolved review thread -> REFUSE", sc(threads=[True, False]), "1 unresolved review thread")
 refuse("(17) changes requested -> REFUSE", sc(reviewDecision="CHANGES_REQUESTED"), "requesting changes")
+refuse("(17b) a reviewer's latest review requests changes though reviews are not required (empty decision) -> REFUSE",
+       sc(opinions=[{"state": "APPROVED", "author": {"login": "amy"}}, {"state": "CHANGES_REQUESTED", "author": {"login": "bo"}}]),
+       "bo requested changes")
+merge("(17c) a reviewer who requested changes and then approved does not block",
+      sc(opinions=[{"state": "APPROVED", "author": {"login": "bo"}}]), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(17d) a required check green on the head but failed on the test merge commit -> REFUSE",
+       sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint", "FAILURE")]}), "failed on the test merge commit")
+merge("(17e) the test merge commit carries only green or unrelated checks: merges",
+      sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint"), st("unrelated", "FAILURE", required=False)]}),
+      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(17f) a rule bound to an app is not met by a commit status of that name -> REFUSE naming why",
+       sc(rules=["lint"], ruleObjects=[{"context": "tests", "integration_id": 15368}], pages=[[st("tests"), cr("lint", ident=11)]]),
+       "cannot show which app sent it")
 refuse("(18) blocked with no required check at all -> REFUSE: nothing proves the head green",
        sc(rules=[], pages=[[cr("tests", ident=10, required=False)]]), "requires no check")
 merge("(19) no required check and clean -> MERGE plainly (a train with no rules)",
@@ -147,11 +166,13 @@ refuse("(21) a check only classic protection requires, failing -> REFUSE",
        "build is failure")
 refuse("(22) a check GitHub marks required but no ruleset names, failing -> REFUSE",
        sc(rules=["tests"], pages=[[cr("tests", ident=10), cr("lint", "TIMED_OUT", ident=11)]]), "lint is timed_out")
-merge("(23) a failed run re-run green: the newest run counts",
-      sc(pages=[[cr("tests", "FAILURE", ident=10), cr("tests", ident=20), cr("lint", ident=11)]]),
+refuse("(22b) two same-name jobs in one workflow run are siblings: a failing one is never hidden by a later green one",
+       sc(pages=[[cr("tests", "FAILURE", ident=10, run=5), cr("tests", ident=20, run=5), cr("lint", ident=11)]]), "tests is failure")
+merge("(23) a later workflow run of the check counts over an earlier failed one",
+      sc(pages=[[cr("tests", "FAILURE", ident=10, run=5), cr("tests", ident=20, run=6), cr("lint", ident=11)]]),
       "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
-refuse("(24) a green run re-queued: the queued newest run counts -> REFUSE",
-       sc(pages=[[cr("tests", ident=10), cr("tests", status="QUEUED", ident=20), cr("lint", ident=11)]]), "tests is pending")
+refuse("(24) a later workflow run still queued counts -> REFUSE",
+       sc(pages=[[cr("tests", ident=10, run=5), cr("tests", status="QUEUED", ident=20, run=6), cr("lint", ident=11)]]), "tests is pending")
 refuse("(25) a required commit status pending -> REFUSE",
        sc(rules=["tests", "lint", "deploy/preview"], pages=[[cr("tests", ident=10), cr("lint", ident=11), st("deploy/preview", "PENDING")]]),
        "deploy/preview is pending")
@@ -201,7 +222,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 55 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 61 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.

@@ -27,10 +27,13 @@ The rule (an approver's admin merge exactly when every required check is green, 
   another workflow or app, or a same-name commit status, is another check and must pass too. Every
   check that can satisfy a requirement must have passed at the expected head. Passed is GitHub's
   own reading: SUCCESS, or SKIPPED or NEUTRAL (a workflow that skips a job when nothing needed
-  it, which GitHub counts as passing). A check's verdict is its newest run, ordered by workflow
-  run number and then attempt, so a later run or re-run supersedes an earlier one; a skipped or
-  neutral newest run never hides an older run of the same check that executed and is failing or
-  still pending. Pending, failed, cancelled, timed out or missing is a REFUSE naming it.
+  it, which GitHub counts as passing). A check's verdict is its newest workflow run (by run
+  number; a re-run keeps its number and GitHub lists only its latest attempt). Same-name jobs in
+  that one run are siblings, and every one must pass. A skipped or neutral newest run never hides
+  an older run of the same check that executed and is failing or still pending. Pending, failed,
+  cancelled, timed out or missing is a REFUSE naming it. A required check that also ran on the
+  pull request's test merge commit must pass there too (GitHub requires it). A commit status
+  cannot show which app sent it, so a rule bound to an app is met only by that app's check run.
   `--all-green` holds every check at the head to the same rule, not only the required ones
   (`release` uses it for production).
 - Classic protection answering 404 means none only with GitHub's two messages for it ("Branch
@@ -38,7 +41,9 @@ The rule (an approver's admin merge exactly when every required check is green, 
 - A base that requires branches to be up to date (a ruleset's strict policy, or classic `strict`)
   is checked with the compare API: a head behind its base is a REFUSE, so `--admin` never merges
   an out-of-date head even when GitHub reads the pull request BLOCKED rather than BEHIND.
-- No open conversation: a CHANGES_REQUESTED decision or any unresolved review thread is a REFUSE.
+- No open conversation: a CHANGES_REQUESTED decision, any reviewer whose latest review requests
+  changes (even when reviews are not required and the decision is empty), or any unresolved
+  review thread is a REFUSE.
 - `--admin` only when GitHub reads the pull request BLOCKED with all of the above true, at least
   one required check, and no rule on the base this gate cannot judge (KNOWN_RULES; a
   `workflows`, `code_scanning`, `required_deployments`, `merge_queue` or other rule would be
@@ -69,6 +74,8 @@ PR_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: Stri
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       number state isDraft headRefOid baseRefName mergeStateStatus reviewDecision
+      latestOpinionatedReviews(first: 100) { pageInfo { hasNextPage } nodes { state author { login } } }
+      potentialMergeCommit { oid }
       commits(last: 1) { nodes { commit { oid statusCheckRollup {
         contexts(first: 100, after: $after) {
           pageInfo { hasNextPage endCursor }
@@ -80,6 +87,24 @@ PR_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: Stri
           }
         }
       } } } }
+    }
+  }
+}"""
+
+MERGE_COMMIT_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      potentialMergeCommit { oid statusCheckRollup {
+        contexts(first: 100, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            __typename
+            ... on CheckRun { name status conclusion databaseId
+                              checkSuite { app { databaseId } workflowRun { runNumber workflow { databaseId } } } }
+            ... on StatusContext { context state }
+          }
+        }
+      } }
     }
   }
 }"""
@@ -173,6 +198,24 @@ def pull_request(owner, name, number):
     return pr
 
 
+def merge_commit_contexts(owner, name, number, oid):
+    """The check contexts on the pull request's test merge commit, all pages; none when there is none."""
+    after, contexts = None, []
+    while True:
+        repo = graphql(MERGE_COMMIT_QUERY, owner, name, number, after)
+        commit = (repo.get("pullRequest") or {}).get("potentialMergeCommit")
+        if not commit:
+            return []
+        if commit.get("oid") != oid:
+            raise Unreadable("the test merge commit changed while its checks were being read: ask again")
+        rollup = (commit.get("statusCheckRollup") or {}).get("contexts") or {"nodes": [], "pageInfo": {}}
+        contexts += rollup.get("nodes") or []
+        info = rollup.get("pageInfo") or {}
+        if not info.get("hasNextPage"):
+            return contexts
+        after = info.get("endCursor")
+
+
 def unresolved_threads(owner, name, number):
     after, count = None, 0
     while True:
@@ -245,13 +288,25 @@ def protection_checks(owner, name, base):
     return required, data.get("strict") is True
 
 
+def worst(states):
+    """One workflow run's verdict for a check from its sibling jobs: a failure, else pending, else
+    success, else skipped or neutral."""
+    for state in states:
+        if state not in PASSED and state != "PENDING":
+            return state
+    if "PENDING" in states:
+        return "PENDING"
+    return "SUCCESS" if "SUCCESS" in states else states[0]
+
+
 def runs_at_head(contexts):
-    """Every distinct check at this head and its verdict. A check run is one (name, app, workflow);
-    its runs are ordered by workflow run number, then attempt (a re-run's check run has a higher
-    id within the same workflow run), so the newest run is the verdict. A skipped or neutral
-    newest run passes only when the newest run that executed, if any, passed and none is pending.
-    A commit status is one context (GitHub reports only its latest state). Same-name checks from
-    another workflow or app, and a same-name status, stay separate: each must pass."""
+    """Every distinct check at this head and its verdict. A check run belongs to one (name, app,
+    workflow); its workflow runs are ordered by run number (a re-run keeps its number, and GitHub
+    lists only the latest attempt), and same-name jobs in one run are siblings that must all pass.
+    The newest run is the verdict; a skipped or neutral newest run passes only when no run is
+    pending and the newest run that executed passed. A commit status is one context (GitHub
+    reports only its latest state). Same-name checks from another workflow or app, and a same-name
+    status, stay separate: each must pass."""
     runs = {}
     for c in contexts:
         if not isinstance(c, dict):
@@ -261,27 +316,28 @@ def runs_at_head(contexts):
             app = (suite.get("app") or {}).get("databaseId")
             run = suite.get("workflowRun") or {}
             workflow = (run.get("workflow") or {}).get("databaseId")
-            key, order = ("check", c.get("name"), app, workflow), (run.get("runNumber") or 0, c.get("databaseId") or 0)
+            key, number = ("check", c.get("name"), app, workflow), run.get("runNumber") or 0
             state = c.get("conclusion") if c.get("status") == "COMPLETED" else "PENDING"
         elif c.get("__typename") == "StatusContext":
-            key, order = ("status", c.get("context"), None, None), (0, 0)
+            key, number = ("status", c.get("context"), None, None), 0
             state = {"PENDING": "PENDING", "EXPECTED": "PENDING"}.get(c.get("state"), c.get("state"))
         else:
             continue
         if key[1]:
-            runs.setdefault(key, []).append((order, state or "PENDING", bool(c.get("isRequired"))))
+            entry = runs.setdefault(key, {"required": False, "byRun": {}})
+            entry["required"] = entry["required"] or bool(c.get("isRequired"))
+            entry["byRun"].setdefault(number, []).append(state or "PENDING")
     verdicts = {}
-    for key, seen in runs.items():
-        seen.sort(key=lambda r: r[0])
-        state = seen[-1][1]
+    for key, entry in runs.items():
+        ordered = [worst(entry["byRun"][n]) for n in sorted(entry["byRun"])]
+        state = ordered[-1]
         if state in QUIET:
-            pending = [r for r in seen if r[1] == "PENDING"]
-            executed = [r for r in seen if r[1] not in QUIET]
-            if pending:
+            executed = [x for x in ordered if x not in QUIET]
+            if "PENDING" in ordered:
                 state = "PENDING"
-            elif executed and executed[-1][1] != "SUCCESS":
-                state = executed[-1][1]
-        verdicts[key] = (state, any(r[2] for r in seen))
+            elif executed and executed[-1] != "SUCCESS":
+                state = executed[-1]
+        verdicts[key] = (state, entry["required"])
     return verdicts
 
 
@@ -291,7 +347,9 @@ def problems_with(required, runs):
         source = " from app %d" % app if app else ""
         matching = [(k, v) for k, v in runs.items() if k[1] == check and (app is None or (k[0] == "check" and k[2] == app))]
         if not matching:
-            problems.append("%s%s never ran at this head" % (check, source))
+            status_only = app and any(k[1] == check and k[0] == "status" for k in runs)
+            problems.append("%s%s never ran at this head%s" % (check, source,
+                            " (a commit status of that name cannot show which app sent it)" if status_only else ""))
             continue
         for key, (state, _) in sorted(matching, key=lambda kv: (kv[0][0], kv[0][2] or 0, kv[0][3] or 0)):
             if state not in PASSED:
@@ -319,6 +377,14 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
         raise Refuse("GitHub reads #%d as %s: ask again once it has finished computing" % (number, state))
     if pr.get("reviewDecision") == "CHANGES_REQUESTED":
         raise Refuse("#%d has a review requesting changes" % number)
+    opinions = pr.get("latestOpinionatedReviews")
+    if not isinstance(opinions, dict) or not isinstance(opinions.get("nodes"), list) \
+            or (opinions.get("pageInfo") or {}).get("hasNextPage"):
+        raise Unreadable("the reviews of #%d could not be read in full" % number)
+    asking = sorted(((r.get("author") or {}).get("login") or "a reviewer") for r in opinions["nodes"]
+                    if isinstance(r, dict) and r.get("state") == "CHANGES_REQUESTED")
+    if asking:
+        raise Refuse("#%d: %s requested changes and has not approved since" % (number, ", ".join(asking)))
     open_threads = unresolved_threads(owner, name, number)
     if open_threads:
         raise Refuse("#%d has %d unresolved review thread(s): resolve them first" % (number, open_threads))
@@ -332,6 +398,14 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     problems = problems_with(required, runs)
     if problems:
         raise Refuse("not every required check is green at %s: %s" % (expected[:12], "; ".join(problems)))
+    merge_oid = (pr.get("potentialMergeCommit") or {}).get("oid")
+    if merge_oid:
+        on_merge = runs_at_head(merge_commit_contexts(owner, name, number, merge_oid))
+        ran_there = {r for r in required if any(k[1] == r[0] for k in on_merge)}
+        red = [p for p in problems_with(ran_there, on_merge) if "never ran" not in p]
+        if red:
+            raise Refuse("a required check failed on the test merge commit %s, which GitHub holds above the head: %s"
+                         % (merge_oid[:12], "; ".join(red)))
     if all_green:
         red = problems_with({(k[1], None) for k in runs}, runs)
         if red:

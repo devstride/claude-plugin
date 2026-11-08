@@ -410,8 +410,10 @@ M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exac
      classic protection, and what GitHub marks required) completed SUCCESS on its newest run there
      (passed is GitHub's reading: SUCCESS, SKIPPED or NEUTRAL, but a skipped newest run never hides
      an older executed run of that check that failed or is pending; pending, failed or missing
-     refuses; runs order by workflow run number, then attempt, never by check-run id alone), no
-     unresolved thread and no changes requested. A strict base is compared: behind refuses.
+     refuses; runs order by workflow run number, never by check-run id, and same-name jobs in one
+     run are siblings that must all pass), green on the test merge commit too where it ran there,
+     no unresolved thread, and no reviewer whose latest review requests changes (the aggregate
+     decision is empty when reviews are not required). A strict base is compared: behind refuses.
      `--admin` only when GitHub reads it BLOCKED with all of that true and at least one required
      check and no rule type it cannot judge: an admin merge never bypasses a conflict, an
      out-of-date branch or a red check. Production uses `--all-green` (every check). A check
