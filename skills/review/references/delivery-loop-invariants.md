@@ -412,8 +412,8 @@ M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exac
      (passed is GitHub's reading: SUCCESS, SKIPPED or NEUTRAL, but a skipped newest run never hides
      an older executed run of that check that failed or is pending, and a required one passes only
      when a job of its own run or an older run of that check succeeded; a run from an event GitHub
-     does not count, such as workflow_dispatch, is ignored; pending, failed or missing refuses; each trigger event is judged apart, any pending job refuses, an older red run counts
-     unless the passing run's latest attempt began after it (a re-run); same-name jobs are siblings), green on the test merge commit too where it ran there,
+     does not count, such as workflow_dispatch, is ignored; pending, failed or missing refuses; each trigger event is judged apart, any pending job or run of that workflow refuses, so
+     does a newer run ended red, and a later re-run's red counts; same-name jobs are siblings), green on the test merge commit too where it ran there,
      no unresolved thread, and no reviewer whose latest review requests changes (the aggregate
      decision is empty when reviews are not required). A strict base is compared: behind refuses.
      `--admin` only when GitHub reads it BLOCKED with all of that true and at least one required

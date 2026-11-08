@@ -61,12 +61,28 @@ if a[0] == "api" and "/rules/branches/" in a[1]:
                        "strict_required_status_checks_policy": bool(s.get("strict"))}},
                       {"type": "pull_request", "parameters": s.get("prRule", {"required_approving_review_count": 0, "require_code_owner_review": False})},
                       {"type": "update"}] + extra)); sys.exit(0)
-if a[0] == "api" and "/actions/runs/" in a[1]:
+if a[0] == "api" and "/actions/runs?head_sha=" in a[1]:
     if s.get("runsFail"):
         sys.stderr.write("gh: Not Found (HTTP 404)\n"); sys.exit(1)
-    rid = a[1].rsplit("/", 1)[1]
-    m = 18 * 60 + int(rid) % 100000   # by default a run began in run-number order
-    print(json.dumps({"run_started_at": s.get("runStarted", {}).get(rid, "2026-01-15T%02d:%02d:00Z" % (m // 60, m % 60))})); sys.exit(0)
+    sha = a[1].split("head_sha=")[1].split("&")[0]
+    nodes = (s.get("mergeCommit") or {}).get("nodes", []) if sha != s["pr"]["headRefOid"] else [n for page in s.get("pages", []) for n in page]
+    runs = {}
+    for n in nodes:
+        w = ((n.get("checkSuite") or {}).get("workflowRun")) if n.get("__typename") == "CheckRun" else None
+        if not w:
+            continue
+        r = runs.setdefault(w["databaseId"], {"id": w["databaseId"], "workflow_id": w["workflow"]["databaseId"], "run_number": w["runNumber"],
+                                              "event": w["event"], "status": "completed", "conclusion": "success"})
+        if n["status"] != "COMPLETED":
+            r["status"], r["conclusion"] = "in_progress", None
+        elif r["status"] == "completed" and n["conclusion"] in ("FAILURE", "CANCELLED", "TIMED_OUT"):
+            r["conclusion"] = n["conclusion"].lower()
+    out = list(runs.values()) + s.get("extraRuns", [])
+    for r in out:
+        m = 18 * 60 + r["id"] % 100000   # by default a run began in run-number order
+        r.setdefault("run_started_at", s.get("runStarted", {}).get(str(r["id"]), "2026-01-15T%02d:%02d:00Z" % (m // 60, m % 60)))
+        r.setdefault("run_attempt", 2 if str(r["id"]) in s.get("runStarted", {}) else 1)   # a moved start is a re-run
+    print(json.dumps({"total_count": len(out), "workflow_runs": out})); sys.exit(0)
 if a[0] == "api" and "/compare/" in a[1]:
     print(json.dumps({"behind_by": s.get("behindBy", 0), "ahead_by": 3})); sys.exit(0)
 if a[0] == "api" and a[1].endswith("/protection/required_status_checks"):
@@ -97,7 +113,9 @@ def run(number, sha, scenario, *extra):
     return p.returncode, p.stdout.strip().split("\n"), p.stderr
 def say(good, label, extra=""):
     print(("ok   " if good else "FAIL ") + label + ("" if good else " -> " + extra))
-def cr(name, conclusion="SUCCESS", status="COMPLETED", ident=1, required=True, app=15368, workflow=1, run=None, event="pull_request"):
+WF = {"tests": 1, "plan": 1, "lint": 2, "lint-plan": 2, "optional": 3}   # the workflow of each check, unless a case names one
+def cr(name, conclusion="SUCCESS", status="COMPLETED", ident=1, required=True, app=15368, workflow="auto", run=None, event="pull_request"):
+    workflow = WF.get(name, 9) if workflow == "auto" else workflow
     return {"__typename": "CheckRun", "name": name, "status": status, "conclusion": conclusion if status == "COMPLETED" else None,
             "startedAt": "2026-01-15T18:00:00Z" if status != "QUEUED" else None, "databaseId": ident, "isRequired": required,
             "checkSuite": {"app": {"databaseId": app}, "workflowRun": {"databaseId": workflow * 100000 + (run if run is not None else ident), "runNumber": run if run is not None else ident, "event": event, "workflow": {"databaseId": workflow}} if workflow else None}}
@@ -174,11 +192,21 @@ refuse("(6r) a job still running beside a failed sibling in an older run is pend
 refuse("(6s) a partial re-run is timed by its run's latest attempt, not its jobs: an older run's kept green job never makes it read old",
        sc(runStarted={"100001": "2026-01-15T19:00:00Z"}, pages=[[cr("plan", ident=5, run=1, required=False), cr("tests", "FAILURE", ident=30, run=1),
                   cr("tests", ident=20, run=2), cr("lint", ident=11)]]), "tests is failure")
-refuse("(6t) a run start that cannot be read when a red run must be ordered is an ERROR, never a guess",
-       sc(runsFail=True, pages=[[cr("tests", "CANCELLED", ident=10, run=1), cr("tests", ident=20, run=2), cr("lint", ident=11)]]), "actions/runs", 1)
-open(os.environ["GH_LOG"], "w").close()
-code, out, err = run(7, H, sc(pages=[[cr("tests", "SKIPPED", ident=10, run=1), cr("tests", ident=20, run=2), cr("lint", ident=11)]]))
-say(code == 0 and "/actions/runs/" not in open(os.environ["GH_LOG"]).read(), "(6u) no red run to order: the Actions API is never read", "rc=%d %r" % (code, out))
+refuse("(6t) the workflow runs at the head that cannot be listed are an ERROR, never a guess",
+       sc(runsFail=True), "actions/runs", 1)
+refuse("(6u) a newer run still going before it has created the required check holds it pending (a matrix still being generated)",
+       sc(extraRuns=[{"id": 100050, "workflow_id": 1, "run_number": 50, "event": "pull_request", "status": "in_progress", "conclusion": None}]),
+       "tests is pending")
+refuse("(6v) a newer run that ended red without reporting the check refuses",
+       sc(extraRuns=[{"id": 100050, "workflow_id": 1, "run_number": 50, "event": "pull_request", "status": "completed", "conclusion": "failure"}]),
+       "workflow run #50 ended so without reporting it")
+merge("(6w) a run of another workflow, or from another event, still going does not hold this check",
+      sc(extraRuns=[{"id": 700050, "workflow_id": 7, "run_number": 50, "event": "pull_request", "status": "in_progress", "conclusion": None},
+                    {"id": 100051, "workflow_id": 1, "run_number": 51, "event": "workflow_dispatch", "status": "in_progress", "conclusion": None}]),
+      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+merge("(6x) a first attempt never supersedes a higher-numbered run, even when both began in the same second (a concurrency cancel)",
+      sc(runStarted={}, pages=[[cr("tests", "CANCELLED", ident=10, run=1), cr("tests", ident=20, run=2), cr("lint", ident=11)]],
+         extraRuns=[]), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
 refuse("(6k) a scheduled run's success does not count either",
        sc(pages=[[cr("tests", ident=20, event="schedule"), cr("lint", ident=11)]]), "tests never ran at this head")
 refuse("(6b) a skipped newest run never hides an older run of the same check that failed",
@@ -306,7 +334,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 89 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 92 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.
