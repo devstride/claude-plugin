@@ -302,5 +302,7 @@ cfg '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standing
 expect "(62) an impossible ownerDecision is a WARN, a shaped-but-wrong approval an ERROR" 1 "^CONFIG: 1 error(s), 1 warning(s)" "ownerDecision. (YYYY-MM-DD, a real date"
 cfg '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true, "ownerDecision": "2026-11-07", "migrationGlobs": ["db/*.sql"], "approvedMigrations": 7}}}'
 if printf '%s\n' "$OUT" | grep -q Traceback || ! printf '%s\n' "$OUT" | head -1 | grep -q '^CONFIG: [1-9]'; then bad "(63) approvedMigrations: 7 — exit $RC: $OUT"; else ok "(63) approvedMigrations: 7 → a schema finding, never a crash"; fi
+cfg '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true, "ownerDecision": "2999-01-01", "migrationGlobs": ["db/*.sql"], "approvedMigrations": [{"blob": "0123456789abcdef0123456789abcdef01234567", "path": "db/1.sql", "item": "I20100", "approved": "2999-01-01"}]}}}'
+expect "(64) a future ownerDecision is a WARN and a future approval an ERROR, as the helper asks" 1 "^CONFIG: 1 error(s), 1 warning(s)" "not after today"
 
 exit "$FAIL"

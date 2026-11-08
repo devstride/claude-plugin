@@ -836,7 +836,7 @@ skills/release/SKILL.md|release-holds.md
 skills/release/references/release-branch.md|Release holds.
 skills/release/SKILL.md|light or written
 skills/release/references/auto-start.md|approved BY CONTENT
-skills/release/references/auto-start.md|never on a relayed yes
+skills/release/references/auto-start.md|relayed yes: add
 skills/release/scripts/standing-yes.py|has no owner approval for this content
 skills/build-item/references/release-holds.md|scripts/release-holds.py
 skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor

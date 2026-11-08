@@ -62,7 +62,8 @@ gate green, any class) needs, in this order:
       base, renames split, repository-root paths) has its content approved:
       its blob id at --head is the `blob` of an `approvedMigrations` entry (`{"blob", "path",
       "item", "approved"}`, written on the owner's own yes, dated no later than today). A deleted
-      migration file, a file name with a control character, or an entry with a bad shape, asks.
+      migration file, a link or submodule where a migration should be, a file name with a
+      control character, or an entry with a bad shape, asks.
       The helper cannot tell who wrote an entry: provenance is the owner's words, the entry's own
       commit and the recap and comment that name every approved migration a release carries. The same content under a new number (a renumber) stays
       approved; any change to the content needs a new approval.
@@ -301,6 +302,9 @@ def migrations(head, production, full, live_base):
         if not path or not is_migration(path):
             continue
         ask(status != "D", "the release deletes the migration %s" % path)
+        listed = subprocess.run(["git", "ls-tree", "-z", head, "--", path], capture_output=True).stdout.decode("utf-8", "surrogateescape")
+        mode = listed.split(" ", 1)[0] if listed else ""
+        ask(mode in ("100644", "100755"), "the migration %s is not a plain file (mode %s): a link or submodule never pins its content" % (path, mode or "unreadable"))
         blob = subprocess.run(["git", "rev-parse", "%s:%s" % (head, path)], capture_output=True, text=True).stdout.strip()
         entry = approved.get(blob)
         ask(entry, "the migration %s (blob %s) has no owner approval for this content" % (path, blob[:12] or "unreadable"))

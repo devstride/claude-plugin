@@ -236,6 +236,11 @@ fullgraph "$(FULLCFG "" ', "migrationGlobs": ["db/**"]' | sed 's/"migrationGlobs
 g checkout -q rel; printf 'x\n' > "$WORK/repo/db/migrations/001
 new.sql"; g add db; g commit -q -m "newline name"; NL="$(g rev-parse HEAD)"; g checkout -q develop
 fbase; HEAD_ARG="$NL" REVIEWED="$NL"; release_pr "$NL"; expect "(F2j) a file name holding a newline → ASK, never classified" 0 '^ASK the release changes a file whose name holds a control character'
+fullgraph "$(FULLCFG)"
+g checkout -q rel; ln -s ../pending.txt "$WORK/repo/db/migrations/sql/0400_link.sql"; g add db; g commit -q -m "link migration"; LNK="$(g rev-parse HEAD)"
+refull "$(approved "$FIRSTBLOB"), $(approved "$(g rev-parse "$LNK:db/migrations/sql/0400_link.sql")")"
+g checkout -q rel; ln -s ../pending.txt "$WORK/repo/db/migrations/sql/0400_link.sql"; g add db; g commit -q -m "link migration"; LNK="$(g rev-parse HEAD)"; g checkout -q develop
+fbase; HEAD_ARG="$LNK" REVIEWED="$LNK"; release_pr "$LNK"; expect "(F2k) a migration that is a symbolic link, even with its link blob approved → ASK" 0 '^ASK the migration db/migrations/sql/0400_link.sql is not a plain file \(mode 120000\)'
 
 fbase; REVIEWED=""; expect "(F3) no --reviewed-head → ASK" 0 '^ASK no --reviewed-head as a full commit id'
 fbase; REVIEWED="HEAD"; (cd "$WORK/repo" && g checkout -q "$FULLHEAD"); expect "(F3f) a moving ref as --reviewed-head (HEAD at the head) → ASK, never resolved" 0 '^ASK no --reviewed-head as a full commit id'

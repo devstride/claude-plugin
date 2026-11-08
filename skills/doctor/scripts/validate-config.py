@@ -138,10 +138,9 @@ def real_date(value):
     if not (isinstance(value, str) and re.match(r"^\d{4}-\d{2}-\d{2}$", value)):
         return False
     try:
-        datetime.date.fromisoformat(value)
+        return datetime.date.fromisoformat(value) <= datetime.date.today()
     except ValueError:
         return False
-    return True
 
 
 def auto_start_checks(v, config):
@@ -164,7 +163,7 @@ def auto_start_checks(v, config):
     if not release.get("clearance"):
         v.add("WARN", key, "has no effect without `release.clearance`: no tower status can show the release On final")
     if not real_date(full.get("ownerDecision")):
-        v.add("WARN", key, "has no effect without `release.fullRelease.ownerDecision` (YYYY-MM-DD, a real date, the day the owner wrote the yes)")
+        v.add("WARN", key, "has no effect without `release.fullRelease.ownerDecision` (YYYY-MM-DD, a real date not after today, the day the owner wrote the yes)")
     globs = full.get("migrationGlobs")
     if not (isinstance(globs, list) and globs):
         v.add("WARN", key, "has no effect without `release.fullRelease.migrationGlobs`: no migration could be told apart")
@@ -174,7 +173,7 @@ def auto_start_checks(v, config):
               and isinstance(entry.get("path"), str) and entry["path"].strip()
               and isinstance(entry.get("item"), str) and re.match(r"^I\d+$", entry["item"]) and real_date(entry.get("approved")))
         if not ok:
-            v.add("ERROR", "release.fullRelease.approvedMigrations[%d]" % i, "needs blob (a full git blob id), path, item (I#####) and approved (a real YYYY-MM-DD): a malformed entry makes every full release ask")
+            v.add("ERROR", "release.fullRelease.approvedMigrations[%d]" % i, "needs blob (a full git blob id), path, item (I#####) and approved (a real YYYY-MM-DD, not after today): a malformed entry makes every full release ask")
 
 
 class Validator:
