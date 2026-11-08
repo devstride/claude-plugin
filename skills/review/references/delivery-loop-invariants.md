@@ -159,7 +159,8 @@ F10. If the roster drops to Claude-only on a PR path because CONFIGURED engines 
      the roster-resolution and degradation policy at the top of `skills/review/SKILL.md`.
 F11. No result, no review. An engine's result is its findings or its explicit no-findings verdict;
      a crash, kill, timeout, non-zero exit, empty or unparseable output is not one. Every cycle that
-     launches engines (not LOCAL-ONLY, which triages a hand-off) runs `review-gate.py engine` per
+     launches engines (not LOCAL-ONLY, which triages a hand-off; release's identical-tree
+     high-risk pass included) runs `review-gate.py engine` per
      CLI run and `round` over all engines: a round in
      which no engine returned a result is FAILED and never settles, flips, records a receipt or
      merges. The LOCAL-FULL receipt (schema 2) carries each engine's result; `record` refuses bare

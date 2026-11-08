@@ -24,7 +24,8 @@ epic release pull request): `git rev-parse <sha>^{tree}`.
 
 - **Identical** → no merge-gate review on the production pull request. Instead, run ONE pass of
   `highRiskEngine` (the configured local CLI when it names that engine) scoped to the files the
-  release changes under `highRiskPaths`; none changed → no pass, said so. Its findings take the
+  release changes under `highRiskPaths`; none changed → no pass, said so. The pass goes through
+  `review-gate.py` `engine` and `round` (`review` step 3): exit 2 STOPS, never PRE-SHIP RESUME. Its findings take the
   usual route (verify, fix on the release branch under the fix-exclusion check, reply). Then
   invoke `review` in PRE-SHIP RESUME mode (no review cycle): it marks the pull request ready and
   settles CI, so the release never stays a draft.

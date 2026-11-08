@@ -220,6 +220,9 @@ refuse("(27p) signed commits required: never bypassed with --admin", sc(ruleType
 merge("(27q) the base moves once during the read: one fresh read, then MERGE",
       sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, mergeCommitMoves=1), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
 refuse("(27r) the base keeps moving: REFUSE asking to run again", sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, mergeCommitMoves=9), "run the gate again")
+refuse("(17g) a required app's check on the head, only another app's of that name on the test merge commit -> REFUSE",
+       sc(rules=["lint"], ruleObjects=[{"context": "tests", "integration_id": 15368}],
+          mergeCommit={"oid": "d" * 40, "nodes": [cr("tests", ident=90, app=7, required=False)]}), "tests from app 15368 never ran")
 refuse("(27s) the test merge commit vanishes mid-read (GitHub regenerating it): never read as 'no checks'",
        sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint", "FAILURE")]}, mergeCommitVanishes=True), "run the gate again")
 refuse("(27t) classic protection requires a deployment: an admin merge would bypass it -> REFUSE",
@@ -250,7 +253,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 71 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 72 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.

@@ -440,7 +440,7 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     if merge_oid:
         on_merge = runs_at_head(merge_commit_contexts(owner, name, number, merge_oid))
         ran_there = {r for r in required if any(k[1] == r[0] for k in on_merge)}
-        red = [p for p in problems_with(ran_there, on_merge) if "never ran" not in p]
+        red = problems_with(ran_there, on_merge)   # a name there from the wrong app is a problem too
         if red:
             raise Refuse("a required check failed on the test merge commit %s, which GitHub holds above the head: %s"
                          % (merge_oid[:12], "; ".join(red)))
