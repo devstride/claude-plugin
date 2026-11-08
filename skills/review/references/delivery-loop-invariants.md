@@ -392,6 +392,10 @@ M17. A release hold is DATA on the item (a `Release hold:` line), never memory: 
      on the train or the base, and on an epic's leaves too before it releases (held work waits on
      its own branch), and
      over every item before the train snapshot and the cut, which STOP naming the held item.
+M18. The production merge waits for the owner's in-the-moment yes unless `standing-yes.py` answers
+     MERGE from the config at the release head: light (a LIGHT tree equal to its reviewed train) or
+     full (the owner's written, dated yes; the exact reviewed head; every gate green; every
+     migration it adds or changes approved by content, its blob id, on the owner's own words).
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
 N1. ONE profile word — `prototype` / `standard` / `extended` — moves every rigor knob together; the
@@ -830,6 +834,10 @@ skills/review/references/local-full.md|review-gate.py record
 skills/build-item/SKILL.md|release-holds.md
 skills/release/SKILL.md|release-holds.md
 skills/release/references/release-branch.md|Release holds.
+skills/release/SKILL.md|light or written
+skills/release/references/auto-start.md|approved BY CONTENT
+skills/release/references/auto-start.md|relayed yes: add
+skills/release/scripts/standing-yes.py|has no owner approval for this content
 skills/build-item/references/release-holds.md|scripts/release-holds.py
 skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor
 skills/build-item/references/next-unblocked.md|landed set BEFORE the merge

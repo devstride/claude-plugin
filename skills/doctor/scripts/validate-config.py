@@ -32,6 +32,7 @@ doctor's own checks. The script reads two local files, writes nothing and calls 
 Exit codes: 0 no errors, 1 errors, 2 the config or schema could not be read or parsed (never a
 fallback to defaults).
 """
+import datetime
 import difflib
 import json
 import os
@@ -133,6 +134,15 @@ def pre_ship_checks(v, config):
             v.add("ERROR", "preShipChecks[%d].runAt" % i, "cannot be combined with `onlyWhenTouched: true`: a train check is skipped only by same-snapshot train evidence, never by path")
 
 
+def real_date(value):
+    if not (isinstance(value, str) and re.match(r"^\d{4}-\d{2}-\d{2}$", value)):
+        return False
+    try:
+        return datetime.date.fromisoformat(value) <= datetime.date.today()
+    except ValueError:
+        return False
+
+
 def auto_start_checks(v, config):
     """`release.autoStart.enabled` needs a claims store; the standing yes needs a classify skill."""
     release = config.get("release") if isinstance(config, dict) else None
@@ -146,6 +156,24 @@ def auto_start_checks(v, config):
         v.add("WARN", "release.lightRelease.standingYes", "has no effect without `release.classifySkill`: no release is ever classified LIGHT")
     if isinstance(light, dict) and light.get("standingYes") is True and not release.get("clearance"):
         v.add("WARN", "release.lightRelease.standingYes", "has no effect without `release.clearance`: no tower status can show the release On final")
+    full = release.get("fullRelease")
+    if not (isinstance(full, dict) and full.get("standingYes") is True):
+        return
+    key = "release.fullRelease.standingYes"
+    if not release.get("clearance"):
+        v.add("WARN", key, "has no effect without `release.clearance`: no tower status can show the release On final")
+    if not real_date(full.get("ownerDecision")):
+        v.add("WARN", key, "has no effect without `release.fullRelease.ownerDecision` (YYYY-MM-DD, a real date not after today, the day the owner wrote the yes)")
+    globs = full.get("migrationGlobs")
+    if not (isinstance(globs, list) and globs):
+        v.add("WARN", key, "has no effect without `release.fullRelease.migrationGlobs`: no migration could be told apart")
+    entries = full.get("approvedMigrations")
+    for i, entry in enumerate(entries if isinstance(entries, list) else []):
+        ok = (isinstance(entry, dict) and isinstance(entry.get("blob"), str) and re.match(r"^[0-9a-f]{40}([0-9a-f]{24})?$", entry["blob"])
+              and isinstance(entry.get("path"), str) and entry["path"].strip()
+              and isinstance(entry.get("item"), str) and re.match(r"^I\d+$", entry["item"]) and real_date(entry.get("approved")))
+        if not ok:
+            v.add("ERROR", "release.fullRelease.approvedMigrations[%d]" % i, "needs blob (a full git blob id), path, item (I#####) and approved (a real YYYY-MM-DD, not after today): a malformed entry makes every full release ask")
 
 
 class Validator:

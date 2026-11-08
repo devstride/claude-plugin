@@ -8,6 +8,64 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.37.0] — 2026-11-07
+
+### Added
+
+- **The owner's written standing yes covers full releases.** A new setting, `release.fullRelease`,
+  records it: `standingYes`, the date the owner wrote it (`ownerDecision`), the migration file
+  patterns (`migrationGlobs`) and the owner's migration approvals (`approvedMigrations`). With it
+  on, a release of any class merges and deploys without an in-the-moment yes when it is at exactly
+  its reviewed head, is not a draft, every gate is green (required checks, zero open threads,
+  pre-ship passed unwaived, pre-merge clear, the previous release checked, the dev deploy done, the
+  release alone on final) and every migration file it adds or changes is approved by content: the
+  file's git blob id is in `approvedMigrations`. A new migration, an edited one or a deleted one
+  still asks; a renumbered one with the same content does not. A migration that is a link or a
+  submodule, a file name with a control character, an approval dated after today, or a local copy
+  of production that is not the pull request's live base also asks. The helper cannot tell who
+  wrote an approval: each is added on the owner's own words in a commit of its own, and the recap
+  and merge comment name every approved migration a release carries. `standing-yes.py` decides
+  both routes and prints the one comment to post on the merged pull request, dated. `doctor` warns
+  when the yes cannot take effect and refuses a malformed approval. Invariant M18.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.36.0 @ ee8743d, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.36.0 | tokens@devstride--v3.36.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,094 | 8,032 | 24,094 | 8,032 | +0 | 8,040 |
+| skills/release/SKILL.md | 23,999 | 8,000 | 23,967 | 7,989 | -11 | 8,000 |
+| skills/doctor/SKILL.md | 23,870 | 7,957 | 23,870 | 7,957 | +0 | 7,960 |
+| skills/review/SKILL.md | 23,602 | 7,868 | 23,602 | 7,868 | +0 | 7,870 |
+| skills/build-item/SKILL.md | 23,368 | 7,790 | 23,368 | 7,790 | +0 | 7,790 |
+| skills/rebalance/SKILL.md | 17,724 | 5,908 | 17,724 | 5,908 | +0 | 5,910 |
+| skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,655 | 4,885 | +0 | 4,900 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-defect/SKILL.md | 6,202 | 2,068 | 6,202 | 2,068 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 5,793 | 1,931 | 5,793 | 1,931 | +0 | 1,940 |
+| skills/comprehend-plan/SKILL.md | 5,201 | 1,734 | 5,201 | 1,734 | +0 | 1,740 |
+| skills/insert-defect/SKILL.md | 4,714 | 1,572 | 4,714 | 1,572 | +0 | 1,600 |
+| skills/insert-story/SKILL.md | 4,037 | 1,346 | 4,037 | 1,346 | +0 | 1,400 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 273,038 | 91,022 | 273,006 | 91,011 | -11 | |
+
 ## [3.36.0] — 2026-11-07
 
 ### Added
@@ -3524,7 +3582,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.36.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.37.0...HEAD
+[3.37.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.36.0...devstride--v3.37.0
 [3.36.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.35.0...devstride--v3.36.0
 [3.35.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.34.0...devstride--v3.35.0
 [3.34.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.33.0...devstride--v3.34.0

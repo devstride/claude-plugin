@@ -3,8 +3,8 @@ load: contract
 ---
 # The train claim, releases that start themselves, and the standing yes
 
-Three rules, each opt-in. With no `claims` block, `release.autoStart` and
-`release.lightRelease.standingYes` unset, nothing here applies.
+Three rules, each opt-in. With no `claims` block, `release.autoStart`,
+`release.lightRelease.standingYes` and `release.fullRelease.standingYes` unset, nothing here applies.
 
 ## The train claim — every release, when a `claims` block is configured
 
@@ -82,26 +82,40 @@ A `started-by: auto` release that reaches step 4 without a MERGE from the standi
 (the `ASK` reason, or "standing yes off"), and the pull request link. Then it waits for the yes,
 holding the tower as any release does.
 
-## The standing yes — `release.lightRelease.standingYes`
+## The standing yes — `release.lightRelease.standingYes`, `release.fullRelease.standingYes`
 
 At step 4, after the pre-merge check and the recap, run
 `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/standing-yes.py --pr <n> --head <head>
 --class "<classify-release line>" --checks green|red --unresolved <count>
 --pre-ship "<2b verdict line>" --pre-merge "<pre-merge-check verdict line>" --previous-release <gate exit> --dev-deploy <exit>|not-applicable --tower
-"<provider status output>"`. `--head` is the release pull request's head. The script reads its live head
-and finds the reviewed train itself: the latest merged train pull request into the release source
-(`release-branch.md`'s two-title search), merged into that head; it computes both trees. With
-`release.devDeployVerification` set the dev-deploy wait runs BEFORE this check, whatever the delta,
-and passes its exit; unset, `not-applicable` (omitting it is an ERROR). `MERGE <sha>` only
-when all of its nine conditions hold (a classifier configured, and the pre-merge check `CLEAR` or
-`NOT CONFIGURED`, among them) (the script's header lists them); anything else prints
-`ASK <reason>`. Without `release.clearance` there is no `On final` line, so it always asks.
+"<provider status output>" --reviewed-head <reviewedHead>`. `--head` is the release pull request's
+head; `--reviewed-head` is step 2's `<reviewedHead>`. With `release.devDeployVerification` set the
+dev-deploy wait runs BEFORE this check, whatever the delta, and passes its exit; unset,
+`not-applicable` (omitting it is an ERROR). The script reads the config from the head itself and
+prints `MERGE <sha>` and a `COMMENT <text>` line only when one route's conditions all hold (its
+header lists them); anything else prints `ASK <reason>`. Without `release.clearance` there is no
+`On final` line, so it always asks.
 
+- **Light route** (`release.lightRelease.standingYes`): a `LIGHT` release whose tree equals the
+  reviewed train's (the script finds that train itself, by `release-branch.md`'s two-title
+  search), a classifier configured, and every gate below.
+- **Full route** (`release.fullRelease.standingYes`: the owner's WRITTEN yes, dated by
+  `ownerDecision`): a `LIGHT` or `FULL` release, non-draft, at exactly `<reviewedHead>` (or
+  review's same-tree re-trigger), and every gate below, and every migration file it adds or
+  changes (`migrationGlobs`, against `origin/<productionBranch>`) approved BY CONTENT: its blob id
+  is an `approvedMigrations` entry. A new or changed migration, or a deleted one, asks.
+- **Gates, both routes**: every required check green, zero unresolved threads, pre-ship
+  `PASS (<n> ran, 0 waived)` or `NOTHING TO RUN`, pre-merge `CLEAR` (`NOT CONFIGURED` only with no
+  hook), the previous-release gate 0, the dev-deploy wait 0, and this pull request alone `On final`.
+- **Approving a migration** happens only on the owner's own words, in the moment, never on a
+  relayed yes: add `{"blob": "<git rev-parse HEAD:<path>>", "path", "item": "I#####", "approved":
+  "<today>"}` to `release.fullRelease.approvedMigrations` in a commit of its own (`approve
+  migration <path> [I#####]`). The blob pins the content: a renumber keeps it; any edit needs a new
+  approval. The script cannot tell who wrote an entry, so step 4's recap and the merge comment name
+  every approved migration the release carries, and the owner sees each one.
 - **`MERGE <sha>`** is the owner's yes for this pull request at exactly `<sha>`: run step 4's "On
   the yes" checks, merge with `gh pr merge --match-head-commit <sha>`, and 5a approves the deploy on
-  the same yes. Post ONE comment on the pull request:
-  "Merged on the standing yes for light releases identical to the reviewed train
-  (release.lightRelease.standingYes, owner decision <the date the owner set it>)."
-- **`ASK` or `ERROR`** → the owner's in-the-moment yes, exactly as before. A FULL release, a tree
-  that differs from the reviewed one, a waived pre-ship check, a pre-merge `HOLD` or `NOT RUN`, or a
-  failed previous release always asks. A return to step 2 voids it like any yes.
+  the same yes. Post the `COMMENT` line's text as ONE comment on the pull request.
+- **`ASK` or `ERROR`** → the owner's in-the-moment yes, exactly as before. A waived pre-ship check,
+  a pre-merge `HOLD` or `NOT RUN`, a failed previous release or an unapproved migration always
+  asks. A return to step 2 voids it like any yes.

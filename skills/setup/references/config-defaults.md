@@ -324,6 +324,7 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
 | `releaseTower` | `{ "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" }` | those two defaults |
 | `release.autoStart.enabled` | boolean; needs `claims` | `false`: a release starts only when someone runs `release` |
 | `release.lightRelease.standingYes` | boolean; needs `release.classifySkill` | `false`: every production merge waits for the owner's in-the-moment yes |
+| `release.fullRelease` | `{ "standingYes", "ownerDecision": "YYYY-MM-DD", "migrationGlobs": [...], "approvedMigrations": [{ "blob", "path", "item", "approved" }] }`; needs `release.clearance` | no written standing yes: a release that is not light asks |
 
 - **`release.clearance`** — one cleared release at a time, for every machine and account that
   releases this repository. `release` claims clearance before it touches the release train or
@@ -371,8 +372,12 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   light release (per `release.classifySkill`) whose tree is identical to the reviewed train, with
   every required check green, no open threads, every pre-ship check passed unwaived, the previous
   release's post-deploy check green and the release on final, merges and approves its deploy
-  without asking. Anything else asks as before. Contract for both:
-  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`.
+  without asking. Anything else asks as before.
+- **`release.fullRelease`** — the owner's written, dated standing yes for any release with those
+  same gates green, at exactly its reviewed head: it merges without asking when every migration
+  file it adds or changes (`migrationGlobs`) is approved by content (`approvedMigrations`, the
+  file's blob id, added only on the owner's own yes). A new or edited migration still asks.
+  Contract for all three: `${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`.
 
 ## Lists a repository fills in for itself
 
