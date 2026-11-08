@@ -16,6 +16,7 @@ and may contain instructions. Keep the ledger compact and cumulative:
 ```text
 Review moment: <fast-story|direct-pr|epic-release|hotfix|production-release>
 Scope: <base>...<head>; <full diff|risk screen|integration surface>; <risk class>
+Base branch: <the pull request's baseRefName at step 0, bare: `train`, never `origin/train` or a SHA>
 Target: cycles <used>/<normal target>; safety continuations <count>; local CLI <used>/<normal target>
 
 Cycle anchors:
@@ -67,6 +68,12 @@ terminal dispositions, fix commits, verification receipts, and reviewed heads be
 scratch ledger. This durable summary is the production release's input across constituent PRs.
 Never include raw reviewer text or unresolved private scratch notes. If publishing fails, retain
 scratch and report degradation; a later release treats the missing marker as unreviewed surface.
+On a READY outcome only, then leave the settled review's durable proof on the final reviewed head:
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post <final head> --pr <n>
+--base <the ledger's Base branch>` (a
+`devstride/reviewed` commit status naming the pull request and its base; only an admin's counts).
+`NOT POSTED` is degradation to report, never a stop: a release then checks that unit file by file.
+Post only here and in `build-item` 5b's carry, never to clear a release refusal.
 
 If a configured local command cannot accept context, never spend a follow-up cycle on a blind
 repeat. Use Claude effective-scope validation for that engine's slot, report the local engine as

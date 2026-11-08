@@ -288,7 +288,7 @@ a trailing `[-n]`): `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patt
   (deploy configuration, database migrations). Such a fix goes to the source by a normal pull
   request; the release branch is abandoned and re-cut. The same list keeps one-offs that touch
   those paths off the release train. A reviewed release unit (an epic's pull request merged onto
-  the train) may carry such paths on the train: the release's exclusion check covers only work no
+  the train, its merged head carrying an admin's `devstride/reviewed` status for it) may carry such paths on the train: the release's exclusion check covers only work no
   pull request reviewed (`skills/release/scripts/train_exclusions.py`).
 - **`release.migrationRenumber`** — optional `{ "sqlGlobs": [...], "metaGlobs": [...] }`. Merging
   the source into the train snapshot can force a reviewed migration to take a new number; with this

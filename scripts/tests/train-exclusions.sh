@@ -6,10 +6,20 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; TOOL="$ROOT/skills/release/scripts/
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 mkdir "$WORK/bin" "$WORK/pr"
-# gh stub: `gh pr view <n> --json …` prints $WORK/pr/<n>.json, and fails when there is none.
+# gh stub: `gh pr view <n> --json …` prints $WORK/pr/<n>.json, and fails when there is none. The
+# review proof: `gh api …/commits/<sha>/statuses?…` prints $WORK/pr/status-<sha>.json (else []), and
+# `gh api …/collaborators/<login>/permission` answers admin for "owner", write for anyone else.
 cat > "$WORK/bin/gh" <<'STUB'
 #!/bin/bash
 [ "$1" = pr ] && [ "$2" = view ] && [ -f "$GH_STUB_DIR/$3.json" ] && { cat "$GH_STUB_DIR/$3.json"; exit 0; }
+if [ "$1" = api ]; then
+  case "$2" in
+    */statuses\?*) [ -n "${GH_STATUS_FAIL:-}" ] && { echo "HTTP 502" >&2; exit 1; }; sha="${2#*/commits/}"; sha="${sha%%/*}"
+      [ -f "$GH_STUB_DIR/status-$sha.json" ] && cat "$GH_STUB_DIR/status-$sha.json" || echo '[]'; exit 0 ;;
+    */collaborators/*/permission) login="${2#*/collaborators/}"; login="${login%%/*}"
+      [ "$login" = owner ] && echo '{"permission":"admin"}' || echo '{"permission":"write"}'; exit 0 ;;
+  esac
+fi
 exit 1
 STUB
 chmod +x "$WORK/bin/gh"; export GH_STUB_DIR="$WORK/pr" PATH="$WORK/bin:$PATH"
@@ -30,7 +40,7 @@ PY
 }
 # repo NAME: a repository with develop (also origin/develop), a train branch cut from it, SB = the source at the cut
 repo() {
-  R="$WORK/$1"; mkdir "$R"; cd "$R" || exit 2
+  R="$WORK/$1"; mkdir "$R"; cd "$R" || exit 2; rm -f "$GH_STUB_DIR"/status-*.json   # fixture SHAs repeat across repos
   git init -q -b develop; mkdir -p db/migrations/meta infra src
   echo "select 1;" > db/migrations/0001_init.sql; echo "{}" > db/migrations/meta/_journal.json
   echo a > infra/main.tf; echo a > src/a.txt; git add -A; git commit -qm base
@@ -42,7 +52,24 @@ unit() {
   for f in "$@"; do mkdir -p "$(dirname "$f")"; echo "$b $f" > "$f"; done
   git add -A; git commit -qm "work on $b"; git checkout -q train; git merge -q --no-ff -m "$subj" "$b"
 }
-stub() { printf '{"baseRefName":"%s","state":"%s","mergeCommit":{"oid":"%s"}}\n' "$2" "$3" "$4" > "$GH_STUB_DIR/$1.json"; }
+# stub N BASE STATE MERGE-OID: gh's answer for pull request N, merged after the grandfather cutoff (MERGED_AT
+# overrides); unless NOPROOF=1, the merged head (MERGE-OID^2) carries an admin's settled-review status
+stub() {
+  printf '{"baseRefName":"%s","state":"%s","mergeCommit":{"oid":"%s"},"mergedAt":"%s"}\n' "$2" "$3" "$4" "${MERGED_AT:-2026-12-01T10:00:00Z}" > "$GH_STUB_DIR/$1.json"
+  h="$(git rev-parse --verify --quiet "$4^2" 2>/dev/null)"
+  [ -n "$h" ] && [ "${NOPROOF:-}" != 1 ] && DESC="Settled review of #$1 into $2" proof "$h" owner success
+}
+# proof SHA LOGIN STATE…: the devstride/reviewed statuses on SHA, newest first, each described as
+# DESC (default: a settled review of #30 into train)
+proof() {
+  sha="$1"; shift; out="["; i=0
+  while [ $# -ge 2 ]; do
+    [ $i -gt 0 ] && out="$out,"
+    out="$out{\"id\":$((100 - i)),\"context\":\"devstride/reviewed\",\"state\":\"$2\",\"description\":\"${DESC:-Settled review of #30 into train}\",\"created_at\":\"2026-12-01T1$((9 - i)):00:00Z\",\"creator\":{\"login\":\"$1\"}}"
+    i=$((i + 1)); shift 2
+  done
+  echo "$out]" > "$GH_STUB_DIR/status-$sha.json"
+}
 # run NAME [renumber]: the tool over SB..train; sets RC and OUT
 run() { config "$WORK/c-$1.json" "${2:-}"; OUT="$(python3 "$TOOL" --config "$WORK/c-$1.json" --source-before "${SB_OVERRIDE:-$SB}" --head "${HEAD_REF:-train}" --repo "$WORK/$1" 2>&1)"; RC=$?; }
 # expect LABEL RC PYTHON-CONDITION-ON-d
@@ -267,4 +294,33 @@ json.dump({"release": {"releaseSource": "develop", "releaseBranchFixExclusions":
 PY2
 OUT="$(python3 "$TOOL" --config "$WORK/c-t24.json" --source-before "$SB" --head train --repo "$WORK/t24" 2>&1)"; RC=$?
 expect "(24) with the default patterns a plan release is judged as a plan, its direct commit checked" 1 "d['refused']==['infra/direct.tf'] and d['reviewedUnits']==[13, 11]"
+
+# The review proof: a branch named like an epic is never enough on its own.
+E="Merge pull request #30 from acme/jane/26-10-01/epic-checkout"
+repo t30; unit epic "$E" infra/queue.tf; NOPROOF=1 stub 30 train MERGED "$(git rev-parse HEAD)"; run t30
+expect "(30) an epic-named, gh-confirmed pull request with no review proof is checked like any commit" 1 "d['refused']==['infra/queue.tf'] and d['reviewedUnits']==[]"
+repo t31; unit epic "$E" infra/queue.tf; NOPROOF=1 stub 30 train MERGED "$(git rev-parse HEAD)"; proof "$(git rev-parse HEAD^2)" partner success; run t31
+expect "(31) a reviewed status posted by someone without admin permission is ignored" 1 "d['refused']==['infra/queue.tf']"
+repo t32; unit epic "$E" infra/queue.tf; NOPROOF=1 stub 30 train MERGED "$(git rev-parse HEAD)"; proof "$(git rev-parse HEAD)" owner success; run t32
+expect "(32) proof on another commit (the merge, not its merged head) does not count" 1 "d['refused']==['infra/queue.tf']"
+repo t33; unit epic "$E" infra/queue.tf; NOPROOF=1 stub 30 train MERGED "$(git rev-parse HEAD)"; proof "$(git rev-parse HEAD^2)" owner failure owner success; run t33
+expect "(33) an admin who withdrew the proof (newest admin status failure) leaves the unit unreviewed" 1 "d['refused']==['infra/queue.tf']"
+repo t34; unit epic "$E" infra/queue.tf; NOPROOF=1 stub 30 train MERGED "$(git rev-parse HEAD)"; proof "$(git rev-parse HEAD^2)" partner failure owner success; run t34
+expect "(34) a later status from a non-admin never overrides an admin's proof" 0 "d['refused']==[] and d['reviewedUnits']==[30] and d['grandfatheredUnits']==[]"
+repo t35; unit epic "$E" infra/queue.tf; NOPROOF=1 MERGED_AT=2026-11-01T12:00:00Z stub 30 train MERGED "$(git rev-parse HEAD)"; run t35
+expect "(35) a unit merged before the grandfather cutoff keeps the old rule, and is listed as grandfathered" 0 "d['refused']==[] and d['reviewedUnits']==[30] and d['grandfatheredUnits']==[30]"
+repo t36; unit epic "$E" infra/queue.tf; NOPROOF=1 MERGED_AT="" stub 30 train MERGED "$(git rev-parse HEAD)"; run t36
+expect "(36) no mergedAt from gh is never read as before the cutoff" 1 "d['refused']==['infra/queue.tf']"
+repo t37; git config log.showSignature true; git config color.ui always; unit epic "$E" infra/queue.tf; stub 30 train MERGED "$(git rev-parse HEAD)"; run t37
+expect "(37) local log and colour settings never change the subject the check reads" 0 "d['reviewedUnits']==[30]"
+repo t38; unit epic "$E" infra/queue.tf; NOPROOF=1 stub 30 train MERGED "$(git rev-parse HEAD)"; DESC="Settled review of #12 into jane/26-10-01/epic-checkout" proof "$(git rev-parse HEAD^2)" owner success; run t38
+expect "(38) an admin's proof for another pull request or base (a story into the epic) does not count" 1 "d['refused']==['infra/queue.tf'] and d['unprovenUnits'][0]['number']==30 and 'for #30 into train' in d['unprovenUnits'][0]['reason']"
+repo t39; unit epic "$E" infra/queue.tf; NOPROOF=1 stub 30 train MERGED "$(git rev-parse HEAD)"; DESC="Settled review of #30 into train, carried from abcdef123456 (same tree)" proof "$(git rev-parse HEAD^2)" owner success; run t39
+expect "(39) a proof carried to a tree-identical rebase counts" 0 "d['reviewedUnits']==[30] and d['unprovenUnits']==[]"
+repo t40; unit epic "$E" infra/queue.tf; stub 30 train MERGED "$(git rev-parse HEAD)"; GH_STATUS_FAIL=1 run t40
+[ "$RC" = 2 ] && [[ "$OUT" == *"review proof of #30 could not be read"* ]] && ok "(40) GitHub unreadable while reading a proof: exit 2, never a guess" || bad "(40) $RC $OUT"
+repo t41; unit epic "$E" infra/queue.tf; NOPROOF=1 MERGED_AT=2026-11-01T12:00:00Z stub 30 train MERGED "$(git rev-parse HEAD)"; GH_STATUS_FAIL=1 run t41
+expect "(41) a grandfathered unit never needs GitHub's statuses" 0 "d['grandfatheredUnits']==[30]"
+repo t42; unit epic "Merge pull request #42 from acme/jane/26-10-01/epic-checkout" infra/queue.tf; run t42
+expect "(42) a pull request gh cannot confirm is listed with the reason and checked file by file" 1 "d['refused']==['infra/queue.tf'] and d['unprovenUnits'][0]['number']==42 and d['unprovenUnits'][0]['reason'].startswith('gh could not confirm #42')"
 exit $FAIL

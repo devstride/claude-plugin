@@ -261,7 +261,10 @@ K5. A release branch (`release.releaseBranchPattern`) takes new commits only —
 K6. Infra-touching fixes never land on a release branch: a commit staging any path matching
     `release.releaseBranchFixExclusions` is refused (merge it to the source, abandon, re-cut), and
     the same check runs over an adopted branch's commits, since a hand-pushed one bypasses the
-    commit-time check. The same list keeps such one-offs off the release train.
+    commit-time check. The same list keeps such one-offs off the release train. A release unit
+    carries such paths onto the train only with a settled review's proof on its merged head (an
+    admin's `devstride/reviewed` status naming that pull request and base, `reviewed-status.py`),
+    posted only at settle or 5b's carry, never to clear a refusal; a branch name is never proof.
 K7. One matching rule for `protectedBranches`, `releaseBranchPattern` and
     `releaseBranchFixExclusions`, anchored at both ends: `*` within one path segment, `**` across
     segments, `<YY-MM-DD>` two-digit date parts, trailing `[-n]` an optional `-<digits>`. A shell
@@ -868,6 +871,11 @@ skills/release/references/release-branch.md|merge-gate.py <n> <settled head>
 skills/release/references/auto-start.md|merge-gate.py <n> <sha> --all-green
 skills/build-item/SKILL.md|never the live one
 skills/build-item/SKILL.md|merge-gate.py <n> <head>
+skills/build-item/SKILL.md|reviewed-status.py post <new head> --from
+skills/review/references/review-ledger.md|reviewed-status.py post <final head>
+skills/review/references/review-ledger.md|On a READY outcome only
+skills/release/scripts/train_exclusions.py|reviewed_status.verify
+skills/release/references/release-branch.md|grandfatheredUnits
 skills/build-item/references/epic-release-steps.md|merge-gate.py
 skills/pr/scripts/merge-gate.py|an admin merge would bypass a block it cannot name
 skills/build-item/SKILL.md|release-holds.md

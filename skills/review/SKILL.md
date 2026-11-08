@@ -115,7 +115,7 @@ definition or a deferral route.**
 number can be closed or merged). **A DRAFT is the NORMAL state** — never skip it or ask; no profile
 starts CI early. Resolve `{owner}/{repo}` once. **Initialize the cumulative ledger** per
 `${CLAUDE_PLUGIN_ROOT}/skills/review/references/review-ledger.md`: review moment, risk/scope, base
-and head SHAs, targets, and caller evidence (story ledgers, receipts, dismissed findings,
+branch, base and head SHAs, targets, and caller evidence (story ledgers, receipts, dismissed findings,
 constituent-PR markers); add a reviewed-head row per engine result.
 
 ## 1. Launch cycle 1, concurrently
@@ -288,7 +288,7 @@ reads `skipping`, or CI is red.**
    (else reset, STOP) — named in step 8; (c) still nothing → GitHub incident: STOP, never loop. It
    changes no patch (7.1's rule does not fire); step 0 escalates the same way. Report the verified
    outcome.
-4. **Settle**: one background poll of CHECKS (a short lag is normal). The
+4. **Settle**: one background poll of CHECKS. The
    FINAL head SHA must show SUCCESS for every applicable check — absent, skipped, pending or
    stale-SHA is not green; only proven non-applicable suites may be absent. **If the poll times
    out while a required check is still pending, LAUNCH ANOTHER INSTANCE exactly once;
@@ -317,7 +317,7 @@ findings, only report step 6.5's tally.
   at the registration window** and **every reviewer that never responded** (learned bound or
   `pollTimeoutMinutes`); findings fixed / dismissed / captured / deferred; **the lessons tally**;
   resolved-thread count; CI state; every captured deferral; the final receipt's tree/SHA +
-  commands. Persist the sanitized final ledger marker, then delete the scratch ledger and say so (kept
+  commands. Persist the sanitized final ledger marker (READY: and the proof), then delete the scratch ledger and say so (kept
   only when blocked or abandoned).
 - **CI runs on this PR — counted per workflow** under `ci.workflowGlobs`, attributed per
   `ci-settle.md`: `backend-tests 1 · lint 1 — expected 1 per workflow
