@@ -40,21 +40,24 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            process id now belongs to a process with another known start time, it sends `end`
            (reason `gone`) and exits; and it sends `beat` when the last send is `intervalMinutes`
            old or a held change is due. It covers a long turn with no prompt, and a killed session.
-  send <event> <state> <session> <sequence> <at>  (detached) runs the command once, holding the
-           session's send lock so reports run one at a time, and only when its sequence number is
+  send <event> <state> <session> <record> <sequence> <at>  (detached) runs the command once,
+           holding the session's send lock so reports run one at a time, and only for the record
+           that queued it (a record recreated since is another) and when its sequence number is
            above the last one sent: a report overtaken by a newer one is dropped, so an old `end`
-           never follows a resumed session's `start`. From the repository root, through the shell,
+           never follows a resumed session's `start`. Stop or SessionEnd from an older process of
+           the session, while a newer process holds it, does nothing. From the repository root, through the shell,
            at most 20 seconds, its exit code kept in the record. It exports
            PRESENCE_EVENT (start|beat|end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE,
            PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM (an item number the branch name carries,
            else empty), PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON,
-           PRESENCE_AT (when the hook or keeper queued the report, epoch milliseconds, so a
-           repository can drop a report older than one it already stored), and
+           PRESENCE_AT (when the hook or keeper queued the report, epoch milliseconds, always later
+           than the session's previous report, so a repository can drop one older than it stored), and
            CLAUDE_CODE_SESSION_ID and CLAUDE_PID so the repository can resolve the session's name.
 
 DEVSTRIDE_PRESENCE_MINUTE (seconds in a keeper minute, default 60) exists for the tests only.
 Records: ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/presence/<session>.json (and the session's
-three lock files), owner-only, pruned after 7 days untouched; nothing is created for a session whose
+three lock files), owner-only; another session's files untouched for 7 days are pruned at a new
+session's start, each under its own lock; nothing is created for a session whose
 checkout has no block. FAILS OPEN: every hook exits 0 and prints nothing (a prompt hook's stdout would become
 context), whatever goes wrong. python3 and the standard library only.
 """
@@ -148,15 +151,43 @@ def save(sid, record):
     write_atomic(records_dir(), sid + ".json", record)
 
 
-def prune(now):
-    directory = records_dir()
+def stale(path, now):
+    try:
+        info = os.lstat(path)
+    except OSError:
+        return False
+    return stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and now - info.st_mtime > KEEP
+
+
+def prune(own, now):
+    """Remove other sessions' files untouched for KEEP. A record or lock goes only while its lock is
+    held and it is still stale, so a session that comes back at that moment keeps its files."""
+    directory = records_path()
     for name in os.listdir(directory):
         path = os.path.join(directory, name)
+        if not stale(path, now):
+            continue
         try:
-            info = os.lstat(path)
-            if stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and now - info.st_mtime > KEEP:
-                os.unlink(path)
-        except OSError:
+            if name.startswith("."):
+                os.unlink(path)  # a temporary file left by a killed writer
+                continue
+            if name.endswith(".lock"):
+                sid, kind = name[:-5].rsplit(".", 1)
+            elif name.endswith(".json"):
+                sid, kind = name[:-5], "state"
+            else:
+                continue
+            if sid == own or not SESSION_ID.match(sid) or kind not in ("state", "send", "keeper"):
+                continue
+            fd = lock(sid, kind, False, touch=False)
+            if fd is None:
+                continue
+            try:
+                if stale(path, now):
+                    os.unlink(path)
+            finally:
+                os.close(fd)
+        except (OSError, ValueError):
             pass
 
 
@@ -234,18 +265,28 @@ def started(pid):
         return ""
 
 
-def lock(sid, kind, block_until_free):
+def lock(sid, kind, block_until_free, touch=True):
     """An open, flock-held lock file for this session, or None when another process holds it (and
-    block_until_free is False). The lock lives as long as the returned descriptor."""
+    block_until_free is False). The lock lives as long as the returned descriptor. A lock whose file
+    was unlinked while we waited is a lock on nothing, so it is taken again on the file now there."""
     path = os.path.join(records_dir(), "%s.%s.lock" % (sid, kind))
-    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX if block_until_free else fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
+    for _ in range(5):
+        fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX if block_until_free else fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            os.close(fd)
+            return None
+        try:
+            same = os.fstat(fd).st_ino == os.lstat(path).st_ino
+        except OSError:
+            same = False
+        if same:
+            if touch:
+                os.utime(fd)
+            return fd
         os.close(fd)
-        return None
-    os.utime(fd)
-    return fd
+    return None
 
 
 @contextlib.contextmanager
@@ -261,10 +302,12 @@ def state_lock(sid):
 
 
 def queue(record, now):
-    """Mark a report as queued now and return its sequence number (the state lock is held)."""
+    """Mark a report as queued now (the state lock is held): its sequence number, and its time in
+    milliseconds, always later than the session's previous report."""
     sequence = int(record.get("queued") or 0) + 1
-    record.update({"queued": sequence, "sent": round(now, 3), "reported": record.get("state")})
-    return sequence
+    at = max(int(now * 1000), int(record.get("at") or 0) + 1)
+    record.update({"queued": sequence, "at": at, "sent": round(now, 3), "reported": record.get("state")})
+    return sequence, at
 
 
 def keeper_running(sid):
@@ -326,9 +369,9 @@ def run_command(sid, record, event, state, at):
         return "error"
 
 
-def send(event, state, sid, sequence, at):
-    """Run the repository's command once for this session: one report at a time, and only when no
-    newer report has already been sent."""
+def send(event, state, sid, incarnation, sequence, at):
+    """Run the repository's command once for this session: one report at a time, only for the record
+    that queued it, and only when no newer report has already been sent."""
     if event not in EVENTS or state not in STATES.values():
         return
     fd = lock(sid, "send", True)
@@ -337,15 +380,16 @@ def send(event, state, sid, sequence, at):
     try:
         with state_lock(sid):
             record = load(sid)
-            if not record or sequence <= int(record.get("done") or 0):
-                return  # overtaken: a newer report for this session already ran
+            if not record or record.get("id") != incarnation or sequence <= int(record.get("done") or 0):
+                return  # the record was replaced, or a newer report for this session already ran
         code = run_command(sid, record, event, state, at)
         with state_lock(sid):
-            latest = load(sid) or record
-            latest["done"] = max(sequence, int(latest.get("done") or 0))
-            if code is not None:
-                latest["last"] = {"event": event, "exit": code, "at": round(time.time(), 3)}
-            save(sid, latest)
+            latest = load(sid)
+            if latest and latest.get("id") == incarnation:  # never recreate a record removed meanwhile
+                latest["done"] = max(sequence, int(latest.get("done") or 0))
+                if code is not None:
+                    latest["last"] = {"event": event, "exit": code, "at": round(time.time(), 3)}
+                save(sid, latest)
     finally:
         os.close(fd)
 
@@ -375,10 +419,14 @@ def hook():
         return  # nothing to report, and nothing written
     if event in ("Stop", "SessionEnd") and (peek is None or peek.get("state") == "ended"):
         return  # never reported here, or already ended
-    owner = owner_pid() if event == "SessionStart" else env_owner()
-    owner_started = started(owner) if owner else ""
-    now = time.time()
+    mine = int(os.environ["CLAUDE_PID"]) if os.environ.get("CLAUDE_PID", "").isdigit() else 0
+    if event in ("SessionStart", "UserPromptSubmit"):
+        owner = owner_pid() if event == "SessionStart" else env_owner()
+        owner_started = started(owner) if owner else ""  # `ps` runs before the state lock is taken
+    else:
+        owner, owner_started = 0, ""
     with state_lock(sid):
+        now = time.time()
         record = load(sid)
         if not here:
             if not (record and block(record.get("top"))):
@@ -386,16 +434,19 @@ def hook():
             top = record["top"]  # moved to a checkout without the block: keep reporting under the old one
         fresh = record is None
         previous = None if fresh else record.get("state")
-        if event in ("Stop", "SessionEnd") and (fresh or previous == "ended"):
-            return
+        if event in ("Stop", "SessionEnd"):
+            if fresh or previous == "ended":
+                return
+            if mine and record.get("owner") not in (0, None, mine) and alive(record.get("owner")):
+                return  # from an older process of this session, which a newer one has since resumed
         if fresh:
             record = {"schema": 1, "top": top, "state": None, "sent": 0, "owner": 0}
-            if event == "SessionStart":
-                prune(now)
+        if not record.get("id"):
+            record["id"] = secrets.token_hex(6)  # this record's incarnation: sends are bound to it
         moved = not fresh and record.get("top") != top
         sent, state = record.get("sent") or 0, STATES[event]
         record.update({"top": top, "state": state, "version": running_version() or record.get("version") or ""})
-        if not owner and not alive(record.get("owner")):
+        if event == "UserPromptSubmit" and not owner and not alive(record.get("owner")):
             owner = owner_pid()
             owner_started = started(owner) if owner else ""
         if owner and (event == "SessionStart" or owner != record.get("owner")):
@@ -411,12 +462,14 @@ def hook():
             verb = "beat"
         else:
             verb = None
-        sequence = queue(record, now) if verb else 0
+        sequence, at = queue(record, now) if verb else (0, 0)
         save(sid, record)
         if verb:
-            spawn("send", verb, state, sid, str(sequence), str(int(now * 1000)))
+            spawn("send", verb, state, sid, record["id"], str(sequence), str(at))
         if event in ("SessionStart", "UserPromptSubmit") and record.get("owner") and not keeper_running(sid):
             spawn("keeper", sid)
+    if fresh and event == "SessionStart":
+        prune(sid, now)
 
 
 def replaced(record):
@@ -453,17 +506,18 @@ def keeper(sid):
                 owner, now = record.get("owner"), time.time()
                 due = now - (record.get("sent") or 0) >= settings["intervalMinutes"] * MINUTE
                 held = record.get("state") != record.get("reported") and now - (record.get("sent") or 0) >= CHANGE_AFTER
-                if not alive(owner) or (reused and owner == peek.get("owner")):
+                same = owner == peek.get("owner") and record.get("ownerStarted") == peek.get("ownerStarted")
+                if not alive(owner) or (reused and same):
                     record.update({"state": "ended", "reason": "gone"})
-                    job = ("end", "ended", queue(record, now), now)
+                    job = ("end", "ended") + queue(record, now)
                     save(sid, record)
                     os.close(fd)
                     fd = None
                 elif due or held:
-                    job = ("beat", record["state"], queue(record, now), now)
+                    job = ("beat", record["state"]) + queue(record, now)
                     save(sid, record)
             if job:
-                send(job[0], job[1], sid, job[2], int(job[3] * 1000))
+                send(job[0], job[1], sid, record["id"], job[2], job[3])
     finally:
         if fd is not None:
             os.close(fd)
@@ -475,9 +529,9 @@ def main(argv):
             hook()
         elif argv[:1] == ["keeper"] and len(argv) == 2 and SESSION_ID.match(argv[1]):
             keeper(argv[1])
-        elif (argv[:1] == ["send"] and len(argv) == 6 and SESSION_ID.match(argv[3]) and argv[4].isdigit()
-              and argv[5].isdigit()):
-            send(argv[1], argv[2], argv[3], int(argv[4]), int(argv[5]))
+        elif (argv[:1] == ["send"] and len(argv) == 7 and SESSION_ID.match(argv[3]) and argv[5].isdigit()
+              and argv[6].isdigit()):
+            send(argv[1], argv[2], argv[3], argv[4], int(argv[5]), int(argv[6]))
     except Exception:
         pass
     return 0

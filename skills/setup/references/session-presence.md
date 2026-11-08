@@ -44,8 +44,8 @@ clock (the hook spawns it and returns). Exported: `PRESENCE_EVENT`, `PRESENCE_ST
 root), `PRESENCE_BRANCH`, `PRESENCE_ITEM` (an item number the branch name carries as its own
 segment, such as `I20100` in `jane/03-14-26/I20100-attachment-storage`; else empty),
 `PRESENCE_PLUGIN_VERSION`, `PRESENCE_INTERVAL_MINUTES`, `PRESENCE_END_REASON` (on `end` only),
-`PRESENCE_AT` (when the report was queued, in epoch milliseconds, to drop one older than what is
-stored), and `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PID`, so the repository can resolve the session's own
+`PRESENCE_AT` (when queued, in epoch milliseconds, rising with each report, so an
+older one can be dropped), and `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PID`, so the repository can resolve the session's own
 name. Its exit code is kept in the session's local record; nothing reads it as a verdict.
 
 ## Rules a repository's implementation should keep

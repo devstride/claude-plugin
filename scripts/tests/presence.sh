@@ -177,7 +177,7 @@ done
 chmod 500 "$RECORDS"
 O="$O$(fire SessionStart s11 "$R" 2>&1)"; RC=$((RC + $?))
 chmod 700 "$RECORDS"
-O="$O$(python3 "$HOOK" 2>&1)$(python3 "$HOOK" send bogus starting s1 9 1 2>&1)$(python3 "$HOOK" send beat working s1 x 1 2>&1)$(python3 "$HOOK" send beat bogus s1 9 1 2>&1)$(DEVSTRIDE_PRESENCE_MINUTE=x python3 "$HOOK" keeper nobody 2>&1)"; RC=$((RC + $?))
+O="$O$(python3 "$HOOK" 2>&1)$(python3 "$HOOK" send bogus starting s1 ab 9 1 2>&1)$(python3 "$HOOK" send beat working s1 ab x 1 2>&1)$(python3 "$HOOK" send beat bogus s1 ab 9 1 2>&1)$(DEVSTRIDE_PRESENCE_MINUTE=x python3 "$HOOK" keeper nobody 2>&1)"; RC=$((RC + $?))
 if [ "$RC" = 0 ] && [ -z "$O" ] && [ ! -e "$XDG_CACHE_HOME/devstride-plugin/x.json" ] && [ ! -e "$RECORDS/s11.json" ] \
   && [ ! -e "$RECORDS/nobody.keeper.lock" ]; then
   ok "(11) malformed payload / bad session id / unknown event / unwritable cache / bad args → exit 0, silent"
@@ -246,21 +246,24 @@ else bad "(18) $(cat "$LOG")"; fi
 
 # (19) the keeper sends a held state change once 30 seconds pass, with no hook firing
 : > "$LOG"; O19="$(owner)"
-DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O19" fire SessionStart s19 "$K5" >/dev/null; wait_sent 1
-fire Stop s19 "$K5" >/dev/null; sleep 0.5; H="$(sent)"            # held: within 30 s of the start
+K60="$(mkrepo keeper60 "$(config 60)")"   # the ordinary beat is 24 s away: only the held change can send
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O19" fire SessionStart s19 "$K60" >/dev/null; wait_sent 1
+fire Stop s19 "$K60" >/dev/null; sleep 0.5; H="$(sent)"           # held: within 30 s of the start
 age s19 31; wait_sent 2; sleep 0.3
 if [ "$H" = 1 ] && [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = beat ] && [ "$(field 2 PRESENCE_STATE)" = waiting ]; then
   ok "(19) Stop held within 30 s → the keeper sends it (beat, waiting) once 30 s pass"
 else bad "(19) h=$H $(cat "$LOG")"; fi
 
-# (20) a report overtaken by a newer one is dropped: an old end after a resume's start never runs
+# (20) a report overtaken by a newer one, or queued by a record since replaced, is dropped
 : > "$LOG"
 fire SessionStart s20 "$R" >/dev/null; wait_sent 1; stop_keeper s20
+ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$RECORDS/s20.json")"
 NOW_MS="$(python3 -c 'import time; print(int(time.time()*1000))')"
-python3 "$HOOK" send start starting s20 3 "$NOW_MS"; python3 "$HOOK" send end ended s20 2 "$NOW_MS"
-python3 "$HOOK" send beat working s20 3 "$NOW_MS"; sleep 0.3
-if [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = start ] && [ "$(field 1 PRESENCE_AT)" -gt 1000000000000 ]; then
-  ok "(20) sequence 3 (start) ran → sequence 2 (end) and a repeat of 3 dropped; PRESENCE_AT in milliseconds"
+python3 "$HOOK" send start starting s20 "$ID" 3 "$NOW_MS"; python3 "$HOOK" send end ended s20 "$ID" 2 "$NOW_MS"
+python3 "$HOOK" send beat working s20 "$ID" 3 "$NOW_MS"; python3 "$HOOK" send beat working s20 0123456789ab 9 "$NOW_MS"; sleep 0.3
+DONE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["done"])' "$RECORDS/s20.json")"
+if [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = start ] && [ "$DONE" = 3 ] && [ "$(field 1 PRESENCE_AT)" -gt 1000000000000 ]; then
+  ok "(20) sequence 3 (start) ran → 2 (end), a repeat of 3 and another record's 9 dropped; PRESENCE_AT in ms"
 else bad "(20) $(cat "$LOG")"; fi
 
 # (21) a resume re-reads the process start time even when the process id is the same number
@@ -282,6 +285,24 @@ if [ "$(sent)" -ge 3 ] && ! grep -q '"PRESENCE_EVENT": "end"' "$LOG" && keeper_a
   ok "(22) ps failing → the keeper keeps beating, no false end"
 else bad "(22) $(cat "$LOG")"; fi
 stop_keeper s22
+
+# (23) a new session prunes other sessions' files untouched for 7 days, and nothing else
+: > "$LOG"; touch -t 202001010000 "$RECORDS/s6x.json" 2>/dev/null
+for f in old.json old.state.lock old.send.lock .old.json.x.tmp; do printf '{}' > "$RECORDS/$f"; touch -t 202001010000 "$RECORDS/$f"; done
+fire SessionStart s23 "$R" >/dev/null; wait_sent 1
+LEFT="$(ls -a "$RECORDS" | grep -c '^\.\{0,1\}old')"
+if [ "$LEFT" = 0 ] && [ -e "$RECORDS/s23.json" ] && [ -e "$RECORDS/s1.json" ]; then
+  ok "(23) a new session → other sessions' week-old record, locks and temporary files pruned; live ones kept"
+else bad "(23) left=$LEFT $(ls -a "$RECORDS")"; fi
+
+# (24) Stop or SessionEnd from an older process of a resumed session does nothing
+: > "$LOG"; O24A="$(owner)"; O24B="$(owner)"
+CLAUDE_PID="$O24A" fire SessionStart s24 "$R" >/dev/null; wait_sent 1
+CLAUDE_PID="$O24B" fire SessionStart s24 "$R" resume >/dev/null; wait_sent 2
+age s24 61; CLAUDE_PID="$O24A" fire Stop s24 "$R" >/dev/null; CLAUDE_PID="$O24A" fire SessionEnd s24 "$R" other >/dev/null; sleep 0.5
+if [ "$(sent)" = 2 ] && [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["state"])' "$RECORDS/s24.json")" = starting ]; then
+  ok "(24) Stop / SessionEnd from the older process after a resume in a newer one → nothing"
+else bad "(24) $(cat "$LOG")"; fi
 
 # (12) hooks.json registers the hook on all four events, bounded and failing open
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'
