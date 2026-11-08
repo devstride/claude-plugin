@@ -41,14 +41,19 @@ if a[:2] == ["api", "graphql"]:
     print(json.dumps({"data": {"repository": {"pullRequest": pr}}})); sys.exit(0)
 if a[0] == "api" and "/rules/branches/" in a[1]:
     objs = [{"context": c} for c in s.get("rules", [])] + s.get("ruleObjects", [])
-    print(json.dumps([{"type": "required_status_checks", "parameters": {"required_status_checks": objs}},
-                      {"type": "pull_request", "parameters": {}}])); sys.exit(0)
+    extra = [{"type": k} for k in s.get("ruleTypes", [])]
+    print(json.dumps([{"type": "required_status_checks", "parameters": {"required_status_checks": objs,
+                       "strict_required_status_checks_policy": bool(s.get("strict"))}},
+                      {"type": "pull_request", "parameters": {}}, {"type": "update"}] + extra)); sys.exit(0)
+if a[0] == "api" and "/compare/" in a[1]:
+    print(json.dumps({"behind_by": s.get("behindBy", 0), "ahead_by": 3})); sys.exit(0)
 if a[0] == "api" and a[1].endswith("/protection/required_status_checks"):
     p = s.get("protection", {"code": 404})
     if p.get("code") == "branch":
         print(json.dumps({"name": "release", "commit": {"sha": "x"}})); sys.exit(0)
     if p.get("code") == 404:
-        print('{"message":"Branch not protected"}'); sys.stderr.write("gh: Branch not protected (HTTP 404)\n"); sys.exit(1)
+        m = p.get("message", "Branch not protected")
+        print(json.dumps({"message": m})); sys.stderr.write("gh: %s (HTTP 404)\n" % m); sys.exit(1)
     if p.get("code") == 403:
         print('{"message":"Must have admin rights"}'); sys.stderr.write("gh: Must have admin rights to Repository. (HTTP 403)\n"); sys.exit(1)
     apps = p.get("checksApp", {})
@@ -70,10 +75,10 @@ def run(number, sha, scenario, *extra):
     return p.returncode, p.stdout.strip().split("\n"), p.stderr
 def say(good, label, extra=""):
     print(("ok   " if good else "FAIL ") + label + ("" if good else " -> " + extra))
-def cr(name, conclusion="SUCCESS", status="COMPLETED", ident=1, required=True, app=15368, workflow=1):
+def cr(name, conclusion="SUCCESS", status="COMPLETED", ident=1, required=True, app=15368, workflow=1, run=None):
     return {"__typename": "CheckRun", "name": name, "status": status, "conclusion": conclusion if status == "COMPLETED" else None,
             "startedAt": "2026-01-15T18:00:00Z" if status != "QUEUED" else None, "databaseId": ident, "isRequired": required,
-            "checkSuite": {"app": {"databaseId": app}, "workflowRun": {"workflow": {"databaseId": workflow}} if workflow else None}}
+            "checkSuite": {"app": {"databaseId": app}, "workflowRun": {"runNumber": run if run is not None else ident, "workflow": {"databaseId": workflow}} if workflow else None}}
 def st(context, state="SUCCESS", required=True):
     return {"__typename": "StatusContext", "context": context, "state": state, "createdAt": "2026-01-15T18:00:00Z", "isRequired": required}
 GREEN = {"pr": {"number": 7, "state": "OPEN", "isDraft": False, "headRefOid": H, "baseRefName": "develop",
@@ -109,7 +114,17 @@ merge("(3) unstable (only a check that is not required failed) -> MERGE without 
       sc(mergeStateStatus="UNSTABLE"), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s" % H)
 refuse("(4) a required check pending -> REFUSE naming it", sc(pages=[[cr("tests", status="IN_PROGRESS", ident=10), cr("lint", ident=11)]]), "tests is pending")
 refuse("(5) a required check failed -> REFUSE", sc(pages=[[cr("tests", "FAILURE", ident=10), cr("lint", ident=11)]]), "tests is failure")
-refuse("(6) a required check skipped -> REFUSE (skipped is not green)", sc(pages=[[cr("tests", "SKIPPED", ident=10), cr("lint", ident=11)]]), "tests is skipped")
+merge("(6) a required check whose only run skipped passes, as GitHub counts it (a job with nothing to test)",
+      sc(pages=[[cr("tests", "SKIPPED", ident=10), cr("lint", "NEUTRAL", ident=11)]]), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(6b) a skipped newest run never hides an older run of the same check that failed",
+       sc(pages=[[cr("tests", "FAILURE", ident=10), cr("tests", "SKIPPED", ident=20), cr("lint", ident=11)]]), "tests is failure")
+refuse("(6c) a skipped newest run never hides one still running",
+       sc(pages=[[cr("tests", status="IN_PROGRESS", ident=10), cr("tests", "SKIPPED", ident=20), cr("lint", ident=11)]]), "tests is pending")
+merge("(6d) concurrent runs: the later workflow run counts though its check run has the lower id",
+      sc(pages=[[cr("tests", "SKIPPED", ident=50, run=1), cr("tests", ident=40, run=2), cr("lint", ident=11)]]),
+      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(6e) concurrent runs: a later workflow run that failed counts though its id is lower",
+       sc(pages=[[cr("tests", ident=50, run=1), cr("tests", "FAILURE", ident=40, run=2), cr("lint", ident=11)]]), "tests is failure")
 refuse("(7) a required check cancelled -> REFUSE", sc(pages=[[cr("tests", "CANCELLED", ident=10), cr("lint", ident=11)]]), "tests is cancelled")
 refuse("(8) a required check that never ran at this head -> REFUSE", sc(rules=["tests", "lint", "sast"]), "sast never ran at this head")
 refuse("(9) the head moved -> REFUSE", GREEN, "the head moved", sha="b" * 40)
@@ -160,6 +175,19 @@ refuse("(26b) a failure on the second page is seen",
 refuse("(27) GitHub unreadable -> ERROR, exit 1, never a merge", sc(graphqlFail=True), "gh api graphql failed", code_wanted=1)
 refuse("(27b) review threads that come back as an error with partial data -> ERROR, never zero threads", sc(threadsPartial=True), "carried errors", code_wanted=1)
 refuse("(27c) a protection answer that is not a required-checks answer -> ERROR", sc(protection={"code": "branch"}), "not a required-status-checks answer", code_wanted=1)
+merge("(27e) classic 404 'Required status checks not enabled' is no protection",
+      sc(protection={"code": 404, "message": "Required status checks not enabled"}), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(27f) any other classic 404 is ERROR, never 'no protection'", sc(protection={"code": 404, "message": "Not Found"}), "not one of GitHub's no-protection answers", code_wanted=1)
+refuse("(27g) a strict base: a head behind it -> REFUSE even though GitHub reads BLOCKED", sc(strict=True, behindBy=2), "2 commit(s) behind develop")
+merge("(27h) a strict base: a head up to date with it merges", sc(strict=True, behindBy=0), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(27i) blocked with a rule the gate cannot judge -> REFUSE, never a silent admin bypass", sc(ruleTypes=["workflows"]), "rule(s) this gate cannot judge (workflows)")
+merge("(27j) the same unknown rule on a clean pull request: GitHub enforces it, no --admin",
+      sc(ruleTypes=["code_scanning"], mergeStateStatus="CLEAN"), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s" % H)
+code, out, err = run(7, H, GREEN, "--all-green")
+say(code == 2 and out[0].startswith("REFUSE --all-green") and "optional is failure" in out[0], "(27k) --all-green refuses a red check that is not required", "rc=%d %r" % (code, out))
+merge("(27l) --all-green with every check green merges",
+      sc(pages=[[cr("tests", ident=10), cr("lint", ident=11), cr("optional", "SKIPPED", ident=12, required=False)]]),
+      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H, "--all-green")
 code, out, err = run(7, H, sc(baseRefName="release#v1/x"))
 log = open(os.environ["GH_LOG"]).read()
 say(code == 0 and "rules/branches/release%23v1%2Fx?" in log and "branches/release%23v1%2Fx/protection" in log,
@@ -173,7 +201,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 43 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 55 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.

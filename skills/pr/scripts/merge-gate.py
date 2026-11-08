@@ -4,7 +4,8 @@
 Every place the plugin merges (`release`, `build-item`, a departure's merge) runs this file and
 then runs exactly the command it prints, never its own `gh pr merge`. It reads GitHub only.
 
-  merge-gate.py <pr-number> <expected-head-sha> [--delete-branch] [--subject <text>] [--repo <owner>/<name>]
+  merge-gate.py <pr-number> <expected-head-sha> [--all-green] [--delete-branch] [--subject <text>]
+                [--repo <owner>/<name>]
 
   MERGE gh pr merge <n> --repo <owner>/<name> --merge --match-head-commit <sha> [--admin]
         [--delete-branch] [--subject '<text>']   exit 0: the repository it inspected is named, and
@@ -24,11 +25,24 @@ The rule (an approver's admin merge exactly when every required check is green, 
   rule names one (`integration_id`, `app_id`). A check is one (name, app, workflow) or one commit
   status: a re-run of the same check supersedes the run before it, but a same-name check from
   another workflow or app, or a same-name commit status, is another check and must pass too. Every
-  check that can satisfy a requirement must have completed with SUCCESS at the expected head.
-  Pending, failed, cancelled, skipped, neutral or missing is a REFUSE naming it.
+  check that can satisfy a requirement must have passed at the expected head. Passed is GitHub's
+  own reading: SUCCESS, or SKIPPED or NEUTRAL (a workflow that skips a job when nothing needed
+  it, which GitHub counts as passing). A check's verdict is its newest run, ordered by workflow
+  run number and then attempt, so a later run or re-run supersedes an earlier one; a skipped or
+  neutral newest run never hides an older run of the same check that executed and is failing or
+  still pending. Pending, failed, cancelled, timed out or missing is a REFUSE naming it.
+  `--all-green` holds every check at the head to the same rule, not only the required ones
+  (`release` uses it for production).
+- Classic protection answering 404 means none only with GitHub's two messages for it ("Branch
+  not protected", "Required status checks not enabled"); any other 404 is an ERROR.
+- A base that requires branches to be up to date (a ruleset's strict policy, or classic `strict`)
+  is checked with the compare API: a head behind its base is a REFUSE, so `--admin` never merges
+  an out-of-date head even when GitHub reads the pull request BLOCKED rather than BEHIND.
 - No open conversation: a CHANGES_REQUESTED decision or any unresolved review thread is a REFUSE.
-- `--admin` only when GitHub reads the pull request BLOCKED with all of the above true and at least
-  one required check: the base's rules let only an admin's merge through. CLEAN, HAS_HOOKS or
+- `--admin` only when GitHub reads the pull request BLOCKED with all of the above true, at least
+  one required check, and no rule on the base this gate cannot judge (KNOWN_RULES; a
+  `workflows`, `code_scanning`, `required_deployments`, `merge_queue` or other rule would be
+  bypassed silently, so it refuses): the base's rules let only an admin's merge through. CLEAN, HAS_HOOKS or
   UNSTABLE (a failing check that is not required) merges without it. DIRTY, BEHIND, UNKNOWN and
   any other state is a REFUSE: an admin merge never bypasses a conflict, an out-of-date branch or
   a state GitHub has not finished computing.
@@ -42,7 +56,13 @@ from urllib.parse import quote
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
 REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-GREEN = "SUCCESS"
+PASSED = ("SUCCESS", "SKIPPED", "NEUTRAL")
+QUIET = ("SKIPPED", "NEUTRAL")
+NO_PROTECTION = ("Branch not protected", "Required status checks not enabled")
+# Rule types an admin merge may pass knowing what it bypasses: required checks are judged here;
+# reviews by the open-thread and change-request checks; the rest guard pushes, not merges.
+KNOWN_RULES = ("required_status_checks", "pull_request", "copilot_code_review", "update", "deletion",
+               "non_fast_forward", "creation", "required_signatures")
 PLAIN = ("CLEAN", "HAS_HOOKS", "UNSTABLE")
 
 PR_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: String) {
@@ -55,7 +75,7 @@ PR_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: Stri
           nodes {
             __typename
             ... on CheckRun { name status conclusion startedAt completedAt databaseId isRequired(pullRequestNumber: $number)
-                              checkSuite { app { databaseId } workflowRun { workflow { databaseId } } } }
+                              checkSuite { app { databaseId } workflowRun { runNumber workflow { databaseId } } } }
             ... on StatusContext { context state createdAt isRequired(pullRequestNumber: $number) }
           }
         }
@@ -173,18 +193,24 @@ def app_of(value):
 
 
 def ruleset_checks(owner, name, base):
-    required, page = set(), 1
+    """The base's ruleset requirements: (required checks with their apps, strict?, rule types)."""
+    required, strict, types, page = set(), False, set(), 1
     while True:
         rules = gh_json("api", "repos/%s/%s/rules/branches/%s?per_page=100&page=%d" % (owner, name, quote(base, safe=""), page))
         if not isinstance(rules, list):
             raise Unreadable("the rules of %s did not come back as a list" % base)
         for rule in rules:
-            if isinstance(rule, dict) and rule.get("type") == "required_status_checks":
-                for check in (rule.get("parameters") or {}).get("required_status_checks") or []:
+            if not isinstance(rule, dict):
+                continue
+            types.add(rule.get("type"))
+            if rule.get("type") == "required_status_checks":
+                params = rule.get("parameters") or {}
+                strict = strict or params.get("strict_required_status_checks_policy") is True
+                for check in params.get("required_status_checks") or []:
                     if isinstance(check, dict) and check.get("context"):
                         required.add((check["context"], app_of(check.get("integration_id"))))
         if len(rules) < 100:
-            return required
+            return required, strict, types
         page += 1
 
 
@@ -193,7 +219,14 @@ def protection_checks(owner, name, base):
     if code != 0:
         said = (err or "") + (out or "")
         if "HTTP 404" in said:
-            return set()      # no classic protection, or none requiring checks
+            try:
+                message = json.loads(out).get("message")
+            except (ValueError, AttributeError):
+                message = None
+            if message in NO_PROTECTION:
+                return set(), False
+            raise Unreadable("reading the branch protection of %s answered 404 %r, not one of GitHub's "
+                             "no-protection answers" % (base, message))
         if "HTTP 403" in said:
             raise Refuse("the classic branch protection of %s cannot be read with this login, so a required check "
                          "that never ran would go unseen: merge as an admin of the repository" % base)
@@ -209,34 +242,47 @@ def protection_checks(owner, name, base):
         if isinstance(c, dict) and c.get("context"):
             required.discard((c["context"], None))
             required.add((c["context"], app_of(c.get("app_id"))))
-    return required
+    return required, data.get("strict") is True
 
 
 def runs_at_head(contexts):
-    """Every distinct check at this head with its newest run. A check run is one (name, app,
-    workflow): a re-run of it supersedes the run before (ids rise with creation, and a queued
-    re-run has no start time yet). A commit status is one context. Same-name checks from another
-    workflow or app, and a same-name status, stay separate: each must pass."""
-    best = {}
+    """Every distinct check at this head and its verdict. A check run is one (name, app, workflow);
+    its runs are ordered by workflow run number, then attempt (a re-run's check run has a higher
+    id within the same workflow run), so the newest run is the verdict. A skipped or neutral
+    newest run passes only when the newest run that executed, if any, passed and none is pending.
+    A commit status is one context (GitHub reports only its latest state). Same-name checks from
+    another workflow or app, and a same-name status, stay separate: each must pass."""
+    runs = {}
     for c in contexts:
         if not isinstance(c, dict):
             continue
         if c.get("__typename") == "CheckRun":
             suite = c.get("checkSuite") or {}
             app = (suite.get("app") or {}).get("databaseId")
-            workflow = ((suite.get("workflowRun") or {}).get("workflow") or {}).get("databaseId")
-            key, order = ("check", c.get("name"), app, workflow), (c.get("databaseId") or 0, "")
+            run = suite.get("workflowRun") or {}
+            workflow = (run.get("workflow") or {}).get("databaseId")
+            key, order = ("check", c.get("name"), app, workflow), (run.get("runNumber") or 0, c.get("databaseId") or 0)
             state = c.get("conclusion") if c.get("status") == "COMPLETED" else "PENDING"
         elif c.get("__typename") == "StatusContext":
-            key, order = ("status", c.get("context"), None, None), (0, c.get("createdAt") or "")
+            key, order = ("status", c.get("context"), None, None), (0, 0)
             state = {"PENDING": "PENDING", "EXPECTED": "PENDING"}.get(c.get("state"), c.get("state"))
         else:
             continue
-        if not key[1]:
-            continue
-        if key not in best or order > best[key][0]:
-            best[key] = (order, state or "PENDING", bool(c.get("isRequired")))
-    return best
+        if key[1]:
+            runs.setdefault(key, []).append((order, state or "PENDING", bool(c.get("isRequired"))))
+    verdicts = {}
+    for key, seen in runs.items():
+        seen.sort(key=lambda r: r[0])
+        state = seen[-1][1]
+        if state in QUIET:
+            pending = [r for r in seen if r[1] == "PENDING"]
+            executed = [r for r in seen if r[1] not in QUIET]
+            if pending:
+                state = "PENDING"
+            elif executed and executed[-1][1] != "SUCCESS":
+                state = executed[-1][1]
+        verdicts[key] = (state, any(r[2] for r in seen))
+    return verdicts
 
 
 def problems_with(required, runs):
@@ -247,14 +293,14 @@ def problems_with(required, runs):
         if not matching:
             problems.append("%s%s never ran at this head" % (check, source))
             continue
-        for key, (_, state, _) in sorted(matching, key=lambda kv: (kv[0][0], kv[0][2] or 0, kv[0][3] or 0)):
-            if state != GREEN:
+        for key, (state, _) in sorted(matching, key=lambda kv: (kv[0][0], kv[0][2] or 0, kv[0][3] or 0)):
+            if state not in PASSED:
                 kind = "" if len(matching) == 1 else (" (commit status)" if key[0] == "status" else " (app %s, workflow %s)" % (key[2], key[3]))
                 problems.append("%s%s is %s" % (check, kind, str(state).lower()))
     return problems
 
 
-def decide(number, expected, owner, name, delete_branch, subject=None):
+def decide(number, expected, owner, name, delete_branch, subject=None, all_green=False):
     pr = pull_request(owner, name, number)
     if pr.get("state") != "OPEN":
         raise Refuse("#%d is %s, not open" % (number, str(pr.get("state")).lower()))
@@ -280,15 +326,32 @@ def decide(number, expected, owner, name, delete_branch, subject=None):
     if not isinstance(base, str) or not base:
         raise Unreadable("#%d names no base branch" % number)
     runs = runs_at_head(pr["_contexts"])
-    required = ruleset_checks(owner, name, base) | protection_checks(owner, name, base)
-    required |= {(k[1], None) for k, (_, _, req) in runs.items() if req}
+    ruled, ruled_strict, types = ruleset_checks(owner, name, base)
+    protected, protected_strict = protection_checks(owner, name, base)
+    required = ruled | protected | {(k[1], None) for k, (_, req) in runs.items() if req}
     problems = problems_with(required, runs)
     if problems:
         raise Refuse("not every required check is green at %s: %s" % (expected[:12], "; ".join(problems)))
+    if all_green:
+        red = problems_with({(k[1], None) for k in runs}, runs)
+        if red:
+            raise Refuse("--all-green: not every check is green at %s: %s" % (expected[:12], "; ".join(red)))
+    if ruled_strict or protected_strict:
+        compared = gh_json("api", "repos/%s/%s/compare/%s...%s" % (owner, name, quote(base, safe=""), expected))
+        behind = compared.get("behind_by") if isinstance(compared, dict) else None
+        if not isinstance(behind, int):
+            raise Unreadable("comparing %s with %s gave no behind_by" % (expected[:12], base))
+        if behind:
+            raise Refuse("#%d is %d commit(s) behind %s, which requires it to be up to date: update it, then check the new head"
+                         % (number, behind, base))
     admin = state == "BLOCKED"
     if admin and not required:
         raise Refuse("#%d is blocked and %s requires no check, so nothing proves this head green: "
                      "an admin merge would bypass a block it cannot name" % (number, base))
+    unknown = sorted(t for t in types if t not in KNOWN_RULES)
+    if admin and unknown:
+        raise Refuse("#%d is blocked and %s has rule(s) this gate cannot judge (%s): an admin merge would bypass them"
+                     % (number, base, ", ".join(str(t) for t in unknown)))
     command = "gh pr merge %d --repo %s/%s --merge --match-head-commit %s%s%s%s" % (
         number, owner, name, expected, " --admin" if admin else "", " --delete-branch" if delete_branch else "",
         " --subject " + shlex.quote(subject) if subject else "")
@@ -298,11 +361,13 @@ def decide(number, expected, owner, name, delete_branch, subject=None):
 
 
 def main(argv):
-    args, delete_branch, repo, subject = [], False, None, None
+    args, delete_branch, repo, subject, all_green = [], False, None, None, False
     it = iter(argv[1:])
     for a in it:
         if a == "--delete-branch":
             delete_branch = True
+        elif a == "--all-green":
+            all_green = True
         elif a == "--repo":
             repo = next(it, None)
         elif a == "--subject":
@@ -314,7 +379,7 @@ def main(argv):
             args.append(a)
     if len(args) != 2 or not args[0].isdigit() or int(args[0]) < 1 or not SHA.match(args[1]) \
             or (repo is not None and not REPO.match(repo)):
-        sys.stderr.write("usage: merge-gate.py <pr-number> <expected-head-sha (40 hex)> [--delete-branch] [--subject <text>] [--repo <owner>/<name>]\n")
+        sys.stderr.write("usage: merge-gate.py <pr-number> <expected-head-sha (40 hex)> [--all-green] [--delete-branch] [--subject <text>] [--repo <owner>/<name>]\n")
         return 2
     number, expected = int(args[0]), args[1]
     try:
@@ -324,7 +389,7 @@ def main(argv):
             if code != 0 or not REPO.match(repo):
                 raise Unreadable("the repository could not be resolved: %s" % (err or out).strip()[:200])
         owner, name = repo.split("/")
-        command, why = decide(number, expected, owner, name, delete_branch, subject)
+        command, why = decide(number, expected, owner, name, delete_branch, subject, all_green)
     except Refuse as err:
         print("REFUSE %s" % str(err).replace("\n", " "))
         return 2

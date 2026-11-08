@@ -152,7 +152,7 @@ wait**: one self-terminating background call — never Monitor or a foreground s
 
 - **The round first** when this cycle launched engines (LOCAL-ONLY launches none):
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/review-gate.py` `engine` per CLI run, then every
-  result, Claude's and cloud's too, through `round`. Exit 2 → STOP: never settled, flipped or merged.
+  engine's `findings`, `no-findings` or `failed` through `round`. Exit 2 → STOP, unsettled.
 - **By `pull_request_review_id` above the high-water mark, never login.**
 - **Inline threads AND the review body**, including a collapsed *"Comments suppressed due to low
   confidence"* block — real findings. Zero inline ≠ zero findings.

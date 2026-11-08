@@ -153,6 +153,8 @@ def engine_results(engines):
         name = e["engine"]
         need(name not in seen, "engine %s is listed twice" % name)
         seen.add(name)
+        need(e.get("result") != "returned", "engine %s: `returned` (from `engine`) means read its output, then give "
+             "findings, no-findings, or failed with reason unparseable" % name)
         need(e.get("result") in RESULTS, "engine %s: result must be %s" % (name, ", ".join(RESULTS)))
         reason = e.get("reason")
         if e["result"] == "failed":
@@ -200,6 +202,8 @@ def settled(r, config):
         note = f.get("note")
         need(note is None or (isinstance(note, str) and "\n" not in note and len(note) <= 200), "finding %s: note must be one line of at most 200 characters" % f["id"])
         clean.append({k: f[k] for k in ("id", "severity", "disposition", "note") if f.get(k) is not None})
+    need(clean or not any(e["result"] == "findings" for e in engines),
+         "an engine returned findings but the findings list is empty: record each one with its disposition")
     r["engines"] = engines
     return clean
 

@@ -239,7 +239,7 @@ the deploy.
   every 2b check passed or was waived; the
   paginated **zero-unresolved-threads** check still reads zero (a late comment is replied-to AND
   resolved via `review` step 6 first, never merged over). Then run the `MERGE` line of
-  `python3 ${CLAUDE_PLUGIN_ROOT}/skills/pr/scripts/merge-gate.py <n> <reviewedHead>`; else STOP.
+  `python3 ${CLAUDE_PLUGIN_ROOT}/skills/pr/scripts/merge-gate.py <n> <reviewedHead> --all-green`; else STOP.
 - The deploy then runs on its own (with `release.deployApproval`, 5a approves it on this yes):
   note it is in flight; never trigger or gate it otherwise.
 

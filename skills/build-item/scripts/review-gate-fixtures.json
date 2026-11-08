@@ -148,7 +148,7 @@
      "engines": [
       {
        "engine": "claude",
-       "result": "findings"
+       "result": "no-findings"
       },
       {
        "engine": "codex",
@@ -165,7 +165,7 @@
     "riskFiles": [
      "src/auth/login.ts"
     ],
-    "mergeBody": "Review: LOCAL-FULL at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa over origin/train/release (merge base eeeeeeeeeeee), 2 cycle(s), engines: claude (findings), codex (no findings)\n- no findings"
+    "mergeBody": "Review: LOCAL-FULL at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa over origin/train/release (merge base eeeeeeeeeeee), 2 cycle(s), engines: claude (no findings), codex (no findings)\n- no findings"
    }
   },
   {
@@ -1755,6 +1755,50 @@
     }
    },
    "refuses": "the claude review did not return a result"
+  },
+  {
+   "name": "record refuses findings reported with an empty findings list",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "cycles": 2,
+    "engines": [
+     {
+      "engine": "claude",
+      "result": "findings"
+     },
+     {
+      "engine": "codex",
+      "result": "no-findings"
+     }
+    ],
+    "findings": [],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
+   },
+   "refuses": "findings list is empty"
   }
  ],
  "round": [
@@ -1825,6 +1869,16 @@
    "name": "no engines at all -> refused",
    "engines": [],
    "refuses": "engines must list each engine that ran"
+  },
+  {
+   "name": "engine's `returned` piped straight in -> refused, naming the mapping",
+   "engines": [
+    {
+     "engine": "codex",
+     "result": "returned"
+    }
+   ],
+   "refuses": "means read its output"
   }
  ],
  "engine": [

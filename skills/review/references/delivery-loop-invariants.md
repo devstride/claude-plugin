@@ -408,9 +408,13 @@ M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exac
      line; `REFUSE` or `ERROR` stops. It merges only an open, non-draft pull request at the
      expected head, pinned with `--match-head-commit`, with every required check (rulesets,
      classic protection, and what GitHub marks required) completed SUCCESS on its newest run there
-     (pending, failed, skipped or missing refuses), no unresolved thread and no changes requested.
+     (passed is GitHub's reading: SUCCESS, SKIPPED or NEUTRAL, but a skipped newest run never hides
+     an older executed run of that check that failed or is pending; pending, failed or missing
+     refuses; runs order by workflow run number, then attempt, never by check-run id alone), no
+     unresolved thread and no changes requested. A strict base is compared: behind refuses.
      `--admin` only when GitHub reads it BLOCKED with all of that true and at least one required
-     check: an admin merge never bypasses a conflict, an out-of-date branch or a red check. A check
+     check and no rule type it cannot judge: an admin merge never bypasses a conflict, an
+     out-of-date branch or a red check. Production uses `--all-green` (every check). A check
      is one (name, app, workflow) or one commit status; a same-name check elsewhere must pass too,
      and a rule's app restriction is kept. The printed command names `--repo`. No skill
      text carries its own `--admin` (`scripts/tests/merge-gate.sh` greps for one).
@@ -853,7 +857,7 @@ skills/review/SKILL.md|No result, no review
 skills/review/SKILL.md|through `round`
 skills/review/references/local-full.md|no engine returned a result
 skills/build-item/scripts/review-gate.py|a bare name does not say whether it returned a result
-skills/release/SKILL.md|merge-gate.py <n> <reviewedHead>
+skills/release/SKILL.md|merge-gate.py <n> <reviewedHead> --all-green
 skills/release/references/release-branch.md|merge-gate.py <n> <reviewedHead> --delete-branch
 skills/release/references/release-branch.md|merge-gate.py <n> <settled head>
 skills/release/references/auto-start.md|merge-gate.py <n> <sha>
