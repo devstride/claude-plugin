@@ -124,5 +124,9 @@
   "activeAgents": {
     "boardId": "board-1", "tagName": "agent active", "tagColor": "green", "staleMinutes": 20,
     "commands": { "start": "./tools/presence start <root>", "end": "./tools/presence end <root>" }
+  },
+  "consequenceNotices": {
+    "enabled": true, "notify": ["ops-lead"],
+    "categories": [{ "id": "data-retention", "title": "Changes how long data is kept", "means": "a retention period, expiry or deletion schedule changes" }]
   }
 }

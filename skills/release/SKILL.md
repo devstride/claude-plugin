@@ -26,8 +26,8 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 ## Hard floors
 
 - **Config wins.** Load `.claude/ds-config.json` first: `release.productionBranch`,
-  `release.releaseSource`, `release.autoDeployOnMerge` (a plain-English string quoted back to the
-  owner — never assume a provider), `release.deployApproval`, `release.deployVerification`, `release.devDeployVerification`,
+  `release.releaseSource`, `release.autoDeployOnMerge` (quoted back to the owner; never assume a
+  provider), `release.deployApproval`, `release.deployVerification`, `release.devDeployVerification`,
   the hooks its steps run, `baseBranch`, `protectedBranches` (names or patterns),
   `release.releaseBranchPattern`, `release.releaseBranchFixExclusions`,
   `release.mergeTrainBeforeCut`, `releaseTrain.branch`, `release.clearance`, and the `review.*` /
@@ -113,9 +113,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 
 - `gh pr create --draft --base master --head <release branch>` (pattern absent: `--head develop`)
   whenever PR workflows exist (the draft holds CI via `ci.draftGateCondition`); no CI → omit
-  `--draft` and report `no pull-request CI`. Never `--fill`. Leave cloud requests to `review` (it
-  captures each baseline/request hand-off while local review starts); `review` step 7 flips it
-  ready. `preShipChecks` run in 2b (`runAt: train`: 4b), never CI.
+  `--draft` and report `no pull-request CI`. Never `--fill`. Leave cloud requests to `review`; its step 7 flips it ready. `preShipChecks` run in 2b (`runAt: train`: 4b), never CI.
 - **Release-flavored body** — `prBodyTemplate.sections` in order,
   flavor by POSITION: 1st (fallback `## Simple Description`) — what consumers get in this deploy, in
   plain language, then the constituent epics/items (`I##### — title`); 2nd (`## Technical
@@ -217,8 +215,8 @@ the deploy.
   it deploys, and what "yes" versus "no" does. Then: the PR (green + settled), the review tally, the
   delta and 2b's release class, the pre-merge verdict, **each 2b result (or its waiver)**, the
   documentation plan (the steps 5c will call / "none registered" / "suppressed"), the release-notes
-  decision (default "not requested — none will be
-  written"), and what merging triggers, quoted from `release.autoDeployOnMerge`. **Then ASK** (standing
+  decision (default: none written), the consequence notices
+  (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/consequence-notices.md`), and what merging triggers, quoted from `release.autoDeployOnMerge`. **Then ASK** (standing
   yes: `auto-start.md`); **never proceed without a yes.**
   - **Name the deploy stage**: `stage.resolve` set → quote "this merge deploys to `<stage>`" beside
     `autoDeployOnMerge`; no `stage` block or empty result → nothing, never a guess (nor
@@ -308,7 +306,7 @@ never decides a release deserves one. Otherwise call **`write-release-notes`**
   merge commit, where it landed, whether the deploy is confirmed live, the release class, the
   pre-merge and post-deploy health results, documentation, knowledge-base and release-note results,
   whether clearance was handed back (kept, with the reason, when a check failed or 5b stopped
-  early), anything still `owed`, and any owner action left (a docs draft awaiting a look, a PR to
+  early), consequence notices again, anything still `owed`, and any owner action left (a docs draft awaiting a look, a PR to
   merge).
-- Update any project memory tracking release/plan state: epics that reached production, the date,
-  docs/release-note status. Then `release.autoStart.enabled` → its trigger (`auto-start.md`).
+- Update any project memory tracking release state: epics now in production, the date, docs and
+  notes. Then `release.autoStart.enabled` → its trigger (`auto-start.md`).

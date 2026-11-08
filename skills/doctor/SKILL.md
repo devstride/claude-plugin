@@ -136,17 +136,15 @@ next action. For each failure symptom, read
   default`. The contract behind the word is
   `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`; read its resolution order,
   and say that a plan root's own marker or an explicit skill argument outranks the file at run time
-  — this reports the repository's default, not what a particular plan will run under, and it never
-  calls a DevStride tool to find out. Any other value is a FAIL: skills read it as unknown, fall
+  — this is the repository's default, not a given plan's; never call a DevStride tool for it. Any other value is a FAIL: skills read it as unknown, fall
   back to `standard` and say so. Fix: set one of the three names, or run `/devstride:setup`.
   **Then the contradictions.** Compare `epicIntegrationBranches.autoRelease` and
   `review.pollTimeoutMinutes` with the profile's values in the `| Key | prototype | standard |
   extended |` table at the top of
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/config-defaults.md` — **read that table only, not
   the whole file** — and `epicIntegrationBranches.fastStoryMerges.enabled` against `prototype`
-  only, and only when `verify.typecheck` is set. `autoRelease` has three legal values: `true`,
-  `false`, and `"ask"`. Report a present `"ask"` like any other value: never a type error,
-  and a contradiction only where it differs from the profile's.
+  only, and only when `verify.typecheck` is set. `autoRelease` may also be `"ask"`: never a
+  type error, and a contradiction only where it differs from the profile's.
   A present key that differs is **informational, not a FAIL** — the
   explicit key wins by contract — but say which key, which value, and what the profile would
   have written (`silent-failures.md` holds why). A present `review.localCommand` under
@@ -191,6 +189,9 @@ next action. For each failure symptom, read
   single-word command that does not resolve may be a shell alias or function — report "not on
   PATH (may be an alias)", not a flat FAIL.
 - **`conventionsDoc` exists** — set → the file must be present; the build engine reads it.
+- **`consequenceNotices`** — report the lines of `python3
+  ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/consequence-notices.py doctor` (`ERROR` FAILs); a
+  `notify` name `resolve_user` cannot find WARNs.
 
 ## 5. The CI draft gate (`ci`)
 

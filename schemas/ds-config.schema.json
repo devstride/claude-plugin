@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.40.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.41.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -1213,6 +1213,60 @@
       },
       "additionalProperties": false,
       "description": "production release settings"
+    },
+    "consequenceNotices": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "false posts no notice and repeats none"
+        },
+        "notify": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "DevStride users (name, username or email) mentioned on every notice beside the item's author"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "lower-case words joined by hyphens, unique, never a default's id"
+              },
+              "title": {
+                "type": "string",
+                "description": "the notice's heading for a finding, one line of at most 80 characters"
+              },
+              "means": {
+                "type": "string",
+                "description": "what counts, in plain words; the agent judges the diff against it"
+              }
+            },
+            "patternProperties": {
+              "^_": {}
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "means"
+            ]
+          },
+          "default": [],
+          "description": "the repository's own categories, added to the four defaults"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "the notice build-item posts on an item whose change could add billable infrastructure, remove something callers use, remove someone's access or break a published interface; absent means on, with the four default categories, notifying the item's author"
     },
     "activeAgents": {
       "type": [

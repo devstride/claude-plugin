@@ -1,0 +1,1376 @@
+{
+ "cases": [
+  {
+   "name": "no finding and no earlier notice: nothing to post",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [],
+    "earlier": []
+   },
+   "expect": {
+    "post": false,
+    "notices": 0,
+    "recap": []
+   }
+  },
+  {
+   "name": "billable infrastructure: one notice mentioning the author",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "lines": "1-12",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "recap": [
+     "Consequence notice I20130: Adds billable infrastructure — infra/queue.ts lines 1–12: A new queue is billed per request and keeps messages for 14 days."
+    ],
+    "html": [
+     "data-id=\"ada\"",
+     "@Ada Example",
+     "<code>infra/queue.ts</code> lines 1–12",
+     "not a stop"
+    ]
+   }
+  },
+  {
+   "name": "removed routes cite the removed side; a changed limit cites the new side",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/api/routes.ts b/api/routes.ts\n--- a/api/routes.ts\n+++ b/api/routes.ts\n@@ -40,3 +39,0 @@\n-router.get('/v1/export', exportAll);\n-router.get('/v1/export/:id', exportOne);\n-// end of export routes\n@@ -80 +77 @@\n-  limit: 100,\n+  limit: 10,\n",
+    "findings": [
+     {
+      "category": "removed-caller-surface",
+      "file": "api/routes.ts",
+      "lines": "40-41",
+      "side": "old",
+      "sentence": "The export endpoints are gone; any integration that downloads exports will get a 404."
+     },
+     {
+      "category": "interface-break",
+      "file": "api/routes.ts",
+      "lines": "77",
+      "sentence": "The list endpoint now returns at most 10 rows, so callers paging by 100 miss rows."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 2,
+    "recap": [
+     "Consequence notice I20130: Removes something callers still use — api/routes.ts lines 40–41 (removed): The export endpoints are gone; any integration that downloads exports will get a 404.",
+     "Consequence notice I20130: Could break a published interface — api/routes.ts line 77: The list endpoint now returns at most 10 rows, so callers paging by 100 miss rows."
+    ],
+    "html": [
+     "(removed)",
+     "line 77"
+    ]
+   }
+  },
+  {
+   "name": "access removed",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/auth/roles.json b/auth/roles.json\n--- a/auth/roles.json\n+++ b/auth/roles.json\n@@ -12,2 +12 @@\n-    \"reports:read\",\n-    \"reports:export\"\n+    \"reports:read\"\n",
+    "findings": [
+     {
+      "category": "access-removed",
+      "file": "auth/roles.json",
+      "lines": "13",
+      "side": "old",
+      "sentence": "People with the reports role can no longer export reports."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "recap": [
+     "Consequence notice I20130: Removes someone's access — auth/roles.json line 13 (removed): People with the reports role can no longer export reports."
+    ]
+   }
+  },
+  {
+   "name": "a removed line that starts with two dashes is a change, not a file header",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/docs/notes.sql b/docs/notes.sql\n--- a/docs/notes.sql\n+++ b/docs/notes.sql\n@@ -3 +3 @@\n--- old comment\n+-- new comment\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "docs/notes.sql",
+      "lines": "3",
+      "side": "old",
+      "sentence": "The old comment is gone."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1
+   }
+  },
+  {
+   "name": "the same notice already on the item: nothing new to post",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "lines": "1-12",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days."
+     }
+    ],
+    "earlier": [
+     "<p>Unrelated comment</p>",
+     "<p><strong>Consequence notice</strong> for I20130 at reviewed head <code>0123456</code>:</p><ul><li>Adds billable infrastructure — infra/queue.ts lines 1–12: A new queue is billed per request and keeps messages for 14 days.</li></ul>"
+    ]
+   },
+   "expect": {
+    "post": false,
+    "notices": 1,
+    "recap": [
+     "Consequence notice I20130: Adds billable infrastructure — infra/queue.ts lines 1–12: A new queue is billed per request and keeps messages for 14 days."
+    ]
+   }
+  },
+  {
+   "name": "a different finding than the earlier notice: post the new one",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/api/routes.ts b/api/routes.ts\n--- a/api/routes.ts\n+++ b/api/routes.ts\n@@ -40,3 +39,0 @@\n-router.get('/v1/export', exportAll);\n-router.get('/v1/export/:id', exportOne);\n-// end of export routes\n@@ -80 +77 @@\n-  limit: 100,\n+  limit: 10,\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "api/routes.ts",
+      "lines": "77",
+      "sentence": "The list endpoint now returns at most 10 rows, so callers paging by 100 miss rows."
+     }
+    ],
+    "earlier": [
+     "<p><strong>Consequence notice</strong> for I20130 at reviewed head <code>0123456</code>:</p><ul><li>Removes something callers still use — api/routes.ts lines 40–41 (removed): The export endpoints are gone; any integration that downloads exports will get a 404.</li><li>Could break a published interface — api/routes.ts line 77: The list endpoint now returns at most 10 rows, so callers paging by 100 miss rows.</li></ul>"
+    ]
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "recap": [
+     "Consequence notice I20130: Could break a published interface — api/routes.ts line 77: The list endpoint now returns at most 10 rows, so callers paging by 100 miss rows."
+    ]
+   }
+  },
+  {
+   "name": "an earlier notice the final change no longer supports: a withdrawal",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [],
+    "earlier": [
+     "<p><strong>Consequence notice</strong> for I20130 at reviewed head <code>0123456</code>:</p><ul><li>Adds billable infrastructure — infra/queue.ts lines 1–12: A new queue is billed per request and keeps messages for 14 days.</li></ul>"
+    ]
+   },
+   "expect": {
+    "post": true,
+    "notices": 0,
+    "html": [
+     ": none.",
+     "no longer applies"
+    ],
+    "recap": [
+     "Consequence notice I20130: withdrawn, the final change no longer does what the earlier notice said"
+    ]
+   }
+  },
+  {
+   "name": "after a withdrawal, no finding posts nothing",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [],
+    "earlier": [
+     "<p><strong>Consequence notice</strong> for I20130 at reviewed head <code>0123456</code>:</p><ul><li>Adds billable infrastructure — infra/queue.ts lines 1–12: A new queue is billed per request and keeps messages for 14 days.</li></ul>",
+     "<p><strong>Consequence notice</strong> for I20130 at reviewed head <code>0123456</code>: none.</p>"
+    ]
+   },
+   "expect": {
+    "post": false,
+    "notices": 0,
+    "recap": []
+   }
+  },
+  {
+   "name": "turned off in config: nothing, whatever the findings",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {
+     "consequenceNotices": {
+      "enabled": false
+     }
+    },
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "lines": "1-12",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": false,
+    "notices": 0,
+    "recap": []
+   }
+  },
+  {
+   "name": "a repository category is accepted alongside the defaults",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {
+     "consequenceNotices": {
+      "categories": [
+       {
+        "id": "data-retention",
+        "title": "Changes how long data is kept",
+        "means": "retention periods change"
+       }
+      ]
+     }
+    },
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "data-retention",
+      "file": "infra/queue.ts",
+      "lines": "1",
+      "sentence": "Messages are now kept for 14 days."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "Changes how long data is kept"
+    ]
+   }
+  },
+  {
+   "name": "the people config names are mentioned too, the author once",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "lines": "1-12",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days."
+     }
+    ],
+    "notify": [
+     {
+      "username": "bo",
+      "name": "Bo Example"
+     },
+     {
+      "username": "ADA",
+      "name": "Ada Example"
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "data-id=\"ada\"",
+     "data-id=\"bo\""
+    ],
+    "absent": [
+     "data-id=\"ADA\""
+    ]
+   }
+  },
+  {
+   "name": "markup in a sentence is shown, never rendered",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "lines": "1-12",
+      "sentence": "Adds a <b>paid</b> queue & more."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "&lt;b&gt;paid&lt;/b&gt; queue &amp; more."
+    ],
+    "absent": [
+     "<b>paid"
+    ]
+   }
+  },
+  {
+   "name": "a pure rename is cited by its old path with no lines",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/public/guide.html b/public/help.html\nsimilarity index 100%\nrename from public/guide.html\nrename to public/help.html\ndiff --git a/assets/logo.png b/assets/logo.png\ndeleted file mode 100644\nindex 1111111..0000000\nBinary files a/assets/logo.png and /dev/null differ\n",
+    "findings": [
+     {
+      "category": "removed-caller-surface",
+      "file": "public/guide.html",
+      "sentence": "The documented guide URL now returns a 404."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "<code>public/guide.html</code> renamed to <code>public/help.html</code>"
+    ],
+    "recap": [
+     "Consequence notice I20130: Removes something callers still use — public/guide.html renamed to public/help.html: The documented guide URL now returns a 404."
+    ]
+   }
+  },
+  {
+   "name": "a deleted binary file is cited with no lines",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/public/guide.html b/public/help.html\nsimilarity index 100%\nrename from public/guide.html\nrename to public/help.html\ndiff --git a/assets/logo.png b/assets/logo.png\ndeleted file mode 100644\nindex 1111111..0000000\nBinary files a/assets/logo.png and /dev/null differ\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "assets/logo.png",
+      "side": "old",
+      "sentence": "Pages that embed the logo show a broken image."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "(binary file)"
+    ]
+   }
+  },
+  {
+   "name": "several ranges on one side",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/api/routes.ts b/api/routes.ts\n--- a/api/routes.ts\n+++ b/api/routes.ts\n@@ -40,3 +39,0 @@\n-router.get('/v1/export', exportAll);\n-router.get('/v1/export/:id', exportOne);\n-// end of export routes\n@@ -80 +77 @@\n-  limit: 100,\n+  limit: 10,\n",
+    "findings": [
+     {
+      "category": "removed-caller-surface",
+      "file": "api/routes.ts",
+      "lines": "40, 42",
+      "side": "old",
+      "sentence": "The export route and its marker are gone."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "lines 40, 42 (removed)"
+    ]
+   }
+  },
+  {
+   "name": "a reply that starts with the words is not a notice and withdraws nothing",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "lines": "1-12",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days."
+     }
+    ],
+    "earlier": [
+     "<p><strong>Consequence notice</strong> for I20130 at reviewed head <code>0123456</code>:</p><ul><li>Adds billable infrastructure — infra/queue.ts lines 1–12: A new queue is billed per request and keeps messages for 14 days.</li></ul>",
+     "<p>Consequence notices acknowledged; proceed.</p>"
+    ]
+   },
+   "expect": {
+    "post": false,
+    "notices": 1
+   }
+  },
+  {
+   "name": "another item's notice is not this item's",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [],
+    "earlier": [
+     "<p><strong>Consequence notice</strong> for I20131 at reviewed head <code>0123456</code>:</p><ul><li>Adds billable infrastructure — infra/queue.ts lines 1–12: A new queue is billed per request and keeps messages for 14 days.</li></ul>"
+    ]
+   },
+   "expect": {
+    "post": false,
+    "notices": 0,
+    "recap": []
+   }
+  },
+  {
+   "name": "the same findings in another order: nothing new to post",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/api/routes.ts b/api/routes.ts\n--- a/api/routes.ts\n+++ b/api/routes.ts\n@@ -40,3 +39,0 @@\n-router.get('/v1/export', exportAll);\n-router.get('/v1/export/:id', exportOne);\n-// end of export routes\n@@ -80 +77 @@\n-  limit: 100,\n+  limit: 10,\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "api/routes.ts",
+      "lines": "77",
+      "sentence": "The list endpoint now returns at most 10 rows, so callers paging by 100 miss rows."
+     },
+     {
+      "category": "removed-caller-surface",
+      "file": "api/routes.ts",
+      "lines": "40-41",
+      "side": "old",
+      "sentence": "The export endpoints are gone; any integration that downloads exports will get a 404."
+     }
+    ],
+    "earlier": [
+     {
+      "message": {
+       "html": "<p><strong>Consequence notice</strong> for I20130 at reviewed head <code>0123456</code>:</p><ul><li>Removes something callers still use — api/routes.ts lines 40–41 (removed): The export endpoints are gone; any integration that downloads exports will get a 404.</li><li>Could break a published interface — api/routes.ts line 77: The list endpoint now returns at most 10 rows, so callers paging by 100 miss rows.</li></ul>"
+      }
+     }
+    ]
+   },
+   "expect": {
+    "post": false,
+    "notices": 2
+   }
+  },
+  {
+   "name": "a rename inside a directory named a keeps its path",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/a/old.ts b/a/new.ts\nsimilarity index 100%\nrename from a/old.ts\nrename to a/new.ts\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "a/old.ts",
+      "sentence": "Imports of the old module path fail."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "<code>a/old.ts</code> renamed to <code>a/new.ts</code>"
+    ]
+   }
+  },
+  {
+   "name": "the same lines with changed facts: posted again, newest wins",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/api/routes.ts b/api/routes.ts\n--- a/api/routes.ts\n+++ b/api/routes.ts\n@@ -40,3 +39,0 @@\n-router.get('/v1/export', exportAll);\n-router.get('/v1/export/:id', exportOne);\n-// end of export routes\n@@ -80 +77 @@\n-  limit: 100,\n+  limit: 10,\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "api/routes.ts",
+      "lines": "77",
+      "sentence": "The list endpoint now returns at most 50 rows."
+     }
+    ],
+    "earlier": [
+     "<p><strong>Consequence notice</strong> for I20130 at reviewed head <code>0123456</code>:</p><ul><li>Could break a published interface — api/routes.ts line 77: The list endpoint now returns at most 10 rows, so callers paging by 100 miss rows.</li></ul>"
+    ]
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "at most 50 rows"
+    ]
+   }
+  },
+  {
+   "name": "a mode-only change is cited with no lines",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/bin/tool b/bin/tool\nold mode 100755\nnew mode 100644\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "bin/tool",
+      "sentence": "Running the published command directly now fails: it is no longer executable."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "<code>bin/tool</code> (mode 100755 → 100644)"
+    ]
+   }
+  },
+  {
+   "name": "ranges in any order and split differently read the same",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/api/routes.ts b/api/routes.ts\n--- a/api/routes.ts\n+++ b/api/routes.ts\n@@ -40,3 +39,0 @@\n-router.get('/v1/export', exportAll);\n-router.get('/v1/export/:id', exportOne);\n-// end of export routes\n@@ -80 +77 @@\n-  limit: 100,\n+  limit: 10,\n",
+    "findings": [
+     {
+      "category": "removed-caller-surface",
+      "file": "api/routes.ts",
+      "lines": "42, 40-41",
+      "side": "old",
+      "sentence": "The export routes are gone."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "lines 40–42 (removed)"
+    ]
+   }
+  },
+  {
+   "name": "a binary file whose path holds the word and",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/img/cats and dogs.png b/img/cats and dogs.png\nindex 1111111..2222222 100644\nBinary files a/img/cats and dogs.png and b/img/cats and dogs.png differ\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "img/cats and dogs.png",
+      "sentence": "The documented image changed size."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "(binary file)"
+    ]
+   }
+  },
+  {
+   "name": "unchanged context inside a hunk is not evidence",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/x.ts b/x.ts\n--- a/x.ts\n+++ b/x.ts\n@@ -10,3 +10,3 @@\n-a\n+A\n b\n-c\n+C\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "x.ts",
+      "lines": "10, 12",
+      "sentence": "Two calls change."
+     }
+    ],
+    "earlier": []
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "lines 10, 12"
+    ]
+   }
+  },
+  {
+   "name": "an empty file deleted is cited with no lines",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "earlier": [],
+    "diff": "diff --git a/public/.well-known/hook b/public/.well-known/hook\ndeleted file mode 100644\nindex e69de29..0000000\n",
+    "findings": [
+     {
+      "category": "removed-caller-surface",
+      "file": "public/.well-known/hook",
+      "side": "old",
+      "sentence": "The discovery URL partners poll now returns 404."
+     }
+    ]
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "(file deleted) (removed)"
+    ]
+   }
+  },
+  {
+   "name": "a rename target with a colon reads back whole",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "earlier": [],
+    "diff": "diff --git a/docs/a.md b/docs/a:b.md\nsimilarity index 100%\nrename from docs/a.md\nrename to docs/a:b.md\n",
+    "findings": [
+     {
+      "category": "removed-caller-surface",
+      "file": "docs/a.md",
+      "sentence": "The documented page moved; old links break."
+     }
+    ]
+   },
+   "expect": {
+    "post": true,
+    "notices": 1,
+    "html": [
+     "renamed to <code>docs/a:b.md</code>"
+    ]
+   }
+  },
+  {
+   "name": "a form feed inside a line is content, not a new line",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "earlier": [],
+    "diff": "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -2,2 +2,3 @@\n-b\n-c\n+b\f x\n+C\n+d\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "f.txt",
+      "lines": "2-4",
+      "sentence": "Three lines change."
+     }
+    ]
+   },
+   "expect": {
+    "post": true,
+    "notices": 1
+   }
+  }
+ ],
+ "errors": [
+  {
+   "name": "an unknown category",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "cost",
+      "file": "infra/queue.ts",
+      "lines": "1-12",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days."
+     }
+    ],
+    "earlier": []
+   },
+   "contains": "unknown category"
+  },
+  {
+   "name": "a file the diff does not change",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/other.ts",
+      "lines": "1-12",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days."
+     }
+    ],
+    "earlier": []
+   },
+   "contains": "not a file this diff changes"
+  },
+  {
+   "name": "lines the diff did not change",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/api/routes.ts b/api/routes.ts\n--- a/api/routes.ts\n+++ b/api/routes.ts\n@@ -40,3 +39,0 @@\n-router.get('/v1/export', exportAll);\n-router.get('/v1/export/:id', exportOne);\n-// end of export routes\n@@ -80 +77 @@\n-  limit: 100,\n+  limit: 10,\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "api/routes.ts",
+      "lines": "60-70",
+      "sentence": "The list endpoint now returns at most 10 rows, so callers paging by 100 miss rows."
+     }
+    ],
+    "earlier": []
+   },
+   "contains": "was not added or changed"
+  },
+  {
+   "name": "removed lines cited on the new side",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/api/routes.ts b/api/routes.ts\n--- a/api/routes.ts\n+++ b/api/routes.ts\n@@ -40,3 +39,0 @@\n-router.get('/v1/export', exportAll);\n-router.get('/v1/export/:id', exportOne);\n-// end of export routes\n@@ -80 +77 @@\n-  limit: 100,\n+  limit: 10,\n",
+    "findings": [
+     {
+      "category": "removed-caller-surface",
+      "file": "api/routes.ts",
+      "lines": "40-41",
+      "side": "new",
+      "sentence": "The export endpoints are gone; any integration that downloads exports will get a 404."
+     }
+    ],
+    "earlier": []
+   },
+   "contains": "was not added or changed"
+  },
+  {
+   "name": "added lines cited on the removed side",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "lines": "1-12",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days.",
+      "side": "old"
+     }
+    ],
+    "earlier": []
+   },
+   "contains": "was not removed"
+  },
+  {
+   "name": "a sentence over two lines",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "lines": "1-12",
+      "sentence": "One.\nTwo."
+     }
+    ],
+    "earlier": []
+   },
+   "contains": "one plain line"
+  },
+  {
+   "name": "an item that is not an item number",
+   "request": {
+    "item": "20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [],
+    "earlier": []
+   },
+   "contains": "item must be"
+  },
+  {
+   "name": "a head that is not a SHA",
+   "request": {
+    "item": "I20130",
+    "head": "main",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [],
+    "earlier": []
+   },
+   "contains": "head must be"
+  },
+  {
+   "name": "findings missing",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "earlier": []
+   },
+   "contains": "findings must be a list"
+  },
+  {
+   "name": "a repository category that reuses a default id",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {
+     "consequenceNotices": {
+      "categories": [
+       {
+        "id": "access-removed",
+        "title": "x",
+        "means": "y"
+       }
+      ]
+     }
+    },
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [],
+    "earlier": []
+   },
+   "contains": "already a category"
+  },
+  {
+   "name": "no diff and no base",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "findings": [],
+    "earlier": []
+   },
+   "contains": "base is required"
+  },
+  {
+   "name": "a person without a name",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "lines": "1-12",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days."
+     }
+    ],
+    "earlier": []
+   },
+   "contains": "username and a name"
+  },
+  {
+   "name": "a range that runs past the changed lines",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "lines": "1-9999",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days."
+     }
+    ],
+    "earlier": []
+   },
+   "contains": "line 13 was not added or changed"
+  },
+  {
+   "name": "no lines on a file that has them",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days."
+     }
+    ],
+    "earlier": []
+   },
+   "contains": "needs the changed lines"
+  },
+  {
+   "name": "lines that run backwards",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "infra/queue.ts",
+      "lines": "9-3",
+      "sentence": "A new queue is billed per request and keeps messages for 14 days."
+     }
+    ],
+    "earlier": []
+   },
+   "contains": "lines must be like"
+  },
+  {
+   "name": "a comment with no HTML",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": [],
+    "earlier": [
+     {
+      "id": "x"
+     }
+    ]
+   },
+   "contains": "message.html"
+  },
+  {
+   "name": "an unchanged context line inside a hunk",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/x.ts b/x.ts\n--- a/x.ts\n+++ b/x.ts\n@@ -10,3 +10,3 @@\n-a\n+A\n b\n-c\n+C\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "x.ts",
+      "lines": "11",
+      "sentence": "Nothing changed here."
+     }
+    ],
+    "earlier": []
+   },
+   "contains": "line 11 was not added or changed"
+  },
+  {
+   "name": "no earlier comments given",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "diff": "diff --git a/infra/queue.ts b/infra/queue.ts\nnew file mode 100644\n--- /dev/null\n+++ b/infra/queue.ts\n@@ -0,0 +1,12 @@\n+export const jobs = new Queue('jobs', { retentionDays: 14 });\n+// line 2\n+// line 3\n+// line 4\n+// line 5\n+// line 6\n+// line 7\n+// line 8\n+// line 9\n+// line 10\n+// line 11\n+// line 12\n",
+    "findings": []
+   },
+   "contains": "earlier must be"
+  },
+  {
+   "name": "a line past a form-feed line is not changed",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "earlier": [],
+    "diff": "diff --git a/f.txt b/f.txt\n--- a/f.txt\n+++ b/f.txt\n@@ -2,2 +2,3 @@\n-b\n-c\n+b\f x\n+C\n+d\n",
+    "findings": [
+     {
+      "category": "interface-break",
+      "file": "f.txt",
+      "lines": "5",
+      "sentence": "Nothing here."
+     }
+    ]
+   },
+   "contains": "line 5 was not added or changed"
+  },
+  {
+   "name": "an added binary file cited as removed",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "earlier": [],
+    "diff": "diff --git a/img/new.png b/img/new.png\nnew file mode 100644\nindex 0000000..1111111\nBinary files /dev/null and b/img/new.png differ\n",
+    "findings": [
+     {
+      "category": "billable-infrastructure",
+      "file": "img/new.png",
+      "side": "old",
+      "sentence": "x"
+     }
+    ]
+   },
+   "contains": "was added by this diff, so its side is new"
+  },
+  {
+   "name": "a deleted empty file cited on the new side",
+   "request": {
+    "item": "I20130",
+    "head": "0123456789abcdef0123456789abcdef01234567",
+    "config": {},
+    "author": {
+     "username": "ada",
+     "name": "Ada Example"
+    },
+    "earlier": [],
+    "diff": "diff --git a/public/hook b/public/hook\ndeleted file mode 100644\nindex e69de29..0000000\n",
+    "findings": [
+     {
+      "category": "removed-caller-surface",
+      "file": "public/hook",
+      "sentence": "x"
+     }
+    ]
+   },
+   "contains": "was deleted by this diff, so its side is old"
+  }
+ ],
+ "collect": [
+  {
+   "name": "the newest notice per item; withdrawn and plain comments add nothing",
+   "request": {
+    "items": [
+     {
+      "number": "I20101",
+      "comments": [
+       "<p>hello</p>",
+       "<p><strong>Consequence notice</strong> for I20101 at reviewed head <code>0123456</code>:</p><ul><li>Removes something callers still use — api/routes.ts lines 40–41 (removed): The export endpoints are gone; any integration that downloads exports will get a 404.</li></ul>",
+       {
+        "message": {
+         "html": "<p><strong>Consequence notice</strong> for I20101 at reviewed head <code>0123456</code>: <user-mention-popup data-mention=\"\" class=\"mention\" data-id=\"ada\" data-label=\"Ada Example\">@Ada Example</user-mention-popup></p><p>This change may affect people or systems outside this work. It is a notice, not a stop: the build, review, merge and release carry on.</p><ul><li><strong>Adds billable infrastructure</strong> — <code>infra/queue.ts</code> lines 1–12: A new queue is billed per request and keeps messages for 14 days.</li></ul>"
+        }
+       },
+       "<p>Consequence notices acknowledged; proceed.</p>",
+       "<p><strong>Consequence notice</strong> for I20102 at reviewed head <code>0123456</code>:</p><ul><li>Something else</li></ul>"
+      ]
+     },
+     {
+      "number": "I20102",
+      "comments": [
+       "<p><strong>Consequence notice</strong> for I20102 at reviewed head <code>0123456</code>:</p><ul><li>Removes someone's access — auth/roles.json line 13 (removed): People with the reports role can no longer export reports.</li></ul>",
+       "<p><strong>Consequence notice</strong> for I20102 at reviewed head <code>0123456</code>: none.</p>"
+      ]
+     },
+     {
+      "number": "I20103",
+      "comments": []
+     }
+    ],
+    "config": {}
+   },
+   "expect": {
+    "notices": [
+     {
+      "item": "I20101",
+      "lines": [
+       "Adds billable infrastructure — infra/queue.ts lines 1–12: A new queue is billed per request and keeps messages for 14 days."
+      ],
+      "findings": [
+       {
+        "title": "Adds billable infrastructure",
+        "file": "infra/queue.ts",
+        "where": "lines 1–12",
+        "removed": false,
+        "sentence": "A new queue is billed per request and keeps messages for 14 days."
+       }
+      ]
+     }
+    ],
+    "recap": [
+     "Consequence notice I20101: Adds billable infrastructure — infra/queue.ts lines 1–12: A new queue is billed per request and keeps messages for 14 days."
+    ],
+    "reason": "1 item(s) with a standing notice"
+   }
+  },
+  {
+   "name": "turned off: a release repeats nothing",
+   "request": {
+    "config": {
+     "consequenceNotices": {
+      "enabled": false
+     }
+    },
+    "items": [
+     {
+      "number": "I20101",
+      "comments": [
+       "<p><strong>Consequence notice</strong> for I20101 at reviewed head <code>0123456</code>:</p><ul><li>Adds billable infrastructure — infra/queue.ts lines 1–12: A new queue is billed per request and keeps messages for 14 days.</li></ul>"
+      ]
+     }
+    ]
+   },
+   "expect": {
+    "notices": [],
+    "recap": [],
+    "reason": "consequence notices are off (consequenceNotices.enabled is false)"
+   }
+  }
+ ]
+}

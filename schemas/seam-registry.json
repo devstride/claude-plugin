@@ -1695,6 +1695,54 @@
       "since": "3.21.0"
     },
     {
+      "key": "consequenceNotices",
+      "type": "object",
+      "description": "the notice build-item posts on an item whose change could add billable infrastructure, remove something callers use, remove someone's access or break a published interface; absent means on, with the four default categories, notifying the item's author",
+      "since": "3.41.0"
+    },
+    {
+      "key": "consequenceNotices.enabled",
+      "type": "boolean",
+      "default": true,
+      "description": "false posts no notice and repeats none",
+      "since": "3.41.0"
+    },
+    {
+      "key": "consequenceNotices.notify",
+      "type": "string[]",
+      "default": [],
+      "description": "DevStride users (name, username or email) mentioned on every notice beside the item's author",
+      "since": "3.41.0"
+    },
+    {
+      "key": "consequenceNotices.categories",
+      "type": "object[]",
+      "default": [],
+      "description": "the repository's own categories, added to the four defaults",
+      "since": "3.41.0"
+    },
+    {
+      "key": "consequenceNotices.categories[].id",
+      "type": "string",
+      "required": true,
+      "description": "lower-case words joined by hyphens, unique, never a default's id",
+      "since": "3.41.0"
+    },
+    {
+      "key": "consequenceNotices.categories[].title",
+      "type": "string",
+      "required": true,
+      "description": "the notice's heading for a finding, one line of at most 80 characters",
+      "since": "3.41.0"
+    },
+    {
+      "key": "consequenceNotices.categories[].means",
+      "type": "string",
+      "required": true,
+      "description": "what counts, in plain words; the agent judges the diff against it",
+      "since": "3.41.0"
+    },
+    {
       "key": "activeAgents",
       "type": [
         "object",
