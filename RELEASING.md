@@ -48,7 +48,9 @@ run it rather than these steps by hand.
   the status-line marker when that script changed, and one `release: v<version>` commit that
   `scripts/check-version-bump.sh` accepts.
 - **The pull request merges**, after the delivery loop's review and the three required checks
-  (`release-guard`, `merge-path`, `public-hygiene`; AGENTS.md, "How a change reaches `main`").
+  (`release-guard`, `merge-path`, `public-hygiene`; AGENTS.md, "How a change reaches `main`"),
+  through `plugin-release merge <pr>` under the owner's standing yes (`.claude/standing-yes.md`)
+  when every one of its conditions holds, else on the owner's own yes.
 - **`release-guard` tags `devstride--v<version>`** on the merge commit. Never tag by hand and never
   push to `main`: the tag is created only for a commit that is already on `main`, so a public
   release tag can never name a commit nobody merged.
