@@ -22,11 +22,12 @@ standing yes replaces only the per-pull-request question that used to follow it.
    only account that pushed to its branch, and linked to a tracked work item whose build the owner
    started.
 2. It changes nothing that guards merges: nothing under `.claude/` (this file and the release
-   skill) or `.github/` (the required checks); no `scripts/check-*`, `scripts/neutrality-*`,
-   `scripts/validate.sh`, `scripts/tests/run.sh`, `scripts/public-hygiene.allow` or
-   `scripts/config-key-scan.ignore`; and none of `skills/pr/scripts/merge-gate.py`,
-   `skills/review/scripts/reviewed-status.py` or `skills/update/scripts/update-plugin.py`; by old or
-   new name. Such a change always needs the
+   skill) or `.github/` (the required checks); nothing under `scripts/` (the checks themselves)
+   except `scripts/cost-budgets.json` and the test cases in `scripts/tests/` (`run.sh` is
+   guarded); and none of the files the checks load or run: `skills/pr/scripts/merge-gate.py`,
+   `skills/review/scripts/reviewed-status.py`, `skills/update/scripts/update-plugin.py`,
+   `skills/doctor/scripts/validate-config.py` and
+   `skills/review/references/delivery-loop-invariants.md`; by old or new name. Such a change always needs the
    owner's own yes on that pull request.
 3. The review settled clean: the last local round (Claude and Codex) found no P1 and no serious P2,
    and the head carries a `devstride/reviewed` status for that pull request into `main`, posted

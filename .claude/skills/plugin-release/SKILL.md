@@ -74,10 +74,13 @@ reason; nothing is merged and nothing is bypassed.
 worktree of `origin/main` (`git fetch origin && git worktree add --detach <tmp> origin/main`, then
 start the session there), so the skill and instructions loaded are main's; a session started in
 the pull request's checkout stops with `OWNER YES NEEDED`. Every path below marked *(main)* is in
-`<tmp>`.
+`<tmp>`. One worktree serves one merge: the next `merge` starts again in a fresh session from a
+fresh worktree of the then-current `main`.
 
 1. **The standing yes is in force.** `<tmp>/.claude/standing-yes.md` *(main)* exists and says
-   `Status: in force`. Note its date and `origin/main`'s commit. Follow this procedure as written in
+   `Status: in force`. Note its date and `<trusted>` = `git -C <tmp> rev-parse HEAD`, then `git
+   fetch origin`: `origin/main` must equal `<trusted>` (otherwise `<tmp>` is stale; stop). Follow
+   this procedure as written in
    `<tmp>/.claude/skills/plugin-release/SKILL.md` *(main)*; where it differs from the branch's copy,
    main's wins.
 2. **The pull request qualifies.** `gh pr view <pr> --json
@@ -92,11 +95,12 @@ the pull request's checkout stops with `OWNER YES NEEDED`. Every path below mark
    the private tracker comment, never on GitHub.
 3. **It touches nothing that guards merges.** List the files with `gh api
    repos/{owner}/{repo}/pulls/<pr>/files --paginate` (the count must equal `changedFiles`) and read
-   both `filename` and `previous_filename`. Neither may be under `.claude/` or `.github/`, match
-   `scripts/check-*` or `scripts/neutrality-*`, or be `scripts/validate.sh`,
-   `scripts/tests/run.sh`, `scripts/public-hygiene.allow`, `scripts/config-key-scan.ignore`,
-   `skills/pr/scripts/merge-gate.py`, `skills/review/scripts/reviewed-status.py` or
-   `skills/update/scripts/update-plugin.py` (the version-bump check reads it). A change to any
+   both `filename` and `previous_filename`. Neither may be under `.claude/` or `.github/`; under
+   `scripts/`, except `scripts/cost-budgets.json` and the test cases in `scripts/tests/` (its
+   `run.sh` is guarded); or be one of the files the checks load or run:
+   `skills/pr/scripts/merge-gate.py`, `skills/review/scripts/reviewed-status.py`,
+   `skills/update/scripts/update-plugin.py`, `skills/doctor/scripts/validate-config.py` or
+   `skills/review/references/delivery-loop-invariants.md`. A change to any
    of them, including this procedure and the standing yes, always needs the owner's own yes.
 4. **The review settled clean.** The last local review round (Claude and Codex) on `<head>` found
    no P1 and no serious P2. Only then post the proof, `python3
@@ -110,10 +114,9 @@ the pull request's checkout stops with `OWNER YES NEEDED`. Every path below mark
    `head`).
 6. **Every check is green on `<head>`.** `python3 <tmp>/skills/pr/scripts/merge-gate.py <pr>
    <head> --all-green --repo devstride/claude-plugin` *(main)* prints `MERGE <command>`. Right
-   before running it, `git fetch origin` and compare `origin/main` with the commit noted in step 1.
-   If it moved (a revocation may have landed), `<tmp>` is stale: stop with `OWNER YES NEEDED` (main
-   moved during the merge) and start `merge` again in a fresh session. Then run exactly that
-   command.
+   before running it, `git fetch origin` and compare `origin/main` with `<trusted>`. If it moved (a
+   revocation may have landed), `<tmp>` is stale: stop with `OWNER YES NEEDED` (main moved during
+   the merge) and start `merge` again in a fresh session. Then run exactly that command.
    `REFUSE` or `ERROR` stops with its reason (wait for pending checks first; a red check is never
    merged).
 7. **The audit comment**, on the pull request at once (`gh pr comment <pr> --body-file <file>`):
