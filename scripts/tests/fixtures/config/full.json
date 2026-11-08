@@ -128,5 +128,6 @@
   "consequenceNotices": {
     "enabled": true, "notify": ["ops-lead"],
     "categories": [{ "id": "data-retention", "title": "Changes how long data is kept", "means": "a retention period, expiry or deletion schedule changes" }]
-  }
+  },
+  "presence": { "command": "./tools/presence report", "intervalMinutes": 5 }
 }

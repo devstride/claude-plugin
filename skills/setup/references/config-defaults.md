@@ -469,6 +469,20 @@ Optional, and only `/devstride:setup agents` writes it, after a typed yes:
   nothing else) and runs them through the build loop:
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`.
 
+## Session presence
+
+Optional. Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/session-presence.md` before writing
+or changing the block.
+
+| Key | Shape | Absent means |
+| --- | --- | --- |
+| `presence` | `null`, or `{ "command": "…", "intervalMinutes"?: 5 }` | no session reports itself: no hook sends anything and no keeper starts |
+
+- **The command is the repository's**: the plugin's hooks run it for every session, at start, on
+  prompts, at each finished turn, from a per-session keeper every `presence.intervalMinutes`, and
+  at session end, with the event and the session's details in the environment. It is separate
+  from `activeAgents`, which marks plan roots during build-item runs only.
+
 ## Local environment
 
 ```json

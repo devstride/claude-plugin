@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.41.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.42.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -1341,6 +1341,33 @@
       "description": "the Active Agents board, tag and the repository's presence commands; absent or null means the plugin writes nothing to DevStride for this feature and runs nothing",
       "required": [
         "commands"
+      ]
+    },
+    "presence": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "command hook — PRESENCE_EVENT (start, beat or end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE, PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM, PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON, PRESENCE_AT (epoch milliseconds the report was queued), CLAUDE_CODE_SESSION_ID and CLAUDE_PID exported; run from the repository root through the shell"
+        },
+        "intervalMinutes": {
+          "type": "integer",
+          "x-warnMinimum": 1,
+          "x-warnMaximum": 60,
+          "default": 5,
+          "description": "minutes between the keeper's beats while the session's process lives; a value outside 1 to 60 is ignored with a warning and reads as 5"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "the repository's own presence command, run by the plugin's hooks for every session (session start, prompts and finished turns, throttled; a keeper every intervalMinutes; session end); absent or null, or a blank command, runs nothing and writes nothing",
+      "required": [
+        "command"
       ]
     },
     "releaseTrain": {
