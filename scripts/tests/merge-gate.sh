@@ -258,7 +258,9 @@ merge("(27l) --all-green with every check green merges",
       sc(pages=[[cr("tests", ident=10), cr("lint", ident=11), cr("optional", "SKIPPED", ident=12, run=10, required=False)]]),
       "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H, "--all-green")
 code, out, err = run(7, H, sc(pages=[[cr("tests", ident=10), cr("lint", ident=11), cr("optional", "SKIPPED", ident=12, required=False)]]), "--all-green")
-say(code == 2 and "optional is skipped in a run where nothing ran" in out[0], "(27m) --all-green refuses a check whose run ran nothing", "rc=%d %r" % (code, out))
+say(code == 0 and out[0].startswith("MERGE "), "(27m) --all-green reads a check that is not required as GitHub does: a run that only skips passes", "rc=%d %r" % (code, out))
+code, out, err = run(7, H, sc(pages=[[cr("tests", "SKIPPED", ident=10), cr("lint", ident=11)]]), "--all-green")
+say(code == 2 and "tests is skipped in a run where nothing ran" in out[0], "(27n) --all-green still refuses a required check whose run ran nothing", "rc=%d %r" % (code, out))
 code, out, err = run(7, H, sc(baseRefName="release#v1/x"))
 log = open(os.environ["GH_LOG"]).read()
 say(code == 0 and "rules/branches/release%23v1%2Fx?" in log and "branches/release%23v1%2Fx/protection" in log,
@@ -272,7 +274,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 79 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 80 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.

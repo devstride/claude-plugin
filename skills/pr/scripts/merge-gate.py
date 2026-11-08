@@ -27,10 +27,12 @@ The rule (an approver's admin merge exactly when every required check is green, 
   another workflow or app, or a same-name commit status, is another check and must pass too. Every
   check that can satisfy a requirement must have passed at the expected head. Passed is GitHub's
   own reading: SUCCESS, or SKIPPED or NEUTRAL (a workflow that skips a job when nothing needed
-  it, which GitHub counts as passing), but a quiet result passes only with evidence that CI ran:
-  another job of its own workflow run succeeded, or an older run of that check succeeded. A run
-  where every job skipped (a draft's held CI, still the newest just after the ready flip) proves
-  nothing and is a REFUSE. A workflow run from an event GitHub does not count toward a pull
+  it, which GitHub counts as passing), but a quiet required check passes only with evidence that
+  CI ran: another job of its own workflow run succeeded, or an older run of that check succeeded.
+  A run where every job skipped (a draft's held CI, still the newest just after the ready flip)
+  proves nothing and is a REFUSE. `--all-green` reads a check that is not required as GitHub does:
+  a workflow that only ever skips (one answering @-mentions, a matrix job's skipped placeholder
+  name) is never asked to have run. A workflow run from an event GitHub does not count toward a pull
   request's checks (`workflow_dispatch`, `schedule`, ...) is ignored, as GitHub ignores it. A
   check's verdict is its newest workflow run (by run number; a re-run keeps its number and GitHub
   lists only its latest attempt). Same-name jobs in that one run are siblings, and every one must
@@ -467,7 +469,9 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
             raise Refuse("a required check failed on the test merge commit %s, which GitHub holds above the head: %s"
                          % (merge_oid[:12], "; ".join(red)))
     if all_green:
-        red = problems_with({(k[1], None) for k in runs}, runs)
+        names = {r[0] for r in required}
+        every = {k: (("SKIPPED" if s == UNEARNED and k[1] not in names else s), r) for k, (s, r) in runs.items()}
+        red = problems_with({(k[1], None) for k in every}, every)
         if red:
             raise Refuse("--all-green: not every check is green at %s: %s" % (expected[:12], "; ".join(red)))
     if ruled_strict or protected_strict:
