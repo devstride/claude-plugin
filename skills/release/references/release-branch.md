@@ -52,11 +52,10 @@ renumber the source merge forced; the snapshot pull request's body reports each 
 renumbered NNNN → MMMM (the source took NNNN)".
 
 **Release holds.** Before the snapshot, every item the range carries (each one-off's merge subject
-and landed record, less an item whose every merge was reverted in the range) is checked with its
-ancestors by
+and landed record) is checked with its ancestors by
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`'s helper. Held → STOP, naming
-each and saying: "<item> is held (<reason>); take it off the train (`git revert -m 1 <its merge>`
-on the train, pushed) or wait, then re-run." One held one-off must not stall the train unnamed.
+each: "<item> is held (<reason>) but already on the train: wait for the hold to lift, or remove its
+`Release hold:` line; taking it off the train is the owner's call."
 
 **Finding release-train pull requests — both spellings, permanently.** Run two queries, one per
 title, because `gh pr list --search` has no reliable OR across quoted phrases: `gh pr list --base

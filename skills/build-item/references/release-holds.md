@@ -31,7 +31,8 @@ cases any other tool must pass.
   every leaf it carries (a leaf's hold travels with its epic): held → the epic waits on its
   integration branch, reported "release-ready, held until …".
 - `release`, before the train snapshot (`release-branch.md` §1) and over the delta before the cut:
-  the backstop. Held → STOP, naming the item, why, and how to take it out. An item whose every
-  merge in the range was reverted in the range (`This reverts commit <sha>`) is not carried.
+  the backstop, for work that reached the path without the step-5 check. Held → STOP, naming the
+  item and why: wait for the hold to lift, or the owner removes its line. Taking work back off the
+  train is the owner's call, never this run's.
 
 Time spent held is reported apart from build and review time.

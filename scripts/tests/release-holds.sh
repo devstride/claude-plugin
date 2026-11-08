@@ -54,6 +54,16 @@ say(out.get("held") is True, "git: I20101ABC is not I20101", p.stdout + p.stderr
 git("commit", "-q", "--allow-empty", "-m", "fix(y): z [I20101]")
 p = run(req, cwd=repo); out = json.loads(p.stdout) if p.returncode == 0 else {}
 say(out.get("held") is False and "no post-deploy status" in out["holds"][0]["reason"], "git: merged, with no post-deploy status recorded: met, and says so", p.stdout + p.stderr)
+# under cut-to-deploy, an item commit inside a merged branch is found through the merge (no gh here:
+# the lookup fails, which must refuse, never read as live or as "not on production")
+git("checkout", "-q", "-b", "side"); git("commit", "-q", "--allow-empty", "-m", "feat: a [I20105]"); git("commit", "-q", "--allow-empty", "-m", "feat: b")
+git("checkout", "-q", "master"); git("merge", "-q", "--no-ff", "side", "-m", "merge side")
+cfg = os.path.join(repo, ".claude", "ds-config.json")
+json.dump({"release": {"productionBranch": "master", "clearance": {"scope": "cut-to-deploy"}}}, open(cfg, "w"))
+env = dict(os.environ, PATH="/usr/bin:/bin", GH_HOST="invalid.example")
+q = subprocess.run([sys.executable, helper, "decide"], input=json.dumps({"items": [{"number": "I20102", "description": "<p>Release hold: after I20105 is live</p>"}], "productionRef": "master"}),
+                   capture_output=True, text=True, cwd=repo, env=env)
+say(q.returncode == 2 and "release/post-deploy" in q.stderr, "git: a commit inside a merged branch reaches the status lookup; an unreadable status refuses", q.stdout + q.stderr)
 p = run(dict(req, productionRef="origin/nowhere"), cwd=repo)
 say(p.returncode == 2, "git: an unknown production ref refuses", p.stderr)
 PY

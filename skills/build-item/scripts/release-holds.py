@@ -48,7 +48,6 @@ import zoneinfo
 
 HOLD = re.compile(r"^\s*release hold\s*:\s*(.*?)\s*$", re.I)
 NOT_BEFORE = re.compile(r"^not before\s+(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2}(?::\d{2})?)\s*(Z|[+-](?:0\d|1[0-4]):?[0-5]\d)?)?\.?$", re.I)
-ANYWHERE = re.compile(r"release hold\s*:", re.I)
 AFTER = re.compile(r"^after\s+(I\d+)\s+is\s+live\.?$", re.I)
 ITEM = re.compile(r"^I\d+$")
 BREAKS = re.compile(r"<\s*/?\s*(br|p|li|ul|ol|h[1-6]|div|tr|td|th|table|blockquote|pre|section|article|hr)\b[^>]*>", re.I)
@@ -80,8 +79,6 @@ def holds_of(item):
     for line in lines_of(desc or ""):
         m = HOLD.match(line)
         if not m:
-            need(not ANYWHERE.search(line), "%s: \"%s\" has a release hold that does not start its own line, so it holds"
-                 % (item["number"], line.strip()))
             continue
         rule = m.group(1)
         nb, after = NOT_BEFORE.match(rule), AFTER.match(rule)
@@ -156,9 +153,12 @@ def zone_of(req, config):
 
 
 def gh_status(sha):
-    p = subprocess.run(["gh", "api", "repos/{owner}/{repo}/commits/%s/status" % sha, "--jq",
-                        '[.statuses[] | select(.context == "release/post-deploy") | .state] | first // ""'],
-                       capture_output=True)
+    try:
+        p = subprocess.run(["gh", "api", "repos/{owner}/{repo}/commits/%s/status" % sha, "--jq",
+                            '[.statuses[] | select(.context == "release/post-deploy") | .state] | first // ""'],
+                           capture_output=True)
+    except OSError as err:
+        raise Refuse("cannot read release/post-deploy on %s: %s" % (sha[:12], err))
     need(p.returncode == 0, "cannot read release/post-deploy on %s: %s" % (sha[:12], p.stderr.decode("utf-8", "replace").strip()[:200]))
     return p.stdout.decode().strip()
 
@@ -184,9 +184,11 @@ def live_check(req, config):
             return True, "merged to %s; this repository records no post-deploy status" % ref
         # Deploys are cumulative: a success on the carrying production merge or any later one on
         # the first-parent line proves it live. Newest first, so the usual answer is one lookup.
-        later = git("rev-list", "--first-parent", "--ancestry-path", "%s..%s" % (commit, ref)).split()
-        on_line = commit in set(git("rev-list", "--first-parent", ref).split())
-        for sha in later + ([commit] if on_line else []):
+        # Candidates: production's first-parent commits that contain the item's commit (through any
+        # parent, so a commit inside a merged branch counts), newest first.
+        contains = set(git("rev-list", "--ancestry-path", "%s..%s" % (commit, ref)).split()) | {commit}
+        line = [sha for sha in git("rev-list", "--first-parent", ref).split() if sha in contains]
+        for sha in line:
             if gh_status(sha) == "success":
                 return True, "release/post-deploy success on %s" % sha[:12]
         return False, "merged to %s (%s) but no release/post-deploy success on it or after" % (ref, commit[:12])

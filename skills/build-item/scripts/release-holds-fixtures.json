@@ -344,6 +344,27 @@
      }
     ]
    }
+  },
+  {
+   "name": "prose that mentions a release hold mid-line is not a hold",
+   "request": {
+    "items": [
+     {
+      "number": "I20100",
+      "description": "<p>No release hold: ready for deployment.</p><p>Write \"Release hold: not before YYYY-MM-DD\" to hold.</p>"
+     }
+    ],
+    "now": "2026-11-08T00:00:00Z",
+    "config": {
+     "release": {
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "expect": {
+    "held": false,
+    "holds": []
+   }
   }
  ],
  "errors": [
@@ -490,25 +511,6 @@
     }
    },
    "contains": "does not parse"
-  },
-  {
-   "name": "a hold that does not start its own line fails closed",
-   "request": {
-    "items": [
-     {
-      "number": "I20100",
-      "description": "<p>Note. Release hold: not before 2099-01-01</p>"
-     }
-    ],
-    "now": "2026-11-08T00:00:00Z",
-    "config": {
-     "release": {
-      "productionBranch": "master",
-      "holdTimeZone": "America/Chicago"
-     }
-    }
-   },
-   "contains": "does not start its own line"
   }
  ]
 }
