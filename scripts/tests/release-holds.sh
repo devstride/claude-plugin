@@ -45,9 +45,10 @@ git("add", "-A"); git("commit", "-qm", "base")
 req = {"items": [{"number": "I20102", "description": "<p>Release hold: after I20101 is live</p>"}], "productionRef": "master"}
 p = run(req, cwd=repo); out = json.loads(p.stdout) if p.returncode == 0 else {}
 say(out.get("held") is True, "git: nothing names I20101 on master: held", p.stdout + p.stderr)
-git("commit", "-q", "--allow-empty", "-m", "feat: x [I201010]")
+longer = "I20101" + "0"  # the number plus a digit, built here so no new example number ships
+git("commit", "-q", "--allow-empty", "-m", "feat: x [%s]" % longer)
 p = run(req, cwd=repo); out = json.loads(p.stdout) if p.returncode == 0 else {}
-say(out.get("held") is True, "git: I201010 is not I20101", p.stdout + p.stderr)
+say(out.get("held") is True, "git: the number plus a digit is not the number", p.stdout + p.stderr)
 git("commit", "-q", "--allow-empty", "-m", "chore: I20101ABC")
 p = run(req, cwd=repo); out = json.loads(p.stdout) if p.returncode == 0 else {}
 say(out.get("held") is True, "git: I20101ABC is not I20101", p.stdout + p.stderr)

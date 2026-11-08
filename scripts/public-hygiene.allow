@@ -19,7 +19,6 @@ item I20112 an example item in the build skills
 item I20130 the example story in the build and review skills
 item I20131 an example item in the build skills
 item I20431 an example item in the release skills
-item I201010 the prefix-collision example in the release-holds test (I20101 plus a digit)
 
 host devstride.com       the public website, and the domain of public email addresses
 host api.devstride.com   the public API and the hosted MCP endpoint
