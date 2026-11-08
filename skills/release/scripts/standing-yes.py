@@ -293,7 +293,7 @@ def migrations(head, production, full, live_base):
         % (production, base[:12], (live_base or "unreadable")[:12]))
     done = subprocess.run(["git", "merge-base", base, head], capture_output=True, text=True)
     ask(done.returncode == 0, "no merge base between origin/%s and the head" % production)
-    diff = subprocess.run(["git", "diff", "--name-status", "-z", "--no-renames", "--no-relative", "--no-ext-diff", done.stdout.strip(), head], capture_output=True)
+    diff = subprocess.run(["git", "diff", "--name-status", "-z", "--no-renames", "--no-relative", "--no-ext-diff", "--ignore-submodules=none", done.stdout.strip(), head], capture_output=True)
     ask(diff.returncode == 0, "the release diff cannot be read")
     fields = diff.stdout.decode("utf-8", "surrogateescape").split("\0")
     shipped = []

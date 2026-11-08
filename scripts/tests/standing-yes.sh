@@ -241,6 +241,11 @@ g checkout -q rel; ln -s ../pending.txt "$WORK/repo/db/migrations/sql/0400_link.
 refull "$(approved "$FIRSTBLOB"), $(approved "$(g rev-parse "$LNK:db/migrations/sql/0400_link.sql")")"
 g checkout -q rel; ln -s ../pending.txt "$WORK/repo/db/migrations/sql/0400_link.sql"; g add db; g commit -q -m "link migration"; LNK="$(g rev-parse HEAD)"; g checkout -q develop
 fbase; HEAD_ARG="$LNK" REVIEWED="$LNK"; release_pr "$LNK"; expect "(F2k) a migration that is a symbolic link, even with its link blob approved → ASK" 0 '^ASK the migration db/migrations/sql/0400_link.sql is not a plain file \(mode 120000\)'
+fullgraph "$(FULLCFG "$(approved "$FIRSTBLOB")")"
+g checkout -q rel; g update-index --add --cacheinfo "160000,$FULLHEAD,db/migrations/sql/0401_mod.sql"; g commit -q -m "gitlink migration"; SUBM="$(g rev-parse HEAD)"; g checkout -q develop
+g config diff.ignoreSubmodules all
+fbase; HEAD_ARG="$SUBM" REVIEWED="$SUBM"; release_pr "$SUBM"; expect "(F2l) a submodule at a migration path, diff.ignoreSubmodules=all set → still seen, ASK" 0 '^ASK the migration db/migrations/sql/0401_mod.sql is not a plain file \(mode 160000\)'
+g config --unset diff.ignoreSubmodules
 
 fbase; REVIEWED=""; expect "(F3) no --reviewed-head → ASK" 0 '^ASK no --reviewed-head as a full commit id'
 fbase; REVIEWED="HEAD"; (cd "$WORK/repo" && g checkout -q "$FULLHEAD"); expect "(F3f) a moving ref as --reviewed-head (HEAD at the head) → ASK, never resolved" 0 '^ASK no --reviewed-head as a full commit id'
