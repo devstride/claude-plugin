@@ -33,9 +33,15 @@ Checked set: the files each FIRST-PARENT commit in `<source-before>..<head>` cha
   (ii) a merge that brought a REVIEWED release-unit pull request onto the train: the subject is
        `Merge pull request #<n> from <owner>/<head>`, `<head>` matches `epicIntegrationBranches.pattern`
        (matched as in `skills/release/references/branch-patterns.md`, with date tokens and every other
-       token a wildcard), AND `gh pr view <n> --json baseRefName,state,mergeCommit` says the pull
-       request is MERGED, based on the train, with exactly that commit as its merge commit. A
-       hand-written subject gh does not confirm is checked like any other commit.
+       token a wildcard), `gh pr view <n> --json baseRefName,state,mergeCommit,mergedAt` says the pull
+       request is MERGED, based on the train, with exactly that commit as its merge commit, AND its
+       merged head (the merge's second parent) carries proof of a settled review of THAT pull request
+       into THAT base: an admin's `devstride/reviewed` status naming both
+       (`skills/review/scripts/reviewed-status.py verify`). The branch name alone is never enough:
+       anyone can name a branch like an epic. A unit merged before GRANDFATHERED_BEFORE (GitHub's
+       mergedAt) keeps the old rule and is listed in `grandfatheredUnits`. A hand-written subject gh
+       does not confirm, or a unit without proof (listed in `unprovenUnits` with the reason), is
+       checked like any other commit. GitHub unreadable while reading a proof: exit 2.
   (iii) a merge that brought a REVIEWED plan release onto the train (plan scope): the same test with
        `<head>` matching `planIntegrationBranches.pattern`. It is not exempt whole: the plan
        branch's own first-parent commits are judged instead — each epic pull request merged onto
@@ -56,7 +62,9 @@ content, where the old file was introduced by a reviewed release unit in this ra
 under `metaGlobs`. It is reported as {"from", "to"}. Any other excluded-path change is refused.
 
 Output (stdout, one JSON object):
-  {"refused": [files], "allowedRenumbers": [{"from", "to"}], "reviewedUnits": [pull request numbers]}
+  {"refused": [files], "allowedRenumbers": [{"from", "to"}], "reviewedUnits": [pull request numbers],
+   "grandfatheredUnits": [units accepted under the old rule, merged before GRANDFATHERED_BEFORE],
+   "unprovenUnits": [{"number", "head", "reason"}: confirmed units without proof, checked file by file]}
 Exit 0 nothing refused; 1 something refused; 2 usage, config or git error (one `train_exclusions:`
 line on stderr).
 """
@@ -70,6 +78,10 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILLS = os.path.dirname(os.path.dirname(HERE))
 ROUTING = os.path.join(SKILLS, "build-item/scripts/routing.py")
+REVIEWED = os.path.join(SKILLS, "review/scripts/reviewed-status.py")
+# Release units merged before this instant (GitHub's mergedAt) keep the rule they were merged under:
+# a confirmed pull request with an epic-shaped head. From it on, only proof of a settled review counts.
+GRANDFATHERED_BEFORE = "2026-11-09T00:00:00Z"
 
 
 def fail(msg):
@@ -77,19 +89,25 @@ def fail(msg):
     sys.exit(2)
 
 
-def load_routing():
-    """The one glob matcher (branch-patterns.md) lives in routing.py; reuse it, never a second copy."""
-    spec = importlib.util.spec_from_file_location("routing", ROUTING)
+def load(name, path):
+    """The one glob matcher (branch-patterns.md) lives in routing.py and the one review proof in
+    reviewed-status.py; reuse them, never a second copy."""
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-routing = load_routing()
+routing = load("routing", ROUTING)
+reviewed_status = load("reviewed_status", REVIEWED)
 
 
 def git(repo, *args, check=True):
-    p = subprocess.run(["git", "-C", repo] + list(args), capture_output=True)
+    """Git as the repository's objects say, never as local settings render them: no replacement
+    objects, no colour, no signature lines in log output, no relative or external diffs."""
+    p = subprocess.run(["git", "-C", repo, "-c", "color.ui=false", "-c", "log.showSignature=false",
+                        "-c", "diff.relative=false", "-c", "core.quotePath=false"] + list(args),
+                       capture_output=True, env=dict(os.environ, GIT_NO_REPLACE_OBJECTS="1"))
     if check and p.returncode != 0:
         fail("git %s failed: %s" % (" ".join(args), p.stderr.decode("utf-8", "replace").strip()))
     return p
@@ -113,15 +131,19 @@ def pull_request_head(subject):
     return (m.group(1), m.group(2)) if m else None
 
 
-def reviewed_unit(repo, commit, subject, head_regex, train):
+def reviewed_unit(repo, commit, subject, head_regex, train, grandfathered=None, unproven=None):
     """The pull request number when `commit` is the confirmed merge of a pull request whose head
-    matches `head_regex` into `train` (the base it must have been reviewed against)."""
+    matches `head_regex` into `train` (the base it must have been reviewed against) AND whose merged
+    head (the merge's second parent) carries proof of a settled review of that pull request into
+    `train` (`reviewed-status.py verify`). A unit merged before GRANDFATHERED_BEFORE keeps the old
+    rule and is added to `grandfathered`; a confirmed unit without proof is added to `unproven`
+    with the reason. GitHub unreadable: exit 2. The branch name alone never makes a unit reviewed."""
     found = pull_request_head(subject)
     if not found or not head_regex.match(found[1]):
         return None
     number = found[0]
     try:
-        p = subprocess.run(["gh", "pr", "view", number, "--json", "baseRefName,state,mergeCommit"],
+        p = subprocess.run(["gh", "pr", "view", number, "--json", "baseRefName,state,mergeCommit,mergedAt"],
                            cwd=repo, capture_output=True, text=True)
         info = json.loads(p.stdout) if p.returncode == 0 else None
     except (OSError, ValueError):
@@ -130,6 +152,21 @@ def reviewed_unit(repo, commit, subject, head_regex, train):
         return None
     merge = info.get("mergeCommit")
     if not isinstance(merge, dict) or merge.get("oid") != commit:
+        return None
+    merged_at = info.get("mergedAt")
+    if isinstance(merged_at, str) and merged_at and merged_at < GRANDFATHERED_BEFORE:
+        if grandfathered is not None:
+            grandfathered.append(int(number))
+        return int(number)
+    head = git(repo, "rev-parse", "--verify", "--quiet", "%s^2" % commit, check=False)
+    head = head.stdout.decode("ascii", "replace").strip() if head.returncode == 0 else ""
+    try:
+        proven, why = reviewed_status.verify(head, repo, number, train) if head else (False, "no merged head")
+    except reviewed_status.Unreadable as err:
+        fail("the review proof of #%s could not be read: %s" % (number, err))
+    if not proven:
+        if unproven is not None:
+            unproven.append({"number": int(number), "head": head, "reason": why})
         return None
     return int(number)
 
@@ -216,7 +253,7 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
     if start_on == "train" and not is_ancestor(repo, head, origin_train):
         fail("--head %s is not on %s: --start-on train checks train work only" % (head, origin_train))
 
-    introduced, reviewed = set(), []
+    introduced, reviewed, grandfathered, unproven = set(), [], [], []
     refused, renumbers, pending_meta = set(), [], set()
 
     def check_commit(c, first):
@@ -234,9 +271,9 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
         for old in deleted:
             if old not in introduced:
                 continue
-            before = git(repo, "show", "%s:%s" % (first, old), check=False)
+            before = git(repo, "cat-file", "blob", "%s:%s" % (first, old), check=False)
             for new in unused:
-                after = git(repo, "show", "%s:%s" % (c, new), check=False)
+                after = git(repo, "cat-file", "blob", "%s:%s" % (c, new), check=False)
                 if before.returncode == 0 and after.returncode == 0 and before.stdout == after.stdout:
                     pairs.append((old, new))
                     unused.remove(new)
@@ -280,7 +317,7 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
                         flag_merge_path(p)
                     continue
                 number = reviewed_unit(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip(),
-                                       epic_regex, plan_branch) if epic_regex else None
+                                       epic_regex, plan_branch, grandfathered, unproven) if epic_regex else None
                 if number is not None:
                     accept_unit(number, c, parents[0])
                     continue
@@ -313,14 +350,14 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
                 head_name = (pull_request_head(subject) or (None, ""))[1]
                 # a plan head is judged as a plan, never as an epic: default patterns can match both
                 if plan_regex and plan_regex.match(head_name):
-                    plan = reviewed_unit(repo, c, subject, plan_regex, train)
+                    plan = reviewed_unit(repo, c, subject, plan_regex, train, grandfathered, unproven)
                     if plan is not None:
                         reviewed.append(plan)
                         walk_plan(git_text(repo, "rev-list", "--first-parent", "--reverse", parents[1], "^" + parents[0]).split(),
                                   head_name, parents[0])
                         continue
                 else:
-                    number = reviewed_unit(repo, c, subject, epic_regex, train) if epic_regex else None
+                    number = reviewed_unit(repo, c, subject, epic_regex, train, grandfathered, unproven) if epic_regex else None
                     if number is not None:
                         accept_unit(number, c, parents[0])
                         continue
@@ -333,7 +370,8 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
     walk(git_text(repo, "rev-list", "--first-parent", "--reverse", "%s..%s" % (source_before, head)).split())
     if not renumbers:
         refused.update(pending_meta)
-    return {"refused": sorted(refused), "allowedRenumbers": renumbers, "reviewedUnits": reviewed}
+    return {"refused": sorted(refused), "allowedRenumbers": renumbers, "reviewedUnits": reviewed,
+            "grandfatheredUnits": grandfathered, "unprovenUnits": unproven}
 
 
 def main(argv):

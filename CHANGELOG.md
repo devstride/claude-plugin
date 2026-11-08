@@ -8,6 +8,27 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **A release unit now needs proof of its review, not just a branch name.** Before, the release
+  train's exclusion check let an epic's pull request carry migrations and deploy configuration
+  onto the train whenever its branch looked like an epic branch and `gh` confirmed the merge.
+  Anyone who can push can name a branch like an epic. Now a settled review leaves a durable proof
+  on GitHub: `review` posts a `devstride/reviewed` commit status on the final reviewed head
+  (`skills/review/scripts/reviewed-status.py post <sha> --pr <n>`), naming the pull request and
+  its base, and `build-item` 5b carries it to a tree-identical rebase (`--from`). `train_exclusions.py`
+  accepts a unit only when its merged head (the merge's second parent) carries that status for
+  that same pull request into the train, so a story's review into an epic branch never proves the
+  epic's merge. Only an account with admin permission on the repository counts; statuses from
+  others, bots and deleted accounts are ignored, and an admin withdraws a proof by posting
+  `failure`. A unit without proof is checked file by file like any other commit and listed in the
+  new `unprovenUnits` output with the reason; GitHub unreadable is an error (exit 2), never a
+  guess. Units merged before this version (`GRANDFATHERED_BEFORE`, by GitHub's `mergedAt`) keep
+  the old rule and are listed in `grandfatheredUnits`. A post that does not count (the poster is
+  not an admin) says so at once. Failing to post is reported, never a stop.
+  The check's own `git` calls now ignore local colour, signature, relative-diff and replace-object
+  settings.
+
 ## [3.38.0] — 2026-11-08
 
 ### Added
