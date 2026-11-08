@@ -429,14 +429,29 @@ def runs_at_head(contexts, workflow_runs):
     verdicts = {}
     for key, entry in runs.items():
         judged = {}
-        for event, byRun in entry["streams"].items():
+        events = set(entry["streams"]) | {r["event"] for r in listed if key[3] and r["workflow_id"] == key[3]
+                                           and r["event"] in ELIGIBLE}
+        for event in events:
+            byRun = entry["streams"].get(event, {})
             mine = [r for r in listed if key[3] and r["workflow_id"] == key[3] and r["event"] == event]
+            going = sorted(r["run_number"] for r in mine if r["status"] != "completed")
+            red_runs = [r for r in mine if r["status"] == "completed"
+                        and r.get("conclusion") not in ("success", "skipped", "neutral")]
+            if not byRun:
+                # runs of this workflow and event that never reported the check: one still going or
+                # ended red (a matrix that failed before creating it) holds it; a green one says nothing
+                if going:
+                    judged[event] = ("PENDING", False)
+                elif red_runs:
+                    r = max(red_runs, key=lambda r: r["run_number"])
+                    judged[event] = ("%s (workflow run #%d ended so without reporting it)"
+                                     % (str(r.get("conclusion")).upper(), r["run_number"]), True)
+                continue
             began = lambda n, mine=mine: next(((r["run_attempt"], r["run_started_at"]) for r in mine if r["run_number"] == n), None) \
                 or _unreadable("workflow run #%s of workflow %s is not in the run list" % (n, key[3]))
             state, earned, relied = stream_verdict(byRun, began)
-            going = sorted(r["run_number"] for r in mine if r["status"] != "completed")
-            ended = sorted((r["run_number"], r["conclusion"]) for r in mine if r["status"] == "completed"
-                           and r["run_number"] > relied and r["conclusion"] not in ("success", "skipped", "neutral"))
+            ended = sorted((r["run_number"], r.get("conclusion")) for r in red_runs if r["run_number"] > relied
+                           or (r["run_attempt"] > 1 and r["run_started_at"] > began(relied)[1]))
             if going and state in PASSED + ("PENDING",):
                 state, earned = "PENDING", False
             elif ended and state in PASSED:

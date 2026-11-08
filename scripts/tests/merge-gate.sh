@@ -204,6 +204,23 @@ merge("(6w) a run of another workflow, or from another event, still going does n
       sc(extraRuns=[{"id": 700050, "workflow_id": 7, "run_number": 50, "event": "pull_request", "status": "in_progress", "conclusion": None},
                     {"id": 100051, "workflow_id": 1, "run_number": 51, "event": "workflow_dispatch", "status": "in_progress", "conclusion": None}]),
       "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(6y) a pull_request run still going with no check yet holds a check another event passed",
+       sc(pages=[[cr("tests", ident=10, run=2, event="push"), cr("lint", ident=11)]],
+          extraRuns=[{"id": 100003, "workflow_id": 1, "run_number": 3, "event": "pull_request", "status": "in_progress", "conclusion": None}]),
+       "tests is pending")
+refuse("(6z) a pull_request run that failed before creating the check refuses, though a push run passed it",
+       sc(pages=[[cr("tests", ident=10, run=2, event="push"), cr("lint", ident=11)]],
+          extraRuns=[{"id": 100003, "workflow_id": 1, "run_number": 3, "event": "pull_request", "status": "completed", "conclusion": "failure"}]),
+       "workflow run #3 ended so without reporting it")
+refuse("(6aa) an older run re-run later that failed before creating the check refuses",
+       sc(pages=[[cr("tests", ident=10, run=2), cr("lint", ident=11)]],
+          extraRuns=[{"id": 100001, "workflow_id": 1, "run_number": 1, "event": "pull_request", "status": "completed", "conclusion": "failure",
+                      "run_attempt": 2, "run_started_at": "2026-01-15T19:00:00Z"}]),
+       "workflow run #1 ended so without reporting it")
+merge("(6ab) an older first-attempt run that failed without the check never supersedes the newer pass (it was cancelled or replaced)",
+      sc(pages=[[cr("tests", ident=10, run=2), cr("lint", ident=11)]],
+         extraRuns=[{"id": 100001, "workflow_id": 1, "run_number": 1, "event": "pull_request", "status": "completed", "conclusion": "cancelled"}]),
+      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
 merge("(6x) a first attempt never supersedes a higher-numbered run, even when both began in the same second (a concurrency cancel)",
       sc(runStarted={}, pages=[[cr("tests", "CANCELLED", ident=10, run=1), cr("tests", ident=20, run=2), cr("lint", ident=11)]],
          extraRuns=[]), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
@@ -334,7 +351,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 92 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 96 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.
