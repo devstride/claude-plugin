@@ -89,14 +89,17 @@ out="$(cd "$WORK/repo" && python3 "$HELPER" 2>&1)"; code=$?
 [ "$code" = 2 ] && ok "(11) no verb → usage, exit 2" || bad "(11) (exit $code) $out"
 
 # (12) two sessions reach a trigger at once: both see START, the claim decides. A stand-in store
-# whose claim is an atomic mkdir; each starter writes WON or LOST.
+# whose claim is an atomic mkdir; each starter writes WON or LOST. The mkdir is Python's os.mkdir
+# (one mkdir(2) system call), never the mkdir command: uutils coreutils (Ubuntu 25.10 onward, the
+# CI image) reports success to both of two racing `mkdir` runs on one path about 1 time in 12,
+# which made both starters win here while the real claim path was never at fault.
 cfg "$ON"
 STORE="$WORK/claims"; mkdir -p "$STORE"
 starter() {
   local line; line="$(run check | head -1)"
   case "$line" in START*) ;; *) echo "SKIPPED" > "$WORK/starter-$1"; return;; esac
   local key; key="$(run key)" || { echo "KEYFAIL $key" > "$WORK/starter-$1"; return; }
-  if mkdir "$STORE/release-train:$(printf '%s' "$key" | tr / _)" 2>/dev/null; then echo "WON $key" > "$WORK/starter-$1"; else echo "LOST $key" > "$WORK/starter-$1"; fi
+  if python3 -c 'import os, sys; os.mkdir(sys.argv[1])' "$STORE/release-train:$(printf '%s' "$key" | tr / _)" 2>/dev/null; then echo "WON $key" > "$WORK/starter-$1"; else echo "LOST $key" > "$WORK/starter-$1"; fi
 }
 starter one & starter two & wait
 got="$(cut -d' ' -f1 "$WORK/starter-one" "$WORK/starter-two" | sort | tr '\n' ' ')"

@@ -8,6 +8,15 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The auto-start race test no longer fails on Ubuntu 26.04 runners.** Its stand-in claims store
+  took a claim with the `mkdir` command, and the uutils coreutils that Ubuntu ships from 25.10
+  reports success to both of two racing `mkdir` runs on one path (about 1 in 12 races on the CI
+  image), so both starters "won". The test now claims with Python's `os.mkdir`, one system call,
+  which never let both win in 3,000 races there. The plugin's own locks were never affected: they
+  use `O_EXCL` and `flock` system calls, not the command.
+
 ## [3.37.0] — 2026-11-07
 
 ### Added
