@@ -87,9 +87,9 @@ fresh worktree of the then-current `main`.
    state,isDraft,baseRefName,headRefOid,isCrossRepository,author,changedFiles`: open, not a draft,
    base `main`, not cross-repository, authored by the owner (`philreynolds`), the account the
    owner's builds run under. Record `<head>` = `headRefOid`. Every commit
-   (`gh api repos/{owner}/{repo}/pulls/<pr>/commits --paginate`) has the owner as its GitHub
-   author. Commit authorship alone can be set by anyone who can push, so also read every push to
-   the head branch (`gh api "repos/{owner}/{repo}/activity?ref=refs/heads/<headRefName>"
+   (`gh api repos/{owner}/{repo}/pulls/<pr>/commits --paginate`; the count must equal the pull
+   request's commit count, and the list stops at 250) has the owner as its GitHub author. Commit
+   authorship alone can be set by anyone who can push, so also read every push to the head branch (`gh api "repos/{owner}/{repo}/activity?ref=refs/heads/<headRefName>"
    --paginate`): each entry's `actor` is the owner, and `<head>` is the `after` of one of them. The
    pull request is linked to a tracked work item whose build the owner started; say which item in
    the private tracker comment, never on GitHub.
@@ -99,7 +99,8 @@ fresh worktree of the then-current `main`.
    `scripts/`, except `scripts/cost-budgets.json` and the test cases in `scripts/tests/` (its
    `run.sh` is guarded); or be one of the files the checks load or run:
    `skills/pr/scripts/merge-gate.py`, `skills/review/scripts/reviewed-status.py`,
-   `skills/update/scripts/update-plugin.py`, `skills/doctor/scripts/validate-config.py` or
+   `skills/update/scripts/update-plugin.py`, `skills/doctor/scripts/validate-config.py`,
+   `skills/build-item/scripts/routing.py` (the merge-path check runs it) or
    `skills/review/references/delivery-loop-invariants.md`. A change to any
    of them, including this procedure and the standing yes, always needs the owner's own yes.
 4. **The review settled clean.** The last local review round (Claude and Codex) on `<head>` found

@@ -26,7 +26,7 @@ standing yes replaces only the per-pull-request question that used to follow it.
    except `scripts/cost-budgets.json` and the test cases in `scripts/tests/` (`run.sh` is
    guarded); and none of the files the checks load or run: `skills/pr/scripts/merge-gate.py`,
    `skills/review/scripts/reviewed-status.py`, `skills/update/scripts/update-plugin.py`,
-   `skills/doctor/scripts/validate-config.py` and
+   `skills/doctor/scripts/validate-config.py`, `skills/build-item/scripts/routing.py` and
    `skills/review/references/delivery-loop-invariants.md`; by old or new name. Such a change always needs the
    owner's own yes on that pull request.
 3. The review settled clean: the last local round (Claude and Codex) found no P1 and no serious P2,
