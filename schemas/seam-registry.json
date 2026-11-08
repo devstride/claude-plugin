@@ -294,7 +294,7 @@
       ],
       "unset": "the whole presence block is absent: no hook sends anything and no keeper starts",
       "contract": "skills/setup/references/session-presence.md",
-      "since": "unreleased"
+      "since": "3.42.0"
     },
     {
       "key": "verify.typecheck",
@@ -1825,7 +1825,7 @@
         "null"
       ],
       "description": "the repository's own presence command, run by the plugin's hooks for every session (session start, prompts and finished turns, throttled; a keeper every intervalMinutes; session end); absent or null, or a blank command, runs nothing and writes nothing",
-      "since": "unreleased"
+      "since": "3.42.0"
     },
     {
       "key": "presence.intervalMinutes",
@@ -1834,7 +1834,7 @@
       "warnMaximum": 60,
       "default": 5,
       "description": "minutes between the keeper's beats while the session's process lives; a value outside 1 to 60 is ignored with a warning and reads as 5",
-      "since": "unreleased"
+      "since": "3.42.0"
     },
     {
       "key": "release.docsRepo",
