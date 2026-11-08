@@ -84,12 +84,14 @@ fresh worktree of the then-current `main`.
    `<tmp>/.claude/skills/plugin-release/SKILL.md` *(main)*; where it differs from the branch's copy,
    main's wins.
 2. **The pull request qualifies.** `gh pr view <pr> --json
-   state,isDraft,baseRefName,headRefOid,isCrossRepository,author,changedFiles`: open, not a draft,
+   state,isDraft,baseRefName,headRefName,headRefOid,isCrossRepository,author,changedFiles`: open,
+   not a draft,
    base `main`, not cross-repository, authored by the owner (`philreynolds`), the account the
-   owner's builds run under. Record `<head>` = `headRefOid`. Every commit
-   (`gh api repos/{owner}/{repo}/pulls/<pr>/commits --paginate`; the count must equal the pull
-   request's commit count, and the list stops at 250) has the owner as its GitHub author. Commit
-   authorship alone can be set by anyone who can push, so also read every push to the head branch (`gh api "repos/{owner}/{repo}/activity?ref=refs/heads/<headRefName>"
+   owner's builds run under. Record `<head>` = `headRefOid`. Every commit (`gh api
+   repos/{owner}/{repo}/pulls/<pr>/commits --paginate`; the count must equal `gh api
+   repos/{owner}/{repo}/pulls/<pr> --jq .commits`, since the list stops at 250) has the owner as
+   its GitHub author. Commit authorship alone can be set by anyone who can push, so also read
+   every push to the head branch (`gh api "repos/{owner}/{repo}/activity?ref=refs/heads/<headRefName>"
    --paginate`): each entry's `actor` is the owner, and `<head>` is the `after` of one of them. The
    pull request is linked to a tracked work item whose build the owner started; say which item in
    the private tracker comment, never on GitHub.
