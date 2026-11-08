@@ -74,7 +74,8 @@ reason; nothing is merged and nothing is bypassed.
 worktree of `origin/main` (`git fetch origin && git worktree add --detach <tmp> origin/main`, then
 start the session there), so the skill and instructions loaded are main's; a session started in
 the pull request's checkout stops with `OWNER YES NEEDED`. Every path below marked *(main)* is in
-`<tmp>`. One worktree serves one merge: the next `merge` starts again in a fresh session from a
+`<tmp>`. Both gate scripts run with `python3 -I`, so nothing placed beside them is imported. One
+worktree serves one merge: the next `merge` starts again in a fresh session from a
 fresh worktree of the then-current `main`.
 
 1. **The standing yes is in force.** `<tmp>/.claude/standing-yes.md` *(main)* exists and says
@@ -106,7 +107,7 @@ fresh worktree of the then-current `main`.
    `skills/review/references/delivery-loop-invariants.md`. A change to any
    of them, including this procedure and the standing yes, always needs the owner's own yes.
 4. **The review settled clean.** The last local review round (Claude and Codex) on `<head>` found
-   no P1 and no serious P2. Only then post the proof, `python3
+   no P1 and no serious P2. Only then post the proof, `python3 -I
    <tmp>/skills/review/scripts/reviewed-status.py post <head> --pr <pr> --base main` *(main)*, and
    check it: `verify <head> --pr <pr> --base main` *(main)* prints `REVIEWED`. Never post it to get
    past this step. The proof is this session's attestation, posted under the owner's account.
@@ -115,7 +116,7 @@ fresh worktree of the then-current `main`.
    scripts/check-neutrality.sh`, `bash scripts/check-public-hygiene.sh --base origin/main`, and
    `bash scripts/validate.sh --needles` (in the background, read from its log, never piped through
    `head`).
-6. **Every check is green on `<head>`.** `python3 <tmp>/skills/pr/scripts/merge-gate.py <pr>
+6. **Every check is green on `<head>`.** `python3 -I <tmp>/skills/pr/scripts/merge-gate.py <pr>
    <head> --all-green --repo devstride/claude-plugin` *(main)* prints `MERGE <command>`. Right
    before running it, `git fetch origin` and compare `origin/main` with `<trusted>`. If it moved (a
    revocation may have landed), `<tmp>` is stale: stop with `OWNER YES NEEDED` (main moved during
