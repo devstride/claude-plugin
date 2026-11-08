@@ -33,6 +33,9 @@ In plan scope, the refresh source, the cut base and the close-out change as
   cloud may still cover the whole PR. A firing
   `verify.skipDuringStoryBuilds` suite is mandatory, with no story exemption; with the list empty,
   local pre-ship suites remain the callers' step-2b responsibility.
+- **Consequence notices**, just before the merge: gather the release's notices, run the release
+  unit's own check on the final reviewed head, then reconcile
+  (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/consequence-notices.md`).
 - **Merge** with the `MERGE` line of `python3 ${CLAUDE_PLUGIN_ROOT}/skills/pr/scripts/merge-gate.py
   <n> <head>` (`<head>`: review's final reviewed head, never the live one) once green and settled (landed set captured first; anything else STOPS), then
   **close out** (`next-unblocked.md`): `add_comment` on the RELEASE-UNIT item (release PR, leaves,
@@ -45,7 +48,8 @@ In plan scope, the refresh source, the cut base and the close-out change as
   `NOT CONFIGURED` → say so and continue; keep its links exact. **Never release notes here.**
 - Update handoff memory and sync develop.
 - **Human recap.** Lead with `Merged / Released`: every item and its effect, where it landed,
-  validation/review/CI, docs, whether live, the remaining production action. Surface, never
+  validation/review/CI, docs, whether live, the remaining production action, and the unit's and
+  its leaves' consequence notices (`consequence-notices.md`). Surface, never
   perform, the owner-cut promotion (`/devstride:release`). New findings → 6.5.
 - **Last, after the recap:** merged onto the train with `release.autoStart.enabled` → its trigger
   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`), after docs staged `live: false`.

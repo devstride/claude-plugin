@@ -8,6 +8,29 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **The item's author hears when a change could cost money, cut someone off or break a caller.**
+  Once per item, on the final reviewed diff and before the merge, `build-item` checks for four
+  consequences: new billable infrastructure, removing something callers still use, removing
+  someone's access, and a change that could break a published interface (an API, webhook, tool,
+  command or documented URL). Each finding names its category, the file and the changed lines, and
+  one plain sentence on who or what is affected. When there is one, the loop posts an internal
+  DevStride comment on the item that @-mentions the item's creator, and puts a line in the run's
+  recap. It is a notice, not a gate: the build, review, merge and release carry on. A new
+  dependency-free helper, `skills/build-item/scripts/consequence-notices.py`, keeps the parts that
+  must not rest on judgment:
+  - it refuses a finding whose file and lines the diff did not change;
+  - it renders the comment;
+  - it posts nothing when the same notice is already on the item;
+  - it withdraws an earlier notice the final change no longer supports.
+  An epic's release checks the release unit too. The production release (steps 4 and 6) and the
+  epic release recap repeat every notice the release carries, so the owner sees them before the
+  yes. Before repeating them, the release checks each notice against its own diff and withdraws
+  or replaces any that a later change made untrue. The new `consequenceNotices` block can turn the check off (`enabled`), name more people to
+  mention (`notify`) and add the repository's own categories (`categories`). `/devstride:doctor`
+  checks the block.
+
 ## [3.40.0] — 2026-11-08
 
 ### Changed

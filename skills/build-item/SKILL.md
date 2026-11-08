@@ -230,7 +230,9 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 **Release holds first**, before any merge onto the train or `baseBranch` (one-off or plan story): a
 hold on the item or an ancestor
 (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`) → no merge; the story
-branch waits, said.
+branch waits, said. **Consequence notices** just before 5a's or 5b's merge command, on the head that
+merges, every profile, never a gate:
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/consequence-notices.md`.
 
 ### 5a. Fast merge (from 4a)
 
