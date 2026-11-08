@@ -159,6 +159,12 @@ refuse("(6o) an older run still running beside a newer one that passed -> REFUSE
 merge("(6p) an older run cancelled before the newer one started (a concurrency group) does not count",
       sc(pages=[[cr("tests", "CANCELLED", ident=10, run=1, at="2026-01-15T17:00:00Z"), cr("tests", ident=20, run=2), cr("lint", ident=11)]]),
       "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(6q) a re-run's success never skips the failed run the other order still sees (run 2 failed, run 3 skipped, run 1 re-run green)",
+       sc(pages=[[cr("tests", ident=40, run=1, at="2026-01-15T19:00:00Z"), cr("tests", "FAILURE", ident=20, run=2),
+                  cr("tests", "SKIPPED", ident=30, run=3), cr("lint", ident=11)]]), "tests is failure")
+refuse("(6r) a job still running beside a failed sibling in an older run is pending, never superseded",
+       sc(pages=[[cr("tests", "FAILURE", ident=10, run=1), cr("tests", status="IN_PROGRESS", ident=11, run=1),
+                  cr("tests", ident=20, run=2), cr("lint", ident=12)]]), "tests is pending")
 refuse("(6k) a scheduled run's success does not count either",
        sc(pages=[[cr("tests", ident=20, event="schedule"), cr("lint", ident=11)]]), "tests never ran at this head")
 refuse("(6b) a skipped newest run never hides an older run of the same check that failed",
@@ -286,7 +292,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 85 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 87 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.

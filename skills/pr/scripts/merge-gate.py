@@ -352,27 +352,30 @@ def worst(states):
 
 
 def stream_verdict(byRun, at):
-    """One event's runs of one check: (verdict, earned). Any run still pending is PENDING. The
-    newest run is read two ways, by run number and by when its latest attempt started (a re-run
-    keeps its old number but starts later), and the worse of the two counts. A quiet newest run
-    defers to the newest run that executed; none executed leaves it quiet and unearned."""
-    numbers = sorted(byRun)
-    verdict = {n: worst(byRun[n]) for n in numbers}
-    if "PENDING" in verdict.values():
+    """One event's runs of one check: (verdict, earned). Any job of any run still pending is
+    PENDING. The runs are read in two orders, by run number and by when each run's latest attempt
+    started (a re-run keeps its old number but starts later), and each order is settled on its
+    own: its newest run, or, when that run is quiet, its newest run that executed. The worse of the
+    two counts. A quiet result with no executed run in either order is unearned."""
+    if any("PENDING" in states for states in byRun.values()):
         return "PENDING", False
-    def newest(ns):
-        return [verdict[n] for n in {ns[-1], max(ns, key=lambda n: (at.get(n) or "", n))}]
-    picked = newest(numbers)
-    red = [v for v in picked if v not in PASSED]
+    verdict = {n: worst(byRun[n]) for n in byRun}
+    def settle(order):
+        last = verdict[order[-1]]
+        if last not in QUIET:
+            return last, True
+        executed = [n for n in order if verdict[n] not in QUIET]
+        if not executed:
+            return last, False
+        newest = verdict[executed[-1]]
+        return (last if newest == "SUCCESS" else newest), True
+    results = [settle(sorted(byRun)), settle(sorted(byRun, key=lambda n: (at.get(n) or "", n)))]
+    red = [v for v, _ in results if v not in PASSED]
     if red:
         return red[0], True
-    if "SUCCESS" in picked:
+    if any(v == "SUCCESS" for v, _ in results):
         return "SUCCESS", True
-    executed = [n for n in numbers if verdict[n] not in QUIET]
-    if executed:
-        red = [v for v in newest(executed) if v != "SUCCESS"]
-        return (red[0], True) if red else (picked[0], True)
-    return picked[0], False
+    return results[0][0], any(earned for _, earned in results)
 
 
 def runs_at_head(contexts):
