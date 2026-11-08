@@ -261,9 +261,9 @@ branch waits, said.
 - **Zero unresolved threads immediately before merging** (`review`'s paginated query); else back
   through `review` steps 3–6.
 - Run the `MERGE` line of `python3 ${CLAUDE_PLUGIN_ROOT}/skills/pr/scripts/merge-gate.py <n> <head>
-  --delete-branch` (integration-branch or train base: add `--subject "Merge pull request #<n> from
-  <owner>/<head branch>"`); else STOP — **never `--delete-branch` on a head matching
-  `protectedBranches`** (anchored: `branch-patterns.md`).
+  --delete-branch` (integration-branch or train base: add
+  `--subject "Merge pull request #<n> from <owner>/<head branch>"`); else STOP — **never
+  `--delete-branch` on a head matching `protectedBranches`** (anchored: `branch-patterns.md`).
 
 ## 6. Completion ritual
 
