@@ -54,6 +54,9 @@ The rule (an approver's admin merge exactly when every required check is green, 
 - The test merge commit going null or changing mid-read is a fresh read, never "no checks there".
   So is any new workflow run, attempt, status or conclusion between the run listings read just
   before and just after a commit's checks (a re-run finishing between the reads).
+- Known limit: the verdict is one reading. GitHub does not re-check required checks at an
+  `--admin` merge, so a check or status that turns red after it was read (during the gate's
+  remaining reads, or before the printed command runs) is not seen. Run the command at once.
 - Classic protection answering 404 means none only with GitHub's two messages for it ("Branch
   not protected", "Required status checks not enabled"); any other 404 is an ERROR.
 - A base that requires branches to be up to date (a ruleset's strict policy, or classic `strict`)
