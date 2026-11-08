@@ -287,4 +287,16 @@ cfg '{"release": {"classifySkill": "classify", "lightRelease": {"standingYes": t
 expect "(57) the standing yes without release.clearance is a WARN, exit 0" 0 "^CONFIG: 0 error(s), 1 warning(s)" \
   "^WARN release.lightRelease.standingYes: has no effect without \`release.clearance\`"
 
+# (58)-(61) the written full standing yes: clearance, ownerDecision and migrationGlobs, well-formed approvals
+cfg '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true, "ownerDecision": "2026-11-07", "migrationGlobs": ["db/*.sql"], "approvedMigrations": [{"blob": "0123456789abcdef0123456789abcdef01234567", "path": "db/1.sql", "item": "I20100", "approved": "2026-11-07"}]}}}'
+expect "(58) a complete full standing yes is clean" 0 "$CLEAN"
+cfg '{"release": {"fullRelease": {"standingYes": true, "ownerDecision": "2026-11-07", "migrationGlobs": ["db/*.sql"]}}}'
+expect "(59) the full standing yes without release.clearance is a WARN" 0 "^CONFIG: 0 error(s), 1 warning(s)" \
+  "^WARN release.fullRelease.standingYes: has no effect without \`release.clearance\`"
+cfg '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true}}}'
+expect "(60) no ownerDecision and no migrationGlobs are two WARNs" 0 "^CONFIG: 0 error(s), 2 warning(s)" \
+  "^WARN release.fullRelease.standingYes: has no effect without \`release.fullRelease.ownerDecision\`"
+cfg '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true, "ownerDecision": "2026-11-07", "migrationGlobs": ["db/*.sql"], "approvedMigrations": [{"blob": "abc"}]}}}'
+expect "(61) a malformed approval is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR release.fullRelease.approvedMigrations\[0\]: needs blob, path, item and approved"
+
 exit "$FAIL"

@@ -146,6 +146,21 @@ def auto_start_checks(v, config):
         v.add("WARN", "release.lightRelease.standingYes", "has no effect without `release.classifySkill`: no release is ever classified LIGHT")
     if isinstance(light, dict) and light.get("standingYes") is True and not release.get("clearance"):
         v.add("WARN", "release.lightRelease.standingYes", "has no effect without `release.clearance`: no tower status can show the release On final")
+    full = release.get("fullRelease")
+    if not (isinstance(full, dict) and full.get("standingYes") is True):
+        return
+    key = "release.fullRelease.standingYes"
+    if not release.get("clearance"):
+        v.add("WARN", key, "has no effect without `release.clearance`: no tower status can show the release On final")
+    decided = full.get("ownerDecision")
+    if not (isinstance(decided, str) and re.match(r"^\d{4}-\d{2}-\d{2}$", decided)):
+        v.add("WARN", key, "has no effect without `release.fullRelease.ownerDecision` (YYYY-MM-DD, the day the owner wrote the yes)")
+    globs = full.get("migrationGlobs")
+    if not (isinstance(globs, list) and globs):
+        v.add("WARN", key, "has no effect without `release.fullRelease.migrationGlobs`: no migration could be told apart")
+    for i, entry in enumerate(full.get("approvedMigrations") or []):
+        if not (isinstance(entry, dict) and all(isinstance(entry.get(k), str) and entry[k] for k in ("blob", "path", "item", "approved"))):
+            v.add("ERROR", "release.fullRelease.approvedMigrations[%d]" % i, "needs blob, path, item and approved: a malformed entry makes every full release ask")
 
 
 class Validator:

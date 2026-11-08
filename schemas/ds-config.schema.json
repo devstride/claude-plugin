@@ -1148,6 +1148,36 @@
           "additionalProperties": false,
           "description": "rules for a light release (one the classify skill calls LIGHT)"
         },
+        "fullRelease": {
+          "type": "object",
+          "properties": {
+            "standingYes": {
+              "type": "boolean",
+              "default": false,
+              "description": "a release with every gate green, at its reviewed head, and every migration it carries approved by content, merges and deploys without an in-the-moment yes"
+            },
+            "ownerDecision": {
+              "type": "string",
+              "description": "YYYY-MM-DD: the day the owner wrote the yes, quoted on every merge it makes; absent or invalid: the route asks"
+            },
+            "migrationGlobs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "the migration files (branch-patterns.md globs); each one a release adds or changes needs an approval; absent or empty: the route asks"
+            },
+            "approvedMigrations": {
+              "type": "array",
+              "description": "the owner's migration approvals by content: {blob, path, item, approved}, each added on the owner's own yes"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "description": "the owner's written standing yes for releases of any class with every gate green; contract: skills/release/references/auto-start.md"
+        },
         "productionReview": {
           "type": "object",
           "properties": {

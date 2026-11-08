@@ -36,8 +36,8 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
 - **Hooks run through step skills** (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md`):
   call each by name, read its first-line verdict, decide what follows; never inline its logic.
 - **Steps 0–3 run autonomously**, surfacing only genuine forks (an ambiguous/risky/unverifiable finding, an unresolvable conflict, an infra/secret gate the owner must provision).
-- **The production merge is a human gate**, except a light release identical to its reviewed tree
-  when the owner set the standing yes (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`).
+- **The production merge is a human gate**, except on the owner's standing yes, light or written
+  full (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`).
   Otherwise NEVER merge into `master` without an explicit, in-the-moment owner go-ahead — it deploys
   production. Invoking `/devstride:release` is never standing consent for anything else.
 - **Docs are on by default and still outward-facing.** With `docs.updateSkill` registered the

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Tests for skills/release/scripts/standing-yes.py — the owner's standing yes for light releases.
+# Tests for skills/release/scripts/standing-yes.py — the owner's standing yes for light releases,
+# and (from case F1) the written standing yes for full releases with approved migrations.
 # A fake `gh` on PATH answers `gh pr view <n>` from one file per pull-request number (the release
 # pull request is #42) and `gh pr list` for each train title from its own file, so the reviewed
 # train is found by the helper (the latest merged one, merged into the head), never passed in. One passing case, then one case per condition,
@@ -47,10 +48,10 @@ cat "$WORK/prs/\$3.json"
 SH
 chmod +x "$WORK/bin/gh"
 export PATH="$WORK/bin:$PATH"
-pr() { # number state title base head
-  printf '{"state": "%s", "title": "%s", "baseRefName": "%s", "headRefOid": "%s"}' "$2" "$3" "$4" "$5" > "$WORK/prs/$1.json"
+pr() { # number state title base head [isDraft]
+  printf '{"state": "%s", "title": "%s", "baseRefName": "%s", "headRefOid": "%s", "isDraft": %s}' "$2" "$3" "$4" "$5" "${6:-false}" > "$WORK/prs/$1.json"
 }
-release_pr() { pr 42 "${2:-OPEN}" "Release 26-01-15" "${3:-master}" "${1:-$RELEASE}"; }
+release_pr() { pr 42 "${2:-OPEN}" "Release 26-01-15" "${3:-master}" "${1:-$RELEASE}" "${4:-false}"; }
 row() { # number title marker mergedAt head merge
   printf '{"number": %s, "title": "%s", "body": "<!-- %s source 1111111 snapshot 2222222 -->", "mergedAt": "%s", "headRefOid": "%s", "mergeCommit": {"oid": "%s"}}' "$@"
 }
@@ -69,12 +70,13 @@ TOWER=$'Tower: clear\nOn final: #42 release/26-01-15 (draft)\nWaiting: #43 relea
 base() {
   fresh
   PR=42 HEAD_ARG="$RELEASE" CLASS="RELEASE CLASS: LIGHT" CHECKS=green UNRESOLVED=0
-  PRESHIP="PRE-SHIP: PASS (2 ran, 0 waived)" PREMERGE="PRE-MERGE: CLEAR" PREV=0 DEV=not-applicable TOWER_ARG="$TOWER" NO_DEV=""
+  PRESHIP="PRE-SHIP: PASS (2 ran, 0 waived)" PREMERGE="PRE-MERGE: CLEAR" PREV=0 DEV=not-applicable TOWER_ARG="$TOWER" NO_DEV="" REVIEWED=""
 }
 run() {
   local dev=(--dev-deploy "$DEV"); [ -n "$NO_DEV" ] && dev=()
+  local reviewed=(); [ -n "${REVIEWED:-}" ] && reviewed=(--reviewed-head "$REVIEWED")
   (cd "$WORK/repo" && python3 "$HELPER" --pr "$PR" --head "$HEAD_ARG" --class "$CLASS" \
-    --checks "$CHECKS" --unresolved "$UNRESOLVED" --pre-ship "$PRESHIP" --pre-merge "$PREMERGE" --previous-release "$PREV" ${dev[@]+"${dev[@]}"} --tower "$TOWER_ARG" 2>&1)
+    --checks "$CHECKS" --unresolved "$UNRESOLVED" --pre-ship "$PRESHIP" --pre-merge "$PREMERGE" --previous-release "$PREV" ${dev[@]+"${dev[@]}"} --tower "$TOWER_ARG" ${reviewed[@]+"${reviewed[@]}"} 2>&1)
 }
 expect() { # label, expected exit, regex
   local out code; out="$(run)"; code=$?
@@ -82,12 +84,14 @@ expect() { # label, expected exit, regex
 }
 
 base; expect "(1) every condition holds → MERGE naming the release head (another commit, the same tree)" 0 "^MERGE $RELEASE\$"
+base; expect "(1e) ...with the light comment on the next line" 0 '^COMMENT Merged on the standing yes for light releases identical to the reviewed train \(release.lightRelease.standingYes\)\.$'
+
 base; DEV=0; expect "(1b) with the dev-deploy wait answered 0 → MERGE" 0 '^MERGE [0-9a-f]{40}$'
 base; PRESHIP="PRE-SHIP: NOTHING TO RUN"; expect "(1c) nothing to pre-ship → MERGE" 0 '^MERGE [0-9a-f]{40}$'
 base; expect "(1d) releaseSource absent → develop, not baseBranch (main)" 0 '^MERGE '
 
 cfg '{"release": {"classifySkill": "classify"}}'
-base; expect "(2) the standing yes is off → ASK" 0 '^ASK the standing yes is off'
+base; expect "(2) the standing yes is off → ASK" 0 '^ASK the standing yes is off \(neither'
 [ "$(cat "$WORK/repo/.claude/ds-config.json")" = "$AMBIENT" ] && ok "(2h) ...even with the working folder's config switching everything on" || bad "(2h) the ambient config was not in place"
 cfg '{"release": {"classifySkill": "classify", "lightRelease": {"standingYes": "yes"}}}'
 base; expect "(2b) a non-boolean standingYes is off → ASK" 0 '^ASK the standing yes is off'
@@ -173,5 +177,78 @@ out="$(cd "$WORK/repo" && python3 "$HELPER" --pr 42 2>&1)"; code=$?
 [ "$code" = 1 ] && printf '%s\n' "$out" | grep -q '^ERROR ' && ok "(12b) missing arguments → ERROR, exit 1" || bad "(12b) (exit $code) $out"
 cfg '{nope'
 base; expect "(13) an unreadable committed config → ERROR, exit 1" 1 '^ERROR .*cannot be read as JSON'
+
+# ── the full route: release.fullRelease, the owner's written standing yes ──
+# fullgraph: production (master) at the base commit; the release adds one migration on top of the
+# light graph's FIXED head (a tree no train reviewed, so only the full route can answer MERGE).
+MIG="db/migrations/sql/0352_add_x.sql"
+FULLCFG() { # [approved-entries-json] [extra fullRelease keys]
+  printf '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true, "ownerDecision": "2026-11-07", "migrationGlobs": ["db/migrations/sql/*.sql"], "approvedMigrations": [%s]%s}}}' "${1:-}" "${2:-}"
+}
+fullgraph() { # config, [migration content]
+  build "$1"
+  g branch -q master "$(g rev-list --max-parents=0 HEAD)"
+  g update-ref refs/remotes/origin/master master
+  g checkout -q -b rel "$FIXED"
+  mkdir -p "$WORK/repo/db/migrations/sql/meta"
+  printf '%s\n' "${2:-create table x (id int);}" > "$WORK/repo/$MIG"; echo '{"j":1}' > "$WORK/repo/db/migrations/sql/meta/_journal.json"
+  g add db; g commit -q -m "migration 0352"; FULLHEAD="$(g rev-parse HEAD)"; BLOB="$(g rev-parse "HEAD:$MIG")"
+  g commit -q --allow-empty -m "review re-trigger"; RETRIGGER="$(g rev-parse HEAD)"
+  g checkout -q develop
+}
+approved() { printf '{"blob": "%s", "path": "%s", "item": "I20100", "approved": "2026-11-07"}' "${1:-$BLOB}" "$MIG"; }
+fbase() { base; HEAD_ARG="$FULLHEAD" REVIEWED="$FULLHEAD" CLASS="RELEASE CLASS: FULL"; release_pr "$FULLHEAD"; }
+refull() { fullgraph "$(FULLCFG "$1" "${2:-}")" "${3:-}"; }
+
+fullgraph "$(FULLCFG)"; FIRSTBLOB="$BLOB"
+refull "$(approved "$FIRSTBLOB")"
+fbase; expect "(F1) a full release, every gate green, its migration approved by content → MERGE" 0 "^MERGE $FULLHEAD\$"
+fbase; expect "(F1b) ...with the dated full comment naming the approved migration" 0 '^COMMENT Merged on the owner.s written standing yes .*owner decision 2026-11-07\). Migrations: db/migrations/sql/0352_add_x.sql \(I20100, approved 2026-11-07\)\.$'
+fbase; CLASS="RELEASE CLASS: LIGHT"; expect "(F1c) a light release whose tree no train reviewed, full yes on → MERGE by the full route" 0 '^COMMENT Merged on the owner.s written standing yes'
+fbase; HEAD_ARG="$RETRIGGER"; release_pr "$RETRIGGER"; expect "(F1d) review's same-tree re-trigger commit on top of the reviewed head → MERGE" 0 "^MERGE $RETRIGGER\$"
+fbase; expect "(F1e) the meta journal beside it is not a migration (only migrationGlobs count)" 0 '^MERGE '
+
+refull ""
+fbase; expect "(F2) a new migration nobody approved → ASK naming it" 0 "^ASK the migration $MIG \\(blob [0-9a-f]{12}\\) has no owner approval for this content\$"
+refull "$(approved "$FIRSTBLOB")" "" "create table x (id bigint);"
+fbase; expect "(F2b) the approved migration changed after its approval → ASK" 0 "^ASK the migration $MIG .* has no owner approval"
+refull '{"blob": "abc", "path": "p", "item": "I1", "approved": "2026-11-07"}'
+fbase; expect "(F2c) a malformed approval entry → ASK" 0 '^ASK release.fullRelease.approvedMigrations\[0\] needs blob'
+refull "$(approved "$FIRSTBLOB" | sed 's/"approved": "2026-11-07"/"approved": "2026-13-40"/')"
+fbase; expect "(F2d) an approval with an impossible date → ASK" 0 '^ASK release.fullRelease.approvedMigrations\[0\]'
+refull "$(approved "$FIRSTBLOB")"
+fbase; g -c core.hooksPath=/dev/null checkout -q rel; g rm -q "$MIG"; g commit -q -m "drop it"; DROP="$(g rev-parse HEAD)"; g update-ref refs/remotes/origin/master "$FULLHEAD"; g checkout -q develop
+HEAD_ARG="$DROP" REVIEWED="$DROP"; release_pr "$DROP"; expect "(F2e) a release that deletes a migration production has → ASK" 0 "^ASK the release deletes the migration $MIG\$"
+g update-ref refs/remotes/origin/master master
+fbase; g update-ref -d refs/remotes/origin/master; expect "(F2f) production cannot be read → ASK" 0 '^ASK origin/master cannot be read'
+g update-ref refs/remotes/origin/master master
+
+fbase; REVIEWED=""; expect "(F3) no --reviewed-head → ASK" 0 '^ASK no readable --reviewed-head'
+fbase; REVIEWED="$RELEASE"; expect "(F3b) the reviewed head is an older, different tree → ASK" 0 '^ASK the head [0-9a-f]{12} is not the reviewed head'
+fbase; release_pr "$FULLHEAD" OPEN master true; expect "(F3c) the release pull request is still a draft → ASK" 0 '^ASK pull request #42 is still a draft'
+fbase; release_pr "$RELEASE"; expect "(F3d) the pull request moved past the head given → ASK" 0 '^ASK pull request #42 is at'
+fbase; CLASS=""; expect "(F3e) no class line → ASK" 0 '^ASK no release class \(no class line\)$'
+fbase; CHECKS=red; expect "(F4) a red required check → ASK" 0 '^ASK a required check on the head is not green$'
+fbase; PRESHIP="PRE-SHIP: PASS (2 ran, 1 waived)"; expect "(F4b) a waived pre-ship check → ASK" 0 '^ASK the pre-ship checks did not all pass unwaived'
+fbase; PREMERGE="PRE-MERGE: HOLD checkpoint missing"; expect "(F4c) a pre-merge hold → ASK" 0 '^ASK the pre-merge check did not clear'
+fbase; TOWER_ARG=$'On final: #41 release/x'; expect "(F4d) another release on final → ASK" 0 '^ASK pull request #42 is not the one release On final'
+fbase; PREV=1; expect "(F4e) the previous release not cleared → ASK" 0 '^ASK the previous-release gate answered 1'
+
+for bad_decision in '' '"ownerDecision": "yes", ' '"ownerDecision": "2999-01-01", ' '"ownerDecision": "2026-02-30", '; do
+  fullgraph "$(printf '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true, %s"migrationGlobs": ["db/migrations/sql/*.sql"], "approvedMigrations": [%s]}}}' "$bad_decision" "$(approved "$FIRSTBLOB")")"
+  fbase; expect "(F5) ownerDecision ${bad_decision:-absent} → ASK" 0 '^ASK release.fullRelease.ownerDecision must be the date'
+done
+for bad_globs in '' '"migrationGlobs": [], ' '"migrationGlobs": "db/**", '; do
+  fullgraph "$(printf '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true, "ownerDecision": "2026-11-07", %s"approvedMigrations": []}}}' "$bad_globs")"
+  fbase; expect "(F5b) migrationGlobs ${bad_globs:-absent} → ASK" 0 '^ASK release.fullRelease.migrationGlobs must list'
+done
+fullgraph '{"release": {"fullRelease": {"standingYes": true, "ownerDecision": "2026-11-07", "migrationGlobs": ["db/**"]}}}'
+fbase; expect "(F5c) no clearance → ASK" 0 '^ASK no usable release.clearance is configured'
+fullgraph "$(printf '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": "yes", "ownerDecision": "2026-11-07", "migrationGlobs": ["db/**"]}}}')"
+fbase; expect "(F5d) a non-boolean full standingYes is off → ASK" 0 '^ASK the standing yes is off'
+
+fullgraph "$(printf '{"release": {"classifySkill": "c", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}, "fullRelease": {"standingYes": true, "ownerDecision": "2026-11-07", "migrationGlobs": ["db/migrations/sql/*.sql"], "approvedMigrations": []}}}')"
+fbase; CLASS="RELEASE CLASS: LIGHT"; expect "(F6) both yeses on, both routes ask → the full reason first, then the light one" 0 '^ASK the migration .* has no owner approval .*\(light route: the head.s tree .* differs from the reviewed train tree'
+base; expect "(F6b) both on: a light release identical to its train → MERGE by the light route" 0 '^COMMENT Merged on the standing yes for light releases'
 
 exit "$FAIL"

@@ -88,6 +88,7 @@
     "mergeTrainBeforeCut": true,
     "autoStart": { "enabled": true },
     "lightRelease": { "standingYes": true },
+    "fullRelease": { "standingYes": true, "ownerDecision": "2026-11-07", "migrationGlobs": ["db/migrations/sql/*.sql"], "approvedMigrations": [{ "blob": "0123456789abcdef0123456789abcdef01234567", "path": "db/migrations/sql/0001_init.sql", "item": "I20100", "approved": "2026-11-07" }] },
     "productionReview": { "reviewIdenticalTree": false, "highRiskPaths": ["src/auth/**"], "highRiskEngine": "local" },
     "deployApproval": null,
     "deployVerification": "scripts/verify-deploy.sh",

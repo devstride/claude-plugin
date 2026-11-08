@@ -8,6 +8,20 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **The owner's written standing yes covers full releases.** A new setting, `release.fullRelease`,
+  records it: `standingYes`, the date the owner wrote it (`ownerDecision`), the migration file
+  patterns (`migrationGlobs`) and the owner's migration approvals (`approvedMigrations`). With it
+  on, a release of any class merges and deploys without an in-the-moment yes when it is at exactly
+  its reviewed head, is not a draft, every gate is green (required checks, zero open threads,
+  pre-ship passed unwaived, pre-merge clear, the previous release checked, the dev deploy done, the
+  release alone on final) and every migration file it adds or changes is approved by content: the
+  file's git blob id is in `approvedMigrations`. A new migration, an edited one or a deleted one
+  still asks; a renumbered one with the same content does not. `standing-yes.py` decides both
+  routes and prints the one comment to post on the merged pull request, dated. `doctor` warns when
+  the yes cannot take effect and refuses a malformed approval. Invariant M18.
+
 ## [3.36.0] — 2026-11-07
 
 ### Added

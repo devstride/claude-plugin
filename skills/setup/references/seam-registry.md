@@ -183,6 +183,11 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.autoStart.enabled` | boolean | — | `false` | a train landing or a finished release starts the next release; needs a claims block | 3.29.0 |
 | `release.lightRelease` | object | — | — | rules for a light release (one the classify skill calls LIGHT) | 3.29.0 |
 | `release.lightRelease.standingYes` | boolean | — | `false` | the owner's standing yes: a light release identical to its reviewed train merges and deploys without an in-the-moment yes; contract: skills/release/references/auto-start.md | 3.29.0 |
+| `release.fullRelease` | object | — | — | the owner's written standing yes for releases of any class with every gate green; contract: skills/release/references/auto-start.md | 3.37.0 |
+| `release.fullRelease.standingYes` | boolean | — | `false` | a release with every gate green, at its reviewed head, and every migration it carries approved by content, merges and deploys without an in-the-moment yes | 3.37.0 |
+| `release.fullRelease.ownerDecision` | string | — | — | YYYY-MM-DD: the day the owner wrote the yes, quoted on every merge it makes; absent or invalid: the route asks | 3.37.0 |
+| `release.fullRelease.migrationGlobs` | string[] | — | — | the migration files (branch-patterns.md globs); each one a release adds or changes needs an approval; absent or empty: the route asks | 3.37.0 |
+| `release.fullRelease.approvedMigrations` | array | — | — | the owner's migration approvals by content: {blob, path, item, approved}, each added on the owner's own yes | 3.37.0 |
 | `release.productionReview` | object | — | — | review-once economy for the production pull request | pre-registry |
 | `release.productionReview.reviewIdenticalTree` | boolean | — | — | false skips re-reviewing a tree already reviewed | pre-registry |
 | `release.productionReview.highRiskPaths` | string[] | — | — | paths that still get one pass | pre-registry |
