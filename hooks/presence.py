@@ -61,6 +61,7 @@ session's start, each under its own lock; nothing is created for a session whose
 checkout has no block. FAILS OPEN: every hook exits 0 and prints nothing (a prompt hook's stdout would become
 context), whatever goes wrong. python3 and the standard library only.
 """
+import calendar
 import contextlib
 import fcntl
 import json
@@ -164,7 +165,8 @@ def prune(own, now):
     """Remove other sessions' files untouched for KEEP. A record or lock goes only while its lock is
     held and it is still stale, so a session that comes back at that moment keeps its files."""
     directory = records_path()
-    for name in os.listdir(directory):
+    # records before locks: pruning a record takes its state lock, which would recreate a lock pruned first
+    for name in sorted(os.listdir(directory), key=lambda n: not n.endswith(".json")):
         path = os.path.join(directory, name)
         if not stale(path, now):
             continue
@@ -258,11 +260,12 @@ def owner_pid():
 
 
 def started(pid):
-    """A process's start time in epoch seconds, so a reused process id is told apart; 0 unknown."""
+    """A process's start time in epoch seconds, so a reused process id is told apart; 0 unknown.
+    Printed in UTC, so a long-lived keeper and a fresh hook read it alike whatever the zone."""
     try:
         out = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
-                             timeout=1, env=dict(os.environ, LC_ALL="C"))
-        return int(time.mktime(time.strptime(" ".join(out.stdout.split()), "%a %b %d %H:%M:%S %Y")))
+                             timeout=1, env=dict(os.environ, LC_ALL="C", TZ="UTC0"))
+        return calendar.timegm(time.strptime(" ".join(out.stdout.split()), "%a %b %d %H:%M:%S %Y"))
     except Exception:
         return 0
 
@@ -422,11 +425,8 @@ def hook():
     if event in ("Stop", "SessionEnd") and (peek is None or peek.get("state") == "ended"):
         return  # never reported here, or already ended
     mine = int(os.environ["CLAUDE_PID"]) if os.environ.get("CLAUDE_PID", "").isdigit() else 0
-    owner = 0  # every `ps` runs here, before the state lock is taken
-    if event == "SessionStart" or (event == "UserPromptSubmit" and not env_owner() and not alive((peek or {}).get("owner"))):
-        owner = owner_pid()
-    elif event == "UserPromptSubmit":
-        owner = env_owner()
+    # every `ps` runs here, before the state lock is taken
+    owner = owner_pid() if event in ("SessionStart", "UserPromptSubmit") else 0
     owner_started = started(owner) if owner else 0
     with state_lock(sid):
         now = time.time()
@@ -449,8 +449,9 @@ def hook():
         moved = not fresh and record.get("top") != top
         sent, state = record.get("sent") or 0, STATES[event]
         record.update({"top": top, "state": state, "version": running_version() or record.get("version") or ""})
-        if owner and (owner_started or owner != record.get("owner")):
-            record.update({"owner": owner, "ownerStarted": owner_started})  # re-read on every start and prompt
+        if owner and (event == "SessionStart" or owner_started or owner != record.get("owner")):
+            # re-read on every start and prompt; a start whose look-up failed keeps no old start time
+            record.update({"owner": owner, "ownerStarted": owner_started})
         if event == "SessionEnd":
             record["reason"] = str(payload.get("reason") or "")
             verb = "end"

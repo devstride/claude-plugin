@@ -246,8 +246,8 @@ else bad "(18) $(cat "$LOG")"; fi
 
 # (19) the keeper sends a held state change once 30 seconds pass, with no hook firing
 : > "$LOG"; O19="$(owner)"
-K60="$(mkrepo keeper60 "$(config 60)")"   # the ordinary beat is 24 s away: only the held change can send
-DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O19" fire SessionStart s19 "$K60" >/dev/null; wait_sent 1
+K60="$(mkrepo keeper60 "$(config 60)")"   # the ordinary beat is 60 s away: only the held change can send
+DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O19" fire SessionStart s19 "$K60" >/dev/null; wait_sent 1
 fire Stop s19 "$K60" >/dev/null; sleep 0.5; H="$(sent)"           # held: within 30 s of the start
 age s19 31; wait_sent 2; sleep 0.3
 if [ "$H" = 1 ] && [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = beat ] && [ "$(field 2 PRESENCE_STATE)" = waiting ]; then
@@ -272,7 +272,7 @@ CLAUDE_PID="$O21" fire SessionStart s21 "$R" >/dev/null; wait_sent 1
 edit s21 'r["ownerStarted"] = 1'
 CLAUDE_PID="$O21" fire SessionStart s21 "$R" resume >/dev/null; wait_sent 2
 W="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["ownerStarted"])' "$RECORDS/s21.json")"
-REAL="$(LC_ALL=C ps -o lstart= -p "$O21" | python3 -c 'import sys,time; print(int(time.mktime(time.strptime(" ".join(sys.stdin.read().split()), "%a %b %d %H:%M:%S %Y"))))')"
+REAL="$(LC_ALL=C TZ=UTC0 ps -o lstart= -p "$O21" | python3 -c 'import calendar,sys,time; print(calendar.timegm(time.strptime(" ".join(sys.stdin.read().split()), "%a %b %d %H:%M:%S %Y")))')"
 if [ "$W" = "$REAL" ]; then
   ok "(21) resume with the same process id → its start time re-read (no false gone after a reboot)"
 else bad "(21) ownerStarted=$W"; fi
@@ -347,6 +347,20 @@ if [ "$Q1" = 1 ] && [ "$Q2" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = beat ]; the
   ok "(26) state lock held elsewhere → the prompt's update waits for it, then lands (beat)"
 else bad "(26) q1=$Q1 q2=$Q2 $(cat "$LOG")"; fi
 stop_keeper s26
+
+# (27) a start time a few seconds off is the same process (no end); a send for a record removed
+#      meanwhile runs nothing and recreates nothing
+: > "$LOG"; O27="$(owner)"
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O27" fire SessionStart s27 "$K" >/dev/null; wait_sent 1
+edit s27 'r["ownerStarted"] = r["ownerStarted"] - 3'
+wait_sent 3; sleep 0.2
+GONE27="$(grep -c '"PRESENCE_EVENT": "end"' "$LOG")"; stop_keeper s27
+ID27="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$RECORDS/s27.json")"
+rm -f "$RECORDS/s27.json"; N27="$(sent)"
+python3 "$HOOK" send beat working s27 "$ID27" 99 1
+if [ "$GONE27" = 0 ] && [ "$(sent)" = "$N27" ] && [ ! -e "$RECORDS/s27.json" ]; then
+  ok "(27) start time 3 s off → still beating, no end; a send after its record was removed → nothing, not recreated"
+else bad "(27) gone=$GONE27 $(cat "$LOG")"; fi
 
 # (12) hooks.json registers the hook on all four events, bounded and failing open
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'
