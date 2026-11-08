@@ -42,7 +42,7 @@ if a[0] == "api" and "/collaborators/" in a[1]:
     print(json.dumps({"permission": "admin" if login == "owner" else "write"})); sys.exit(0)
 sys.stderr.write("gh stub: unexpected %r\n" % a); sys.exit(1)
 STUB
-chmod +x "$WORK/bin/gh"; export ST="$WORK/st" PATH="$WORK/bin:$PATH"
+chmod +x "$WORK/bin/gh"; export ST="$WORK/st" PATH="$WORK/bin:$PATH" REVIEWED_STATUS_WAIT=0
 export GIT_AUTHOR_NAME=jane GIT_AUTHOR_EMAIL=jane@example.com GIT_COMMITTER_NAME=jane GIT_COMMITTER_EMAIL=jane@example.com
 R="$WORK/repo"; mkdir "$R"; cd "$R" || exit 2
 git init -q -b main; echo a > a.txt; git add -A; git commit -qm base; BASE="$(git rev-parse HEAD)"
@@ -68,7 +68,7 @@ V() { t verify "$1" --pr 7 --base train; }
 
 V "$REVIEWED"
 [ "$RC" = 2 ] && [[ "$OUT" == UNREVIEWED*"no devstride/reviewed status from a repository admin"*"for #7 into train" ]] && ok "(1) no status: UNREVIEWED" || bad "(1) $RC $OUT"
-PR_HEAD="$REVIEWED" t post "$REVIEWED" --pr 7
+PR_HEAD="$REVIEWED" t post "$REVIEWED" --pr 7 --base train
 [ "$RC" = 0 ] && [ "$OUT" = "POSTED $REVIEWED devstride/reviewed: Settled review of #7 into train" ] && ok "(2) post on the reviewed head names the pull request and its base" || bad "(2) $RC $OUT"
 V "$REVIEWED"
 [ "$RC" = 0 ] && [ "$OUT" = "REVIEWED $REVIEWED by owner" ] && ok "(3) an admin's success status verifies for that pull request and base" || bad "(3) $RC $OUT"
@@ -76,7 +76,7 @@ t verify "$REVIEWED" --pr 9 --base train
 [ "$RC" = 2 ] && ok "(3b) ... and never for another pull request" || bad "(3b) $RC $OUT"
 t verify "$REVIEWED" --pr 7 --base jane/26-10-01/epic-x
 [ "$RC" = 2 ] && ok "(3c) ... or another base (a story review never proves the epic's merge)" || bad "(3c) $RC $OUT"
-GH_LOGIN=partner PR_HEAD="$BASE" t post "$BASE" --pr 7
+GH_LOGIN=partner PR_HEAD="$BASE" t post "$BASE" --pr 7 --base train
 [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED posted, but it does not count as proof"* ]] && ok "(4) a post by someone without admin permission says it does not count" || bad "(4) $RC $OUT"
 V "$BASE"; [ "$RC" = 2 ] && ok "(4b) ... and does not verify" || bad "(4b) $RC $OUT"
 inject "$REVIEWED" 5000 partner failure
@@ -87,22 +87,24 @@ V "$REVIEWED"; [ "$RC" = 0 ] && ok "(5b) a bot's status and an unknown account's
 inject "$REVIEWED" 6000 owner failure "withdrawn"
 V "$REVIEWED"
 [ "$RC" = 2 ] && [[ "$OUT" == *"an admin withdrew the devstride/reviewed proof"*"failure"* ]] && ok "(6) an admin withdraws the proof with a newer failure" || bad "(6) $RC $OUT"
-PR_HEAD="$REVIEWED" t post "$REVIEWED" --pr 7
-PR_HEAD="$SAME" t post "$SAME" --pr 7 --from "$REVIEWED"
+PR_HEAD="$REVIEWED" t post "$REVIEWED" --pr 7 --base train
+PR_HEAD="$SAME" t post "$SAME" --pr 7 --base train --from "$REVIEWED"
 [ "$RC" = 0 ] && [[ "$OUT" == *"Settled review of #7 into train, carried from ${REVIEWED:0:12} (same tree)" ]] && ok "(7) a tree-identical rebase carries the proof" || bad "(7) $RC $OUT"
 V "$SAME"; [ "$RC" = 0 ] && ok "(7b) ... and it verifies" || bad "(7b) $RC $OUT"
-PR_HEAD="$REBASED" t post "$REBASED" --pr 7 --from "$REVIEWED"
+PR_HEAD="$REBASED" t post "$REBASED" --pr 7 --base train --from "$REVIEWED"
 [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"*"not a tree-identical rebase"* ]] && ok "(8) a rebase onto a moved base (another tree) carries nothing" || bad "(8) $RC $OUT"
-PR_HEAD="$SAME" PR_BASE=develop t post "$SAME" --pr 7 --from "$REVIEWED"
+PR_HEAD="$SAME" PR_BASE=develop t post "$SAME" --pr 7 --base develop --from "$REVIEWED"
 [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"*"no proof to carry over"* ]] && ok "(9) carrying a proof earned against another base posts nothing" || bad "(9) $RC $OUT"
-PR_HEAD="$BASE" t post "$SAME" --pr 7
+PR_HEAD="$SAME" PR_BASE=train t post "$SAME" --pr 7 --base jane/26-10-01/epic-x
+[ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED #7 is based on train now, not jane/26-10-01/epic-x"* ]] && ok "(9a) a pull request retargeted after its review gets no proof" || bad "(9a) $RC $OUT"
+PR_HEAD="$BASE" t post "$SAME" --pr 7 --base train
 [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"*"is not the head of #7"* ]] && ok "(9b) never posted on a commit that is not the pull request's head" || bad "(9b) $RC $OUT"
-PR_HEAD="$SAME" PR_STATE=MERGED t post "$SAME" --pr 7
+PR_HEAD="$SAME" PR_STATE=MERGED t post "$SAME" --pr 7 --base train
 [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"*"not an open pull request"* ]] && ok "(9c) never posted on a merged pull request (no proof after the fact)" || bad "(9c) $RC $OUT"
-t post "$SAME"; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(9d) post without --pr is a usage error" || bad "(9d) $RC $OUT"
-t post abc123 --pr 7; [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"*"not a full commit SHA"* ]] && ok "(10) a short SHA is refused" || bad "(10) $RC $OUT"
+t post "$SAME" --pr 7; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(9d) post without --base is a usage error" || bad "(9d) $RC $OUT"
+t post abc123 --pr 7 --base train; [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"*"not a full commit SHA"* ]] && ok "(10) a short SHA is refused" || bad "(10) $RC $OUT"
 GH_FAIL=1 V "$REVIEWED"; [ "$RC" = 1 ] && [[ "$OUT" == ERROR* ]] && ok "(11) GitHub unreadable: ERROR, never REVIEWED" || bad "(11) $RC $OUT"
-GH_FAIL=1 t post "$REVIEWED" --pr 7; [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"* ]] && ok "(12) a failed post says NOT POSTED" || bad "(12) $RC $OUT"
+GH_FAIL=1 t post "$REVIEWED" --pr 7 --base train; [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"* ]] && ok "(12) a failed post says NOT POSTED" || bad "(12) $RC $OUT"
 t verify; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(13) usage" || bad "(13) $RC $OUT"
 t verify "$REVIEWED" --pr 7; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(13b) --pr without --base is a usage error" || bad "(13b) $RC $OUT"
 exit $FAIL

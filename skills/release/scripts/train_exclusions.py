@@ -137,7 +137,7 @@ def reviewed_unit(repo, commit, subject, head_regex, train, grandfathered=None, 
     head (the merge's second parent) carries proof of a settled review of that pull request into
     `train` (`reviewed-status.py verify`). A unit merged before GRANDFATHERED_BEFORE keeps the old
     rule and is added to `grandfathered`; a confirmed unit without proof is added to `unproven`
-    with the reason. GitHub unreadable: exit 2. The branch name alone never makes a unit reviewed."""
+    with the reason, as is one gh could not confirm. A proof unreadable: exit 2. The branch name alone never makes a unit reviewed."""
     found = pull_request_head(subject)
     if not found or not head_regex.match(found[1]):
         return None
@@ -146,9 +146,14 @@ def reviewed_unit(repo, commit, subject, head_regex, train, grandfathered=None, 
         p = subprocess.run(["gh", "pr", "view", number, "--json", "baseRefName,state,mergeCommit,mergedAt"],
                            cwd=repo, capture_output=True, text=True)
         info = json.loads(p.stdout) if p.returncode == 0 else None
-    except (OSError, ValueError):
-        info = None
-    if not isinstance(info, dict) or info.get("state") != "MERGED" or info.get("baseRefName") != train:
+        why = (p.stderr or p.stdout).strip()[:200] if p.returncode else "an answer that is not JSON"
+    except (OSError, ValueError) as err:
+        info, why = None, str(err)[:200]
+    if not isinstance(info, dict):
+        if unproven is not None:   # visible, never exempt: the unit is checked file by file
+            unproven.append({"number": int(number), "head": "", "reason": "gh could not confirm #%s: %s" % (number, why)})
+        return None
+    if info.get("state") != "MERGED" or info.get("baseRefName") != train:
         return None
     merge = info.get("mergeCommit")
     if not isinstance(merge, dict) or merge.get("oid") != commit:

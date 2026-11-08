@@ -249,7 +249,7 @@ branch waits, said.
   `/devstride:push` (conflict → fork). Compare patches: CHANGED returns to `review` with its
   cumulative ledger, target and safety state, never a fresh budget; tree-identical keeps its
   receipt and carries its proof (`skills/review/scripts/reviewed-status.py post <new head> --from
-  <reviewed head> --pr <n>`), else affected checks rerun. Then RECOMPUTE `verify.skipDuringStoryBuilds` applicability
+  <reviewed head> --pr <n> --base <base>`), else affected checks rerun. Then RECOMPUTE `verify.skipDuringStoryBuilds` applicability
   from the new SHA.
 - **Observe greenness**: non-draft, every applicable check succeeded — actually RAN — at the
   CURRENT head SHA. Re-poll only after a re-push, with `review` step 7's background poll; never

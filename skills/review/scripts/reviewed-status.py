@@ -11,10 +11,11 @@ train's exclusion check (`skills/release/scripts/train_exclusions.py`) accepts a
 reviewed only through `verify`, never through its branch name. Run in the repository; `gh`
 resolves `{owner}/{repo}`.
 
-  post <sha> --pr <n> [--from <reviewed-sha>]
-        Post a `success` status on <sha>, the head of open pull request <n> (GitHub's own head and
-        base for <n> are read; the base goes into the description). `review` runs it once a pull
-        request settles, with the final reviewed head; `build-item` 5b runs it with `--from` to carry
+  post <sha> --pr <n> --base <branch> [--from <reviewed-sha>]
+        Post a `success` status on <sha>, the head of open pull request <n>, whose base must still be
+        <branch>, the base the review was done against (GitHub's own head, state and base for <n> are
+        read; a pull request retargeted after its review gets no proof). `review` runs it once a pull
+        request settles READY, with the final reviewed head; `build-item` 5b runs it with `--from` to carry
         a review to a tree-identical rebase: <sha> and <reviewed-sha> must have the same tree, and
         <reviewed-sha> must itself verify for <n> and its base. Post ONLY there: never to clear a
         release refusal (a refused unit goes back to the owner). After posting it verifies; a post
@@ -23,6 +24,10 @@ resolves `{owner}/{repo}`.
         checks that unit file by file, as it does any unreviewed work)
   verify <sha> [--pr <n> --base <branch>]
         REVIEWED <sha> by <login> exit 0 | UNREVIEWED <reason> exit 2 | ERROR <reason> exit 1
+
+A proof names its base, so renaming the train voids the proofs of units still open against the old
+name: an admin re-posts them after the cutover. Withdrawing a proof does not follow a copy already
+carried to a rebased head: withdraw both heads.
 
 Trust: only a status posted by an account with ADMIN permission on the repository counts, because
 anyone who can push (a partner's branch, a workflow token) can post a commit status too. Statuses
@@ -37,6 +42,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 CONTEXT = "devstride/reviewed"
 SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -76,9 +82,7 @@ def statuses(sha, cwd):
         found += [s for s in batch if isinstance(s, dict) and s.get("context") == CONTEXT]
         if len(batch) < 100:
             break
-        if page >= 10:
-            raise Unreadable("more than 1,000 statuses on %s: GitHub accepts no more, so no proof can be read" % sha[:12])
-        page += 1
+        page += 1   # GitHub's 1,000 limit is per context, so other contexts can make many pages
     for s in found:
         if not (isinstance(s.get("state"), str) and isinstance(s.get("created_at"), str)
                 and isinstance(s.get("id"), int)):
@@ -136,19 +140,22 @@ def tree(sha, cwd):
     return p.stdout.strip() if p.returncode == 0 else None
 
 
-def post(sha, cwd, pr, source=None):
+def post(sha, cwd, pr, base, source=None, wait=3):
     if not SHA.match(sha or ""):
         return False, "%r is not a full commit SHA" % sha
     if not re.match(r"^[1-9][0-9]*$", pr or ""):
         return False, "--pr %r is not a pull request number" % pr
-    info = gh_json(cwd, "pr", "view", pr, "--json", "state,headRefOid,baseRefName")
+    for attempt in (0, 1):   # just after a push GitHub may still report the old head: read once more
+        info = gh_json(cwd, "pr", "view", pr, "--json", "state,headRefOid,baseRefName")
+        if not isinstance(info, dict) or info.get("headRefOid") == sha or attempt:
+            break
+        time.sleep(wait)
     if not isinstance(info, dict) or info.get("state") != "OPEN":
         return False, "#%s is not an open pull request" % pr
     if info.get("headRefOid") != sha:
         return False, "%s is not the head of #%s (%s)" % (sha[:12], pr, str(info.get("headRefOid"))[:12])
-    base = info.get("baseRefName")
-    if not isinstance(base, str) or not base:
-        return False, "the base of #%s could not be read" % pr
+    if info.get("baseRefName") != base:
+        return False, "#%s is based on %s now, not %s, the base it was reviewed against" % (pr, info.get("baseRefName"), base)
     if source is not None:
         if not SHA.match(source):
             return False, "--from %r is not a full commit SHA" % source
@@ -174,13 +181,13 @@ def post(sha, cwd, pr, source=None):
 
 def main(argv):
     args = argv[1:]
-    usage = ("usage: reviewed-status.py post <sha> --pr <n> [--from <reviewed-sha>]"
+    usage = ("usage: reviewed-status.py post <sha> --pr <n> --base <branch> [--from <reviewed-sha>]"
              " | verify <sha> [--pr <n> --base <branch>]\n")
     if not args or args[0] not in ("post", "verify") or len(args) < 2:
         sys.stderr.write(usage)
         return 2
     verb, sha, rest = args[0], args[1], args[2:]
-    allowed = ("--from", "--pr") if verb == "post" else ("--pr", "--base")
+    allowed = ("--from", "--pr", "--base") if verb == "post" else ("--pr", "--base")
     opts = {}
     while rest:
         if rest[0] in allowed and len(rest) > 1 and rest[0] not in opts:
@@ -189,7 +196,8 @@ def main(argv):
         else:
             sys.stderr.write(usage)
             return 2
-    if (verb == "post" and "--pr" not in opts) or (verb == "verify" and ("--pr" in opts) != ("--base" in opts)):
+    if (verb == "post" and ("--pr" not in opts or "--base" not in opts)) or (
+            verb == "verify" and ("--pr" in opts) != ("--base" in opts)):
         sys.stderr.write(usage)
         return 2
     try:
@@ -197,7 +205,8 @@ def main(argv):
             ok, why = verify(sha, None, opts.get("--pr"), opts.get("--base"))
             print(("REVIEWED %s by %s" if ok else "UNREVIEWED %s") % ((sha, why) if ok else (why,)))
             return 0 if ok else 2
-        ok, why = post(sha, None, opts["--pr"], opts.get("--from"))
+        ok, why = post(sha, None, opts["--pr"], opts["--base"], opts.get("--from"),
+                       float(os.environ.get("REVIEWED_STATUS_WAIT", "3")))
         print(("POSTED %s %s: %s" % (sha, CONTEXT, why)) if ok else "NOT POSTED %s" % why)
         return 0 if ok else 2
     except Unreadable as err:

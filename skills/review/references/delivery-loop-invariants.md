@@ -873,6 +873,7 @@ skills/build-item/SKILL.md|never the live one
 skills/build-item/SKILL.md|merge-gate.py <n> <head>
 skills/build-item/SKILL.md|reviewed-status.py post <new head> --from
 skills/review/references/review-ledger.md|reviewed-status.py post <final head>
+skills/review/references/review-ledger.md|On a READY outcome only
 skills/release/scripts/train_exclusions.py|reviewed_status.verify
 skills/release/references/release-branch.md|grandfatheredUnits
 skills/build-item/references/epic-release-steps.md|merge-gate.py

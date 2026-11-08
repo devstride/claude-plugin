@@ -67,8 +67,9 @@ terminal dispositions, fix commits, verification receipts, and reviewed heads be
 scratch ledger. This durable summary is the production release's input across constituent PRs.
 Never include raw reviewer text or unresolved private scratch notes. If publishing fails, retain
 scratch and report degradation; a later release treats the missing marker as unreviewed surface.
-Then leave the settled review's durable proof on the final reviewed head: `python3
-${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post <final head> --pr <n>` (a
+On a READY outcome only, then leave the settled review's durable proof on the final reviewed head:
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post <final head> --pr <n>
+--base <the base the review ran against>` (a
 `devstride/reviewed` commit status naming the pull request and its base; only an admin's counts).
 `NOT POSTED` is degradation to report, never a stop: a release then checks that unit file by file.
 Post only here and in `build-item` 5b's carry, never to clear a release refusal.

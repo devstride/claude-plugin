@@ -321,4 +321,6 @@ repo t40; unit epic "$E" infra/queue.tf; stub 30 train MERGED "$(git rev-parse H
 [ "$RC" = 2 ] && [[ "$OUT" == *"review proof of #30 could not be read"* ]] && ok "(40) GitHub unreadable while reading a proof: exit 2, never a guess" || bad "(40) $RC $OUT"
 repo t41; unit epic "$E" infra/queue.tf; NOPROOF=1 MERGED_AT=2026-11-01T12:00:00Z stub 30 train MERGED "$(git rev-parse HEAD)"; GH_STATUS_FAIL=1 run t41
 expect "(41) a grandfathered unit never needs GitHub's statuses" 0 "d['grandfatheredUnits']==[30]"
+repo t42; unit epic "Merge pull request #42 from acme/jane/26-10-01/epic-checkout" infra/queue.tf; run t42
+expect "(42) a pull request gh cannot confirm is listed with the reason and checked file by file" 1 "d['refused']==['infra/queue.tf'] and d['unprovenUnits'][0]['number']==42 and d['unprovenUnits'][0]['reason'].startswith('gh could not confirm #42')"
 exit $FAIL
