@@ -21,9 +21,11 @@ standing yes replaces only the per-pull-request question that used to follow it.
    a fork), authored by the owner's account, with the owner as the author of every commit, and
    linked to a tracked work item whose build the owner started.
 2. It changes nothing that guards merges: nothing under `.claude/` (this file and the release
-   skill) or `.github/` (the required checks), no `scripts/check-*` or `scripts/validate.sh`, and
-   neither `skills/pr/scripts/merge-gate.py` nor `skills/review/scripts/reviewed-status.py`, by old
-   or new name. Such a change always needs the owner's own yes on that pull request.
+   skill) or `.github/` (the required checks); no `scripts/check-*`, `scripts/neutrality-*`,
+   `scripts/validate.sh`, `scripts/tests/run.sh`, `scripts/public-hygiene.allow` or
+   `scripts/config-key-scan.ignore`; and neither `skills/pr/scripts/merge-gate.py` nor
+   `skills/review/scripts/reviewed-status.py`; by old or new name. Such a change always needs the
+   owner's own yes on that pull request.
 3. The review settled clean: the last local round (Claude and Codex) found no P1 and no serious P2,
    and the head carries a `devstride/reviewed` status for that pull request into `main`, posted
    under the owner's account after that round.
@@ -33,8 +35,10 @@ standing yes replaces only the per-pull-request question that used to follow it.
    check, required or not, green on that exact commit. `main` requires `release-guard`,
    `merge-path` and `public-hygiene`, and only org owners can update it, through a pull request.
 
-The merge step reads this file, its own procedure and both gate scripts from `main`, never from
-the pull request being merged.
+The merge step runs in a session started in a clean worktree of `main`, and reads this file, its
+own procedure and both gate scripts from there, never from the pull request being merged. It
+reads this file again right before merging, so a revocation that lands meanwhile stops it. It
+merges with a merge commit.
 
 ## The audit trail
 

@@ -70,9 +70,11 @@ holds at one exact head. The first one that fails stops here with `OWNER YES NEE
 reason; nothing is merged and nothing is bypassed.
 
 **Trusted copy.** This procedure, the standing yes and both gate scripts are read and run from
-`origin/main`, never from the pull request: `git fetch origin`, then `git worktree add --detach
-<tmp> origin/main` and use `<tmp>` for every path below marked *(main)*. Remove the worktree at
-the end.
+`origin/main`, never from the pull request. Run `merge` only in a session started in a clean
+worktree of `origin/main` (`git fetch origin && git worktree add --detach <tmp> origin/main`, then
+start the session there), so the skill and instructions loaded are main's; a session started in
+the pull request's checkout stops with `OWNER YES NEEDED`. Every path below marked *(main)* is in
+`<tmp>`.
 
 1. **The standing yes is in force.** `<tmp>/.claude/standing-yes.md` *(main)* exists and says
    `Status: in force`. Note its date and `origin/main`'s commit. Follow this procedure as written in
@@ -88,9 +90,10 @@ the end.
 3. **It touches nothing that guards merges.** List the files with `gh api
    repos/{owner}/{repo}/pulls/<pr>/files --paginate` (the count must equal `changedFiles`) and read
    both `filename` and `previous_filename`. Neither may be under `.claude/` or `.github/`, match
-   `scripts/check-*` or `scripts/validate.sh`, or be `skills/pr/scripts/merge-gate.py` or
-   `skills/review/scripts/reviewed-status.py`. A change to any of them, including this procedure
-   and the standing yes, always needs the owner's own yes.
+   `scripts/check-*` or `scripts/neutrality-*`, or be `scripts/validate.sh`,
+   `scripts/tests/run.sh`, `scripts/public-hygiene.allow`, `scripts/config-key-scan.ignore`,
+   `skills/pr/scripts/merge-gate.py` or `skills/review/scripts/reviewed-status.py`. A change to any
+   of them, including this procedure and the standing yes, always needs the owner's own yes.
 4. **The review settled clean.** The last local review round (Claude and Codex) on `<head>` found
    no P1 and no serious P2. Only then post the proof, `python3
    <tmp>/skills/review/scripts/reviewed-status.py post <head> --pr <pr> --base main` *(main)*, and
@@ -102,9 +105,11 @@ the end.
    `bash scripts/validate.sh --needles` (in the background, read from its log, never piped through
    `head`).
 6. **Every check is green on `<head>`.** `python3 <tmp>/skills/pr/scripts/merge-gate.py <pr>
-   <head> --all-green --repo devstride/claude-plugin` *(main)* prints `MERGE <command>`; run
-   exactly that command. `REFUSE` or `ERROR` stops with its reason (wait for pending checks first;
-   a red check is never merged).
+   <head> --all-green --repo devstride/claude-plugin` *(main)* prints `MERGE <command>`. Right
+   before running it, `git fetch origin`: if `origin/main` moved since step 1, read the standing yes
+   again (a revocation may have landed) and run this step again. Then run exactly that command.
+   `REFUSE` or `ERROR` stops with its reason (wait for pending checks first; a red check is never
+   merged).
 7. **The audit comment**, on the pull request at once (`gh pr comment <pr> --body-file <file>`):
 
    ```
