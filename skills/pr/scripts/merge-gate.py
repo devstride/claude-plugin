@@ -43,7 +43,9 @@ The rule (an approver's admin merge exactly when every required check is green, 
   an out-of-date head even when GitHub reads the pull request BLOCKED rather than BEHIND.
 - No bypassed approval: when the merge would need `--admin`, a REVIEW_REQUIRED decision or an
   unmet approval requirement of the base's pull_request rule (approving count, code owners, last
-  push, required reviewers) is a REFUSE: `--admin` would skip the approval.
+  push, required reviewers) is a REFUSE: `--admin` would skip the approval. Any other setting of
+  that rule (for example `require_extra_approval_for_unattributed_changes`) is judged only through
+  GitHub's REVIEW_REQUIRED decision.
 - No open conversation: a CHANGES_REQUESTED decision, any reviewer whose latest review requests
   changes (even when reviews are not required and the decision is empty), or any unresolved
   review thread is a REFUSE.

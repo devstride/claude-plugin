@@ -7,7 +7,7 @@
   "bodies": {
     "branch-feature": 900,
     "branch-hotfix": 2200,
-    "build-item": 7840,
+    "build-item": 7861,
     "ci-audit": 2600,
     "comprehend-plan": 1740,
     "create-defect": 2500,
@@ -107,7 +107,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 82617,
+      "budget": 82638,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -146,7 +146,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 67194,
+      "budget": 67215,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
