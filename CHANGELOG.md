@@ -8,6 +8,25 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **A review in which no engine returned a result fails, on every path.** Before, if Claude's
+  review and the CLI engine both crashed or timed out, the round could still settle and the code
+  could merge or land as reviewed. Now an engine's result is its findings or its explicit
+  no-findings verdict; a crash, kill, timeout, non-zero exit, empty or unparseable output is not
+  one. `review-gate.py` has two new commands. `engine` judges one CLI run from its exit status and
+  output file (empty output and a timeout are failures whatever was printed). `round` takes every
+  engine's result for a cycle, and exits 2 with one line naming each engine and why it failed when
+  none returned a result. The review skill runs both every cycle on the pull request path and on
+  LOCAL-FULL, and a FAILED round is never settled, flipped, recorded or merged. **The LOCAL-FULL
+  receipt is now schema 2**: each engine is `{engine, result, reason?}` with result `findings`,
+  `no-findings` or `failed`. `record` refuses bare engine names, a round with no result and a
+  failed `claude`. `check` refuses a schema-1 receipt, because it cannot show that any engine
+  returned, so a one-off reviewed before this release is reviewed again before it lands. The merge
+  body names each engine's result. The shared fixtures carry the new cases. Invariant F11.
+- Review body, LOCAL-FULL reference, invariants and three composed-path budgets raised by what
+  this rule costs (review body 7,870 → 7,994 tokens, under the 8,000 ceiling).
+
 ### Fixed
 
 - **The auto-start race test no longer fails on Ubuntu 26.04 runners.** Its stand-in claims store
