@@ -36,6 +36,11 @@ The rule (an approver's admin merge exactly when every required check is green, 
   cannot show which app sent it, so a rule bound to an app is met only by that app's check run.
   `--all-green` holds every check at the head to the same rule, not only the required ones
   (`release` uses it for production).
+- When the merge would need `--admin`, the classic protection rule that applies (read through
+  GraphQL, which resolves its pattern) must require nothing the gate cannot prove: deployments,
+  signed commits, linear history or a locked branch refuse, and so do required reviews, code
+  owners or last-push approval without an APPROVED decision.
+- The test merge commit going null or changing mid-read is a fresh read, never "no checks there".
 - Classic protection answering 404 means none only with GitHub's two messages for it ("Branch
   not protected", "Required status checks not enabled"); any other 404 is an ERROR.
 - A base that requires branches to be up to date (a ruleset's strict policy, or classic `strict`)
@@ -114,6 +119,15 @@ MERGE_COMMIT_QUERY = """query($owner: String!, $name: String!, $number: Int!, $a
         }
       } }
     }
+  }
+}"""
+
+CLASSIC_QUERY = """query($owner: String!, $name: String!, $ref: String!) {
+  repository(owner: $owner, name: $name) {
+    ref(qualifiedName: $ref) { branchProtectionRule {
+      pattern requiresDeployments requiresCommitSignatures requiresLinearHistory lockBranch
+      requiresApprovingReviews requiresCodeOwnerReviews requireLastPushApproval
+    } }
   }
 }"""
 
@@ -216,9 +230,7 @@ def merge_commit_contexts(owner, name, number, oid):
     while True:
         repo = graphql(MERGE_COMMIT_QUERY, owner, name, number, after)
         commit = (repo.get("pullRequest") or {}).get("potentialMergeCommit")
-        if not commit:
-            return []
-        if commit.get("oid") != oid:
+        if not commit or commit.get("oid") != oid:   # null while GitHub regenerates it: never "no checks"
             raise Retry("the base moved while the test merge commit's checks were being read")
         rollup = (commit.get("statusCheckRollup") or {}).get("contexts") or {"nodes": [], "pageInfo": {}}
         contexts += rollup.get("nodes") or []
@@ -226,6 +238,16 @@ def merge_commit_contexts(owner, name, number, oid):
         if not info.get("hasNextPage"):
             return contexts
         after = info.get("endCursor")
+
+
+def classic_rule(owner, name, base):
+    """The classic protection rule that applies to the base (GitHub resolves the pattern), or None."""
+    data = gh_json("api", "graphql", "-f", "query=" + CLASSIC_QUERY, "-f", "owner=" + owner, "-f", "name=" + name,
+                   "-f", "ref=refs/heads/" + base)
+    repo = (data.get("data") or {}).get("repository") if isinstance(data, dict) else None
+    if not isinstance(data, dict) or data.get("errors") or not isinstance(repo, dict) or not isinstance(repo.get("ref"), dict):
+        raise Unreadable("the classic protection of %s could not be read" % base)
+    return repo["ref"].get("branchProtectionRule")
 
 
 def unresolved_threads(owner, name, number):
@@ -441,6 +463,14 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     if admin and (pr.get("reviewDecision") == "REVIEW_REQUIRED" or (approvals and pr.get("reviewDecision") != "APPROVED")):
         raise Refuse("#%d still needs an approving review (%s): an admin merge would bypass it"
                      % (number, ", ".join(sorted(set(approvals))) or "GitHub reads REVIEW_REQUIRED"))
+    classic = classic_rule(owner, name, base) if admin else None
+    if classic:
+        cannot = [k for k in ("requiresDeployments", "requiresCommitSignatures", "requiresLinearHistory", "lockBranch") if classic.get(k)]
+        if pr.get("reviewDecision") != "APPROVED":
+            cannot += [k for k in ("requiresApprovingReviews", "requiresCodeOwnerReviews", "requireLastPushApproval") if classic.get(k)]
+        if cannot:
+            raise Refuse("#%d is blocked and the classic protection of %s (%s) requires %s, which this gate cannot "
+                         "prove met: an admin merge would bypass it" % (number, base, classic.get("pattern"), ", ".join(cannot)))
     unknown = sorted(t for t in types if t not in KNOWN_RULES)
     if admin and unknown:
         raise Refuse("#%d is blocked and %s has rule(s) this gate cannot judge (%s): an admin merge would bypass them"

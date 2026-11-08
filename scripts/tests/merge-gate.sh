@@ -21,6 +21,8 @@ if a[:2] == ["api", "graphql"]:
     if s.get("graphqlFail"):
         sys.stderr.write("gh: Something went wrong (HTTP 502)\n"); sys.exit(1)
     q = next(x[6:] for x in a if x.startswith("query="))
+    if "branchProtectionRule" in q:
+        print(json.dumps({"data": {"repository": {"ref": {"branchProtectionRule": s.get("classic")}}}})); sys.exit(0)
     after = next((x[6:] for x in a if x.startswith("after=")), None)
     if "reviewThreads" in q:
         if s.get("threadsPartial"):
@@ -31,6 +33,8 @@ if a[:2] == ["api", "graphql"]:
         sys.exit(0)
     if "potentialMergeCommit { oid statusCheckRollup" in q:
         m = s.get("mergeCommit")
+        if s.get("mergeCommitVanishes"):
+            m = None
         if s.get("mergeCommitMoves"):
             n = int(open(os.environ["GH_LOG"] + ".mc", "a+").seek(0, 2) or 0)
             open(os.environ["GH_LOG"] + ".mc", "a").write("x")
@@ -216,6 +220,15 @@ refuse("(27p) signed commits required: never bypassed with --admin", sc(ruleType
 merge("(27q) the base moves once during the read: one fresh read, then MERGE",
       sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, mergeCommitMoves=1), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
 refuse("(27r) the base keeps moving: REFUSE asking to run again", sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, mergeCommitMoves=9), "run the gate again")
+refuse("(27s) the test merge commit vanishes mid-read (GitHub regenerating it): never read as 'no checks'",
+       sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint", "FAILURE")]}, mergeCommitVanishes=True), "run the gate again")
+refuse("(27t) classic protection requires a deployment: an admin merge would bypass it -> REFUSE",
+       sc(classic={"pattern": "develop", "requiresDeployments": True}), "requiresDeployments")
+refuse("(27u) classic protection requires approving reviews, decision empty -> REFUSE",
+       sc(classic={"pattern": "dev*", "requiresApprovingReviews": True}), "requiresApprovingReviews")
+merge("(27v) classic protection requiring nothing the gate cannot prove -> MERGE --admin",
+      sc(classic={"pattern": "develop", "requiresDeployments": False, "lockBranch": False}),
+      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
 refuse("(27i) blocked with a rule the gate cannot judge -> REFUSE, never a silent admin bypass", sc(ruleTypes=["workflows"]), "rule(s) this gate cannot judge (workflows)")
 merge("(27j) the same unknown rule on a clean pull request: GitHub enforces it, no --admin",
       sc(ruleTypes=["code_scanning"], mergeStateStatus="CLEAN"), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s" % H)
@@ -237,7 +250,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 67 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 71 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.

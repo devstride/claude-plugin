@@ -415,7 +415,8 @@ M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exac
      no unresolved thread, and no reviewer whose latest review requests changes (the aggregate
      decision is empty when reviews are not required). A strict base is compared: behind refuses.
      `--admin` only when GitHub reads it BLOCKED with all of that true and at least one required
-     check, no unmet approval it would skip, and no rule type it cannot judge: an admin merge never bypasses a conflict, an
+     check, no unmet approval it would skip, and no ruleset rule type or classic requirement it
+     cannot judge: an admin merge never bypasses a conflict, an
      out-of-date branch or a red check. Production uses `--all-green` (every check). A check
      is one (name, app, workflow) or one commit status; a same-name check elsewhere must pass too,
      and a rule's app restriction is kept. The printed command names `--repo`. No skill
