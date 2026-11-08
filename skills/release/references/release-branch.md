@@ -51,7 +51,8 @@ on the error. `allowedRenumbers` (only with `release.migrationRenumber` set) lis
 renumber the source merge forced; the snapshot pull request's body reports each as "migration
 renumbered NNNN → MMMM (the source took NNNN)".
 
-**Release holds.** Before the snapshot, every item the range carries (each one-off's merge subject
+**Release holds.** Before the snapshot, and again on its final head before it merges (late
+arrivals, an adopted snapshot), every item the range carries (each one-off's merge subject
 and landed record) is checked with its ancestors by
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`'s helper. Held → STOP, naming
 each: "<item> is held (<reason>) but already on the train: wait for the hold to lift, or remove its

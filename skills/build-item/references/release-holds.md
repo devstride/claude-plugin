@@ -30,7 +30,8 @@ cases any other tool must pass.
 - `build-item` step 8, before an epic's release is cut or merged, over the unit, its ancestors and
   every leaf it carries (a leaf's hold travels with its epic): held → the epic waits on its
   integration branch, reported "release-ready, held until …".
-- `release`, before the train snapshot (`release-branch.md` §1) and over the delta before the cut:
+- `release`, before the train snapshot and on its final head (`release-branch.md` §1), and over the
+  delta before the cut:
   the backstop, for work that reached the path without the step-5 check. Held → STOP, naming the
   item and why: wait for the hold to lift, or the owner removes its line. Taking work back off the
   train is the owner's call, never this run's.

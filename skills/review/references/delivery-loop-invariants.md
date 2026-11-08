@@ -386,7 +386,8 @@ M16. A story merged onto its release unit's integration branch is LANDED, not Do
      passes GitHub's default merge subject with `--subject`; the close-out writes no dates, keeping
      step 6's.
 M17. A release hold is DATA on the item (a `Release hold:` line), never memory: `release-holds.py`
-     decides it, in one zone (`release.holdTimeZone`), "live" meaning deployed and checked, and a
+     decides it, in one zone (`release.holdTimeZone`), "live" meaning deployed and checked where
+     releases record it (else merged to production), and a
      line it cannot parse holds. It is checked on the item and its ancestors before any story lands
      on the train or the base, and on an epic's leaves too before it releases (held work waits on
      its own branch), and

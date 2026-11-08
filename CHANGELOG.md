@@ -19,7 +19,7 @@ for what each version component means here and how a release is cut.
   merge). A hold line that does not parse holds, naming the item and the line. `build-item` checks
   before a one-off merges onto the train or the base branch and before an epic releases; held work
   waits on its own branch. `release` checks every item before the train snapshot and before the cut,
-  and stops naming the held item and how to take it out.
+  and stops naming the held item; taking work back off the train is the owner's call.
 
 ## [3.35.0] — 2026-11-07
 
