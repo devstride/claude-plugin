@@ -36,8 +36,9 @@ The rule (an approver's admin merge exactly when every required check is green, 
   request's checks (`workflow_dispatch`, `schedule`, ...) is ignored, as GitHub ignores it. A
   check's runs are judged per trigger event (push, pull_request, ...), and no event's verdict may
   be failing or pending, so a later push run never hides a failed pull_request run. Within one
-  event any run still pending refuses, and the newest run is read both by run number and by when
-  its latest attempt started (a re-run keeps its number but starts later); the worse counts.
+  event any job still pending refuses, and an older run that is red counts unless the run the
+  verdict rests on began its latest attempt after it (read from the Actions API: a re-run keeps
+  its old number, and job times cannot order runs).
   Same-name jobs in one run are siblings, and every one must pass. A skipped or neutral newest run never hides
   an older run of the same check that executed and is failing or still pending. Pending, failed,
   cancelled, timed out or missing is a REFUSE naming it. A required check that also ran on the
@@ -109,7 +110,7 @@ PR_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: Stri
           nodes {
             __typename
             ... on CheckRun { name status conclusion startedAt completedAt databaseId isRequired(pullRequestNumber: $number)
-                              checkSuite { app { databaseId } workflowRun { runNumber event workflow { databaseId } } } }
+                              checkSuite { app { databaseId } workflowRun { databaseId runNumber event workflow { databaseId } } } }
             ... on StatusContext { context state createdAt isRequired(pullRequestNumber: $number) }
           }
         }
@@ -127,7 +128,7 @@ MERGE_COMMIT_QUERY = """query($owner: String!, $name: String!, $number: Int!, $a
           nodes {
             __typename
             ... on CheckRun { name status conclusion startedAt completedAt databaseId
-                              checkSuite { app { databaseId } workflowRun { runNumber event workflow { databaseId } } } }
+                              checkSuite { app { databaseId } workflowRun { databaseId runNumber event workflow { databaseId } } } }
             ... on StatusContext { context state }
           }
         }
@@ -351,34 +352,34 @@ def worst(states):
     return "SUCCESS" if "SUCCESS" in states else states[0]
 
 
-def stream_verdict(byRun, at):
+def stream_verdict(byRun, began):
     """One event's runs of one check: (verdict, earned). Any job of any run still pending is
-    PENDING. The runs are read in two orders, by run number and by when each run's latest attempt
-    started (a re-run keeps its old number but starts later), and each order is settled on its
-    own: its newest run, or, when that run is quiet, its newest run that executed. The worse of the
-    two counts. A quiet result with no executed run in either order is unearned."""
+    PENDING. The verdict rests on the newest run by number or, when that run is quiet, on the
+    newest run that executed. An older run that is red still counts when its latest attempt began
+    no earlier than that run's (a re-run keeps its old number), read through began(n) only then.
+    A quiet result with no executed run is unearned."""
     if any("PENDING" in states for states in byRun.values()):
         return "PENDING", False
     verdict = {n: worst(byRun[n]) for n in byRun}
-    def settle(order):
-        last = verdict[order[-1]]
-        if last not in QUIET:
-            return last, True
-        executed = [n for n in order if verdict[n] not in QUIET]
+    numbers = sorted(byRun)
+    relied = numbers[-1]
+    state = verdict[relied]
+    if state in QUIET:
+        executed = [n for n in numbers if verdict[n] not in QUIET]
         if not executed:
-            return last, False
-        newest = verdict[executed[-1]]
-        return (last if newest == "SUCCESS" else newest), True
-    results = [settle(sorted(byRun)), settle(sorted(byRun, key=lambda n: (at.get(n) or "", n)))]
-    red = [v for v, _ in results if v not in PASSED]
-    if red:
-        return red[0], True
-    if any(v == "SUCCESS" for v, _ in results):
-        return "SUCCESS", True
-    return results[0][0], any(earned for _, earned in results)
+            return state, False
+        relied = executed[-1]
+        if verdict[relied] != "SUCCESS":
+            return verdict[relied], True
+    elif state not in PASSED:
+        return state, True
+    for n in numbers:
+        if n < relied and verdict[n] not in PASSED and began(n) >= began(relied):
+            return verdict[n], True
+    return state, True
 
 
-def runs_at_head(contexts):
+def runs_at_head(contexts, started):
     """Every distinct check at this head and its verdict. A check run belongs to one (name, app,
     workflow), and a commit status is one context (GitHub reports only its latest state). Same-name
     checks from another workflow or app, and a same-name status, stay separate: each must pass. A
@@ -386,11 +387,12 @@ def runs_at_head(contexts):
     satisfies a check nor stands in front of an older one. Each counted event (push,
     pull_request, ...) is its own stream, judged by stream_verdict, and no stream may be failing or
     pending: a later push run never hides a failed pull_request run. Same-name jobs in one run are
-    siblings that must all pass. A skipped or neutral verdict is earned when a stream executed, or
-    when another job of that same workflow run succeeded (a job skipped because its run found
-    nothing to test); a check where nothing ever ran (a draft's held CI, read before the ready run
-    starts) or a quiet check from outside a workflow is UNEARNED."""
-    runs, ran = {}, set()
+    siblings that must all pass. started(run id) is when that workflow run's latest attempt began
+    (the Actions API; job times cannot order runs). A skipped or neutral verdict is earned when a
+    stream executed, or when another job of that same workflow run succeeded (a job skipped
+    because its run found nothing to test); a check where nothing ever ran (a draft's held CI,
+    read before the ready run starts) or a quiet check from outside a workflow is UNEARNED."""
+    runs, ran, ids = {}, set(), {}
     for c in contexts:
         if not isinstance(c, dict):
             continue
@@ -401,26 +403,25 @@ def runs_at_head(contexts):
             if run and run.get("event") not in ELIGIBLE:
                 continue
             workflow = (run.get("workflow") or {}).get("databaseId")
-            key, number = ("check", c.get("name"), app, workflow), run.get("runNumber") or 0
-            stream, when = run.get("event"), c.get("startedAt") or c.get("completedAt")
+            key, number, stream = ("check", c.get("name"), app, workflow), run.get("runNumber") or 0, run.get("event")
             state = c.get("conclusion") if c.get("status") == "COMPLETED" else "PENDING"
             if workflow and state == "SUCCESS":
                 ran.add((app, workflow, number))
+            if workflow:
+                ids[(app, workflow, number)] = run.get("databaseId")
         elif c.get("__typename") == "StatusContext":
-            key, number, stream, when = ("status", c.get("context"), None, None), 0, None, None
+            key, number, stream = ("status", c.get("context"), None, None), 0, None
             state = {"PENDING": "PENDING", "EXPECTED": "PENDING"}.get(c.get("state"), c.get("state"))
         else:
             continue
         if key[1]:
             entry = runs.setdefault(key, {"required": False, "streams": {}})
             entry["required"] = entry["required"] or bool(c.get("isRequired"))
-            byRun, at = entry["streams"].setdefault(stream, ({}, {}))
-            byRun.setdefault(number, []).append(state or "PENDING")
-            if when and when > (at.get(number) or ""):
-                at[number] = when
+            entry["streams"].setdefault(stream, {}).setdefault(number, []).append(state or "PENDING")
     verdicts = {}
     for key, entry in runs.items():
-        judged = {e: stream_verdict(*pair) for e, pair in entry["streams"].items()}
+        began = lambda n, key=key: started(ids.get((key[2], key[3], n)))
+        judged = {e: stream_verdict(byRun, began) for e, byRun in entry["streams"].items()}
         red = [v for v, _ in judged.values() if v not in PASSED]
         if red:
             state = next((v for v in red if v != "PENDING"), "PENDING")
@@ -429,7 +430,7 @@ def runs_at_head(contexts):
         else:
             state = next(iter(judged.values()))[0]
             bare = not any(earned for _, earned in judged.values())
-            newest = [max(pair[0]) for pair in entry["streams"].values()]
+            newest = [max(byRun) for byRun in entry["streams"].values()]
             if bare and not (key[3] and any((key[2], key[3], n) in ran for n in newest)):
                 state = UNEARNED
         verdicts[key] = (state, entry["required"])
@@ -486,7 +487,19 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     base = pr.get("baseRefName")
     if not isinstance(base, str) or not base:
         raise Unreadable("#%d names no base branch" % number)
-    runs = runs_at_head(pr["_contexts"])
+    starts = {}
+    def started(run_id):
+        """When a workflow run's latest attempt began; read only to order a red run against a green one."""
+        if not isinstance(run_id, int):
+            raise Unreadable("a workflow run at %s has no id, so its re-runs cannot be ordered" % expected[:12])
+        if run_id not in starts:
+            at = gh_json("api", "repos/%s/%s/actions/runs/%d" % (owner, name, run_id))
+            at = at.get("run_started_at") if isinstance(at, dict) else None
+            if not isinstance(at, str) or not at:
+                raise Unreadable("workflow run %d gave no run_started_at" % run_id)
+            starts[run_id] = at
+        return starts[run_id]
+    runs = runs_at_head(pr["_contexts"], started)
     ruled, ruled_strict, types, approvals = ruleset_checks(owner, name, base)
     protected, protected_strict = protection_checks(owner, name, base)
     required = ruled | protected | {(k[1], None) for k, (_, req) in runs.items() if req}
@@ -495,7 +508,7 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
         raise Refuse("not every required check is green at %s: %s" % (expected[:12], "; ".join(problems)))
     merge_oid = (pr.get("potentialMergeCommit") or {}).get("oid")
     if merge_oid:
-        on_merge = runs_at_head(merge_commit_contexts(owner, name, number, merge_oid))
+        on_merge = runs_at_head(merge_commit_contexts(owner, name, number, merge_oid), started)
         ran_there = {r for r in required if any(k[1] == r[0] for k in on_merge)}
         red = problems_with(ran_there, on_merge)   # a name there from the wrong app is a problem too
         if red:
