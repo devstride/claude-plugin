@@ -30,7 +30,7 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            The record follows the session, not the checkout: a session that moves to a checkout
            without the block keeps reporting under the one it came from, and Stop or SessionEnd is
            never dropped for a session that has a record. The session's process (CLAUDE_PID, else
-           the parent of the hook's shell) and its start time are refreshed whenever they change.
+           the parent of the hook's shell) and its start time are re-read on every start and prompt.
            Every read-modify-write of the record holds the session's state lock (never while the
            command runs), and every queued report takes the next number in the record's sequence.
   keeper <session>  (detached, one per session, holding the session's keeper lock, which is how a
@@ -82,6 +82,7 @@ BEAT_AFTER = 60          # a prompt re-sends when the last send is this old
 CHANGE_AFTER = 30        # a state change within this of the last send waits for the next send
 COMMAND_TIMEOUT = 20
 KEEP = 7 * 24 * 3600
+STARTED_SLACK = 5        # seconds a process's reported start time may drift before it is another process
 PAYLOAD_LIMIT = 4 * 1048576   # a prompt hook's payload carries the whole prompt
 # Seconds in a keeper minute. Tests shorten it; nothing else sets DEVSTRIDE_PRESENCE_MINUTE.
 try:
@@ -257,12 +258,13 @@ def owner_pid():
 
 
 def started(pid):
-    """A process's start time as `ps` prints it, so a reused process id is told apart; "" unknown."""
+    """A process's start time in epoch seconds, so a reused process id is told apart; 0 unknown."""
     try:
-        out = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True, timeout=2)
-        return out.stdout.strip() if out.returncode == 0 else ""
+        out = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
+                             timeout=1, env=dict(os.environ, LC_ALL="C"))
+        return int(time.mktime(time.strptime(" ".join(out.stdout.split()), "%a %b %d %H:%M:%S %Y")))
     except Exception:
-        return ""
+        return 0
 
 
 def lock(sid, kind, block_until_free, touch=True):
@@ -420,11 +422,12 @@ def hook():
     if event in ("Stop", "SessionEnd") and (peek is None or peek.get("state") == "ended"):
         return  # never reported here, or already ended
     mine = int(os.environ["CLAUDE_PID"]) if os.environ.get("CLAUDE_PID", "").isdigit() else 0
-    if event in ("SessionStart", "UserPromptSubmit"):
-        owner = owner_pid() if event == "SessionStart" else env_owner()
-        owner_started = started(owner) if owner else ""  # `ps` runs before the state lock is taken
-    else:
-        owner, owner_started = 0, ""
+    owner = 0  # every `ps` runs here, before the state lock is taken
+    if event == "SessionStart" or (event == "UserPromptSubmit" and not env_owner() and not alive((peek or {}).get("owner"))):
+        owner = owner_pid()
+    elif event == "UserPromptSubmit":
+        owner = env_owner()
+    owner_started = started(owner) if owner else 0
     with state_lock(sid):
         now = time.time()
         record = load(sid)
@@ -446,11 +449,8 @@ def hook():
         moved = not fresh and record.get("top") != top
         sent, state = record.get("sent") or 0, STATES[event]
         record.update({"top": top, "state": state, "version": running_version() or record.get("version") or ""})
-        if event == "UserPromptSubmit" and not owner and not alive(record.get("owner")):
-            owner = owner_pid()
-            owner_started = started(owner) if owner else ""
-        if owner and (event == "SessionStart" or owner != record.get("owner")):
-            record.update({"owner": owner, "ownerStarted": owner_started})  # a resume re-reads both
+        if owner and (owner_started or owner != record.get("owner")):
+            record.update({"owner": owner, "ownerStarted": owner_started})  # re-read on every start and prompt
         if event == "SessionEnd":
             record["reason"] = str(payload.get("reason") or "")
             verb = "end"
@@ -474,10 +474,13 @@ def hook():
 
 def replaced(record):
     """Whether the session's process id now belongs to another process: only a known start time
-    that differs counts, never a failed look-up."""
+    more than a few seconds off counts (a stepped clock shifts what `ps` reports), never a failed
+    look-up."""
     was = record.get("ownerStarted")
-    now = started(record.get("owner")) if was else ""
-    return bool(was and now and now != was)
+    if isinstance(was, bool) or not isinstance(was, int) or was <= 0:
+        return False
+    now = started(record.get("owner"))
+    return bool(now and abs(now - was) > STARTED_SLACK)
 
 
 def keeper(sid):

@@ -227,7 +227,7 @@ else bad "(16) $(cat "$LOG")"; fi
 : > "$LOG"; O17="$(owner)"
 CLAUDE_PID="$O17" fire SessionStart s17 "$K5" >/dev/null; wait_sent 1
 stop_keeper s17; KBEFORE=0; keeper_alive s17 && KBEFORE=1
-edit s17 'r["owner"] = 99998; r["ownerStarted"] = "then"'
+edit s17 'r["owner"] = 99998; r["ownerStarted"] = 1'
 CLAUDE_PID="$O17" fire SessionStart s17 "$K5" resume >/dev/null; wait_sent 2
 i=0; while ! keeper_alive s17 && [ $i -lt 30 ]; do sleep 0.1; i=$((i + 1)); done
 if [ "$KBEFORE" = 0 ] && keeper_alive s17 && [ "$(field 2 PRESENCE_EVENT)" = start ] && [ "$(field 2 CLAUDE_PID)" = "$O17" ]; then
@@ -269,10 +269,11 @@ else bad "(20) $(cat "$LOG")"; fi
 # (21) a resume re-reads the process start time even when the process id is the same number
 : > "$LOG"; O21="$(owner)"
 CLAUDE_PID="$O21" fire SessionStart s21 "$R" >/dev/null; wait_sent 1
-edit s21 'r["ownerStarted"] = "Thu Jan  1 00:00:00 1970"'
+edit s21 'r["ownerStarted"] = 1'
 CLAUDE_PID="$O21" fire SessionStart s21 "$R" resume >/dev/null; wait_sent 2
 W="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["ownerStarted"])' "$RECORDS/s21.json")"
-if [ "$W" = "$(ps -o lstart= -p "$O21" | sed 's/^ *//;s/ *$//')" ]; then
+REAL="$(LC_ALL=C ps -o lstart= -p "$O21" | python3 -c 'import sys,time; print(int(time.mktime(time.strptime(" ".join(sys.stdin.read().split()), "%a %b %d %H:%M:%S %Y"))))')"
+if [ "$W" = "$REAL" ]; then
   ok "(21) resume with the same process id → its start time re-read (no false gone after a reboot)"
 else bad "(21) ownerStarted=$W"; fi
 
@@ -303,6 +304,49 @@ age s24 61; CLAUDE_PID="$O24A" fire Stop s24 "$R" >/dev/null; CLAUDE_PID="$O24A"
 if [ "$(sent)" = 2 ] && [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["state"])' "$RECORDS/s24.json")" = starting ]; then
   ok "(24) Stop / SessionEnd from the older process after a resume in a newer one → nothing"
 else bad "(24) $(cat "$LOG")"; fi
+
+# (25) many hooks at once, across two checkouts, with a keeper beating: every queued report is
+#      accounted for, report times never go backwards, one keeper
+: > "$LOG"; O25="$(owner)"; K60B="$(mkrepo keeper60b "$(config 60)")"
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O25" fire SessionStart s25 "$K60" >/dev/null; wait_sent 1
+for n in $(seq 1 30); do
+  if [ $((n % 2)) = 0 ]; then D="$K60"; else D="$K60B"; fi
+  (age s25 61 2>/dev/null; CLAUDE_PID="$O25" fire UserPromptSubmit s25 "$D" >/dev/null) &
+  [ $((n % 7)) = 0 ] && (CLAUDE_PID="$O25" fire Stop s25 "$D" >/dev/null) &
+done
+wait
+i=0; while [ $i -lt 100 ]; do
+  python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); sys.exit(0 if r.get("queued")==r.get("done") else 1)' "$RECORDS/s25.json" 2>/dev/null && break
+  sleep 0.1; i=$((i + 1))
+done
+ORDER="$(python3 -c '
+import json,sys
+ats=[int(json.loads(l)["PRESENCE_AT"]) for l in open(sys.argv[1])]
+print("ok" if ats==sorted(ats) and len(ats)>=2 else "bad %s" % ats)' "$LOG")"
+KEEPERS="$(pgrep -f "presence.py keeper s25\$" | wc -l | tr -d ' ')"
+if [ "$i" -lt 100 ] && [ "$ORDER" = ok ] && [ "$KEEPERS" = 1 ]; then
+  ok "(25) 30 prompts and Stops at once across two checkouts → queued = done, PRESENCE_AT never falls, one keeper"
+else bad "(25) i=$i order=$ORDER keepers=$KEEPERS $(cat "$RECORDS/s25.json")"; fi
+stop_keeper s25
+
+# (26) a hook waits for the session's state lock: nothing in the record changes while another
+#      process holds it, and the update lands once it is released
+: > "$LOG"; O26="$(owner)"
+CLAUDE_PID="$O26" fire SessionStart s26 "$K60" >/dev/null; wait_sent 1; stop_keeper s26; age s26 61
+python3 -c '
+import fcntl, os, sys, time
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT, 0o600); fcntl.flock(fd, fcntl.LOCK_EX)
+open(sys.argv[2], "w").close(); time.sleep(1.5)' "$RECORDS/s26.state.lock" "$WORK/held26" &
+HOLDER=$!
+i=0; while [ ! -e "$WORK/held26" ] && [ $i -lt 50 ]; do sleep 0.05; i=$((i + 1)); done
+(CLAUDE_PID="$O26" fire UserPromptSubmit s26 "$K60" >/dev/null) &
+sleep 0.7; Q1="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["queued"])' "$RECORDS/s26.json")"
+wait "$HOLDER"; wait_sent 2
+Q2="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["queued"])' "$RECORDS/s26.json")"
+if [ "$Q1" = 1 ] && [ "$Q2" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = beat ]; then
+  ok "(26) state lock held elsewhere → the prompt's update waits for it, then lands (beat)"
+else bad "(26) q1=$Q1 q2=$Q2 $(cat "$LOG")"; fi
+stop_keeper s26
 
 # (12) hooks.json registers the hook on all four events, bounded and failing open
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'
