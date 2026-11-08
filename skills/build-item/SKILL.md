@@ -248,7 +248,7 @@ branch waits, said.
 - **The rebase already happened** in `review` step 7; rebase again only if the base moved, via
   `/devstride:push` (conflict → fork). Compare patches: CHANGED returns to `review` with its
   cumulative ledger, target and safety state, never a fresh budget; tree-identical keeps its
-  receipt and carries its proof (`skills/review/scripts/reviewed-status.py post <new head> --from
+  receipt and carries its proof (`python3 ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post <new head> --from
   <reviewed head> --pr <n> --base <ledger's Base branch>`), else affected checks rerun. Then RECOMPUTE `verify.skipDuringStoryBuilds` applicability
   from the new SHA.
 - **Observe greenness**: non-draft, every applicable check succeeded — actually RAN — at the

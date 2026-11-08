@@ -184,7 +184,7 @@ def post(sha, cwd, pr, base, source=None, wait=3):
 
 def wait_seconds():
     try:
-        return max(0.0, float(os.environ.get("REVIEWED_STATUS_WAIT", "3")))
+        return min(60.0, max(0.0, float(os.environ.get("REVIEWED_STATUS_WAIT", "3"))))
     except ValueError:
         return 3.0
 
