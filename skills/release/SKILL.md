@@ -76,7 +76,7 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   an adopted release branch first gets the fix-exclusion check on its commits.
 - **Prove CI can stay last before opening anything**: inspect pull-request workflows, excluding the
   convention-only shape in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`. None
-  → a valid no-CI release, said plainly. An expensive PR workflow without all draft-hold flags true
+  → a valid no-CI release, said. An expensive PR workflow without all draft-hold flags true
   → STOP with `/devstride:setup ci`; false, mixed or ambiguous facts prove no hold.
 - **Ground truth.** Read what OTHER authors landed on both branches
   (`git log origin/<branch> --since='6 hours ago'`), say when another session looks active, and verify every remembered fact against `origin`/`gh` first —
@@ -97,14 +97,14 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   release (release branch), or advances this PR's head and step 2 re-reviews.
 - **Record `<sourceHead>`** — the SHA the delta is computed from: an adopted release branch's cut
   point, else the `origin/<releaseSource>` tip (where 0c cuts). Every later integrity check compares
-  against it, never the branch tip.
+  against it, not the branch tip.
 - **Compute the delta** from `git log --first-parent origin/master..<sourceHead>` and the merged
   PRs in that range (`gh pr list --base develop --state merged`): the epics/stories that landed, the
   **user-facing** subset (UI, API, behaviour, permissions, migrations) vs internal, and any breaking
   change or migration called out. It drives the PR body and the docs payload; report it before
   cutting, with the `RELEASE CLASS` line and reason from **`classify-release`** (`head:
   <sourceHead>`; `release.classifySkill` unset or unreadable → `FULL`). A release hold on any item in
-  it (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`) → STOP, named.
+  it (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`) → STOP, named, at every recompute too.
 - **0c. Cut the release branch** when `release.releaseBranchPattern` is set and none was adopted:
   named by the pattern for today (`-2`, `-3` … when taken), cut at `<sourceHead>`, pushed —
   `release-branch.md` §2.
@@ -169,10 +169,10 @@ Optional arguments — documentation switches and a scope: $ARGUMENTS
   by this run's fix commits and a hotfix merge (`release-branch.md` §4), each re-reviewed; without
   one it must still equal `<sourceHead>`. Anything else → recompute the delta and restart step 2 on
   the new head with the same ledger, target and safety triggers. Record the SHA that finally settles
-  as `<reviewedHead>` (after `review` 7.3's one empty re-trigger commit when that fired — same
+  as `<reviewedHead>` (after `review` 7.3's empty re-trigger commit if one fired — same
   tree). Nothing is frozen: an advance after the flip goes back through step 2 — a ready PR is first
   returned to draft (`gh pr ready --undo`), so CI waits — never merged over; any return to step 2
-  voids an owner yes already given.
+  voids any owner yes given.
 - Only genuinely ambiguous/risky findings stall — surface them with a recommendation. A dismissed
   finding stays dismissed; each entry on this release's or the step-0b train pull request's
   untracked-deferral list → `create-defect deferred <item#>` (a bug) or
