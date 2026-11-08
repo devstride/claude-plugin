@@ -51,7 +51,8 @@ release pull request names each one. Never post a proof to clear a refusal: an u
 back to the owner. A plan's release pull request (plan scope)
 is not exempt whole: its plan branch's epic pull requests are the reviewed units, the rest is checked. Exit 1 → STOP, naming each file in
 `refused` and saying: "this touches deploy configuration or database migrations without a reviewed
-pull request; merge it to <releaseSource> through a normal pull request, then re-run." Exit 2 → STOP
+pull request; merge it to <releaseSource> through a normal pull request, then re-run." Name each
+`unprovenUnits` entry (number, reason) apart: its files go to the owner, not to the source. Exit 2 → STOP
 on the error. `allowedRenumbers` (only with `release.migrationRenumber` set) lists each migration
 renumber the source merge forced; the snapshot pull request's body reports each as "migration
 renumbered NNNN → MMMM (the source took NNNN)".
