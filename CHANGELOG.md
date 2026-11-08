@@ -8,6 +8,8 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.39.0] — 2026-11-08
+
 ### Changed
 
 - **A release unit now needs proof of its review, not just a branch name.** Before, the release
@@ -17,18 +19,57 @@ for what each version component means here and how a release is cut.
   on GitHub: `review` posts a `devstride/reviewed` commit status on the final reviewed head
   (`skills/review/scripts/reviewed-status.py post <sha> --pr <n> --base <base>`) on a READY
   outcome, naming the pull request and the base it was reviewed against (a pull request retargeted
-  since gets none), and `build-item` 5b carries it to a tree-identical rebase (`--from`). `train_exclusions.py`
-  accepts a unit only when its merged head (the merge's second parent) carries that status for
-  that same pull request into the train, so a story's review into an epic branch never proves the
-  epic's merge. Only an account with admin permission on the repository counts; statuses from
-  others, bots and deleted accounts are ignored, and an admin withdraws a proof by posting
-  `failure`. A unit without proof is checked file by file like any other commit and listed in the
-  new `unprovenUnits` output with the reason; GitHub unreadable is an error (exit 2), never a
-  guess. Units merged before this version (`GRANDFATHERED_BEFORE`, by GitHub's `mergedAt`) keep
-  the old rule and are listed in `grandfatheredUnits`. A post that does not count (the poster is
-  not an admin) says so at once. Failing to post is reported, never a stop.
+  since gets none), and `build-item` 5b carries it to a tree-identical rebase (`--from`).
+  `train_exclusions.py` accepts a unit only when its merged head (the merge's second parent)
+  carries that status for that same pull request into the train, so a story's review into an epic
+  branch never proves the epic's merge. Only an account with admin permission on the repository
+  counts; statuses from others, bots and deleted accounts are ignored, and an admin withdraws a
+  proof by posting `failure`. A unit without proof is checked file by file like any other commit
+  and listed in the new `unprovenUnits` output with the reason; GitHub unreadable while reading a
+  proof is an error (exit 2), never a guess. Units merged before 2026-11-10 00:00 UTC
+  (`GRANDFATHERED_BEFORE`, by GitHub's `mergedAt`; a day after this release, so running sessions
+  can update first) keep the old rule and are listed in `grandfatheredUnits`. A post that does not
+  count (the poster is not an admin) says so at once. Failing to post is reported, never a stop.
   The check's own `git` calls now ignore local colour, signature, relative-diff and replace-object
   settings.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.38.0 @ 9b52fb6, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.38.0 | tokens@devstride--v3.38.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,094 | 8,032 | 24,094 | 8,032 | +0 | 8,040 |
+| skills/review/SKILL.md | 23,979 | 7,993 | 23,991 | 7,997 | +4 | 7,997 |
+| skills/release/SKILL.md | 23,971 | 7,991 | 23,971 | 7,991 | +0 | 8,000 |
+| skills/doctor/SKILL.md | 23,870 | 7,957 | 23,870 | 7,957 | +0 | 7,960 |
+| skills/build-item/SKILL.md | 23,581 | 7,861 | 23,758 | 7,920 | +59 | 7,920 |
+| skills/rebalance/SKILL.md | 17,724 | 5,908 | 17,724 | 5,908 | +0 | 5,910 |
+| skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,655 | 4,885 | +0 | 4,900 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-defect/SKILL.md | 6,202 | 2,068 | 6,202 | 2,068 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 5,793 | 1,931 | 5,793 | 1,931 | +0 | 1,940 |
+| skills/comprehend-plan/SKILL.md | 5,201 | 1,734 | 5,201 | 1,734 | +0 | 1,740 |
+| skills/insert-defect/SKILL.md | 4,714 | 1,572 | 4,714 | 1,572 | +0 | 1,600 |
+| skills/insert-story/SKILL.md | 4,037 | 1,346 | 4,037 | 1,346 | +0 | 1,400 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 273,600 | 91,209 | 273,789 | 91,272 | +63 | |
 
 ## [3.38.0] — 2026-11-08
 
@@ -3693,7 +3734,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.38.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.39.0...HEAD
+[3.39.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.38.0...devstride--v3.39.0
 [3.38.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.37.0...devstride--v3.38.0
 [3.37.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.36.0...devstride--v3.37.0
 [3.36.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.35.0...devstride--v3.36.0

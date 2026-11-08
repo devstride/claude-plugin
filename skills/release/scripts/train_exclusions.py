@@ -81,7 +81,7 @@ ROUTING = os.path.join(SKILLS, "build-item/scripts/routing.py")
 REVIEWED = os.path.join(SKILLS, "review/scripts/reviewed-status.py")
 # Release units merged before this instant (GitHub's mergedAt) keep the rule they were merged under:
 # a confirmed pull request with an epic-shaped head. From it on, only proof of a settled review counts.
-GRANDFATHERED_BEFORE = "2026-11-09T00:00:00Z"
+GRANDFATHERED_BEFORE = "2026-11-10T00:00:00Z"
 
 
 def fail(msg):
