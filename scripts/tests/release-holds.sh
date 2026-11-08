@@ -48,6 +48,9 @@ say(out.get("held") is True, "git: nothing names I20101 on master: held", p.stdo
 git("commit", "-q", "--allow-empty", "-m", "feat: x [I201010]")
 p = run(req, cwd=repo); out = json.loads(p.stdout) if p.returncode == 0 else {}
 say(out.get("held") is True, "git: I201010 is not I20101", p.stdout + p.stderr)
+git("commit", "-q", "--allow-empty", "-m", "chore: I20101ABC")
+p = run(req, cwd=repo); out = json.loads(p.stdout) if p.returncode == 0 else {}
+say(out.get("held") is True, "git: I20101ABC is not I20101", p.stdout + p.stderr)
 git("commit", "-q", "--allow-empty", "-m", "fix(y): z [I20101]")
 p = run(req, cwd=repo); out = json.loads(p.stdout) if p.returncode == 0 else {}
 say(out.get("held") is False and "no post-deploy status" in out["holds"][0]["reason"], "git: merged, with no post-deploy status recorded: met, and says so", p.stdout + p.stderr)

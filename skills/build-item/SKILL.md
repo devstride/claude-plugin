@@ -134,9 +134,6 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   with `releaseTrain.fastMerges` true. **Read
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` before changing the one-off
   classification or its step-0 delta.**
-- **Step 5** — a release hold on the item or an ancestor
-  (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`) keeps it off the train and
-  `baseBranch`: checked before every merge; held → the story branch waits, said.
 - **Step 6.5** — follow-ups become their own one-offs (`/devstride:create-story` /
   `/devstride:create-defect`), never `insert-*`; a deferred finding keeps the DEFERRED placement
   under the root this item resolves to.
@@ -230,6 +227,11 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 
 ## 5. Merge
 
+**Release holds first**, before any merge onto the train or `baseBranch` (one-off or plan story): a
+hold on the item or an ancestor
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`) → no merge; the story
+branch waits, said.
+
 ### 5a. Fast merge (from 4a)
 
 - Clean tree, every 4a fix committed. `git checkout <epic branch> && git pull --ff-only`; merge the
@@ -312,7 +314,7 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 ## 8. EPIC RELEASE — epic branch → develop, fully reviewed
 
 **Gate**: zero remaining leaves, working base the unit's integration branch, no release hold on the
-unit or an ancestor (`references/release-holds.md`; held → wait, said), **auto-release on** —
+unit, an ancestor or a leaf it carries (`references/release-holds.md`; held → wait, said), **auto-release on** —
 `epicIntegrationBranches.autoRelease` when PRESENT, the profile default only when ABSENT. Off →
 cut nothing; report release-ready and stop — after the owner merges it, one
 `/devstride:build-item <root>` run marks its stories Done (plan scope: landed, `plan-scope.md`). **`"ask"` is a third legal value**: ask

@@ -306,6 +306,44 @@
      }
     ]
    }
+  },
+  {
+   "name": "an attributed <br> and nested block tags still split lines",
+   "request": {
+    "items": [
+     {
+      "number": "I20100",
+      "description": "<div><p>Details<br class=\"editor-break\">Release hold: not before 2099-01-01</p></div><ul><li><p>Release hold: after I20101 is live</p></li></ul>"
+     }
+    ],
+    "now": "2026-11-08T00:00:00Z",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    },
+    "live": [
+     "I20101"
+    ]
+   },
+   "expect": {
+    "held": true,
+    "holds": [
+     {
+      "item": "I20100",
+      "kind": "notBefore",
+      "value": "2099-01-01T00:00:00-06:00",
+      "satisfied": false
+     },
+     {
+      "item": "I20100",
+      "kind": "after",
+      "value": "I20101",
+      "satisfied": true
+     }
+    ]
+   }
   }
  ],
  "errors": [
@@ -433,6 +471,44 @@
     }
    },
    "contains": "number like I20100"
+  },
+  {
+   "name": "an offset with impossible minutes fails closed",
+   "request": {
+    "items": [
+     {
+      "number": "I20103",
+      "description": "<p>Release hold: not before 2026-11-11T08:00+00:99</p>"
+     }
+    ],
+    "now": "2026-11-12T00:00:00Z",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "contains": "does not parse"
+  },
+  {
+   "name": "a hold that does not start its own line fails closed",
+   "request": {
+    "items": [
+     {
+      "number": "I20100",
+      "description": "<p>Note. Release hold: not before 2099-01-01</p>"
+     }
+    ],
+    "now": "2026-11-08T00:00:00Z",
+    "config": {
+     "release": {
+      "productionBranch": "master",
+      "holdTimeZone": "America/Chicago"
+     }
+    }
+   },
+   "contains": "does not start its own line"
   }
  ]
 }
