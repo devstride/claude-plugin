@@ -59,7 +59,9 @@ The `merge-path` rules still admit an epic-shaped branch (`<prefix>/<YY-MM-DD>/e
 when it bumps the version, so a branch cut by hand in that shape cannot reach `main` unreleased.
 
 A release is cut with the repo-local `plugin-release` skill (`.claude/skills/plugin-release/`),
-never by hand; `/devstride:release` is not configured here.
+never by hand; `/devstride:release` is not configured here. A settled, green pull request merges
+through `plugin-release merge <pr>` under the owner's standing yes (`.claude/standing-yes.md`, with
+its conditions and audit trail); when any condition fails, only the owner's own yes merges it.
 
 ## Working copy
 
