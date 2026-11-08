@@ -33,7 +33,8 @@ In plan scope, the refresh source, the cut base and the close-out change as
   cloud may still cover the whole PR. A firing
   `verify.skipDuringStoryBuilds` suite is mandatory, with no story exemption; with the list empty,
   local pre-ship suites remain the callers' step-2b responsibility.
-- **Merge** `gh pr merge <n> --merge` once green and settled (landed set captured first), then
+- **Merge** with the `MERGE` line of `python3 ${CLAUDE_PLUGIN_ROOT}/skills/pr/scripts/merge-gate.py
+  <n> <head>` (`<head>`: review's final reviewed head, never the live one) once green and settled (landed set captured first; anything else STOPS), then
   **close out** (`next-unblocked.md`): `add_comment` on the RELEASE-UNIT item (release PR, leaves,
   date), Done if its status is tracked, THEN landed leaves → Done, **linking the release PR onto
   every leaf** (the close-out comment, or `link_pull_request`). Delete the epic branch **only if

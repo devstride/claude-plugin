@@ -8,6 +8,95 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.38.0] — 2026-11-08
+
+### Added
+
+- **One merge gate for every merge: `skills/pr/scripts/merge-gate.py <n> <head>`.** Before, the
+  rule that an approver's admin merge happens only when every required check is green on that
+  exact commit was a habit, and an admin merge could bypass a red check. Now `release` (step 4 and
+  the release branch's train merge), the standing-yes route and `build-item` (story, train and
+  epic-release merges) run the gate and then exactly the command it prints. It prints `MERGE gh pr
+  merge <n> --repo <owner>/<name> --merge --match-head-commit <head>` only for an open, non-draft
+  pull request still at that head (the reviewed head, never the live one), with every required
+  check passed on its newest run there. The required checks are the base's rulesets, its classic
+  protection and whatever GitHub marks required. Pending, failed, cancelled or missing refuses
+  and names the check. An unresolved review thread or a change request also refuses. It adds
+  `--admin` only when GitHub reads the pull request BLOCKED with all of that true, at least one
+  required check and no approval it would skip, so an admin merge never bypasses a conflict, an
+  out-of-date branch, a missing approval or a red check. `REFUSE` exits 2 and `ERROR`
+  (GitHub unreadable) exits 1; neither merges. `--delete-branch` and a train merge's `--subject`
+  carry through, quoted so the line runs as printed. A test fails the build if any skill text
+  carries its own `--admin`. A check is one (name, app, workflow) or one commit status: a re-run supersedes the run before it, but a green check never hides a failing same-name check from another workflow or app, or a same-name commit status. A rule's app restriction (`integration_id`, `app_id`) is kept. The base branch is URL-encoded in REST paths, and the printed command names `--repo`, so it acts on the pull request that was inspected. The production-to-source sync merge goes through the gate too. A check passes as GitHub reads it: SUCCESS, or SKIPPED or NEUTRAL (a workflow that skips a job with nothing to test), but a skipped newest run never hides an older executed run of that check that failed or is still pending, and a required check's skip passes only with evidence that CI ran: another job of its own workflow run succeeded, or an older run of that check did. A run where every job skipped (a draft's held CI, still the newest just after the ready flip) refuses. A workflow run from an event GitHub does not count toward a pull request's checks (`workflow_dispatch`, `schedule`) is ignored, so a manual run never stands in for a failed one. Each trigger event's runs are judged apart, so a later push run never hides a failed pull_request run; any job still pending refuses, and so does any run of that workflow and event still going (the Actions API lists every run at the commit, so a newer run that has not created the check yet holds it) or a newer one that ended red without reporting it; the newest run is chosen by workflow run number (check-run ids do not follow run order when runs overlap), and an older run that is red still counts when it was re-run after the run the verdict rests on began (a re-run keeps its old number; job times cannot order runs; a first attempt never supersedes a higher-numbered run, even within the same second). A red run that never reported the check counts unless a later run of its workflow and event passed with a job that executed (a run where every job skipped clears nothing). The runs at a commit are listed just before and just after its checks are read, and any change between the two (a re-run finishing mid-read) is a fresh read. Same-name jobs in one run are siblings that must all pass. A required check that also ran on the test merge commit must pass there, and any reviewer whose latest review requests changes refuses even when reviews are not required. A base that requires up-to-date branches is compared, and a head behind it refuses. Classic protection reads as "none" only for GitHub's two no-protection 404 answers. A BLOCKED pull request on a base with a rule type the gate cannot judge (signed commits included) refuses rather than bypassing it with `--admin`. A base or head that moves while the gate reads, or a test merge commit GitHub is regenerating, gets one fresh read before it refuses. With `--admin`, the classic protection rule that applies must require nothing the gate cannot prove (deployments, signed commits, linear history, a locked branch, or reviews without an approval). `--all-green` holds every check, not only the required ones, to the same rule; the production merge in `release` uses it. Replayed over the last 40 merged pull requests of a consuming repository, the gate refuses none. Invariant M19.
+
+### Changed
+
+- **A review in which no engine returned a result fails, on every path.** Before, if Claude's
+  review and the CLI engine both crashed or timed out, the round could still settle and the code
+  could merge or land as reviewed. Now an engine's result is its findings or its explicit
+  no-findings verdict; a crash, kill, timeout, non-zero exit, empty or unparseable output is not
+  one. `review-gate.py` has two new commands. `engine` judges one CLI run from its exit status and
+  output file (empty output and a timeout are failures whatever was printed). `round` takes every
+  engine's result for a cycle, and exits 2 with one line naming each engine and why it failed when
+  none returned a result. The review skill runs both every cycle on the pull request path and on
+  LOCAL-FULL, and a FAILED round is never settled, flipped, recorded or merged. **The LOCAL-FULL
+  receipt is now schema 2**: each engine is `{engine, result, reason?}` with result `findings`,
+  `no-findings` or `failed`. `record` refuses bare engine names, a round with no result and a
+  failed `claude`. `check` refuses a schema-1 receipt, because it cannot show that any engine
+  returned, so a one-off reviewed before this release is reviewed again before it lands. The merge
+  body names each engine's result. The shared fixtures carry the new cases. LOCAL-ONLY, which triages a hand-off and launches no engine, runs no round; release's identical-tree high-risk pass runs one, and a FAILED round stops before the pull request is marked ready. `round` refuses `engine`'s `returned` with the mapping to make (read the output, then `findings`, `no-findings` or `failed`), and `record` refuses an engine that reported findings with an empty findings list. Each engine's recorded result is its latest across the review, so a Claude-only follow-up cycle keeps the CLI engine's earlier result. Invariant F11.
+- Review body, LOCAL-FULL reference, invariants and three composed-path budgets raised by what
+  this rule costs (review body 7,870 → 7,993 tokens, under the 8,000 ceiling). The merge gate
+  raises the build-item body (7,790 → 7,820), three references and the composed paths; the release
+  body fell (7,989 → 7,987) because step 4 now leaves the draft and green-head checks to the gate.
+
+### Fixed
+
+- **The auto-start race test no longer fails on Ubuntu 26.04 runners.** Its stand-in claims store
+  took a claim with the `mkdir` command, and the uutils coreutils that Ubuntu ships from 25.10
+  reports success to both of two racing `mkdir` runs on one path (about 1 in 12 races on the CI
+  image), so both starters "won". The test now claims with Python's `os.mkdir`, one system call,
+  which never let both win in 3,000 races there. The plugin's own locks were never affected: they
+  use `O_EXCL` and `flock` system calls, not the command.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.37.0 @ ce2b8ab, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.37.0 | tokens@devstride--v3.37.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,094 | 8,032 | 24,094 | 8,032 | +0 | 8,040 |
+| skills/review/SKILL.md | 23,602 | 7,868 | 23,979 | 7,993 | +125 | 7,993 |
+| skills/release/SKILL.md | 23,967 | 7,989 | 23,971 | 7,991 | +2 | 8,000 |
+| skills/doctor/SKILL.md | 23,870 | 7,957 | 23,870 | 7,957 | +0 | 7,960 |
+| skills/build-item/SKILL.md | 23,368 | 7,790 | 23,581 | 7,861 | +71 | 7,861 |
+| skills/rebalance/SKILL.md | 17,724 | 5,908 | 17,724 | 5,908 | +0 | 5,910 |
+| skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,655 | 4,885 | +0 | 4,900 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-defect/SKILL.md | 6,202 | 2,068 | 6,202 | 2,068 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 5,793 | 1,931 | 5,793 | 1,931 | +0 | 1,940 |
+| skills/comprehend-plan/SKILL.md | 5,201 | 1,734 | 5,201 | 1,734 | +0 | 1,740 |
+| skills/insert-defect/SKILL.md | 4,714 | 1,572 | 4,714 | 1,572 | +0 | 1,600 |
+| skills/insert-story/SKILL.md | 4,037 | 1,346 | 4,037 | 1,346 | +0 | 1,400 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 273,006 | 91,011 | 273,600 | 91,209 | +198 | |
+
 ## [3.37.0] — 2026-11-07
 
 ### Added
@@ -3582,7 +3671,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.37.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.38.0...HEAD
+[3.38.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.37.0...devstride--v3.38.0
 [3.37.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.36.0...devstride--v3.37.0
 [3.36.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.35.0...devstride--v3.36.0
 [3.35.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.34.0...devstride--v3.35.0

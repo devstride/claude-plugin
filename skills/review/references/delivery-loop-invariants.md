@@ -15,7 +15,7 @@ one document grouped by theme; every entry from the round-by-round sections surv
 two entries stated the same rule (the merged entry keeps every clause of both). Entry ids are stable
 within this revision only — cite the rule's words, not its id, from anywhere else.
 
-**Count: see the total at the end.** Recount whenever you add one. The count has been wrong six
+**Count: see the total at the end.** Recount whenever you add one. The count has been wrong seven
 times — among them an early revision that claimed 56 for the first eight sections when they
 enumerated 53, and the round-by-round revision that claimed 153 when it enumerated 154. The miscount is recorded rather than
 quietly fixed because it is the instructive part: the checklist was being cited as proof that no
@@ -157,6 +157,15 @@ F10. If the roster drops to Claude-only on a PR path because CONFIGURED engines 
      human GitHub review — do not proceed on the Claude pass alone. A configured-EMPTY roster
      (localCommand null, automatedReviewers []) is the repo's own choice: proceed, announced. See
      the roster-resolution and degradation policy at the top of `skills/review/SKILL.md`.
+F11. No result, no review. An engine's result is its findings or its explicit no-findings verdict;
+     a crash, kill, timeout, non-zero exit, empty or unparseable output is not one. Every cycle that
+     launches engines (not LOCAL-ONLY, which triages a hand-off; release's identical-tree
+     high-risk pass included) runs `review-gate.py engine` per
+     CLI run and `round` over all engines: a round in
+     which no engine returned a result is FAILED and never settles, flips, records a receipt or
+     merges. The LOCAL-FULL receipt (schema 2) carries each engine's result; `record` refuses bare
+     engine names and a failed `claude`, and `check` refuses a schema-1 receipt, which cannot show
+     that any engine returned. Before this, a review whose engines all failed could settle.
 
 ## G. Mandatory review lenses (config: `review.mandatoryLenses`; contract: `skills/ultracode-build/references/mandatory-lenses.md`)
 G1. An entry `{name, paths, question}` whose ANCHORED `paths` match a hand-written file in the diff
@@ -396,6 +405,24 @@ M18. The production merge waits for the owner's in-the-moment yes unless `standi
      MERGE from the config at the release head: light (a LIGHT tree equal to its reviewed train) or
      full (the owner's written, dated yes; the exact reviewed head; every gate green; every
      migration it adds or changes approved by content, its blob id, on the owner's own words).
+M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exactly its `MERGE`
+     line; `REFUSE` or `ERROR` stops. It merges only an open, non-draft pull request at the
+     expected head, pinned with `--match-head-commit`, with every required check (rulesets,
+     classic protection, and what GitHub marks required) completed SUCCESS on its newest run there
+     (passed is GitHub's reading: SUCCESS, SKIPPED or NEUTRAL, but a skipped newest run never hides
+     an older executed run of that check that failed or is pending, and a required one passes only
+     when a job of its own run or an older run of that check succeeded; a run from an event GitHub
+     does not count, such as workflow_dispatch, is ignored; pending, failed or missing refuses; each trigger event is judged apart, any pending job or run of that workflow refuses, so
+     does a newer run ended red, and a later re-run's red counts; same-name jobs are siblings), green on the test merge commit too where it ran there,
+     no unresolved thread, and no reviewer whose latest review requests changes (the aggregate
+     decision is empty when reviews are not required). A strict base is compared: behind refuses.
+     `--admin` only when GitHub reads it BLOCKED with all of that true and at least one required
+     check, no unmet approval it would skip, and no ruleset rule type or classic requirement it
+     cannot judge: an admin merge never bypasses a conflict, an
+     out-of-date branch or a red check. Production uses `--all-green` (every check). A check
+     is one (name, app, workflow) or one commit status; a same-name check elsewhere must pass too,
+     and a rule's app restriction is kept. The printed command names `--repo`. No skill
+     text carries its own `--admin` (`scripts/tests/merge-gate.sh` greps for one).
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
 N1. ONE profile word — `prototype` / `standard` / `extended` — moves every rigor knob together; the
@@ -831,6 +858,18 @@ skills/build-item/SKILL.md|LOCAL-FULL
 skills/review/SKILL.md|LOCAL-FULL
 skills/build-item/references/release-train.md|review-gate.py
 skills/review/references/local-full.md|review-gate.py record
+skills/review/SKILL.md|No result, no review
+skills/review/SKILL.md|through `round`
+skills/review/references/local-full.md|no engine returned a result
+skills/build-item/scripts/review-gate.py|a bare name does not say whether it returned a result
+skills/release/SKILL.md|merge-gate.py <n> <reviewedHead> --all-green
+skills/release/references/release-branch.md|merge-gate.py <n> <reviewedHead> --delete-branch
+skills/release/references/release-branch.md|merge-gate.py <n> <settled head>
+skills/release/references/auto-start.md|merge-gate.py <n> <sha> --all-green
+skills/build-item/SKILL.md|never the live one
+skills/build-item/SKILL.md|merge-gate.py <n> <head>
+skills/build-item/references/epic-release-steps.md|merge-gate.py
+skills/pr/scripts/merge-gate.py|an admin merge would bypass a block it cannot name
 skills/build-item/SKILL.md|release-holds.md
 skills/release/SKILL.md|release-holds.md
 skills/release/references/release-branch.md|Release holds.
@@ -953,11 +992,12 @@ step. That is the moment a rule goes missing, and it is the only moment this fil
 
 ---
 
-**Total: 144 rule entries (A–T) + 6 editing disciplines (U) = 150.** (The previous total claimed 142
-while 143 were enumerated — M16 was added without a recount: the sixth miscount, corrected here.)
+**Total: 148 rule entries (A–T) + 6 editing disciplines (U) = 154.** (The previous total claimed 144
+while 146 were enumerated — M17 and M18 were added without a recount: the seventh miscount,
+corrected here. Before it, 142 claimed while 143 were enumerated, when M16 was added.)
 The round-by-round revision enumerated 154 facts; 20 of them were near-duplicates stated in two to
 four places, and each group became one entry carrying every clause. (Needles are a SAMPLE, not one per fact; recount their loops
 after editing.)
 
 > This total is LAST on purpose. Appending an entry must take you past it — if you added entries
-> and this number did not change, the count is now wrong. It has been wrong six times.
+> and this number did not change, the count is now wrong. It has been wrong seven times.

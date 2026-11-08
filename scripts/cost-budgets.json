@@ -7,7 +7,7 @@
   "bodies": {
     "branch-feature": 900,
     "branch-hotfix": 2200,
-    "build-item": 7790,
+    "build-item": 7861,
     "ci-audit": 2600,
     "comprehend-plan": 1740,
     "create-defect": 2500,
@@ -21,7 +21,7 @@
     "rationalize-gantt": 3200,
     "rebalance": 5910,
     "release": 8000,
-    "review": 7870,
+    "review": 7993,
     "setup": 10700,
     "ultracode-build": 4900,
     "update": 1000,
@@ -61,11 +61,11 @@
     "skills/release/references/clearance.md": 6860,
     "skills/release/references/docs-hooks.md": 4420,
     "skills/release/references/post-deploy-check.md": 1620,
-    "skills/release/references/release-branch.md": 7560,
+    "skills/release/references/release-branch.md": 7606,
     "skills/release/references/release-gates.md": 1350,
-    "skills/release/references/review-once.md": 1210,
+    "skills/release/references/review-once.md": 1241,
     "skills/review/references/ci-settle.md": 1800,
-    "skills/review/references/delivery-loop-invariants.md": 23410,
+    "skills/review/references/delivery-loop-invariants.md": 24572,
     "skills/review/references/delta-re-review.md": 2300,
     "skills/review/references/final-head-request.md": 910,
     "skills/review/references/github-review-api.md": 4700,
@@ -93,21 +93,21 @@
     "skills/build-item/references/checkout-pool-commands.md": 1400,
     "skills/build-item/references/story-claims.md": 1410,
     "skills/doctor/references/claims-checks.md": 450,
-    "skills/build-item/references/epic-release-steps.md": 1460,
+    "skills/build-item/references/epic-release-steps.md": 1512,
     "skills/review/references/cloud-reviewers.md": 700,
     "skills/build-item/references/deferred-container.md": 2380,
     "skills/setup/references/agents-mode.md": 1670,
     "skills/doctor/references/agents.md": 620,
     "skills/build-item/references/active-agents.md": 540,
-    "skills/release/references/auto-start.md": 3200,
+    "skills/release/references/auto-start.md": 3206,
     "skills/build-item/references/plan-scope.md": 2500,
     "skills/build-item/references/item-status.md": 580,
-    "skills/review/references/local-full.md": 750,
+    "skills/review/references/local-full.md": 933,
     "skills/build-item/references/release-holds.md": 780
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 82390,
+      "budget": 82638,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -146,7 +146,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 67020,
+      "budget": 67215,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -188,7 +188,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 81890,
+      "budget": 82023,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

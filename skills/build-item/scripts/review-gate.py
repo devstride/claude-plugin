@@ -11,10 +11,14 @@ tool that lands one-offs (a repository's own CLI) runs this file, never a copy. 
                  "numstat"?, "tree"?, "mergeBase"?}
           stdout {"verdict": "small"|"reviewed"|"not-applicable", "files", "lines", "riskFiles",
                   "reason", "mergeBody"}
-  record  stdin {"base", "head"?, "cycles", "engines": [...], "findings": [{"id", "severity",
-                 "disposition", "note"?}], "config"?, "receiptsDir"?, "tree"?, "mergeBase"?}
-                 (tree, mergeBase and config together, with head, or all from git)
+  record  stdin {"base", "head"?, "cycles", "engines": [{"engine", "result", "reason"?}],
+                 "findings": [{"id", "severity", "disposition", "note"?}], "config"?, "receiptsDir"?,
+                 "tree"?, "mergeBase"?} (tree, mergeBase and config together, with head, or all from git)
           stdout {"receipt", "mergeBody"}
+  round   stdin {"engines": [{"engine", "result", "reason"?}]}   (one review round, any path)
+          stdout {"verdict": "ok", "returned": [...], "failed": [{"engine", "reason"}]}
+  engine  stdin {"engine", "exitCode", "timedOut"?, "outputFile"}   (one CLI engine run)
+          stdout {"engine", "result": "failed", "reason"} or {"engine", "result": "returned"}
 
 `base` is the ref the one-off lands on (e.g. `origin/train/release`); `head` defaults to `HEAD`.
 Run in the repository: the config (`.claude/ds-config.json`), the diff
@@ -31,11 +35,22 @@ together, with `head`: the fixtures' git-free mode).
   same rules `record` applies) -> `reviewed`.
 - else exit 2, one line naming the review to run. Never merge on a non-zero exit.
 
+**No result, no review.** An engine's `result` is `findings`, `no-findings` (its explicit verdict
+that it found nothing) or `failed` with a one-line `reason`: a crash, kill, timeout, non-zero exit,
+empty or unparseable output is not a result. `engine` decides the mechanical cases from the exit
+status and the output file; output it passes as `returned` is read, and output that is not a review
+is `failed` (unparseable). `round` exits 2 (FAILED) when no engine returned a result: nothing
+settles, merges or counts as reviewed. A bare engine name says nothing about whether it returned,
+so `record` refuses one, and `check` refuses a receipt written before results were kept (schema 1).
+
+Each engine's result in `record` is its latest across the review, from the last cycle it ran: a
+Claude-only follow-up cycle keeps the CLI engine's earlier result.
+
 `record` (LOCAL-FULL, once it settled) writes the receipt `<receiptsDir>/<head>.json`; receiptsDir
 defaults to `<git common dir>/devstride/reviews/local-full`, shared by every worktree of the
-repository on this machine and never committed. It refuses a finding still open, an engine list
-without `claude` (or, with `review.localCommand` set, with nothing but `claude`), or fewer than one
-cycle. A receipt is evidence for exactly one head, tree and
+repository on this machine and never committed. It refuses a finding still open, a round with no
+result, a `claude` review that did not return one (or, with `review.localCommand` set, no other
+engine that did), or fewer than one cycle. A receipt is evidence for exactly one head, tree and
 merge base: any new commit, or a train merged into the branch, needs a new review.
 
 Exit 0 with an answer, 2 with one `review-gate: <reason>` line on stderr, 1 for anything else.
@@ -50,6 +65,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROUTING = os.path.join(HERE, "routing.py")
 CLOSED = ("fixed", "dismissed", "refuted", "deferred", "captured")
+RESULTS = ("findings", "no-findings", "failed")
+SCHEMA = 2
 SHA = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")
 
 
@@ -125,16 +142,61 @@ def receipts_dir(req):
     return os.path.join(common, "devstride", "reviews", "local-full")
 
 
+def one_line(value):
+    return text(value) and "\n" not in value and "\r" not in value and len(value) <= 200
+
+
+def engine_results(engines):
+    """Each engine that ran and what it returned. Raises Refuse naming what is wrong."""
+    need(isinstance(engines, list) and engines, "engines must list each engine that ran, with its result")
+    clean, seen = [], set()
+    for e in engines:
+        need(isinstance(e, dict) and text(e.get("engine")),
+             'each engine is {"engine", "result", "reason"?}: a bare name does not say whether it returned a result')
+        name = e["engine"]
+        need(name not in seen, "engine %s is listed twice" % name)
+        seen.add(name)
+        need(e.get("result") != "returned", "engine %s: `returned` (from `engine`) means read its output, then give "
+             "findings, no-findings, or failed with reason unparseable" % name)
+        need(e.get("result") in RESULTS, "engine %s: result must be %s" % (name, ", ".join(RESULTS)))
+        reason = e.get("reason")
+        if e["result"] == "failed":
+            need(one_line(reason), "engine %s failed: give the reason in one line of at most 200 characters "
+                 "(crashed, timed out, exited N, empty output, unparseable)" % name)
+        else:
+            need(reason is None or one_line(reason), "engine %s: reason must be one line of at most 200 characters" % name)
+        clean.append({k: e[k] for k in ("engine", "result", "reason") if e.get(k) is not None})
+    return clean
+
+
+def returned(engines):
+    return [e["engine"] for e in engines if e["result"] != "failed"]
+
+
+def round_failed(engines):
+    """The one wording of a round in which no engine returned a result."""
+    return ("the review FAILED: no engine returned a result (%s). Nothing settles, merges or counts as reviewed: "
+            "fix the engines and run the round again" % "; ".join("%s: %s" % (e["engine"], e["reason"]) for e in engines))
+
+
 def settled(r, config):
     """The receipt's own claims: a settled LOCAL-FULL review. Raises Refuse naming what is wrong."""
-    need(isinstance(r, dict) and r.get("schema") == 1 and r.get("mode") == "LOCAL-FULL", "not a schema-1 LOCAL-FULL receipt")
-    cycles, engines, findings = r.get("cycles"), r.get("engines"), r.get("findings")
+    need(isinstance(r, dict) and r.get("mode") == "LOCAL-FULL", "not a LOCAL-FULL receipt")
+    need(r.get("schema") == SCHEMA, "schema %r: it was recorded before each engine's result was kept, so it cannot "
+         "show that any engine returned one" % r.get("schema"))
+    cycles, findings = r.get("cycles"), r.get("findings")
     need(isinstance(cycles, int) and not isinstance(cycles, bool) and cycles >= 1, "cycles must be a whole number, at least 1")
-    need(isinstance(engines, list) and engines and all(text(e) for e in engines), "engines must list the engines that ran")
-    need("claude" in engines, "engines must include claude: LOCAL-FULL always runs the Claude review")
+    engines = engine_results(r.get("engines"))
+    ok = returned(engines)
+    if not ok:
+        raise Refuse(round_failed(engines))
+    need(any(e["engine"] == "claude" for e in engines), "engines must include claude: LOCAL-FULL always runs the Claude review")
+    need("claude" in ok, "the claude review did not return a result (%s): a LOCAL-FULL without it is never recorded"
+         % next(e.get("reason", "") for e in engines if e["engine"] == "claude"))
     review = config.get("review") if isinstance(config.get("review"), dict) else {}
-    need(not text(review.get("localCommand")) or any(e != "claude" for e in engines),
-         "engines must include the configured CLI engine (review.localCommand): a Claude-only LOCAL-FULL is never recorded")
+    need(not text(review.get("localCommand")) or any(e != "claude" for e in ok),
+         "engines must include a result from the configured CLI engine (review.localCommand): no engine but claude "
+         "returned one, and a Claude-only LOCAL-FULL is never recorded")
     need(isinstance(findings, list), "findings must be a list (empty when there were none)")
     clean = []
     for f in findings:
@@ -143,12 +205,19 @@ def settled(r, config):
         note = f.get("note")
         need(note is None or (isinstance(note, str) and "\n" not in note and len(note) <= 200), "finding %s: note must be one line of at most 200 characters" % f["id"])
         clean.append({k: f[k] for k in ("id", "severity", "disposition", "note") if f.get(k) is not None})
+    need(clean or not any(e["result"] == "findings" for e in engines),
+         "an engine returned findings but the findings list is empty: record each one with its disposition")
+    r["engines"] = engines
     return clean
+
+
+def label(e):
+    return "%s (%s)" % (e["engine"], "failed: " + e["reason"] if e["result"] == "failed" else e["result"].replace("-", " "))
 
 
 def body(receipt):
     lines = ["Review: LOCAL-FULL at %s over %s (merge base %s), %d cycle(s), engines: %s" % (
-        receipt["head"], receipt["base"], receipt["mergeBase"][:12], receipt["cycles"], ", ".join(receipt["engines"]))]
+        receipt["head"], receipt["base"], receipt["mergeBase"][:12], receipt["cycles"], ", ".join(label(e) for e in receipt["engines"]))]
     for f in receipt["findings"]:
         lines.append("- %s %s %s%s" % (f["id"], f["severity"], f["disposition"], ": " + f["note"] if f.get("note") else ""))
     if not receipt["findings"]:
@@ -196,7 +265,7 @@ def check(req):
 
 def record(req):
     head, tree, merge_base, _ = subject(req, with_diff=False)
-    receipt = {"schema": 1, "mode": "LOCAL-FULL", "base": req["base"], "head": head, "tree": tree, "mergeBase": merge_base,
+    receipt = {"schema": SCHEMA, "mode": "LOCAL-FULL", "base": req["base"], "head": head, "tree": tree, "mergeBase": merge_base,
                "cycles": req.get("cycles"), "engines": req.get("engines"), "findings": req.get("findings")}
     receipt["findings"] = settled(receipt, config_of(req))
     folder = receipts_dir(req)
@@ -208,10 +277,42 @@ def record(req):
     return {"receipt": path, "mergeBody": body(receipt)}
 
 
+def round_(req):
+    need(isinstance(req, dict), "the request must be a JSON object")
+    engines = engine_results(req.get("engines"))
+    ok = returned(engines)
+    if not ok:
+        raise Refuse(round_failed(engines))
+    return {"verdict": "ok", "returned": ok,
+            "failed": [{"engine": e["engine"], "reason": e["reason"]} for e in engines if e["result"] == "failed"]}
+
+
+def engine(req):
+    need(isinstance(req, dict) and text(req.get("engine")), "engine is required: the engine's name")
+    name, code, path = req["engine"], req.get("exitCode"), req.get("outputFile")
+    need(text(path), "outputFile is required: the file the engine's output went to")
+    failed = lambda reason: {"engine": name, "result": "failed", "reason": reason}
+    if req.get("timedOut") is True:
+        return failed("timed out")
+    if code is None:
+        return failed("no exit status: it was killed or is still running")
+    need(isinstance(code, int) and not isinstance(code, bool), "exitCode must be a whole number or null")
+    if code != 0:
+        return failed("exited %d" % code)
+    try:
+        with open(path, "rb") as f:
+            output = f.read()
+    except OSError as err:
+        return failed("its output cannot be read: %s" % err.strerror)
+    if not output.strip():
+        return failed("empty output")
+    return {"engine": name, "result": "returned"}
+
+
 def main(argv):
-    commands = {"check": check, "record": record}
+    commands = {"check": check, "record": record, "round": round_, "engine": engine}
     if len(argv) != 2 or argv[1] not in commands:
-        sys.stderr.write("review-gate: usage: review-gate.py check|record < request.json\n")
+        sys.stderr.write("review-gate: usage: review-gate.py check|record|round|engine < request.json\n")
         return 2
     try:
         request = json.loads(sys.stdin.read())

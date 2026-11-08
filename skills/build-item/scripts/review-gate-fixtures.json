@@ -1,5 +1,5 @@
 {
- "_about": "Shared fixtures for skills/build-item/scripts/review-gate.py, git-free (numstat, tree, mergeBase and config supplied). For each case, write each `receipts` entry to <tmp>/<its head>.json under the CASE's head filename (the request's head), pass receiptsDir=<tmp>, run `check`; `expect` is the answer minus `reason`. An `errors` case must exit 2 with one review-gate: line containing `contains`. A `record` case runs `record` with receiptsDir=<tmp>; with `refuses` null it must exit 0 and `check` on the same head with the second `cases` entry's config and over-limit numstat (the record request's head, tree and merge base) must then answer reviewed with that case's mergeBody. Tooling that re-implements the gate, or calls it, should run these against the installed script.",
+ "_about": "Shared fixtures for skills/build-item/scripts/review-gate.py, git-free (numstat, tree, mergeBase and config supplied). For each case, write each `receipts` entry to <tmp>/<its head>.json under the CASE's head filename (the request's head), pass receiptsDir=<tmp>, run `check`; `expect` is the answer minus `reason`. An `errors` case must exit 2 with one review-gate: line containing `contains`. A `record` case runs `record` with receiptsDir=<tmp>; with `refuses` null it must exit 0 and `check` on the same head with the second `cases` entry's config and over-limit numstat (the record request's head, tree and merge base) must then answer reviewed with that case's mergeBody. Tooling that re-implements the gate, or calls it, should run these against the installed script. A `round` case pipes {engines} into `round`: `expect` is its answer, or with `refuses` it must exit 2 with that text. An `engine` case writes `output` (null: no file) to a file, adds outputFile, runs `engine` and compares `expect`.",
  "cases": [
   {
    "name": "a small fix lands",
@@ -68,7 +68,7 @@
    },
    "receipts": [
     {
-     "schema": 1,
+     "schema": 2,
      "mode": "LOCAL-FULL",
      "base": "origin/train/release",
      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -76,8 +76,14 @@
      "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
      "cycles": 2,
      "engines": [
-      "claude",
-      "codex"
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
      ],
      "findings": [
       {
@@ -99,7 +105,7 @@
     "files": 6,
     "lines": 60,
     "riskFiles": [],
-    "mergeBody": "Review: LOCAL-FULL at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa over origin/train/release (merge base eeeeeeeeeeee), 2 cycle(s), engines: claude, codex\n- R001 P2 fixed: null check on the retry path\n- R002 P3 dismissed"
+    "mergeBody": "Review: LOCAL-FULL at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa over origin/train/release (merge base eeeeeeeeeeee), 2 cycle(s), engines: claude (findings), codex (no findings)\n- R001 P2 fixed: null check on the retry path\n- R002 P3 dismissed"
    }
   },
   {
@@ -132,7 +138,7 @@
    },
    "receipts": [
     {
-     "schema": 1,
+     "schema": 2,
      "mode": "LOCAL-FULL",
      "base": "origin/train/release",
      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -140,8 +146,14 @@
      "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
      "cycles": 2,
      "engines": [
-      "claude",
-      "codex"
+      {
+       "engine": "claude",
+       "result": "no-findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
      ],
      "findings": []
     }
@@ -153,7 +165,7 @@
     "riskFiles": [
      "src/auth/login.ts"
     ],
-    "mergeBody": "Review: LOCAL-FULL at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa over origin/train/release (merge base eeeeeeeeeeee), 2 cycle(s), engines: claude, codex\n- no findings"
+    "mergeBody": "Review: LOCAL-FULL at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa over origin/train/release (merge base eeeeeeeeeeee), 2 cycle(s), engines: claude (no findings), codex (no findings)\n- no findings"
    }
   },
   {
@@ -342,7 +354,7 @@
    },
    "receipts": [
     {
-     "schema": 1,
+     "schema": 2,
      "mode": "LOCAL-FULL",
      "base": "origin/train/release",
      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -350,8 +362,14 @@
      "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
      "cycles": 2,
      "engines": [
-      "claude",
-      "codex"
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
      ],
      "findings": [
       {
@@ -400,7 +418,7 @@
    },
    "receipts": [
     {
-     "schema": 1,
+     "schema": 2,
      "mode": "LOCAL-FULL",
      "base": "origin/train/release",
      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -408,8 +426,14 @@
      "mergeBase": "ffffffffffffffffffffffffffffffffffffffff",
      "cycles": 2,
      "engines": [
-      "claude",
-      "codex"
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
      ],
      "findings": [
       {
@@ -458,7 +482,7 @@
    },
    "receipts": [
     {
-     "schema": 1,
+     "schema": 2,
      "mode": "LOCAL-FULL",
      "base": "origin/train/release",
      "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -466,8 +490,14 @@
      "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
      "cycles": 2,
      "engines": [
-      "claude",
-      "codex"
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
      ],
      "findings": [
       {
@@ -607,7 +637,7 @@
    },
    "receipts": [
     {
-     "schema": 1,
+     "schema": 2,
      "mode": "LOCAL-ONLY",
      "base": "origin/train/release",
      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -615,8 +645,14 @@
      "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
      "cycles": 2,
      "engines": [
-      "claude",
-      "codex"
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
      ],
      "findings": [
       {
@@ -665,7 +701,7 @@
    },
    "receipts": [
     {
-     "schema": 1,
+     "schema": 2,
      "mode": "LOCAL-FULL",
      "base": "origin/train/release",
      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -673,8 +709,14 @@
      "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
      "cycles": 2,
      "engines": [
-      "claude",
-      "codex"
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
      ],
      "findings": [
       {
@@ -731,7 +773,7 @@
    },
    "receipts": [
     {
-     "schema": 1,
+     "schema": 2,
      "mode": "LOCAL-FULL",
      "base": "origin/train/release",
      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -739,7 +781,10 @@
      "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
      "cycles": 2,
      "engines": [
-      "claude"
+      {
+       "engine": "claude",
+       "result": "findings"
+      }
      ],
      "findings": [
       {
@@ -788,13 +833,143 @@
    },
    "receipts": [
     {
-     "schema": 1,
+     "schema": 2,
      "mode": "LOCAL-FULL",
      "base": "origin/train/release",
      "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
      "tree": "cccccccccccccccccccccccccccccccccccccccc",
      "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
      "cycles": 0,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ]
+    }
+   ],
+   "contains": "at least 1"
+  },
+  {
+   "name": "a receipt from a round where every engine failed",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "10\t0\tf0.ts\u000010\t0\tf1.ts\u000010\t0\tf2.ts\u000010\t0\tf3.ts\u000010\t0\tf4.ts\u000010\t0\tf5.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "failed",
+       "reason": "timed out"
+      },
+      {
+       "engine": "codex",
+       "result": "failed",
+       "reason": "exited 1"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ]
+    }
+   ],
+   "contains": "no engine returned a result"
+  },
+  {
+   "name": "a receipt recorded before engine results were kept (schema 1)",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "10\t0\tf0.ts\u000010\t0\tf1.ts\u000010\t0\tf2.ts\u000010\t0\tf3.ts\u000010\t0\tf4.ts\u000010\t0\tf5.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 1,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
      "engines": [
       "claude",
       "codex"
@@ -814,7 +989,140 @@
      ]
     }
    ],
-   "contains": "at least 1"
+   "contains": "before each engine's result was kept"
+  },
+  {
+   "name": "a receipt whose claude review failed",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "10\t0\tf0.ts\u000010\t0\tf1.ts\u000010\t0\tf2.ts\u000010\t0\tf3.ts\u000010\t0\tf4.ts\u000010\t0\tf5.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "failed",
+       "reason": "agent crashed"
+      },
+      {
+       "engine": "codex",
+       "result": "findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ]
+    }
+   ],
+   "contains": "the claude review did not return a result"
+  },
+  {
+   "name": "a receipt whose CLI engine failed when one is configured",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    },
+    "numstat": "10\t0\tf0.ts\u000010\t0\tf1.ts\u000010\t0\tf2.ts\u000010\t0\tf3.ts\u000010\t0\tf4.ts\u000010\t0\tf5.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "failed",
+       "reason": "empty output"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ]
+    }
+   ],
+   "contains": "configured CLI engine"
   }
  ],
  "record": [
@@ -827,8 +1135,14 @@
     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "cycles": 2,
     "engines": [
-     "claude",
-     "codex"
+     {
+      "engine": "claude",
+      "result": "findings"
+     },
+     {
+      "engine": "codex",
+      "result": "no-findings"
+     }
     ],
     "findings": [
      {
@@ -877,8 +1191,14 @@
     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "cycles": 2,
     "engines": [
-     "claude",
-     "codex"
+     {
+      "engine": "claude",
+      "result": "findings"
+     },
+     {
+      "engine": "codex",
+      "result": "no-findings"
+     }
     ],
     "findings": [
      {
@@ -921,7 +1241,10 @@
     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "cycles": 1,
     "engines": [
-     "codex"
+     {
+      "engine": "codex",
+      "result": "no-findings"
+     }
     ],
     "findings": [],
     "config": {
@@ -958,8 +1281,14 @@
     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "cycles": 0,
     "engines": [
-     "claude",
-     "codex"
+     {
+      "engine": "claude",
+      "result": "findings"
+     },
+     {
+      "engine": "codex",
+      "result": "no-findings"
+     }
     ],
     "findings": [],
     "config": {
@@ -996,8 +1325,14 @@
     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "cycles": 1,
     "engines": [
-     "claude",
-     "codex"
+     {
+      "engine": "claude",
+      "result": "findings"
+     },
+     {
+      "engine": "codex",
+      "result": "no-findings"
+     }
     ],
     "findings": [
      {
@@ -1041,7 +1376,10 @@
     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "cycles": 2,
     "engines": [
-     "claude"
+     {
+      "engine": "claude",
+      "result": "findings"
+     }
     ],
     "findings": [
      {
@@ -1080,6 +1418,560 @@
     }
    },
    "refuses": "configured CLI engine"
+  },
+  {
+   "name": "record refuses a round in which every engine failed",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "cycles": 2,
+    "engines": [
+     {
+      "engine": "claude",
+      "result": "failed",
+      "reason": "timed out"
+     },
+     {
+      "engine": "codex",
+      "result": "failed",
+      "reason": "empty output"
+     }
+    ],
+    "findings": [
+     {
+      "id": "R001",
+      "severity": "P2",
+      "disposition": "fixed",
+      "note": "null check on the retry path"
+     },
+     {
+      "id": "R002",
+      "severity": "P3",
+      "disposition": "dismissed"
+     }
+    ],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
+   },
+   "refuses": "no engine returned a result"
+  },
+  {
+   "name": "record refuses bare engine names",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "cycles": 2,
+    "engines": [
+     "claude",
+     "codex"
+    ],
+    "findings": [
+     {
+      "id": "R001",
+      "severity": "P2",
+      "disposition": "fixed",
+      "note": "null check on the retry path"
+     },
+     {
+      "id": "R002",
+      "severity": "P3",
+      "disposition": "dismissed"
+     }
+    ],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
+   },
+   "refuses": "a bare name does not say whether it returned"
+  },
+  {
+   "name": "record refuses a failed engine with no reason",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "cycles": 2,
+    "engines": [
+     {
+      "engine": "claude",
+      "result": "findings"
+     },
+     {
+      "engine": "codex",
+      "result": "failed"
+     }
+    ],
+    "findings": [
+     {
+      "id": "R001",
+      "severity": "P2",
+      "disposition": "fixed",
+      "note": "null check on the retry path"
+     },
+     {
+      "id": "R002",
+      "severity": "P3",
+      "disposition": "dismissed"
+     }
+    ],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
+   },
+   "refuses": "give the reason"
+  },
+  {
+   "name": "record refuses an unknown result",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "cycles": 2,
+    "engines": [
+     {
+      "engine": "claude",
+      "result": "ok"
+     },
+     {
+      "engine": "codex",
+      "result": "findings"
+     }
+    ],
+    "findings": [
+     {
+      "id": "R001",
+      "severity": "P2",
+      "disposition": "fixed",
+      "note": "null check on the retry path"
+     },
+     {
+      "id": "R002",
+      "severity": "P3",
+      "disposition": "dismissed"
+     }
+    ],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
+   },
+   "refuses": "result must be"
+  },
+  {
+   "name": "record refuses an engine listed twice",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "cycles": 2,
+    "engines": [
+     {
+      "engine": "claude",
+      "result": "findings"
+     },
+     {
+      "engine": "claude",
+      "result": "no-findings"
+     },
+     {
+      "engine": "codex",
+      "result": "findings"
+     }
+    ],
+    "findings": [
+     {
+      "id": "R001",
+      "severity": "P2",
+      "disposition": "fixed",
+      "note": "null check on the retry path"
+     },
+     {
+      "id": "R002",
+      "severity": "P3",
+      "disposition": "dismissed"
+     }
+    ],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
+   },
+   "refuses": "listed twice"
+  },
+  {
+   "name": "record refuses a review whose claude review failed",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "cycles": 2,
+    "engines": [
+     {
+      "engine": "claude",
+      "result": "failed",
+      "reason": "agent crashed"
+     },
+     {
+      "engine": "codex",
+      "result": "findings"
+     }
+    ],
+    "findings": [
+     {
+      "id": "R001",
+      "severity": "P2",
+      "disposition": "fixed",
+      "note": "null check on the retry path"
+     },
+     {
+      "id": "R002",
+      "severity": "P3",
+      "disposition": "dismissed"
+     }
+    ],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
+   },
+   "refuses": "the claude review did not return a result"
+  },
+  {
+   "name": "record refuses findings reported with an empty findings list",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "cycles": 2,
+    "engines": [
+     {
+      "engine": "claude",
+      "result": "findings"
+     },
+     {
+      "engine": "codex",
+      "result": "no-findings"
+     }
+    ],
+    "findings": [],
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      }
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     },
+     "review": {
+      "localCommand": "codex exec --sandbox read-only <context>"
+     }
+    }
+   },
+   "refuses": "findings list is empty"
+  }
+ ],
+ "round": [
+  {
+   "name": "every engine failed -> FAILED",
+   "engines": [
+    {
+     "engine": "claude",
+     "result": "failed",
+     "reason": "timed out"
+    },
+    {
+     "engine": "codex",
+     "result": "failed",
+     "reason": "exited 1"
+    }
+   ],
+   "refuses": "the review FAILED: no engine returned a result (claude: timed out; codex: exited 1)"
+  },
+  {
+   "name": "one engine returned -> ok, the failure named",
+   "engines": [
+    {
+     "engine": "claude",
+     "result": "no-findings"
+    },
+    {
+     "engine": "codex",
+     "result": "failed",
+     "reason": "empty output"
+    }
+   ],
+   "expect": {
+    "verdict": "ok",
+    "returned": [
+     "claude"
+    ],
+    "failed": [
+     {
+      "engine": "codex",
+      "reason": "empty output"
+     }
+    ]
+   }
+  },
+  {
+   "name": "no-findings is a result",
+   "engines": [
+    {
+     "engine": "claude",
+     "result": "no-findings"
+    },
+    {
+     "engine": "codex",
+     "result": "no-findings"
+    }
+   ],
+   "expect": {
+    "verdict": "ok",
+    "returned": [
+     "claude",
+     "codex"
+    ],
+    "failed": []
+   }
+  },
+  {
+   "name": "no engines at all -> refused",
+   "engines": [],
+   "refuses": "engines must list each engine that ran"
+  },
+  {
+   "name": "engine's `returned` piped straight in -> refused, naming the mapping",
+   "engines": [
+    {
+     "engine": "codex",
+     "result": "returned"
+    }
+   ],
+   "refuses": "means read its output"
+  }
+ ],
+ "engine": [
+  {
+   "name": "exit 0 with a review -> returned",
+   "request": {
+    "engine": "codex",
+    "exitCode": 0
+   },
+   "output": "P2 src/a.ts:3 missing null check\n",
+   "expect": {
+    "engine": "codex",
+    "result": "returned"
+   }
+  },
+  {
+   "name": "empty output -> failed",
+   "request": {
+    "engine": "codex",
+    "exitCode": 0
+   },
+   "output": "",
+   "expect": {
+    "engine": "codex",
+    "result": "failed",
+    "reason": "empty output"
+   }
+  },
+  {
+   "name": "whitespace-only output -> failed",
+   "request": {
+    "engine": "codex",
+    "exitCode": 0
+   },
+   "output": " \n\t\n",
+   "expect": {
+    "engine": "codex",
+    "result": "failed",
+    "reason": "empty output"
+   }
+  },
+  {
+   "name": "non-zero exit -> failed",
+   "request": {
+    "engine": "codex",
+    "exitCode": 1
+   },
+   "output": "partial",
+   "expect": {
+    "engine": "codex",
+    "result": "failed",
+    "reason": "exited 1"
+   }
+  },
+  {
+   "name": "timed out -> failed whatever it printed",
+   "request": {
+    "engine": "codex",
+    "exitCode": 0,
+    "timedOut": true
+   },
+   "output": "no findings",
+   "expect": {
+    "engine": "codex",
+    "result": "failed",
+    "reason": "timed out"
+   }
+  },
+  {
+   "name": "no exit status (killed) -> failed",
+   "request": {
+    "engine": "codex",
+    "exitCode": null
+   },
+   "output": "",
+   "expect": {
+    "engine": "codex",
+    "result": "failed",
+    "reason": "no exit status: it was killed or is still running"
+   }
+  },
+  {
+   "name": "an output file that does not exist -> failed",
+   "request": {
+    "engine": "codex",
+    "exitCode": 0
+   },
+   "output": null,
+   "expect": {
+    "engine": "codex",
+    "result": "failed",
+    "reason": "its output cannot be read: No such file or directory"
+   }
   }
  ]
 }

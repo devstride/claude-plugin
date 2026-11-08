@@ -15,14 +15,20 @@ request into the base stays the batch's one CI run (why: `release-train.md`).
    `<base>...HEAD`, generated files excluded, with the matched mandatory lenses. No cloud request.
    With `review.localCommand` set, that engine failed or missing → STOP for a human, as step 1's
    Claude-only rule: `record` refuses a Claude-only LOCAL-FULL then, and `check` a receipt like it.
+   Every cycle runs step 3's round first (`review-gate.py engine`, then `round`); a cycle in which
+   no engine returned a result is FAILED: STOP, nothing is recorded.
 2. **Settle:** steps 3–5: verify, triage, fix, with step 5's cycle target (two) and P1/serious-P2
    continuation without a cap. Then step 6.5, the lessons write. Steps 0, 2 and 6–8 never run: no
    thread, no flip, no CI.
 3. **Record:** once every finding is terminal and the tree is clean, pipe
-   `{base, cycles, engines, findings: [{id, severity, disposition, note?}]}` into
+   `{base, cycles, engines: [{engine, result, reason?}], findings: [{id, severity, disposition,
+   note?}]}` into
    `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/review-gate.py record`. Use `fixed`,
    `dismissed`, `refuted`, `deferred` or `captured`; each note is one line in your own words, never
-   an engine's text. Exit 2 → fix what it names. It writes a receipt for exactly this head, tree
+   an engine's text. Each engine's `result` is its latest across the review (the last cycle it ran; a Claude-only
+   follow-up keeps the CLI engine's earlier result): `findings`, `no-findings` or
+   `failed` with a one-line `reason` (an `engine` answer of `returned` is read first, then mapped); `claude` and, with `review.localCommand` set, another engine
+   must have returned one. Exit 2 → fix what it names. It writes a receipt for exactly this head, tree
    and merge base, kept under the repository's git directory on this machine.
 4. **Return:** the triaged findings, the untracked-deferral list, the lessons tally, the cycle
    count, the reviewed head, and the gate's `mergeBody`.

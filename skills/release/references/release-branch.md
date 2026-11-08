@@ -148,8 +148,9 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    pull request, no passing line or a different tree, step 2b runs these entries itself.
 5. **Merge** — first `git fetch origin <releaseSource>` and run the exclusion check with
    `--source-before <sourceBefore> --head <reviewedHead>` (source merges are not train work, and a
-   reviewed release unit is allowed; exit 1 STOPS); then `gh pr merge <n> --merge --match-head-commit <reviewedHead>
-   --delete-branch` (the snapshot is disposable). **Never a direct push to `releaseSource`**: its
+   reviewed release unit is allowed; exit 1 STOPS); then run the `MERGE` line of
+   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/pr/scripts/merge-gate.py <n> <reviewedHead> --delete-branch`
+   (the snapshot is disposable); `REFUSE` or `ERROR` STOPS. **Never a direct push to `releaseSource`**: its
    own required checks run on the pull request. A verified P1 or serious P2 that is not fixed STOPS
    the release.
 6. **Close every one-off it carried.** Candidates come from the subjects of `git log --first-parent
@@ -240,7 +241,8 @@ hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
    with base `<releaseSource>` passed explicitly, declaring `merge-only: true` (its merge commit is
    the point — never rebased), with a scope manifest naming only the merge's conflict resolutions —
    none when the merge was clean, since every other line was reviewed on the release pull request.
-   It settles CI; merge it `--merge --delete-branch` (the sync branch is disposable). Then `git
+   It settles CI; merge it with the `MERGE` line of `merge-gate.py <n> <settled head>
+   --delete-branch` (the sync branch is disposable); `REFUSE` or `ERROR` STOPS. Then `git
    fetch origin <productionBranch> <releaseSource> <train>` so 2 and 3 read the merged state.
 2. **Delete the release branch — the one place the loop deletes a protected branch, and it says
    so.** Only when the name matches the pattern AND it is an ancestor of both

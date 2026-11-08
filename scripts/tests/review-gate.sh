@@ -1,6 +1,6 @@
 #!/bin/bash
 # Tests for skills/build-item/scripts/review-gate.py: every case in review-gate-fixtures.json
-# through the helper's own command line (git-free), then a real repository: record a review, check
+# (check, record, round and engine) through the helper's own command line (git-free), then a real repository: record a review, check
 # it, and prove a new commit or a merged-in train voids it. No network.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -45,6 +45,21 @@ for c in fx["record"]:
     else:
         good = p.returncode == 2 and c["refuses"] in p.stderr and not os.listdir(d)
         say(good, "refuses: " + c["name"], "rc=%d %r" % (p.returncode, p.stderr))
+for c in fx["round"]:
+    p = run("round", {"engines": c["engines"]})
+    if "refuses" in c:
+        lines = p.stderr.strip().split("\n")
+        good = p.returncode == 2 and p.stdout == "" and len(lines) == 1 and c["refuses"] in lines[0]
+    else:
+        good = p.returncode == 0 and json.loads(p.stdout) == c["expect"]
+    say(good, "round: " + c["name"], "rc=%d %s %s" % (p.returncode, p.stdout.strip(), p.stderr.strip()))
+for c in fx["engine"]:
+    path = os.path.join(tempfile.mkdtemp(dir=work), "engine.out")
+    if c["output"] is not None:
+        open(path, "w").write(c["output"])
+    p = run("engine", dict(c["request"], outputFile=path))
+    good = p.returncode == 0 and json.loads(p.stdout) == c["expect"]
+    say(good, "engine: " + c["name"], "rc=%d %s %s" % (p.returncode, p.stdout.strip(), p.stderr.strip()))
 for label, args, body in (("not JSON", ["check"], "{"), ("no subcommand", [], "{}"), ("unknown subcommand", ["merge"], "{}"), ("a JSON array", ["check"], "[]")):
     p = subprocess.run([sys.executable, helper] + args, input=body, capture_output=True, text=True)
     say(p.returncode == 2 and p.stderr.startswith("review-gate: ") and "Traceback" not in p.stderr, "refuses: " + label, repr(p.stderr))
@@ -61,7 +76,7 @@ for i in range(3):
 g("add", "-A"); g("commit", "-qm", "big")
 p = run("check", {"base": "train/release"}, cwd=repo)
 say(p.returncode == 2 and "run /devstride:review local-full train/release" in p.stderr, "git: an unreviewed large fix is refused", p.stderr)
-p = run("record", {"base": "train/release", "cycles": 2, "engines": ["claude", "codex"], "findings": []}, cwd=repo)
+p = run("record", {"base": "train/release", "cycles": 2, "engines": [{"engine": "claude", "result": "no-findings"}, {"engine": "codex", "result": "no-findings"}], "findings": []}, cwd=repo)
 common = g("rev-parse", "--path-format=absolute", "--git-common-dir")
 say(p.returncode == 0 and json.loads(p.stdout)["receipt"].startswith(os.path.join(common, "devstride", "reviews", "local-full")), "git: record writes under the git common dir", p.stderr)
 p = run("check", {"base": "train/release"}, cwd=repo)
@@ -82,5 +97,5 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 30 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 50 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 exit $FAIL
