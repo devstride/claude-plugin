@@ -21,7 +21,7 @@
     "rationalize-gantt": 3200,
     "rebalance": 5910,
     "release": 8000,
-    "review": 7994,
+    "review": 7997,
     "setup": 10700,
     "ultracode-build": 4900,
     "update": 1000,
@@ -61,11 +61,11 @@
     "skills/release/references/clearance.md": 6860,
     "skills/release/references/docs-hooks.md": 4420,
     "skills/release/references/post-deploy-check.md": 1620,
-    "skills/release/references/release-branch.md": 7580,
+    "skills/release/references/release-branch.md": 7606,
     "skills/release/references/release-gates.md": 1350,
     "skills/release/references/review-once.md": 1210,
     "skills/review/references/ci-settle.md": 1800,
-    "skills/review/references/delivery-loop-invariants.md": 24129,
+    "skills/review/references/delivery-loop-invariants.md": 24236,
     "skills/review/references/delta-re-review.md": 2300,
     "skills/review/references/final-head-request.md": 910,
     "skills/review/references/github-review-api.md": 4700,
@@ -107,7 +107,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 82578,
+      "budget": 82581,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -146,7 +146,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 67175,
+      "budget": 67178,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -188,7 +188,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 82016,
+      "budget": 82019,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

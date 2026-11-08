@@ -158,8 +158,9 @@ F10. If the roster drops to Claude-only on a PR path because CONFIGURED engines 
      (localCommand null, automatedReviewers []) is the repo's own choice: proceed, announced. See
      the roster-resolution and degradation policy at the top of `skills/review/SKILL.md`.
 F11. No result, no review. An engine's result is its findings or its explicit no-findings verdict;
-     a crash, kill, timeout, non-zero exit, empty or unparseable output is not one. Every cycle on
-     every path runs `review-gate.py engine` per CLI run and `round` over all engines: a round in
+     a crash, kill, timeout, non-zero exit, empty or unparseable output is not one. Every cycle that
+     launches engines (not LOCAL-ONLY, which triages a hand-off) runs `review-gate.py engine` per
+     CLI run and `round` over all engines: a round in
      which no engine returned a result is FAILED and never settles, flips, records a receipt or
      merges. The LOCAL-FULL receipt (schema 2) carries each engine's result; `record` refuses bare
      engine names and a failed `claude`, and `check` refuses a schema-1 receipt, which cannot show
@@ -409,7 +410,9 @@ M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exac
      classic protection, and what GitHub marks required) completed SUCCESS on its newest run there
      (pending, failed, skipped or missing refuses), no unresolved thread and no changes requested.
      `--admin` only when GitHub reads it BLOCKED with all of that true and at least one required
-     check: an admin merge never bypasses a conflict, an out-of-date branch or a red check. No skill
+     check: an admin merge never bypasses a conflict, an out-of-date branch or a red check. A check
+     is one (name, app, workflow) or one commit status; a same-name check elsewhere must pass too,
+     and a rule's app restriction is kept. The printed command names `--repo`. No skill
      text carries its own `--admin` (`scripts/tests/merge-gate.sh` greps for one).
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
@@ -852,6 +855,7 @@ skills/review/references/local-full.md|no engine returned a result
 skills/build-item/scripts/review-gate.py|a bare name does not say whether it returned a result
 skills/release/SKILL.md|merge-gate.py <n> <reviewedHead>
 skills/release/references/release-branch.md|merge-gate.py <n> <reviewedHead> --delete-branch
+skills/release/references/release-branch.md|merge-gate.py <n> <settled head>
 skills/release/references/auto-start.md|merge-gate.py <n> <sha>
 skills/build-item/SKILL.md|merge-gate.py <n> <head>
 skills/build-item/references/epic-release-steps.md|merge-gate.py

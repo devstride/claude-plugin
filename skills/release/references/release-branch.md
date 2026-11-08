@@ -241,7 +241,8 @@ hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
    with base `<releaseSource>` passed explicitly, declaring `merge-only: true` (its merge commit is
    the point — never rebased), with a scope manifest naming only the merge's conflict resolutions —
    none when the merge was clean, since every other line was reviewed on the release pull request.
-   It settles CI; merge it `--merge --delete-branch` (the sync branch is disposable). Then `git
+   It settles CI; merge it with the `MERGE` line of `merge-gate.py <n> <settled head>
+   --delete-branch` (the sync branch is disposable); `REFUSE` or `ERROR` STOPS. Then `git
    fetch origin <productionBranch> <releaseSource> <train>` so 2 and 3 read the merged state.
 2. **Delete the release branch — the one place the loop deletes a protected branch, and it says
    so.** Only when the name matches the pattern AND it is an ancestor of both

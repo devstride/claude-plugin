@@ -24,7 +24,7 @@ for what each version component means here and how a release is cut.
   never bypasses a conflict, an out-of-date branch or a red check. `REFUSE` exits 2 and `ERROR`
   (GitHub unreadable) exits 1; neither merges. `--delete-branch` and a train merge's `--subject`
   carry through, quoted so the line runs as printed. A test fails the build if any skill text
-  carries its own `--admin`. Invariant M19.
+  carries its own `--admin`. A check is one (name, app, workflow) or one commit status: a re-run supersedes the run before it, but a green check never hides a failing same-name check from another workflow or app, or a same-name commit status. A rule's app restriction (`integration_id`, `app_id`) is kept. The base branch is URL-encoded in REST paths, and the printed command names `--repo`, so it acts on the pull request that was inspected. The production-to-source sync merge goes through the gate too. Invariant M19.
 
 ### Changed
 
@@ -41,9 +41,9 @@ for what each version component means here and how a release is cut.
   `no-findings` or `failed`. `record` refuses bare engine names, a round with no result and a
   failed `claude`. `check` refuses a schema-1 receipt, because it cannot show that any engine
   returned, so a one-off reviewed before this release is reviewed again before it lands. The merge
-  body names each engine's result. The shared fixtures carry the new cases. Invariant F11.
+  body names each engine's result. The shared fixtures carry the new cases. LOCAL-ONLY, which triages a hand-off and launches no engine, runs no round. Invariant F11.
 - Review body, LOCAL-FULL reference, invariants and three composed-path budgets raised by what
-  this rule costs (review body 7,870 → 7,994 tokens, under the 8,000 ceiling). The merge gate
+  this rule costs (review body 7,870 → 7,997 tokens, under the 8,000 ceiling). The merge gate
   raises the build-item body (7,790 → 7,820), three references and the composed paths; the release
   body fell (7,989 → 7,987) because step 4 now leaves the draft and green-head checks to the gate.
 
