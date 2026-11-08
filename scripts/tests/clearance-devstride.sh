@@ -29,6 +29,7 @@ fresh() {
          CLEARANCE_PRODUCTION_BRANCH=master CLEARANCE_RELEASE_PATTERN='release/<YY-MM-DD>[-n]' \
          CLEARANCE_POLL_SECONDS=1 CLEARANCE_WAIT_MINUTES=1 CLEARANCE_STALE_MINUTES=20 \
          CLEARANCE_NOW=2026-10-18T10:05:00Z CLAUDE_CODE_SESSION_ID=me-1 \
+         DEVSTRIDE_MACHINE_NAME=M9-Dan DEVSTRIDE_SESSION=rel-1 \
          CLEARANCE_DEVSTRIDE_TEST_URL="http://127.0.0.1:$(cat "$DS/port")" \
          DEVSTRIDE_API_KEY=test-key DEVSTRIDE_API_SECRET=test-secret DEVSTRIDE_ORG_ID=org-1
   unset CLEARANCE_HOLDER_TOKEN DEVSTRIDE_LEASE_TOKEN CODEX_THREAD_ID CLEARANCE_PHASE_BUDGETS
@@ -86,7 +87,10 @@ if [ "$RC" -eq 0 ] && printf '%s' "$OUT" | grep -q "^CLEARED $(digest claude:me-
    && [ "$(claimfile "r['kind'] + ' ' + r['key']")" = "release-tower o/r" ] && [ "$(field phase)" = claimed ] && [ "$(field user)" = alice ] \
    && ! grep -q 'claude:me-1' "$DS/claims.json" \
    && [ "$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["repo"], d["holder"])' "$CLEARANCE_RECORD")" = "o/r claude:me-1" ] \
-   && [ "$(stat -c %a "$CLEARANCE_RECORD" 2>/dev/null || stat -f %Lp "$CLEARANCE_RECORD")" = 600 ] && [ "$J" = 1 ]; then
+   && [ "$(stat -c %a "$CLEARANCE_RECORD" 2>/dev/null || stat -f %Lp "$CLEARANCE_RECORD")" = 600 ] && [ "$J" = 1 ] \
+   && grep '"tool": "claim_work"' "$DS/calls.log" | grep -q '"machine": "m9-dan", "sessionName": "rel-1"' \
+   && [ "$(field machine)" = m9-dan ]; then
+  ok "(1n) the claim and the record name the machine and session the one shared way (m9-dan, rel-1)"
   ok "(1) claim wins → CLEARED <holder digest> <takenAt>; claim release-tower/o/r, expiry = staleMinutes, record in the payload without the raw holder; local record names the real holder, mode 0600"
 else bad "(1) rc=$RC: $OUT"; fi
 run claim

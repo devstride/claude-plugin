@@ -40,8 +40,8 @@ checkout without the block keeps reporting under the one it came from.
 
 Run from the repository root through the shell, at most 20 seconds, never on the hook's own
 clock (the hook spawns it and returns). Exported: `PRESENCE_EVENT`, `PRESENCE_STATE`,
-`PRESENCE_SESSION_ID`, `PRESENCE_MACHINE` (short host name), `PRESENCE_CHECKOUT` (the checkout's
-root), `PRESENCE_BRANCH`, `PRESENCE_ITEM` (an item number the branch name carries as its own
+`PRESENCE_SESSION_ID`, `PRESENCE_MACHINE` (the claim machine name, `story-claims.md`),
+`PRESENCE_CHECKOUT` (the checkout's root), `PRESENCE_BRANCH`, `PRESENCE_ITEM` (an item number the branch name carries as its own
 segment, such as `I20100` in `jane/03-14-26/I20100-attachment-storage`; else empty),
 `PRESENCE_PLUGIN_VERSION`, `PRESENCE_INTERVAL_MINUTES`, `PRESENCE_END_REASON` (on `end` only),
 `PRESENCE_AT` (when queued, in epoch milliseconds, rising with each report, so an

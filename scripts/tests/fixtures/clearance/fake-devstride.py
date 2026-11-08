@@ -186,7 +186,8 @@ class Handler(BaseHTTPRequestHandler):
             handle.write(json.dumps({"tool": tool, "kind": args.get("kind"), "key": args.get("key"),
                                      "holder": digest(args["holder"]) if args.get("holder") else None,
                                      "takeover": (args.get("takeover") or {}).get("expectedHolderDigest"),
-                                     "expectedHolderDigest": args.get("expectedHolderDigest")}) + "\n")
+                                     "expectedHolderDigest": args.get("expectedHolderDigest"),
+                                     "machine": args.get("machine"), "sessionName": args.get("sessionName")}) + "\n")
         if mode == "http403":
             return self.reply(403, '{"message":"forbidden"}')
         if mode == "unknown-tool":

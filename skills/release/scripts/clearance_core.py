@@ -3,8 +3,11 @@ clearance-devstride.sh are thin wrappers: `python3 clearance_core.py <provider> 
 store (where the one record lives, and how it moves atomically) is the only thing that differs;
 every verdict line, exit code and local file is this file's, so the providers cannot drift. The
 contract is skills/release/references/clearance.md."""
-import hashlib, http.client, json, os, re, secrets, signal, socket, subprocess, sys, time, urllib.error, urllib.request
+import hashlib, http.client, json, os, re, secrets, signal, subprocess, sys, time, urllib.error, urllib.request
 from datetime import datetime, timedelta, timezone
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "build-item", "scripts"))
+import claim_record  # noqa: E402  the one machine and session naming every claim uses
 
 RECORD_VERSION = 1
 DEFAULT_REF = "refs/clearance/release"
@@ -618,7 +621,7 @@ class DevStrideStore(Store):
 
     def claim(self, record, takeover=None):
         arguments = {"kind": CLAIM_KIND, "key": repo(), "purpose": record.get("purpose") or "release", "phase": record.get("phase"),
-                     "payload": clean_record(record), "expiryMinutes": STALE_MINUTES, "holder": self.me, "machine": socket.gethostname()}
+                     "payload": clean_record(record), "expiryMinutes": STALE_MINUTES, "holder": self.me, "machine": claim_record.machine_name(), **session_name()}
         if takeover:
             arguments["takeover"] = {"expectedHolderDigest": takeover}
         if not (self.call("claim_work", arguments) or {}).get("won"):
@@ -649,7 +652,8 @@ class DevStrideStore(Store):
     def adopt(self, record, expected):
         self.refuse_unless(self.call("adopt_claim", {
             "kind": CLAIM_KIND, "key": repo(), "expectedHolderDigest": expected["holder"], "phase": record.get("phase"),
-            "payload": clean_record(record), "holder": self.me, "machine": socket.gethostname()}))
+            "payload": clean_record(record), "holder": self.me, "machine": claim_record.machine_name(),
+            **session_name()}))
 
     def delete(self, expected, force=False):
         arguments = {"kind": CLAIM_KIND, "key": repo(), "outcome": "released", "holder": self.me}
@@ -659,6 +663,12 @@ class DevStrideStore(Store):
         self.refuse_unless(answer)
         if not answer.get("released"):
             raise lost()
+
+
+def session_name():
+    """The claim's sessionName argument, only when this session has a name."""
+    name = claim_record.session_name(os.environ)
+    return {"sessionName": name} if name else {}
 
 
 def clean_record(record):
@@ -1010,7 +1020,7 @@ def cmd_claim(args):
                     print("STALE %s — pull request #%s %s — adopt or wait" % (describe(current, at), number, why))
                     return 3
             record = {
-                "v": RECORD_VERSION, "repo": repo(), "holder": STORE.rid(me), "user": user, "machine": socket.gethostname(),
+                "v": RECORD_VERSION, "repo": repo(), "holder": STORE.rid(me), "user": user, "machine": claim_record.machine_name(),
                 "purpose": purpose, "phase": "claimed", "branch": None, "pr": None,
                 "takenAt": iso(at), "heartbeatAt": iso(at), "phaseStartedAt": iso(at),
             }
@@ -1216,7 +1226,7 @@ def record_owed(items, record, me, at):
     # status --json prints these entries.
     entry = {"repo": repo(), "release": name, "pr": source.get("pr"), "holder": STORE.rid(me),
              "user": source.get("user") if source.get("holder") in (me, STORE.rid(me)) else gh_user(),
-             "machine": socket.gethostname(), "releasedAt": iso(at), "owed": list(dict.fromkeys(items))}
+             "machine": claim_record.machine_name(), "releasedAt": iso(at), "owed": list(dict.fromkeys(items))}
     # One entry per release: the name repeats when no release branch is cut ("release"), so the
     # pull request tells two releases apart.
     entries = [e for e in read_owed() if (e.get("release"), e.get("pr")) != (name, entry["pr"])]
@@ -1342,7 +1352,7 @@ def cmd_adopt(args):
     if print_token:
         progress("holder token %s — export it as CLEARANCE_HOLDER_TOKEN for heartbeat and release" % me)
     previous = dict(record)
-    record.update({"holder": STORE.rid(me), "user": gh_user(), "machine": socket.gethostname(), "heartbeatAt": iso(at),
+    record.update({"holder": STORE.rid(me), "user": gh_user(), "machine": claim_record.machine_name(), "heartbeatAt": iso(at),
                    "phaseStartedAt": iso(at)})
     try:
         STORE.adopt(record, previous)
