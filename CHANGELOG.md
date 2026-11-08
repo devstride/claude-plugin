@@ -8,6 +8,17 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **A story that ships differently from its description now updates its linked specs too.** Before,
+  the build loop's completion step kept the original description in a comment and rewrote the
+  item, so a Knowledge Base spec linked to that item quietly fell behind. Now `build-item` sends
+  the as-built description through DevStride's `record_as_built_change` tool, which updates the
+  item, comments the before and after, and writes a note into every linked spec, or marks the spec
+  out of sync when it cannot. Because that note can reach customers, the step keeps branch, commit
+  and tool names out of it. A server without the tool, or an item it refuses, gets the previous
+  behaviour.
+
 ## [3.39.0] — 2026-11-08
 
 ### Changed

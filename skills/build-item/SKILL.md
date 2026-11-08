@@ -274,11 +274,9 @@ branch waits, said.
   (`next-unblocked.md`), closed by step 8; a train merge too (`release-train.md`), closed by `release`.
 - **The item points at its code**: 4b — confirm the PR auto-linked, else `link_pull_request`; 4a —
   that comment. Never invent a PR number.
-- **Reconcile as-built** on a material deviation: `add_comment` the `view: 'full'` description
-  verbatim under "📋 Original spec (as planned) — superseded by the description below" (HTML: pass
-  `{ html }`, never Markdown), then rewrite it: italic as-built note naming what it shipped in, a
-  **Deviations** list with one-line rationales, an **As shipped** summary — citing the artifact that
-  EXISTS (4b its PR; 4a merge SHA + branch). None → "shipped as specified". Deviations are step 3/4's.
+- **Reconcile as-built** on a material deviation (step 3/4's): **read
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/as-built.md`**. None → report "shipped as
+  specified" and write nothing.
 - **Release the claim** (`claims` set): outcome `done`.
 - **Report** item + `[N]`, status, dates, PR link or SHA + branch, profile + source, reconciled.
 
