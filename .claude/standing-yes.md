@@ -21,8 +21,8 @@ standing yes replaces only the per-pull-request question that used to follow it.
    a fork), authored by the owner's account, with the owner as the author of every commit and the
    only account that pushed to its branch, and linked to a tracked work item whose build the owner
    started.
-2. It changes nothing that guards merges: nothing under `.claude/` (this file and the release
-   skill) or `.github/` (the required checks); nothing under `scripts/` (the checks themselves)
+2. It changes nothing that guards merges, compared in any letter case: nothing under a `.claude/`
+   directory at any depth (this file and the release skill) or `.github/` (the required checks); nothing under `scripts/` (the checks themselves)
    except `scripts/cost-budgets.json` and the test cases in `scripts/tests/` (`run.sh` is
    guarded); and none of the files the checks load or run: `skills/pr/scripts/merge-gate.py`,
    `skills/review/scripts/reviewed-status.py`, `skills/update/scripts/update-plugin.py`,

@@ -98,8 +98,9 @@ fresh worktree of the then-current `main`.
    the private tracker comment, never on GitHub.
 3. **It touches nothing that guards merges.** List the files with `gh api
    repos/{owner}/{repo}/pulls/<pr>/files --paginate` (the count must equal `changedFiles`) and read
-   both `filename` and `previous_filename`. Neither may be under `.claude/` or `.github/`; under
-   `scripts/`, except `scripts/cost-budgets.json` and the test cases in `scripts/tests/` (its
+   both `filename` and `previous_filename`, in any letter case (the owner's disk ignores case, so
+   `.Claude/` is `.claude/`). Neither may be under a `.claude/` directory at any depth or under
+   `.github/`; under `scripts/`, except `scripts/cost-budgets.json` and the test cases in `scripts/tests/` (its
    `run.sh` is guarded); or be one of the files the checks load or run:
    `skills/pr/scripts/merge-gate.py`, `skills/review/scripts/reviewed-status.py`,
    `skills/update/scripts/update-plugin.py`, `skills/doctor/scripts/validate-config.py`,
