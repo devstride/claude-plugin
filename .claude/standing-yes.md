@@ -18,13 +18,15 @@ standing yes replaces only the per-pull-request question that used to follow it.
 ## Conditions (all of them, at the exact head merged)
 
 1. The pull request is open, not a draft, based on `main`, from a branch of this repository (never
-   a fork), authored by the owner's account, with the owner as the author of every commit, and
-   linked to a tracked work item whose build the owner started.
+   a fork), authored by the owner's account, with the owner as the author of every commit and the
+   only account that pushed to its branch, and linked to a tracked work item whose build the owner
+   started.
 2. It changes nothing that guards merges: nothing under `.claude/` (this file and the release
    skill) or `.github/` (the required checks); no `scripts/check-*`, `scripts/neutrality-*`,
    `scripts/validate.sh`, `scripts/tests/run.sh`, `scripts/public-hygiene.allow` or
-   `scripts/config-key-scan.ignore`; and neither `skills/pr/scripts/merge-gate.py` nor
-   `skills/review/scripts/reviewed-status.py`; by old or new name. Such a change always needs the
+   `scripts/config-key-scan.ignore`; and none of `skills/pr/scripts/merge-gate.py`,
+   `skills/review/scripts/reviewed-status.py` or `skills/update/scripts/update-plugin.py`; by old or
+   new name. Such a change always needs the
    owner's own yes on that pull request.
 3. The review settled clean: the last local round (Claude and Codex) found no P1 and no serious P2,
    and the head carries a `devstride/reviewed` status for that pull request into `main`, posted
@@ -36,9 +38,9 @@ standing yes replaces only the per-pull-request question that used to follow it.
    `merge-path` and `public-hygiene`, and only org owners can update it, through a pull request.
 
 The merge step runs in a session started in a clean worktree of `main`, and reads this file, its
-own procedure and both gate scripts from there, never from the pull request being merged. It
-reads this file again right before merging, so a revocation that lands meanwhile stops it. It
-merges with a merge commit.
+own procedure and both gate scripts from there, never from the pull request being merged. Right
+before merging it checks that `main` hasn't moved since it read this file, and stops if it has, so
+a revocation that lands meanwhile stops it. It merges with a merge commit.
 
 ## The audit trail
 

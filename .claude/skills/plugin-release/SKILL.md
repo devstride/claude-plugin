@@ -85,14 +85,18 @@ the pull request's checkout stops with `OWNER YES NEEDED`. Every path below mark
    base `main`, not cross-repository, authored by the owner (`philreynolds`), the account the
    owner's builds run under. Record `<head>` = `headRefOid`. Every commit
    (`gh api repos/{owner}/{repo}/pulls/<pr>/commits --paginate`) has the owner as its GitHub
-   author. The pull request is linked to a tracked work item whose build the owner started; say
-   which item in the private tracker comment, never on GitHub.
+   author. Commit authorship alone can be set by anyone who can push, so also read every push to
+   the head branch (`gh api "repos/{owner}/{repo}/activity?ref=refs/heads/<headRefName>"
+   --paginate`): each entry's `actor` is the owner, and `<head>` is the `after` of one of them. The
+   pull request is linked to a tracked work item whose build the owner started; say which item in
+   the private tracker comment, never on GitHub.
 3. **It touches nothing that guards merges.** List the files with `gh api
    repos/{owner}/{repo}/pulls/<pr>/files --paginate` (the count must equal `changedFiles`) and read
    both `filename` and `previous_filename`. Neither may be under `.claude/` or `.github/`, match
    `scripts/check-*` or `scripts/neutrality-*`, or be `scripts/validate.sh`,
    `scripts/tests/run.sh`, `scripts/public-hygiene.allow`, `scripts/config-key-scan.ignore`,
-   `skills/pr/scripts/merge-gate.py` or `skills/review/scripts/reviewed-status.py`. A change to any
+   `skills/pr/scripts/merge-gate.py`, `skills/review/scripts/reviewed-status.py` or
+   `skills/update/scripts/update-plugin.py` (the version-bump check reads it). A change to any
    of them, including this procedure and the standing yes, always needs the owner's own yes.
 4. **The review settled clean.** The last local review round (Claude and Codex) on `<head>` found
    no P1 and no serious P2. Only then post the proof, `python3
@@ -106,8 +110,10 @@ the pull request's checkout stops with `OWNER YES NEEDED`. Every path below mark
    `head`).
 6. **Every check is green on `<head>`.** `python3 <tmp>/skills/pr/scripts/merge-gate.py <pr>
    <head> --all-green --repo devstride/claude-plugin` *(main)* prints `MERGE <command>`. Right
-   before running it, `git fetch origin`: if `origin/main` moved since step 1, read the standing yes
-   again (a revocation may have landed) and run this step again. Then run exactly that command.
+   before running it, `git fetch origin` and compare `origin/main` with the commit noted in step 1.
+   If it moved (a revocation may have landed), `<tmp>` is stale: stop with `OWNER YES NEEDED` (main
+   moved during the merge) and start `merge` again in a fresh session. Then run exactly that
+   command.
    `REFUSE` or `ERROR` stops with its reason (wait for pending checks first; a red check is never
    merged).
 7. **The audit comment**, on the pull request at once (`gh pr comment <pr> --body-file <file>`):
