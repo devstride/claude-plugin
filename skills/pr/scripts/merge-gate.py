@@ -446,11 +446,13 @@ def runs_at_head(contexts, workflow_runs):
             mine = [r for r in listed if key[3] and r["workflow_id"] == key[3] and r["event"] == event]
             going = sorted(r["run_number"] for r in mine if r["status"] != "completed")
             done = [r for r in mine if r["status"] == "completed"]
-            green = [r for r in done if r.get("conclusion") in ("success", "skipped", "neutral")]
+            passed = [r for r in done if r.get("conclusion") in ("success", "skipped", "neutral")]
+            green = [r for r in passed if (key[2], key[3], r["run_number"]) in ran]
             # a red run that never reported the check counts unless a later run of this workflow and
-            # event passed (a cancel the next run replaced); later: a higher number it was not re-run
-            # past, or a re-run that began after it
-            red_runs = [r for r in done if r not in green and r["run_number"] not in byRun
+            # event passed with a job that executed (a cancel the next run replaced; a run where every
+            # job skipped proves nothing); later: a higher number it was not re-run past, or a re-run
+            # that began after it
+            red_runs = [r for r in done if r not in passed and r["run_number"] not in byRun
                         and not any(_later(g, r) for g in green)]
             if not byRun:
                 # runs of this workflow and event that never reported the check: one still going or
@@ -531,7 +533,8 @@ def settled(owner, name, sha, before):
     or conclusion since the read before them means the checks may be stale (a re-run finishing
     between the two reads), so the gate reads everything afresh."""
     after = workflow_runs(owner, name, sha)
-    mark = lambda runs: sorted((r["id"], r["run_attempt"], r["status"], r.get("conclusion")) for r in runs)
+    mark = lambda runs: sorted((r["id"], r["run_attempt"], r["status"], r.get("conclusion")) for r in runs
+                               if r.get("event") in ELIGIBLE)   # a comment-triggered run never decides a check
     if mark(after) != mark(before):
         raise Retry("the workflow runs at %s changed while its checks were being read" % sha[:12])
     return after
