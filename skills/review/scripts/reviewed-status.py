@@ -79,7 +79,8 @@ def statuses(sha, cwd):
         batch = gh_json(cwd, "api", "repos/{owner}/{repo}/commits/%s/statuses?per_page=100&page=%d" % (sha, page))
         if not isinstance(batch, list):
             raise Unreadable("the statuses on %s could not be read" % sha[:12])
-        found += [s for s in batch if isinstance(s, dict) and s.get("context") == CONTEXT]
+        found += [s for s in batch if isinstance(s, dict) and isinstance(s.get("context"), str)
+                  and s["context"].lower() == CONTEXT]   # GitHub's contexts are case-insensitive
         if len(batch) < 100:
             break
         page += 1   # GitHub's 1,000 limit is per context, so other contexts can make many pages
@@ -145,6 +146,8 @@ def post(sha, cwd, pr, base, source=None, wait=3):
         return False, "%r is not a full commit SHA" % sha
     if not re.match(r"^[1-9][0-9]*$", pr or ""):
         return False, "--pr %r is not a pull request number" % pr
+    if not base or base.startswith(("origin/", "refs/")) or re.match(r"^[0-9a-f]{40}$", base):
+        return False, "--base %r: pass the bare branch name the review ran against (e.g. train), never a remote ref or a SHA" % base
     for attempt in (0, 1):   # just after a push GitHub may still report the old head: read once more
         info = gh_json(cwd, "pr", "view", pr, "--json", "state,headRefOid,baseRefName")
         if not isinstance(info, dict) or info.get("headRefOid") == sha or attempt:
@@ -179,6 +182,13 @@ def post(sha, cwd, pr, base, source=None, wait=3):
     return True, description
 
 
+def wait_seconds():
+    try:
+        return max(0.0, float(os.environ.get("REVIEWED_STATUS_WAIT", "3")))
+    except ValueError:
+        return 3.0
+
+
 def main(argv):
     args = argv[1:]
     usage = ("usage: reviewed-status.py post <sha> --pr <n> --base <branch> [--from <reviewed-sha>]"
@@ -206,7 +216,7 @@ def main(argv):
             print(("REVIEWED %s by %s" if ok else "UNREVIEWED %s") % ((sha, why) if ok else (why,)))
             return 0 if ok else 2
         ok, why = post(sha, None, opts["--pr"], opts["--base"], opts.get("--from"),
-                       float(os.environ.get("REVIEWED_STATUS_WAIT", "3")))
+                       wait_seconds())
         print(("POSTED %s %s: %s" % (sha, CONTEXT, why)) if ok else "NOT POSTED %s" % why)
         return 0 if ok else 2
     except Unreadable as err:

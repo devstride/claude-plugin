@@ -53,12 +53,12 @@ git checkout -q -b same "$REVIEWED"; git commit -q --amend -m "feat (reworded)";
 
 # inject SHA ID LOGIN STATE [DESCRIPTION] [TYPE]: a status newer than every one already on SHA
 inject() {
-  python3 - "$ST/$1.json" "$2" "$3" "$4" "${5:-Settled review of #7 into train}" "${6:-User}" <<'PY'
+  python3 - "$ST/$1.json" "$2" "$3" "$4" "${5:-Settled review of #7 into train}" "${6:-User}" "${CTX:-devstride/reviewed}" <<'PY'
 import datetime, json, os, sys
-f, i, login, state, desc, kind = sys.argv[1:]
+f, i, login, state, desc, kind, ctx = sys.argv[1:]
 s = json.load(open(f)) if os.path.exists(f) else []
 t = max([datetime.datetime.strptime(x["created_at"], "%Y-%m-%dT%H:%M:%SZ") for x in s] or [datetime.datetime(2026, 12, 1, 9)]) + datetime.timedelta(hours=1)
-s.insert(0, {"id": int(i), "context": "devstride/reviewed", "state": state, "description": desc,
+s.insert(0, {"id": int(i), "context": ctx, "state": state, "description": desc,
              "created_at": t.strftime("%Y-%m-%dT%H:%M:%SZ"), "creator": {"login": login, "type": kind}})
 json.dump(s, open(f, "w"))
 PY
@@ -84,9 +84,9 @@ V "$REVIEWED"; [ "$RC" = 0 ] && ok "(5) a later non-admin status never overrides
 inject "$REVIEWED" 5001 "github-actions[bot]" failure "x" Bot
 inject "$REVIEWED" 5002 ghost-user failure
 V "$REVIEWED"; [ "$RC" = 0 ] && ok "(5b) a bot's status and an unknown account's (permission 404) are ignored, never fatal" || bad "(5b) $RC $OUT"
-inject "$REVIEWED" 6000 owner failure "withdrawn"
+CTX=Devstride/Reviewed inject "$REVIEWED" 6000 owner failure "withdrawn"
 V "$REVIEWED"
-[ "$RC" = 2 ] && [[ "$OUT" == *"an admin withdrew the devstride/reviewed proof"*"failure"* ]] && ok "(6) an admin withdraws the proof with a newer failure" || bad "(6) $RC $OUT"
+[ "$RC" = 2 ] && [[ "$OUT" == *"an admin withdrew the devstride/reviewed proof"*"failure"* ]] && ok "(6) an admin withdraws the proof with a newer failure (context matched case-insensitively)" || bad "(6) $RC $OUT"
 PR_HEAD="$REVIEWED" t post "$REVIEWED" --pr 7 --base train
 PR_HEAD="$SAME" t post "$SAME" --pr 7 --base train --from "$REVIEWED"
 [ "$RC" = 0 ] && [[ "$OUT" == *"Settled review of #7 into train, carried from ${REVIEWED:0:12} (same tree)" ]] && ok "(7) a tree-identical rebase carries the proof" || bad "(7) $RC $OUT"
@@ -105,6 +105,10 @@ t post "$SAME" --pr 7; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(9d) post
 t post abc123 --pr 7 --base train; [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"*"not a full commit SHA"* ]] && ok "(10) a short SHA is refused" || bad "(10) $RC $OUT"
 GH_FAIL=1 V "$REVIEWED"; [ "$RC" = 1 ] && [[ "$OUT" == ERROR* ]] && ok "(11) GitHub unreadable: ERROR, never REVIEWED" || bad "(11) $RC $OUT"
 GH_FAIL=1 t post "$REVIEWED" --pr 7 --base train; [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"* ]] && ok "(12) a failed post says NOT POSTED" || bad "(12) $RC $OUT"
+PR_HEAD="$SAME" t post "$SAME" --pr 7 --base origin/train
+[ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED --base 'origin/train': pass the bare branch name"* ]] && ok "(10b) a remote ref as --base is refused with the expected form" || bad "(10b) $RC $OUT"
+PR_HEAD="$SAME" t post "$SAME" --pr 7 --base "$BASE"
+[ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED --base"*"never a remote ref or a SHA" ]] && ok "(10c) a SHA as --base is refused" || bad "(10c) $RC $OUT"
 t verify; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(13) usage" || bad "(13) $RC $OUT"
 t verify "$REVIEWED" --pr 7; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(13b) --pr without --base is a usage error" || bad "(13b) $RC $OUT"
 exit $FAIL
