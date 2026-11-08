@@ -14,31 +14,42 @@ the repository's. The contract: skills/setup/references/session-presence.md.
 
   hook     (the hook command; the event comes from the payload's hook_event_name)
            SessionStart     -> state "starting", sends `start`, starts this session's keeper
-           UserPromptSubmit -> state "working"; sends `beat` on a state change, or when the last
-                               send is a minute old; with no record yet (a session that began
-                               before the block existed or the plugin was updated) sends `start`
-                               and starts the keeper
+                               (source `compact`, an automatic mid-turn compaction, is ignored)
+           UserPromptSubmit -> state "working"; sends `beat` on a state change, when the last send
+                               is a minute old, or when the session moved to another checkout; with
+                               no record yet (a session that began before the block existed or the
+                               plugin was updated) or after an `end`, sends `start`
            Stop             -> state "waiting"; sends `beat` on a state change
            SessionEnd       -> state "ended", sends `end` (PRESENCE_END_REASON = the payload's
                                reason, such as `clear` or `logout`)
            A state change within 30 seconds of the last send is held: the next hook or keeper send
            carries it (a hook compares against the last state REPORTED, so a held change is not lost).
-  keeper <session>  (detached, one per session) sleeps `intervalMinutes`, then sends `beat` while
-           the session's Claude Code process lives. When that process is gone it sends `end`
-           (reason `gone`) and exits; it exits silently once the session has ended, its record is
-           gone or the block is removed. It covers a long turn with no prompt, and a killed session.
-  send <event> <session>  (detached) runs the command once: from the repository root, through the
-           shell, at most 20 seconds, its exit code kept in the record. It exports
+           The record follows the session, not the checkout: a session that moves to a checkout
+           without the block keeps reporting under the one it came from, and Stop or SessionEnd is
+           never dropped for a session that has a record. The session's process (CLAUDE_PID, else
+           the parent of the hook's shell) and its start time are refreshed whenever they change.
+  keeper <session>  (detached, one per session, holding the session's keeper lock, which is how a
+           hook knows one runs) checks every 10 seconds: it exits once the session has ended, its
+           record is gone or the block is removed; when the session's process is gone, or its
+           process id now belongs to a process with another start time, it sends `end` (reason
+           `gone`) and exits; and it sends `beat` when the last send is `intervalMinutes` old. It
+           covers a long turn with no prompt, and a killed session.
+  send <event> <session> <at>  (detached) runs the command once, holding the session's send lock so
+           reports run one at a time and in order: nothing but `start` is sent after an `end`, and
+           a second `end` is not sent. From the repository root, through the shell, at most 20
+           seconds, its exit code kept in the record. It exports
            PRESENCE_EVENT (start|beat|end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE,
            PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM (an item number the branch name carries,
            else empty), PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON,
-           and CLAUDE_CODE_SESSION_ID and CLAUDE_PID so the repository can resolve the session's name.
+           PRESENCE_AT (when the hook or keeper queued the report, epoch seconds, so a repository
+           can drop a report older than one it already stored), and CLAUDE_CODE_SESSION_ID and CLAUDE_PID so the repository can resolve the session's name.
 
 DEVSTRIDE_PRESENCE_MINUTE (seconds in a keeper minute, default 60) exists for the tests only.
-Records: ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/presence/<session>.json, owner-only, pruned
-after 7 days. FAILS OPEN: every hook exits 0 and prints nothing (a prompt hook's stdout would become
+Records: ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/presence/<session>.json (and the session's
+two lock files), owner-only, pruned after 7 days untouched. FAILS OPEN: every hook exits 0 and prints nothing (a prompt hook's stdout would become
 context), whatever goes wrong. python3 and the standard library only.
 """
+import fcntl
 import json
 import os
 import re
@@ -58,6 +69,7 @@ BEAT_AFTER = 60          # a prompt re-sends when the last send is this old
 CHANGE_AFTER = 30        # a state change within this of the last send waits for the next send
 COMMAND_TIMEOUT = 20
 KEEP = 7 * 24 * 3600
+PAYLOAD_LIMIT = 4 * 1048576   # a prompt hook's payload carries the whole prompt
 # Seconds in a keeper minute. Tests shorten it; nothing else sets DEVSTRIDE_PRESENCE_MINUTE.
 try:
     MINUTE = max(0.01, float(os.environ.get("DEVSTRIDE_PRESENCE_MINUTE") or 60))
@@ -177,12 +189,16 @@ def alive(pid):
         return False
 
 
+def env_owner():
+    value = os.environ.get("CLAUDE_PID", "")
+    return int(value) if value.isdigit() and alive(int(value)) else 0
+
+
 def owner_pid():
     """The session's Claude Code process: CLAUDE_PID when Claude Code exports it, else the parent of
     the shell that runs this hook. 0 when neither can be found."""
-    value = os.environ.get("CLAUDE_PID", "")
-    if value.isdigit() and alive(int(value)):
-        return int(value)
+    if env_owner():
+        return env_owner()
     try:
         out = subprocess.run(["ps", "-o", "ppid=", "-p", str(os.getppid())], capture_output=True,
                              text=True, timeout=2)
@@ -190,6 +206,37 @@ def owner_pid():
         return pid if alive(pid) else 0
     except Exception:
         return 0
+
+
+def started(pid):
+    """A process's start time as `ps` prints it, so a reused process id is told apart; "" unknown."""
+    try:
+        out = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True, timeout=2)
+        return out.stdout.strip() if out.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
+def lock(sid, kind, block_until_free):
+    """An open, flock-held lock file for this session, or None when another process holds it (and
+    block_until_free is False). The lock lives as long as the returned descriptor."""
+    path = os.path.join(records_dir(), "%s.%s.lock" % (sid, kind))
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX if block_until_free else fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        return None
+    os.utime(fd)
+    return fd
+
+
+def keeper_running(sid):
+    fd = lock(sid, "keeper", False)
+    if fd is None:
+        return True
+    os.close(fd)
+    return False
 
 
 def spawn(*args):
@@ -212,15 +259,11 @@ def item_of(branch):
     return match.group(1) if match else ""
 
 
-def send(event, sid):
-    """Run the repository's command once for this session; keep its exit code in the record."""
-    record = load(sid)
-    if not record or event not in ("start", "beat", "end"):
-        return
+def run_command(sid, record, event, at):
     top = record.get("top")
     settings = block(top) if isinstance(top, str) else None
     if not settings:
-        return
+        return None
     branch = branch_of(top)
     env = dict(os.environ)
     env.update({
@@ -230,103 +273,136 @@ def send(event, sid):
         "PRESENCE_PLUGIN_VERSION": str(record.get("version") or ""),
         "PRESENCE_INTERVAL_MINUTES": str(settings["intervalMinutes"]),
         "PRESENCE_END_REASON": str(record.get("reason") or "") if event == "end" else "",
-        "CLAUDE_CODE_SESSION_ID": sid,
+        "PRESENCE_AT": str(at), "CLAUDE_CODE_SESSION_ID": sid,
     })
     if record.get("owner"):
         env["CLAUDE_PID"] = str(record["owner"])
-    code = None
     try:
         child = subprocess.Popen(settings["command"], shell=True, cwd=top, env=env, stdin=subprocess.DEVNULL,
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         try:
-            code = child.wait(timeout=COMMAND_TIMEOUT)
+            return child.wait(timeout=COMMAND_TIMEOUT)
         except subprocess.TimeoutExpired:
             os.killpg(child.pid, signal.SIGKILL)
             child.wait()
-            code = "timeout"
+            return "timeout"
     except Exception:
-        code = "error"
-    latest = load(sid) or record
-    latest["last"] = {"event": event, "exit": code, "at": round(time.time(), 3)}
-    save(sid, latest)
+        return "error"
+
+
+def send(event, sid, at):
+    """Run the repository's command once for this session, one report at a time, in order."""
+    if event not in ("start", "beat", "end"):
+        return
+    fd = lock(sid, "send", True)
+    if fd is None:
+        return
+    try:
+        record = load(sid)
+        if not record:
+            return
+        ended = record.get("state") == "ended"
+        if (event == "beat" and ended) or (event == "start" and ended) or (event == "end" and record.get("endSent")):
+            return
+        code = run_command(sid, record, event, at)
+        if code is None:
+            return
+        latest = load(sid) or record
+        latest["last"] = {"event": event, "exit": code, "at": round(time.time(), 3)}
+        if event == "end":
+            latest["endSent"] = latest.get("state") == "ended"  # a start queued since then re-arms it
+        save(sid, latest)
+    finally:
+        os.close(fd)
+
+
+def read_payload():
+    try:
+        payload = json.loads(sys.stdin.read(PAYLOAD_LIMIT) or "{}")
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def hook():
-    try:
-        payload = json.loads(sys.stdin.read(65536) or "{}")
-    except Exception:
-        return
-    if not isinstance(payload, dict):
+    payload = read_payload()
+    if not payload:
         return
     event, sid = payload.get("hook_event_name"), payload.get("session_id")
     if event not in STATES or not isinstance(sid, str) or not SESSION_ID.match(sid):
         return
+    if event == "SessionStart" and payload.get("source") == "compact":
+        return  # an automatic compaction mid-turn: the session is still working
     cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else os.getcwd()
     top = repo_top(cwd)
-    if not block(top):
-        return
-    now = time.time()
     record = load(sid)
-    state = STATES[event]
-    fresh = record is None or record.get("top") != top
+    if not block(top):
+        if record and block(record.get("top")):
+            top = record["top"]  # moved to a checkout without the block: keep reporting under the old one
+        else:
+            return
+    now = time.time()
+    fresh = record is None
     if fresh:
         if event in ("Stop", "SessionEnd"):
-            return  # nothing was ever reported for this session here
-        record = {"schema": 1, "top": top, "state": None, "sent": 0, "owner": 0, "keeper": 0}
+            return  # nothing was ever reported for this session
+        record = {"schema": 1, "top": top, "state": None, "sent": 0, "owner": 0}
         if event == "SessionStart":
             prune(now)
-    previous, sent = record.get("state"), record.get("sent") or 0
-    record.update({"state": state, "version": running_version() or record.get("version") or ""})
+    moved = not fresh and record.get("top") != top
+    previous, sent, state = record.get("state"), record.get("sent") or 0, STATES[event]
+    record.update({"top": top, "state": state, "version": running_version() or record.get("version") or ""})
+    owner = env_owner() or (owner_pid() if event == "SessionStart" or not alive(record.get("owner")) else 0)
+    if owner and owner != record.get("owner"):
+        record.update({"owner": owner, "ownerStarted": started(owner)})
     if event == "SessionEnd":
         record["reason"] = str(payload.get("reason") or "")
         verb = "end" if previous != "ended" else None
-    elif fresh or previous == "ended":
+    elif event == "SessionStart" or fresh or previous == "ended":
         verb = "start"
-    elif event == "UserPromptSubmit" and now - sent >= BEAT_AFTER:
+    elif event == "UserPromptSubmit" and (now - sent >= BEAT_AFTER or moved):
         verb = "beat"
-    elif state != record.get("reported") and now - sent >= CHANGE_AFTER:
+    elif (state != record.get("reported") or moved) and now - sent >= CHANGE_AFTER:
         verb = "beat"
     else:
         verb = None
-    if event in ("SessionStart", "UserPromptSubmit") and not alive(record.get("keeper")):
-        record["owner"] = owner_pid()
-        keeper = bool(record["owner"])
-    else:
-        keeper = False
     if verb:
         record.update({"sent": round(now, 3), "reported": state})
+        if verb == "start":
+            record["endSent"] = False
     save(sid, record)
     if verb:
-        spawn("send", verb, sid)
-    if keeper:
+        spawn("send", verb, sid, str(int(now)))
+    if event in ("SessionStart", "UserPromptSubmit") and record.get("owner") and not keeper_running(sid):
         spawn("keeper", sid)
 
 
 def keeper(sid):
-    record = load(sid)
-    if not record:
-        return
-    record["keeper"] = os.getpid()
-    save(sid, record)
+    fd = lock(sid, "keeper", False)
+    if fd is None:
+        return  # another keeper runs for this session
+    poll = 10 * MINUTE / 60
     while True:
+        time.sleep(poll)
+        os.utime(fd)
+        record = load(sid)
+        if not record or record.get("state") == "ended":
+            return
         settings = block(record.get("top"))
         if not settings:
             return
-        time.sleep(settings["intervalMinutes"] * MINUTE)
-        record = load(sid)
-        if not record or record.get("state") == "ended" or record.get("keeper") != os.getpid():
-            return
-        if not alive(record.get("owner")):
-            record.update({"state": "ended", "reason": "gone", "sent": round(time.time(), 3), "reported": "ended"})
+        owner, now = record.get("owner"), time.time()
+        due = now - (record.get("sent") or 0) >= settings["intervalMinutes"] * MINUTE
+        gone = not alive(owner) or (due and record.get("ownerStarted") and started(owner) != record["ownerStarted"])
+        if gone:
+            record.update({"state": "ended", "reason": "gone", "sent": round(now, 3), "reported": "ended"})
             save(sid, record)
-            send("end", sid)
+            send("end", sid, int(now))
             return
-        if not block(record.get("top")):
-            return
-        record.update({"sent": round(time.time(), 3), "reported": record.get("state")})
-        save(sid, record)
-        send("beat", sid)
-        record = load(sid) or record
+        if due:
+            record.update({"sent": round(now, 3), "reported": record.get("state")})
+            save(sid, record)
+            send("beat", sid, int(now))
 
 
 def main(argv):
@@ -335,8 +411,8 @@ def main(argv):
             hook()
         elif argv[:1] == ["keeper"] and len(argv) == 2 and SESSION_ID.match(argv[1]):
             keeper(argv[1])
-        elif argv[:1] == ["send"] and len(argv) == 3 and SESSION_ID.match(argv[2]):
-            send(argv[1], argv[2])
+        elif argv[:1] == ["send"] and len(argv) == 4 and SESSION_ID.match(argv[2]) and argv[3].isdigit():
+            send(argv[1], argv[2], int(argv[3]))
     except Exception:
         pass
     return 0

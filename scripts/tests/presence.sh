@@ -6,15 +6,14 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; HOOK="$ROOT/hooks/presence.py"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"
-cleanup() { # stop the stand-in owners and every keeper the cases started
-  for p in $(cat "$WORK/owners" 2>/dev/null) $(cat "$XDG_CACHE_HOME"/devstride-plugin/presence/*.json 2>/dev/null \
-      | python3 -c 'import json,sys; [print(json.loads(l).get("keeper") or "") for l in sys.stdin if l.strip()]' 2>/dev/null); do
-    kill "$p" 2>/dev/null
-  done
+cleanup() { # stop the stand-in owners and every keeper the cases started (keepers exit on their own too)
+  for p in $(cat "$WORK/owners" 2>/dev/null); do kill "$p" 2>/dev/null; done
+  for sid in $(ls "$RECORDS" 2>/dev/null | sed -n 's/\.json$//p'); do pkill -f "presence.py keeper $sid\$" 2>/dev/null; done
   chmod -R u+w "$WORK" 2>/dev/null; rm -rf "$WORK"
 }
 trap cleanup EXIT
 export XDG_CACHE_HOME="$WORK/cache"
+unset CLAUDE_PID CLAUDE_CODE_SESSION_ID   # the cases name their own stand-in process
 RECORDS="$XDG_CACHE_HOME/devstride-plugin/presence"
 LOG="$WORK/sent.log"
 ITEM_NO="I$((20000 + 100))"   # an example item number, built at run time (public-repo hygiene)
@@ -31,8 +30,8 @@ mkrepo() { # mkrepo NAME [CONFIG-JSON] [BRANCH]
   printf '%s' "${2:-{\}}" > "$d/.claude/ds-config.json"; printf '%s' "$d"
 }
 config() { python3 -c 'import json,sys; print(json.dumps({"presence":{"command":sys.argv[1],"intervalMinutes":int(sys.argv[2])}}))' "$REPORT" "${1:-5}"; }
-fire() { # fire EVENT SESSION CWD [REASON] — run the hook as Claude Code does; prints its stdout
-  python3 -c 'import json,sys; print(json.dumps({"hook_event_name":sys.argv[1],"session_id":sys.argv[2],"cwd":sys.argv[3],"reason":sys.argv[4]}))' \
+fire() { # fire EVENT SESSION CWD [REASON-OR-SOURCE] — run the hook as Claude Code does; prints its stdout
+  python3 -c 'import json,sys; print(json.dumps({"hook_event_name":sys.argv[1],"session_id":sys.argv[2],"cwd":sys.argv[3],"reason":sys.argv[4],"source":sys.argv[4]}))' \
     "$1" "$2" "$3" "${4:-}" | python3 "$HOOK" hook
 }
 sent() { [ -f "$LOG" ] && wc -l < "$LOG" | tr -d ' ' || echo 0; }
@@ -45,6 +44,20 @@ age() { # age SESSION SECONDS — pretend the last send was SECONDS ago
   python3 - "$RECORDS/$1.json" "$2" <<'PY'
 import json, sys, time
 p = sys.argv[1]; r = json.load(open(p)); r["sent"] = time.time() - float(sys.argv[2]); json.dump(r, open(p, "w"))
+PY
+}
+keeper_alive() { # keeper_alive SESSION — is a keeper holding the session's keeper lock?
+  python3 - "$RECORDS/$1.keeper.lock" <<'PY'
+import fcntl, os, sys
+try:
+    fd = os.open(sys.argv[1], os.O_RDWR)
+except OSError:
+    sys.exit(1)
+try:
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    sys.exit(1)
+except OSError:
+    sys.exit(0)
 PY
 }
 owner() { sleep 300 >/dev/null 2>&1 & echo "$!" >> "$WORK/owners"; echo "$!"; }  # a stand-in Claude Code process
@@ -114,23 +127,23 @@ K="$(mkrepo keeper "$(config 1)")"
 O8="$(owner)"
 DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O8" fire SessionStart s8 "$K" >/dev/null
 wait_sent 3; BEATS="$(grep -c '"PRESENCE_EVENT": "beat"' "$LOG")"
-KEEPER="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["keeper"])' "$RECORDS/s8.json")"
+keeper_alive s8; KEEPER=$?
 kill "$O8" 2>/dev/null; wait "$O8" 2>/dev/null
 i=0; while ! grep -q '"PRESENCE_EVENT": "end"' "$LOG" && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
 sleep 0.6
-if [ "$BEATS" -ge 2 ] && grep -q '"PRESENCE_END_REASON": "gone"' "$LOG" && ! kill -0 "$KEEPER" 2>/dev/null \
+if [ "$BEATS" -ge 2 ] && grep -q '"PRESENCE_END_REASON": "gone"' "$LOG" && [ "$KEEPER" = 0 ] && ! keeper_alive s8 \
   && [ "$(tail -1 "$LOG" | python3 -c 'import json,sys; print(json.load(sys.stdin)["PRESENCE_EVENT"])')" = end ]; then
   ok "(8) keeper → beats every interval; owner gone → end (reason gone), keeper exits"
 else bad "(8) beats=$BEATS keeper=$KEEPER $(cat "$LOG")"; fi
 
-# (9) the keeper of an ended session sends nothing more and exits
-: > "$LOG"
+# (9) the keeper of an ended session sends nothing more and exits at its next check
+: > "$LOG"; K5="$(mkrepo keeper5 "$(config 5)")"
 O9="$(owner)"
-DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O9" fire SessionStart s9 "$K" >/dev/null
-wait_sent 1; KEEPER="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("keeper",0))' "$RECORDS/s9.json")"
-fire SessionEnd s9 "$K" logout >/dev/null; wait_sent 2; sleep 1.2
-if [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = end ] && ! kill -0 "$KEEPER" 2>/dev/null; then
-  ok "(9) SessionEnd → the keeper sends nothing more and exits"
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O9" fire SessionStart s9 "$K5" >/dev/null
+wait_sent 1; sleep 0.2; keeper_alive s9; KEEPER=$?
+fire SessionEnd s9 "$K5" logout >/dev/null; wait_sent 2; sleep 0.3
+if [ "$KEEPER" = 0 ] && ! keeper_alive s9 && sleep 2.5 && [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = end ]; then
+  ok "(9) SessionEnd → the keeper exits at its next check (well inside the interval) and sends nothing more"
 else bad "(9) keeper=$KEEPER $(cat "$LOG")"; fi
 
 # (10) a failing command's exit code is kept; an out-of-range interval reads as 5
@@ -151,10 +164,72 @@ done
 chmod 500 "$RECORDS"
 O="$O$(fire SessionStart s11 "$R" 2>&1)"; RC=$((RC + $?))
 chmod 700 "$RECORDS"
-O="$O$(python3 "$HOOK" 2>&1)$(python3 "$HOOK" send bogus s1 2>&1)$(DEVSTRIDE_PRESENCE_MINUTE=x python3 "$HOOK" keeper nobody 2>&1)"; RC=$((RC + $?))
+O="$O$(python3 "$HOOK" 2>&1)$(python3 "$HOOK" send bogus s1 1 2>&1)$(python3 "$HOOK" send beat s1 notanumber 2>&1)$(DEVSTRIDE_PRESENCE_MINUTE=x python3 "$HOOK" keeper nobody 2>&1)"; RC=$((RC + $?))
 if [ "$RC" = 0 ] && [ -z "$O" ] && [ ! -e "$XDG_CACHE_HOME/devstride-plugin/x.json" ] && [ ! -e "$RECORDS/s11.json" ]; then
   ok "(11) malformed payload / bad session id / unknown event / unwritable cache / bad args → exit 0, silent"
 else bad "(11) rc=$RC out=$O"; fi
+
+# (13) the session moves to a checkout without the block: Stop and SessionEnd still report, under the old one
+: > "$LOG"; M="$(mkrepo moved '{}')"
+fire SessionStart s13 "$R" >/dev/null; wait_sent 1
+age s13 31; fire Stop s13 "$M" >/dev/null; wait_sent 2
+fire SessionEnd s13 "$M" clear >/dev/null; wait_sent 3; sleep 0.3
+if [ "$(sent)" = 3 ] && [ "$(field 2 PRESENCE_STATE)" = waiting ] && [ "$(field 3 PRESENCE_EVENT)" = end ] \
+  && [ "$(field 3 PRESENCE_CHECKOUT)" = "$(cd "$R" && pwd -P)" ]; then
+  ok "(13) moved to a checkout without the block → Stop and SessionEnd still sent, under the checkout it came from"
+else bad "(13) $(cat "$LOG")"; fi
+
+# (14) moving between two configured checkouts beats from the new one, never a second start
+: > "$LOG"; R2="$(mkrepo second "$(config)")"
+fire SessionStart s14 "$R" >/dev/null; wait_sent 1
+fire UserPromptSubmit s14 "$R2" >/dev/null; wait_sent 2; sleep 0.3
+if [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = beat ] && [ "$(field 2 PRESENCE_CHECKOUT)" = "$(cd "$R2" && pwd -P)" ]; then
+  ok "(14) prompt in another configured checkout → beat from it (no second start)"
+else bad "(14) $(cat "$LOG")"; fi
+
+# (15) a session resumed in a new process right after a clean exit, while the old keeper still
+#      holds its lock: no false "gone", the new process is reported, and a keeper keeps running
+: > "$LOG"
+OA="$(owner)"; DEVSTRIDE_PRESENCE_MINUTE=3 CLAUDE_PID="$OA" fire SessionStart s15 "$K5" >/dev/null; wait_sent 1; sleep 0.2
+fire SessionEnd s15 "$K5" prompt_input_exit >/dev/null
+OB="$(owner)"; kill "$OA"; wait "$OA" 2>/dev/null
+DEVSTRIDE_PRESENCE_MINUTE=3 CLAUDE_PID="$OB" fire SessionStart s15 "$K5" resume >/dev/null; wait_sent 3; sleep 1.5
+if ! grep -q '"PRESENCE_END_REASON": "gone"' "$LOG" && [ "$(field 3 PRESENCE_EVENT)" = start ] \
+  && [ "$(field 3 CLAUDE_PID)" = "$OB" ] && keeper_alive s15; then
+  ok "(15) resume in a new process after a clean exit → start with the new process, no false end, keeper running"
+else bad "(15) $(cat "$LOG")"; fi
+
+# (16) reports run one at a time and in order: an end queued with a beat never ends up before it
+: > "$LOG"
+SLOW="$(mkrepo slow "$(python3 -c 'import json,sys; print(json.dumps({"presence":{"command":"sleep 0.4; "+sys.argv[1]}}))' "$REPORT")")"
+fire SessionStart s16 "$SLOW" >/dev/null; age s16 31
+fire Stop s16 "$SLOW" >/dev/null; fire SessionEnd s16 "$SLOW" logout >/dev/null; sleep 2.5
+LASTEV="$(tail -1 "$LOG" | python3 -c 'import json,sys; print(json.load(sys.stdin)["PRESENCE_EVENT"])' 2>/dev/null)"
+if [ "$LASTEV" = end ] && [ "$(grep -c '"PRESENCE_EVENT": "end"' "$LOG")" = 1 ] && [ -n "$(field 1 PRESENCE_AT)" ]; then
+  ok "(16) a beat and an end queued together → end last, once; PRESENCE_AT set"
+else bad "(16) $(cat "$LOG")"; fi
+
+# (17) a keeper lock nobody holds (a stale record from before a reboot) does not stop a new keeper
+: > "$LOG"; O17="$(owner)"
+fire SessionStart s17 "$K" >/dev/null; wait_sent 1
+python3 - "$RECORDS/s17.json" <<'PY'
+import json, sys
+p = sys.argv[1]; r = json.load(open(p)); r["keeper"] = 99998; r["owner"] = 99998; json.dump(r, open(p, "w"))
+PY
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O17" fire SessionStart s17 "$K" resume >/dev/null; sleep 0.5
+if keeper_alive s17 && [ "$(field 2 PRESENCE_EVENT)" = start ] && [ "$(field 2 CLAUDE_PID)" = "$O17" ]; then
+  ok "(17) stale record → resume sends start with the live process and starts a keeper"
+else bad "(17) $(cat "$LOG")"; fi
+
+# (18) an automatic compaction mid-turn changes nothing; a prompt larger than 64 KB still reports
+: > "$LOG"
+fire SessionStart s18 "$R" >/dev/null; wait_sent 1; age s18 61
+python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"SessionStart","source":"compact","session_id":"s18","cwd":sys.argv[1]}))' "$R" | python3 "$HOOK" hook
+python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"UserPromptSubmit","session_id":"s18","cwd":sys.argv[1],"prompt":"x"*200000}))' "$R" | python3 "$HOOK" hook
+wait_sent 2; sleep 0.3
+if [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = beat ] && [ "$(field 2 PRESENCE_STATE)" = working ]; then
+  ok "(18) SessionStart source compact → ignored; a 200 KB prompt → beat (working)"
+else bad "(18) $(cat "$LOG")"; fi
 
 # (12) hooks.json registers the hook on all four events, bounded and failing open
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'

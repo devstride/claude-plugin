@@ -12,25 +12,29 @@ whatever it is doing, through ONE command the repository names. The hook is
 ## The block (`.claude/ds-config.json`)
 
 `presence`: `{ "command": "<the repository's own command>", "intervalMinutes"?: 5 }`.
-**An absent or null block runs nothing and writes nothing.** The plugin never contacts a tracker
-for presence: what a report means, where it is stored and when it expires are the repository's,
-behind its command. `intervalMinutes` (1 to 60; anything else reads as 5) is the keeper's beat.
+**An absent or null block, or a blank `command`, runs nothing and writes nothing.** The plugin
+never contacts a tracker for presence: what a report means, where it is stored and when it
+expires are the repository's, behind its command. `intervalMinutes` (1 to 60; anything else reads as 5, and doctor warns) is
+the keeper's beat.
 
 ## When the command runs
 
 | When | `PRESENCE_EVENT` | `PRESENCE_STATE` |
 | --- | --- | --- |
-| Session start (new, resumed, after `/clear`) | `start` | `starting` |
-| A prompt, with no report yet in this session | `start` | `working` |
-| A prompt, a minute or more after the last report | `beat` | `working` |
+| Session start (new, resumed, after `/clear`; not an automatic compaction) | `start` | `starting` |
+| A prompt, with no report yet in this session, or after an `end` | `start` | `working` |
+| A prompt, a minute or more after the last report, or from another checkout | `beat` | `working` |
 | A finished turn (Claude waits for its person) | `beat` | `waiting` |
-| The keeper, every `intervalMinutes` while the session's process lives | `beat` | the latest |
+| The keeper, when the last report is `intervalMinutes` old | `beat` | the latest |
 | Session end (`PRESENCE_END_REASON`: `clear`, `logout`, …) | `end` | `ended` |
 | The keeper finds the session's process gone (killed, crashed) | `end` (reason `gone`) | `ended` |
 
-A state change within 30 seconds of the last report is held and carried by the next report. The
-keeper is one detached process per session; it exits when the session ends, its record goes or
-the block is removed. It is what keeps a session visible through a long turn with no prompt.
+A state change within 30 seconds of the last report is held and carried by the next report.
+Reports for one session run one at a time, in order, and nothing but a new `start` follows an
+`end`. The keeper is one detached process per session; it checks every 10 seconds and exits once
+the session ends, its record goes or the block is removed. It is what keeps a session visible
+through a long turn with no prompt. A session that moves to a checkout without the block keeps
+reporting under the checkout it came from.
 
 ## What the command receives
 
@@ -40,7 +44,8 @@ clock (the hook spawns it and returns). Exported: `PRESENCE_EVENT`, `PRESENCE_ST
 root), `PRESENCE_BRANCH`, `PRESENCE_ITEM` (an item number the branch name carries as its own
 segment, such as `I20100` in `jane/03-14-26/I20100-attachment-storage`; else empty),
 `PRESENCE_PLUGIN_VERSION`, `PRESENCE_INTERVAL_MINUTES`, `PRESENCE_END_REASON` (on `end` only),
-and `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PID`, so the repository can resolve the session's own
+`PRESENCE_AT` (when the report was queued, in epoch seconds, to drop one older than what is
+stored), and `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PID`, so the repository can resolve the session's own
 name. Its exit code is kept in the session's local record; nothing reads it as a verdict.
 
 ## Rules a repository's implementation should keep
@@ -49,8 +54,11 @@ name. Its exit code is kept in the session's local record; nothing reads it as a
 - **Expire on the server.** A report not renewed within a few intervals means the session is gone:
   a machine that sleeps or loses power sends no `end`.
 - **Fail fast and quietly.** A slow or failing command costs that one report, never a turn.
+- **Quote every variable.** A branch name can hold shell syntax: pass `"$PRESENCE_BRANCH"`
+  quoted, or read the variables from the environment in code.
 
 ## Cited by
 
 - `skills/setup/references/config-defaults.md` — the Session presence section.
 - `schemas/seam-registry.json` — `presence.command`'s contract.
+- `hooks/presence.py` — its docstring.

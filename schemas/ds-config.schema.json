@@ -1355,16 +1355,17 @@
         },
         "intervalMinutes": {
           "type": "integer",
-          "minimum": 1,
+          "x-warnMinimum": 1,
+          "x-warnMaximum": 60,
           "default": 5,
-          "description": "minutes between the keeper's beats while the session's process lives; out of range reads as 5"
+          "description": "minutes between the keeper's beats while the session's process lives; a value outside 1 to 60 is ignored with a warning and reads as 5"
         }
       },
       "patternProperties": {
         "^_": {}
       },
       "additionalProperties": false,
-      "description": "the repository's own presence command, run by the plugin's hooks for every session (start, each prompt, each finished turn, a keeper every intervalMinutes, session end); absent or null runs nothing and writes nothing",
+      "description": "the repository's own presence command, run by the plugin's hooks for every session (session start, prompts and finished turns, throttled; a keeper every intervalMinutes; session end); absent or null, or a blank command, runs nothing and writes nothing",
       "required": [
         "command"
       ]

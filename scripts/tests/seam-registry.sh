@@ -1,6 +1,6 @@
 #!/bin/bash
 # Tests for schemas/seam-registry.json and scripts/build-config-schema.py: the registry is well
-# formed and points at real files and skills, the committed schema and table are exactly what it
+# formed and points at real files, skills and hook scripts, the committed schema and table are exactly what it
 # generates, the schema uses only the keywords the validator implements, and a release cannot
 # ship an entry still marked "unreleased". Mutations run on a scratch copy, never the checkout.
 set -u
@@ -30,12 +30,15 @@ for h in reg["hooks"]:
         problems.append("CONTRACT %s -> %s" % (h["key"], c))
     for caller in h.get("calledBy") or []:
         skill = caller.split()[0]
-        if not os.path.isfile(os.path.join(root, "skills", skill, "SKILL.md")):
+        if skill.startswith("hooks/"):  # a hook script calls it directly: the script must exist
+            if not os.path.isfile(os.path.join(root, skill)):
+                problems.append("CALLER %s -> %s" % (h["key"], caller))
+        elif not os.path.isfile(os.path.join(root, "skills", skill, "SKILL.md")):
             problems.append("CALLER %s -> %s" % (h["key"], caller))
 print("\n".join(problems) or "clean %d %d" % (len(reg["hooks"]), len(reg["settings"])))
 PY
 )"
-case "$OUT" in clean*) ok "(1-4) every hook carries its fields, keys are unique, contracts exist, callers are real skills ($OUT)";;
+case "$OUT" in clean*) ok "(1-4) every hook carries its fields, keys are unique, contracts exist, callers are real skills or hook scripts ($OUT)";;
   *) bad "(1-4) $OUT";; esac
 
 # (5) the committed schema and table are current

@@ -3,45 +3,118 @@
   "_readme": "A synthetic config naming every shape the registry knows; no real repository's.",
   "profile": "standard",
   "profileOverrides": {
-    "grain": "standard", "specDepth": "extended", "understandReaders": 6, "reviewBreadthCeiling": "HIGH-RISK",
-    "verificationDefault": "REFUTED", "verificationGrouping": "per-finding", "fixFloor": "all-confirmed",
-    "localCliEngine": "every-boundary", "maxLocalReviewRounds": 2, "storyVerify": "full", "perStoryPullRequest": true,
-    "releaseCiOrdering": "review-first", "reviewerRegistrationWindowMinutes": 2, "pollTimeoutMinutes": 10, "autoRelease": false
+    "grain": "standard",
+    "specDepth": "extended",
+    "understandReaders": 6,
+    "reviewBreadthCeiling": "HIGH-RISK",
+    "verificationDefault": "REFUTED",
+    "verificationGrouping": "per-finding",
+    "fixFloor": "all-confirmed",
+    "localCliEngine": "every-boundary",
+    "maxLocalReviewRounds": 2,
+    "storyVerify": "full",
+    "perStoryPullRequest": true,
+    "releaseCiOrdering": "review-first",
+    "reviewerRegistrationWindowMinutes": 2,
+    "pollTimeoutMinutes": 10,
+    "autoRelease": false
   },
   "baseBranch": "develop",
   "hotfixBaseBranch": "main",
-  "protectedBranches": ["develop", "main", "release/*"],
+  "protectedBranches": [
+    "develop",
+    "main",
+    "release/*"
+  ],
   "integrationBranch": null,
   "conventionsDoc": "CONTRIBUTING.md",
   "lessonsDoc": ".claude/ds-lessons.md",
   "itemTagFormat": "[PROJ-123]",
-  "repoLocalKeys": ["teamTools"],
-  "teamTools": { "anything": true },
-  "branchNaming": { "pattern": "<prefix>/<YY-MM-DD>/<slug>", "prefixSource": "first name", "dateFormat": "YY-MM-DD" },
+  "repoLocalKeys": [
+    "teamTools"
+  ],
+  "teamTools": {
+    "anything": true
+  },
+  "branchNaming": {
+    "pattern": "<prefix>/<YY-MM-DD>/<slug>",
+    "prefixSource": "first name",
+    "dateFormat": "YY-MM-DD"
+  },
   "epicIntegrationBranches": {
     "enabled": true,
     "pattern": "<prefix>/<YY-MM-DD>/epic-<epic-title-slug>",
     "slugRule": "kebab-case",
     "example": "jane/26-10-01/epic-checkout-redesign",
     "releaseTarget": "train/support",
-    "fastStoryMerges": { "enabled": true, "requireLocalVerifyGreen": true, "epicReleaseIsFirstCloudPass": true, "_note": "silent",
-      "localEngines": ["a build-time risk screen; the full roster reviews the release pull request"] },
+    "fastStoryMerges": {
+      "enabled": true,
+      "requireLocalVerifyGreen": true,
+      "epicReleaseIsFirstCloudPass": true,
+      "_note": "silent",
+      "localEngines": [
+        "a build-time risk screen; the full roster reviews the release pull request"
+      ]
+    },
     "autoRelease": "ask",
     "deleteBranchAfterRelease": true,
     "mergedStatusName": "Review"
   },
-  "planIntegrationBranches": { "pattern": "<prefix>/<YY-MM-DD>/plan-<plan-number>-<plan-title-slug>", "example": "jane/26-10-01/plan-I20100-checkout" },
-  "defects": { "deferredContainerTitle": "Deferred", "deferredContainerLegacyTitles": ["Deferred defects"] },
-  "commitConventions": { "messageFormat": "<type>: <summary>", "reviewFixFormat": "fix: <summary>", "epicMergeFormat": "merge: <scope>" },
-  "prBodyTemplate": { "sections": [ { "heading": "## Summary", "guidance": "What and why." } ], "noAiAttribution": true },
-  "ci": { "workflowGlobs": [".github/workflows/*.yml"], "draftGateCondition": "github.event.pull_request.draft == false", "gateJobName": null, "expectedRunsPerPullRequest": 1 },
+  "planIntegrationBranches": {
+    "pattern": "<prefix>/<YY-MM-DD>/plan-<plan-number>-<plan-title-slug>",
+    "example": "jane/26-10-01/plan-I20100-checkout"
+  },
+  "defects": {
+    "deferredContainerTitle": "Deferred",
+    "deferredContainerLegacyTitles": [
+      "Deferred defects"
+    ]
+  },
+  "commitConventions": {
+    "messageFormat": "<type>: <summary>",
+    "reviewFixFormat": "fix: <summary>",
+    "epicMergeFormat": "merge: <scope>"
+  },
+  "prBodyTemplate": {
+    "sections": [
+      {
+        "heading": "## Summary",
+        "guidance": "What and why."
+      }
+    ],
+    "noAiAttribution": true
+  },
+  "ci": {
+    "workflowGlobs": [
+      ".github/workflows/*.yml"
+    ],
+    "draftGateCondition": "github.event.pull_request.draft == false",
+    "gateJobName": null,
+    "expectedRunsPerPullRequest": 1
+  },
   "preShipChecks": [
-    { "name": "slow suite", "command": "make slow", "when": "releaseOnly", "pathGlobs": ["db/**"], "timeoutNote": "about 20 minutes", "onlyWhenTouched": true },
-    { "name": "train suite", "command": "make train", "when": "releaseOnly", "runAt": "train" }
+    {
+      "name": "slow suite",
+      "command": "make slow",
+      "when": "releaseOnly",
+      "pathGlobs": [
+        "db/**"
+      ],
+      "timeoutNote": "about 20 minutes",
+      "onlyWhenTouched": true
+    },
+    {
+      "name": "train suite",
+      "command": "make train",
+      "when": "releaseOnly",
+      "runAt": "train"
+    }
   ],
   "preCommitWiringChecks": [],
   "verify": {
-    "typecheck": ["make typecheck"],
+    "typecheck": [
+      "make typecheck"
+    ],
     "typecheckCombined": "make typecheck-all",
     "test": "make test",
     "testSingle": "make test FILE=<path/to/test>",
@@ -50,23 +123,61 @@
     "skipDuringStoryBuilds": [
       {
         "name": "end-to-end",
-        "alwaysRunWhenBase": ["productionBranch"],
+        "alwaysRunWhenBase": [
+          "productionBranch"
+        ],
         "manualTriggerLabel": "run-e2e",
-        "runWhenChangedPaths": ["web/**", "api/**"],
-        "ciChecksByBase": { "baseBranch": ["e2e / smoke"], "productionBranch": ["e2e / full"] }
+        "runWhenChangedPaths": [
+          "web/**",
+          "api/**"
+        ],
+        "ciChecksByBase": {
+          "baseBranch": [
+            "e2e / smoke"
+          ],
+          "productionBranch": [
+            "e2e / full"
+          ]
+        }
       }
     ]
   },
-  "generated": { "regenCommand": "make regen", "paths": ["gen/**"], "toleratedTypeErrors": [] },
-  "hierarchyRoles": { "leaf": ["Story", "Defect"], "releaseUnit": "Epic" },
+  "generated": {
+    "regenCommand": "make regen",
+    "paths": [
+      "gen/**"
+    ],
+    "toleratedTypeErrors": []
+  },
+  "hierarchyRoles": {
+    "leaf": [
+      "Story",
+      "Defect"
+    ],
+    "releaseUnit": "Epic"
+  },
   "review": {
     "localReviewerName": "Local",
     "localCommand": "reviewer --read-only <context>",
     "localAssistCommand": null,
-    "localEffort": { "initial": "high", "followUp": "medium", "safety": "high" },
+    "localEffort": {
+      "initial": "high",
+      "followUp": "medium",
+      "safety": "high"
+    },
     "localReReviewScope": "full",
     "automatedReviewers": [
-      { "name": "Bot", "how": "requested_reviewer", "bot": "bot[bot]", "value": "bot[bot]", "graphqlBotId": "BOT_x", "baseBranches": ["main"], "requestPolicy": "final-head" }
+      {
+        "name": "Bot",
+        "how": "requested_reviewer",
+        "bot": "bot[bot]",
+        "value": "bot[bot]",
+        "graphqlBotId": "BOT_x",
+        "baseBranches": [
+          "main"
+        ],
+        "requestPolicy": "final-head"
+      }
     ],
     "openPullRequestsAsDraft": true,
     "readyForReviewReleasesCi": true,
@@ -75,7 +186,15 @@
     "adaptiveReviewerWait": true,
     "resolveAddressedThreads": true,
     "notifyWhenSettled": false,
-    "mandatoryLenses": [ { "name": "migrations", "paths": ["db/migrations/**"], "question": "Is it safe to re-run?" } ]
+    "mandatoryLenses": [
+      {
+        "name": "migrations",
+        "paths": [
+          "db/migrations/**"
+        ],
+        "question": "Is it safe to re-run?"
+      }
+    ]
   },
   "release": {
     "productionBranch": "main",
@@ -83,29 +202,93 @@
     "releaseSource": "develop",
     "autoDeployOnMerge": "Merging to main deploys production.",
     "releaseBranchPattern": "release/<YY-MM-DD>[-n]",
-    "releaseBranchFixExclusions": ["db/migrations/**"],
+    "releaseBranchFixExclusions": [
+      "db/migrations/**"
+    ],
     "syncWorkflow": "sync.yml",
     "mergeTrainBeforeCut": true,
-    "autoStart": { "enabled": true },
-    "lightRelease": { "standingYes": true },
-    "fullRelease": { "standingYes": true, "ownerDecision": "2026-11-07", "migrationGlobs": ["db/migrations/sql/*.sql"], "approvedMigrations": [{ "blob": "0123456789abcdef0123456789abcdef01234567", "path": "db/migrations/sql/0001_init.sql", "item": "I20100", "approved": "2026-11-07" }] },
-    "productionReview": { "reviewIdenticalTree": false, "highRiskPaths": ["src/auth/**"], "highRiskEngine": "local" },
+    "autoStart": {
+      "enabled": true
+    },
+    "lightRelease": {
+      "standingYes": true
+    },
+    "fullRelease": {
+      "standingYes": true,
+      "ownerDecision": "2026-11-07",
+      "migrationGlobs": [
+        "db/migrations/sql/*.sql"
+      ],
+      "approvedMigrations": [
+        {
+          "blob": "0123456789abcdef0123456789abcdef01234567",
+          "path": "db/migrations/sql/0001_init.sql",
+          "item": "I20100",
+          "approved": "2026-11-07"
+        }
+      ]
+    },
+    "productionReview": {
+      "reviewIdenticalTree": false,
+      "highRiskPaths": [
+        "src/auth/**"
+      ],
+      "highRiskEngine": "local"
+    },
     "deployApproval": null,
     "deployVerification": "scripts/verify-deploy.sh",
     "devDeployVerification": "scripts/verify-dev-deploy.sh",
-    "migrationRenumber": { "sqlGlobs": ["db/migrations/*.sql"], "metaGlobs": ["db/migrations/meta/**"] },
+    "migrationRenumber": {
+      "sqlGlobs": [
+        "db/migrations/*.sql"
+      ],
+      "metaGlobs": [
+        "db/migrations/meta/**"
+      ]
+    },
     "postDeployCheckSkill": "health-check",
     "classifySkill": "release-classify",
     "preMergeSkill": "release-pre-merge",
-    "clearance": { "provider": "github", "ref": "refs/clearance/release", "staleMinutes": 20, "waitMinutes": 180, "phaseBudgetMinutes": { "pre-ship": 120, "deploy": 60 },
-                   "credentialsFile": ".devstride/agent.env", "scope": "cut-to-deploy" }
+    "clearance": {
+      "provider": "github",
+      "ref": "refs/clearance/release",
+      "staleMinutes": 20,
+      "waitMinutes": 180,
+      "phaseBudgetMinutes": {
+        "pre-ship": 120,
+        "deploy": 60
+      },
+      "credentialsFile": ".devstride/agent.env",
+      "scope": "cut-to-deploy"
+    }
   },
-  "releaseTrain": { "branch": "train/support", "fastMerges": true, "smallFixes": { "maxFiles": 5, "maxChangedLines": 500 }, "lateArrivals": "restart" },
-  "releaseTower": { "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" },
-  "docs": { "updateSkill": "docs-update", "releaseNotesSkill": null, "updateOnEpicRelease": false,
-            "knowledgeBaseSyncSkill": "kb-sync" },
-  "plugin": { "updateCheck": true, "autoUpdate": true, "pin": null },
-  "session": { "jobClassGate": true },
+  "releaseTrain": {
+    "branch": "train/support",
+    "fastMerges": true,
+    "smallFixes": {
+      "maxFiles": 5,
+      "maxChangedLines": 500
+    },
+    "lateArrivals": "restart"
+  },
+  "releaseTower": {
+    "overrideLabel": "release-tower-override",
+    "hotfixPattern": "*/hotfix/**"
+  },
+  "docs": {
+    "updateSkill": "docs-update",
+    "releaseNotesSkill": null,
+    "updateOnEpicRelease": false,
+    "knowledgeBaseSyncSkill": "kb-sync"
+  },
+  "plugin": {
+    "updateCheck": true,
+    "autoUpdate": true,
+    "pin": null
+  },
+  "session": {
+    "jobClassGate": true
+  },
   "localEnvironment": {
     "create": "tool create <name> --from <base> -b <branch>",
     "recreate": "tool reset <name>",
@@ -117,16 +300,55 @@
     "instanceBoundTo": "directory",
     "fetchOnSessionStart": false
   },
-  "pool": { "checkout": "pool checkout <member> --purpose <purpose>", "checkin": "pool checkin <member>" },
-  "stage": { "resolve": "cat .stage", "productionStages": ["prod"] },
-  "statusLine": { "hiddenSegments": ["stage"], "autoUpdate": true },
-  "claims": { "provider": "devstride", "expiryMinutes": { "story": 240, "release-tower": 20, "release-train": 30 } },
+  "pool": {
+    "checkout": "pool checkout <member> --purpose <purpose>",
+    "checkin": "pool checkin <member>"
+  },
+  "stage": {
+    "resolve": "cat .stage",
+    "productionStages": [
+      "prod"
+    ]
+  },
+  "statusLine": {
+    "hiddenSegments": [
+      "stage"
+    ],
+    "autoUpdate": true
+  },
+  "claims": {
+    "provider": "devstride",
+    "expiryMinutes": {
+      "story": 240,
+      "release-tower": 20,
+      "release-train": 30
+    }
+  },
   "activeAgents": {
-    "boardId": "board-1", "tagName": "agent active", "tagColor": "green", "staleMinutes": 20,
-    "commands": { "start": "./tools/presence start <root>", "end": "./tools/presence end <root>" }
+    "boardId": "board-1",
+    "tagName": "agent active",
+    "tagColor": "green",
+    "staleMinutes": 20,
+    "commands": {
+      "start": "./tools/presence start <root>",
+      "end": "./tools/presence end <root>"
+    }
   },
   "consequenceNotices": {
-    "enabled": true, "notify": ["ops-lead"],
-    "categories": [{ "id": "data-retention", "title": "Changes how long data is kept", "means": "a retention period, expiry or deletion schedule changes" }]
+    "enabled": true,
+    "notify": [
+      "ops-lead"
+    ],
+    "categories": [
+      {
+        "id": "data-retention",
+        "title": "Changes how long data is kept",
+        "means": "a retention period, expiry or deletion schedule changes"
+      }
+    ]
+  },
+  "presence": {
+    "command": "true",
+    "intervalMinutes": 5
   }
 }
