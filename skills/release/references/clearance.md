@@ -90,7 +90,7 @@ reads the exit code and quotes the line; it never parses further.
   `claude:$CLAUDE_CODE_SESSION_ID` joined with `+`; else `token:<random>`, printed once (stderr)
   for a plain terminal to export as `CLEARANCE_HOLDER_TOKEN`. `identity` prints it (exit `1` for the
   random fallback), so other skills use this one rule. `user` is `gh api user`'s login; `machine` is
-  the claim machine name (`story-claims.md`). A claim or adoption by the session that already holds it renews the heartbeat.
+  the claim machine name (`claim_record.py`). A claim or adoption by the session that already holds it renews the heartbeat.
 - **The local record.** On `claim` and `adopt` the provider writes
   `${XDG_CACHE_HOME:-$HOME/.cache}/devstride/release-clearance/<owner>__<repo>.json` — `{ repo,
   holder, user, machine, branch, pr, takenAt, keeperPid }`, mode 0600, the real holder under either

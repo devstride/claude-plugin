@@ -1,5 +1,5 @@
 #!/bin/bash
-# Tests for skills/build-item/scripts/claim_record.py — the one record every claim carries: one
+# Tests for skills/build-item/scripts/claim_record.py — the record every story claim carries: one
 # spelling per machine (the recorded fleet name, else the cleaned-up hostname), the session's own
 # name, and a payload whose four keys are always present. Release clearance and the presence hook
 # use the same machine name. No network.

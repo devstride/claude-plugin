@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Who is claiming: the one record every claim this plugin writes carries — standard library only,
-no network. The rules are in `skills/build-item/references/story-claims.md` § The record.
+"""Who is claiming: the record every story claim carries, and the machine and session names every
+claim this plugin writes uses — standard library only, no network. The naming rules are here;
+`skills/build-item/references/story-claims.md` § The record says when the record is sent.
 
   python3 claim_record.py [--dir <path>]   prints one JSON object:
       {"machine": "<name>", "sessionName": "<name>" (only when known),
