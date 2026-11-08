@@ -410,7 +410,9 @@ M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exac
      expected head, pinned with `--match-head-commit`, with every required check (rulesets,
      classic protection, and what GitHub marks required) completed SUCCESS on its newest run there
      (passed is GitHub's reading: SUCCESS, SKIPPED or NEUTRAL, but a skipped newest run never hides
-     an older executed run of that check that failed or is pending; pending, failed or missing
+     an older executed run of that check that failed or is pending, and passes only when a job of
+     its own run or an older run of that check succeeded, never from a run where nothing ran; a
+     run from an event GitHub does not count, such as workflow_dispatch, is ignored; pending, failed or missing
      refuses; runs order by workflow run number, never by check-run id, and same-name jobs in one
      run are siblings that must all pass), green on the test merge commit too where it ran there,
      no unresolved thread, and no reviewer whose latest review requests changes (the aggregate

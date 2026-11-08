@@ -27,9 +27,14 @@ The rule (an approver's admin merge exactly when every required check is green, 
   another workflow or app, or a same-name commit status, is another check and must pass too. Every
   check that can satisfy a requirement must have passed at the expected head. Passed is GitHub's
   own reading: SUCCESS, or SKIPPED or NEUTRAL (a workflow that skips a job when nothing needed
-  it, which GitHub counts as passing). A check's verdict is its newest workflow run (by run
-  number; a re-run keeps its number and GitHub lists only its latest attempt). Same-name jobs in
-  that one run are siblings, and every one must pass. A skipped or neutral newest run never hides
+  it, which GitHub counts as passing), but a quiet result passes only with evidence that CI ran:
+  another job of its own workflow run succeeded, or an older run of that check succeeded. A run
+  where every job skipped (a draft's held CI, still the newest just after the ready flip) proves
+  nothing and is a REFUSE. A workflow run from an event GitHub does not count toward a pull
+  request's checks (`workflow_dispatch`, `schedule`, ...) is ignored, as GitHub ignores it. A
+  check's verdict is its newest workflow run (by run number; a re-run keeps its number and GitHub
+  lists only its latest attempt). Same-name jobs in that one run are siblings, and every one must
+  pass. A skipped or neutral newest run never hides
   an older run of the same check that executed and is failing or still pending. Pending, failed,
   cancelled, timed out or missing is a REFUSE naming it. A required check that also ran on the
   pull request's test merge commit must pass there too (GitHub requires it). A commit status
@@ -73,6 +78,11 @@ SHA = re.compile(r"^[0-9a-f]{40}$")
 REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 PASSED = ("SUCCESS", "SKIPPED", "NEUTRAL")
 QUIET = ("SKIPPED", "NEUTRAL")
+# The workflow events whose job checks GitHub counts toward a pull request's checks; a run from any
+# other (workflow_dispatch, schedule, ...) never satisfies a required check, so it is ignored here.
+ELIGIBLE = ("push", "pull_request", "pull_request_review", "pull_request_target", "deployment",
+            "deployment_status", "merge_group")
+UNEARNED = "skipped in a run where nothing ran"
 NO_PROTECTION = ("Branch not protected", "Required status checks not enabled")
 # Rule types an admin merge may pass knowing what it bypasses: required checks are judged here;
 # reviews by the open-thread and change-request checks; the rest guard pushes, not merges.
@@ -95,7 +105,7 @@ PR_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: Stri
           nodes {
             __typename
             ... on CheckRun { name status conclusion startedAt completedAt databaseId isRequired(pullRequestNumber: $number)
-                              checkSuite { app { databaseId } workflowRun { runNumber workflow { databaseId } } } }
+                              checkSuite { app { databaseId } workflowRun { runNumber event workflow { databaseId } } } }
             ... on StatusContext { context state createdAt isRequired(pullRequestNumber: $number) }
           }
         }
@@ -113,7 +123,7 @@ MERGE_COMMIT_QUERY = """query($owner: String!, $name: String!, $number: Int!, $a
           nodes {
             __typename
             ... on CheckRun { name status conclusion databaseId
-                              checkSuite { app { databaseId } workflowRun { runNumber workflow { databaseId } } } }
+                              checkSuite { app { databaseId } workflowRun { runNumber event workflow { databaseId } } } }
             ... on StatusContext { context state }
           }
         }
@@ -344,8 +354,13 @@ def runs_at_head(contexts):
     The newest run is the verdict; a skipped or neutral newest run passes only when no run is
     pending and the newest run that executed passed. A commit status is one context (GitHub
     reports only its latest state). Same-name checks from another workflow or app, and a same-name
-    status, stay separate: each must pass."""
-    runs = {}
+    status, stay separate: each must pass. A check run from a workflow event GitHub does not count
+    (ELIGIBLE) is left out: it neither satisfies a check nor stands in front of an older one. A
+    skipped or neutral verdict passes only with evidence that CI ran: another job of that same
+    workflow run succeeded (a job skipped because its run found nothing to test), or an older run
+    of the same check succeeded at this head. A run where every job skipped (a draft's held CI, read
+    before the ready run starts) or a quiet check from outside a workflow is UNEARNED."""
+    runs, ran = {}, set()
     for c in contexts:
         if not isinstance(c, dict):
             continue
@@ -353,9 +368,13 @@ def runs_at_head(contexts):
             suite = c.get("checkSuite") or {}
             app = (suite.get("app") or {}).get("databaseId")
             run = suite.get("workflowRun") or {}
+            if run and run.get("event") not in ELIGIBLE:
+                continue
             workflow = (run.get("workflow") or {}).get("databaseId")
             key, number = ("check", c.get("name"), app, workflow), run.get("runNumber") or 0
             state = c.get("conclusion") if c.get("status") == "COMPLETED" else "PENDING"
+            if workflow and state == "SUCCESS":
+                ran.add((app, workflow, number))
         elif c.get("__typename") == "StatusContext":
             key, number = ("status", c.get("context"), None, None), 0
             state = {"PENDING": "PENDING", "EXPECTED": "PENDING"}.get(c.get("state"), c.get("state"))
@@ -367,7 +386,8 @@ def runs_at_head(contexts):
             entry["byRun"].setdefault(number, []).append(state or "PENDING")
     verdicts = {}
     for key, entry in runs.items():
-        ordered = [worst(entry["byRun"][n]) for n in sorted(entry["byRun"])]
+        numbers = sorted(entry["byRun"])
+        ordered = [worst(entry["byRun"][n]) for n in numbers]
         state = ordered[-1]
         if state in QUIET:
             executed = [x for x in ordered if x not in QUIET]
@@ -375,6 +395,8 @@ def runs_at_head(contexts):
                 state = "PENDING"
             elif executed and executed[-1] != "SUCCESS":
                 state = executed[-1]
+            elif not executed and not (key[3] and (key[2], key[3], numbers[-1]) in ran):
+                state = UNEARNED
         verdicts[key] = (state, entry["required"])
     return verdicts
 

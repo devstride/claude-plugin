@@ -91,10 +91,10 @@ def run(number, sha, scenario, *extra):
     return p.returncode, p.stdout.strip().split("\n"), p.stderr
 def say(good, label, extra=""):
     print(("ok   " if good else "FAIL ") + label + ("" if good else " -> " + extra))
-def cr(name, conclusion="SUCCESS", status="COMPLETED", ident=1, required=True, app=15368, workflow=1, run=None):
+def cr(name, conclusion="SUCCESS", status="COMPLETED", ident=1, required=True, app=15368, workflow=1, run=None, event="pull_request"):
     return {"__typename": "CheckRun", "name": name, "status": status, "conclusion": conclusion if status == "COMPLETED" else None,
             "startedAt": "2026-01-15T18:00:00Z" if status != "QUEUED" else None, "databaseId": ident, "isRequired": required,
-            "checkSuite": {"app": {"databaseId": app}, "workflowRun": {"runNumber": run if run is not None else ident, "workflow": {"databaseId": workflow}} if workflow else None}}
+            "checkSuite": {"app": {"databaseId": app}, "workflowRun": {"runNumber": run if run is not None else ident, "event": event, "workflow": {"databaseId": workflow}} if workflow else None}}
 def st(context, state="SUCCESS", required=True):
     return {"__typename": "StatusContext", "context": context, "state": state, "createdAt": "2026-01-15T18:00:00Z", "isRequired": required}
 GREEN = {"pr": {"number": 7, "state": "OPEN", "isDraft": False, "headRefOid": H, "baseRefName": "develop",
@@ -130,8 +130,25 @@ merge("(3) unstable (only a check that is not required failed) -> MERGE without 
       sc(mergeStateStatus="UNSTABLE"), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s" % H)
 refuse("(4) a required check pending -> REFUSE naming it", sc(pages=[[cr("tests", status="IN_PROGRESS", ident=10), cr("lint", ident=11)]]), "tests is pending")
 refuse("(5) a required check failed -> REFUSE", sc(pages=[[cr("tests", "FAILURE", ident=10), cr("lint", ident=11)]]), "tests is failure")
-merge("(6) a required check whose only run skipped passes, as GitHub counts it (a job with nothing to test)",
-      sc(pages=[[cr("tests", "SKIPPED", ident=10), cr("lint", "NEUTRAL", ident=11)]]), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+merge("(6) a required check skipped in a run where another job succeeded passes (its run found nothing to test)",
+      sc(pages=[[cr("tests", "SKIPPED", ident=10), cr("plan", ident=13, run=10, required=False),
+                 cr("lint", "NEUTRAL", ident=11), cr("lint-plan", ident=14, run=11, required=False)]]),
+      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(6f) a run where every job skipped (a draft's held CI, newest just after the ready flip) -> REFUSE",
+       sc(pages=[[cr("tests", "SKIPPED", ident=10), cr("plan", "SKIPPED", ident=13, run=10, required=False), cr("lint", ident=11)]]),
+       "tests is skipped in a run where nothing ran")
+refuse("(6g) a neutral check from outside any workflow proves nothing -> REFUSE",
+       sc(pages=[[cr("tests", ident=10), cr("lint", "NEUTRAL", ident=11, workflow=None)]]), "lint is skipped in a run where nothing ran")
+merge("(6h) an all-skipped newest run over an older run of the same check that succeeded passes",
+      sc(pages=[[cr("tests", ident=10, run=1), cr("tests", "SKIPPED", ident=20, run=2), cr("lint", ident=11)]]),
+      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(6i) a manual (workflow_dispatch) run never hides an older failed run of the same check",
+       sc(pages=[[cr("tests", "FAILURE", ident=10, run=1, event="push"), cr("tests", ident=20, run=2, event="workflow_dispatch"), cr("lint", ident=11)]]),
+       "tests is failure")
+refuse("(6j) a required check only a manual run reported never ran, as GitHub reads it",
+       sc(pages=[[cr("tests", ident=20, event="workflow_dispatch"), cr("lint", ident=11)]]), "tests never ran at this head")
+refuse("(6k) a scheduled run's success does not count either",
+       sc(pages=[[cr("tests", ident=20, event="schedule"), cr("lint", ident=11)]]), "tests never ran at this head")
 refuse("(6b) a skipped newest run never hides an older run of the same check that failed",
        sc(pages=[[cr("tests", "FAILURE", ident=10), cr("tests", "SKIPPED", ident=20), cr("lint", ident=11)]]), "tests is failure")
 refuse("(6c) a skipped newest run never hides one still running",
@@ -238,8 +255,10 @@ merge("(27j) the same unknown rule on a clean pull request: GitHub enforces it, 
 code, out, err = run(7, H, GREEN, "--all-green")
 say(code == 2 and out[0].startswith("REFUSE --all-green") and "optional is failure" in out[0], "(27k) --all-green refuses a red check that is not required", "rc=%d %r" % (code, out))
 merge("(27l) --all-green with every check green merges",
-      sc(pages=[[cr("tests", ident=10), cr("lint", ident=11), cr("optional", "SKIPPED", ident=12, required=False)]]),
+      sc(pages=[[cr("tests", ident=10), cr("lint", ident=11), cr("optional", "SKIPPED", ident=12, run=10, required=False)]]),
       "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H, "--all-green")
+code, out, err = run(7, H, sc(pages=[[cr("tests", ident=10), cr("lint", ident=11), cr("optional", "SKIPPED", ident=12, required=False)]]), "--all-green")
+say(code == 2 and "optional is skipped in a run where nothing ran" in out[0], "(27m) --all-green refuses a check whose run ran nothing", "rc=%d %r" % (code, out))
 code, out, err = run(7, H, sc(baseRefName="release#v1/x"))
 log = open(os.environ["GH_LOG"]).read()
 say(code == 0 and "rules/branches/release%23v1%2Fx?" in log and "branches/release%23v1%2Fx/protection" in log,
@@ -253,7 +272,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 72 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 79 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.
