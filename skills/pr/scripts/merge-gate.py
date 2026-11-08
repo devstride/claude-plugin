@@ -52,6 +52,8 @@ The rule (an approver's admin merge exactly when every required check is green, 
   signed commits, linear history or a locked branch refuse, and so do required reviews, code
   owners or last-push approval without an APPROVED decision.
 - The test merge commit going null or changing mid-read is a fresh read, never "no checks there".
+  So is any new workflow run, attempt, status or conclusion between the run listings read just
+  before and just after a commit's checks (a re-run finishing between the reads).
 - Classic protection answering 404 means none only with GitHub's two messages for it ("Branch
   not protected", "Required status checks not enabled"); any other 404 is an ERROR.
 - A base that requires branches to be up to date (a ruleset's strict policy, or classic `strict`)
@@ -381,6 +383,14 @@ def stream_verdict(byRun, began):
     return state, True, relied
 
 
+def _later(a, b):
+    """Workflow run a supersedes run b: a re-run that began after b did, or a higher number that b
+    was not re-run past (a re-run keeps its number; a first attempt began when it was created)."""
+    if a["run_attempt"] > 1 and a["run_started_at"] > b["run_started_at"]:
+        return True
+    return a["run_number"] > b["run_number"] and not (b["run_attempt"] > 1 and b["run_started_at"] > a["run_started_at"])
+
+
 def _unreadable(message):
     raise Unreadable(message)
 
@@ -435,8 +445,13 @@ def runs_at_head(contexts, workflow_runs):
             byRun = entry["streams"].get(event, {})
             mine = [r for r in listed if key[3] and r["workflow_id"] == key[3] and r["event"] == event]
             going = sorted(r["run_number"] for r in mine if r["status"] != "completed")
-            red_runs = [r for r in mine if r["status"] == "completed"
-                        and r.get("conclusion") not in ("success", "skipped", "neutral")]
+            done = [r for r in mine if r["status"] == "completed"]
+            green = [r for r in done if r.get("conclusion") in ("success", "skipped", "neutral")]
+            # a red run that never reported the check counts unless a later run of this workflow and
+            # event passed (a cancel the next run replaced); later: a higher number it was not re-run
+            # past, or a re-run that began after it
+            red_runs = [r for r in done if r not in green and r["run_number"] not in byRun
+                        and not any(_later(g, r) for g in green)]
             if not byRun:
                 # runs of this workflow and event that never reported the check: one still going or
                 # ended red (a matrix that failed before creating it) holds it; a green one says nothing
@@ -450,8 +465,9 @@ def runs_at_head(contexts, workflow_runs):
             began = lambda n, mine=mine: next(((r["run_attempt"], r["run_started_at"]) for r in mine if r["run_number"] == n), None) \
                 or _unreadable("workflow run #%s of workflow %s is not in the run list" % (n, key[3]))
             state, earned, relied = stream_verdict(byRun, began)
-            ended = sorted((r["run_number"], r.get("conclusion")) for r in red_runs if r["run_number"] > relied
-                           or (r["run_attempt"] > 1 and r["run_started_at"] > began(relied)[1]))
+            anchor = None if not key[3] else next((r for r in mine if r["run_number"] == relied), None) \
+                or _unreadable("workflow run #%s of workflow %s is not in the run list" % (relied, key[3]))
+            ended = sorted((r["run_number"], r.get("conclusion")) for r in red_runs if anchor and _later(r, anchor))
             if going and state in PASSED + ("PENDING",):
                 state, earned = "PENDING", False
             elif ended and state in PASSED:
@@ -489,7 +505,40 @@ def problems_with(required, runs):
     return problems
 
 
+def workflow_runs(owner, name, sha):
+    """Every workflow run at one commit (the Actions API), jobs or not, paged."""
+    found, page = [], 1
+    while True:
+        got = gh_json("api", "repos/%s/%s/actions/runs?head_sha=%s&per_page=100&page=%d" % (owner, name, sha, page))
+        batch = got.get("workflow_runs") if isinstance(got, dict) else None
+        if not isinstance(batch, list) or not isinstance(got.get("total_count"), int):
+            raise Unreadable("the workflow runs at %s could not be listed" % sha[:12])
+        for r in batch:
+            if not (isinstance(r, dict) and isinstance(r.get("id"), int) and isinstance(r.get("workflow_id"), int)
+                    and isinstance(r.get("run_number"), int) and isinstance(r.get("status"), str)
+                    and isinstance(r.get("run_started_at"), str) and isinstance(r.get("run_attempt"), int)):
+                raise Unreadable("a workflow run at %s could not be read" % sha[:12])
+        found += batch
+        if len(found) >= got["total_count"] or not batch:
+            return found
+        if page >= 10:
+            raise Unreadable("more than 1,000 workflow runs at %s" % sha[:12])
+        page += 1
+
+
+def settled(owner, name, sha, before):
+    """The workflow runs at a commit read again after its checks were: any new run, attempt, status
+    or conclusion since the read before them means the checks may be stale (a re-run finishing
+    between the two reads), so the gate reads everything afresh."""
+    after = workflow_runs(owner, name, sha)
+    mark = lambda runs: sorted((r["id"], r["run_attempt"], r["status"], r.get("conclusion")) for r in runs)
+    if mark(after) != mark(before):
+        raise Retry("the workflow runs at %s changed while its checks were being read" % sha[:12])
+    return after
+
+
 def decide(number, expected, owner, name, delete_branch, subject=None, all_green=False):
+    before = workflow_runs(owner, name, expected)   # read before the checks, compared after them
     pr = pull_request(owner, name, number)
     if pr.get("state") != "OPEN":
         raise Refuse("#%d is %s, not open" % (number, str(pr.get("state")).lower()))
@@ -522,33 +571,8 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     base = pr.get("baseRefName")
     if not isinstance(base, str) or not base:
         raise Unreadable("#%d names no base branch" % number)
-    def lister(sha):
-        """Every workflow run at one commit (the Actions API), read once, jobs or not."""
-        listed = []
-        def read():
-            if listed:
-                return listed[0]
-            found, page = [], 1
-            while True:
-                got = gh_json("api", "repos/%s/%s/actions/runs?head_sha=%s&per_page=100&page=%d" % (owner, name, sha, page))
-                batch = got.get("workflow_runs") if isinstance(got, dict) else None
-                if not isinstance(batch, list) or not isinstance(got.get("total_count"), int):
-                    raise Unreadable("the workflow runs at %s could not be listed" % sha[:12])
-                for r in batch:
-                    if not (isinstance(r, dict) and isinstance(r.get("workflow_id"), int) and isinstance(r.get("run_number"), int)
-                            and isinstance(r.get("status"), str) and isinstance(r.get("run_started_at"), str)
-                            and isinstance(r.get("run_attempt"), int)):
-                        raise Unreadable("a workflow run at %s could not be read" % sha[:12])
-                found += batch
-                if len(found) >= got["total_count"] or not batch:
-                    break
-                if page >= 10:
-                    raise Unreadable("more than 1,000 workflow runs at %s" % sha[:12])
-                page += 1
-            listed.append(found)
-            return found
-        return read
-    runs = runs_at_head(pr["_contexts"], lister(expected))
+    after = settled(owner, name, expected, before)
+    runs = runs_at_head(pr["_contexts"], lambda: after)
     ruled, ruled_strict, types, approvals = ruleset_checks(owner, name, base)
     protected, protected_strict = protection_checks(owner, name, base)
     required = ruled | protected | {(k[1], None) for k, (_, req) in runs.items() if req}
@@ -557,7 +581,10 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
         raise Refuse("not every required check is green at %s: %s" % (expected[:12], "; ".join(problems)))
     merge_oid = (pr.get("potentialMergeCommit") or {}).get("oid")
     if merge_oid:
-        on_merge = runs_at_head(merge_commit_contexts(owner, name, number, merge_oid), lister(merge_oid))
+        first = workflow_runs(owner, name, merge_oid)
+        contexts = merge_commit_contexts(owner, name, number, merge_oid)
+        listed = settled(owner, name, merge_oid, first)
+        on_merge = runs_at_head(contexts, lambda: listed)
         ran_there = {r for r in required if any(k[1] == r[0] for k in on_merge)}
         red = problems_with(ran_there, on_merge)   # a name there from the wrong app is a problem too
         if red:

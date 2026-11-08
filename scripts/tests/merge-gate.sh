@@ -65,7 +65,7 @@ if a[0] == "api" and "/actions/runs?head_sha=" in a[1]:
     if s.get("runsFail"):
         sys.stderr.write("gh: Not Found (HTTP 404)\n"); sys.exit(1)
     sha = a[1].split("head_sha=")[1].split("&")[0]
-    nodes = (s.get("mergeCommit") or {}).get("nodes", []) if sha != s["pr"]["headRefOid"] else [n for page in s.get("pages", []) for n in page]
+    nodes = (s.get("mergeCommit") or {}).get("nodes", []) if sha != (s.get("pr") or {}).get("headRefOid", sha) else [n for page in s.get("pages", []) for n in page]
     runs = {}
     for n in nodes:
         w = ((n.get("checkSuite") or {}).get("workflowRun")) if n.get("__typename") == "CheckRun" else None
@@ -78,6 +78,11 @@ if a[0] == "api" and "/actions/runs?head_sha=" in a[1]:
         elif r["status"] == "completed" and n["conclusion"] in ("FAILURE", "CANCELLED", "TIMED_OUT"):
             r["conclusion"] = n["conclusion"].lower()
     out = list(runs.values()) + s.get("extraRuns", [])
+    if s.get("runsMoves"):   # the first runsMoves reads each see one more run: a re-run landing between reads
+        k = int(open(os.environ["GH_LOG"] + ".runs", "a+").seek(0, 2) or 0)
+        open(os.environ["GH_LOG"] + ".runs", "a").write("x")
+        if k < s["runsMoves"]:
+            out = out + [{"id": 800000 + k, "workflow_id": 8, "run_number": k + 1, "event": "pull_request", "status": "completed", "conclusion": "success"}]
     for r in out:
         m = 18 * 60 + r["id"] % 100000   # by default a run began in run-number order
         r.setdefault("run_started_at", s.get("runStarted", {}).get(str(r["id"]), "2026-01-15T%02d:%02d:00Z" % (m // 60, m % 60)))
@@ -221,6 +226,15 @@ merge("(6ab) an older first-attempt run that failed without the check never supe
       sc(pages=[[cr("tests", ident=10, run=2), cr("lint", ident=11)]],
          extraRuns=[{"id": 100001, "workflow_id": 1, "run_number": 1, "event": "pull_request", "status": "completed", "conclusion": "cancelled"}]),
       "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+merge("(6ac) a cancelled run a later green run replaced never refuses a check only some runs report (a matrix placeholder name)",
+      sc(pages=[[cr("tests", ident=10, run=10), cr("lint", ident=11)]],
+         extraRuns=[{"id": 100011, "workflow_id": 1, "run_number": 11, "event": "pull_request", "status": "completed", "conclusion": "cancelled"},
+                    {"id": 100012, "workflow_id": 1, "run_number": 12, "event": "pull_request", "status": "completed", "conclusion": "success"}]),
+      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+merge("(6ad) the workflow runs change once between the reads around the checks: one fresh read, then MERGE",
+      sc(runsMoves=1), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(6ae) the workflow runs keep changing between the reads around the checks (a re-run landing): REFUSE, never a stale green",
+       sc(runsMoves=99), "changed while its checks were being read twice")
 merge("(6x) a first attempt never supersedes a higher-numbered run, even when both began in the same second (a concurrency cancel)",
       sc(runStarted={}, pages=[[cr("tests", "CANCELLED", ident=10, run=1), cr("tests", ident=20, run=2), cr("lint", ident=11)]],
          extraRuns=[]), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
@@ -351,7 +365,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 96 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 99 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.
