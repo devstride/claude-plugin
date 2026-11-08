@@ -20,9 +20,9 @@ heartbeats, no message; build exactly as before. Hotfixes never claim. `build-it
 - **`provider: devstride`**: call your own DevStride MCP tools `claim_work`, `heartbeat_claim`,
   `release_claim`, `get_claim`. `holder` is the output of
   `${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/clearance-github.sh identity` (one holder rule for
-  every claim), and `machine`, `sessionName` and `payload` exactly as the record below gives them.
-  The holder is bearer-like: pass it only as that argument, never print it, log it or put it in a comment; the
-  server returns its digest (`holderDigest`) instead.
+  every claim), the other fields from the record below. The holder is bearer-like: pass it only
+  as that argument, never print it, log it or put it in a comment; the server returns its digest
+  (`holderDigest`) instead.
 - **`commands`**: run `claims.commands.<verb> "story <I#####>"` plus `--purpose`, `--phase`,
   `--expiry`, `--takeover <holderDigest>` (claim), `--phase` (heartbeat), `--outcome` (release); the
   holder goes in env `CLAIM_HOLDER`, never on argv. The verdict is stdout's first line (`WON`,
@@ -37,15 +37,9 @@ heartbeats, no message; build exactly as before. Hotfixes never claim. `build-it
 
 ## The record
 
-Every claim call (`claim_work`, a takeover included) carries the fields
-`python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/claim_record.py`, run in the checkout,
-prints: `machine`, `sessionName` (absent when unknown: leave it out) and `payload`
-(`sessionId`, `checkout`, `branch`, `pluginVersion`, null when unknown). Pass them verbatim: never
-type a machine or session name yourself, never add or drop a payload key. The machine is the
-fleet name a repository's machine setup records (`DEVSTRIDE_MACHINE_NAME`), else the cleaned-up
-hostname, spelled as the product's own command line spells it. A `commands` provider builds the
-same record itself. A failing helper (exit 1: the machine has no usable name) degrades as a
-failing `identity` does.
+Every `claim_work` call takes `machine`, `sessionName` (when printed) and `payload` verbatim from
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/claim_record.py`, run in the checkout.
+Never type a machine or session name, or add a payload key. Exit 1 degrades as `identity` does.
 
 ## When
 
