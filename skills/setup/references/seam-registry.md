@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.40.0.
+`.claude/ds-config.json` against. Schema version: 3.41.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -214,13 +214,13 @@ starting with `_` and `$schema` are never reported as unknown.
 | `claims.commands.release` | string | — | — | **Required.** the release command | 3.21.0 |
 | `claims.commands.get` | string | — | — | the optional get command | 3.21.0 |
 | `claims.commands.list` | string | — | — | the optional list command | 3.21.0 |
-| `consequenceNotices` | object | — | — | the notice build-item posts on an item whose change could add billable infrastructure, remove something callers use, remove someone's access or break a published interface; absent means on, with the four default categories, notifying the item's author | unreleased |
-| `consequenceNotices.enabled` | boolean | — | `true` | false posts no notice and repeats none | unreleased |
-| `consequenceNotices.notify` | string[] | — |  | DevStride users (name, username or email) mentioned on every notice beside the item's author | unreleased |
-| `consequenceNotices.categories` | object[] | — |  | the repository's own categories, added to the four defaults | unreleased |
-| `consequenceNotices.categories[].id` | string | — | — | **Required.** lower-case words joined by hyphens, unique, never a default's id | unreleased |
-| `consequenceNotices.categories[].title` | string | — | — | **Required.** the notice's heading for a finding, one line of at most 80 characters | unreleased |
-| `consequenceNotices.categories[].means` | string | — | — | **Required.** what counts, in plain words; the agent judges the diff against it | unreleased |
+| `consequenceNotices` | object | — | — | the notice build-item posts on an item whose change could add billable infrastructure, remove something callers use, remove someone's access or break a published interface; absent means on, with the four default categories, notifying the item's author | 3.41.0 |
+| `consequenceNotices.enabled` | boolean | — | `true` | false posts no notice and repeats none | 3.41.0 |
+| `consequenceNotices.notify` | string[] | — |  | DevStride users (name, username or email) mentioned on every notice beside the item's author | 3.41.0 |
+| `consequenceNotices.categories` | object[] | — |  | the repository's own categories, added to the four defaults | 3.41.0 |
+| `consequenceNotices.categories[].id` | string | — | — | **Required.** lower-case words joined by hyphens, unique, never a default's id | 3.41.0 |
+| `consequenceNotices.categories[].title` | string | — | — | **Required.** the notice's heading for a finding, one line of at most 80 characters | 3.41.0 |
+| `consequenceNotices.categories[].means` | string | — | — | **Required.** what counts, in plain words; the agent judges the diff against it | 3.41.0 |
 | `activeAgents` | object, null | — | — | the Active Agents board, tag and the repository's presence commands; absent or null means the plugin writes nothing to DevStride for this feature and runs nothing | 3.25.0 |
 | `activeAgents.boardId` | string, null | — | `null` | the board plan roots are placed on; null until /devstride:setup agents adopts or creates it, and build-item places no root meanwhile | 3.25.0 |
 | `activeAgents.tagName` | string | — | agent active | the tag that marks a root an agent is working under, allowed on every plan-root type | 3.25.0 |
