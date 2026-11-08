@@ -275,7 +275,7 @@ branch waits, said.
 - **The item points at its code**: 4b — confirm the PR auto-linked, else `link_pull_request`; 4a —
   that comment. Never invent a PR number.
 - **Reconcile as-built** on a material deviation (step 3/4's): **read
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/as-built.md`**. None → report "shipped as
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/as-built.md` in full before acting on it**. None → report "shipped as
   specified" and write nothing.
 - **Release the claim** (`claims` set): outcome `done`.
 - **Report** item + `[N]`, status, dates, PR link or SHA + branch, profile + source, reconciled.

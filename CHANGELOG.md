@@ -16,14 +16,14 @@ for what each version component means here and how a release is cut.
   the build loop's completion step kept the original description in a comment and rewrote the
   item, so a Knowledge Base spec linked to that item quietly fell behind. Now `build-item` sends
   the as-built description through DevStride's `record_as_built_change` tool, which updates the
-  item, comments the before and after, and writes a note into every linked spec, or marks the spec
-  out of sync when it cannot. Because that note can reach customers, the step keeps branch, commit
+  item, comments a short summary of what changed, and writes a note into every linked spec, or
+  marks the spec out of sync when it cannot. The original description is still kept in a comment. Because that note can reach customers, the step keeps branch, commit
   and tool names out of it. A server without the tool, or an item it refuses, gets the previous
   behaviour.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.39.0 @ 8d27062, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.39.0 @ 3f5146b, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.39.0 | tokens@devstride--v3.39.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
@@ -31,7 +31,7 @@ for what each version component means here and how a release is cut.
 | skills/review/SKILL.md | 23,991 | 7,997 | 23,991 | 7,997 | +0 | 7,997 |
 | skills/release/SKILL.md | 23,971 | 7,991 | 23,971 | 7,991 | +0 | 8,000 |
 | skills/doctor/SKILL.md | 23,870 | 7,957 | 23,870 | 7,957 | +0 | 7,960 |
-| skills/build-item/SKILL.md | 23,758 | 7,920 | 23,454 | 7,818 | -102 | 7,920 |
+| skills/build-item/SKILL.md | 23,758 | 7,920 | 23,482 | 7,828 | -92 | 7,920 |
 | skills/rebalance/SKILL.md | 17,724 | 5,908 | 17,724 | 5,908 | +0 | 5,910 |
 | skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,655 | 4,885 | +0 | 4,900 |
 | skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
@@ -57,7 +57,7 @@ for what each version component means here and how a release is cut.
 | skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
-| **total (bodies)** | 273,789 | 91,272 | 273,485 | 91,170 | -102 | |
+| **total (bodies)** | 273,789 | 91,272 | 273,513 | 91,180 | -92 | |
 
 ## [3.39.0] — 2026-11-08
 
