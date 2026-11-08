@@ -246,6 +246,10 @@ g checkout -q rel; g update-index --add --cacheinfo "160000,$FULLHEAD,db/migrati
 g config diff.ignoreSubmodules all
 fbase; HEAD_ARG="$SUBM" REVIEWED="$SUBM"; release_pr "$SUBM"; expect "(F2l) a submodule at a migration path, diff.ignoreSubmodules=all set → still seen, ASK" 0 '^ASK the migration db/migrations/sql/0401_mod.sql is not a plain file \(mode 160000\)'
 g config --unset diff.ignoreSubmodules
+refull ""
+g replace "$FULLHEAD" "$FIXED"
+fbase; expect "(F2m) a local replacement of the release head hiding its migration → still seen, ASK" 0 "^ASK the migration $MIG"
+g replace -d "$FULLHEAD" >/dev/null
 
 fbase; REVIEWED=""; expect "(F3) no --reviewed-head → ASK" 0 '^ASK no --reviewed-head as a full commit id'
 fbase; REVIEWED="HEAD"; (cd "$WORK/repo" && g checkout -q "$FULLHEAD"); expect "(F3f) a moving ref as --reviewed-head (HEAD at the head) → ASK, never resolved" 0 '^ASK no --reviewed-head as a full commit id'

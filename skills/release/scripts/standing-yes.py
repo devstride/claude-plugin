@@ -59,7 +59,7 @@ gate green, any class) needs, in this order:
   F5. conditions 4 to 9 above;
   F6. every file matching `migrationGlobs` that the release adds or changes against
       `origin/<productionBranch>` (which must equal the pull request's live base; from their merge
-      base, renames split, repository-root paths) has its content approved:
+      base, renames split, repository-root paths, submodules and real objects) has its content approved:
       its blob id at --head is the `blob` of an `approvedMigrations` entry (`{"blob", "path",
       "item", "approved"}`, written on the owner's own yes, dated no later than today). A deleted
       migration file, a link or submodule where a migration should be, a file name with a
@@ -336,6 +336,7 @@ def full_route(a, head, release, full):
 
 
 def main():
+    os.environ["GIT_NO_REPLACE_OBJECTS"] = "1"  # every git read sees the real objects, never a local replacement
     parser = Parser(prog="standing-yes.py")
     parser.add_argument("--pr", type=int, required=True)
     parser.add_argument("--head", required=True)
