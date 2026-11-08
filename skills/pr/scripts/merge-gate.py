@@ -34,9 +34,11 @@ The rule (an approver's admin merge exactly when every required check is green, 
   a workflow that only ever skips (one answering @-mentions, a matrix job's skipped placeholder
   name) is never asked to have run. A workflow run from an event GitHub does not count toward a pull
   request's checks (`workflow_dispatch`, `schedule`, ...) is ignored, as GitHub ignores it. A
-  check's verdict is its newest workflow run (by run number; a re-run keeps its number and GitHub
-  lists only its latest attempt). Same-name jobs in that one run are siblings, and every one must
-  pass. A skipped or neutral newest run never hides
+  check's runs are judged per trigger event (push, pull_request, ...), and no event's verdict may
+  be failing or pending, so a later push run never hides a failed pull_request run. Within one
+  event any run still pending refuses, and the newest run is read both by run number and by when
+  its latest attempt started (a re-run keeps its number but starts later); the worse counts.
+  Same-name jobs in one run are siblings, and every one must pass. A skipped or neutral newest run never hides
   an older run of the same check that executed and is failing or still pending. Pending, failed,
   cancelled, timed out or missing is a REFUSE naming it. A required check that also ran on the
   pull request's test merge commit must pass there too (GitHub requires it). A commit status
@@ -124,7 +126,7 @@ MERGE_COMMIT_QUERY = """query($owner: String!, $name: String!, $number: Int!, $a
           pageInfo { hasNextPage endCursor }
           nodes {
             __typename
-            ... on CheckRun { name status conclusion databaseId
+            ... on CheckRun { name status conclusion startedAt completedAt databaseId
                               checkSuite { app { databaseId } workflowRun { runNumber event workflow { databaseId } } } }
             ... on StatusContext { context state }
           }
@@ -349,19 +351,42 @@ def worst(states):
     return "SUCCESS" if "SUCCESS" in states else states[0]
 
 
+def stream_verdict(byRun, at):
+    """One event's runs of one check: (verdict, earned). Any run still pending is PENDING. The
+    newest run is read two ways, by run number and by when its latest attempt started (a re-run
+    keeps its old number but starts later), and the worse of the two counts. A quiet newest run
+    defers to the newest run that executed; none executed leaves it quiet and unearned."""
+    numbers = sorted(byRun)
+    verdict = {n: worst(byRun[n]) for n in numbers}
+    if "PENDING" in verdict.values():
+        return "PENDING", False
+    def newest(ns):
+        return [verdict[n] for n in {ns[-1], max(ns, key=lambda n: (at.get(n) or "", n))}]
+    picked = newest(numbers)
+    red = [v for v in picked if v not in PASSED]
+    if red:
+        return red[0], True
+    if "SUCCESS" in picked:
+        return "SUCCESS", True
+    executed = [n for n in numbers if verdict[n] not in QUIET]
+    if executed:
+        red = [v for v in newest(executed) if v != "SUCCESS"]
+        return (red[0], True) if red else (picked[0], True)
+    return picked[0], False
+
+
 def runs_at_head(contexts):
     """Every distinct check at this head and its verdict. A check run belongs to one (name, app,
-    workflow); its workflow runs are ordered by run number (a re-run keeps its number, and GitHub
-    lists only the latest attempt), and same-name jobs in one run are siblings that must all pass.
-    The newest run is the verdict; a skipped or neutral newest run passes only when no run is
-    pending and the newest run that executed passed. A commit status is one context (GitHub
-    reports only its latest state). Same-name checks from another workflow or app, and a same-name
-    status, stay separate: each must pass. A check run from a workflow event GitHub does not count
-    (ELIGIBLE) is left out: it neither satisfies a check nor stands in front of an older one. A
-    skipped or neutral verdict passes only with evidence that CI ran: another job of that same
-    workflow run succeeded (a job skipped because its run found nothing to test), or an older run
-    of the same check succeeded at this head. A run where every job skipped (a draft's held CI, read
-    before the ready run starts) or a quiet check from outside a workflow is UNEARNED."""
+    workflow), and a commit status is one context (GitHub reports only its latest state). Same-name
+    checks from another workflow or app, and a same-name status, stay separate: each must pass. A
+    check run from a workflow event GitHub does not count (ELIGIBLE) is left out: it neither
+    satisfies a check nor stands in front of an older one. Each counted event (push,
+    pull_request, ...) is its own stream, judged by stream_verdict, and no stream may be failing or
+    pending: a later push run never hides a failed pull_request run. Same-name jobs in one run are
+    siblings that must all pass. A skipped or neutral verdict is earned when a stream executed, or
+    when another job of that same workflow run succeeded (a job skipped because its run found
+    nothing to test); a check where nothing ever ran (a draft's held CI, read before the ready run
+    starts) or a quiet check from outside a workflow is UNEARNED."""
     runs, ran = {}, set()
     for c in contexts:
         if not isinstance(c, dict):
@@ -374,30 +399,35 @@ def runs_at_head(contexts):
                 continue
             workflow = (run.get("workflow") or {}).get("databaseId")
             key, number = ("check", c.get("name"), app, workflow), run.get("runNumber") or 0
+            stream, when = run.get("event"), c.get("startedAt") or c.get("completedAt")
             state = c.get("conclusion") if c.get("status") == "COMPLETED" else "PENDING"
             if workflow and state == "SUCCESS":
                 ran.add((app, workflow, number))
         elif c.get("__typename") == "StatusContext":
-            key, number = ("status", c.get("context"), None, None), 0
+            key, number, stream, when = ("status", c.get("context"), None, None), 0, None, None
             state = {"PENDING": "PENDING", "EXPECTED": "PENDING"}.get(c.get("state"), c.get("state"))
         else:
             continue
         if key[1]:
-            entry = runs.setdefault(key, {"required": False, "byRun": {}})
+            entry = runs.setdefault(key, {"required": False, "streams": {}})
             entry["required"] = entry["required"] or bool(c.get("isRequired"))
-            entry["byRun"].setdefault(number, []).append(state or "PENDING")
+            byRun, at = entry["streams"].setdefault(stream, ({}, {}))
+            byRun.setdefault(number, []).append(state or "PENDING")
+            if when and when > (at.get(number) or ""):
+                at[number] = when
     verdicts = {}
     for key, entry in runs.items():
-        numbers = sorted(entry["byRun"])
-        ordered = [worst(entry["byRun"][n]) for n in numbers]
-        state = ordered[-1]
-        if state in QUIET:
-            executed = [x for x in ordered if x not in QUIET]
-            if "PENDING" in ordered:
-                state = "PENDING"
-            elif executed and executed[-1] != "SUCCESS":
-                state = executed[-1]
-            elif not executed and not (key[3] and (key[2], key[3], numbers[-1]) in ran):
+        judged = {e: stream_verdict(*pair) for e, pair in entry["streams"].items()}
+        red = [v for v, _ in judged.values() if v not in PASSED]
+        if red:
+            state = next((v for v in red if v != "PENDING"), "PENDING")
+        elif any(v == "SUCCESS" for v, _ in judged.values()):
+            state = "SUCCESS"
+        else:
+            state = next(iter(judged.values()))[0]
+            bare = not any(earned for _, earned in judged.values())
+            newest = [max(pair[0]) for pair in entry["streams"].values()]
+            if bare and not (key[3] and any((key[2], key[3], n) in ran for n in newest)):
                 state = UNEARNED
         verdicts[key] = (state, entry["required"])
     return verdicts

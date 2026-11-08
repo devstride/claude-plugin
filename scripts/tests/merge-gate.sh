@@ -91,9 +91,9 @@ def run(number, sha, scenario, *extra):
     return p.returncode, p.stdout.strip().split("\n"), p.stderr
 def say(good, label, extra=""):
     print(("ok   " if good else "FAIL ") + label + ("" if good else " -> " + extra))
-def cr(name, conclusion="SUCCESS", status="COMPLETED", ident=1, required=True, app=15368, workflow=1, run=None, event="pull_request"):
+def cr(name, conclusion="SUCCESS", status="COMPLETED", ident=1, required=True, app=15368, workflow=1, run=None, event="pull_request", at="2026-01-15T18:00:00Z"):
     return {"__typename": "CheckRun", "name": name, "status": status, "conclusion": conclusion if status == "COMPLETED" else None,
-            "startedAt": "2026-01-15T18:00:00Z" if status != "QUEUED" else None, "databaseId": ident, "isRequired": required,
+            "startedAt": at if status != "QUEUED" else None, "databaseId": ident, "isRequired": required,
             "checkSuite": {"app": {"databaseId": app}, "workflowRun": {"runNumber": run if run is not None else ident, "event": event, "workflow": {"databaseId": workflow}} if workflow else None}}
 def st(context, state="SUCCESS", required=True):
     return {"__typename": "StatusContext", "context": context, "state": state, "createdAt": "2026-01-15T18:00:00Z", "isRequired": required}
@@ -147,6 +147,18 @@ refuse("(6i) a manual (workflow_dispatch) run never hides an older failed run of
        "tests is failure")
 refuse("(6j) a required check only a manual run reported never ran, as GitHub reads it",
        sc(pages=[[cr("tests", ident=20, event="workflow_dispatch"), cr("lint", ident=11)]]), "tests never ran at this head")
+refuse("(6l) a later push run's success never hides a failed pull_request run of the same check",
+       sc(pages=[[cr("tests", "FAILURE", ident=10, run=1), cr("tests", ident=20, run=2, event="push"), cr("lint", ident=11)]]), "tests is failure")
+merge("(6m) a push run where every job skipped beside a pull_request run that succeeded passes (a develop push with its suite off)",
+      sc(pages=[[cr("tests", ident=10, run=2), cr("tests", "SKIPPED", ident=20, run=1, event="push"), cr("lint", ident=11)]]),
+      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(6n) an older run re-run after a newer one passed, and failing, counts: re-runs keep their number but start later",
+       sc(pages=[[cr("tests", "FAILURE", ident=30, run=1, at="2026-01-15T19:00:00Z"), cr("tests", ident=20, run=2), cr("lint", ident=11)]]), "tests is failure")
+refuse("(6o) an older run still running beside a newer one that passed -> REFUSE pending",
+       sc(pages=[[cr("tests", status="IN_PROGRESS", ident=10, run=1), cr("tests", ident=20, run=2), cr("lint", ident=11)]]), "tests is pending")
+merge("(6p) an older run cancelled before the newer one started (a concurrency group) does not count",
+      sc(pages=[[cr("tests", "CANCELLED", ident=10, run=1, at="2026-01-15T17:00:00Z"), cr("tests", ident=20, run=2), cr("lint", ident=11)]]),
+      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
 refuse("(6k) a scheduled run's success does not count either",
        sc(pages=[[cr("tests", ident=20, event="schedule"), cr("lint", ident=11)]]), "tests never ran at this head")
 refuse("(6b) a skipped newest run never hides an older run of the same check that failed",
@@ -274,7 +286,7 @@ PY
 )"
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 80 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -ge 85 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.
