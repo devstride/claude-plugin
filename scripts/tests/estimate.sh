@@ -268,7 +268,7 @@ OUT=$(run quote --sha "$L4" --now 2026-11-09T19:35:00Z --json)
 [ "$(echo "$OUT" | field landedAt)" = 2026-11-09T19:10:00Z ] && ok "(9k) a landing after a batch branch was cut keeps its own landing time" || bad "(9k) landing time: $OUT"
 
 # (9l) Only an absorb's subject marks it (release-branch.md 4a). Branches cut from the train merged
-# back at its tip, or after a sync of develop, stay one landing; with the snapshot's merge of
+# back at its tip (one named for absorb work), or after a sync of develop, stay one landing; with the snapshot's merge of
 # develop a no-op, an absorb by git's own subject and one by the prescribed subject are read
 # through; a delivery whose subject is its title is recognised; a sync from master as the pull
 # request's head carries nothing; backtest holds a release still deploying as pending.
@@ -280,10 +280,10 @@ batch() {   # batch <name> <time>: a branch of two --no-ff merges cut from the t
     g checkout -q "$1"; at "$2" merge -q --no-ff -m "merge: $1 part $n" "$1-$n"
   done
 }
-batch tipbatch 2026-11-09T20:00:00Z
-g checkout -q train/release; at 2026-11-09T20:01:00Z merge -q --no-ff -m "merge: tipbatch into train/release" tipbatch
+L7=$(land l7 2026-11-09T20:00:00Z I707)
+batch tipbatch 2026-11-09T20:01:00Z
+g checkout -q train/release; at 2026-11-09T20:02:00Z merge -q --no-ff -m "Merge pull request #14 from acme/p/fix-absorb-validation" tipbatch
 LB3=$(g rev-parse HEAD)
-L7=$(land l7 2026-11-09T20:05:00Z I707)
 batch syncbatch 2026-11-09T20:06:00Z
 g checkout -q -b direct2 develop; at 2026-11-09T20:07:00Z commit -q --allow-empty -m "direct two"
 g checkout -q develop; at 2026-11-09T20:08:00Z merge -q --no-ff -m "Merge pull request #10 from acme/direct2" direct2
@@ -317,6 +317,35 @@ OUT=$(run shipped --merge "$RELEASE5" --json)
 echo "$OUT" | grep -q '"landings": \[\]' && ok "(9m) a sync from master as the pull request's head carries nothing" || bad "(9m) master-headed sync: $OUT"
 OUT=$(run backtest --days 1 --now 2026-11-09T21:45:00Z --json)
 [ "$(echo "$OUT" | field pending)" = 6 ] && ok "(9n) backtest holds a release still deploying at --now as pending" || bad "(9n) deploying: $OUT"
+
+# (9o) A subject that reads like an absorb is not enough: the merge must also hold only merges,
+# continue a commit of the delivery and have no landing after that commit. A one-off, a batch with a
+# landing after its cut, and an epic cut from develop each stay one landing (the one-off is cut at the
+# train's newest landing, so only its non-merge story keeps it whole).
+g branch -f train/release develop
+L11=$(land l11 2026-11-10T08:59:00Z I719)
+g checkout -q -b absorb-retries train/release; at 2026-11-10T09:00:00Z commit -q --allow-empty -m "I720"
+g checkout -q train/release; at 2026-11-10T09:01:00Z merge -q --no-ff -m "merge: absorb-retries into train/release" absorb-retries
+O1=$(g rev-parse HEAD)
+batch absorbbatch 2026-11-10T09:02:00Z
+L10=$(land l10 2026-11-10T09:05:00Z I721)
+g checkout -q train/release; at 2026-11-10T09:06:00Z merge -q --no-ff -m "merge: absorb batch into the release train snapshot" absorbbatch
+B5=$(g rev-parse HEAD)
+g checkout -q -b epic3 develop
+g checkout -q -b e3s epic3; at 2026-11-10T09:07:00Z commit -q --allow-empty -m "I731"
+g checkout -q epic3; at 2026-11-10T09:07:00Z merge -q --no-ff -m "merge: I731 [1] into epic integration" e3s
+g checkout -q train/release; at 2026-11-10T09:08:00Z merge -q --no-ff -m "merge: absorb epic three into train/release" epic3
+E5=$(g rev-parse HEAD)
+deliver 2026-11-10T09:30:00Z
+g checkout -q master; at 2026-11-10T09:40:00Z merge -q --no-ff -m "release" develop
+RELEASE6=$(g rev-parse HEAD)
+g checkout -q develop; g push -q origin develop master train/release; g fetch -q origin
+OUT=$(run shipped --merge "$RELEASE6" --json); CODE=$?
+if [ "$CODE" = 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); got={l["sha"] for l in d["landings"]}; sys.exit(0 if got==set(sys.argv[1:]) else 1)' "$L11" "$O1" "$L10" "$B5" "$E5"; then
+  ok "(9o) an absorb-like subject alone never reads a one-off, a batch or an epic through"
+else
+  bad "(9o) absorb-like subjects: exit $CODE $OUT"
+fi
 
 # (10) No release train that ships: work lands on the release source; a source that is production
 # means a merge is the release.

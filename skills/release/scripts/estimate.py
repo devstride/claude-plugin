@@ -232,13 +232,15 @@ def merged_branch(root, sha):
 
 
 ABSORB = re.compile(r"^Merge commit '([0-9a-f]{7,40})'")
-ABSORB_WORDS = re.compile(r"\babsorb|\blate (?:train )?landing", re.I)
+ABSORB_WORDS = re.compile(r"^merge: (?:absorb\b|late (?:train )?landing|.* into .*(?:\bsnapshot\b|(?:release|support)-train-))", re.I)
 
 
 def says_absorb(root, row, train):
     """The merge's subject says it absorbed the train: the subject release-branch.md 4a prescribes
     (`Merge branch '<train>' (<absorbAt>) into <snapshot>`), git's own for merging the absorbed
-    commit by its sha, or the older wording ("absorb", "late landing")."""
+    commit by its sha, or the older wording (`merge: absorb …`, `merge: late train landing …`,
+    `merge: <train> (<sha>) into the … snapshot`); never a word inside a branch name. Syncs into
+    the snapshot are skipped before this is asked."""
     branch, lines = merged_branch(root, row[0])
     commit = ABSORB.match(lines[0]) if lines else None
     return (branch == train or bool(commit and row[2][1].startswith(commit.group(1)))
