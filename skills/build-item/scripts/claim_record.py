@@ -47,11 +47,12 @@ def session_id(env):
 
 
 def session_name(env, home=None):
-    """The Claude Code session's name from its own record (~/.claude/sessions/<pid>.json), the one
-    for CLAUDE_PID first, then any naming this session id; else DEVSTRIDE_SESSION."""
+    """The Claude Code session's name from its own record (<CLAUDE_CONFIG_DIR, else ~/.claude>/sessions/
+    <pid>.json), the one for CLAUDE_PID first, then any naming this session id; else DEVSTRIDE_SESSION."""
     sid = env.get("CLAUDE_CODE_SESSION_ID")
     if sid:
-        folder = os.path.join(home or os.path.expanduser("~"), ".claude", "sessions")
+        config = env.get("CLAUDE_CONFIG_DIR") or os.path.join(home or os.path.expanduser("~"), ".claude")
+        folder = os.path.join(config, "sessions")
         pid = env.get("CLAUDE_PID") or ""
         try:
             entries = sorted(e for e in os.listdir(folder) if e.endswith(".json"))

@@ -40,6 +40,10 @@ check("(2b) else any record naming the session id", cr.session_name({"CLAUDE_COD
 check("(2c) a record for another session is never used", cr.session_name({"CLAUDE_CODE_SESSION_ID": "s-1", "CLAUDE_PID": "300"}, home), "other record")
 check("(2d) no record → DEVSTRIDE_SESSION", cr.session_name({"CLAUDE_CODE_SESSION_ID": "s-9", "DEVSTRIDE_SESSION": "wt-a"}, home), "wt-a")
 check("(2e) nothing known → none", cr.session_name({}, home), None)
+alt = os.path.join(tmp, "alt-config"); os.makedirs(os.path.join(alt, "sessions"))
+with open(os.path.join(alt, "sessions", "5.json"), "w") as handle:
+    json.dump({"sessionId": "s-7", "name": "from config dir"}, handle)
+check("(2g) CLAUDE_CONFIG_DIR holds the session records when set", cr.session_name({"CLAUDE_CODE_SESSION_ID": "s-7", "CLAUDE_PID": "5", "CLAUDE_CONFIG_DIR": alt}, home), "from config dir")
 check("(2f) a long name is capped at 200", len(cr.session_name({"DEVSTRIDE_SESSION": "x" * 500}, home)), 200)
 
 # (3) the record: four payload keys always, in and out of a checkout
@@ -55,9 +59,10 @@ got = cr.record(outside, {"DEVSTRIDE_MACHINE_NAME": "m1-bob", "CODEX_THREAD_ID":
 check("(3c) outside a checkout: same keys, null values, no sessionName", (sorted(got), sorted(got["payload"]), got["payload"]["checkout"], got["payload"]["branch"], got["payload"]["sessionId"]),
       (["machine", "payload"], ["branch", "checkout", "pluginVersion", "sessionId"], None, None, "t-1"))
 PY
-)"
+)"; PRC=$?
 echo "$OUT" | sed 's/^ok   /  ok   /; s/^FAIL /  FAIL /'
 echo "$OUT" | grep -q '^FAIL' && FAIL=1
+[ "$PRC" -eq 0 ] || bad "(0) the Python cases crashed (exit $PRC)"
 
 # (4) the command line: the record as JSON, `machine` alone, a usable error when there is no name
 J="$(cd "$T" && DEVSTRIDE_MACHINE_NAME=M5-Carol CLAUDE_CODE_SESSION_ID= DEVSTRIDE_SESSION=s python3 "$HELPER")"
