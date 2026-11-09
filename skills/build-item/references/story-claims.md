@@ -20,9 +20,9 @@ heartbeats, no message; build exactly as before. Hotfixes never claim. `build-it
 - **`provider: devstride`**: call your own DevStride MCP tools `claim_work`, `heartbeat_claim`,
   `release_claim`, `get_claim`. `holder` is the output of
   `${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/clearance-github.sh identity` (one holder rule for
-  every claim), `machine` the short hostname, `sessionName` only when you know it. The holder is
-  bearer-like: pass it only as that argument, never print it, log it or put it in a comment; the
-  server returns its digest (`holderDigest`) instead.
+  every claim), the other fields from the record below. The holder is bearer-like: pass it only
+  as that argument, never print it, log it or put it in a comment; the server returns its digest
+  (`holderDigest`) instead.
 - **`commands`**: run `claims.commands.<verb> "story <I#####>"` plus `--purpose`, `--phase`,
   `--expiry`, `--takeover <holderDigest>` (claim), `--phase` (heartbeat), `--outcome` (release); the
   holder goes in env `CLAIM_HOLDER`, never on argv. The verdict is stdout's first line (`WON`,
@@ -34,6 +34,14 @@ heartbeats, no message; build exactly as before. Hotfixes never claim. `build-it
   stdin) and follow its `action`: `proceed`, `skip`, `stop`, `takeover` (claim again with its
   `takeoverDigest` as the takeover's expected holder digest), `reclaim` (claim again, plainly) or
   `degrade`; say its `message`, which names times in the local time zone with its abbreviation.
+
+## The record
+
+Every `claim_work` call takes `machine`, `sessionName` (when printed) and `payload`, and every
+`heartbeat_claim` the `payload` (so the branch stays current), verbatim from
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/claim_record.py`, run in the checkout
+before each call.
+Never type a machine or session name, or add a payload key. Exit 1 degrades as `identity` does.
 
 ## When
 

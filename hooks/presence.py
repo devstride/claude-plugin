@@ -69,11 +69,14 @@ import os
 import re
 import secrets
 import signal
-import socket
 import stat
 import subprocess
 import sys
 import time
+
+sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills/build-item/scripts"))
+import claim_record  # noqa: E402  the one machine naming every claim uses
 
 SESSION_ID = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}$")
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
@@ -352,7 +355,7 @@ def run_command(sid, record, event, state, at):
     env = dict(os.environ)
     env.update({
         "PRESENCE_EVENT": event, "PRESENCE_STATE": state,
-        "PRESENCE_SESSION_ID": sid, "PRESENCE_MACHINE": socket.gethostname().split(".")[0],
+        "PRESENCE_SESSION_ID": sid, "PRESENCE_MACHINE": claim_record.machine_name(),
         "PRESENCE_CHECKOUT": top, "PRESENCE_BRANCH": branch, "PRESENCE_ITEM": item_of(branch),
         "PRESENCE_PLUGIN_VERSION": str(record.get("version") or ""),
         "PRESENCE_INTERVAL_MINUTES": str(settings["intervalMinutes"]),
