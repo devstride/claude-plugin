@@ -134,7 +134,8 @@ Replacing a literal effort tier with `<effort>` is worth proposing on its own ei
 ```
 
 Read it as a checklist rather than a command: a non-interactive invocation, read-only, ambient
-tooling off, and `<context>` last so the prompt arrives on stdin. Substitute `<effort>` only where
+tooling off, and `<context>` last so the prompt arrives on stdin. The loop always redirects that
+stdin, from the prompt file or `/dev/null`, so a CLI that reads stdin never waits on the session's. Substitute `<effort>` only where
 the CLI exposes a reasoning tier. `setup` probes the first token and the placeholder shape; a
 single real review is what proves the rest.
 

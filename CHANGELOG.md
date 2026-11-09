@@ -8,6 +8,13 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A local review engine can no longer hang waiting on its input.** Every launch of
+  `review.localCommand` or `review.localAssistCommand` now redirects stdin, from the prompt file or
+  `/dev/null`. A launch that inherited the session's stdin could wait forever for input that never
+  closed, using no CPU and printing nothing, which looks like a slow review rather than a stuck one.
+
 ## [3.44.0] — 2026-11-08
 
 ### Added
