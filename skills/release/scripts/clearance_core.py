@@ -6,6 +6,7 @@ contract is skills/release/references/clearance.md."""
 import hashlib, http.client, json, os, re, secrets, signal, subprocess, sys, time, urllib.error, urllib.request
 from datetime import datetime, timedelta, timezone
 
+sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "build-item/scripts"))
 import claim_record  # noqa: E402  the one machine and session naming every claim uses
 

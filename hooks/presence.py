@@ -74,6 +74,7 @@ import subprocess
 import sys
 import time
 
+sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills/build-item/scripts"))
 import claim_record  # noqa: E402  the one machine naming every claim uses
 
