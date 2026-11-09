@@ -65,9 +65,10 @@ mkdir -p "$WORK/notgit"; OUT="$(run "$WORK/notgit" s1 '/devstride:setup')"; RC=$
 [ $RC -eq 0 ] && [ -z "$OUT" ] && ok "(10c) not a repository → allowed" || bad "(10c) rc=$RC $OUT"
 OUT="$(printf 'not json' | bash "$HOOK" 2>&1)"; RC=$?
 [ $RC -eq 0 ] && [ -z "$OUT" ] && ok "(10d) malformed payload → allowed" || bad "(10d) rc=$RC $OUT"
-R3="$(mkrepo c)"; mkdir -p "$R3/.git/devstride"; chmod 500 "$R3/.git/devstride"
+# A plain file where the marker directory belongs: unwritable for every user, root included (a
+# read-only mode bit is not: root writes through it, as in a container).
+R3="$(mkrepo c)"; : > "$R3/.git/devstride"
 run "$R3" s1 '/devstride:setup' >/dev/null; OUT="$(run "$R3" s1 '/devstride:build-item I1')"; RC=$?
-chmod 700 "$R3/.git/devstride"
 [ $RC -eq 0 ] && [ -z "$OUT" ] && ok "(10e) unwritable marker directory → allowed (nothing recorded, nothing blocked)" || bad "(10e) rc=$RC $OUT"
 # (11) a worktree shares the main repository's session markers (git-common-dir)
 git -C "$R" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q --allow-empty -m init 2>/dev/null
