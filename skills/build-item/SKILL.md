@@ -274,6 +274,7 @@ merges, every profile, never a gate:
 - `item-status.py decide`, `event: landed`, sets status and comment (never `mark_done`);
   `startDate`/`dueDate` = branch creation → merge. Base → **Done**; an epic-branch merge is LANDED
   (`next-unblocked.md`), closed by step 8; a train merge too (`release-train.md`), closed by `release`.
+  A train or base landing is then quoted (`item-status.md` step 4).
 - **The item points at its code**: 4b — confirm the PR auto-linked, else `link_pull_request`; 4a —
   that comment. Never invent a PR number.
 - **Reconcile as-built** on a material deviation (step 3/4's): **read

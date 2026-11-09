@@ -279,3 +279,4 @@ hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
 - `skills/release/SKILL.md` — steps 0b, 0c, the protected-branch floor, the hotfix rule and step 5b;
   `references/release-pr.md` — step 2's head re-validation.
 - `skills/review/SKILL.md` — step 7.1's hand-back on a release-branch head.
+- `skills/release/scripts/estimate.py` — a train delivery read by its snapshot slug and title.

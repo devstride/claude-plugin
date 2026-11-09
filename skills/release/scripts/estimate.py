@@ -150,13 +150,26 @@ def rows(root, *revs, since=None):
     """-> [(sha, committed epoch, [parents])] of the first-parent walk of revs, oldest first."""
     args = ["log", "--first-parent", "--reverse", "--format=%H %ct %P"]
     if since is not None:
-        args.append("--since=@%d" % since)
+        args.append("--since-as-filter=@%d" % since)   # --since stops at the first older commit
     found = []
     for line in git(root, *(args + list(revs) + ["--"])).stdout.splitlines():
         parts = line.split()
         if len(parts) >= 2:
             found.append((parts[0], int(parts[1]), parts[2:]))
     return found
+
+
+def train_exists(root, train):
+    """Fetch the train when origin has it; False when it does not exist there yet."""
+    if os.environ.get("AUTO_START_NO_FETCH") != "1":
+        listed = git(root, "ls-remote", "--heads", "origin", train, check=False)
+        if listed.returncode != 0:
+            raise Answer("ERROR", "git ls-remote origin failed: %s" % (listed.stderr or "").strip()[:200])
+        if not listed.stdout.strip():
+            return False
+        fetch(root, [train])
+        return True
+    return git(root, "rev-parse", "--verify", "--quiet", "origin/%s^{commit}" % train, check=False).returncode == 0
 
 
 def first_parent(root, branch, since=None):
@@ -180,20 +193,52 @@ def landed_at(root, sha, chain):
     return chain[lo] if lo < len(chain) else None
 
 
-def brought(root, merge):
-    """The landings a first-parent commit of the release source brought. A train delivery (its
-    second parent's first-parent walk back to its first parent holds nothing but merges: the
-    train's landings and syncs) brings that walk; any other commit, a pull request merged straight
-    into the source included, is itself the landing."""
-    if len(merge[2]) < 2:
+def carries_nothing(root, row, production, *bases):
+    """A sync: the merge brings no commit other than merges that its first parent, `bases` or the
+    production branch as it stood then did not already hold (production merged back, the source
+    merged into a train or a snapshot)."""
+    if len(row[2]) < 2:
+        return False
+    then = git(root, "rev-list", "-1", "--first-parent", "--before=@%d" % row[1], "origin/%s" % production).stdout.split()
+    left = git(root, "rev-list", "--no-merges", "--count", row[0], "--not", row[2][0], *(list(bases) + then)).stdout.strip()
+    return left == "0"
+
+
+def delivery(root, merge, train):
+    """A train delivery is recognised by its merge naming the train branch, the release train's
+    snapshot (`release-train-<date>`, `support-train-<date>` under the train's old name) or its pull
+    request title (`Release train:`); release-branch.md names them so. Any other merge into the source is itself one landing, however many merges its
+    branch holds (an epic's release pull request is one landing, not its stories)."""
+    text = git(root, "log", "-1", "--format=%B", merge[0]).stdout
+    return bool(train) and any(mark in text for mark in (train, "release-train-", "support-train-", "Release train:", "Support train:"))
+
+
+def brought(root, merge, production, train):
+    """The landings a first-parent commit of the release source brought, syncs left out. A train
+    delivery brings each train landing on its second parent's first-parent walk: snapshot fixes
+    (not merges) and syncs are skipped, and a merge that absorbed late landings (its own walk all
+    merges, continuing a commit already in the delivery) is read through to them. Any other commit
+    is itself the landing."""
+    if len(merge[2]) < 2 or not delivery(root, merge, train):
         return [merge]
-    walk = rows(root, merge[2][1], "--not", merge[2][0])
-    if walk and all(len(row[2]) >= 2 for row in walk):
-        return walk
-    return [merge]
+    found, seen = [], set()
+
+    def walk(head, stop):
+        for row in rows(root, head, "--not", stop):
+            seen.add(row[0])
+            if len(row[2]) < 2 or carries_nothing(root, row, production, merge[2][0]):
+                continue
+            inner = rows(root, row[2][1], "--not", row[2][0])
+            if inner and inner[0][2] and inner[0][2][0] in seen and all(len(r[2]) >= 2 for r in inner):
+                walk(row[2][1], row[2][0])
+            else:
+                found.append(row)
+
+    walk(merge[2][1], merge[2][0])
+    return found or [merge]
 
 
-def landing_of(root, sha, landing, source):
+def landing_of(root, sha, landing, source, production):
     """When sha landed: the first first-parent commit of the landing branch containing it. A train
     is fast-forwarded or merged into the source at each release, so once sha is on the source it is
     found through the source merge that brought it, never on the train's walk as it stands now."""
@@ -201,7 +246,7 @@ def landing_of(root, sha, landing, source):
         return landed_at(root, sha, first_parent(root, source))
     if ancestor(root, sha, source):
         merge = landed_at(root, sha, first_parent(root, source))
-        return landed_at(root, sha, brought(root, merge)) or merge
+        return landed_at(root, sha, brought(root, merge, production, landing)) or merge
     return landed_at(root, sha, rows(root, "origin/%s" % landing, "--not", "origin/%s" % source))
 
 
@@ -224,21 +269,21 @@ def table(root, landing, source, production, start):
     left out. Landings on a train are read through the source merges that brought them (the train's
     own walk loses them when it is fast-forwarded), plus those still on the train beyond the
     source. `shipped` is when the first production first-parent commit containing it was made."""
-    upstream = {sha for branch in {source, production} if branch != landing
-                for sha, _, _ in first_parent(root, branch, start - 30 * 86400)}
     if landing == source:
-        candidates = first_parent(root, source, start)
+        candidates = [(row, ()) for row in first_parent(root, source, start)]
     else:
-        candidates = [row for merge in first_parent(root, source, start) for row in brought(root, merge)]
-        candidates += rows(root, "origin/%s" % landing, "--not", "origin/%s" % source)
+        candidates = [(row, ()) for merge in first_parent(root, source, start)
+                      for row in brought(root, merge, production, landing)]
+        candidates += [(row, ("origin/%s" % source,))
+                       for row in rows(root, "origin/%s" % landing, "--not", "origin/%s" % source)]
     shipped = shipped_times(root, production, start)
     found, seen = [], set()
-    for sha, when, parents in candidates:
+    for row, bases in candidates:
+        sha, when, _ = row
         if sha in seen or when < start:
             continue
         seen.add(sha)
-        others = parents[1:]
-        if others and all(p in upstream for p in others):
+        if carries_nothing(root, row, production, *bases):
             continue   # a sync merge carries nothing
         found.append((sha, when, shipped.get(sha)))
     return found
@@ -300,7 +345,9 @@ def setup():
     auto = load_auto_start()
     config, root = auto.load_config()
     landing, source, production, deploy, zone = settings(config, auto.section)
-    fetch(root, [landing, source, production])
+    fetch(root, [source, production])
+    if landing != source and not train_exists(root, landing):
+        landing = source   # a train not created yet: work lands on the source
     return root, landing, source, production, deploy, zone
 
 
@@ -342,7 +389,7 @@ def quote(args):
             production, shown(merged, zone, now), " (about %d minutes)" % deploy if deploy else ""),
             live=utc(merged + datetime.timedelta(minutes=deploy)), **record)
     on_source = ancestor(root, sha, source)
-    at = landing_of(root, sha, landing, source) if on_source or ancestor(root, sha, landing) else None
+    at = landing_of(root, sha, landing, source, production) if on_source or ancestor(root, sha, landing) else None
     if at is None or at[1] > now.timestamp():
         where = landing if landing == source else "%s or %s" % (landing, source)
         raise Answer("NONE", "not landed on %s yet: no clock time before landing; say which steps remain" % where, **record)
@@ -370,8 +417,10 @@ def shipped(args):
     if row is None:
         raise Answer("ERROR", "%s is not a first-parent commit of %s" % (merge[:12], production))
     since = row[2][0] if row[2] else None
-    new = set(git(root, "rev-list", ("%s..%s" % (since, merge)) if since else merge).stdout.split())
-    landings = [r for r in table(root, landing, source, production, row[1] - 30 * 86400) if r[0] in new]
+    brought_in = git(root, "log", "--format=%H %ct", ("%s..%s" % (since, merge)) if since else merge).stdout.split()
+    new = set(brought_in[0::2])
+    oldest = min(int(t) for t in brought_in[1::2]) if brought_in else row[1]
+    landings = [r for r in table(root, landing, source, production, oldest) if r[0] in new]
     item = load(os.path.join(HERE, "backstop.py")).ITEM
     found = []
     for sha, _, _ in landings:
@@ -392,9 +441,9 @@ def backtest(args):
     counts = {"inside": 0, "early": 0, "late": 0, "none": 0, "pending": 0}
     worst = 0
     for sha, landed, shipped in landings:
-        if landed < start:
-            continue
-        if shipped is None:
+        if landed < start or landed + 300 > now.timestamp():
+            continue   # outside the window, or not yet quotable as of --now
+        if shipped is None or shipped > now.timestamp():
             counts["pending"] += 1
             continue
         at = datetime.datetime.fromtimestamp(landed, UTC) + datetime.timedelta(minutes=5)

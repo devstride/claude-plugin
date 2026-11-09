@@ -42,7 +42,7 @@ In plan scope, the refresh source, the cut base and the close-out change as
   date), Done if its status is tracked, THEN landed leaves → Done, **linking the release PR onto
   every leaf** (the close-out comment, or `link_pull_request`), and quote on the release-unit item
   when it will be live (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/estimates.md`, from the
-  release pull request's merge commit). Delete the epic branch **only if
+  release pull request's merge commit, when it merged onto the train or the source). Delete the epic branch **only if
   `epicIntegrationBranches.deleteBranchAfterRelease`** — false retains it.
 - **Docs STAGE, never publish** — only when `docs.updateOnEpicRelease` is true (else silent): call
   **`update-docs update`** with the `epic-release` payload, **`live: false`**, never optional

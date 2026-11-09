@@ -14,7 +14,8 @@ history, as a range with a confidence, and to score every quote against what hap
 - **Before work lands, never give a clock time or a duration for when it will be live.** Say which
   steps remain instead ("after review and its landing, then the next release"). Work has landed
   when it is on the release train (when one ships) or the release source; an epic's work lands
-  when its release pull request merges, never at a story's merge onto the epic branch.
+  when its release pull request merges onto one of them,
+  never at a story's merge onto the epic branch (nor onto a plan's branch).
 - **After it lands, quote only what `estimate.py quote` gives**: its range and its confidence,
   word for word, never a single time and never a narrower range. `NONE` means there is no honest
   range: say so and name the steps that remain. `LIVE` means it is already on the production branch.
@@ -43,8 +44,8 @@ re-runs `quote` (a new token, a new comment) only when the person asks for a fre
 After `release` merges into the production branch (`merge-and-deploy.md`, step 5a), once the deploy
 is confirmed or its confirmation was skipped (never while it is unconfirmed): `estimate.py shipped
 --merge <merge sha> --json` lists the landings that merge brought, each with the items its commit
-message names. For each listed item whose comments carry an `[estimate v1 sha=<that landing>…]`
-token and no `[estimate-score v1 …]` token for the same `sha`: `estimate.py score --sha <sha>
+message names. For each `[estimate v1 sha=<that landing>…]` token a listed item carries with no
+`[estimate-score v1 …]` token for the same `sha` and `quoted`: `estimate.py score --sha <sha>
 --quoted <quoted> --low <low> --high <high>` (live is the production merge time plus
 `deployMinutes`, exactly what the quote modelled), then `add_comment` "Estimate scored: <line>" and
 its token. `PENDING` or `ERROR` → no comment, said once. Scoring never blocks or delays a release.
@@ -59,6 +60,9 @@ from the production merge to live). It measures every part of the path together:
 release starts (after the one in progress, or the backstop's limit), the train's tests and their
 failures, the release steps, the golden route and the owner's go-ahead are all in the history.
 Fewer than 8 comparable landings → `NONE`. Times show in `release.holdTimeZone`; tokens are UTC.
+A train delivery is recognised by its merge naming the train, the snapshot or its title as
+`release-branch.md` names them; its fixes and syncs are not landings, and late landings it
+absorbed are. Any other merge into the source (an epic's release pull request) is one landing.
 
 `estimate.py backtest [--days N]` replays the method over recent history (each landing quoted 5
 minutes after it landed, from the history as it stood then) and says how many went live inside
