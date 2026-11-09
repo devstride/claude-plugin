@@ -8,6 +8,18 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Presence reports say when a session last did anything, so a hung session can be told from a
+  busy one.** A new hook after every tool use stamps the session's last activity, and every
+  presence report now carries it as `PRESENCE_ACTIVE_AT` (epoch milliseconds of the last start,
+  prompt, tool use or finished turn; empty from older records). The keeper beats while the
+  session's process lives, so a hung turn still beats: a `working` report whose last activity is
+  long past is a hung session. A tool use in a session reported as `waiting` (a turn a
+  notification started, with no prompt) now reports `working`. `story-claims.md` notes that a
+  repository's presence command may keep story claims alive while the session is active and
+  release them at its end.
+
 ## [3.43.0] — 2026-11-08
 
 ### Changed

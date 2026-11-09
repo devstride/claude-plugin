@@ -287,7 +287,7 @@
       "valueType": "string",
       "nullable": false,
       "required": true,
-      "payload": "PRESENCE_EVENT (start, beat or end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE, PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM, PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON, PRESENCE_AT (epoch milliseconds the report was queued), CLAUDE_CODE_SESSION_ID and CLAUDE_PID exported; run from the repository root through the shell",
+      "payload": "PRESENCE_EVENT (start, beat or end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE, PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM, PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON, PRESENCE_AT (epoch milliseconds the report was queued), PRESENCE_ACTIVE_AT (epoch milliseconds of the session's last activity), CLAUDE_CODE_SESSION_ID and CLAUDE_PID exported; run from the repository root through the shell",
       "verdict": "none read: the exit code is kept in the session's local record; more than 20 seconds is killed; nothing ever blocks a turn",
       "calledBy": [
         "hooks/presence.py"

@@ -362,15 +362,39 @@ if [ "$GONE27" = 0 ] && [ "$(sent)" = "$N27" ] && [ ! -e "$RECORDS/s27.json" ]; 
   ok "(27) start time 3 s off → still beating, no end; a send after its record was removed → nothing, not recreated"
 else bad "(27) gone=$GONE27 $(cat "$LOG")"; fi
 
-# (12) hooks.json registers the hook on all four events, bounded and failing open
+# (28) a tool use: nothing for a session never reported; otherwise it stamps the session's last
+#      activity, which every later report carries as PRESENCE_ACTIVE_AT, and a waiting session that
+#      uses a tool (a turn a notification started, no prompt) reports `working` once 30 s allow
+s28() { python3 -c 'import json,sys; rows=[json.loads(l) for l in open(sys.argv[1]) if l.strip()]; rows=[r for r in rows if r.get("PRESENCE_SESSION_ID")=="s28"]; n=int(sys.argv[2]); print(len(rows) if n==0 else (rows[n-1].get(sys.argv[3],"") if len(rows)>=n else ""))' "$LOG" "$1" "${2:-}"; }
+wait28() { local i=0; while [ "$(s28 0)" -lt "$1" ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done; }
+O28="$(owner)"; R28="$(mkrepo r28 "$(config)")"
+OUT="$(fire PostToolUse s28 "$R28" 2>&1)"; sleep 0.3
+if [ -z "$OUT" ] && [ ! -e "$RECORDS/s28.json" ] && [ "$(s28 0)" = 0 ]; then
+  CLAUDE_PID="$O28" fire SessionStart s28 "$R28" >/dev/null; wait28 1
+  START_ACTIVE="$(s28 1 PRESENCE_ACTIVE_AT)"; T0="$(python3 -c 'import time; print(int(time.time()*1000))')"
+  age s28 31; fire Stop s28 "$R28" >/dev/null; wait28 2                     # waiting
+  sleep 0.05; age s28 31; fire PostToolUse s28 "$R28" >/dev/null; wait28 3  # back to working
+  ACT3="$(s28 3 PRESENCE_ACTIVE_AT)"
+  if [ "$(s28 3 PRESENCE_EVENT)" = beat ] && [ "$(s28 3 PRESENCE_STATE)" = working ] \
+     && [ -n "$START_ACTIVE" ] && [ "$ACT3" -ge "$T0" ] && [ "$ACT3" -gt "$START_ACTIVE" ] && [ "$(s28 2 PRESENCE_STATE)" = waiting ]; then
+    fire PostToolUse s28 "$R28" >/dev/null; sleep 0.4                           # same state, 0 s later: nothing sent
+    STAMP="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("activeAt"))' "$RECORDS/s28.json")"
+    if [ "$(s28 0)" = 3 ] && [ "$STAMP" -gt "$ACT3" ]; then
+      ok "(28) tool use → no report for an unknown session; stamps activity (PRESENCE_ACTIVE_AT on every report); waiting → working beat"
+    else bad "(28) repeat sent=$(s28 0) stamp=$STAMP act3=$ACT3"; fi
+  else bad "(28) e3=$(s28 3 PRESENCE_EVENT) s3=$(s28 3 PRESENCE_STATE) start=$START_ACTIVE act3=$ACT3 t0=$T0"; fi
+else bad "(28) unknown session: out=$OUT sent=$(s28 0)"; fi
+stop_keeper s28
+
+# (12) hooks.json registers the hook on all five events, bounded and failing open
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'
 import json, sys
 h = json.load(open(sys.argv[1]))["hooks"]
-for event in ("SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"):
+for event in ("SessionStart", "UserPromptSubmit", "PostToolUse", "Stop", "SessionEnd"):
     found = [c for g in h[event] for c in g["hooks"] if "hooks/presence.py\" hook" in c["command"]]
     assert len(found) == 1 and found[0].get("timeout") == 5 and found[0]["command"].endswith("exit 0"), event
 PY
-then ok "(12) hooks.json → presence hook on SessionStart, UserPromptSubmit, Stop, SessionEnd (timeout 5, exit 0)"
+then ok "(12) hooks.json → presence hook on SessionStart, UserPromptSubmit, PostToolUse, Stop, SessionEnd (timeout 5, exit 0)"
 else bad "(12) hooks.json registration"; fi
 
 exit $FAIL

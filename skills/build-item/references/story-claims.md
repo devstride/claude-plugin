@@ -57,7 +57,7 @@ Never type a machine or session name, or add a payload key. Exit 1 degrades as `
    step 1 on, and at each `ultracode-build` phase (`mode: heartbeat`). NOT HOLDER → STOP naming the
    holder: another agent took the story after it lapsed. A phase longer than the expiry lets the
    claim lapse; the next heartbeat claims it again if free (`reclaim`/`takeover`) and STOPs if taken.
-   No keeper process runs for story claims.
+   A repository's presence command may renew them, and release them at session end.
 4. **Completion (step 6, whether the story is Done or landed).** `release_claim` with outcome `done`. A
    STOP releases nothing: the claim expires, so a person can resume inside the window without a
    takeover.

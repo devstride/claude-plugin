@@ -20,10 +20,14 @@ the repository's. The contract: skills/setup/references/session-presence.md.
                                is a minute old, or when the session moved to another checkout; with
                                no record yet (a session that began before the block existed or the
                                plugin was updated) or after an `end`, sends `start`
+           PostToolUse      -> state "working" (a turn a notification started has no prompt); sends
+                               `beat` on a state change; never starts a report
            Stop             -> state "waiting"; sends `beat` on a state change
            SessionEnd       -> state "ended", sends `end` (PRESENCE_END_REASON = the payload's
                                reason, such as `clear` or `logout`)
-           Stop or SessionEnd for a session with no record, or one already ended, does nothing.
+           Every event but SessionEnd stamps the session's last activity (PRESENCE_ACTIVE_AT).
+           PostToolUse, Stop or SessionEnd for a session with no record, or one already ended,
+           does nothing.
            A state change within 30 seconds of the last send is held: the next hook or keeper send
            carries it, and the keeper sends it once those 30 seconds pass (both compare against the
            last state REPORTED, so a held change is not lost).
@@ -44,14 +48,15 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            holding the session's send lock so reports run one at a time, and only for the record
            that queued it (a record recreated since is another) and when its sequence number is
            above the last one sent: a report overtaken by a newer one is dropped, so an old `end`
-           never follows a resumed session's `start`. Stop or SessionEnd from an older process of
+           never follows a resumed session's `start`. PostToolUse, Stop or SessionEnd from an older process of
            the session, while a newer process holds it, does nothing. From the repository root, through the shell,
            at most 20 seconds, its exit code kept in the record. It exports
            PRESENCE_EVENT (start|beat|end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE,
            PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM (an item number the branch name carries,
            else empty), PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON,
            PRESENCE_AT (when the hook or keeper queued the report, epoch milliseconds, always later
-           than the session's previous report, so a repository can drop one older than it stored), and
+           than the session's previous report, so a repository can drop one older than it stored),
+           PRESENCE_ACTIVE_AT (the session's last activity, epoch milliseconds; empty when unknown), and
            CLAUDE_CODE_SESSION_ID and CLAUDE_PID so the repository can resolve the session's name.
 
 DEVSTRIDE_PRESENCE_MINUTE (seconds in a keeper minute, default 60) exists for the tests only.
@@ -93,8 +98,10 @@ try:
     MINUTE = max(0.01, float(os.environ.get("DEVSTRIDE_PRESENCE_MINUTE") or 60))
 except ValueError:
     MINUTE = 60.0
-STATES = {"SessionStart": "starting", "UserPromptSubmit": "working", "Stop": "waiting", "SessionEnd": "ended"}
+STATES = {"SessionStart": "starting", "UserPromptSubmit": "working", "PostToolUse": "working", "Stop": "waiting",
+          "SessionEnd": "ended"}
 EVENTS = ("start", "beat", "end")
+LATER = ("PostToolUse", "Stop", "SessionEnd")  # events that only update a session already reported
 
 
 def cache_dir():
@@ -341,6 +348,11 @@ def branch_of(top):
         return ""
 
 
+def active_at(record):
+    value = record.get("activeAt")
+    return str(value) if isinstance(value, int) and not isinstance(value, bool) and value > 0 else ""
+
+
 def item_of(branch):
     match = ITEM.search(branch or "")
     return match.group(1) if match else ""
@@ -360,7 +372,7 @@ def run_command(sid, record, event, state, at):
         "PRESENCE_PLUGIN_VERSION": str(record.get("version") or ""),
         "PRESENCE_INTERVAL_MINUTES": str(settings["intervalMinutes"]),
         "PRESENCE_END_REASON": str(record.get("reason") or "") if event == "end" else "",
-        "PRESENCE_AT": str(at), "CLAUDE_CODE_SESSION_ID": sid,
+        "PRESENCE_AT": str(at), "PRESENCE_ACTIVE_AT": active_at(record), "CLAUDE_CODE_SESSION_ID": sid,
     })
     if record.get("owner"):
         env["CLAUDE_PID"] = str(record["owner"])
@@ -425,7 +437,7 @@ def hook():
     peek = load(sid)
     if not here and not (peek and block(peek.get("top"))):
         return  # nothing to report, and nothing written
-    if event in ("Stop", "SessionEnd") and (peek is None or peek.get("state") == "ended"):
+    if event in LATER and (peek is None or peek.get("state") == "ended"):
         return  # never reported here, or already ended
     mine = int(os.environ["CLAUDE_PID"]) if os.environ.get("CLAUDE_PID", "").isdigit() else 0
     # every `ps` runs here, before the state lock is taken
@@ -440,7 +452,7 @@ def hook():
             top = record["top"]  # moved to a checkout without the block: keep reporting under the old one
         fresh = record is None
         previous = None if fresh else record.get("state")
-        if event in ("Stop", "SessionEnd"):
+        if event in LATER:
             if fresh or previous == "ended":
                 return
             if mine and record.get("owner") not in (0, None, mine) and alive(record.get("owner")):
@@ -452,6 +464,8 @@ def hook():
         moved = not fresh and record.get("top") != top
         sent, state = record.get("sent") or 0, STATES[event]
         record.update({"top": top, "state": state, "version": running_version() or record.get("version") or ""})
+        if event != "SessionEnd":
+            record["activeAt"] = int(now * 1000)  # the session's last sign of life: start, prompt, tool use, stop
         if owner and (event == "SessionStart" or owner_started or owner != record.get("owner")):
             # re-read on every start and prompt; a start whose look-up failed keeps no old start time
             record.update({"owner": owner, "ownerStarted": owner_started})
