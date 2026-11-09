@@ -676,14 +676,22 @@ def clean_record(record):
     return {k: v for k, v in record.items() if not k.startswith("_")}
 
 
+# The waits before each retry of a change rejected while the record stayed the same. A change in
+# flight (this holder's own keeper stamping, a push the store is still landing) gets close to four
+# seconds to show, however fast this machine retries: counted in rejections alone, a quick machine
+# gave up within a tenth of a second, before its own keeper's stamp had landed.
+UNMOVED_RETRY_WAITS = (0.25, 0.5, 1.0, 2.0)
+
+
 def lost_race(error, expected, stuck):
-    """A rejected change is a lost race only when the record MOVED. The same record after three
-    rejections is the store refusing the change (a hook, a ruleset): raise it instead of retrying
-    forever. Returns the new stuck count."""
+    """A rejected change is a lost race only when the record MOVED. The same record still there
+    after the waits in UNMOVED_RETRY_WAITS is the store refusing the change (a hook, a ruleset):
+    raise it instead of retrying forever. Returns the new stuck count."""
     if STORE.version() != expected:
         return 0
-    if stuck + 1 >= 3:
+    if stuck >= len(UNMOVED_RETRY_WAITS):
         raise STORE.refusal(error.text)
+    time.sleep(UNMOVED_RETRY_WAITS[stuck])
     return stuck + 1
 
 
