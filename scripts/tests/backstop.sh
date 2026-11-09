@@ -251,6 +251,26 @@ for url in "git@github.example.com:acme/widgets.git" "https://github.example.com
     && ok "(20g2) an enterprise origin ($url) is listed on its own host; the claim key is unchanged" || bad "(20g2) $url: $out — $(cat "$WORK/gh-calls")"
   g "$WORK/repo" config --unset url."$WORK/origin.git".insteadOf "$url"
 done
+url="https://github.example.com:8443/acme/widgets.git"
+g "$WORK/repo" remote set-url origin "$url"; g "$WORK/repo" config url."$WORK/origin.git".insteadOf "$url"; rm -f "$WORK/gh-calls"
+out="$(run due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json")"
+grep -q -- '--repo github.example.com:8443/acme/widgets ' "$WORK/gh-calls" && printf '%s' "$out" | grep -q "^START $KEY " \
+  && ok "(20g4) an https origin on a non-default port keeps the port, so gh lists on that endpoint" || bad "(20g4) $out — $(cat "$WORK/gh-calls")"
+g "$WORK/repo" config --unset url."$WORK/origin.git".insteadOf "$url"
+url="github.com/acme/widgets.git"
+g "$WORK/repo" remote set-url origin "$url"; g "$WORK/repo" config url."$WORK/origin.git".insteadOf "$url"; rm -f "$WORK/gh-calls"
+expect "(20g5) a relative filesystem origin that looks like host/owner/repo has no host → SKIP" 11 '^SKIP open release pull requests cannot be read: cannot read the host of the origin remote' due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json"
+[ ! -e "$WORK/gh-calls" ] || bad "(20g5) gh was called: $(cat "$WORK/gh-calls")"
+g "$WORK/repo" config --unset url."$WORK/origin.git".insteadOf "$url"
+python3 - "$HELPER" <<'PY' && ok "(20g6) origin hosts: ssh ports dropped, https ports kept, filesystem paths and file:// have none" || bad "(20g6) origin host table"
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("backstop", sys.argv[1]); b = importlib.util.module_from_spec(spec); spec.loader.exec_module(b)
+cases = {"git@github.com:acme/widgets.git": "github.com", "ssh://git@ghe.example.com:2222/a/b.git": "ghe.example.com",
+         "https://ghe.example.com:443/a/b": "ghe.example.com", "https://user@GHE.example.com:8443/a/b": "ghe.example.com:8443",
+         "github.com/acme/widgets.git": None, "/srv/git/a/b.git": None, "../widgets": None, "file:///srv/a/b": None, "C:/repos/x": None}
+bad = {u: (b.origin_host(u), w) for u, w in cases.items() if b.origin_host(u) != w}
+sys.exit(1 if bad else 0) if not bad else (print(bad, file=sys.stderr), sys.exit(1))
+PY
 g "$WORK/repo" remote set-url origin "/srv/git/acme/widgets.git"; g "$WORK/repo" config url."$WORK/origin.git".insteadOf "/srv/git/acme/widgets.git"; rm -f "$WORK/gh-calls"
 expect "(20g3) an origin with an owner and name but no host → SKIP, and gh is never asked" 11 '^SKIP open release pull requests cannot be read: cannot read the host of the origin remote' due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json"
 [ ! -e "$WORK/gh-calls" ] || bad "(20g3) gh was called: $(cat "$WORK/gh-calls")"

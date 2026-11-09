@@ -222,18 +222,42 @@ def delta_items(root, train, source, production):
     return sorted(set(ITEM.findall(text)), key=lambda number: int(number[1:]))
 
 
-ORIGIN_HOST = re.compile(r"^(?:[a-z][a-z0-9+.-]*://)?(?:[^@/]+@)?(\[[^\]]+\]|[^:/@\s]+)(?::\d+)?[:/]", re.I)
+ORIGIN_URL = re.compile(r"^([a-z][a-z0-9+.-]*)://(?:[^@/]+@)?(\[[^\]]+\]|[^:/@\s]+)(?::(\d+))?/", re.I)
+ORIGIN_SCP = re.compile(r"^(?:[^@/:]+@)?(\[[^\]]+\]|[^:/@\s]+):(?!/)")
+
+
+def origin_host(url):
+    """-> the host gh should list on, or None. A network URL (scheme://) keeps a non-default
+    http(s) port, since gh reaches the API over https; an ssh/git transport port is dropped.
+    An scp-style origin (host:path, no slash before the colon) has no port. Anything else,
+    including a relative or absolute filesystem path, has no host."""
+    found = ORIGIN_URL.match(url)
+    if found:
+        scheme, host, port = found.group(1).lower(), found.group(2).lower(), found.group(3)
+        if scheme in ("http", "https") and port and port != {"http": "80", "https": "443"}[scheme]:
+            host = "%s:%s" % (host, port)
+        elif scheme not in ("http", "https", "ssh", "git", "git+ssh", "ssh+git"):
+            return None
+        bare = found.group(2)
+    else:
+        found = ORIGIN_SCP.match(url)
+        if not found:
+            return None
+        host = bare = found.group(1).lower()
+    if "." not in bare and bare.lower() != "localhost":
+        return None
+    return host
 
 
 def origin_repo(root, repo):
     """-> HOST/OWNER/REPO for `gh --repo`, the host read from the same raw origin URL as the owner and
-    name (ssh, scp-style or https; insteadOf never applies), so an enterprise origin is listed on its
+    name (ssh, scp-style or http(s); insteadOf never applies), so an enterprise origin is listed on its
     own host, never on github.com. An origin with no host to read raises an Answer."""
     url = run(["git", "-C", root, "config", "--get", "remote.origin.url"], root).stdout.strip()
-    found = ORIGIN_HOST.match(url)
-    if not found or "." not in found.group(1) and found.group(1).lower() != "localhost":
+    host = origin_host(url)
+    if not host:
         raise Answer("ERROR", "cannot read the host of the origin remote (%r)" % url)
-    return "%s/%s" % (found.group(1).lower(), repo)
+    return "%s/%s" % (host, repo)
 
 
 def open_release_prs(root, release, production, source, repo):
