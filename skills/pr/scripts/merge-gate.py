@@ -54,9 +54,17 @@ The rule (an approver's admin merge exactly when every required check is green, 
 - The test merge commit going null or changing mid-read is a fresh read, never "no checks there".
   So is any new workflow run, attempt, status or conclusion between the run listings read just
   before and just after a commit's checks (a re-run finishing between the reads).
+- The checks are read last. The pull request's static facts (its state, threads, rulesets,
+  classic protection, the base compare and the classic rule) are read and judged first; then the
+  test merge commit's checks, then the head's run listing, the pull request again with its check
+  rollup, and the run listing again, and the verdict follows with no further read. The second
+  reading of the pull request must agree with the first (state, draft, head, base, merge state,
+  review decision, test merge commit), or the gate reads everything afresh.
 - Known limit: the verdict is one reading. GitHub does not re-check required checks at an
-  `--admin` merge, so a check or status that turns red after it was read (during the gate's
-  remaining reads, or before the printed command runs) is not seen. Run the command at once.
+  `--admin` merge, so a check or status that turns red after it was read (in the one run
+  listing after the check rollup, or before the printed command runs) is not seen. Reading the
+  checks last narrows that window; only GitHub enforcing the checks at merge time (auto-merge or
+  a merge queue instead of `--admin`) closes it. Run the command at once.
 - Classic protection answering 404 means none only with GitHub's two messages for it ("Branch
   not protected", "Required status checks not enabled"); any other 404 is an ERROR.
 - A base that requires branches to be up to date (a ruleset's strict policy, or classic `strict`)
@@ -543,9 +551,9 @@ def settled(owner, name, sha, before):
     return after
 
 
-def decide(number, expected, owner, name, delete_branch, subject=None, all_green=False):
-    before = workflow_runs(owner, name, expected)   # read before the checks, compared after them
-    pr = pull_request(owner, name, number)
+def admissible(pr, number, expected):
+    """The pull request's own state, from one reading of it: open, not a draft, at the expected
+    head, mergeable, and no review asking for changes. Refuses, or returns its merge state."""
     if pr.get("state") != "OPEN":
         raise Refuse("#%d is %s, not open" % (number, str(pr.get("state")).lower()))
     if pr.get("isDraft"):
@@ -571,37 +579,28 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
                     if isinstance(r, dict) and r.get("state") == "CHANGES_REQUESTED")
     if asking:
         raise Refuse("#%d: %s requested changes and has not approved since" % (number, ", ".join(asking)))
+    return state
+
+
+# What the static reading decided on; the pull request read again with its checks must agree, or
+# a decision rests on facts that changed in between.
+SAME = ("state", "isDraft", "headRefOid", "_oid", "baseRefName", "mergeStateStatus", "reviewDecision")
+
+
+def decide(number, expected, owner, name, delete_branch, subject=None, all_green=False):
+    # The static facts first: the pull request's state, threads, rules, protection, the base
+    # compare and the classic rule. None of them is a check, so the reads that are (the run
+    # listings and the check rollup) come last, right before the verdict.
+    pr = pull_request(owner, name, number)
+    state = admissible(pr, number, expected)
     open_threads = unresolved_threads(owner, name, number)
     if open_threads:
         raise Refuse("#%d has %d unresolved review thread(s): resolve them first" % (number, open_threads))
     base = pr.get("baseRefName")
     if not isinstance(base, str) or not base:
         raise Unreadable("#%d names no base branch" % number)
-    after = settled(owner, name, expected, before)
-    runs = runs_at_head(pr["_contexts"], lambda: after)
     ruled, ruled_strict, types, approvals = ruleset_checks(owner, name, base)
     protected, protected_strict = protection_checks(owner, name, base)
-    required = ruled | protected | {(k[1], None) for k, (_, req) in runs.items() if req}
-    problems = problems_with(required, runs)
-    if problems:
-        raise Refuse("not every required check is green at %s: %s" % (expected[:12], "; ".join(problems)))
-    merge_oid = (pr.get("potentialMergeCommit") or {}).get("oid")
-    if merge_oid:
-        first = workflow_runs(owner, name, merge_oid)
-        contexts = merge_commit_contexts(owner, name, number, merge_oid)
-        listed = settled(owner, name, merge_oid, first)
-        on_merge = runs_at_head(contexts, lambda: listed)
-        ran_there = {r for r in required if any(k[1] == r[0] for k in on_merge)}
-        red = problems_with(ran_there, on_merge)   # a name there from the wrong app is a problem too
-        if red:
-            raise Refuse("a required check failed on the test merge commit %s, which GitHub holds above the head: %s"
-                         % (merge_oid[:12], "; ".join(red)))
-    if all_green:
-        names = {r[0] for r in required}
-        every = {k: (("SKIPPED" if s == UNEARNED and k[1] not in names else s), r) for k, (s, r) in runs.items()}
-        red = problems_with({(k[1], None) for k in every}, every)
-        if red:
-            raise Refuse("--all-green: not every check is green at %s: %s" % (expected[:12], "; ".join(red)))
     if ruled_strict or protected_strict:
         compared = gh_json("api", "repos/%s/%s/compare/%s...%s" % (owner, name, quote(base, safe=""), expected))
         behind = compared.get("behind_by") if isinstance(compared, dict) else None
@@ -611,9 +610,6 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
             raise Refuse("#%d is %d commit(s) behind %s, which requires it to be up to date: update it, then check the new head"
                          % (number, behind, base))
     admin = state == "BLOCKED"
-    if admin and not required:
-        raise Refuse("#%d is blocked and %s requires no check, so nothing proves this head green: "
-                     "an admin merge would bypass a block it cannot name" % (number, base))
     if admin and (pr.get("reviewDecision") == "REVIEW_REQUIRED" or (approvals and pr.get("reviewDecision") != "APPROVED")):
         raise Refuse("#%d still needs an approving review (%s): an admin merge would bypass it"
                      % (number, ", ".join(sorted(set(approvals))) or "GitHub reads REVIEW_REQUIRED"))
@@ -629,6 +625,44 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     if admin and unknown:
         raise Refuse("#%d is blocked and %s has rule(s) this gate cannot judge (%s): an admin merge would bypass them"
                      % (number, base, ", ".join(str(t) for t in unknown)))
+
+    # The checks, last. The test merge commit's first (GitHub holds a required check there above
+    # the head), then the head's: its run listing, the pull request read again with its check
+    # rollup, and the listing again, so the verdict follows the head's checks by no further read.
+    merge_oid = (pr.get("potentialMergeCommit") or {}).get("oid")
+    on_merge = None
+    if merge_oid:
+        first = workflow_runs(owner, name, merge_oid)
+        contexts = merge_commit_contexts(owner, name, number, merge_oid)
+        listed = settled(owner, name, merge_oid, first)
+        on_merge = runs_at_head(contexts, lambda: listed)
+    before = workflow_runs(owner, name, expected)   # read before the checks, compared after them
+    fresh = pull_request(owner, name, number)
+    after = settled(owner, name, expected, before)
+    if any(fresh.get(k) != pr.get(k) for k in SAME) \
+            or (fresh.get("potentialMergeCommit") or {}).get("oid") != merge_oid:
+        raise Retry("#%d changed while it was being read" % number)
+    admissible(fresh, number, expected)   # a review asking for changes since the first reading
+    runs = runs_at_head(fresh["_contexts"], lambda: after)
+    required = ruled | protected | {(k[1], None) for k, (_, req) in runs.items() if req}
+    problems = problems_with(required, runs)
+    if problems:
+        raise Refuse("not every required check is green at %s: %s" % (expected[:12], "; ".join(problems)))
+    if on_merge is not None:
+        ran_there = {r for r in required if any(k[1] == r[0] for k in on_merge)}
+        red = problems_with(ran_there, on_merge)   # a name there from the wrong app is a problem too
+        if red:
+            raise Refuse("a required check failed on the test merge commit %s, which GitHub holds above the head: %s"
+                         % (merge_oid[:12], "; ".join(red)))
+    if all_green:
+        names = {r[0] for r in required}
+        every = {k: (("SKIPPED" if s == UNEARNED and k[1] not in names else s), r) for k, (s, r) in runs.items()}
+        red = problems_with({(k[1], None) for k in every}, every)
+        if red:
+            raise Refuse("--all-green: not every check is green at %s: %s" % (expected[:12], "; ".join(red)))
+    if admin and not required:
+        raise Refuse("#%d is blocked and %s requires no check, so nothing proves this head green: "
+                     "an admin merge would bypass a block it cannot name" % (number, base))
     command = "gh pr merge %d --repo %s/%s --merge --match-head-commit %s%s%s%s" % (
         number, owner, name, expected, " --admin" if admin else "", " --delete-branch" if delete_branch else "",
         " --subject " + shlex.quote(subject) if subject else "")
