@@ -68,7 +68,7 @@ Three configuration shapes are catalogued:
   This works for `delta` and `full` scope. Substitute `<effort>` per § Local effort per round (the task route from
   `delivery-profiles.md` when the key is absent) before launch.
 - **Legacy base-only template** — substitute `<base>` (or append ` --base <value>` when the old
-  template has no placeholder) for the initial launch. Do not run a contextless follow-up. Use
+  template has no placeholder) for the initial launch, with stdin from `/dev/null`. Do not run a contextless follow-up. Use
   the contextual Claude effective-scope validation in its place, report the local follow-up as degraded,
   and point to `/devstride:setup review`.
 
