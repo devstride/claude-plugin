@@ -8,6 +8,8 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.44.2] — 2026-11-08
+
 ### Changed
 
 - **The release skill's main file is shorter; how each step is done now lives in two references it
@@ -19,6 +21,44 @@ for what each version component means here and how a release is cut.
   (steps 4 and 5a) moved to `references/merge-and-deploy.md`, read before step 4. Text that only
   repeated the clearance, release-branch and documentation references was removed. Release
   behaviour is unchanged: every rule, condition and verdict is still read on the same run.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.44.1 @ b1b211e, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.44.1 | tokens@devstride--v3.44.1 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,094 | 8,032 | 24,094 | 8,032 | +0 | 8,040 |
+| skills/review/SKILL.md | 23,995 | 7,999 | 23,995 | 7,999 | +0 | 7,999 |
+| skills/doctor/SKILL.md | 23,955 | 7,985 | 23,955 | 7,985 | +0 | 7,985 |
+| skills/build-item/SKILL.md | 23,677 | 7,893 | 23,677 | 7,893 | +0 | 7,985 |
+| skills/release/SKILL.md | 23,947 | 7,983 | 18,000 | 6,000 | -1983 | 6,000 |
+| skills/rebalance/SKILL.md | 17,724 | 5,908 | 17,724 | 5,908 | +0 | 5,910 |
+| skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,655 | 4,885 | +0 | 4,900 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-defect/SKILL.md | 6,202 | 2,068 | 6,202 | 2,068 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 5,793 | 1,931 | 5,793 | 1,931 | +0 | 1,940 |
+| skills/comprehend-plan/SKILL.md | 5,201 | 1,734 | 5,201 | 1,734 | +0 | 1,740 |
+| skills/insert-defect/SKILL.md | 4,714 | 1,572 | 4,714 | 1,572 | +0 | 1,600 |
+| skills/insert-story/SKILL.md | 4,037 | 1,346 | 4,037 | 1,346 | +0 | 1,400 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 273,773 | 91,267 | 267,826 | 89,284 | -1983 | |
 
 ## [3.44.1] — 2026-11-08
 
@@ -4068,7 +4108,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.44.1...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.44.2...HEAD
+[3.44.2]: https://github.com/devstride/claude-plugin/compare/devstride--v3.44.1...devstride--v3.44.2
 [3.44.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.44.0...devstride--v3.44.1
 [3.44.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.43.0...devstride--v3.44.0
 [3.43.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.42.0...devstride--v3.43.0
