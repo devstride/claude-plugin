@@ -20,15 +20,17 @@ sources: review settle (honest-estimates, six cycles)
   must never accept), then accept only fixed prescribed forms plus structural checks; give every
   alternative a fixture and a mutation that fails it.
 
-## L-002 · Tests swap shared state that detached processes still use
+## L-002 · Tests share state with detached processes from other cases
 
-class: general · recurrences: 1 · first-seen: 2026-11-09 · last-seen: 2026-11-09
-sources: review settle (unwritable-directory tests, two cycles)
+class: general · recurrences: 2 · first-seen: 2026-11-09 · last-seen: 2026-11-09
+sources: review settle (unwritable-directory tests; keepers left beating into a shared log)
 
 - **Pattern:** a test case moves, deletes, chmods or replaces a directory or file (`mv x x.away`,
   `rm` then restore) that keepers, watchers or other detached processes started by earlier cases
-  still read or recreate.
+  still read or recreate; or a case ends with such a process still running that writes to a log
+  or file later cases count.
 - **Why:** each case passes alone and the swap window is milliseconds, so it only fails
   intermittently, often in a later case, and reads as a flaky test.
 - **Avoid:** give the case its own isolated copy (its own cache or `XDG_*` root, its own repo)
-  instead of altering shared state, and assert nothing was written beside the placeholder.
+  instead of altering shared state; stop every process a case started before the case ends; and
+  count only the case's own entries in anything shared.

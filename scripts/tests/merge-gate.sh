@@ -15,6 +15,8 @@ import json, os, sys
 a = sys.argv[1:]
 open(os.environ["GH_LOG"], "a").write(" ".join(a)[:120].replace("\n", " ") + "\n")
 s = json.load(open(os.environ["GH_SCENARIO"]))
+def kind(k):   # the order of reads, one word each, for the cases that check it
+    open(os.environ["GH_LOG"] + ".order", "a").write(k + "\n")
 if a[:2] == ["repo", "view"]:
     print(s.get("repo", "acme/widgets")); sys.exit(0)
 if a[:2] == ["api", "graphql"]:
@@ -22,9 +24,11 @@ if a[:2] == ["api", "graphql"]:
         sys.stderr.write("gh: Something went wrong (HTTP 502)\n"); sys.exit(1)
     q = next(x[6:] for x in a if x.startswith("query="))
     if "branchProtectionRule" in q:
+        kind("classic")
         print(json.dumps({"data": {"repository": {"ref": {"branchProtectionRule": s.get("classic")}}}})); sys.exit(0)
     after = next((x[6:] for x in a if x.startswith("after=")), None)
     if "reviewThreads" in q:
+        kind("threads")
         if s.get("threadsPartial"):
             print(json.dumps({"data": {"repository": {"pullRequest": {"reviewThreads": None}}}, "errors": [{"type": "NOT_FOUND", "path": ["repository", "pullRequest", "reviewThreads"]}]}))
             sys.exit(1)
@@ -32,6 +36,7 @@ if a[:2] == ["api", "graphql"]:
         print(json.dumps({"data": {"repository": {"pullRequest": {"reviewThreads": {"pageInfo": {"hasNextPage": False}, "nodes": nodes}}}}}))
         sys.exit(0)
     if "potentialMergeCommit { oid statusCheckRollup" in q:
+        kind("merge-checks")
         m = s.get("mergeCommit")
         if s.get("mergeCommitVanishes"):
             m = None
@@ -49,12 +54,24 @@ if a[:2] == ["api", "graphql"]:
     i = int(after[1:]) if after else 0
     more = i + 1 < len(pages)
     pr = dict(s["pr"])
+    mc = s.get("mergeCommit")
+    if not after:   # each reading of the pull request (its first page)
+        kind("pr")
+        n = int(open(os.environ["GH_LOG"] + ".pr", "a+").seek(0, 2) or 0)
+        open(os.environ["GH_LOG"] + ".pr", "a").write("x")
+        if n in s.get("prChangesOn", []):   # the readings (0-based) that see the pull request changed
+            pr.update(s.get("prChanges", {}))
+            if mc and s.get("prChangesMergeOid"):
+                mc = dict(mc, oid=s["prChangesMergeOid"])
     pr["latestOpinionatedReviews"] = {"pageInfo": {"hasNextPage": False}, "nodes": s.get("opinions", [])}
-    pr["potentialMergeCommit"] = {"oid": s["mergeCommit"]["oid"]} if s.get("mergeCommit") else None
+    if not after and n in s.get("prChangesOn", []) and "prChangesOpinions" in s:
+        pr["latestOpinionatedReviews"]["nodes"] = s["prChangesOpinions"]
+    pr["potentialMergeCommit"] = {"oid": mc["oid"]} if mc else None
     pr["commits"] = {"nodes": [{"commit": {"oid": s.get("oid", pr["headRefOid"]), "statusCheckRollup": {"contexts": {
         "pageInfo": {"hasNextPage": more, "endCursor": "p%d" % (i + 1) if more else None}, "nodes": pages[i]}}}}]}
     print(json.dumps({"data": {"repository": {"pullRequest": pr}}})); sys.exit(0)
 if a[0] == "api" and "/rules/branches/" in a[1]:
+    kind("rules")
     objs = [{"context": c} for c in s.get("rules", [])] + s.get("ruleObjects", [])
     extra = [{"type": k} for k in s.get("ruleTypes", [])]
     print(json.dumps([{"type": "required_status_checks", "parameters": {"required_status_checks": objs,
@@ -65,6 +82,7 @@ if a[0] == "api" and "/actions/runs?head_sha=" in a[1]:
     if s.get("runsFail"):
         sys.stderr.write("gh: Not Found (HTTP 404)\n"); sys.exit(1)
     sha = a[1].split("head_sha=")[1].split("&")[0]
+    kind("runs-head" if sha == (s.get("pr") or {}).get("headRefOid", sha) else "runs-merge")
     nodes = (s.get("mergeCommit") or {}).get("nodes", []) if sha != (s.get("pr") or {}).get("headRefOid", sha) else [n for page in s.get("pages", []) for n in page]
     runs = {}
     for n in nodes:
@@ -89,8 +107,10 @@ if a[0] == "api" and "/actions/runs?head_sha=" in a[1]:
         r.setdefault("run_attempt", 2 if str(r["id"]) in s.get("runStarted", {}) else 1)   # a moved start is a re-run
     print(json.dumps({"total_count": len(out), "workflow_runs": out})); sys.exit(0)
 if a[0] == "api" and "/compare/" in a[1]:
+    kind("compare")
     print(json.dumps({"behind_by": s.get("behindBy", 0), "ahead_by": 3})); sys.exit(0)
 if a[0] == "api" and a[1].endswith("/protection/required_status_checks"):
+    kind("protection")
     p = s.get("protection", {"code": 404})
     if p.get("code") == "branch":
         print(json.dumps({"name": "release", "commit": {"sha": "x"}})); sys.exit(0)
@@ -113,6 +133,11 @@ helper, work = sys.argv[1], sys.argv[2]
 H = "a" * 40
 def run(number, sha, scenario, *extra):
     path = os.path.join(work, "scenario.json"); json.dump(scenario, open(path, "w"))
+    for counter in (".runs", ".mc", ".pr", ".order"):   # every case counts its own reads from zero
+        try:
+            os.remove(os.environ["GH_LOG"] + counter)
+        except FileNotFoundError:
+            pass
     p = subprocess.run([sys.executable, helper, str(number), sha] + list(extra), capture_output=True, text=True,
                        env=dict(os.environ, GH_SCENARIO=path))
     return p.returncode, p.stdout.strip().split("\n"), p.stderr
@@ -361,6 +386,26 @@ code, out, err = run(7, H, sc(baseRefName="release#v1/x"))
 log = open(os.environ["GH_LOG"]).read()
 say(code == 0 and "rules/branches/release%23v1%2Fx?" in log and "branches/release%23v1%2Fx/protection" in log,
     "(27d) the base branch is URL-encoded in both REST paths", "rc=%d %r" % (code, [l for l in log.splitlines() if "branches/" in l][-2:]))
+# (32) the checks are read last: every static read before the first run listing, and the verdict
+#      follows the run listing of the head, the pull request read with its checks, and the listing again
+STRICT = sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, strict=True, classic={"pattern": "develop"})
+code, out, err = run(7, H, STRICT)
+order = open(os.environ["GH_LOG"] + ".order").read().split()
+first = order.index("runs-head") if "runs-head" in order else len(order)
+static = {"threads", "rules", "protection", "compare", "classic"}
+say(code == 0 and static <= set(order[:first]) and not static & set(order[first:]) and order[1:first].count("pr") == 0
+    and order[first:] == ["runs-head", "pr", "runs-head", "runs-merge", "merge-checks", "runs-merge"],
+    "(32a) static facts first (threads, rules, protection, compare, classic), then the checks of the head (runs, pull request, runs), then those of the test merge commit", "rc=%d %r %r" % (code, out, order))
+merge("(32b) the merge state changes once between the two readings: one fresh read, then MERGE",
+      sc(prChangesOn=[1], prChanges={"mergeStateStatus": "UNSTABLE"}), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+refuse("(32c) the pull request keeps changing between the readings: REFUSE, never a verdict on facts that moved",
+       sc(prChangesOn=[1, 3], prChanges={"mergeStateStatus": "CLEAN"}), "changed while it was being read twice")
+refuse("(32d) a review requesting changes lands between the readings: REFUSE",
+       sc(prChangesOn=[1, 2, 3], prChanges={"reviewDecision": "CHANGES_REQUESTED"}), "has a review requesting changes")
+refuse("(32e) the test merge commit changes between the readings, every time: REFUSE",
+       sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, prChangesOn=[1, 3], prChangesMergeOid="c" * 40), "changed while it was being read twice")
+refuse("(32f) a reviewer requests changes in the second reading only, the review decision unchanged: REFUSE",
+       sc(prChangesOn=[1], prChangesOpinions=[{"state": "CHANGES_REQUESTED", "author": {"login": "kim"}}]), "kim requested changes")
 for label, args in (("no arguments", []), ("a short SHA", ["7", "abc123"]), ("a number that is not one", ["x", H]), ("a bad --repo", ["7", H, "--repo", "a b"])):
     p = subprocess.run([sys.executable, helper] + args, capture_output=True, text=True, env=dict(os.environ, GH_SCENARIO=os.path.join(work, "scenario.json")))
     say(p.returncode == 2 and p.stdout == "" and p.stderr.startswith("usage:"), "(28) usage: " + label, repr(p.stderr))
