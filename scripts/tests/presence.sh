@@ -174,9 +174,11 @@ O=""; RC=0
 for p in 'not json' '[]' '{"hook_event_name":"SessionStart","session_id":"../x","cwd":"'"$R"'"}' '{"hook_event_name":"Other","session_id":"ok","cwd":"'"$R"'"}'; do
   O="$O$(printf '%s' "$p" | python3 "$HOOK" hook 2>&1)"; RC=$((RC + $?))
 done
-chmod 500 "$RECORDS"
+# A plain file where the records directory belongs: unwritable for every user, root included (a
+# read-only mode bit is not: root writes through it, as in a container).
+mv "$RECORDS" "$RECORDS.away"; : > "$RECORDS"
 O="$O$(fire SessionStart s11 "$R" 2>&1)"; RC=$((RC + $?))
-chmod 700 "$RECORDS"
+rm -f "$RECORDS"; mv "$RECORDS.away" "$RECORDS"
 O="$O$(python3 "$HOOK" 2>&1)$(python3 "$HOOK" send bogus starting s1 ab 9 1 2>&1)$(python3 "$HOOK" send beat working s1 ab x 1 2>&1)$(python3 "$HOOK" send beat bogus s1 ab 9 1 2>&1)$(DEVSTRIDE_PRESENCE_MINUTE=x python3 "$HOOK" keeper nobody 2>&1)"; RC=$((RC + $?))
 if [ "$RC" = 0 ] && [ -z "$O" ] && [ ! -e "$XDG_CACHE_HOME/devstride-plugin/x.json" ] && [ ! -e "$RECORDS/s11.json" ] \
   && [ ! -e "$RECORDS/nobody.keeper.lock" ]; then
