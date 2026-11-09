@@ -12,12 +12,14 @@ for what each version component means here and how a release is cut.
 
 - **The merge gate reads the checks last.** `skills/pr/scripts/merge-gate.py` now reads and judges
   everything that is not a check first (the pull request's state, review threads, rulesets, classic
-  protection, the base compare and the classic rule), then the test merge commit's checks, then the
-  head's: the run listing, the pull request again with its check rollup, and the run listing again,
-  and gives its verdict with no further read. GitHub does not re-check required checks at an
-  `--admin` merge, so a check that turns red after the gate read it is not seen; that window was
-  every read after the checks (about 2.4 seconds) and is now one run listing. It is narrowed, not
-  closed: only GitHub enforcing the checks at merge time (auto-merge or a merge queue) closes it.
+  protection, the base compare and the classic rule), then the head's checks (the run listing, the
+  pull request again with its check rollup, and the run listing again), then the test merge
+  commit's when GitHub holds one, and gives its verdict with no further read. GitHub does not
+  re-check required checks at an `--admin` merge, so a check that turns red after the gate read it
+  is not seen; for the head's checks that window was every read after them (about 2.4 seconds) and
+  is now one run listing, plus the test merge commit's three reads when there is one. It is
+  narrowed, not closed: only GitHub enforcing the checks at merge time (auto-merge or a merge
+  queue) closes it.
   The two readings of the pull request must agree (state, draft, head, base, merge state, review
   decision, test merge commit), or the gate reads everything afresh, and refuses if it keeps
   changing. Replayed over the last 32 merged devstride pull requests: the same verdict as before on

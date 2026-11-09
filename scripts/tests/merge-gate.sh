@@ -64,6 +64,8 @@ if a[:2] == ["api", "graphql"]:
             if mc and s.get("prChangesMergeOid"):
                 mc = dict(mc, oid=s["prChangesMergeOid"])
     pr["latestOpinionatedReviews"] = {"pageInfo": {"hasNextPage": False}, "nodes": s.get("opinions", [])}
+    if not after and n in s.get("prChangesOn", []) and "prChangesOpinions" in s:
+        pr["latestOpinionatedReviews"]["nodes"] = s["prChangesOpinions"]
     pr["potentialMergeCommit"] = {"oid": mc["oid"]} if mc else None
     pr["commits"] = {"nodes": [{"commit": {"oid": s.get("oid", pr["headRefOid"]), "statusCheckRollup": {"contexts": {
         "pageInfo": {"hasNextPage": more, "endCursor": "p%d" % (i + 1) if more else None}, "nodes": pages[i]}}}}]}
@@ -389,11 +391,11 @@ say(code == 0 and "rules/branches/release%23v1%2Fx?" in log and "branches/releas
 STRICT = sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, strict=True, classic={"pattern": "develop"})
 code, out, err = run(7, H, STRICT)
 order = open(os.environ["GH_LOG"] + ".order").read().split()
-first = order.index("runs-merge") if "runs-merge" in order else len(order)
+first = order.index("runs-head") if "runs-head" in order else len(order)
 static = {"threads", "rules", "protection", "compare", "classic"}
 say(code == 0 and static <= set(order[:first]) and not static & set(order[first:]) and order[1:first].count("pr") == 0
-    and order[-3:] == ["runs-head", "pr", "runs-head"] and order[first:-3] == ["runs-merge", "merge-checks", "runs-merge"],
-    "(32a) static facts first (threads, rules, protection, compare, classic), then the checks on the test merge commit, then those of the head: runs, pull request, runs", "rc=%d %r %r" % (code, out, order))
+    and order[first:] == ["runs-head", "pr", "runs-head", "runs-merge", "merge-checks", "runs-merge"],
+    "(32a) static facts first (threads, rules, protection, compare, classic), then the checks of the head (runs, pull request, runs), then those of the test merge commit", "rc=%d %r %r" % (code, out, order))
 merge("(32b) the merge state changes once between the two readings: one fresh read, then MERGE",
       sc(prChangesOn=[1], prChanges={"mergeStateStatus": "UNSTABLE"}), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
 refuse("(32c) the pull request keeps changing between the readings: REFUSE, never a verdict on facts that moved",
@@ -402,6 +404,8 @@ refuse("(32d) a review requesting changes lands between the readings: REFUSE",
        sc(prChangesOn=[1, 2, 3], prChanges={"reviewDecision": "CHANGES_REQUESTED"}), "has a review requesting changes")
 refuse("(32e) the test merge commit changes between the readings, every time: REFUSE",
        sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, prChangesOn=[1, 3], prChangesMergeOid="c" * 40), "changed while it was being read twice")
+refuse("(32f) a reviewer requests changes in the second reading only, the review decision unchanged: REFUSE",
+       sc(prChangesOn=[1], prChangesOpinions=[{"state": "CHANGES_REQUESTED", "author": {"login": "kim"}}]), "kim requested changes")
 for label, args in (("no arguments", []), ("a short SHA", ["7", "abc123"]), ("a number that is not one", ["x", H]), ("a bad --repo", ["7", H, "--repo", "a b"])):
     p = subprocess.run([sys.executable, helper] + args, capture_output=True, text=True, env=dict(os.environ, GH_SCENARIO=os.path.join(work, "scenario.json")))
     say(p.returncode == 2 and p.stdout == "" and p.stderr.startswith("usage:"), "(28) usage: " + label, repr(p.stderr))

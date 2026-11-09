@@ -54,17 +54,20 @@ The rule (an approver's admin merge exactly when every required check is green, 
 - The test merge commit going null or changing mid-read is a fresh read, never "no checks there".
   So is any new workflow run, attempt, status or conclusion between the run listings read just
   before and just after a commit's checks (a re-run finishing between the reads).
-- The checks are read last. The pull request's static facts (its state, threads, rulesets,
+- The checks are read last. The pull request's other facts (its state, threads, rulesets,
   classic protection, the base compare and the classic rule) are read and judged first; then the
-  test merge commit's checks, then the head's run listing, the pull request again with its check
-  rollup, and the run listing again, and the verdict follows with no further read. The second
-  reading of the pull request must agree with the first (state, draft, head, base, merge state,
-  review decision, test merge commit), or the gate reads everything afresh.
+  head's run listing, the pull request again with its check rollup, and the run listing again;
+  then, when GitHub holds a test merge commit, its run listing, checks and run listing again; and
+  the verdict follows with no further read. The second reading of the pull request must agree
+  with the first (state, draft, head, base, merge state, review decision, test merge commit), or
+  the gate reads everything afresh.
 - Known limit: the verdict is one reading. GitHub does not re-check required checks at an
-  `--admin` merge, so a check or status that turns red after it was read (in the one run
-  listing after the check rollup, or before the printed command runs) is not seen. Reading the
-  checks last narrows that window; only GitHub enforcing the checks at merge time (auto-merge or
-  a merge queue instead of `--admin`) closes it. Run the command at once.
+  `--admin` merge, so a check or status that turns red after it was read (during the reads that
+  follow it: one run listing for the head's checks, plus the test merge commit's three reads when
+  there is one; or before the printed command runs) is not seen. Reading the checks last narrows
+  that window; only GitHub enforcing the checks at merge time (auto-merge or a merge queue
+  instead of `--admin`) closes it. The other facts are read first, so a protection rule an admin
+  changes during the check reads is not seen either. Run the command at once.
 - Classic protection answering 404 means none only with GitHub's two messages for it ("Branch
   not protected", "Required status checks not enabled"); any other 404 is an ERROR.
 - A base that requires branches to be up to date (a ruleset's strict policy, or classic `strict`)
@@ -626,16 +629,11 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
         raise Refuse("#%d is blocked and %s has rule(s) this gate cannot judge (%s): an admin merge would bypass them"
                      % (number, base, ", ".join(str(t) for t in unknown)))
 
-    # The checks, last. The test merge commit's first (GitHub holds a required check there above
-    # the head), then the head's: its run listing, the pull request read again with its check
-    # rollup, and the listing again, so the verdict follows the head's checks by no further read.
+    # The checks, last: the head's run listing, the pull request read again with its check rollup,
+    # and the listing again; then, when GitHub holds a test merge commit (a required check that
+    # ran there must pass there too), its listing, checks and listing again. No other read follows
+    # either, so every check is read at most one test merge commit's reads before the verdict.
     merge_oid = (pr.get("potentialMergeCommit") or {}).get("oid")
-    on_merge = None
-    if merge_oid:
-        first = workflow_runs(owner, name, merge_oid)
-        contexts = merge_commit_contexts(owner, name, number, merge_oid)
-        listed = settled(owner, name, merge_oid, first)
-        on_merge = runs_at_head(contexts, lambda: listed)
     before = workflow_runs(owner, name, expected)   # read before the checks, compared after them
     fresh = pull_request(owner, name, number)
     after = settled(owner, name, expected, before)
@@ -643,6 +641,12 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
             or (fresh.get("potentialMergeCommit") or {}).get("oid") != merge_oid:
         raise Retry("#%d changed while it was being read" % number)
     admissible(fresh, number, expected)   # a review asking for changes since the first reading
+    on_merge = None
+    if merge_oid:
+        first = workflow_runs(owner, name, merge_oid)
+        contexts = merge_commit_contexts(owner, name, number, merge_oid)
+        listed = settled(owner, name, merge_oid, first)
+        on_merge = runs_at_head(contexts, lambda: listed)
     runs = runs_at_head(fresh["_contexts"], lambda: after)
     required = ruled | protected | {(k[1], None) for k, (_, req) in runs.items() if req}
     problems = problems_with(required, runs)
