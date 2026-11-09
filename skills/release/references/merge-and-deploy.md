@@ -64,13 +64,13 @@ Then run the `MERGE` line of `merge-gate.py <n> <reviewedHead> --all-green` (ste
   confirms; non-zero → retry on an interval suited to the deploy; still failing → report it
   unconfirmed and STOP (no 5c–5e). Unset → ask the owner to confirm (a legitimate pause). Nothing
   in 5c–5e would run and no `release.postDeployCheckSkill` → skip the confirmation, said so.
-- **Score the estimates**: deploy confirmed → score every quote the shipped items carry, then
-  post each score (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/estimates.md`, Scoring at the
-  deploy); it never blocks or delays the release.
+- **Score the estimates**: deploy confirmed, or its confirmation skipped → score every quote the
+  shipped items carry and post each score
+  (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/estimates.md`, Scoring at the release); it never
+  blocks or delays the release.
 
 ## Cited by
 
-- `skills/release/references/estimates.md` — the score at the confirmed deploy.
-
 - `skills/release/SKILL.md` — step 4's pointer ("Read … in full before step 4"), and step 5a's
   ("read it first when step 4 did not run this session").
+- `skills/release/references/estimates.md` — the score after the production merge.

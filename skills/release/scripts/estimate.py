@@ -15,6 +15,9 @@ it writes nothing, posts nothing and starts nothing. The caller posts its `token
       SCORED <line>     inside, early or late, and by how many minutes                       exit 0
       PENDING <reason>  not on the production branch yet and no --live given                 exit 10
       ERROR <reason>                                                                          exit 1
+  shipped --merge SHA [--json]
+      SHIPPED <line>    the landings one production first-parent commit (a release's merge)
+                        brought, each with the item numbers its commit message names         exit 0
   backtest [--days N] [--now ISO] [--json]
       BACKTEST <line>   every landing of the last N days (default 14) that went live, quoted 5
                         minutes after landing from the history as it stood then, and scored: how
@@ -23,7 +26,9 @@ it writes nothing, posts nothing and starts nothing. The caller posts its `token
 
 WHERE WORK LANDS: the release train when one ships (`release.mergeTrainBeforeCut` true and
 `releaseTrain.branch`, or the old `supportTrain.branch`), else `release.releaseSource` (default
-`develop`). Work has landed when SHA is reachable from origin/<landing branch>; its landing time is
+`develop`). Work has landed when SHA is reachable from origin/<landing branch> or from the release
+source (work merged straight into the source, a train repository's excluded one-off or an epic's
+release pull request, lands there); its landing time is
 the committer time of the first first-parent commit of that branch containing it (a `--no-ff` or
 pull-request merge, stamped when it landed). A landing branch that IS `release.productionBranch`
 means a merge is the release: the quote is LIVE. An epic integration branch is never a landing
@@ -46,10 +51,11 @@ the train's tests and their failures, the release steps, the golden route, the o
 because each is in the history. Times are shown in `release.holdTimeZone` (an IANA name; absent:
 UTC) and stored in UTC.
 
-The token is the record: quote → `[estimate v1 sha=<12> quoted=<UTC> low=<UTC> high=<UTC> p=80
+The token is the record (its sha is the landing commit's, whatever commit was asked about):
+quote → `[estimate v1 sha=<12> quoted=<UTC> low=<UTC> high=<UTC> p=80
 n=<N>]`; score → `[estimate-score v1 sha=<12> quoted=… low=… high=… live=<UTC>
-result=inside|early|late minutes=<N>]` (minutes outside the range; 0 inside). `score` takes LIVE as
---live (the deploy confirmed) or, without it, the production merge time plus deployMinutes.
+result=inside|early|late minutes=<N>]` (minutes outside the range; 0 inside). `score` reads LIVE as
+the quote models it, the production merge time plus deployMinutes; --live overrides it.
 
 Test seams: AUTO_START_NO_FETCH=1 (read the remote-tracking refs as they are), --now.
 """
@@ -68,7 +74,7 @@ UTC = datetime.timezone.utc
 WINDOW_DAYS = 14
 MIN_AT_RISK = 8
 LOW_Q, HIGH_Q = 0.10, 0.90
-EXIT = {"QUOTE": 0, "SCORED": 0, "BACKTEST": 0, "NONE": 10, "PENDING": 10, "LIVE": 11, "ERROR": 1}
+EXIT = {"QUOTE": 0, "SCORED": 0, "SHIPPED": 0, "BACKTEST": 0, "NONE": 10, "PENDING": 10, "LIVE": 11, "ERROR": 1}
 
 
 class Answer(Exception):
@@ -77,12 +83,16 @@ class Answer(Exception):
         self.verdict, self.line, self.record = verdict, line, record
 
 
-def load_auto_start():
-    """auto-start.py's load_config and section: one way to find the config, reused."""
-    spec = importlib.util.spec_from_file_location("auto_start", os.path.join(HERE, "auto-start.py"))
+def load(path):
+    spec = importlib.util.spec_from_file_location(os.path.basename(path).replace("-", "_")[:-3], path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def load_auto_start():
+    """auto-start.py's load_config and section: one way to find the config, reused."""
+    return load(os.path.join(HERE, "auto-start.py"))
 
 
 def parse_time(text, name):
@@ -331,9 +341,11 @@ def quote(args):
         raise Answer("LIVE", "already on %s since %s; live after the deploy%s" % (
             production, shown(merged, zone, now), " (about %d minutes)" % deploy if deploy else ""),
             live=utc(merged + datetime.timedelta(minutes=deploy)), **record)
-    at = landing_of(root, sha, landing, source) if ancestor(root, sha, landing) else None
+    on_source = ancestor(root, sha, source)
+    at = landing_of(root, sha, landing, source) if on_source or ancestor(root, sha, landing) else None
     if at is None or at[1] > now.timestamp():
-        raise Answer("NONE", "not landed on %s yet: no clock time before landing; say which steps remain" % landing, **record)
+        where = landing if landing == source else "%s or %s" % (landing, source)
+        raise Answer("NONE", "not landed on %s yet: no clock time before landing; say which steps remain" % where, **record)
     record["landing"] = at[0]
     landings = table(root, landing, source, production, int(now.timestamp()) - WINDOW_DAYS * 86400)
     try:
@@ -342,10 +354,32 @@ def quote(args):
         answer.record.update(record)
         raise
     record.update(found)
-    token = "[estimate v1 sha=%s quoted=%s low=%s high=%s p=80 n=%d]" % (sha[:12], utc(now), utc(lo), utc(hi), found["atRisk"])
+    token = "[estimate v1 sha=%s quoted=%s low=%s high=%s p=80 n=%d]" % (at[0][:12], utc(now), utc(lo), utc(hi), found["atRisk"])
     line = "live between %s and %s (8 in 10 chance), from %d landings in the last %d days" % (
         shown(lo, zone, now), shown(hi, zone, now), found["atRisk"], WINDOW_DAYS)
     raise Answer("QUOTE", line, low=utc(lo), high=utc(hi), confidence=0.8, token=token, **record)
+
+
+def shipped(args):
+    """The landings one production first-parent commit brought, each with the item numbers its
+    commit message names (backstop.py's ITEM rule, reused): the items whose quotes `score` reads."""
+    root, landing, source, production, deploy, zone = setup()
+    merge = resolve(root, args.merge)
+    chain = first_parent(root, production)
+    row = next((r for r in chain if r[0] == merge), None)
+    if row is None:
+        raise Answer("ERROR", "%s is not a first-parent commit of %s" % (merge[:12], production))
+    since = row[2][0] if row[2] else None
+    new = set(git(root, "rev-list", ("%s..%s" % (since, merge)) if since else merge).stdout.split())
+    landings = [r for r in table(root, landing, source, production, row[1] - 30 * 86400) if r[0] in new]
+    item = load(os.path.join(HERE, "backstop.py")).ITEM
+    found = []
+    for sha, _, _ in landings:
+        text = git(root, "log", "-1", "--format=%B", sha).stdout
+        found.append({"sha": sha, "items": sorted(set(item.findall(text)), key=lambda n: int(n[1:]))})
+    line = "%d landing(s): %s" % (len(found), "; ".join(
+        "%s %s" % (f["sha"][:12], " ".join(f["items"]) or "(no item named)") for f in found) or "none")
+    raise Answer("SHIPPED", line, merge=merge, landings=found)
 
 
 def backtest(args):
@@ -432,6 +466,9 @@ def main(argv):
         s.add_argument(name, required=True)
     s.add_argument("--live")
     s.add_argument("--json", action="store_true")
+    m = sub.add_parser("shipped", add_help=False)
+    m.add_argument("--merge", required=True)
+    m.add_argument("--json", action="store_true")
     b = sub.add_parser("backtest", add_help=False)
     b.add_argument("--days", type=int, default=WINDOW_DAYS)
     b.add_argument("--now")
@@ -441,11 +478,11 @@ def main(argv):
     except SystemExit:
         print(__doc__.strip().split("\n\n")[1])
         return 2
-    if args.command not in ("quote", "score", "backtest") or getattr(args, "days", 1) < 1:
+    if args.command not in ("quote", "score", "shipped", "backtest") or getattr(args, "days", 1) < 1:
         print(__doc__.strip().split("\n\n")[1])
         return 2
     try:
-        {"quote": quote, "score": score, "backtest": backtest}[args.command](args)
+        {"quote": quote, "score": score, "shipped": shipped, "backtest": backtest}[args.command](args)
     except Answer as answer:
         if args.json:
             print(json.dumps(dict(answer.record, verdict=answer.verdict, line=answer.line), sort_keys=True))

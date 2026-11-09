@@ -38,12 +38,15 @@ onto its release target (its merge commit; the quote goes on the release-unit it
 Quote once per landing: the comment is the record, and a later question about the same work
 re-runs `quote` (a new token, a new comment) only when the person asks for a fresh estimate.
 
-## Scoring at the deploy
+## Scoring at the release
 
-When `release` confirms the production deploy (`merge-and-deploy.md`, step 5a), for each item the
-release shipped whose comments carry an `[estimate v1 …]` token and no `[estimate-score v1 …]` token
-for the same `sha`: `estimate.py score --sha <sha> --quoted <quoted> --low <low> --high <high>
---live <the time the deploy was confirmed, UTC>`, then `add_comment` "Estimate scored: <line>" and
+After `release` merges into the production branch (`merge-and-deploy.md`, step 5a), once the deploy
+is confirmed or its confirmation was skipped (never while it is unconfirmed): `estimate.py shipped
+--merge <merge sha> --json` lists the landings that merge brought, each with the items its commit
+message names. For each listed item whose comments carry an `[estimate v1 sha=<that landing>…]`
+token and no `[estimate-score v1 …]` token for the same `sha`: `estimate.py score --sha <sha>
+--quoted <quoted> --low <low> --high <high>` (live is the production merge time plus
+`deployMinutes`, exactly what the quote modelled), then `add_comment` "Estimate scored: <line>" and
 its token. `PENDING` or `ERROR` → no comment, said once. Scoring never blocks or delays a release.
 
 ## How the range is made
@@ -67,7 +70,8 @@ release rhythm changes.
 The tokens are a contract for any tool that reports accuracy (a repository's own throughput
 report, for one): `[estimate v1 sha=<12> quoted=<UTC> low=<UTC> high=<UTC> p=80 n=<landings>]`
 and `[estimate-score v1 sha=<12> quoted=… low=… high=… live=<UTC> result=inside|early|late
-minutes=<outside the range>]`, each on its own line in an item comment.
+minutes=<outside the range>]`, each on its own line in an item comment. `sha` is always the landing
+commit's (the merge onto the train or the source), whatever commit `quote` was given.
 
 ## Cited by
 
@@ -75,3 +79,5 @@ minutes=<outside the range>]`, each on its own line in an item comment.
 - `skills/build-item/references/item-status.md` — the landed event's quote.
 - `skills/build-item/references/epic-release-steps.md` — the release unit's quote.
 - `skills/release/references/merge-and-deploy.md` — step 5a's score.
+- `skills/setup/references/config-defaults.md` — `release.estimates.deployMinutes`.
+- `skills/release/scripts/estimate.py` — its rules.

@@ -441,7 +441,9 @@ M21. Honest estimates (`skills/release/references/estimates.md`): no clock time 
      confidence, word for word, never a single time or a narrower range; NONE says no range.
      The range is measured from 14 days of git history, conditional on the wait so far, with
      still-waiting landings counted as at least their wait. Each quote is posted on the item with
-     its token; each is scored at the confirmed deploy, never blocking the release.
+     its token, keyed by the landing commit; each is scored after the production merge (deploy
+     confirmed or its confirmation skipped) against that merge plus `deployMinutes`, never
+     blocking the release. Work merged straight into the release source has landed too.
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
 N1. ONE profile word — `prototype` / `standard` / `extended` — moves every rigor knob together; the
@@ -925,6 +927,9 @@ skills/release/references/estimates.md|never a single time and never a narrower 
 skills/release/references/estimates.md|never at a story's merge onto the epic branch
 skills/release/references/estimates.md|Scoring never blocks or delays a release
 skills/release/scripts/estimate.py|no clock time before landing
+skills/build-item/references/plain-language-output.md|give no clock time or duration
+skills/build-item/references/item-status.md|target kind is `train` or `base`
+skills/release/references/merge-and-deploy.md|or its confirmation skipped
 skills/release/scripts/standing-yes.py|has no owner approval for this content
 skills/build-item/references/release-holds.md|scripts/release-holds.py
 skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor

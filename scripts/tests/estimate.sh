@@ -34,7 +34,7 @@ land() {   # land <story> <time> -> prints the landing sha
   g checkout -q -b "story/$1" train/release
   at "$2" commit -q --allow-empty -m "story $1"
   g checkout -q train/release
-  at "$2" merge -q --no-ff -m "merge: $1 onto the train" "story/$1"
+  at "$2" merge -q --no-ff -m "merge: ${3:-$1} onto the train" "story/$1"
   g rev-parse HEAD
 }
 release() {   # release <time>: train -> develop -> master, master synced into develop, train fast-forwarded
@@ -47,7 +47,7 @@ DURATIONS=(60 90 120 120 150 180 180 240 300 360)
 FIRST=""
 for i in $(seq 0 9); do
   day=$(python3 -c 'import datetime,sys; print((datetime.date(2026,10,27)+datetime.timedelta(days=int(sys.argv[1]))).isoformat())' "$i")
-  sha=$(land "s$i" "${day}T10:00:00Z")
+  sha=$(land "s$i" "${day}T10:00:00Z" "I4$i")
   [ -n "$FIRST" ] || FIRST="$sha"
   release "$(minutes "${day}T10:00:00Z" "${DURATIONS[$i]}")"
 done
@@ -84,7 +84,7 @@ fi
 
 # (3) No clock time before landing: a commit not on the train gets NONE.
 OUT=$(run quote --sha "$UNLANDED" --now 2026-11-09T18:00:00Z); CODE=$?
-if [ "$CODE" = 10 ] && echo "$OUT" | grep -q "^NONE not landed on train/release yet: no clock time before landing"; then
+if [ "$CODE" = 10 ] && echo "$OUT" | grep -q "^NONE not landed on train/release or develop yet: no clock time before landing"; then
   ok "(3) work not landed yet gets no clock time"
 else
   bad "(3) not landed: exit $CODE $OUT"
@@ -148,6 +148,31 @@ if [ "$(echo "$OUT" | field atRisk)" = 11 ] && [ "$(echo "$OUT" | field high)" =
 else
   bad "(9b) censored landing: $OUT"
 fi
+
+# (9c) Work merged straight into the release source while a train ships (an excluded one-off, an
+# epic's release pull request) has landed too, at its merge into the source.
+g checkout -q -b story/direct develop
+at 2026-11-09T17:50:00Z commit -q --allow-empty -m "direct"
+g checkout -q develop; at 2026-11-09T17:55:00Z merge -q --no-ff -m "Merge pull request #7 from acme/direct" story/direct
+DIRECT=$(g rev-parse HEAD)
+g push -q origin develop; g fetch -q origin
+OUT=$(run quote --sha "$DIRECT" --now 2026-11-09T18:00:00Z --json); CODE=$?
+if [ "$CODE" = 0 ] && [ "$(echo "$OUT" | field verdict)" = QUOTE ] && [ "$(echo "$OUT" | field landedAt)" = 2026-11-09T17:55:00Z ]; then
+  ok "(9c) work merged straight into the release source is quoted from its merge"
+else
+  bad "(9c) straight into the source: exit $CODE $OUT"
+fi
+
+# (9d) shipped: the landings one release brought, with the item numbers their messages name.
+RELEASE1=$(git -C "$WORK/repo" rev-list --first-parent --reverse origin/master | sed -n 2p)
+OUT=$(run shipped --merge "$RELEASE1" --json); CODE=$?
+if [ "$CODE" = 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); l=d["landings"]; sys.exit(0 if len(l)==1 and l[0]["items"]==["I40"] and l[0]["sha"]==sys.argv[1] else 1)' "$FIRST"; then
+  ok "(9d) shipped lists the release's one landing and the item it names"
+else
+  bad "(9d) shipped: exit $CODE $OUT"
+fi
+OUT=$(run shipped --merge "$CANDIDATE"); CODE=$?
+[ "$CODE" = 1 ] && echo "$OUT" | grep -q "is not a first-parent commit of master" && ok "(9e) shipped refuses a commit that is not a release merge" || bad "(9e) shipped non-release: exit $CODE $OUT"
 
 # (10) No release train that ships: work lands on the release source; a source that is production
 # means a merge is the release.
