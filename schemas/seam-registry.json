@@ -1478,6 +1478,32 @@
       "since": "3.29.0"
     },
     {
+      "key": "release.backstop",
+      "type": "object",
+      "description": "start a release when work on the release train has waited too long and nothing is releasing it; contract: skills/release/references/backstop.md",
+      "since": "unreleased"
+    },
+    {
+      "key": "release.backstop.mode",
+      "type": "string",
+      "enum": [
+        "off",
+        "shadow",
+        "live"
+      ],
+      "default": "off",
+      "description": "off: no check; shadow: record what the backstop would start and change nothing; live: start the release (only after shadow results were checked); needs a claims block",
+      "since": "unreleased"
+    },
+    {
+      "key": "release.backstop.maxWaitMinutes",
+      "type": "integer",
+      "minimum": 15,
+      "default": 120,
+      "description": "how long the oldest landing on the train may wait, by its committer time, before the backstop starts a release",
+      "since": "unreleased"
+    },
+    {
       "key": "release.lightRelease",
       "type": "object",
       "description": "rules for a light release (one the classify skill calls LIGHT)",

@@ -1133,6 +1133,32 @@
           "additionalProperties": false,
           "description": "releases that start themselves under a one-winner release-train claim; contract: skills/release/references/auto-start.md"
         },
+        "backstop": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "off",
+                "shadow",
+                "live"
+              ],
+              "default": "off",
+              "description": "off: no check; shadow: record what the backstop would start and change nothing; live: start the release (only after shadow results were checked); needs a claims block"
+            },
+            "maxWaitMinutes": {
+              "type": "integer",
+              "minimum": 15,
+              "default": 120,
+              "description": "how long the oldest landing on the train may wait, by its committer time, before the backstop starts a release"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "description": "start a release when work on the release train has waited too long and nothing is releasing it; contract: skills/release/references/backstop.md"
+        },
         "lightRelease": {
           "type": "object",
           "properties": {

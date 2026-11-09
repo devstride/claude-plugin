@@ -34,6 +34,7 @@ fallback to defaults).
 """
 import datetime
 import difflib
+import importlib.util
 import json
 import os
 import re
@@ -174,6 +175,23 @@ def auto_start_checks(v, config):
               and isinstance(entry.get("item"), str) and re.match(r"^I\d+$", entry["item"]) and real_date(entry.get("approved")))
         if not ok:
             v.add("ERROR", "release.fullRelease.approvedMigrations[%d]" % i, "needs blob (a full git blob id), path, item (I#####) and approved (a real YYYY-MM-DD, not after today): a malformed entry makes every full release ask")
+
+
+def backstop_checks(v, config):
+    """`release.backstop` needs a claims store and a release train: the rules are backstop.py's own
+    `problems`, imported from the plugin copy this validator ships in, so doctor and the check agree."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                        "release/scripts/backstop.py")
+    try:
+        spec = importlib.util.spec_from_file_location("backstop", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        found = module.problems(config)
+    except Exception as exc:  # a broken copy is reported, never a traceback
+        v.add("WARN", "release.backstop", "its checks could not run: %s" % exc)
+        return
+    for severity, where, message in found:
+        v.add(severity, where, message)
 
 
 class Validator:
@@ -371,6 +389,8 @@ def main(argv):
     deferred_container_checks(v, config)
     pre_ship_checks(v, config)
     auto_start_checks(v, config)
+    if isinstance(config, dict):
+        backstop_checks(v, config)
     errors = [f for f in v.findings if f[0] == "ERROR"]
     warns = [f for f in v.findings if f[0] == "WARN"]
     notes = [f for f in v.findings if f[0] == "NOTE"]
