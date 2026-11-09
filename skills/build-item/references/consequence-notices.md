@@ -108,5 +108,5 @@ recorded before the merge". They inform the owner's yes and never condition it, 
 
 - `skills/build-item/SKILL.md` — step 5, before the merge.
 - `skills/build-item/references/epic-release-steps.md` — the release unit's own check and recap.
-- `skills/release/SKILL.md` — steps 4 and 6's recaps.
+- `skills/release/SKILL.md` — step 6's recap; `references/merge-and-deploy.md` — 4's.
 - `skills/doctor/SKILL.md` — §4, the `consequenceNotices` block.

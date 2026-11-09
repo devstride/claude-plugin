@@ -61,5 +61,5 @@ once over the whole train.
 
 ## Cited by
 
-- `skills/release/SKILL.md` — step 2; `skills/pre-ship/SKILL.md` — 2b's selection.
+- `skills/release/SKILL.md` and `references/release-pr.md` — step 2; `skills/pre-ship/SKILL.md` — 2b's selection.
 - `skills/release/references/release-branch.md` — §1 step 4.

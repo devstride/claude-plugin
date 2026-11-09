@@ -276,5 +276,6 @@ hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
 
 ## Cited by
 
-- `skills/release/SKILL.md` — steps 0b, 0c, the protected-branch floor, the hotfix rule and step 5b.
+- `skills/release/SKILL.md` — steps 0b, 0c, the protected-branch floor, the hotfix rule and step 5b;
+  `references/release-pr.md` — step 2's head re-validation.
 - `skills/review/SKILL.md` — step 7.1's hand-back on a release-branch head.

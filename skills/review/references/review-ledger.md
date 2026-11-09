@@ -94,4 +94,4 @@ head, repeated claim without new evidence, or no progress is a human gate, never
 
 - `skills/review/SKILL.md` — cycle initialization, collection, follow-up and reporting.
 - `skills/review/references/delta-re-review.md` — contextual local-CLI launch form.
-- `skills/release/SKILL.md` — prior settled dispositions for aggregate production review.
+- `skills/release/references/release-pr.md` — settled dispositions seeded for production review.

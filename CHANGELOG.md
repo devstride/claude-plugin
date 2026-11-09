@@ -8,6 +8,18 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **The release skill's main file is shorter; how each step is done now lives in two references it
+  reads when it reaches them.** `skills/release/SKILL.md` keeps the order of the steps, each step's
+  outcome lines and the hard floors, and drops from about 8,000 to about 6,000 tokens, well under
+  its 8,000-token ceiling. The release pull request's body and how the release review is run
+  (steps 1 to 2c) moved to `references/release-pr.md`, read before step 1; what the owner's
+  go-ahead recap carries, what is checked on the yes, and how the merge and deploy are confirmed
+  (steps 4 and 5a) moved to `references/merge-and-deploy.md`, read before step 4. Text that only
+  repeated the clearance, release-branch and documentation references was removed. Release
+  behaviour is unchanged: every rule, condition and verdict is still read on the same run.
+
 ## [3.44.1] — 2026-11-08
 
 ### Fixed
