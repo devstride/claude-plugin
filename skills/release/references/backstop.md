@@ -34,7 +34,7 @@ script and then the claim calls below. A run that does not START does nothing mo
 |---|---|---|
 | `START` | 0 | live: claim the backstop key (below) |
 | `SHADOW` | 10 | shadow: claim the backstop key, record, start nothing |
-| `SKIP` | 11 | stop, saying the reason once: not waiting long enough, nothing waiting, a release in progress, held, clearance unreadable, no train, no claims block |
+| `SKIP` | 11 | stop, saying the reason once: not waiting long enough, nothing waiting, a release in progress, held, unreadable, no train, no claims block, or changed since the claim |
 | `OFF` | 12 | stop silently |
 | `HOLDS` | 13 | read every listed item and each ancestor up to the root (`get_item(view: 'full')`), write `{"items": [{"number", "description"}...]}` to a file and run `due` again with `--holds <file>` |
 | `ERROR` | 1 | say it once and stop |
@@ -43,43 +43,56 @@ script and then the claim calls below. A run that does not START does nothing mo
   first-parent commit of `origin/<source>..origin/<train>`, except a sync merge (a merge whose
   other parents are all on the source). Landings are `--no-ff` or pull-request merges, so a
   landing's committer time is when it landed; git carries it, so every machine computes the same
-  wait. Story commits' own times (when they were written) are never used.
-- **Nothing is releasing it**: with `release.clearance` set, its provider's `status --json` reads
-  `clear` with no release pull request on final; held (stale included: the owner settles a stale
-  release) or unreadable → SKIP. A release holding the train claim is found by claiming it (live,
-  below): `claim_work` decides, a listing never does.
-- **Holds** are `release-holds.md`'s, decided by `release-holds.py` over the items the waiting
-  work's commit messages name; a line it cannot parse holds.
+  wait. The OLDEST landing is the one with the smallest committer time (on a tie, the earlier in
+  first-parent order), never the one at the end of the list: a merge stamped by a skewed clock
+  counts from its stamp. Story commits' own times (when they were written) are never used.
+- **Nothing is releasing it**, checked BEFORE anything is claimed: no open pull request into
+  `release.productionBranch` headed by the release source or a `release.releaseBranchPattern`
+  branch (`gh pr list`, always, with or without clearance; a release waiting at step 4 for the
+  owner's yes may have let its train claim lapse, and the backstop never adopts it); and, with
+  `release.clearance` set, its provider's `status --json` reads `clear`, `derived`, with no
+  release pull request on final. Held (stale included: the owner settles a stale release),
+  unreadable, a failed or truncated list, or a status not derived → SKIP. A release holding the
+  train claim is found by claiming it (below): `claim_work` decides, a listing never does.
+- **Holds** are `release-holds.md`'s, decided by `release-holds.py` after fetching
+  `origin/<productionBranch>`, over every item the release itself would check: the commits on the
+  train or the source that are not on production. A line it cannot parse holds.
 
-## The backstop claim — one starter per waiting work
+## The backstop claim — one start per waiting work per window
 
-Kind `release-train`, key the verdict's `<owner>/<repo>@<oldest landing sha>` (`:shadow` appended
-in shadow mode, so shadow records never consume a live key). Every check while that work waits
-computes the same key, whatever its clock or the landings since; once that landing ships, the key
-moves to the next oldest. Claim it as `story-claims.md` claims (holder, `claim_record.py` record,
-`claims.expiryMinutes["release-train"]` else 30), purpose `release backstop`, and decide with
-`story-claim.py decide` in mode `select`: `skip` (another machine holds it, or it is already
-finished) → stop silently; `takeover` → take it over once; `degrade` → do nothing, said once (the
-backstop never runs without its claim).
+The `--json` record carries the claim to make: `claim` (kind `release-train`, key
+`<owner>/<repo>@<oldest landing sha>`, `:shadow` appended in shadow mode so shadow records never
+consume a live key; `expiryMinutes` = `maxWaitMinutes`, at most 1440; purpose `release backstop`)
+and `trainClaim` (key `<owner>/<repo>`). Every check while that work waits computes the same key,
+whatever its clock or the landings since; once that landing ships, the key moves to the next
+oldest. Claim it as `story-claims.md` claims (holder, `claim_record.py` record), with the record's
+fields and one payload key more, `backstop`: the `--json` record. Decide with `story-claim.py
+decide` in mode `select`: `skip` (another machine holds it in this window) → stop silently;
+`takeover` (the window lapsed) → claim again with its `takeoverDigest`; `degrade` → do nothing,
+said once (the backstop never runs without its claim).
+Never heartbeat it and never release it on a start: it lapses after `maxWaitMinutes`, so each
+waiting work gets at most one start per window, and a release that stops early (a hold, a red
+check, the owner's no) is retried once per window while the work still waits and nothing is in
+progress.
 
 - **Live, won:** claim the train (`auto-start.md`'s train claim, mode `select`). Lost to a live
   holder → a release is in progress: `release_claim` the backstop key with outcome `busy`, NOT
-  final, so a later check may act once that release ends; stop. Won → `release_claim` the backstop
-  key with `final: true`, outcome `started` and the `--json` record as `result`, then run
-  **`release`** in this session declaring `started-by: auto` (inside `release backstop`: carry on
-  as that release run; `auto-start.md`'s path: its step 0 refreshes the train claim; the
-  unattended stop and the standing yes apply). One backstop per
-  waiting work: a release that then stops leaves the next move to the owner, never another backstop.
-- **Shadow, won:** read the train claim with `get_claim` (kind `release-train`, key
-  `<owner>/<repo>`), never claiming it, and add `trainClaim` (`held by <machine>` or `free`) to the
-  record; then `release_claim` the backstop key with `final: true`, outcome `shadow` and the record
-  as `result`. Say the verdict line. Nothing else: no train claim, no tower, no branch, no pull
-  request, no release.
+  final, with the record as `result`, so a later check may act once that release ends; stop. Won →
+  run `due --json --recheck <key>` (with `--holds` again, re-read): anything but `START` → release
+  the train claim (outcome `released`, never final) and the backstop key (outcome `changed`, not
+  final), and stop. `START` → run **`release`** in this session declaring `started-by: auto`
+  (inside `release backstop`: carry on as that release run; `auto-start.md`'s path: its step 0
+  refreshes the train claim; the unattended stop and the standing yes apply).
+- **Shadow, won:** the same steps, reading instead of claiming: `get_claim` the train key; live →
+  `release_claim` the backstop key with outcome `busy`, not final, the record (with `trainClaim:
+  "held by <machine>"`) as `result`, as live would. Free → `due --json --recheck <key>`; anything
+  but `SHADOW` → release it with outcome `changed`, not final; `SHADOW` → keep the claim, which
+  lapses like a live start. Say the verdict line. Nothing else: no train claim, no tower, no
+  branch, no pull request, no release.
 - **Where shadow records go:** the claim store, shared by every machine and already proving one
-  winner per key: `list_claims` kind `release-train`, `keyPrefix` `<owner>/<repo>@`, state
-  `released`, gives each record's outcome and `result`. Nothing is written to the repository.
-- **A `claims.commands` store** has no final release (its release verb takes `--outcome` only), so a
-  released key may be won again and a stopped release restarted for the same work; doctor warns.
+  winner per key: `list_claims` kind `release-train`, `keyPrefix` `<owner>/<repo>@`, state `all`,
+  gives each would-start (the `backstop` payload) and each `busy` or `changed` outcome with its
+  `result`. Nothing is written to the repository.
 
 ## Cited by
 

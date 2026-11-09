@@ -16,9 +16,11 @@ for what each version component means here and how a release is cut.
   backstop`, by hand or from a scheduled session; a dispatcher can run
   `skills/release/scripts/backstop.py due` directly). It starts a release only when the oldest
   landing on the train has waited longer than `maxWaitMinutes` (default 120, measured from the
-  landing's merge time in git), no release is in progress, and no release hold applies. Otherwise
-  it does nothing and says why. Machines checking at the same time for the same waiting work
-  compete for one claim, so only one of them starts the release. `mode` is `off` by default.
+  landing's merge time in git), no release is in progress (no open release pull request, and the
+  release clearance free when one is configured), and no release hold applies. Otherwise it does
+  nothing and says why. Machines checking at the same time for the same waiting work compete for
+  one claim, so only one of them starts the release; if that release stops early, the backstop
+  tries again at most once per `maxWaitMinutes` while the work still waits. `mode` is `off` by default.
   `shadow` records in the claims store what the check would have started and changes nothing.
   `live` starts the release through the same path as an automatic start, and is meant to be
   switched on only after the shadow records have been checked. The setting needs a `claims` block,

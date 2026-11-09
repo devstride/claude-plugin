@@ -427,11 +427,12 @@ M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exac
      and a rule's app restriction is kept. The printed command names `--repo`. No skill
      text carries its own `--admin` (`scripts/tests/merge-gate.sh` greps for one).
 M20. The release backstop (`release.backstop`) never delays or caps a release: `backstop.py due`
-     starts one only when the oldest landing on the train (a first-parent commit beyond the source,
-     by committer time) waited over `maxWaitMinutes`, clearance shows no release in progress
-     (unreadable is never clear) and no hold applies. One machine per waiting work wins the claim
-     keyed by that landing, released final once started (`busy`, not final, when the train claim is
-     held); shadow records in the claim store and starts nothing; live only after shadow is checked.
+     starts one only when the landing on the train with the smallest committer time waited over
+     `maxWaitMinutes`, no release is in progress (no open release pull request by `gh`, always;
+     clearance clear and derived when set; unreadable is never clear) and no hold applies over the
+     release's own delta. One machine per waiting work wins the claim keyed by that landing, which
+     lapses after `maxWaitMinutes` (never released on a start: an early stop retries once per window),
+     re-checked under the train claim; shadow mirrors live and starts nothing; live only after shadow.
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
 N1. ONE profile word — `prototype` / `standard` / `extended` — moves every rigor knob together; the
@@ -898,7 +899,10 @@ skills/release/references/auto-start.md|relayed yes: add
 skills/release/SKILL.md|backstop.md
 skills/release/references/auto-start.md|backstop.md
 skills/release/references/backstop.md|only after the shadow results were checked
-skills/release/references/backstop.md|outcome `shadow`
+skills/release/references/backstop.md|never release it on a start
+skills/release/references/backstop.md|--recheck <key>
+skills/release/references/backstop.md|smallest committer time
+skills/release/scripts/backstop.py|derived
 skills/release/references/backstop.md|outcome `busy`
 skills/release/scripts/backstop.py|unreadable is never clear
 skills/release/scripts/standing-yes.py|has no owner approval for this content

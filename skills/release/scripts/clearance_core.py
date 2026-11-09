@@ -1412,4 +1412,5 @@ def main(argv):
         return 1
 
 
-sys.exit(main(sys.argv[1:]))
+if __name__ == "__main__":   # backstop.py imports pattern_regex
+    sys.exit(main(sys.argv[1:]))

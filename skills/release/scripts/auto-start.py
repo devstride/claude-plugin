@@ -16,7 +16,7 @@ its old name `supportTrain.branch`; both set is an ERROR), and after a fetch
 `git log --no-merges origin/<releaseSource>..origin/<train>` is non-empty. It never looks for an
 open train pull request: the winner's release step 0b runs that search itself, after the claim.
 No network beyond `git ls-remote` and `git fetch`. `train_state` is that train half alone, which
-skills/release/scripts/departures.py reuses.
+skills/release/scripts/backstop.py reuses.
 
 The train is looked up on origin first, the way routing.py's `resolve_train` does (one rule, reused):
 not there and no other `train/*` branch → SKIP, nothing has landed yet; not there but exactly one
@@ -108,7 +108,7 @@ def origin_heads(root):
 
 def train_state(config, root):
     """Does the release train hold work beyond the release source? The half of `check` that does not
-    read `release.autoStart`, shared with departures.py (one rule, reused). Returns ("SKIP", reason),
+    read `release.autoStart`, shared with backstop.py (one rule, reused). Returns ("SKIP", reason),
     ("ERROR", reason) or ("AHEAD", commits, train, source); fetches unless AUTO_START_NO_FETCH=1."""
     release = section(config, "release")
     if isinstance(config.get("releaseTrain"), dict) and isinstance(config.get("supportTrain"), dict):

@@ -7,18 +7,20 @@ dispatcher, or `/devstride:release backstop` by hand), starts one ONLY when work
 train has waited longer than `maxWaitMinutes` and nothing is releasing it. It claims nothing,
 starts nothing and writes nothing: a START or SHADOW goes on to claim the backstop key, and that
 claim, not this check, decides which machine acts. Its `--json` answer is the record the caller
-stores with that claim.
+stores with that claim, and carries the exact claim to make (`claim`, `trainClaim`).
 
-  due [--now ISO] [--json] [--holds FILE]
-      START <key> (<why>)                live: claim <key>, the train claim, then release     exit 0
+  due [--now ISO] [--json] [--holds FILE] [--recheck KEY]
+      START <key> (<why>)                live: claim <key>, the train claim, recheck, release exit 0
       SHADOW <key> would start (<why>)   shadow: claim <key>, record, start nothing             exit 10
       SKIP <reason>                      nothing to do now, and why                             exit 11
       OFF <reason>                       no release.backstop block, or its mode is off          exit 12
       HOLDS <I#> [<I#>...]               read these items and their ancestors; run again        exit 13
       ERROR <reason>                     a bad config, an unreadable train or holds request     exit 1
     SKIP covers: not waiting long enough, nothing waiting, a release in progress, held, clearance
-    unreadable, no release train, no claims block. HOLDS: the waiting work names these items; write
-    release-holds.py's request for each and its ancestors and run `due` again with --holds <file>.
+    or release pull requests unreadable, no release train, no claims block, and under --recheck
+    any answer other than the same START or SHADOW for KEY ("changed since the claim"). HOLDS: the
+    release delta names these items; write release-holds.py's request for each and its ancestors
+    and run `due` again with --holds <file>.
   config
       OK, or one `ERROR|WARN <path>: <message>` line per finding; exit 1 on an ERROR.
       skills/doctor/scripts/validate-config.py reports the same findings (it imports `problems`).
@@ -28,22 +30,31 @@ WAITING WORK is every LANDING on the train not yet on the release source: each f
 in origin/<source>..origin/<train>, except a merge whose other parents are all already on the source
 (a sync merge, which carries nothing). Work lands on the train as a `--no-ff` merge or a pull
 request merge, so a landing's committer time is the moment it landed; it is read from git, so every
-machine computes the same wait. The OLDEST landing's committer time is when the wait began, and its
-SHA keys the claim: `<owner>/<repo>@<sha>` (kind `release-train`; `:shadow` appended in shadow mode
-so shadow records never consume a live key). Every check while that work waits computes the same
-key, so concurrent checks dedupe; once the work ships, the oldest landing changes and so does the key.
+machine computes the same wait. The OLDEST landing is the one with the SMALLEST committer time (the
+earlier in first-parent order on a tie), whatever its position, so a merge stamped by a skewed
+clock still counts from its stamp. Its committer time is when the wait began, and its SHA keys the
+claim: `<owner>/<repo>@<sha>` (kind `release-train`; `:shadow` appended in shadow mode so shadow
+records never consume a live key). Every check while that work waits computes the same key, so
+concurrent checks dedupe; once that landing ships, the key moves to the next oldest.
 
 START or SHADOW only when ALL hold: the mode is live or shadow, a `claims` block is configured, the
 train holds work beyond the source (auto-start.py's `train_state`, one rule, reused), the oldest
-landing waited MORE than `maxWaitMinutes` (default 120), clearance shows no release in progress
-(with `release.clearance` set: its provider's `status --json` is `clear`, with no open release pull
-request on final; unreadable is never clear), and no release hold holds the waiting items
-(release-holds.py on `--holds`, the single implementation; its exit 2 is held). A release that holds
-the train claim is found by the caller's own claim of it (claim_work decides; a list never does).
+landing waited MORE than `maxWaitMinutes` (default 120), no release is in progress, and no release
+hold holds the release delta. A release is in progress when `gh pr list` shows an open pull request
+into the production branch headed by the release source or a `release.releaseBranchPattern` branch
+(the branch-patterns rule, clearance_core.py's `pattern_regex`), always, with or without clearance;
+and, with `release.clearance` set, when its provider's `status --json` is anything but `clear` with
+`derived` true and no release pull request on final. Unreadable is never clear: a failed or
+truncated list, or a status that is unknown or not derived, is a release in progress. A release that
+holds the train claim is found by the caller's own claim of it (claim_work decides; a list never
+does). The holds are release-holds.py's (the single implementation; its exit 2 is held) over every
+item the release itself would check: the commits on origin/<train> or origin/<source> that are not
+on origin/<production>, after fetching all three.
 
-`--now` replaces the clock (an ISO time with its offset). Test seams are auto-start.py's:
-AUTO_START_REPO (owner/name) and AUTO_START_NO_FETCH=1. Network: `git ls-remote`/`git fetch`, and the
-clearance provider's `status` when `release.clearance` is set.
+`--recheck KEY` is the check the caller repeats once it holds the train claim: the same START (or
+SHADOW) for KEY, else SKIP "changed since the claim: …". `--now` replaces the clock (an ISO time with
+its offset). Test seams are auto-start.py's: AUTO_START_REPO (owner/name) and AUTO_START_NO_FETCH=1.
+Network: `git ls-remote`/`git fetch`, `gh pr list`, and the clearance provider's `status`.
 """
 import datetime
 import importlib.util
@@ -55,9 +66,11 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 AUTO_START = os.path.join(HERE, "auto-start.py")
+CLEARANCE_CORE = os.path.join(HERE, "clearance_core.py")
 HOLDS = os.path.join(os.path.dirname(os.path.dirname(HERE)), "build-item/scripts/release-holds.py")
 MODES = ("off", "shadow", "live")
-DEFAULT_WAIT, MIN_WAIT = 120, 15
+DEFAULT_WAIT, MIN_WAIT, MAX_EXPIRY = 120, 15, 1440
+PR_LIMIT = 200   # a list this long is truncated, never trusted
 ITEM = re.compile(r"(?<![0-9A-Za-z])I\d{2,}(?![0-9A-Za-z])")
 UTC = datetime.timezone.utc
 EXIT = {"START": 0, "SHADOW": 10, "SKIP": 11, "OFF": 12, "HOLDS": 13, "ERROR": 1}
@@ -69,9 +82,10 @@ class Answer(Exception):
         self.verdict, self.line, self.record = verdict, line, record
 
 
-def load_auto_start():
-    """The config lookup, the train check and the repository key are auto-start.py's; never a copy."""
-    spec = importlib.util.spec_from_file_location("auto_start", AUTO_START)
+def load(name, path):
+    """auto-start.py (config, train check, repository key) and clearance_core.py (the branch-patterns
+    rule) are reused, never copied."""
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -80,6 +94,17 @@ def load_auto_start():
 def section(value, key):
     found = value.get(key) if isinstance(value, dict) else None
     return found if isinstance(found, dict) else {}
+
+
+def whole(value):
+    """A whole number of minutes: an int, or a float with no fraction (JSON's 120.0 is 120)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return None
 
 
 def problems(config):
@@ -93,9 +118,6 @@ def problems(config):
     if not isinstance(config.get("claims"), dict):
         found.append(("ERROR", "release.backstop.mode", "needs a `claims` block: without a one-winner "
                       "backstop claim two machines could start a release for the same waiting work"))
-    elif isinstance(config["claims"].get("commands"), dict):
-        found.append(("WARN", "release.backstop.mode", "a `claims.commands` store cannot release a claim "
-                      "final, so a stopped release may be started again for the same waiting work"))
     train = section(config, "releaseTrain").get("branch") or section(config, "supportTrain").get("branch")
     if release.get("mergeTrainBeforeCut") is not True or not train:
         found.append(("WARN", "release.backstop.mode", "has no effect without a release train "
@@ -113,8 +135,8 @@ def settings(config):
     mode = block.get("mode", "off")
     if mode not in MODES:
         raise Answer("ERROR", "release.backstop.mode must be off, shadow or live, not %r" % (mode,))
-    wait = block.get("maxWaitMinutes", DEFAULT_WAIT)
-    if isinstance(wait, bool) or not isinstance(wait, int) or wait < MIN_WAIT:
+    wait = whole(block.get("maxWaitMinutes", DEFAULT_WAIT))
+    if wait is None or wait < MIN_WAIT:
         raise Answer("ERROR", "release.backstop.maxWaitMinutes must be a whole number of minutes, at least %d" % MIN_WAIT)
     if mode == "off":
         raise Answer("OFF", "release.backstop.mode is off", mode="off")
@@ -133,16 +155,29 @@ def parse_now(text):
     return now.astimezone(UTC)
 
 
+def run(argv, root, **extra):
+    return subprocess.run(argv, cwd=root, capture_output=True, text=True, stdin=subprocess.DEVNULL, **extra)
+
+
 def git(root, *args):
-    done = subprocess.run(["git", "-C", root] + list(args), capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    done = run(["git", "-C", root] + list(args), root)
     if done.returncode != 0:
         raise Answer("ERROR", "git %s failed: %s" % (args[0], (done.stderr or "").strip()[:200]))
     return done.stdout
 
 
+def fetch_production(root, production):
+    if os.environ.get("AUTO_START_NO_FETCH") == "1":
+        return
+    done = run(["git", "-C", root, "fetch", "-q", "origin",
+                "+refs/heads/%s:refs/remotes/origin/%s" % (production, production)], root)
+    if done.returncode != 0:
+        raise Answer("ERROR", "git fetch of %s failed: %s" % (production, (done.stderr or "").strip()[:200]))
+
+
 def landings(root, train, source):
-    """-> [(sha, committed epoch)] newest first: the first-parent commits beyond the source, sync
-    merges (every other parent already on the source) left out."""
+    """-> [(sha, committed epoch)] in first-parent order, newest first: the first-parent commits
+    beyond the source, sync merges (every other parent already on the source) left out."""
     found = []
     for row in git(root, "log", "--first-parent", "--format=%H %ct %P", "origin/%s..origin/%s" % (source, train)).splitlines():
         parts = row.split()
@@ -150,21 +185,55 @@ def landings(root, train, source):
             continue
         sha, when, parents = parts[0], int(parts[1]), parts[2:]
         others = parents[1:]
-        if others and all(subprocess.run(["git", "-C", root, "merge-base", "--is-ancestor", p, "origin/%s" % source],
-                                         stdin=subprocess.DEVNULL).returncode == 0 for p in others):
+        if others and all(run(["git", "-C", root, "merge-base", "--is-ancestor", p, "origin/%s" % source], root).returncode == 0
+                          for p in others):
             continue
         found.append((sha, when))
     return found
 
 
-def waiting_items(root, train, source):
-    """Every item number a commit message on the train beyond the source names, merges included."""
-    found = set(ITEM.findall(git(root, "log", "--format=%B", "origin/%s..origin/%s" % (source, train))))
-    return sorted(found, key=lambda number: int(number[1:]))
+def oldest_of(landed):
+    """The landing with the smallest committer time; on a tie, the earlier in first-parent order."""
+    best = None
+    for position, (sha, when) in enumerate(landed):   # newest first, so a later index is earlier
+        if best is None or when < best[1] or (when == best[1] and position > best[2]):
+            best = (sha, when, position)
+    return best[0], best[1]
+
+
+def delta_items(root, train, source, production):
+    """Every item number a commit on the train or the source, not on production, names."""
+    text = git(root, "log", "--format=%B", "origin/%s" % train, "origin/%s" % source, "--not", "origin/%s" % production)
+    return sorted(set(ITEM.findall(text)), key=lambda number: int(number[1:]))
+
+
+def open_release_prs(root, release, production, source):
+    """-> (busy, reason) from `gh pr list`: an open pull request into production headed by the source
+    or a release branch is a release in progress. A failed or truncated list is never clear."""
+    pattern = release.get("releaseBranchPattern")
+    matcher = load("clearance_core", CLEARANCE_CORE).pattern_regex(pattern) if isinstance(pattern, str) and pattern else None
+    try:
+        done = run(["gh", "pr", "list", "--base", production, "--state", "open", "--json", "number,headRefName",
+                    "--limit", str(PR_LIMIT)], root, timeout=120)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return True, "open release pull requests could not be read (%s)" % error
+    try:
+        listed = json.loads(done.stdout) if done.returncode == 0 else None
+    except ValueError:
+        listed = None
+    if not isinstance(listed, list):
+        return True, "open release pull requests could not be read (%s)" % ((done.stderr or "").strip()[:200] or "exit %d" % done.returncode)
+    if len(listed) >= PR_LIMIT:
+        return True, "open pull requests into %s could not all be read (%d or more)" % (production, PR_LIMIT)
+    for pr in sorted((p for p in listed if isinstance(p, dict)), key=lambda p: p.get("number") or 0):
+        head = pr.get("headRefName") or ""
+        if head == source or (matcher and matcher.match(head)):
+            return True, "a release is in progress: release pull request #%s (%s) is open" % (pr.get("number"), head)
+    return False, "no release pull request is open"
 
 
 def clearance(config, root):
-    """-> (busy, reason). No release.clearance → not read. Unreadable is never clear."""
+    """-> (busy, reason). No release.clearance → not read. Unreadable or not derived is never clear."""
     block = section(config, "release").get("clearance")
     if not block:
         return False, "no release.clearance configured"
@@ -181,7 +250,7 @@ def clearance(config, root):
     else:
         return True, "release.clearance names no provider this check can read"
     try:
-        done = subprocess.run(argv, cwd=root, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=120)
+        done = run(argv, root, timeout=120)
     except (OSError, subprocess.TimeoutExpired) as error:
         return True, "clearance could not be read (%s)" % error
     try:
@@ -197,9 +266,11 @@ def clearance(config, root):
         by = record.get("machine") or record.get("user") or "another session"
         return True, "a release is in progress: clearance is held for %s by %s%s" % (
             what, by, " (stale: the owner decides)" if status.get("stale") else "")
+    if status.get("derived") is not True:
+        return True, "clearance could not be read (its release pull requests were not derived)"
     final = status.get("onFinal")
     if isinstance(final, dict) and final.get("number"):
-        return True, "a release is in progress: release pull request #%s is open" % final["number"]
+        return True, "a release is in progress: release pull request #%s is on final" % final["number"]
     return False, "clearance is clear"
 
 
@@ -212,11 +283,11 @@ def check_holds(path, items, now, root):
         raise Answer("ERROR", "the holds request %s cannot be read as JSON (%s)" % (path, error))
     listed = request.get("items") if isinstance(request, dict) else None
     if not isinstance(listed, list) or not listed:
-        raise Answer("ERROR", "the holds request needs items: each waiting item and its ancestors")
+        raise Answer("ERROR", "the holds request needs items: each release item and its ancestors")
     numbers = {entry.get("number") for entry in listed if isinstance(entry, dict)}
     missing = [n for n in items if n not in numbers]
     if missing:
-        raise Answer("ERROR", "the holds request leaves out %s: read every waiting item and its ancestors" % " ".join(missing))
+        raise Answer("ERROR", "the holds request leaves out %s: read every release item and its ancestors" % " ".join(missing))
     request.setdefault("now", now.isoformat())
     ran = subprocess.run([sys.executable, HOLDS, "decide"], input=json.dumps(request), capture_output=True,
                          text=True, cwd=root)
@@ -232,7 +303,7 @@ def check_holds(path, items, now, root):
 
 
 def due(now_text, holds_path):
-    auto = load_auto_start()
+    auto = load("auto_start", AUTO_START)
     now = parse_now(now_text)
     try:
         config, root = auto.load_config()
@@ -246,31 +317,41 @@ def due(now_text, holds_path):
     if state[0] != "AHEAD":
         raise Answer(state[0], state[1], **record)
     _, commits, train, source = state
+    release = section(config, "release")
+    production = release.get("productionBranch") or "master"
     landed = landings(root, train, source)
     if not landed:
         raise Answer("SKIP", "the train holds nothing beyond %s" % source, **record)
-    oldest, since = landed[-1]
+    oldest, since = oldest_of(landed)
     waited = (now - datetime.datetime.fromtimestamp(since, UTC)).total_seconds() / 60
     try:
         repo = auto.repo_key(root)
     except SystemExit:
         raise Answer("ERROR", "cannot read <owner>/<repo> from the origin remote", printed=True)
     key = "%s@%s%s" % (repo, oldest, ":shadow" if mode == "shadow" else "")
-    record.update({"key": key, "train": train, "source": source, "commits": len(commits), "landings": len(landed),
-                   "oldestLanding": oldest, "landedAt": datetime.datetime.fromtimestamp(since, UTC).isoformat(),
-                   "waitedMinutes": int(waited)})
+    record.update({"key": key, "train": train, "source": source, "production": production,
+                   "commits": len(commits), "landings": len(landed), "oldestLanding": oldest,
+                   "landedAt": datetime.datetime.fromtimestamp(since, UTC).isoformat(), "waitedMinutes": int(waited),
+                   "claim": {"kind": "release-train", "key": key, "expiryMinutes": min(wait, MAX_EXPIRY),
+                             "purpose": "release backstop"},
+                   "trainClaim": {"kind": "release-train", "key": repo}})
     if waited <= wait:
         raise Answer("SKIP", "not waiting long enough: the oldest landing %s has waited %d of %d minutes"
                      % (oldest[:12], int(waited), wait), **record)
+    busy, why = open_release_prs(root, release, production, source)
+    record["releasePullRequests"] = why
+    if busy:
+        raise Answer("SKIP", why, **record)
     busy, why = clearance(config, root)
     record["clearance"] = why
     if busy:
         raise Answer("SKIP", why, **record)
-    items = waiting_items(root, train, source)
+    fetch_production(root, production)
+    items = delta_items(root, train, source, production)
     record["items"] = items
     if items and not holds_path:
         raise Answer("HOLDS", " ".join(items), **record)
-    held, reason = check_holds(holds_path, items, now, root) if holds_path else (False, "no item named on the train")
+    held, reason = check_holds(holds_path, items, now, root) if holds_path else (False, "no item named in the release delta")
     record["holds"] = reason
     if held:
         raise Answer("SKIP", reason if reason.startswith("held") else "held: " + reason, **record)
@@ -284,7 +365,7 @@ def due(now_text, holds_path):
 def main(argv):
     args = argv[1:]
     verb = args.pop(0) if args else None
-    options = {"--now": None, "--holds": None}
+    options = {"--now": None, "--holds": None, "--recheck": None}
     as_json = False
     while args:
         flag = args.pop(0)
@@ -296,10 +377,10 @@ def main(argv):
             verb = None
             break
     if verb not in ("due", "config") or (verb == "config" and (as_json or any(options.values()))):
-        sys.stderr.write("usage: backstop.py due [--now ISO] [--json] [--holds FILE] | config\n")
+        sys.stderr.write("usage: backstop.py due [--now ISO] [--json] [--holds FILE] [--recheck KEY] | config\n")
         return 2
     if verb == "config":
-        config, _ = load_auto_start().load_config()
+        config, _ = load("auto_start", AUTO_START).load_config()
         found = problems(config)
         try:
             settings(config)
@@ -310,16 +391,20 @@ def main(argv):
         return 1 if any(f[0] == "ERROR" for f in found) else 0
     try:
         due(options["--now"], options["--holds"])
-    except Answer as answer:
-        if answer.record.pop("printed", False):
-            return 1
-        if as_json:
-            print(json.dumps(dict(answer.record, verdict=answer.verdict, reason=answer.line), ensure_ascii=False))
-        else:
-            print("%s %s" % (answer.verdict, answer.line))
-        return EXIT[answer.verdict]
-    print("ERROR no verdict")
-    return 1
+        answer = Answer("ERROR", "no verdict")
+    except Answer as raised:
+        answer = raised
+    if answer.record.pop("printed", False):
+        return 1
+    recheck = options["--recheck"]
+    if recheck and not (answer.verdict in ("START", "SHADOW") and answer.record.get("key") == recheck):
+        answer = Answer("SKIP", "changed since the claim: %s %s" % (answer.verdict, answer.line),
+                        **dict(answer.record, recheck=recheck))
+    if as_json:
+        print(json.dumps(dict(answer.record, verdict=answer.verdict, reason=answer.line), ensure_ascii=False))
+    else:
+        print("%s %s" % (answer.verdict, answer.line))
+    return EXIT[answer.verdict]
 
 
 if __name__ == "__main__":
