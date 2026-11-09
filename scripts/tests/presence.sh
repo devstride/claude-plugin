@@ -215,6 +215,7 @@ if ! grep -q '"PRESENCE_END_REASON": "gone"' "$LOG" && [ "$(field 3 PRESENCE_EVE
   && [ "$(field 3 CLAUDE_PID)" = "$OB" ] && keeper_alive s15; then
   ok "(15) resume in a new process after a clean exit → start with the new process, no false end, keeper running"
 else bad "(15) $(cat "$LOG")"; fi
+stop_keeper s15   # its owner lives on: left running, it beats into the shared log of every later case
 
 # (16) reports run one at a time and in order: an end queued with a beat never ends up before it
 : > "$LOG"
@@ -256,6 +257,7 @@ age s19 31; wait_sent 2; sleep 0.3
 if [ "$H" = 1 ] && [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = beat ] && [ "$(field 2 PRESENCE_STATE)" = waiting ]; then
   ok "(19) Stop held within 30 s → the keeper sends it (beat, waiting) once 30 s pass"
 else bad "(19) h=$H $(cat "$LOG")"; fi
+stop_keeper s19   # likewise: its next beat would land in a later case
 
 # (20) a report overtaken by a newer one, or queued by a record since replaced, is dropped
 : > "$LOG"
@@ -359,9 +361,9 @@ edit s27 'r["ownerStarted"] = r["ownerStarted"] - 3'
 wait_sent 3; sleep 0.2
 GONE27="$(grep -c '"PRESENCE_EVENT": "end"' "$LOG")"; stop_keeper s27
 ID27="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$RECORDS/s27.json")"
-rm -f "$RECORDS/s27.json"; N27="$(sent)"
+rm -f "$RECORDS/s27.json"; N27="$(grep -c '"PRESENCE_SESSION_ID": "s27"' "$LOG")"
 python3 "$HOOK" send beat working s27 "$ID27" 99 1
-if [ "$GONE27" = 0 ] && [ "$(sent)" = "$N27" ] && [ ! -e "$RECORDS/s27.json" ]; then
+if [ "$GONE27" = 0 ] && [ "$(grep -c '"PRESENCE_SESSION_ID": "s27"' "$LOG")" = "$N27" ] && [ ! -e "$RECORDS/s27.json" ]; then
   ok "(27) start time 3 s off → still beating, no end; a send after its record was removed → nothing, not recreated"
 else bad "(27) gone=$GONE27 $(cat "$LOG")"; fi
 
