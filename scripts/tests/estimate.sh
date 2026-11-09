@@ -325,7 +325,7 @@ OUT=$(run backtest --days 1 --now 2026-11-09T21:45:00Z --json)
 g branch -f train/release develop
 L11=$(land l11 2026-11-10T08:59:00Z I719)
 g checkout -q -b absorb-retries train/release; at 2026-11-10T09:00:00Z commit -q --allow-empty -m "I720"
-g checkout -q train/release; at 2026-11-10T09:01:00Z merge -q --no-ff -m "merge: absorb-retries into train/release" absorb-retries
+g checkout -q train/release; at 2026-11-10T09:01:00Z merge -q --no-ff -m "merge: absorb one-off into the release snapshot" absorb-retries
 O1=$(g rev-parse HEAD)
 batch absorbbatch 2026-11-10T09:02:00Z
 L10=$(land l10 2026-11-10T09:05:00Z I721)
@@ -334,7 +334,7 @@ B5=$(g rev-parse HEAD)
 g checkout -q -b epic3 develop
 g checkout -q -b e3s epic3; at 2026-11-10T09:07:00Z commit -q --allow-empty -m "I731"
 g checkout -q epic3; at 2026-11-10T09:07:00Z merge -q --no-ff -m "merge: I731 [1] into epic integration" e3s
-g checkout -q train/release; at 2026-11-10T09:08:00Z merge -q --no-ff -m "merge: absorb epic three into train/release" epic3
+g checkout -q train/release; at 2026-11-10T09:08:00Z merge -q --no-ff -m "merge: absorb epic three into the release snapshot" epic3
 E5=$(g rev-parse HEAD)
 deliver 2026-11-10T09:30:00Z
 g checkout -q master; at 2026-11-10T09:40:00Z merge -q --no-ff -m "release" develop
@@ -348,7 +348,8 @@ else
 fi
 
 # (9p) Absorbs in the older hand-written wording are read through to their own train merges: one
-# "into the … snapshot", one into the snapshot's release-train- branch, one "late train landing".
+# "into the … snapshot", one into the snapshot's release-train- branch, one "late train landing", one
+# into a snapshot whose name starts with the train's.
 g branch -f train/release develop
 L0=$(land l0 2026-11-10T09:55:00Z I750)
 g checkout -q -b p/release-train-26-11-10-3 train/release
@@ -358,35 +359,47 @@ LB=$(land lb 2026-11-10T10:02:00Z I752)
 g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:03:00Z merge -q --no-ff -m "merge: train/release at ${LB:0:10} (I752) into p/release-train-26-11-10-3" train/release
 LC=$(land lc 2026-11-10T10:04:00Z I753)
 g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:05:00Z merge -q --no-ff -m "merge: late train landing I753" train/release
+LD=$(land ld 2026-11-10T10:06:00Z I754)
+g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:07:00Z merge -q --no-ff -m "merge: train/release (${LD:0:10}) into train/release-train-26-11-10-3" train/release
 g checkout -q develop; at 2026-11-10T10:10:00Z merge -q --no-ff -m "Merge pull request #15 from acme/p/release-train-26-11-10-3" p/release-train-26-11-10-3
 g checkout -q master; at 2026-11-10T10:20:00Z merge -q --no-ff -m "release" develop
 RELEASE7=$(g rev-parse HEAD)
 g checkout -q develop; g push -q origin develop master train/release; g fetch -q origin
 OUT=$(run shipped --merge "$RELEASE7" --json); CODE=$?
-if [ "$CODE" = 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); got={l["sha"] for l in d["landings"]}; sys.exit(0 if got==set(sys.argv[1:]) else 1)' "$L0" "$LA" "$LB" "$LC"; then
+if [ "$CODE" = 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); got={l["sha"] for l in d["landings"]}; sys.exit(0 if got==set(sys.argv[1:]) else 1)' "$L0" "$LA" "$LB" "$LC" "$LD"; then
   ok "(9p) absorbs in the older wording are read through to their own landings"
 else
   bad "(9p) older absorb wording: exit $CODE $OUT"
 fi
 
-# (9q) Only whole absorb words or a snapshot destination mark an absorb: a batch of merges named
-# absorb-two, and one merged into the train itself with "snapshot" in its subject, each cut at the
-# train's newest landing, stay one landing.
+# (9q) Only whole absorb words or a snapshot named right after "into" mark an absorb, and a subject
+# that says it goes into the train itself never does. Batches of merges, each cut at the train's
+# newest landing and merged back under one of these subjects, stay one landing each.
 g branch -f train/release develop
 L12=$(land l12 2026-11-10T11:00:00Z I760)
-batch absorb-two 2026-11-10T11:01:00Z
-g checkout -q train/release; at 2026-11-10T11:02:00Z merge -q --no-ff -m "merge: absorb-two into train/release" absorb-two
-B6=$(g rev-parse HEAD)
-batch snapbatch 2026-11-10T11:03:00Z
-g checkout -q train/release; at 2026-11-10T11:04:00Z merge -q --no-ff -m "merge: snapbatch into train/release (snapshot prep)" snapbatch
-B7=$(g rev-parse HEAD)
+EXPECT9Q="$L12"; k=0
+while IFS= read -r subject <&3; do
+  k=$((k+1)); batch "nq$k" "2026-11-10T11:$(printf %02d $((k*2)))":00Z
+  g checkout -q train/release; at "2026-11-10T11:$(printf %02d $((k*2+1)))":00Z merge -q --no-ff -m "$subject" "nq$k"
+  EXPECT9Q="$EXPECT9Q $(g rev-parse HEAD)"
+done 3<<'SUBJECTS'
+merge: absorb-two
+merge: snapbatch into train/release (snapshot prep)
+merge: absorb batch into train/release
+merge: batch into the train (snapshot prep)
+merge: batch into origin/train/release before the snapshot
+merge: batch into train/release (folds I761 into snapshot prep)
+merge: golden snapshot fix into the integration batch
+MERGE: Absorb batch Into Train/Release
+SUBJECTS
 deliver 2026-11-10T11:30:00Z
 g checkout -q master; at 2026-11-10T11:40:00Z merge -q --no-ff -m "release" develop
 RELEASE8=$(g rev-parse HEAD)
 g checkout -q develop; g push -q origin develop master train/release; g fetch -q origin
 OUT=$(run shipped --merge "$RELEASE8" --json); CODE=$?
-if [ "$CODE" = 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); got={l["sha"] for l in d["landings"]}; sys.exit(0 if got==set(sys.argv[1:]) else 1)' "$L12" "$B6" "$B7"; then
-  ok "(9q) a branch named absorb-… or a merge into the train itself is never an absorb"
+# shellcheck disable=SC2086
+if [ "$CODE" = 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); got={l["sha"] for l in d["landings"]}; sys.exit(0 if got==set(sys.argv[1:]) else 1)' $EXPECT9Q; then
+  ok "(9q) a branch named absorb-…, or a subject saying it goes into the train, is never an absorb"
 else
   bad "(9q) absorb words and destination: exit $CODE $OUT"
 fi
