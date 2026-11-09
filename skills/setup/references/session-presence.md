@@ -24,7 +24,7 @@ of range reads as 5, and doctor warns) is the keeper's beat.
 | Session start (new, resumed, after `/clear`; not after a compaction) | `start` | `starting` |
 | A prompt, with no report yet in this session, or after an `end` | `start` | `working` |
 | A prompt, a minute or more after the last report, or from another checkout | `beat` | `working` |
-| A tool use while `waiting` (a turn a notification started) | `beat` | `working` |
+| A tool use while `starting` or `waiting` (a turn a notification started) | `beat` | `working` |
 | A finished turn (Claude waits for its person); nothing after an `end` | `beat` | `waiting` |
 | The keeper, when the last report is `intervalMinutes` old, or a held change is 30 seconds old | `beat` | the latest |
 | Session end (`PRESENCE_END_REASON`: `clear`, `logout`, …) | `end` | `ended` |
@@ -52,10 +52,12 @@ name. Its exit code is kept in the session's local record; nothing reads it as a
 
 ## Rules a repository's implementation should keep
 
-- **Display only.** Presence never decides who acts; claims do.
+- **Display only.** Presence never decides who acts; claims do. It may renew or release claims
+  its own session holds.
 - **Expire on the server.** A report not renewed within a few intervals means the session is gone:
   a machine that sleeps or loses power sends no `end`.
-- **Alive is not active.** A hung turn still beats: `working` with an old `PRESENCE_ACTIVE_AT`.
+- **Alive is not active.** A hung turn still beats. `working` with an old `PRESENCE_ACTIVE_AT`
+  is hung or in one long command: activity is stamped after a tool use, not before.
 - **Fail fast and quietly.** A slow or failing command costs that one report, never a turn.
 - **Quote every variable.** A branch name can hold shell syntax: pass `"$PRESENCE_BRANCH"`
   quoted, or read the variables from the environment in code.

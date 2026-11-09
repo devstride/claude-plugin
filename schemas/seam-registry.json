@@ -1824,7 +1824,7 @@
         "object",
         "null"
       ],
-      "description": "the repository's own presence command, run by the plugin's hooks for every session (session start, prompts and finished turns, throttled; a keeper every intervalMinutes; session end); absent or null, or a blank command, runs nothing and writes nothing",
+      "description": "the repository's own presence command, run by the plugin's hooks for every session (session start, prompts, tool uses and finished turns, throttled; a keeper every intervalMinutes; session end); absent or null, or a blank command, runs nothing and writes nothing",
       "since": "3.42.0"
     },
     {

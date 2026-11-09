@@ -386,6 +386,21 @@ if [ -z "$OUT" ] && [ ! -e "$RECORDS/s28.json" ] && [ "$(s28 0)" = 0 ]; then
 else bad "(28) unknown session: out=$OUT sent=$(s28 0)"; fi
 stop_keeper s28
 
+# (28b) a tool use never resurrects an ended session, never moves a record a newer process of the
+#       session holds, and an `end` stamps no activity
+O28B="$(owner)"; CLAUDE_PID="$O28B" fire SessionStart s28b "$R28" >/dev/null; wait28 3
+A0="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["activeAt"])' "$RECORDS/s28b.json")"
+OLD28="$(owner)"; CLAUDE_PID="$OLD28" fire PostToolUse s28b "$R28" >/dev/null                 # an older process
+A1="$(python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["activeAt"], r["state"])' "$RECORDS/s28b.json")"
+sleep 0.05; fire SessionEnd s28b "$R28" other >/dev/null
+A2="$(python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["activeAt"], r["state"])' "$RECORDS/s28b.json")"
+fire PostToolUse s28b "$R28" >/dev/null; sleep 0.3
+A3="$(python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["activeAt"], r["state"])' "$RECORDS/s28b.json")"
+if [ "$A1" = "$A0 starting" ] && [ "$A2" = "$A0 ended" ] && [ "$A3" = "$A0 ended" ]; then
+  ok "(28b) tool use from an older process or after an end → record unchanged; an end stamps no activity"
+else bad "(28b) a0=$A0 a1=$A1 a2=$A2 a3=$A3"; fi
+stop_keeper s28b
+
 # (12) hooks.json registers the hook on all five events, bounded and failing open
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'
 import json, sys

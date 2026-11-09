@@ -228,7 +228,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `activeAgents.tagColor` | string | gray-medium-dark, red, pink, orange, yellow, lime, green, teal, blue, blue-medium, purple | green | the tag's colour | 3.25.0 |
 | `activeAgents.staleMinutes` | integer | >= 1 | `20` | minutes without a heartbeat after which the repository's presence implementation treats a session as gone; exported to both commands | 3.25.0 |
 | `activeAgents.commands` | object | — | — | **Required.** the repository's own start and end commands | 3.25.0 |
-| `presence` | object, null | — | — | the repository's own presence command, run by the plugin's hooks for every session (session start, prompts and finished turns, throttled; a keeper every intervalMinutes; session end); absent or null, or a blank command, runs nothing and writes nothing | 3.42.0 |
+| `presence` | object, null | — | — | the repository's own presence command, run by the plugin's hooks for every session (session start, prompts, tool uses and finished turns, throttled; a keeper every intervalMinutes; session end); absent or null, or a blank command, runs nothing and writes nothing | 3.42.0 |
 | `presence.intervalMinutes` | integer | 1..60, else warned and the default stands | `5` | minutes between the keeper's beats while the session's process lives; a value outside 1 to 60 is ignored with a warning and reads as 5 | 3.42.0 |
 | `release.docsRepo` | any | — | — | **Deprecated (error):** retired pre-1.0 shape the release skill never acts on; run /devstride:setup docs to migrate it into the docs block | pre-registry |
 | `releaseTrain` | object, null | — | — | one long-lived branch one-off work batches on; null reads as absent | pre-registry |
