@@ -24,6 +24,7 @@ of range reads as 5, and doctor warns) is the keeper's beat.
 | Session start (new, resumed, after `/clear`; not after a compaction) | `start` | `starting` |
 | A prompt, with no report yet in this session, or after an `end` | `start` | `working` |
 | A prompt, a minute or more after the last report, or from another checkout | `beat` | `working` |
+| A tool use while `starting` or `waiting` (a turn a notification started) | `beat` | `working` |
 | A finished turn (Claude waits for its person); nothing after an `end` | `beat` | `waiting` |
 | The keeper, when the last report is `intervalMinutes` old, or a held change is 30 seconds old | `beat` | the latest |
 | Session end (`PRESENCE_END_REASON`: `clear`, `logout`, …) | `end` | `ended` |
@@ -45,14 +46,18 @@ clock (the hook spawns it and returns). Exported: `PRESENCE_EVENT`, `PRESENCE_ST
 segment, such as `I20100` in `jane/03-14-26/I20100-attachment-storage`; else empty),
 `PRESENCE_PLUGIN_VERSION`, `PRESENCE_INTERVAL_MINUTES`, `PRESENCE_END_REASON` (on `end` only),
 `PRESENCE_AT` (when queued, in epoch milliseconds, rising with each report, so an
-older one can be dropped), and `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PID`, so the repository can resolve the session's own
+older one can be dropped), `PRESENCE_ACTIVE_AT` (the last hook event but `end`, epoch milliseconds;
+may be empty), and `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PID`, so the repository can resolve the session's own
 name. Its exit code is kept in the session's local record; nothing reads it as a verdict.
 
 ## Rules a repository's implementation should keep
 
-- **Display only.** Presence never decides who acts; claims do.
+- **Display only.** Presence never decides who acts; claims do. It may renew or release claims
+  its own session holds.
 - **Expire on the server.** A report not renewed within a few intervals means the session is gone:
   a machine that sleeps or loses power sends no `end`.
+- **Alive is not active.** A hung turn still beats. `working` with an old `PRESENCE_ACTIVE_AT`
+  is hung or in one long command: activity is stamped after a tool use, not before.
 - **Fail fast and quietly.** A slow or failing command costs that one report, never a turn.
 - **Quote every variable.** A branch name can hold shell syntax: pass `"$PRESENCE_BRANCH"`
   quoted, or read the variables from the environment in code.
