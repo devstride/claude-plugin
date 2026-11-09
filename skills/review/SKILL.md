@@ -130,7 +130,7 @@ reports. In one turn:
 - **Local CLI** (on the roster only) — `review.localCommand` in the worktree, `<base>` =
   `origin/<baseRefName>`, `<effort>` per `delta-re-review.md` § Local effort per round; a context template gets scope, ledger and each
   matched lens `question` (a hypothesis) on stdin, a legacy base-only one drops `<context>`. Record
-  the launch head. **Background, long timeout.** Unavailable → degradation. It spends cycle 1 and
+  the launch head. **Background, stdin redirected.** Unavailable → degradation. It spends cycle 1 and
   local round 1; ordinary relaunches respect `maxLocalReviewRounds` (under
   `targetAdversarialCycles`); safety cycles override both.
 - **Cloud** — none configured or in scope → no request, no step 2 (step 6 still runs for human

@@ -64,18 +64,18 @@ Three configuration shapes are catalogued:
   failure rather than a configuration one.
 - **Context-capable template** — `review.localCommand` contains `<context>`. On every contextual
   launch, remove any `review --base <base>` pair, replace `<context>` with `-`, and feed a prompt
-  whose first instruction gives the exact three-dot range, followed by the cumulative ledger.
+  from a file (`< prompt`) whose first instruction gives the exact three-dot range, followed by the cumulative ledger.
   This works for `delta` and `full` scope. Substitute `<effort>` per § Local effort per round (the task route from
   `delivery-profiles.md` when the key is absent) before launch.
 - **Legacy base-only template** — substitute `<base>` (or append ` --base <value>` when the old
-  template has no placeholder) for the initial launch. Do not run a contextless follow-up. Use
+  template has no placeholder) for the initial launch, with stdin from `/dev/null`. Do not run a contextless follow-up. Use
   the contextual Claude effective-scope validation in its place, report the local follow-up as degraded,
   and point to `/devstride:setup review`.
 
 A `<context>` template without `<base>` is valid only when it is a prompt-first command that
 accepts stdin on every launch; setup probes that form. For one that carries both placeholders,
-the initial base-mode launch removes `<context>` rather than substituting `-`, so it cannot wait
-on empty stdin. A CLI that rejects its configured contextual form is this-run degradation.
+the initial base-mode launch removes `<context>` rather than substituting `-` and runs with
+`</dev/null`, so it cannot wait on stdin. A CLI that rejects its configured contextual form is this-run degradation.
 
 ## Local effort per round — `review.localEffort`
 

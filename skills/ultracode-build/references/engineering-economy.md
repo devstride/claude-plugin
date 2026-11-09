@@ -57,7 +57,7 @@ hypothesis failed. Routine work skips it. If independent Claude readers are also
 read-only support call concurrently with them; do not serialize identical investigations.
 
 Replace `<effort>` with the task-sized effort from the table and `<context>` with `-`, then feed a
-distilled prompt on stdin: the accepted scope, relevant paths/diff, evidence already found, the one
+distilled prompt on stdin from a file (`< prompt`, never an inherited stdin, which never closes): the accepted scope, relevant paths/diff, evidence already found, the one
 question to answer, and required structured output. The command is advisory and read-only: it never
 writes files, invokes DevStride MCP, decides scope, or substitutes for the merge gate. Verify useful
 claims against the repository before acting on them and carry the disposition in the shared ledger.
