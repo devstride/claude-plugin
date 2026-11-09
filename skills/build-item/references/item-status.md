@@ -22,6 +22,9 @@ own CLI, a script) runs this file, never a copy.
 3. Exit 0: `statusId` present → `update_item` to it and read the item back; absent → leave the
    status. `comment` present → `add_comment` it, whatever the status did. Show `message`.
    Exit 2 or 1 → move nothing, post nothing, and report its `item-status:` line.
+4. A `landed` event whose target kind is `train` or `base`, once the merge is pushed: quote when
+   it will be live and record the quote on the item
+   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/estimates.md`, Quoting at landing).
 
 It never moves an item out of a done-type status (the landed comment still posts) and never posts
 progress comments.

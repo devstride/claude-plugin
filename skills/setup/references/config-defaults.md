@@ -375,6 +375,11 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   one machine per waiting work wins its claim. `mode` `off` (default), `shadow` (records what it would start in
   the claim store, changes nothing) or `live`, switched on only after the shadow records were
   checked. Needs `claims`. Contract: `${CLAUDE_PLUGIN_ROOT}/skills/release/references/backstop.md`.
+- **`release.estimates.deployMinutes`** — minutes from the production merge to live (default 0),
+  added to both ends of every estimate. Estimates need no switch: no clock time is given before
+  work lands, and after it lands the quote is a range measured from the last 14 days of git history,
+  recorded on the item and scored at the deploy. Contract:
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/estimates.md`.
 - **`release.lightRelease.standingYes`** — the owner's standing yes for one kind of release: a
   light release (per `release.classifySkill`) whose tree is identical to the reviewed train, with
   every required check green, no open threads, every pre-ship check passed unwaived, the previous

@@ -8,6 +8,23 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Honest estimates of when work will be live.** Agents no longer give a clock time or a duration
+  for when work will be live before it has landed on the release train or the release source (for
+  an epic, before its release pull request merges); they say which steps remain. Once work lands,
+  the new `skills/release/scripts/estimate.py quote` gives a range with a confidence (for example
+  "live between 12:45 PM and 4:45 PM CST, 8 in 10 chance"), measured from the last 14 days of the
+  repository's own git history: every landing, when it reached the production branch, and the ones
+  still waiting. The range is conditional on how long the work has already waited, so a quote asked
+  for later is still honest. With too little history it gives no range rather than a guess. The
+  quote is posted on the item as a comment with a machine-readable token, and when a release's
+  deploy is confirmed each shipped item's quote is scored (inside the range, early or late, by how
+  many minutes) on the item too, so accuracy can be reported. `estimate.py backtest` replays the
+  method over recent history and says how many quotes would have been right. New setting
+  `release.estimates.deployMinutes` (default 0): the time from the production merge to live.
+  Contract: `skills/release/references/estimates.md`.
+
 ## [3.45.0] — 2026-11-09
 
 ### Added
