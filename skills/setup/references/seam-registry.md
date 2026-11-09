@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.45.0.
+`.claude/ds-config.json` against. Schema version: 3.46.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -185,8 +185,8 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.backstop` | object | — | — | start a release when work on the release train has waited too long and nothing is releasing it; contract: skills/release/references/backstop.md | 3.45.0 |
 | `release.backstop.mode` | string | off, shadow, live | off | off: no check; shadow: record what the backstop would start and change nothing; live: start the release (only after shadow results were checked); needs a claims block | 3.45.0 |
 | `release.backstop.maxWaitMinutes` | integer | >= 15, <= 1440 | `120` | how long the oldest landing on the train may wait, by its committer time, before the backstop starts a release; at most a day, the longest a claim can live | 3.45.0 |
-| `release.estimates` | object | — | — | honest estimates of when landed work will be live: a measured range after landing, never a clock time before; contract: skills/release/references/estimates.md | unreleased |
-| `release.estimates.deployMinutes` | integer | >= 0, <= 1440 | `0` | minutes from the production merge to live, added to both ends of every estimate range and to a score read from git | unreleased |
+| `release.estimates` | object | — | — | honest estimates of when landed work will be live: a measured range after landing, never a clock time before; contract: skills/release/references/estimates.md | 3.46.0 |
+| `release.estimates.deployMinutes` | integer | >= 0, <= 1440 | `0` | minutes from the production merge to live, added to both ends of every estimate range and to a score read from git | 3.46.0 |
 | `release.lightRelease` | object | — | — | rules for a light release (one the classify skill calls LIGHT) | 3.29.0 |
 | `release.lightRelease.standingYes` | boolean | — | `false` | the owner's standing yes: a light release identical to its reviewed train merges and deploys without an in-the-moment yes; contract: skills/release/references/auto-start.md | 3.29.0 |
 | `release.fullRelease` | object | — | — | the owner's written standing yes for releases of any class with every gate green; contract: skills/release/references/auto-start.md | 3.37.0 |

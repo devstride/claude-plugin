@@ -1508,7 +1508,7 @@
       "key": "release.estimates",
       "type": "object",
       "description": "honest estimates of when landed work will be live: a measured range after landing, never a clock time before; contract: skills/release/references/estimates.md",
-      "since": "unreleased"
+      "since": "3.46.0"
     },
     {
       "key": "release.estimates.deployMinutes",
@@ -1517,7 +1517,7 @@
       "maximum": 1440,
       "default": 0,
       "description": "minutes from the production merge to live, added to both ends of every estimate range and to a score read from git",
-      "since": "unreleased"
+      "since": "3.46.0"
     },
     {
       "key": "release.lightRelease",
