@@ -8,6 +8,20 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **Every claim names its machine and session the same way.** Story claims no longer ask the agent
+  for "the short hostname": a new helper, `skills/build-item/scripts/claim_record.py`, prints the
+  machine, the session's own name and a payload with the same four keys every time (`sessionId`,
+  `checkout`, `branch`, `pluginVersion`, null when unknown), and `story-claims.md` § The record has
+  the agent pass them verbatim on every claim and the payload on every heartbeat. The machine is
+  `DEVSTRIDE_MACHINE_NAME` when a repository's machine setup recorded it, else the hostname without
+  `.local`, lower-cased with other characters turned to hyphens — the spelling the product's own
+  command line uses. Release clearance and the presence hook use the same machine name (so
+  `PRESENCE_MACHINE` and a clearance record's `machine` may change spelling), and a DevStride
+  clearance claim or adoption now carries the session name. The session name is read from Claude
+  Code's own session record (under `CLAUDE_CONFIG_DIR` when set), else `DEVSTRIDE_SESSION`.
+
 ## [3.42.0] — 2026-11-08
 
 ### Added
