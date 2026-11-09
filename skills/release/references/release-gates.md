@@ -3,7 +3,7 @@ load: rationale
 ---
 # Release gates — why they are local, and what the head SHAs protect
 
-The rules live in the `release` body; this file holds the reasoning, read when a pre-ship check
+The rules live in the `release` body and `release-pr.md`; this file holds the reasoning, read when a pre-ship check
 is red, when the head advanced by anything other than this run's fix commits or a hotfix merge, or
 before waiving a check.
 
@@ -59,4 +59,4 @@ review scope turns out to be.
 
 - `skills/release/SKILL.md` — step 2's pointer ("Read … when a pre-ship check is red, when the
   head advanced by anything other than this run's fix commits or a hotfix merge, or before waiving
-  a check").
+  a check"); `skills/release/references/release-pr.md` — step 2's scope and suites.

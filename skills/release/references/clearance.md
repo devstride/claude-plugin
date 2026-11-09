@@ -234,7 +234,8 @@ request — then even an administrator cannot land a second release beside the f
 
 ## Cited by
 
-- `skills/release/SKILL.md` — the clearance floor, steps 0a, 4, 5b and 6.
+- `skills/release/SKILL.md` — the clearance floor, steps 0a, 4, 5b and 6;
+  `references/merge-and-deploy.md` — step 4's recap.
 - `skills/setup/SKILL.md` and `references/ci-cost-patterns.md` §E — the `setup ci` template.
 - `skills/doctor/SKILL.md` — the config audit of `release.clearance` and `releaseTower`.
 - `skills/setup/references/statusline-segments.md` — the `release` segment.

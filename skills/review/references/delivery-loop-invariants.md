@@ -791,7 +791,12 @@ skills/review/references/review-ledger.md|On every settled PR
 skills/review/references/delta-re-review.md|localReReviewScope
 skills/review/SKILL.md|exact range
 skills/review/SKILL.md|second timeout STOPS
-skills/release/SKILL.md|sanitized `<!-- devstride:review-context -->` final marker
+skills/release/references/release-pr.md|sanitized `<!-- devstride:review-context -->` final marker
+skills/release/SKILL.md|release-pr.md
+skills/release/SKILL.md|merge-and-deploy.md
+skills/release/references/release-pr.md|PRE-SHIP RESUME
+skills/release/references/merge-and-deploy.md|zero-unresolved-threads
+skills/release/references/merge-and-deploy.md|RELEASE_COMMIT=<merge sha>
 skills/review/SKILL.md|never pasted
 skills/review/scripts/rereview-scope.sh|numstat
 skills/review/references/delta-re-review.md|threshold
