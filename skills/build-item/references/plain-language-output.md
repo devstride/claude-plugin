@@ -115,6 +115,13 @@ put an exact command or edit after the explanation. After an attempted repair sa
 `Result:`. Close with the readiness state, blockers, warnings, repairs still available and one next
 action. Personal-setting deletion keeps its own consent question.
 
+## Time estimates
+
+Before work lands (on the release train or the release source; an epic's, when its release pull
+request merges onto one of them), give no clock time or duration for when it will be live: say which steps remain.
+After, quote only `estimate.py quote`'s range and confidence
+(`${CLAUDE_PLUGIN_ROOT}/skills/release/references/estimates.md`).
+
 ## Tone guardrails
 
 Plain does not mean childish, vague or euphemistic. Prefer “convert the pull request to draft so

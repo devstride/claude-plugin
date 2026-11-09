@@ -435,6 +435,15 @@ M20. The release backstop (`release.backstop`) never delays or caps a release: `
      lapses after `maxWaitMinutes` (at most 1440), so an early stop retries once per window; checks
      repeat under the train claim; `gh` lists the origin's host and repository; shadow mirrors
      live; live only after shadow.
+M21. Honest estimates (`skills/release/references/estimates.md`): no clock time or duration for
+     when work will be live before it lands (on the train or the release source; an epic's work
+     at its release pull request's merge). After it lands, only `estimate.py quote`'s range and
+     confidence, word for word, never a single time or a narrower range; NONE says no range.
+     The range is measured from 14 days of git history, conditional on the wait so far, with
+     still-waiting landings counted as at least their wait. Each quote is posted on the item with
+     its token, keyed by the landing commit; each is scored after the production merge (deploy
+     confirmed or its confirmation skipped) against that merge plus `deployMinutes`, never
+     blocking the release. Work merged straight into the release source has landed too.
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
 N1. ONE profile word — `prototype` / `standard` / `extended` — moves every rigor knob together; the
@@ -910,6 +919,17 @@ skills/release/scripts/backstop.py|"--repo", repo
 skills/release/scripts/backstop.py|derived
 skills/release/references/backstop.md|outcome `busy`
 skills/release/scripts/backstop.py|unreadable is never clear
+skills/build-item/references/plain-language-output.md|estimates.md
+skills/build-item/references/item-status.md|estimates.md
+skills/build-item/references/epic-release-steps.md|estimates.md
+skills/release/references/merge-and-deploy.md|estimates.md
+skills/release/references/estimates.md|never a single time and never a narrower range
+skills/release/references/estimates.md|never at a story's merge onto the epic branch
+skills/release/references/estimates.md|Scoring never blocks or delays a release
+skills/release/scripts/estimate.py|no clock time before landing
+skills/build-item/references/plain-language-output.md|give no clock time or duration
+skills/build-item/references/item-status.md|target kind is `train` or `base`
+skills/release/references/merge-and-deploy.md|or its confirmation skipped
 skills/release/scripts/standing-yes.py|has no owner approval for this content
 skills/build-item/references/release-holds.md|scripts/release-holds.py
 skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor
@@ -1026,8 +1046,9 @@ step. That is the moment a rule goes missing, and it is the only moment this fil
 
 ---
 
-**Total: 149 rule entries (A–T) + 6 editing disciplines (U) = 155.** (M20, the release backstop,
-added with a recount. The total before it claimed 144
+**Total: 150 rule entries (A–T) + 6 editing disciplines (U) = 156.** (M21, honest estimates,
+added with a recount; before it 155, when M20, the release backstop,
+was added with a recount. The total before it claimed 144
 while 146 were enumerated — M17 and M18 were added without a recount: the seventh miscount,
 corrected then. Before it, 142 claimed while 143 were enumerated, when M16 was added.)
 The round-by-round revision enumerated 154 facts; 20 of them were near-duplicates stated in two to

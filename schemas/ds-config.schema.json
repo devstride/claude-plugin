@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.45.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.46.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -1159,6 +1159,23 @@
           },
           "additionalProperties": false,
           "description": "start a release when work on the release train has waited too long and nothing is releasing it; contract: skills/release/references/backstop.md"
+        },
+        "estimates": {
+          "type": "object",
+          "properties": {
+            "deployMinutes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1440,
+              "default": 0,
+              "description": "minutes from the production merge to live, added to both ends of every estimate range and to a score read from git"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "description": "honest estimates of when landed work will be live: a measured range after landing, never a clock time before; contract: skills/release/references/estimates.md"
         },
         "lightRelease": {
           "type": "object",
