@@ -7,7 +7,7 @@ The schema defaults to ${CLAUDE_PLUGIN_ROOT}/schemas/ds-config.schema.json (the 
 script ships in when the variable is unset). It is generated from schemas/seam-registry.json, and
 this validator implements exactly the keyword subset the generator emits — type (a list included),
 properties, patternProperties, additionalProperties (false, or the schema every other key's value
-must meet), required, enum, items, oneOf, minimum, exclusiveMinimum, its own x-setTogether
+must meet), required, enum, items, oneOf, minimum, exclusiveMinimum, maximum, its own x-setTogether
 (children set all together or not at all; null is unset) and its own x-warnMinimum /
 x-warnMaximum (a value outside them is ignored by its reader, which keeps its default: a WARN) —
 plus
@@ -34,6 +34,7 @@ fallback to defaults).
 """
 import datetime
 import difflib
+import importlib.util
 import json
 import os
 import re
@@ -176,6 +177,23 @@ def auto_start_checks(v, config):
             v.add("ERROR", "release.fullRelease.approvedMigrations[%d]" % i, "needs blob (a full git blob id), path, item (I#####) and approved (a real YYYY-MM-DD, not after today): a malformed entry makes every full release ask")
 
 
+def backstop_checks(v, config):
+    """`release.backstop` needs a claims store and a release train: the rules are backstop.py's own
+    `problems`, imported from the plugin copy this validator ships in, so doctor and the check agree."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                        "release/scripts/backstop.py")
+    try:
+        spec = importlib.util.spec_from_file_location("backstop", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        found = module.problems(config)
+    except Exception as exc:  # a broken copy is reported, never a traceback
+        v.add("WARN", "release.backstop", "its checks could not run: %s" % exc)
+        return
+    for severity, where, message in found:
+        v.add(severity, where, message)
+
+
 class Validator:
     def __init__(self, schema, local_prefixes):
         self.findings = []
@@ -218,6 +236,9 @@ class Validator:
         if "minimum" in schema and type_of(value) in ("integer", "number") \
                 and value < schema["minimum"]:
             self.add("ERROR", path, "%s is below the minimum %s" % (show(value), schema["minimum"]))
+        if "maximum" in schema and type_of(value) in ("integer", "number") \
+                and value > schema["maximum"]:
+            self.add("ERROR", path, "%s is above the maximum %s" % (show(value), schema["maximum"]))
         if "exclusiveMinimum" in schema and type_of(value) in ("integer", "number") \
                 and value <= schema["exclusiveMinimum"]:
             self.add("ERROR", path, "%s must be greater than %s" % (
@@ -371,6 +392,8 @@ def main(argv):
     deferred_container_checks(v, config)
     pre_ship_checks(v, config)
     auto_start_checks(v, config)
+    if isinstance(config, dict):
+        backstop_checks(v, config)
     errors = [f for f in v.findings if f[0] == "ERROR"]
     warns = [f for f in v.findings if f[0] == "WARN"]
     notes = [f for f in v.findings if f[0] == "NOTE"]

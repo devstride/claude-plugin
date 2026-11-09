@@ -426,6 +426,15 @@ M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exac
      is one (name, app, workflow) or one commit status; a same-name check elsewhere must pass too,
      and a rule's app restriction is kept. The printed command names `--repo`. No skill
      text carries its own `--admin` (`scripts/tests/merge-gate.sh` greps for one).
+M20. The release backstop (`release.backstop`) never delays or caps a release: `backstop.py due`
+     starts one only when the landing on the train with the smallest committer time waited over
+     `maxWaitMinutes`, no release is in progress (no open release pull request by `gh`, always;
+     clearance clear and derived when set; unreadable is never clear) and no hold applies over the
+     release's own delta. One machine per waiting work wins the claim keyed by that landing; while
+     live it blocks a start whoever holds it, this session too (read first, never renewed), and it
+     lapses after `maxWaitMinutes` (at most 1440), so an early stop retries once per window; checks
+     repeat under the train claim; `gh` lists the origin's host and repository; shadow mirrors
+     live; live only after shadow.
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
 N1. ONE profile word — `prototype` / `standard` / `extended` — moves every rigor knob together; the
@@ -889,6 +898,18 @@ skills/release/references/release-branch.md|Release holds.
 skills/release/SKILL.md|light or written
 skills/release/references/auto-start.md|approved BY CONTENT
 skills/release/references/auto-start.md|relayed yes: add
+skills/release/SKILL.md|backstop.md
+skills/release/references/auto-start.md|backstop.md
+skills/release/references/backstop.md|only after the shadow results were checked
+skills/release/references/backstop.md|never release it on a start
+skills/release/references/backstop.md|due --json --recheck <key>
+skills/release/references/backstop.md|smallest committer time
+skills/release/references/backstop.md|WHOEVER holds it
+skills/release/references/backstop.md|gh pr list --repo <host>/<owner>/<repo>
+skills/release/scripts/backstop.py|"--repo", repo
+skills/release/scripts/backstop.py|derived
+skills/release/references/backstop.md|outcome `busy`
+skills/release/scripts/backstop.py|unreadable is never clear
 skills/release/scripts/standing-yes.py|has no owner approval for this content
 skills/build-item/references/release-holds.md|scripts/release-holds.py
 skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor
@@ -1005,9 +1026,10 @@ step. That is the moment a rule goes missing, and it is the only moment this fil
 
 ---
 
-**Total: 148 rule entries (A–T) + 6 editing disciplines (U) = 154.** (The previous total claimed 144
+**Total: 149 rule entries (A–T) + 6 editing disciplines (U) = 155.** (M20, the release backstop,
+added with a recount. The total before it claimed 144
 while 146 were enumerated — M17 and M18 were added without a recount: the seventh miscount,
-corrected here. Before it, 142 claimed while 143 were enumerated, when M16 was added.)
+corrected then. Before it, 142 claimed while 143 were enumerated, when M16 was added.)
 The round-by-round revision enumerated 154 facts; 20 of them were near-duplicates stated in two to
 four places, and each group became one entry carrying every clause. (Needles are a SAMPLE, not one per fact; recount their loops
 after editing.)

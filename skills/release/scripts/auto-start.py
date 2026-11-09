@@ -15,7 +15,8 @@ configured, `release.mergeTrainBeforeCut` is true with a train branch (`releaseT
 its old name `supportTrain.branch`; both set is an ERROR), and after a fetch
 `git log --no-merges origin/<releaseSource>..origin/<train>` is non-empty. It never looks for an
 open train pull request: the winner's release step 0b runs that search itself, after the claim.
-No network beyond `git ls-remote` and `git fetch`.
+No network beyond `git ls-remote` and `git fetch`. `train_state` is that train half alone, which
+skills/release/scripts/backstop.py reuses.
 
 The train is looked up on origin first, the way routing.py's `resolve_train` does (one rule, reused):
 not there and no other `train/*` branch → SKIP, nothing has landed yet; not there but exactly one
@@ -105,6 +106,40 @@ def origin_heads(root):
     return heads
 
 
+def train_state(config, root):
+    """Does the release train hold work beyond the release source? The half of `check` that does not
+    read `release.autoStart`, shared with backstop.py (one rule, reused). Returns ("SKIP", reason),
+    ("ERROR", reason) or ("AHEAD", commits, train, source); fetches unless AUTO_START_NO_FETCH=1."""
+    release = section(config, "release")
+    if isinstance(config.get("releaseTrain"), dict) and isinstance(config.get("supportTrain"), dict):
+        return ("ERROR", "both releaseTrain and supportTrain are set; supportTrain is the old name of releaseTrain")
+    train = (section(config, "releaseTrain") or section(config, "supportTrain")).get("branch")
+    if release.get("mergeTrainBeforeCut") is not True or not isinstance(train, str) or not train:
+        return ("SKIP", "no release train (release.mergeTrainBeforeCut and releaseTrain.branch)")
+    source = release.get("releaseSource") or "develop"   # the schema's default, never baseBranch
+    where = load_routing().resolve_train(train, origin_heads(root))
+    if "kind" in where:
+        return ("ERROR", where["reason"])
+    if where["create"]:
+        return ("SKIP", "the release train %s is not on origin yet: nothing has landed on it" % train)
+    if where["branch"] != train:
+        return ("ERROR", "a release reads only %s, so none can start until the rename is cut over%s"
+                % (train, where["note"]))
+    if os.environ.get("AUTO_START_NO_FETCH") != "1":
+        fetched = git(root, "fetch", "-q", "origin",
+                      "+refs/heads/%s:refs/remotes/origin/%s" % (train, train),
+                      "+refs/heads/%s:refs/remotes/origin/%s" % (source, source))
+        if fetched.returncode != 0:
+            return ("ERROR", "git fetch of %s and %s failed: %s" % (train, source, (fetched.stderr or "").strip()[:200]))
+    ahead = git(root, "log", "--no-merges", "--format=%H", "origin/%s..origin/%s" % (source, train))
+    if ahead.returncode != 0:
+        return ("ERROR", "cannot compare origin/%s with origin/%s: %s" % (train, source, (ahead.stderr or "").strip()[:200]))
+    commits = [line for line in ahead.stdout.splitlines() if line.strip()]
+    if not commits:
+        return ("SKIP", "the train holds nothing beyond %s" % source)
+    return ("AHEAD", commits, train, source)
+
+
 def check():
     config, root = load_config()
     release = section(config, "release")
@@ -112,32 +147,10 @@ def check():
         out("SKIP release.autoStart.enabled is not true")
     if not isinstance(config.get("claims"), dict):
         out("SKIP release.autoStart needs a claims block; without one it does nothing")
-    if isinstance(config.get("releaseTrain"), dict) and isinstance(config.get("supportTrain"), dict):
-        out("ERROR both releaseTrain and supportTrain are set; supportTrain is the old name of releaseTrain", 1)
-    train = (section(config, "releaseTrain") or section(config, "supportTrain")).get("branch")
-    if release.get("mergeTrainBeforeCut") is not True or not isinstance(train, str) or not train:
-        out("SKIP no release train (release.mergeTrainBeforeCut and releaseTrain.branch)")
-    source = release.get("releaseSource") or "develop"   # the schema's default, never baseBranch
-    where = load_routing().resolve_train(train, origin_heads(root))
-    if "kind" in where:
-        out("ERROR %s" % where["reason"], 1)
-    if where["create"]:
-        out("SKIP the release train %s is not on origin yet: nothing has landed on it" % train)
-    if where["branch"] != train:
-        out("ERROR a release reads only %s, so none can start until the rename is cut over%s"
-            % (train, where["note"]), 1)
-    if os.environ.get("AUTO_START_NO_FETCH") != "1":
-        fetched = git(root, "fetch", "-q", "origin",
-                      "+refs/heads/%s:refs/remotes/origin/%s" % (train, train),
-                      "+refs/heads/%s:refs/remotes/origin/%s" % (source, source))
-        if fetched.returncode != 0:
-            out("ERROR git fetch of %s and %s failed: %s" % (train, source, (fetched.stderr or "").strip()[:200]), 1)
-    ahead = git(root, "log", "--no-merges", "--format=%H", "origin/%s..origin/%s" % (source, train))
-    if ahead.returncode != 0:
-        out("ERROR cannot compare origin/%s with origin/%s: %s" % (train, source, (ahead.stderr or "").strip()[:200]), 1)
-    commits = [line for line in ahead.stdout.splitlines() if line.strip()]
-    if not commits:
-        out("SKIP the train holds nothing beyond %s" % source)
+    state = train_state(config, root)
+    if state[0] != "AHEAD":
+        out("%s %s" % state, 1 if state[0] == "ERROR" else 0)
+    _, commits, train, source = state
     out("START %s (%d commit(s) on %s not on %s)" % (repo_key(root), len(commits), train, source))
 
 

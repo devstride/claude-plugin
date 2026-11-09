@@ -368,6 +368,13 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   train holds work beyond the source and, if it wins the `release-train` claim, runs `release`.
   Exactly one machine wins; a session that loses carries on with its own loop. Without `claims`
   it does nothing and `doctor` reports an error.
+- **`release.backstop`** — a release when landed work has waited too long, never instead of the
+  releases that start whenever work is ready: a check run on a schedule (`/devstride:release
+  backstop`) starts one only when the oldest landing on the train is older than `maxWaitMinutes`
+  (default 120, 15 to 1440), clearance shows no release in progress and no release hold applies;
+  one machine per waiting work wins its claim. `mode` `off` (default), `shadow` (records what it would start in
+  the claim store, changes nothing) or `live`, switched on only after the shadow records were
+  checked. Needs `claims`. Contract: `${CLAUDE_PLUGIN_ROOT}/skills/release/references/backstop.md`.
 - **`release.lightRelease.standingYes`** — the owner's standing yes for one kind of release: a
   light release (per `release.classifySkill`) whose tree is identical to the reviewed train, with
   every required check green, no open threads, every pre-ship check passed unwaived, the previous

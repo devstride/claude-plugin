@@ -27,7 +27,7 @@ Registry rules the generator applies:
     that treats null as unset).
   - a setting's `warnMinimum` / `warnMaximum` become `x-warnMinimum` / `x-warnMaximum`: a value
     outside them is ignored by its reader, which keeps its default, so the validator WARNs rather
-    than errs (the validator's own keywords; `minimum` and `exclusiveMinimum` stay errors);
+    than errs (the validator's own keywords; `minimum`, `exclusiveMinimum` and `maximum` stay errors);
   - an object setting's `values` (a type plus optional bounds) types every entry of a map whose
     keys are the user's own (`additionalProperties` carrying that schema instead of false);
   - a hook a step skill runs carries `step` (the skill's directory) and `stepVerdict` (the
@@ -52,10 +52,10 @@ TABLE = "skills/setup/references/seam-registry.md"
 ID_FORMAT = "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v{}/schemas/ds-config.schema.json"
 
 VALIDATION_KEYWORDS = {"type", "properties", "patternProperties", "additionalProperties",
-                       "required", "enum", "items", "oneOf", "minimum", "exclusiveMinimum",
+                       "required", "enum", "items", "oneOf", "minimum", "exclusiveMinimum", "maximum",
                        "x-setTogether", "x-warnMinimum", "x-warnMaximum"}
 ANNOTATIONS = {"$schema", "$id", "title", "description", "default", "x-severity"}
-BOUNDS = (("minimum", "minimum"), ("exclusiveMinimum", "exclusiveMinimum"),
+BOUNDS = (("minimum", "minimum"), ("exclusiveMinimum", "exclusiveMinimum"), ("maximum", "maximum"),
           ("warnMinimum", "x-warnMinimum"), ("warnMaximum", "x-warnMaximum"))
 HOOK_FIELDS = ["key", "shape", "valueType", "nullable", "payload", "verdict", "calledBy",
                "unset", "contract", "since"]
@@ -142,6 +142,8 @@ def allowed(spec):
         parts.append(">= %s" % spec["minimum"])
     if "exclusiveMinimum" in spec:
         parts.append("> %s" % spec["exclusiveMinimum"])
+    if "maximum" in spec:
+        parts.append("<= %s" % spec["maximum"])
     if "warnMinimum" in spec or "warnMaximum" in spec:
         parts.append("%s..%s, else warned and the default stands" % (
             spec.get("warnMinimum", ""), spec.get("warnMaximum", "")))
