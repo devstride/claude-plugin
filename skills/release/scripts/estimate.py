@@ -232,19 +232,28 @@ def merged_branch(root, sha):
 
 
 ABSORB = re.compile(r"^Merge commit '([0-9a-f]{7,40})'")
-ABSORB_WORDS = re.compile(r"^merge: (?:absorb\b|late (?:train )?landing|.* into .*(?:\bsnapshot\b|(?:release|support)-train-))", re.I)
+ABSORB_WORDS = re.compile(r"^merge: (?:absorb|late (?:train )?landing)(?:\s|$)", re.I)
+INTO = re.compile(r"^merge: .* into (\S+)(.*)$", re.I)
 
 
 def says_absorb(root, row, train):
     """The merge's subject says it absorbed the train: the subject release-branch.md 4a prescribes
     (`Merge branch '<train>' (<absorbAt>) into <snapshot>`), git's own for merging the absorbed
     commit by its sha, or the older wording (`merge: absorb …`, `merge: late train landing …`,
-    `merge: <train> (<sha>) into the … snapshot`); never a word inside a branch name. Syncs into
-    the snapshot are skipped before this is asked."""
+    `merge: <train> (<sha>) into the … snapshot` or `… into <…release-train-…>`). The words lead
+    the merge's own `merge:` subject as whole words, or name its destination after its last
+    `into` — a snapshot, never the train itself; a branch name (`absorb-retries`,
+    `fix-absorb-validation`) is never the evidence. Syncs into the snapshot are skipped before
+    this is asked."""
     branch, lines = merged_branch(root, row[0])
-    commit = ABSORB.match(lines[0]) if lines else None
+    first = lines[0] if lines else ""
+    commit = ABSORB.match(first)
+    into = INTO.match(first)
+    dest = into and into.group(1).removeprefix("origin/")
     return (branch == train or bool(commit and row[2][1].startswith(commit.group(1)))
-            or bool(lines and ABSORB_WORDS.search(lines[0])))
+            or bool(ABSORB_WORDS.match(first))
+            or bool(into and dest != train
+                    and (SNAPSHOT.search(dest) or re.search(r"\bsnapshot\b", into.group(0)[into.start(1):], re.I))))
 
 
 def delivery(root, merge, train):
