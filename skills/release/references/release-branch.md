@@ -117,9 +117,11 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    ABSORB them: resolve `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said
    back); `<trainSnapshot>` must be its ancestor (else STOP); run the exclusion check over the NEW
    train work only, `--start-on train --source-before <trainSnapshot> --head <absorbAt>` (source
-   merges are not train work; exit 1 STOPS); `git merge --no-ff <absorbAt>` into the snapshot (a
-   conflict STOPS) and push; rewrite the marker to `snapshot <absorbAt>`, the title's count and the
-   body's list, and from then on read `<trainSnapshot>` as `<absorbAt>` for detection and step 6.
+   merges are not train work; exit 1 STOPS);
+   `git merge --no-ff -m "Merge branch '<train>' (<absorbAt>) into <snapshot>" <absorbAt>` into the
+   snapshot (that subject is how `estimate.py` tells an absorb; a conflict STOPS) and push; rewrite
+   the marker to `snapshot <absorbAt>`, the title's count and the body's list, and from then on
+   read `<trainSnapshot>` as `<absorbAt>` for detection and step 6.
    When to absorb follows `releaseTrain.lateArrivals`:
    - **`"restart"`** — automatically, up to `review` step 7's ready-flip: a late arrival is meant to
      supersede what is there. `late-arrivals` is declared to `pr`, which passes it to `review` with

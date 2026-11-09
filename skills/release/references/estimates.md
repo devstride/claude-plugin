@@ -62,7 +62,7 @@ failures, the release steps, the golden route and the owner's go-ahead are all i
 Fewer than 8 comparable landings → `NONE`. Times show in `release.holdTimeZone`; tokens are UTC.
 A train delivery is recognised by its merge naming the train, the snapshot or its title as
 `release-branch.md` names them; its fixes and syncs are not landings, and late landings it
-absorbed are. Any other merge into the source (an epic's release pull request) is one landing.
+absorbed (the absorb's subject, 4a, says so) are. Any other merge into the source (an epic's release pull request) is one landing.
 
 `estimate.py backtest [--days N]` replays the method over recent history (each landing quoted 5
 minutes after it landed, from the history as it stood then) and says how many went live inside

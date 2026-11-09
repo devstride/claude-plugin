@@ -200,9 +200,11 @@ def carries_nothing(root, row, production, *bases):
     merged into a train or a snapshot)."""
     if len(row[2]) < 2:
         return False
-    then = [sha for sha, when, _ in reversed(production_walk(root, production)) if when <= row[1]][:1]
-    if then and (then[0] == row[0] or then[0] in row[2]):
-        then = []   # the merge is on production itself (a source that is production): not yet
+    walk = production_walk(root, production)
+    if row[0] in {sha for sha, _, _ in walk}:
+        then = []   # on production itself (a source that is production): its first parent is the baseline
+    else:
+        then = [sha for sha, when, _ in reversed(walk) if when <= row[1]][:1]
     left = git(root, "rev-list", "--no-merges", "--count", row[0], "--not", row[2][0], *(list(bases) + then)).stdout.strip()
     return left == "0"
 
@@ -229,28 +231,41 @@ def merged_branch(root, sha):
     return (named and (named.group(1) or named.group(2))), lines
 
 
+ABSORB = re.compile(r"^Merge commit '([0-9a-f]{7,40})'")
+ABSORB_WORDS = re.compile(r"\babsorb|\blate (?:train )?landing", re.I)
+
+
+def says_absorb(root, row, train):
+    """The merge's subject says it absorbed the train: the subject release-branch.md 4a prescribes
+    (`Merge branch '<train>' (<absorbAt>) into <snapshot>`), git's own for merging the absorbed
+    commit by its sha, or the older wording ("absorb", "late landing")."""
+    branch, lines = merged_branch(root, row[0])
+    commit = ABSORB.match(lines[0]) if lines else None
+    return (branch == train or bool(commit and row[2][1].startswith(commit.group(1)))
+            or bool(lines and ABSORB_WORDS.search(lines[0])))
+
+
 def delivery(root, merge, train):
     """A train delivery is recognised by the branch its merge names (the train, or the release
     train's snapshot `release-train-<date>`, `support-train-<date>` under the train's old name) or
-    by its pull request title (`Release train:`); release-branch.md names them so. Any other merge
+    by its pull request title (`Release train:`, as the subject or under it); release-branch.md
+    names them so. Any other merge
     into the source is itself one landing, however many merges its branch holds (an epic's release
     pull request is one landing, not its stories), whatever its message mentions."""
     branch, lines = merged_branch(root, merge[0])
-    title = next((line for line in lines[1:] if line.strip()), "")
+    titles = [lines[0] if lines else "", next((line for line in lines[1:] if line.strip()), "")]
     return bool(train) and (branch == train or bool(branch and SNAPSHOT.search(branch))
-                            or title.startswith(("Release train:", "Support train:")))
+                            or any(t.startswith(("Release train:", "Support train:")) for t in titles))
 
 
 def brought(root, merge, production, train):
     """The landings a first-parent commit of the release source brought, syncs left out. A train
     delivery brings each train landing on its second parent's first-parent walk: snapshot fixes
     (not merges) and syncs are skipped, and a merge that absorbed late landings is read through to
-    them (release-branch.md 4a): its own walk is all merges and continues an earlier commit of the
-    delivery with nothing but snapshot work (fixes, syncs, earlier absorbs) after that commit and
-    before it, and either something between (the snapshot's merge of the source) or a subject
-    naming the train as the branch merged. A branch cut from the train mid-cycle has a landing
-    between, or continues the commit just before it, so it stays one landing. Any other commit is
-    itself the landing."""
+    them (release-branch.md 4a): its subject says so, its own walk is all merges, and it continues
+    an earlier commit of the delivery with no landing after that commit. The history's shape alone
+    cannot tell an absorb from a branch cut from the train mid-cycle (a batch, an epic), which
+    stays one landing. Any other commit is itself the landing."""
     if len(merge[2]) < 2 or not delivery(root, merge, train):
         return [merge]
     found, walked, landed = [], {}, []
@@ -267,7 +282,7 @@ def brought(root, merge, production, train):
             inner = rows(root, row[2][1], "--not", row[2][0])
             start = inner[0][2][0] if inner and inner[0][2] else None
             if (start in walked and walked[start] == len(landed) and all(len(r[2]) >= 2 for r in inner)
-                    and (start != row[2][0] or merged_branch(root, row[0])[0] == train)):
+                    and says_absorb(root, row, train)):
                 absorbed = True
                 for late in inner:
                     if landing(late):
