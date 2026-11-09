@@ -1499,8 +1499,9 @@
       "key": "release.backstop.maxWaitMinutes",
       "type": "integer",
       "minimum": 15,
+      "maximum": 1440,
       "default": 120,
-      "description": "how long the oldest landing on the train may wait, by its committer time, before the backstop starts a release",
+      "description": "how long the oldest landing on the train may wait, by its committer time, before the backstop starts a release; at most a day, the longest a claim can live",
       "since": "unreleased"
     },
     {

@@ -73,7 +73,11 @@ g "$WORK/repo" remote set-url origin "git@github.com:acme/widgets.git"
 
 # --- bad config rejected -----------------------------------------------------------------------
 conf shadow ', "maxWaitMinutes": 5'
-expect "(3a) a wait under 15 minutes → ERROR, exit 1" 1 '^ERROR release.backstop.maxWaitMinutes must be a whole number of minutes, at least 15$' due
+expect "(3a) a wait under 15 minutes → ERROR, exit 1" 1 '^ERROR release.backstop.maxWaitMinutes must be a whole number of minutes from 15 to 1440$' due
+conf shadow ', "maxWaitMinutes": 1441'
+expect "(3a2) a wait over a day (1441) → ERROR: a claim lives at most 1440 minutes" 1 '^ERROR release.backstop.maxWaitMinutes must be a whole number of minutes from 15 to 1440$' due
+conf shadow ', "maxWaitMinutes": 1440'
+expect "(3a3) 1440 itself is allowed" 11 '^SKIP the train holds nothing beyond develop$' due --now 2026-11-09T12:00:00Z
 conf shadow ', "maxWaitMinutes": "2h"'
 expect "(3b) a wait that is not a number → ERROR" 1 '^ERROR release.backstop.maxWaitMinutes' due
 conf shadow ', "maxWaitMinutes": 120.5'
@@ -96,6 +100,10 @@ VAL="$ROOT/skills/doctor/scripts/validate-config.py"; SCHEMA="$ROOT/schemas/ds-c
 doctor() { OUT="$(python3 "$VAL" "$WORK/repo/.claude/ds-config.json" --schema "$SCHEMA" </dev/null 2>&1)"; RC=$?; }
 conf shadow ', "maxWaitMinutes": 5'; doctor
 [ "$RC" = 1 ] && printf '%s\n' "$OUT" | grep -q '^ERROR release.backstop.maxWaitMinutes' && ok "(5a) doctor: a wait under 15 is an ERROR" || bad "(5a) $OUT"
+conf shadow ', "maxWaitMinutes": 1441'; doctor
+[ "$RC" = 1 ] && printf '%s\n' "$OUT" | grep -q '^ERROR release.backstop.maxWaitMinutes: 1441 is above the maximum 1440$' && ok "(5a2) doctor: 1441 is above the maximum, as the check says" || bad "(5a2) $OUT"
+cfg '{"claims": {"commands": {"claim": "c", "heartbeat": "h", "release": "r"}}, "releaseTrain": {"branch": "train/release"}, "release": {"mergeTrainBeforeCut": true, "backstop": {"mode": "live"}}}'; doctor
+[ "$RC" = 1 ] && printf '%s\n' "$OUT" | grep -q '^ERROR release.backstop.mode: needs `claims.commands.get`' && ok "(5a3) doctor: a commands store without get is an ERROR (the claim is read before claiming)" || bad "(5a3) $OUT"
 cfg '{"release": {"backstop": {"mode": "live"}}}'; doctor
 [ "$RC" = 1 ] && printf '%s\n' "$OUT" | grep -q '^ERROR release.backstop.mode: needs a `claims` block' \
   && printf '%s\n' "$OUT" | grep -q '^WARN release.backstop.mode: has no effect without a release train' && ok "(5b) doctor: live without claims is an ERROR, without a train a WARN" || bad "(5b) $OUT"
@@ -223,7 +231,7 @@ assert d["trainClaim"] == {"kind": "release-train", "key": "acme/widgets"}, d
 ' "$KEY" && [ "$code" = 10 ] && ok "(20) shadow --json is the record: key, oldest landing and time, wait, items, in-progress checks, the claims to make" || bad "(20) (exit $code) $out"
 after="$(snapshot)"
 calls="$(sort -u "$WORK/gh-calls" 2>/dev/null)"
-[ "$before" = "$after" ] && [ "$calls" = "gh pr list --base master --state open --json number,headRefName --limit 200" ] \
+[ "$before" = "$after" ] && [ "$calls" = "gh pr list --repo acme/widgets --base master --state open --json number,headRefName --limit 200" ] \
   && ok "(20b) shadow changed nothing: refs, origin, working tree and config identical; gh only listed pull requests" \
   || bad "(20b) changed: $(diff <(echo "$before") <(echo "$after")) calls: $calls"
 
@@ -232,6 +240,21 @@ expect "(20c) live → START with the live key (no :shadow), exit 0" 0 "^START $
 expect "(20d) live under the wait → SKIP" 11 '^SKIP not waiting long enough' due --now 2026-11-09T09:00:00Z --holds "$WORK/clear.json"
 expect "(20e) --recheck with the same key → the same START" 0 "^START $KEY " due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json" --recheck "$KEY"
 expect "(20f) --recheck with another key → SKIP changed since the claim" 11 "^SKIP changed since the claim: START $KEY" due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json" --recheck "acme/widgets@other"
+rm -f "$WORK/gh-calls"
+out="$(cd "$WORK/repo" && GH_REPO=elsewhere/other python3 "$HELPER" due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json" </dev/null 2>&1)"
+grep -q -- '--repo acme/widgets ' "$WORK/gh-calls" && ! grep -q elsewhere "$WORK/gh-calls" && printf '%s' "$out" | grep -q '^START ' \
+  && ok "(20g) pull requests are listed in the origin's repository (--repo), whatever GH_REPO says" || bad "(20g) $out — $(cat "$WORK/gh-calls")"
+g "$WORK/repo" remote set-url origin "weird-remote"
+g "$WORK/repo" config url."$WORK/origin.git".insteadOf "weird-remote"
+expect "(20h) an origin with no <owner>/<repo> to read → SKIP, never a start" 11 '^SKIP open release pull requests cannot be read: cannot read <owner>/<repo>' due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json"
+g "$WORK/repo" config --unset url."$WORK/origin.git".insteadOf "weird-remote" 2>/dev/null || g "$WORK/repo" config --unset-all url."$WORK/origin.git".insteadOf
+g "$WORK/repo" config url."$WORK/origin.git".insteadOf "git@github.com:acme/widgets.git"
+g "$WORK/repo" remote set-url origin "$WORK/missing/acme/widgets.git"
+out="$(run due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json" --recheck "$KEY" --json)"; code=$?
+printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["verdict"] == "SKIP" and d["reason"].startswith("changed since the claim: ERROR listing origin"), d' \
+  && [ "$code" = 11 ] && ok "(20i) --recheck when git ls-remote fails → JSON SKIP, exit 11 (never a bare ERROR line)" || bad "(20i) (exit $code) $out"
+expect "(20j) and without --recheck it is the documented ERROR, exit 1" 1 '^ERROR listing origin' due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json"
+g "$WORK/repo" remote set-url origin "git@github.com:acme/widgets.git"
 
 # --- the claims, as backstop.md runs them ---------------------------------------------------------
 # store.py: the claim server's rules over a locked file. claim → won, or lost with `expired` (no
@@ -256,7 +279,8 @@ with open(path, "a+") as f:
         else:
             row = {"kind": req["kind"], "key": req["key"], "holderDigest": me, "machine": req.get("machine"), "claimedAt": iso(now),
                    "expiresAt": iso(now + datetime.timedelta(minutes=req.get("expiryMinutes", 30))), "payload": req.get("payload")}
-            rows[k] = row; out = {"won": True, "takenOver": bool(take), "claim": row}
+            renewed = bool(rows.get(k)) and not rows[k].get("releasedAt") and rows[k]["holderDigest"] == me
+            rows[k] = row; out = {"won": True, "takenOver": bool(take), "renewed": renewed, "claim": row}
     elif op == "release":
         if row and row["holderDigest"] == me and not row.get("releasedAt"):
             row.update(releasedAt=iso(now), outcome=req.get("outcome"), final=bool(req.get("final")), result=req.get("result"))
@@ -277,6 +301,20 @@ def call(op, **req):
     req.update(now=now, holder=holder, machine="m-" + holder)
     return json.loads(subprocess.run([sys.executable, os.path.join(os.path.dirname(store), "store.py"), store, op, json.dumps(req)],
                                      capture_output=True, text=True, stdin=subprocess.DEVNULL).stdout)
+def bdecide(stage, response):
+    p = subprocess.run([sys.executable, helper, "decide"], input=json.dumps({"stage": stage, "response": response, "now": now}),
+                       capture_output=True, text=True)
+    return json.loads(p.stdout)
+def backstop_claim(fields):
+    """backstop.md: read the claim, then claim or take over, then read the answer — backstop.py decide."""
+    before = bdecide("before", call("get", **fields))
+    if before["action"] == "claim":
+        answer = call("claim", **fields)
+    elif before["action"] == "takeover":
+        answer = call("claim", takeover={"expectedHolderDigest": before["takeoverDigest"]}, **fields)
+    else:
+        return False
+    return bdecide("after", answer)["action"] == "proceed"
 def decided(response):
     me = hashlib.sha256(holder.encode()).hexdigest()
     p = subprocess.run([sys.executable, decide, "decide"], input=json.dumps({"mode": "select", "response": response, "me": me, "now": now, "tz": "UTC"}),
@@ -293,7 +331,7 @@ def won(fields):
     if answer["action"] == "takeover":   # a lapsed holder is taken over by its digest, once
         answer = decided(call("claim", takeover={"expectedHolderDigest": answer["takeoverDigest"]}, **fields))
     return answer["action"] == "proceed"
-if not won(claim):
+if not backstop_claim(claim):
     print("SKIP-CLAIM"); sys.exit()
 key, train = record["claim"]["key"], record["trainClaim"]
 if record["verdict"] == "START":
@@ -327,6 +365,9 @@ printf '%s' "$r" | python3 -c 'import json,sys; r=json.load(sys.stdin); assert n
   || bad "(21) $got — $r"
 printf '%s' "$r" | python3 -c 'import json,sys; r=json.load(sys.stdin); assert (r["claimedAt"], r["expiresAt"]) in (("2026-11-09T10:02:00Z", "2026-11-09T12:02:00Z"),), r' \
   && ok "(21b) the backstop claim lapses after maxWaitMinutes (120), the script's own expiry" || bad "(21b) $r"
+got="$(drive s21 one 2026-11-09T10:12:00Z)"
+r2="$(row s21 "release-train $KEY")"
+[ "$got" = "SKIP-CLAIM" ] && [ "$r2" = "$r" ] && ok "(21c) the same session checking again (a /loop) starts nothing and never renews or extends its live claim" || bad "(21c) $got — $r2"
 got="$(drive s21 four 2026-11-09T12:01:00Z)"
 [ "$got" = "SKIP-CLAIM" ] && ok "(22) no retry inside the window: a check before the claim lapses skips" || bad "(22) $got"
 got="$(drive s21 four 2026-11-09T12:03:00Z)"

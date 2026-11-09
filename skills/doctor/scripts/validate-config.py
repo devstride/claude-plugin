@@ -7,7 +7,7 @@ The schema defaults to ${CLAUDE_PLUGIN_ROOT}/schemas/ds-config.schema.json (the 
 script ships in when the variable is unset). It is generated from schemas/seam-registry.json, and
 this validator implements exactly the keyword subset the generator emits — type (a list included),
 properties, patternProperties, additionalProperties (false, or the schema every other key's value
-must meet), required, enum, items, oneOf, minimum, exclusiveMinimum, its own x-setTogether
+must meet), required, enum, items, oneOf, minimum, exclusiveMinimum, maximum, its own x-setTogether
 (children set all together or not at all; null is unset) and its own x-warnMinimum /
 x-warnMaximum (a value outside them is ignored by its reader, which keeps its default: a WARN) —
 plus
@@ -236,6 +236,9 @@ class Validator:
         if "minimum" in schema and type_of(value) in ("integer", "number") \
                 and value < schema["minimum"]:
             self.add("ERROR", path, "%s is below the minimum %s" % (show(value), schema["minimum"]))
+        if "maximum" in schema and type_of(value) in ("integer", "number") \
+                and value > schema["maximum"]:
+            self.add("ERROR", path, "%s is above the maximum %s" % (show(value), schema["maximum"]))
         if "exclusiveMinimum" in schema and type_of(value) in ("integer", "number") \
                 and value <= schema["exclusiveMinimum"]:
             self.add("ERROR", path, "%s must be greater than %s" % (

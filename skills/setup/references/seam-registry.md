@@ -184,7 +184,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.autoStart.enabled` | boolean | — | `false` | a train landing or a finished release starts the next release; needs a claims block | 3.29.0 |
 | `release.backstop` | object | — | — | start a release when work on the release train has waited too long and nothing is releasing it; contract: skills/release/references/backstop.md | unreleased |
 | `release.backstop.mode` | string | off, shadow, live | off | off: no check; shadow: record what the backstop would start and change nothing; live: start the release (only after shadow results were checked); needs a claims block | unreleased |
-| `release.backstop.maxWaitMinutes` | integer | >= 15 | `120` | how long the oldest landing on the train may wait, by its committer time, before the backstop starts a release | unreleased |
+| `release.backstop.maxWaitMinutes` | integer | >= 15, <= 1440 | `120` | how long the oldest landing on the train may wait, by its committer time, before the backstop starts a release; at most a day, the longest a claim can live | unreleased |
 | `release.lightRelease` | object | — | — | rules for a light release (one the classify skill calls LIGHT) | 3.29.0 |
 | `release.lightRelease.standingYes` | boolean | — | `false` | the owner's standing yes: a light release identical to its reviewed train merges and deploys without an in-the-moment yes; contract: skills/release/references/auto-start.md | 3.29.0 |
 | `release.fullRelease` | object | — | — | the owner's written standing yes for releases of any class with every gate green; contract: skills/release/references/auto-start.md | 3.37.0 |

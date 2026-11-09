@@ -21,6 +21,11 @@ stores with that claim, and carries the exact claim to make (`claim`, `trainClai
     any answer other than the same START or SHADOW for KEY ("changed since the claim"). HOLDS: the
     release delta names these items; write release-holds.py's request for each and its ancestors
     and run `due` again with --holds <file>.
+  decide   (stdin {"stage": "before"|"after", "response": <get_claim | claim_work answer>, "now"?})
+      {"action": "claim"|"takeover"|"skip"|"proceed"|"degrade", "message", "takeoverDigest"?}  exit 0
+      before: a live claim held by anyone, this session too, is skip (never renewed or extended);
+      a lapsed one is takeover; none, or one released not final, is claim. after: won is proceed
+      unless it renewed this holder's own claim; lost is skip.
   config
       OK, or one `ERROR|WARN <path>: <message>` line per finding; exit 1 on an ERROR.
       skills/doctor/scripts/validate-config.py reports the same findings (it imports `problems`).
@@ -56,8 +61,10 @@ SHADOW) for KEY, else SKIP "changed since the claim: …". `--now` replaces the 
 its offset). Test seams are auto-start.py's: AUTO_START_REPO (owner/name) and AUTO_START_NO_FETCH=1.
 Network: `git ls-remote`/`git fetch`, `gh pr list`, and the clearance provider's `status`.
 """
+import contextlib
 import datetime
 import importlib.util
+import io
 import json
 import os
 import re
@@ -69,7 +76,7 @@ AUTO_START = os.path.join(HERE, "auto-start.py")
 CLEARANCE_CORE = os.path.join(HERE, "clearance_core.py")
 HOLDS = os.path.join(os.path.dirname(os.path.dirname(HERE)), "build-item/scripts/release-holds.py")
 MODES = ("off", "shadow", "live")
-DEFAULT_WAIT, MIN_WAIT, MAX_EXPIRY = 120, 15, 1440
+DEFAULT_WAIT, MIN_WAIT, MAX_WAIT = 120, 15, 1440   # a claim lives at most a day
 PR_LIMIT = 200   # a list this long is truncated, never trusted
 ITEM = re.compile(r"(?<![0-9A-Za-z])I\d{2,}(?![0-9A-Za-z])")
 UTC = datetime.timezone.utc
@@ -118,6 +125,9 @@ def problems(config):
     if not isinstance(config.get("claims"), dict):
         found.append(("ERROR", "release.backstop.mode", "needs a `claims` block: without a one-winner "
                       "backstop claim two machines could start a release for the same waiting work"))
+    elif isinstance(config["claims"].get("commands"), dict) and not config["claims"]["commands"].get("get"):
+        found.append(("ERROR", "release.backstop.mode", "needs `claims.commands.get`: a live backstop claim is "
+                      "read before claiming, so a check never renews or extends one"))
     train = section(config, "releaseTrain").get("branch") or section(config, "supportTrain").get("branch")
     if release.get("mergeTrainBeforeCut") is not True or not train:
         found.append(("WARN", "release.backstop.mode", "has no effect without a release train "
@@ -136,8 +146,9 @@ def settings(config):
     if mode not in MODES:
         raise Answer("ERROR", "release.backstop.mode must be off, shadow or live, not %r" % (mode,))
     wait = whole(block.get("maxWaitMinutes", DEFAULT_WAIT))
-    if wait is None or wait < MIN_WAIT:
-        raise Answer("ERROR", "release.backstop.maxWaitMinutes must be a whole number of minutes, at least %d" % MIN_WAIT)
+    if wait is None or not MIN_WAIT <= wait <= MAX_WAIT:
+        raise Answer("ERROR", "release.backstop.maxWaitMinutes must be a whole number of minutes from %d to %d"
+                     % (MIN_WAIT, MAX_WAIT))
     if mode == "off":
         raise Answer("OFF", "release.backstop.mode is off", mode="off")
     return mode, wait
@@ -207,14 +218,14 @@ def delta_items(root, train, source, production):
     return sorted(set(ITEM.findall(text)), key=lambda number: int(number[1:]))
 
 
-def open_release_prs(root, release, production, source):
+def open_release_prs(root, release, production, source, repo):
     """-> (busy, reason) from `gh pr list`: an open pull request into production headed by the source
     or a release branch is a release in progress. A failed or truncated list is never clear."""
     pattern = release.get("releaseBranchPattern")
     matcher = load("clearance_core", CLEARANCE_CORE).pattern_regex(pattern) if isinstance(pattern, str) and pattern else None
     try:
-        done = run(["gh", "pr", "list", "--base", production, "--state", "open", "--json", "number,headRefName",
-                    "--limit", str(PR_LIMIT)], root, timeout=120)
+        done = run(["gh", "pr", "list", "--repo", repo, "--base", production, "--state", "open",
+                    "--json", "number,headRefName", "--limit", str(PR_LIMIT)], root, timeout=120)
     except (OSError, subprocess.TimeoutExpired) as error:
         return True, "open release pull requests could not be read (%s)" % error
     try:
@@ -302,18 +313,27 @@ def check_holds(path, items, now, root):
     return bool(answer.get("held")), answer.get("reason") or ""
 
 
+def quiet(function, *args):
+    """Run an auto-start.py helper whose failures print an ERROR line and exit: the line becomes this
+    check's own Answer, so every failure keeps the documented verdict, exit code and --json shape."""
+    printed = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(printed):
+            return function(*args)
+    except SystemExit:
+        line = printed.getvalue().strip().splitlines()
+        raise Answer("ERROR", re.sub(r"^ERROR ", "", line[0]) if line else "auto-start.py stopped")
+
+
 def due(now_text, holds_path):
     auto = load("auto_start", AUTO_START)
     now = parse_now(now_text)
-    try:
-        config, root = auto.load_config()
-    except SystemExit:   # load_config printed its own ERROR line
-        raise Answer("ERROR", "the config cannot be read", printed=True)
+    config, root = quiet(auto.load_config)
     mode, wait = settings(config)
     record = {"mode": mode, "now": now.isoformat(), "maxWaitMinutes": wait}
     if not isinstance(config.get("claims"), dict):
         raise Answer("SKIP", "release.backstop needs a claims block; without one it does nothing", **record)
-    state = auto.train_state(config, root)
+    state = quiet(auto.train_state, config, root)
     if state[0] != "AHEAD":
         raise Answer(state[0], state[1], **record)
     _, commits, train, source = state
@@ -325,20 +345,20 @@ def due(now_text, holds_path):
     oldest, since = oldest_of(landed)
     waited = (now - datetime.datetime.fromtimestamp(since, UTC)).total_seconds() / 60
     try:
-        repo = auto.repo_key(root)
-    except SystemExit:
-        raise Answer("ERROR", "cannot read <owner>/<repo> from the origin remote", printed=True)
+        repo = quiet(auto.repo_key, root)
+    except Answer as answer:   # no repository to list pull requests in, nor to key the claim by
+        raise Answer("SKIP", "open release pull requests cannot be read: %s" % answer.line, **record)
     key = "%s@%s%s" % (repo, oldest, ":shadow" if mode == "shadow" else "")
     record.update({"key": key, "train": train, "source": source, "production": production,
                    "commits": len(commits), "landings": len(landed), "oldestLanding": oldest,
                    "landedAt": datetime.datetime.fromtimestamp(since, UTC).isoformat(), "waitedMinutes": int(waited),
-                   "claim": {"kind": "release-train", "key": key, "expiryMinutes": min(wait, MAX_EXPIRY),
+                   "claim": {"kind": "release-train", "key": key, "expiryMinutes": wait,
                              "purpose": "release backstop"},
                    "trainClaim": {"kind": "release-train", "key": repo}})
     if waited <= wait:
         raise Answer("SKIP", "not waiting long enough: the oldest landing %s has waited %d of %d minutes"
                      % (oldest[:12], int(waited), wait), **record)
-    busy, why = open_release_prs(root, release, production, source)
+    busy, why = open_release_prs(root, release, production, source, repo)
     record["releasePullRequests"] = why
     if busy:
         raise Answer("SKIP", why, **record)
@@ -362,6 +382,54 @@ def due(now_text, holds_path):
     raise Answer("SHADOW", "%s would start (%s)" % (key, why), **record)
 
 
+FAILURES = ("ABSENT", "UNREACHABLE", "FORBIDDEN", "ERROR")
+
+
+def decide_claim(request):
+    """The backstop claim's two decisions (backstop.md). `before`: get_claim's answer for the key.
+    A live claim held by ANYONE, this session included, is skip — never claimed again, so never
+    renewed or extended; a lapsed one is taken over by its digest; none, or one released not final,
+    is claimed. `after`: claim_work's answer. Won → proceed, unless it renewed a claim this holder
+    already held (skip); lost → skip. A failure is degrade either way."""
+    stage, response = request.get("stage"), request.get("response")
+    now = parse_now(request.get("now"))
+    if isinstance(response, dict) and (response.get("error") or str(response.get("verdict", "")).upper() in FAILURES):
+        return {"action": "degrade", "message": "The claims store could not be used; the backstop does nothing."}
+    if stage == "after":
+        if not isinstance(response, dict):
+            return {"action": "degrade", "message": "The claim answer could not be read; the backstop does nothing."}
+        won = response.get("won") if "won" in response else str(response.get("verdict", "")).upper() in ("WON", "OK")
+        if won and response.get("renewed"):
+            return {"action": "skip", "message": "This session already held the backstop claim; it starts nothing twice."}
+        if won:
+            return {"action": "proceed", "message": "Claimed the backstop."}
+        return {"action": "skip", "message": "Another check holds the backstop claim."}
+    if stage != "before":
+        return {"action": "degrade", "message": "stage must be before or after"}
+    row = response.get("claim") if isinstance(response, dict) and "claim" in response else \
+        (response if isinstance(response, dict) and response.get("holderDigest") else None)
+    if not isinstance(row, dict):
+        return {"action": "claim", "message": "No backstop claim yet."}
+    state = row.get("state")
+    if state not in ("live", "expired", "released"):
+        expires = row.get("expiresAt")
+        try:
+            lapsed = bool(expires) and parse_now(expires) <= now
+        except Answer:
+            lapsed = False
+        state = "released" if row.get("releasedAt") else ("expired" if lapsed else "live")
+    who = row.get("machine") or row.get("sessionName") or "a session"
+    if state == "released":
+        if row.get("final"):
+            return {"action": "skip", "message": "The backstop claim was finished for good."}
+        return {"action": "claim", "message": "The last backstop claim was released (%s)." % (row.get("outcome") or "released")}
+    if state == "live":
+        return {"action": "skip", "message": "The backstop claim is held by %s until %s; nothing starts before it lapses."
+                % (who, row.get("expiresAt") or "it lapses")}
+    return {"action": "takeover", "takeoverDigest": row.get("holderDigest"),
+            "message": "The backstop claim held by %s lapsed; taking it over." % who}
+
+
 def main(argv):
     args = argv[1:]
     verb = args.pop(0) if args else None
@@ -376,9 +444,19 @@ def main(argv):
         else:
             verb = None
             break
-    if verb not in ("due", "config") or (verb == "config" and (as_json or any(options.values()))):
-        sys.stderr.write("usage: backstop.py due [--now ISO] [--json] [--holds FILE] [--recheck KEY] | config\n")
+    if verb not in ("due", "config", "decide") or (verb != "due" and (as_json or any(options.values()))):
+        sys.stderr.write("usage: backstop.py due [--now ISO] [--json] [--holds FILE] [--recheck KEY] | config | decide\n")
         return 2
+    if verb == "decide":
+        try:
+            request = json.loads(sys.stdin.read())
+            if not isinstance(request, dict):
+                raise ValueError("not an object")
+            print(json.dumps(decide_claim(request)))
+        except (ValueError, Answer) as error:
+            sys.stderr.write("backstop: decide needs a JSON object on stdin: %s\n" % error)
+            return 2
+        return 0
     if verb == "config":
         config, _ = load("auto_start", AUTO_START).load_config()
         found = problems(config)
@@ -394,8 +472,6 @@ def main(argv):
         answer = Answer("ERROR", "no verdict")
     except Answer as raised:
         answer = raised
-    if answer.record.pop("printed", False):
-        return 1
     recheck = options["--recheck"]
     if recheck and not (answer.verdict in ("START", "SHADOW") and answer.record.get("key") == recheck):
         answer = Answer("SKIP", "changed since the claim: %s %s" % (answer.verdict, answer.line),

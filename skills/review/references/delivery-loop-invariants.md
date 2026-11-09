@@ -430,9 +430,11 @@ M20. The release backstop (`release.backstop`) never delays or caps a release: `
      starts one only when the landing on the train with the smallest committer time waited over
      `maxWaitMinutes`, no release is in progress (no open release pull request by `gh`, always;
      clearance clear and derived when set; unreadable is never clear) and no hold applies over the
-     release's own delta. One machine per waiting work wins the claim keyed by that landing, which
-     lapses after `maxWaitMinutes` (never released on a start: an early stop retries once per window),
-     re-checked under the train claim; shadow mirrors live and starts nothing; live only after shadow.
+     release's own delta. One machine per waiting work wins the claim keyed by that landing; while
+     live it blocks a start whoever holds it, this session too (read first, never renewed), and it
+     lapses after `maxWaitMinutes` (at most 1440), so an early stop retries once per window; checks
+     repeat under the train claim; `gh` lists the origin's repository; shadow mirrors live; live only
+     after shadow.
 
 ## N. Delivery profiles (contract: `skills/plan/references/delivery-profiles.md`)
 N1. ONE profile word — `prototype` / `standard` / `extended` — moves every rigor knob together; the
@@ -902,6 +904,8 @@ skills/release/references/backstop.md|only after the shadow results were checked
 skills/release/references/backstop.md|never release it on a start
 skills/release/references/backstop.md|due --json --recheck <key>
 skills/release/references/backstop.md|smallest committer time
+skills/release/references/backstop.md|WHOEVER holds it
+skills/release/scripts/backstop.py|"--repo", repo
 skills/release/scripts/backstop.py|derived
 skills/release/references/backstop.md|outcome `busy`
 skills/release/scripts/backstop.py|unreadable is never clear
