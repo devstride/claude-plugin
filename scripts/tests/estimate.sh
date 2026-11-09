@@ -349,31 +349,33 @@ fi
 
 # (9p) Absorbs in the older hand-written wording are read through to their own train merges: one
 # "into the … snapshot", one into the snapshot's release-train- branch, one "late train landing", one
-# into a snapshot whose name starts with the train's.
+# into a snapshot whose name starts with the train's, one into a support-train- slug; case never matters.
 g branch -f train/release develop
 L0=$(land l0 2026-11-10T09:55:00Z I750)
 g checkout -q -b p/release-train-26-11-10-3 train/release
 LA=$(land la 2026-11-10T10:00:00Z I751)
-g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:01:00Z merge -q --no-ff -m "merge: train/release (${LA:0:10}) into the release 26-11-10 snapshot — absorbs I751" train/release
+g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:01:00Z merge -q --no-ff -m "merge: train/release (${LA:0:10}) into the release 26-11-10 Snapshot — absorbs I751" train/release
 LB=$(land lb 2026-11-10T10:02:00Z I752)
 g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:03:00Z merge -q --no-ff -m "merge: train/release at ${LB:0:10} (I752) into p/release-train-26-11-10-3" train/release
 LC=$(land lc 2026-11-10T10:04:00Z I753)
-g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:05:00Z merge -q --no-ff -m "merge: late train landing I753" train/release
+g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:05:00Z merge -q --no-ff -m "Merge: Late Train Landing I753" train/release
 LD=$(land ld 2026-11-10T10:06:00Z I754)
 g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:07:00Z merge -q --no-ff -m "merge: train/release (${LD:0:10}) into train/release-train-26-11-10-3" train/release
+LE=$(land le 2026-11-10T10:08:00Z I755)
+g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:09:00Z merge -q --no-ff -m "merge: train/support at ${LE:0:10} (I755) into support-train-26-11-10-3" train/release
 g checkout -q develop; at 2026-11-10T10:10:00Z merge -q --no-ff -m "Merge pull request #15 from acme/p/release-train-26-11-10-3" p/release-train-26-11-10-3
 g checkout -q master; at 2026-11-10T10:20:00Z merge -q --no-ff -m "release" develop
 RELEASE7=$(g rev-parse HEAD)
 g checkout -q develop; g push -q origin develop master train/release; g fetch -q origin
 OUT=$(run shipped --merge "$RELEASE7" --json); CODE=$?
-if [ "$CODE" = 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); got={l["sha"] for l in d["landings"]}; sys.exit(0 if got==set(sys.argv[1:]) else 1)' "$L0" "$LA" "$LB" "$LC" "$LD"; then
+if [ "$CODE" = 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); got={l["sha"] for l in d["landings"]}; sys.exit(0 if got==set(sys.argv[1:]) else 1)' "$L0" "$LA" "$LB" "$LC" "$LD" "$LE"; then
   ok "(9p) absorbs in the older wording are read through to their own landings"
 else
   bad "(9p) older absorb wording: exit $CODE $OUT"
 fi
 
-# (9q) Only whole absorb words or a snapshot named right after "into" mark an absorb, and a subject
-# that says it goes into the train itself never does. Batches of merges, each cut at the train's
+# (9q) Only whole absorb words, or a train's own merge whose phrase after "into" names a snapshot,
+# mark an absorb; a subject that says it goes into the train itself never does. Batches of merges, each cut at the train's
 # newest landing and merged back under one of these subjects, stay one landing each.
 g branch -f train/release develop
 L12=$(land l12 2026-11-10T11:00:00Z I760)
@@ -391,9 +393,19 @@ merge: batch into origin/train/release before the snapshot
 merge: batch into train/release (folds I761 into snapshot prep)
 merge: golden snapshot fix into the integration batch
 MERGE: Absorb batch Into Train/Release
+merge: absorb batch into train/release.
+merge: batch I15100, I15101 onto train/release (fold fixtures into snapshot tests)
+merge: train/fixes into p/integration, snapshot prep
+merge: train/fixes into p/integration; snapshot prep
+merge: train/fixes into p/integration — snapshot prep
+merge: train/fixes into p/integration (snapshot prep)
 SUBJECTS
-deliver 2026-11-10T11:30:00Z
-g checkout -q master; at 2026-11-10T11:40:00Z merge -q --no-ff -m "release" develop
+batch nqsha 2026-11-10T11:40:00Z   # git's own subject for a merge by sha: "Merge commit '<sha>' into train/release"
+g checkout -q train/release; at 2026-11-10T11:41:00Z merge -q --no-ff --no-edit "$(g rev-parse nqsha)"
+g log -1 --format=%s | grep -q "^Merge commit '.*' into train/release$" || bad "(9q) fixture: git's merge-by-sha subject changed"
+EXPECT9Q="$EXPECT9Q $(g rev-parse HEAD)"
+deliver 2026-11-10T11:50:00Z
+g checkout -q master; at 2026-11-10T11:55:00Z merge -q --no-ff -m "release" develop
 RELEASE8=$(g rev-parse HEAD)
 g checkout -q develop; g push -q origin develop master train/release; g fetch -q origin
 OUT=$(run shipped --merge "$RELEASE8" --json); CODE=$?

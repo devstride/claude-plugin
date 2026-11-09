@@ -233,26 +233,26 @@ def merged_branch(root, sha):
 
 ABSORB = re.compile(r"^Merge commit '([0-9a-f]{7,40})'")
 ABSORB_WORDS = re.compile(r"^merge: (?:absorb|late (?:train )?landing)(?:\s|$)", re.I)
-INTO_SNAPSHOT = re.compile(r"^merge: .*?\binto (?:the )?(?:\S*(?:release|support)-train-|[^,;()\u2014]*?\bsnapshot\b)", re.I)
+INTO_SNAPSHOT = re.compile(
+    r"^merge: (?:origin/)?train/\S+ .*?\binto (?:\S*(?:release|support)-train-|[^,;()\u2014]*?\bsnapshot\b)", re.I)
 
 
 def says_absorb(root, row, train):
     """The merge's subject says it absorbed the train: the subject release-branch.md 4a prescribes
     (`Merge branch '<train>' (<absorbAt>) into <snapshot>`), git's own for merging the absorbed
-    commit by its sha, or the older wording (`merge: absorb …`, `merge: late train landing …`,
-    `merge: <train> (<sha>) into the … snapshot` or `… into <…release-train-…>`). The words lead
-    the merge's own `merge:` subject as whole words, or the phrase right after an `into` names a
-    snapshot; a subject that says it goes into the train itself never counts; a branch name (`absorb-retries`,
-    `fix-absorb-validation`) is never the evidence. Syncs into the snapshot are skipped before
-    this is asked."""
+    commit by its sha, or the older wording: `merge: absorb …` or `merge: late (train) landing …`
+    as whole words, or `merge: train/<…> … into …` whose phrase after `into` (up to , ; ( ) or an
+    em dash) says snapshot or starts a release-train-/support-train- slug. A branch name
+    (`absorb-retries`, `fix-absorb-validation`) is never the evidence. Any subject with
+    `into [origin/]<train>` never counts, in any of these forms. Syncs into the snapshot are
+    skipped before this is asked."""
     branch, lines = merged_branch(root, row[0])
     first = lines[0] if lines else ""
-    commit = ABSORB.match(first)
-    if branch == train or (commit and row[2][1].startswith(commit.group(1))):
-        return True
-    if re.search(r"\binto (?:origin/)?%s(?![\w/.-])" % re.escape(train), first, re.I):
+    if re.search(r"\binto (?:origin/)?%s(?![\w/-]|\.\w)" % re.escape(train), first, re.I):
         return False   # a merge into the train itself is never an absorb, whatever else it says
-    return bool(ABSORB_WORDS.match(first) or INTO_SNAPSHOT.match(first))
+    commit = ABSORB.match(first)
+    return bool(branch == train or (commit and row[2][1].startswith(commit.group(1)))
+                or ABSORB_WORDS.match(first) or INTO_SNAPSHOT.match(first))
 
 
 def delivery(root, merge, train):
