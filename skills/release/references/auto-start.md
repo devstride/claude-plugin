@@ -75,6 +75,10 @@ could be leased by another session while the release still uses it). Never resum
 release; the fleet's hourly machine check never starts one. No batching wait: each release carries
 whatever landed during the previous cycle, and there is never a second concurrent release.
 
+**The backstop** (`release.backstop.mode` shadow or live) enters this same path, on a schedule, only
+when landed work has waited too long. Read
+`${CLAUDE_PLUGIN_ROOT}/skills/release/references/backstop.md` in full before acting on a backstop check.
+
 ## Unattended stop
 
 A `started-by: auto` release that reaches step 4 without a MERGE from the standing yes sends ONE
