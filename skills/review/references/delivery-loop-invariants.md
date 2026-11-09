@@ -900,7 +900,7 @@ skills/release/SKILL.md|backstop.md
 skills/release/references/auto-start.md|backstop.md
 skills/release/references/backstop.md|only after the shadow results were checked
 skills/release/references/backstop.md|never release it on a start
-skills/release/references/backstop.md|--recheck <key>
+skills/release/references/backstop.md|due --json --recheck <key>
 skills/release/references/backstop.md|smallest committer time
 skills/release/scripts/backstop.py|derived
 skills/release/references/backstop.md|outcome `busy`
