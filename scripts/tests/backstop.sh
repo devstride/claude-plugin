@@ -231,7 +231,7 @@ assert d["trainClaim"] == {"kind": "release-train", "key": "acme/widgets"}, d
 ' "$KEY" && [ "$code" = 10 ] && ok "(20) shadow --json is the record: key, oldest landing and time, wait, items, in-progress checks, the claims to make" || bad "(20) (exit $code) $out"
 after="$(snapshot)"
 calls="$(sort -u "$WORK/gh-calls" 2>/dev/null)"
-[ "$before" = "$after" ] && [ "$calls" = "gh pr list --repo acme/widgets --base master --state open --json number,headRefName --limit 200" ] \
+[ "$before" = "$after" ] && [ "$calls" = "gh pr list --repo github.com/acme/widgets --base master --state open --json number,headRefName --limit 200" ] \
   && ok "(20b) shadow changed nothing: refs, origin, working tree and config identical; gh only listed pull requests" \
   || bad "(20b) changed: $(diff <(echo "$before") <(echo "$after")) calls: $calls"
 
@@ -242,8 +242,21 @@ expect "(20e) --recheck with the same key → the same START" 0 "^START $KEY " d
 expect "(20f) --recheck with another key → SKIP changed since the claim" 11 "^SKIP changed since the claim: START $KEY" due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json" --recheck "acme/widgets@other"
 rm -f "$WORK/gh-calls"
 out="$(cd "$WORK/repo" && GH_REPO=elsewhere/other python3 "$HELPER" due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json" </dev/null 2>&1)"
-grep -q -- '--repo acme/widgets ' "$WORK/gh-calls" && ! grep -q elsewhere "$WORK/gh-calls" && printf '%s' "$out" | grep -q '^START ' \
-  && ok "(20g) pull requests are listed in the origin's repository (--repo), whatever GH_REPO says" || bad "(20g) $out — $(cat "$WORK/gh-calls")"
+grep -q -- '--repo github.com/acme/widgets ' "$WORK/gh-calls" && ! grep -q elsewhere "$WORK/gh-calls" && printf '%s' "$out" | grep -q '^START ' \
+  && ok "(20g) a github.com origin: pull requests are listed with --repo github.com/acme/widgets, whatever GH_REPO says" || bad "(20g) $out — $(cat "$WORK/gh-calls")"
+for url in "git@github.example.com:acme/widgets.git" "https://github.example.com/acme/widgets.git"; do
+  g "$WORK/repo" remote set-url origin "$url"; g "$WORK/repo" config url."$WORK/origin.git".insteadOf "$url"; rm -f "$WORK/gh-calls"
+  out="$(run due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json")"
+  grep -q -- '--repo github.example.com/acme/widgets ' "$WORK/gh-calls" && printf '%s' "$out" | grep -q "^START $KEY " \
+    && ok "(20g2) an enterprise origin ($url) is listed on its own host; the claim key is unchanged" || bad "(20g2) $url: $out — $(cat "$WORK/gh-calls")"
+  g "$WORK/repo" config --unset url."$WORK/origin.git".insteadOf "$url"
+done
+g "$WORK/repo" remote set-url origin "/srv/git/acme/widgets.git"; g "$WORK/repo" config url."$WORK/origin.git".insteadOf "/srv/git/acme/widgets.git"; rm -f "$WORK/gh-calls"
+expect "(20g3) an origin with an owner and name but no host → SKIP, and gh is never asked" 11 '^SKIP open release pull requests cannot be read: cannot read the host of the origin remote' due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json"
+[ ! -e "$WORK/gh-calls" ] || bad "(20g3) gh was called: $(cat "$WORK/gh-calls")"
+g "$WORK/repo" config --unset url."$WORK/origin.git".insteadOf "/srv/git/acme/widgets.git"
+g "$WORK/repo" config url."$WORK/origin.git".insteadOf "git@github.com:acme/widgets.git"   # setting one replaced it
+g "$WORK/repo" remote set-url origin "git@github.com:acme/widgets.git"
 g "$WORK/repo" remote set-url origin "weird-remote"
 g "$WORK/repo" config url."$WORK/origin.git".insteadOf "weird-remote"
 expect "(20h) an origin with no <owner>/<repo> to read → SKIP, never a start" 11 '^SKIP open release pull requests cannot be read: cannot read <owner>/<repo>' due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json"
@@ -301,8 +314,8 @@ def call(op, **req):
     req.update(now=now, holder=holder, machine="m-" + holder)
     return json.loads(subprocess.run([sys.executable, os.path.join(os.path.dirname(store), "store.py"), store, op, json.dumps(req)],
                                      capture_output=True, text=True, stdin=subprocess.DEVNULL).stdout)
-def bdecide(stage, response):
-    p = subprocess.run([sys.executable, helper, "decide"], input=json.dumps({"stage": stage, "response": response, "now": now}),
+def bdecide(stage, response, before=None):
+    p = subprocess.run([sys.executable, helper, "decide"], input=json.dumps({"stage": stage, "response": response, "now": now, "before": before}),
                        capture_output=True, text=True)
     return json.loads(p.stdout)
 def backstop_claim(fields):
@@ -314,7 +327,7 @@ def backstop_claim(fields):
         answer = call("claim", takeover={"expectedHolderDigest": before["takeoverDigest"]}, **fields)
     else:
         return False
-    return bdecide("after", answer)["action"] == "proceed"
+    return bdecide("after", answer, before["action"])["action"] == "proceed"
 def decided(response):
     me = hashlib.sha256(holder.encode()).hexdigest()
     p = subprocess.run([sys.executable, decide, "decide"], input=json.dumps({"mode": "select", "response": response, "me": me, "now": now, "tz": "UTC"}),
@@ -365,13 +378,24 @@ printf '%s' "$r" | python3 -c 'import json,sys; r=json.load(sys.stdin); assert n
   || bad "(21) $got — $r"
 printf '%s' "$r" | python3 -c 'import json,sys; r=json.load(sys.stdin); assert (r["claimedAt"], r["expiresAt"]) in (("2026-11-09T10:02:00Z", "2026-11-09T12:02:00Z"),), r' \
   && ok "(21b) the backstop claim lapses after maxWaitMinutes (120), the script's own expiry" || bad "(21b) $r"
-got="$(drive s21 one 2026-11-09T10:12:00Z)"
+W="$(grep -l '^START$' "$WORK/d-one" "$WORK/d-two" | head -1 | sed 's/.*d-//')"
+got="$(drive s21 "$W" 2026-11-09T10:12:00Z)"
 r2="$(row s21 "release-train $KEY")"
 [ "$got" = "SKIP-CLAIM" ] && [ "$r2" = "$r" ] && ok "(21c) the same session checking again (a /loop) starts nothing and never renews or extends its live claim" || bad "(21c) $got — $r2"
 got="$(drive s21 four 2026-11-09T12:01:00Z)"
 [ "$got" = "SKIP-CLAIM" ] && ok "(22) no retry inside the window: a check before the claim lapses skips" || bad "(22) $got"
-got="$(drive s21 four 2026-11-09T12:03:00Z)"
-[ "$got" = "START" ] && ok "(22b) the work still waits after the window → the lapsed claim is taken over by its digest and the release retried" || bad "(22b) $got"
+got="$(drive s21 "$W" 2026-11-09T12:03:00Z)"
+r3="$(row s21 "release-train $KEY")"
+printf '%s' "$r3" | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["claimedAt"] == "2026-11-09T12:03:00Z", r' \
+  && [ -n "$W" ] && [ "$got" = "START" ] && ok "(22b) the session that started at 10:02 checks at 12:03, its own claim lapsed → it takes it back (a renewed win after a takeover) and starts" || bad "(22b) $W $got — $r3"
+drive s22 a 2026-11-09T10:02:00Z >/dev/null
+got="$(drive s22 b 2026-11-09T12:03:00Z)"
+[ "$got" = "START" ] && ok "(22c) another machine after the window → the lapsed claim is taken over by its digest and the release retried" || bad "(22c) $got"
+dec() { printf '%s' "$1" | python3 "$HELPER" decide; }
+out="$(dec '{"stage": "after", "before": "claim", "response": {"won": true, "renewed": true, "claim": {}}}')"
+printf '%s' "$out" | grep -q '"action": "skip"' && ok "(22d) a renewed win the read did not show lapsed → skip (it was live and this session's)" || bad "(22d) $out"
+out="$(dec '{"stage": "after", "before": "takeover", "response": {"won": true, "renewed": true, "claim": {}}}')"
+printf '%s' "$out" | grep -q '"action": "proceed"' && ok "(22e) a renewed win after a takeover → proceed" || bad "(22e) $out"
 
 # a release holds the train claim (its train phase): live releases the backstop key busy, not final
 python3 "$WORK/store.py" "$WORK/s23" claim '{"kind": "release-train", "key": "acme/widgets", "holder": "releaser", "now": "2026-11-09T10:00:00Z", "expiryMinutes": 30}' >/dev/null </dev/null

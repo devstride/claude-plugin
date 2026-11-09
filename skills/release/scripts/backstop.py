@@ -21,11 +21,13 @@ stores with that claim, and carries the exact claim to make (`claim`, `trainClai
     any answer other than the same START or SHADOW for KEY ("changed since the claim"). HOLDS: the
     release delta names these items; write release-holds.py's request for each and its ancestors
     and run `due` again with --holds <file>.
-  decide   (stdin {"stage": "before"|"after", "response": <get_claim | claim_work answer>, "now"?})
+  decide   (stdin {"stage": "before"|"after", "response": <get_claim | claim_work answer>, "now"?,
+            "before"?: <the before stage's action, on the after stage>})
       {"action": "claim"|"takeover"|"skip"|"proceed"|"degrade", "message", "takeoverDigest"?}  exit 0
       before: a live claim held by anyone, this session too, is skip (never renewed or extended);
       a lapsed one is takeover; none, or one released not final, is claim. after: won is proceed
-      unless it renewed this holder's own claim; lost is skip.
+      (a renewal too when "before" was takeover: this holder taking back its own lapsed claim),
+      unless it renewed a claim the read did not show lapsed; lost is skip.
   config
       OK, or one `ERROR|WARN <path>: <message>` line per finding; exit 1 on an ERROR.
       skills/doctor/scripts/validate-config.py reports the same findings (it imports `problems`).
@@ -45,7 +47,9 @@ concurrent checks dedupe; once that landing ships, the key moves to the next old
 START or SHADOW only when ALL hold: the mode is live or shadow, a `claims` block is configured, the
 train holds work beyond the source (auto-start.py's `train_state`, one rule, reused), the oldest
 landing waited MORE than `maxWaitMinutes` (default 120), no release is in progress, and no release
-hold holds the release delta. A release is in progress when `gh pr list` shows an open pull request
+hold holds the release delta. A release is in progress when `gh pr list --repo HOST/OWNER/REPO`
+(all three read from the raw origin URL: an enterprise origin is listed on its own host, and an
+origin with no host to read is a SKIP) shows an open pull request
 into the production branch headed by the release source or a `release.releaseBranchPattern` branch
 (the branch-patterns rule, clearance_core.py's `pattern_regex`), always, with or without clearance;
 and, with `release.clearance` set, when its provider's `status --json` is anything but `clear` with
@@ -218,6 +222,20 @@ def delta_items(root, train, source, production):
     return sorted(set(ITEM.findall(text)), key=lambda number: int(number[1:]))
 
 
+ORIGIN_HOST = re.compile(r"^(?:[a-z][a-z0-9+.-]*://)?(?:[^@/]+@)?(\[[^\]]+\]|[^:/@\s]+)(?::\d+)?[:/]", re.I)
+
+
+def origin_repo(root, repo):
+    """-> HOST/OWNER/REPO for `gh --repo`, the host read from the same raw origin URL as the owner and
+    name (ssh, scp-style or https; insteadOf never applies), so an enterprise origin is listed on its
+    own host, never on github.com. An origin with no host to read raises an Answer."""
+    url = run(["git", "-C", root, "config", "--get", "remote.origin.url"], root).stdout.strip()
+    found = ORIGIN_HOST.match(url)
+    if not found or "." not in found.group(1) and found.group(1).lower() != "localhost":
+        raise Answer("ERROR", "cannot read the host of the origin remote (%r)" % url)
+    return "%s/%s" % (found.group(1).lower(), repo)
+
+
 def open_release_prs(root, release, production, source, repo):
     """-> (busy, reason) from `gh pr list`: an open pull request into production headed by the source
     or a release branch is a release in progress. A failed or truncated list is never clear."""
@@ -346,6 +364,7 @@ def due(now_text, holds_path):
     waited = (now - datetime.datetime.fromtimestamp(since, UTC)).total_seconds() / 60
     try:
         repo = quiet(auto.repo_key, root)
+        gh_repo = origin_repo(root, repo)
     except Answer as answer:   # no repository to list pull requests in, nor to key the claim by
         raise Answer("SKIP", "open release pull requests cannot be read: %s" % answer.line, **record)
     key = "%s@%s%s" % (repo, oldest, ":shadow" if mode == "shadow" else "")
@@ -358,7 +377,7 @@ def due(now_text, holds_path):
     if waited <= wait:
         raise Answer("SKIP", "not waiting long enough: the oldest landing %s has waited %d of %d minutes"
                      % (oldest[:12], int(waited), wait), **record)
-    busy, why = open_release_prs(root, release, production, source, repo)
+    busy, why = open_release_prs(root, release, production, source, gh_repo)
     record["releasePullRequests"] = why
     if busy:
         raise Answer("SKIP", why, **record)
@@ -390,7 +409,9 @@ def decide_claim(request):
     A live claim held by ANYONE, this session included, is skip — never claimed again, so never
     renewed or extended; a lapsed one is taken over by its digest; none, or one released not final,
     is claimed. `after`: claim_work's answer. Won → proceed, unless it renewed a claim this holder
-    already held (skip); lost → skip. A failure is degrade either way."""
+    already held without the read showing it lapsed (skip: `before` was not takeover); a renewal
+    after a takeover is this holder taking back its own lapsed claim (proceed); lost → skip. A
+    failure is degrade either way."""
     stage, response = request.get("stage"), request.get("response")
     now = parse_now(request.get("now"))
     if isinstance(response, dict) and (response.get("error") or str(response.get("verdict", "")).upper() in FAILURES):
@@ -399,7 +420,8 @@ def decide_claim(request):
         if not isinstance(response, dict):
             return {"action": "degrade", "message": "The claim answer could not be read; the backstop does nothing."}
         won = response.get("won") if "won" in response else str(response.get("verdict", "")).upper() in ("WON", "OK")
-        if won and response.get("renewed"):
+        if won and response.get("renewed") and request.get("before") != "takeover":
+            # a renewal of a claim the read did not show lapsed: it was live, and this holder's own
             return {"action": "skip", "message": "This session already held the backstop claim; it starts nothing twice."}
         if won:
             return {"action": "proceed", "message": "Claimed the backstop."}

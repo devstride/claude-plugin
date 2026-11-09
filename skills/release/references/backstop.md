@@ -48,12 +48,13 @@ script and then the claim calls below. A run that does not START does nothing mo
   counts from its stamp. Story commits' own times (when they were written) are never used.
 - **Nothing is releasing it**, checked BEFORE anything is claimed: no open pull request into
   `release.productionBranch` headed by the release source or a `release.releaseBranchPattern`
-  branch (`gh pr list`, always, with or without clearance; a release waiting at step 4 for the
-  owner's yes may have let its train claim lapse, and the backstop never adopts it); and, with
-  `release.clearance` set, its provider's `status --json` reads `clear`, `derived`, with no
-  release pull request on final. Held (stale included: the owner settles a stale release),
-  unreadable, a failed or truncated list, or a status not derived → SKIP. A release holding the
-  train claim is found by claiming it (below): `claim_work` decides, a listing never does.
+  branch (`gh pr list --repo <host>/<owner>/<repo>`, all three read from origin, always, with or
+  without clearance; a release waiting at step 4 for the owner's yes may have let its train claim
+  lapse, and the backstop never adopts it); and, with `release.clearance` set, its provider's
+  `status --json` reads `clear`, `derived`, with no release pull request on final. Held (stale
+  included: the owner settles a stale release), unreadable, a failed or truncated list, an origin
+  with no host to read, or a status not derived → SKIP. A release holding the train claim is found
+  by claiming it (below): `claim_work` decides, a listing never does.
 - **Holds** are `release-holds.md`'s, decided by `release-holds.py` after fetching
   `origin/<productionBranch>`, over every item the release itself would check: the commits on the
   train or the source that are not on production. A line it cannot parse holds.
@@ -62,20 +63,20 @@ script and then the claim calls below. A run that does not START does nothing mo
 
 The `--json` record carries the claim to make: `claim` (kind `release-train`, key
 `<owner>/<repo>@<oldest landing sha>`, `:shadow` appended in shadow mode so shadow records never
-consume a live key; `expiryMinutes` = `maxWaitMinutes`, 15 to 1440, as a claim lives at most a
-day; purpose `release backstop`) and `trainClaim` (key `<owner>/<repo>`). Every check while that work waits computes the same key,
-whatever its clock or the landings since; once that landing ships, the key moves to the next
-oldest. Read it before claiming: `get_claim` (a `commands` store: `claims.commands.get`, which
-doctor requires) piped as `{"stage": "before", "response": <answer>, "now"}` to
-`python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/backstop.py decide`. `skip` → stop silently:
-a live claim blocks a start WHOEVER holds it, this session included (a `/loop` that started a
-release at 10:02 starts nothing at 10:12), and is never claimed again, so never renewed or
-extended. `claim` → `claim_work`; `takeover` (the window lapsed) → `claim_work` with `takeover:
+consume a live key; `expiryMinutes` = `maxWaitMinutes`, 15 to 1440, as a claim lives at most a day;
+purpose `release backstop`) and `trainClaim` (key `<owner>/<repo>`). Every check while that work
+waits computes the same key, whatever its clock or the landings since; once that landing ships, the
+key moves to the next oldest. Read it before claiming: `get_claim` (a `commands` store:
+`claims.commands.get`, which doctor requires) piped as `{"stage": "before", "response": <answer>,
+"now"}` to `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/backstop.py decide`. `skip` → stop
+silently: a live claim blocks a start WHOEVER holds it, this session included (a `/loop` that
+started a release at 10:02 starts nothing at 10:12), and is never claimed again, so never renewed
+or extended. `claim` → `claim_work`; `takeover` (the window lapsed) → `claim_work` with `takeover:
 {expectedHolderDigest: <takeoverDigest>}`. Each claim is `story-claims.md`'s (holder,
 `claim_record.py` record) with the record's fields and one payload key more, `backstop`: the
-`--json` record; pipe its answer as `{"stage": "after", …}`: `proceed` → on; `skip` → stop
-silently; `degrade` (either stage) → do nothing, said once (the backstop never runs without its
-claim).
+`--json` record; pipe its answer as `{"stage": "after", "before": <the before action>, …}`:
+`proceed` → on (this session taking back its own lapsed claim included); `skip` → stop silently;
+`degrade` (either stage) → do nothing, said once (the backstop never runs without its claim).
 Never heartbeat it and never release it on a start: it lapses after `maxWaitMinutes`, so each
 waiting work gets at most one start per window, and a release that stops early (a hold, a red
 check, the owner's no) is retried once per window while the work still waits and nothing is in
