@@ -65,6 +65,7 @@ import importlib.util
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import zoneinfo
@@ -199,42 +200,82 @@ def carries_nothing(root, row, production, *bases):
     merged into a train or a snapshot)."""
     if len(row[2]) < 2:
         return False
-    then = git(root, "rev-list", "-1", "--first-parent", "--before=@%d" % row[1], "origin/%s" % production).stdout.split()
+    then = [sha for sha, when, _ in reversed(production_walk(root, production)) if when <= row[1]][:1]
+    if then and (then[0] == row[0] or then[0] in row[2]):
+        then = []   # the merge is on production itself (a source that is production): not yet
     left = git(root, "rev-list", "--no-merges", "--count", row[0], "--not", row[2][0], *(list(bases) + then)).stdout.strip()
     return left == "0"
 
 
+WALKS = {}
+
+
+def production_walk(root, production):
+    """Production's whole first-parent walk, oldest first, read once per run: where production stood
+    at any moment is the newest commit on it made by then."""
+    if production not in WALKS:
+        WALKS[production] = first_parent(root, production)
+    return WALKS[production]
+
+
+MERGED = re.compile(r"^Merge (?:pull request #\d+ from [^/\s]+/(\S+)|(?:remote-tracking )?branch '(?:origin/)?([^']+)')")
+SNAPSHOT = re.compile(r"(?:^|/)(?:release|support)-train-")
+
+
+def merged_branch(root, sha):
+    """-> (the branch a merge's subject names as merged, or None; its message lines)."""
+    lines = git(root, "log", "-1", "--format=%B", sha).stdout.strip().splitlines()
+    named = MERGED.match(lines[0]) if lines else None
+    return (named and (named.group(1) or named.group(2))), lines
+
+
 def delivery(root, merge, train):
-    """A train delivery is recognised by its merge naming the train branch, the release train's
-    snapshot (`release-train-<date>`, `support-train-<date>` under the train's old name) or its pull
-    request title (`Release train:`); release-branch.md names them so. Any other merge into the source is itself one landing, however many merges its
-    branch holds (an epic's release pull request is one landing, not its stories)."""
-    text = git(root, "log", "-1", "--format=%B", merge[0]).stdout
-    return bool(train) and any(mark in text for mark in (train, "release-train-", "support-train-", "Release train:", "Support train:"))
+    """A train delivery is recognised by the branch its merge names (the train, or the release
+    train's snapshot `release-train-<date>`, `support-train-<date>` under the train's old name) or
+    by its pull request title (`Release train:`); release-branch.md names them so. Any other merge
+    into the source is itself one landing, however many merges its branch holds (an epic's release
+    pull request is one landing, not its stories), whatever its message mentions."""
+    branch, lines = merged_branch(root, merge[0])
+    title = next((line for line in lines[1:] if line.strip()), "")
+    return bool(train) and (branch == train or bool(branch and SNAPSHOT.search(branch))
+                            or title.startswith(("Release train:", "Support train:")))
 
 
 def brought(root, merge, production, train):
     """The landings a first-parent commit of the release source brought, syncs left out. A train
     delivery brings each train landing on its second parent's first-parent walk: snapshot fixes
-    (not merges) and syncs are skipped, and a merge that absorbed late landings (its own walk all
-    merges, continuing a commit already in the delivery) is read through to them. Any other commit
-    is itself the landing."""
+    (not merges) and syncs are skipped, and a merge that absorbed late landings is read through to
+    them (release-branch.md 4a): its own walk is all merges and continues an earlier commit of the
+    delivery with nothing but snapshot work (fixes, syncs, earlier absorbs) after that commit and
+    before it, and either something between (the snapshot's merge of the source) or a subject
+    naming the train as the branch merged. A branch cut from the train mid-cycle has a landing
+    between, or continues the commit just before it, so it stays one landing. Any other commit is
+    itself the landing."""
     if len(merge[2]) < 2 or not delivery(root, merge, train):
         return [merge]
-    found, seen = [], set()
+    found, walked, landed = [], {}, []
 
-    def walk(head, stop):
-        for row in rows(root, head, "--not", stop):
-            seen.add(row[0])
-            if len(row[2]) < 2 or carries_nothing(root, row, production, merge[2][0]):
-                continue
+    def landing(row):
+        if len(row[2]) < 2 or carries_nothing(root, row, production, merge[2][0]):
+            return False
+        found.append(row)
+        return True
+
+    for row in rows(root, merge[2][1], "--not", merge[2][0]):
+        absorbed = False
+        if len(row[2]) >= 2 and not carries_nothing(root, row, production, merge[2][0]):
             inner = rows(root, row[2][1], "--not", row[2][0])
-            if inner and inner[0][2] and inner[0][2][0] in seen and all(len(r[2]) >= 2 for r in inner):
-                walk(row[2][1], row[2][0])
-            else:
-                found.append(row)
-
-    walk(merge[2][1], merge[2][0])
+            start = inner[0][2][0] if inner and inner[0][2] else None
+            if (start in walked and walked[start] == len(landed) and all(len(r[2]) >= 2 for r in inner)
+                    and (start != row[2][0] or merged_branch(root, row[0])[0] == train)):
+                absorbed = True
+                for late in inner:
+                    if landing(late):
+                        landed.append(late[0])
+                    walked[late[0]] = len(landed)   # a later absorb continues from here
+        if not absorbed and landing(row):
+            landed.append(row[0])
+        walked[row[0]] = len(landed)   # landings counted up to and including this commit
     return found or [merge]
 
 
@@ -272,8 +313,8 @@ def table(root, landing, source, production, start):
     if landing == source:
         candidates = [(row, ()) for row in first_parent(root, source, start)]
     else:
-        candidates = [(row, ()) for merge in first_parent(root, source, start)
-                      for row in brought(root, merge, production, landing)]
+        candidates = [(row, () if row[0] == merge[0] else None) for merge in first_parent(root, source, start)
+                      for row in brought(root, merge, production, landing)]   # None: brought() checked it
         candidates += [(row, ("origin/%s" % source,))
                        for row in rows(root, "origin/%s" % landing, "--not", "origin/%s" % source)]
     shipped = shipped_times(root, production, start)
@@ -283,7 +324,7 @@ def table(root, landing, source, production, start):
         if sha in seen or when < start:
             continue
         seen.add(sha)
-        if carries_nothing(root, row, production, *bases):
+        if bases is not None and carries_nothing(root, row, production, *bases):
             continue   # a sync merge carries nothing
         found.append((sha, when, shipped.get(sha)))
     return found
@@ -443,7 +484,7 @@ def backtest(args):
     for sha, landed, shipped in landings:
         if landed < start or landed + 300 > now.timestamp():
             continue   # outside the window, or not yet quotable as of --now
-        if shipped is None or shipped > now.timestamp():
+        if shipped is None or shipped + deploy * 60 > now.timestamp():
             counts["pending"] += 1
             continue
         at = datetime.datetime.fromtimestamp(landed, UTC) + datetime.timedelta(minutes=5)

@@ -28,7 +28,7 @@ JSON
 
 # One landing a day, Oct 27 to Nov 5 at 10:00Z, each released after D minutes, the way a release
 # train ships (release-branch.md): a snapshot cut from the train, develop merged into it, on one
-# release a review fix committed on it, its pull request merged into develop a minute before,
+# release a review fix committed on it (on another a hotfix the sync brings back), its pull request merged into develop a minute before,
 # develop into master at D, master synced back into develop through a sync pull request, then the
 # train fast-forwarded to develop, so the train's own first-parent walk no longer shows its landings
 # and they must be read through the merges into develop.
@@ -50,6 +50,10 @@ deliver() {   # deliver <time> [fix]: the train's snapshot pull request merged i
 release() {   # release <time> [fix]: the train delivered, develop -> master, master synced back by pull request, train fast-forwarded
   deliver "$(minutes "$1" -1)" "${2:-}"
   g checkout -q master; at "$1" merge -q --no-ff -m "release" develop
+  if [ -n "${3:-}" ]; then   # a hotfix merged into master, which the sync below brings back
+    g checkout -q -b "hotfix-$3" master; at "$1" commit -q --allow-empty -m "hotfix"
+    g checkout -q master; at "$1" merge -q --no-ff -m "Merge pull request #5 from acme/hotfix-$3" "hotfix-$3"
+  fi
   local sync; sync="ci/sync-$(echo "$1" | tr -d ':TZ-')"; g checkout -q -b "$sync" develop
   at "$(minutes "$1" 1)" merge -q --no-ff -m "merge: master into develop" master
   g checkout -q develop; at "$(minutes "$1" 1)" merge -q --no-ff -m "Merge pull request #2 from acme/$sync" "$sync"
@@ -61,7 +65,7 @@ for i in $(seq 0 9); do
   day=$(python3 -c 'import datetime,sys; print((datetime.date(2026,10,27)+datetime.timedelta(days=int(sys.argv[1]))).isoformat())' "$i")
   sha=$(land "s$i" "${day}T10:00:00Z" "I4$i")
   [ -n "$FIRST" ] || FIRST="$sha"
-  release "$(minutes "${day}T10:00:00Z" "${DURATIONS[$i]}")" "$([ "$i" = 3 ] && echo fix)"
+  release "$(minutes "${day}T10:00:00Z" "${DURATIONS[$i]}")" "$([ "$i" = 3 ] && echo fix)" "$([ "$i" = 5 ] && echo "$i")"
 done
 CANDIDATE=$(land cand 2026-11-09T17:30:00Z)
 g checkout -q -b story/unlanded develop
@@ -209,12 +213,13 @@ OUT=$(run quote --sha "$LATE" --now 2026-11-09T18:35:00Z --json)
 [ "$(echo "$OUT" | field landing)" = "$LATE" ] && ok "(9g) an absorbed landing landed at its own train merge" || bad "(9g) absorbed landing time: $OUT"
 
 # (9h) An epic's release pull request merged straight into develop is one landing at its merge,
-# never its stories at their merges onto the epic branch, though that branch holds only merges.
+# never its stories at their merges onto the epic branch, though that branch holds only merges and
+# its title mentions the train.
 g checkout -q -b epic/e develop
 g checkout -q -b story/e1 epic/e; at 2026-11-01T09:00:00Z commit -q --allow-empty -m "e1"
 g checkout -q epic/e; at 2026-11-01T09:00:00Z merge -q --no-ff -m "merge: I501 [1] one into epic integration" story/e1
 STORY=$(g rev-parse HEAD)
-g checkout -q develop; at 2026-11-09T18:50:00Z merge -q --no-ff -m "Merge pull request #4 from acme/p/epic-I500-e" epic/e
+g checkout -q develop; at 2026-11-09T18:50:00Z merge -q --no-ff -m "Merge pull request #4 from acme/p/epic-I500-e" -m "Retry handling for train/release and its release-train- snapshots" epic/e
 EPIC=$(g rev-parse HEAD)
 g push -q origin develop; g fetch -q origin
 OUT=$(run quote --sha "$STORY" --now 2026-11-09T19:00:00Z --json)
@@ -229,6 +234,37 @@ if [ "$CODE" = 0 ] && [ "$(echo "$OUT" | field pending)" = 1 ] &&
 else
   bad "(9i) backtest: exit $CODE $OUT"
 fi
+
+# (9j) A batch branch cut from the train mid-cycle, holding only merges, and an epic's release pull
+# request onto the train are each one landing, never read through as if they were absorbs (the
+# release also ships (9h)'s epic).
+g branch -f train/release develop
+L1=$(land b1 2026-11-09T19:00:00Z I611)
+g checkout -q -b batch train/release
+for n in 2 3; do
+  g checkout -q -b "b$n" batch; at "2026-11-09T19:0${n}:00Z" commit -q --allow-empty -m "I61$n"
+  g checkout -q batch; at "2026-11-09T19:0${n}:00Z" merge -q --no-ff -m "merge: I61$n into the batch" "b$n"
+done
+L4=$(land b4 2026-11-09T19:10:00Z I614)
+g checkout -q train/release; at 2026-11-09T19:20:00Z merge -q --no-ff -m "merge: the batch (I612, I613) into train/release" batch
+LB=$(g rev-parse HEAD)
+g checkout -q -b epic2 develop
+g checkout -q -b e2s epic2; at 2026-11-09T19:00:00Z commit -q --allow-empty -m "I621"
+g checkout -q epic2; at 2026-11-09T19:00:00Z merge -q --no-ff -m "merge: I621 [1] into epic integration" e2s
+g checkout -q train/release; at 2026-11-09T19:25:00Z merge -q --no-ff -m "Merge pull request #8 from acme/p/epic-I620-y" epic2
+EB=$(g rev-parse HEAD)
+deliver 2026-11-09T19:30:00Z
+g checkout -q master; at 2026-11-09T19:40:00Z merge -q --no-ff -m "release" develop
+RELEASE3=$(g rev-parse HEAD)
+g push -q origin develop master train/release; g fetch -q origin
+OUT=$(run shipped --merge "$RELEASE3" --json); CODE=$?
+if [ "$CODE" = 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); got={l["sha"] for l in d["landings"]}; sys.exit(0 if got==set(sys.argv[1:]) else 1)' "$L1" "$L4" "$LB" "$EB" "$EPIC"; then
+  ok "(9j) a batch branch and an epic onto the train are each one landing"
+else
+  bad "(9j) batch and epic: exit $CODE $OUT"
+fi
+OUT=$(run quote --sha "$L4" --now 2026-11-09T19:35:00Z --json)
+[ "$(echo "$OUT" | field landedAt)" = 2026-11-09T19:10:00Z ] && ok "(9k) a landing after a batch branch was cut keeps its own landing time" || bad "(9k) landing time: $OUT"
 
 # (10) No release train that ships: work lands on the release source; a source that is production
 # means a merge is the release.
@@ -248,6 +284,23 @@ fi
 # history beside the quoted merge is the eleven train deliveries, not the ten syncs as well (21).
 OUT=$(run quote --sha "$DIRECT" --now 2026-11-09T18:00:00Z --json)
 [ "$(echo "$OUT" | field landings)" = 11 ] && ok "(10b) sync pull requests are not landings" || bad "(10b) sync pull requests: $OUT"
+# (10d) A release source that is the production branch: each merge into it is a landing, never a
+# sync of itself.
+python3 - "$WORK/repo/.claude/ds-config.json" <<'PY'
+import json, sys
+path = sys.argv[1]; config = json.load(open(path))
+config["release"]["releaseSource"] = "master"
+json.dump(config, open(path, "w"))
+PY
+OUT=$(run shipped --merge "$RELEASE1" --json)
+echo "$OUT" | python3 -c 'import json,sys; l=json.load(sys.stdin)["landings"]; sys.exit(0 if [x["sha"] for x in l]==[sys.argv[1]] else 1)' "$RELEASE1" &&
+  ok "(10d) a source that is production: each merge into it is a landing" || bad "(10d) source is production: $OUT"
+python3 - "$WORK/repo/.claude/ds-config.json" <<'PY'
+import json, sys
+path = sys.argv[1]; config = json.load(open(path))
+config["release"]["releaseSource"] = "develop"
+json.dump(config, open(path, "w"))
+PY
 # (10c) A train configured to ship but not created yet: work lands on the source, never an ERROR.
 python3 - "$WORK/repo/.claude/ds-config.json" <<'PY'
 import json, sys
