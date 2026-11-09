@@ -8,6 +8,16 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A release no longer gives up its clearance hand-back or heartbeat while its own keeper is
+  still stamping the clearance.** When the store turned a change away but the clearance had not
+  visibly moved yet, the built-in providers retried twice straight away and then stopped with an
+  error; on a fast machine that took about a tenth of a second, so the session's own keeper
+  landing a stamp at that moment could fail `release` or `heartbeat`. They now wait a little
+  longer before each retry (a quarter second, doubling, close to four seconds in all) and only
+  then report the store's refusal.
+
 ## [3.44.2] — 2026-11-08
 
 ### Changed
