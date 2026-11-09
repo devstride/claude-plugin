@@ -234,15 +234,15 @@ def merged_branch(root, sha):
 ABSORB = re.compile(r"^Merge commit '([0-9a-f]{7,40})'")
 ABSORB_WORDS = re.compile(r"^merge: (?:absorb|late (?:train )?landing)(?:\s|$)", re.I)
 INTO_SNAPSHOT = re.compile(
-    r"^merge: (?:origin/)?train/\S+ .*?\binto (?:\S*(?:release|support)-train-|[^,;()\u2014]*?\bsnapshot\b)", re.I)
+    r"^merge: (?:origin/)?train/\S+ (?:(?!\binto ).)*\binto (?:\S*(?:release|support)-train-|[^,;()\u2014]*?\bsnapshot\b)", re.I)
 
 
 def says_absorb(root, row, train):
     """The merge's subject says it absorbed the train: the subject release-branch.md 4a prescribes
     (`Merge branch '<train>' (<absorbAt>) into <snapshot>`), git's own for merging the absorbed
     commit by its sha, or the older wording: `merge: absorb …` or `merge: late (train) landing …`
-    as whole words, or `merge: train/<…> … into …` whose phrase after `into` (up to , ; ( ) or an
-    em dash) says snapshot or starts a release-train-/support-train- slug. A branch name
+    as whole words, or `merge: train/<…> … into …` whose phrase after its first `into` (up to , ; ( )
+    or an em dash) says snapshot or starts a release-train-/support-train- slug. A branch name
     (`absorb-retries`, `fix-absorb-validation`) is never the evidence. Any subject with
     `into [origin/]<train>` never counts, in any of these forms. Syncs into the snapshot are
     skipped before this is asked."""

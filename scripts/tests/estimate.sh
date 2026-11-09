@@ -349,7 +349,8 @@ fi
 
 # (9p) Absorbs in the older hand-written wording are read through to their own train merges: one
 # "into the … snapshot", one into the snapshot's release-train- branch, one "late train landing", one
-# into a snapshot whose name starts with the train's, one into a support-train- slug; case never matters.
+# into snapshots whose names start with the train's (-, ., /, a letter or digit after it), one into a
+# support-train- slug, one from origin/<train>; case never matters.
 g branch -f train/release develop
 L0=$(land l0 2026-11-10T09:55:00Z I750)
 g checkout -q -b p/release-train-26-11-10-3 train/release
@@ -363,12 +364,20 @@ LD=$(land ld 2026-11-10T10:06:00Z I754)
 g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:07:00Z merge -q --no-ff -m "merge: train/release (${LD:0:10}) into train/release-train-26-11-10-3" train/release
 LE=$(land le 2026-11-10T10:08:00Z I755)
 g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:09:00Z merge -q --no-ff -m "merge: train/support at ${LE:0:10} (I755) into support-train-26-11-10-3" train/release
-g checkout -q develop; at 2026-11-10T10:10:00Z merge -q --no-ff -m "Merge pull request #15 from acme/p/release-train-26-11-10-3" p/release-train-26-11-10-3
-g checkout -q master; at 2026-11-10T10:20:00Z merge -q --no-ff -m "release" develop
+LF=$(land lf 2026-11-10T10:10:00Z I756)
+g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:11:00Z merge -q --no-ff -m "Merge branch 'train/release' (${LF:0:10}) into train/release.26-11-10-3" train/release
+LG=$(land lg 2026-11-10T10:12:00Z I757)
+g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:13:00Z merge -q --no-ff -m "Merge branch 'train/release' (${LG:0:10}) into train/release/26-11-10-3" train/release
+LH=$(land lh 2026-11-10T10:14:00Z I758)
+g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:15:00Z merge -q --no-ff -m "Merge branch 'train/release' (${LH:0:10}) into train/release2" train/release
+LI=$(land li 2026-11-10T10:16:00Z I759)
+g checkout -q p/release-train-26-11-10-3; at 2026-11-10T10:17:00Z merge -q --no-ff -m "merge: origin/train/release (${LI:0:10}) into the release snapshot" train/release
+g checkout -q develop; at 2026-11-10T10:30:00Z merge -q --no-ff -m "Merge pull request #15 from acme/p/release-train-26-11-10-3" p/release-train-26-11-10-3
+g checkout -q master; at 2026-11-10T10:40:00Z merge -q --no-ff -m "release" develop
 RELEASE7=$(g rev-parse HEAD)
 g checkout -q develop; g push -q origin develop master train/release; g fetch -q origin
 OUT=$(run shipped --merge "$RELEASE7" --json); CODE=$?
-if [ "$CODE" = 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); got={l["sha"] for l in d["landings"]}; sys.exit(0 if got==set(sys.argv[1:]) else 1)' "$L0" "$LA" "$LB" "$LC" "$LD" "$LE"; then
+if [ "$CODE" = 0 ] && echo "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); got={l["sha"] for l in d["landings"]}; sys.exit(0 if got==set(sys.argv[1:]) else 1)' "$L0" "$LA" "$LB" "$LC" "$LD" "$LE" "$LF" "$LG" "$LH" "$LI"; then
   ok "(9p) absorbs in the older wording are read through to their own landings"
 else
   bad "(9p) older absorb wording: exit $CODE $OUT"
@@ -399,10 +408,15 @@ merge: train/fixes into p/integration, snapshot prep
 merge: train/fixes into p/integration; snapshot prep
 merge: train/fixes into p/integration — snapshot prep
 merge: train/fixes into p/integration (snapshot prep)
+merge: train/fixes into p/integration (folds I761 into snapshot prep)
+merge: absorb batch into origin/train/release
 SUBJECTS
 batch nqsha 2026-11-10T11:40:00Z   # git's own subject for a merge by sha: "Merge commit '<sha>' into train/release"
 g checkout -q train/release; at 2026-11-10T11:41:00Z merge -q --no-ff --no-edit "$(g rev-parse nqsha)"
 g log -1 --format=%s | grep -q "^Merge commit '.*' into train/release$" || bad "(9q) fixture: git's merge-by-sha subject changed"
+EXPECT9Q="$EXPECT9Q $(g rev-parse HEAD)"
+batch nqother 2026-11-10T11:42:00Z   # git's merge-by-sha subject naming a commit that is not the one merged
+g checkout -q train/release; at 2026-11-10T11:43:00Z merge -q --no-ff -m "Merge commit '${L12:0:12}' into p/elsewhere" nqother
 EXPECT9Q="$EXPECT9Q $(g rev-parse HEAD)"
 deliver 2026-11-10T11:50:00Z
 g checkout -q master; at 2026-11-10T11:55:00Z merge -q --no-ff -m "release" develop
