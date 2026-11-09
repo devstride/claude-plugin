@@ -394,7 +394,7 @@ merge: batch into train/release (folds I761 into snapshot prep)
 merge: golden snapshot fix into the integration batch
 MERGE: Absorb batch Into Train/Release
 merge: absorb batch into train/release.
-merge: batch I15100, I15101 onto train/release (fold fixtures into snapshot tests)
+merge: batch I762, I763 onto train/release (fold fixtures into snapshot tests)
 merge: train/fixes into p/integration, snapshot prep
 merge: train/fixes into p/integration; snapshot prep
 merge: train/fixes into p/integration — snapshot prep
