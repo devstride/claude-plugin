@@ -31,13 +31,13 @@ home = os.path.join(tmp, "home"); sessions = os.path.join(home, ".claude", "sess
 def put(pid, record):
     with open(os.path.join(sessions, "%s.json" % pid), "w") as handle:
         handle.write(record if isinstance(record, str) else json.dumps(record))
-put(100, {"sessionId": "s-1", "name": "from pid"})
-put(200, {"sessionId": "s-1", "name": "other record"})
+put(900, {"sessionId": "s-1", "name": "from pid"})
+put(100, {"sessionId": "s-1", "name": "other record"})
 put(300, {"sessionId": "s-2", "name": "  two\x07\nlines | pipe  "})
 put(400, "not json")
-check("(2a) the CLAUDE_PID record first", cr.session_name({"CLAUDE_CODE_SESSION_ID": "s-1", "CLAUDE_PID": "100"}, home), "from pid")
+check("(2a) the CLAUDE_PID record first", cr.session_name({"CLAUDE_CODE_SESSION_ID": "s-1", "CLAUDE_PID": "900"}, home), "from pid")
 check("(2b) else any record naming the session id", cr.session_name({"CLAUDE_CODE_SESSION_ID": "s-2", "CLAUDE_PID": "999"}, home), "two lines pipe")
-check("(2c) a record for another session is never used", cr.session_name({"CLAUDE_CODE_SESSION_ID": "s-1", "CLAUDE_PID": "300"}, home), "from pid")
+check("(2c) a record for another session is never used", cr.session_name({"CLAUDE_CODE_SESSION_ID": "s-1", "CLAUDE_PID": "300"}, home), "other record")
 check("(2d) no record → DEVSTRIDE_SESSION", cr.session_name({"CLAUDE_CODE_SESSION_ID": "s-9", "DEVSTRIDE_SESSION": "wt-a"}, home), "wt-a")
 check("(2e) nothing known → none", cr.session_name({}, home), None)
 check("(2f) a long name is capped at 200", len(cr.session_name({"DEVSTRIDE_SESSION": "x" * 500}, home)), 200)
@@ -45,7 +45,7 @@ check("(2f) a long name is capped at 200", len(cr.session_name({"DEVSTRIDE_SESSI
 # (3) the record: four payload keys always, in and out of a checkout
 repo = os.path.join(tmp, "wt7")
 subprocess.run(["git", "init", "-q", "-b", "feature/x", repo], check=True)
-env = {"DEVSTRIDE_MACHINE_NAME": "m1-bob", "CLAUDE_CODE_SESSION_ID": "s-1", "CLAUDE_PID": "100"}
+env = {"DEVSTRIDE_MACHINE_NAME": "m1-bob", "CLAUDE_CODE_SESSION_ID": "s-1", "CLAUDE_PID": "900"}
 got = cr.record(repo, env, home)
 check("(3a) the record in a checkout", got, {"machine": "m1-bob", "sessionName": "from pid", "payload": {
     "sessionId": "s-1", "checkout": "wt7", "branch": "feature/x", "pluginVersion": cr.plugin_version()}})

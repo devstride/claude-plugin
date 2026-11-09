@@ -194,7 +194,10 @@ fresh adopt; held claude:other review release/26-10-17 3970 2026-10-18T09:30:00Z
 run adopt --yes
 if [ "$RC" -eq 0 ] && printf '%s' "$OUT" | grep -q '^ADOPTED release/26-10-17 #3970$' && printf '%s' "$OUT" | grep -q '^Resume: branch release/26-10-17, pull request #3970, phase review$' \
    && [ "$(holderd)" = "$(digest claude:me-1)" ] && [ "$(field takenAt)" = 2026-10-18T09:50:00Z ] && [ "$(field heartbeatAt)" = 2026-10-18T10:05:00Z ] \
-   && grep -q "\"expectedHolderDigest\": \"$(digest claude:other)\"" "$DS/calls.log"; then
+   && grep -q "\"expectedHolderDigest\": \"$(digest claude:other)\"" "$DS/calls.log" \
+   && grep '"tool": "adopt_claim"' "$DS/calls.log" | grep -q '"machine": "m9-dan", "sessionName": "rel-1"' \
+   && [ "$(field machine)" = m9-dan ]; then
+  ok "(4n) adopt names the machine and session the one shared way"
   ok "(4) adopt --yes → adopt_claim with the expected digest; holder rewritten, heartbeat now, takenAt kept; Resume line"
 else bad "(4) rc=$RC: $OUT"; fi
 fresh adopt-fresh; held claude:other review release/26-10-18 3981

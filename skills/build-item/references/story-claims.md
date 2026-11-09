@@ -39,7 +39,8 @@ heartbeats, no message; build exactly as before. Hotfixes never claim. `build-it
 
 Every `claim_work` call takes `machine`, `sessionName` (when printed) and `payload`, and every
 `heartbeat_claim` the `payload` (so the branch stays current), verbatim from
-`python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/claim_record.py`, run in the checkout.
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/claim_record.py`, run in the checkout
+before each call.
 Never type a machine or session name, or add a payload key. Exit 1 degrades as `identity` does.
 
 ## When
