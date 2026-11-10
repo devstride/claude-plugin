@@ -119,7 +119,7 @@ steps 2–2c run.
 
 - **Resolve the delivery profile first** and pass it by name to `pr` and `review`. A release has no
   plan root, so per `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`: a bare
-  profile word in `$ARGUMENTS`, else config `profile`, else `standard` — announced with its source.
+  profile word in `$ARGUMENTS`, else config `profile`, else `extended` — announced with its source.
   It never loosens this step (`release-pr.md`) — unless `release.productionReview` is set: then read
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/review-once.md` first; it decides how much of
   this step runs.

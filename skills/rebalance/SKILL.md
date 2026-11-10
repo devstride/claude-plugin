@@ -17,9 +17,8 @@ citation; never restate its table.
 
 Arguments — a grouping item to re-slice (a whole plan root, or one release unit — this org's Epic —
 to scope the re-slice to it; e.g. `I20100`) and the target profile as a bare word anywhere in the
-arguments (`prototype`, `standard` or `extended` — the contract's argument form; the retired
-`enterprise` is an unknown profile, which the contract says how to announce),
-optionally with `--dry-run`; this skill REQUIRES both, so missing either → ask, never guess:
+arguments (`prototype`, `standard` or `extended` — the contract's argument form; step 0 handles
+the retired `enterprise`), optionally with `--dry-run`; this skill REQUIRES both, so missing either → ask, never guess:
 $ARGUMENTS
 
 ## Hard floors
@@ -96,7 +95,7 @@ $ARGUMENTS
   build-item's ritual stamps the real dates when it merges.
 - **Current profile** — the nearest EFFECTIVE marker per the contract: the item's own, else the
   closest ancestor's (walk `hierarchy` up with `get_item(view:"full")`), else config `profile`,
-  else `standard`. On a whole-root run check every release unit for its OWN marker (it wins for its
+  else `extended`. On a whole-root run check every release unit for its OWN marker (it wins for its
   subtree; direction is decided per unit). **Announce both ends with sources** ("current:
   enterprise (retired: read as standard) — from the root marker on I20100; target: extended — from
   `$ARGUMENTS`"). Current
@@ -220,7 +219,7 @@ restore); it is the only write before 3a, and an overwritten probe date stops th
 ## 4. Report
 
 Counts (not-started before → after, per release unit and in total; untouchables listed as
-unchanged); the absorbed → successor map with numbers, prefixes and titles; archived items and the
+unchanged); the contract's **shape against target** line; the absorbed → successor map with numbers, prefixes and titles; archived items and the
 successor each comment names; the marker written, where, any descendant markers rewritten, and the
 un-extracted units it covers; the orphan-check result; unchanged leaves below target depth for a
 follow-up `/devstride:plan`; and **the next-unblocked item**, re-derived per

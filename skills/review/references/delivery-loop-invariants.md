@@ -450,9 +450,10 @@ N1. ONE profile word — `prototype` / `standard` / `extended` — moves every r
     knobs are coupled (coarse stories under a fix-every-finding floor and extra rounds is the worst
     combination — `extended` pairs its coarse grain with standard's), so no skill exposes them as
     independent primary settings. The retired `enterprise` (3.12.0) is an UNKNOWN profile: read as
-    `standard`, announced with the override recipe, never silently.
+    `standard` (never the shipped default), announced with the override recipe, never silently.
 N2. Resolution order, every skill, first match wins, ANNOUNCED with its source: bare word in the
-    arguments → the plan root's `Delivery profile:` marker → `profile` in config → `standard`.
+    arguments → the plan root's `Delivery profile:` marker → `profile` in config → `extended`, the
+    shipped default (`standard` through 3.48.0).
 N3. The marker is read with `get_item(view: 'full')` — the summary projection omits `description`,
     so a summary read finds no marker and silently falls through to the config default.
 N4. Floors no profile removes: one bounded self-check + green exact-tree gate on every story;
@@ -478,6 +479,10 @@ N9. Standard story verification uses targeted checks and reserves the full suite
 N10. Engineering economy is proactive: repository/dependencies/standard library first, then mature
      OSS evaluated for fit, security, license, maintenance, adoption and dependency cost; custom
      code only for a concrete gap. DRY never creates a speculative abstraction over YAGNI.
+N11. Shape targets (stories per epic, epics per capability, per profile) are a soft table in the
+     contract, never knobs or override keys: `plan` quotes them and asks once about merging a unit
+     above range, `plan` and `rebalance` report a shape-against-target line, and nothing refuses a
+     plan for missing one.
 
 ## O. Local environment and hotfixes (config: `localEnvironment`)
 O1. `branch-hotfix` reads `localEnvironment` — `recreate` first (see O3), else `migrate` then `seed`
@@ -701,7 +706,8 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "mandatoryLenses" "mandatory lens" "mandatory-lenses.md" \
               "release.releaseBranchPattern" "releaseBranchFixExclusions" "requestPolicy" \
               "releaseTrain.branch" "final-head" "branch-patterns.md" \
-              "release.clearance" "clearance.md" "release-tower" "never claims" "handed back at 5b"; do
+              "release.clearance" "clearance.md" "release-tower" "never claims" "handed back at 5b" \
+              "stories per epic" "epics per capability" "Shape targets"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
 
@@ -751,6 +757,9 @@ skills/plan/SKILL.md|Delivery profile:
 skills/rebalance/SKILL.md|archive
 skills/setup/SKILL.md|profile
 skills/doctor/SKILL.md|profile
+skills/doctor/SKILL.md|key absent, shipped default
+skills/plan/SKILL.md|shape against target
+skills/rebalance/SKILL.md|shape against target
 skills/doctor/SKILL.md|local > shared
 skills/doctor/references/repairs.md|ask outside the batch
 skills/doctor/scripts/statusline-override.py|require_clean_committed_shared

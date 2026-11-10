@@ -68,7 +68,7 @@ Knobs, floors, resolution order and root marker live ONLY in
 skill honours `perStoryPullRequest` (4), `storyVerify` (4a), `autoRelease` and `releaseCiOrdering` (8).
 
 - **Resolve once the story is SELECTED**, in the contract's order (explicit word → root marker →
-  config `profile` → `standard`; an unknown word → `standard`, said so). The marker walks the
+  config `profile` → `extended`; an unknown word → `standard`, said so). The marker walks the
   story's ancestors (`get_item` with `view: 'full'` each) and takes the NEAREST. A one-off skips
   only the marker step. Never carried over from the last story.
 - **Announce it WITH ITS SOURCE** — `profile: extended — from the plan root I20100` — in the

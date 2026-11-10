@@ -639,7 +639,7 @@
         "standard",
         "extended"
       ],
-      "default": "standard",
+      "default": "extended",
       "description": "the delivery profile; contract: skills/plan/references/delivery-profiles.md",
       "since": "pre-registry"
     },

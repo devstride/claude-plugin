@@ -55,7 +55,7 @@ starting with `_` and `$schema` are never reported as unknown.
 
 | Key | Type | Allowed | Default | Meaning | Since |
 |---|---|---|---|---|---|
-| `profile` | string | prototype, standard, extended | standard | the delivery profile; contract: skills/plan/references/delivery-profiles.md | pre-registry |
+| `profile` | string | prototype, standard, extended | extended | the delivery profile; contract: skills/plan/references/delivery-profiles.md | pre-registry |
 | `profileOverrides` | object | — | — | pins one knob under the profile; operator hand-edit, never written by setup | pre-registry |
 | `profileOverrides.grain` | string | — | — | overrides the profile's grain knob | pre-registry |
 | `profileOverrides.specDepth` | string | — | — | overrides the profile's specDepth knob | pre-registry |
