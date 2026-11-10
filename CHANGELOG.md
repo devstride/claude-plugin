@@ -14,8 +14,10 @@ for what each version component means here and how a release is cut.
   create; `comprehend-plan` reports the tickets linked to a plan.** Pass `--ticket <ticket
   number>[,<ticket number>]` to `plan`, `create-story`, `create-defect`, `insert-story` or
   `insert-defect`. Each ticket is checked to be a Service Desk ticket (it has a requester) before
-  anything is written, then linked with an `originating_ticket` relationship: `plan` links the
-  parent item it plans under, once, at the start; the other four link the item they create. A
+  the linked item is created, then linked with an `originating_ticket` relationship: `plan` links
+  the plan root once, at the hierarchy sign-off; the other four link the item they create (a
+  DEFERRED placement links nothing). The flag is taken out of the arguments first, so a ticket
+  number is never read as the parent. A
   number that is not a ticket is named and skipped. On a DevStride that does not yet support the
   relationship, the skill says so once and carries on without the link, and never substitutes
   another relationship type; any other refusal is shown as the server worded it. The procedure

@@ -51,6 +51,8 @@ agent, each returning a SUMMARIZED record, never raw HTML — `{number, title, w
 description_summary, key_comments, relationships: {blocked_by, blocks}, originating_tickets}`,
 plus `isBug`, `completedAt`, `endedOutcome` and the `related_to` edge for deferred-container members. Read `args` defensively
 (`const items = Array.isArray(args) ? args : JSON.parse(args)` — it can arrive JSON-stringified).
+`originating_tickets` and each ticket's status are read per
+`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/originating-ticket.md` ("Reading the links").
 
 ## 3. Synthesize
 

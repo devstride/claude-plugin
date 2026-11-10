@@ -12,7 +12,7 @@ description: Create a one-off Story (inbound request / ad-hoc work not in a sequ
 
 Use **`/devstride:insert-story`** instead when the work belongs in a sequenced plan — it splices into the dependency chain, numbers it, and lets the loop pick it up in order.
 
-Argument — free text describing the story, optionally with a parent item or workstream number (e.g. `I20100 add rate limiting to webhook intake`, `F42 ...`, or just `add rate limiting to webhook intake`) — a leading `deferred <item#>` selects DEFERRED placement instead; `--ticket <ticket#>` names an originating ticket, never the parent: $ARGUMENTS
+Argument — free text describing the story, optionally with a parent item or workstream number (e.g. `I20100 add rate limiting to webhook intake`, `F42 ...`, or just `add rate limiting to webhook intake`); a leading `deferred <item#>` selects DEFERRED placement instead. **Take any `--ticket <ticket#>[,<ticket#>]` out FIRST**, before reading the `deferred` selector, the parent or the description: it names an originating ticket, never the parent (**read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/originating-ticket.md` in full before linking**): $ARGUMENTS
 
 ## Rules that must hold
 
@@ -31,7 +31,7 @@ Argument — free text describing the story, optionally with a parent item or wo
 ## Steps — ONE-OFF placement (Story-specific parts)
 
 0. **Placement + assignment at the OUTSET.** Enough to act on = the request and the outcome the user wants; a bare invocation or a fragment like "fix the thing" → STOP and ask. Parent resolved against the story-flavored leaf type (this org: `Story`). Priority: the org's normal/medium unless the user flags it urgent.
-1. **Create** with workType = the org's story-flavored leaf type via `get_work_type_hierarchy` (this org: `Story`), description = an honest one-paragraph spec (the create mechanics of `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/splice-mechanics.md` step 3, minus its priority rule (priority is step 0's)). No `[N]` prefix, no edges — the missing splice is what separates this skill from `insert-story`. A `--ticket` is verified before this create and linked after it (`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/originating-ticket.md`).
+1. **Create** with workType = the org's story-flavored leaf type via `get_work_type_hierarchy` (this org: `Story`), description = an honest one-paragraph spec (the create mechanics of `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/splice-mechanics.md` step 3, minus its priority rule (priority is step 0's)). No `[N]` prefix, no edges — the missing splice is what separates this skill from `insert-story`. A `--ticket` is verified before this create and linked after it, as an `originating_ticket` relationship only — never another type (that contract).
 2. **Deliver** via `/devstride:build-item <item#>` in its auto-detected one-off mode; follow-ups become their own `create-story` / `create-defect` items.
 
 ## D. DEFERRED placement — park a follow-up, never build it now
@@ -45,6 +45,7 @@ profile.
   resolve the plan root, find, reopen or create the ONE container, create the item in it with the
   related-to edge back, and nothing else. Here the kind is Story (no `isBug`), its description an
   honest spec of the postponed work.
+- **A `--ticket` links nothing here**: report it as not used (that contract).
 - **SKIP step 2.** NEVER invoke `build-item` for a deferred story. Report the created number, its
   title, the container it landed in, and the related-to target, then STOP.
 

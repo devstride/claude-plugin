@@ -19,9 +19,10 @@ customer request behind the work without searching for it.
 - **Absent → this file does not apply.** No ticket is inferred from the description, a comment or
   the conversation; only a number the person passed is linked.
 
-## Verify before any write
+## Verify before the linked item is created
 
-Before the item it links is created (`plan`: at step 0, before anything is written), read each
+Before the item it links is created (`plan`: at step 0, before anything is written; `insert-*`
+may create a housing container first, which is never linked), read each
 ticket with `get_item` and `fields: ["number", "title", "requesterId", "status"]`:
 
 - **`requesterId` set** → a Service Desk ticket; keep it.
@@ -33,7 +34,7 @@ ticket with `get_item` and `fields: ["number", "title", "requesterId", "status"]
 
 | Skill | Item linked | When |
 | --- | --- | --- |
-| `plan` | the parent item it plans under (the plan root) | once, at step 0 — the only write before step 2's hierarchy sign-off |
+| `plan` | the plan root as confirmed at step 2's hierarchy sign-off (discovery may move it) | once, at that sign-off, beside the root marker; a plan that is dropped links nothing |
 | `create-story`, `create-defect` | the item ONE-OFF step 1 creates | right after `create_item` returns its number |
 | `insert-story`, `insert-defect` | the leaf step 3 creates | right after `create_item` returns its number |
 
@@ -71,9 +72,9 @@ never repaired from a read-only skill.
 
 ## Cited by
 
-- `plan` SKILL.md step 0, Hard floors and step 2's root marker
-- `create-story` SKILL.md argument and step 1
-- `create-defect` SKILL.md argument and step 1
+- `plan` SKILL.md argument, step 0, Hard floors and step 2's sign-off
+- `create-story` SKILL.md argument, step 1 and section D
+- `create-defect` SKILL.md argument, step 1 and section D
 - `insert-story` SKILL.md argument and step 3
 - `insert-defect` SKILL.md argument and step 3
 - `comprehend-plan` SKILL.md steps 2 and 3
