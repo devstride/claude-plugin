@@ -131,12 +131,12 @@ next action. For each failure symptom, read
   an explicit name identify its key and never replace it heuristically. Print suggested JSON; Phase
   2 may offer `/devstride:setup`, or the user can edit all four keys, then rerun `doctor config`.
   If shipped fallbacks exist, PASS and report them.
-- **Delivery profile — the effective one, and its source.** Read `profile` and report it as one
-  line: `profile: <name> — from .claude/ds-config.json`, or `profile: standard — key absent, shipped
-  default`. The contract behind the word is
-  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`; read its resolution order,
-  and say that a plan root's own marker or an explicit skill argument outranks the file at run time
-  — this is the repository's default, not a given plan's; never call a DevStride tool for it. Any other value is a FAIL: skills read it as unknown, fall
+- **Delivery profile — the effective one, and its source.** Read `profile`; report one line:
+  `profile: <name> — from .claude/ds-config.json`, or
+  `profile: extended — key absent, shipped default (fewer, larger stories; set "profile":
+  "standard" to keep the previous default)` (why: `silent-failures.md` §4). Per the resolution order in
+  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`, say that a plan root's
+  marker or a skill argument outranks the file at run time; never call a DevStride tool for it. Any other value is a FAIL: skills read it as unknown, fall
   back to `standard` and say so. Fix: set one of the three names, or run `/devstride:setup`.
   **Then the contradictions.** Compare `epicIntegrationBranches.autoRelease` and
   `review.pollTimeoutMinutes` with the profile's values in the `| Key | prototype | standard |
