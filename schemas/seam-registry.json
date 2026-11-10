@@ -566,6 +566,21 @@
       "since": "pre-registry"
     },
     {
+      "key": "session.nameCommand",
+      "shape": "command",
+      "valueType": "string",
+      "nullable": true,
+      "payload": "none; run from the repository root with CLAUDE_CODE_SESSION_ID exported (the status-line payload's session id)",
+      "verdict": "stdout's first line is this session's display name; any other output is ignored; a failing command or empty output means no name",
+      "calledBy": [
+        "setup statusline",
+        "doctor 4"
+      ],
+      "unset": "the Session segment shows only a name the status-line payload carries (a custom name or title)",
+      "contract": "skills/setup/references/statusline-segments.md",
+      "since": "3.48.0"
+    },
+    {
       "key": "review.localCommand",
       "shape": "command",
       "valueType": "string",
@@ -2072,7 +2087,7 @@
         "object",
         "null"
       ],
-      "description": "session job classes; null reads as absent",
+      "description": "session job classes and the session's display name; null reads as absent",
       "since": "pre-registry"
     },
     {

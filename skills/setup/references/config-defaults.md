@@ -438,15 +438,24 @@ environment variable `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0` disables the check regard
 headless runs. The recipe and the record it writes are in
 `skills/doctor/references/version-currency.md`.
 
-## Session job classes
+## Session job classes and the session's name
 
 ```json
 {
   "session": {
-    "jobClassGate": true
+    "jobClassGate": true,
+    "nameCommand": null
   }
 }
 ```
+
+- **`nameCommand`** is a command whose stdout's first line is this session's display name, for the
+  status line's Session segment (☻). It runs from the repository root with
+  `CLAUDE_CODE_SESSION_ID` exported, out of band and cached ~10s under `$TMPDIR`; any other output
+  is ignored and a failing command shows nothing. `null` (the default) shows only a name the
+  status-line payload carries (a session started with `--name` or renamed). Set it when the
+  repository has its own rule for naming sessions; the name is display only and never decides who
+  holds anything.
 
 - **`jobClassGate`** turns on the plugin's `UserPromptSubmit` hook (`hooks/session-gate.sh`). The
   hook records the JOB CLASS of each top-level `/devstride:<skill>` command per session, under

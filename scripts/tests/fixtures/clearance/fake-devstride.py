@@ -104,7 +104,10 @@ def call(tool, a):
             rows[slot] = fresh(a); save(rows)
             return {"won": True, "expired": False, "final": False, "takenOver": False, "renewed": False, "claim": rows[slot]}
         if row["holderDigest"] == me:
-            stamp(row, a); save(rows)
+            stamp(row, a)
+            if a.get("sessionName"):  # the real server renames a renewing holder's claim
+                row["sessionName"] = a["sessionName"]
+            save(rows)
             return {"won": True, "expired": False, "final": False, "takenOver": False, "renewed": True, "claim": row}
         if expired(row) and take == row["holderDigest"]:
             rows[slot] = fresh(a); save(rows)
@@ -127,6 +130,7 @@ def call(tool, a):
         if row["holderDigest"] != a.get("expectedHolderDigest"):
             return {"outcome": "NOT_HOLDER", "current": row}
         row["machine"] = a.get("machine")
+        row["sessionName"] = a.get("sessionName")
         stamp(row, dict(a, expiryMinutes=20), holder_digest=me)  # adopt takes no expiry: the kind's default
         save(rows)
         return row
@@ -194,6 +198,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.text("Unknown tool: %s" % tool, is_error=True)
         if mode == "forbidden":
             return self.text("Forbidden: missing permission MANAGE_AGENT_CLAIMS", is_error=True)
+        if isinstance(args.get("payload"), dict) and "session" in args["payload"]:  # the real server's refusal
+            return self.text("The payload key `session` is reserved: report the session with `session`", is_error=True)
         try:
             data = call(tool, args)
         except KeyError:

@@ -606,6 +606,10 @@ class DevStrideStore(Store):
         if not isinstance(payload, dict) or not isinstance(digest, str) or not digest or parse_iso(payload.get("takenAt")) is None:
             return {"_invalid": True, "_version": self.version_of(row)}
         record = dict(payload, holder=digest, _version=self.version_of(row))
+        # The display name is the claim's own `sessionName` here, never a payload key (see payload()).
+        record.pop("session", None)
+        if isinstance(row.get("sessionName"), str) and row["sessionName"].strip():
+            record["session"] = row["sessionName"]
         if parse_iso(row.get("heartbeatAt")) is not None:
             record["heartbeatAt"] = row["heartbeatAt"]  # the server's stamp: a keeper beat moves only that
         expires = parse_iso(row.get("expiresAt"))
@@ -620,9 +624,15 @@ class DevStrideStore(Store):
         record = self.read()
         return record["_version"] if record else None
 
+    @staticmethod
+    def payload(record):
+        # The server reserves the payload key `session` (it refuses the whole call) and keeps the
+        # display name in the claim's own `sessionName`, which claim and adopt send.
+        return {k: v for k, v in clean_record(record).items() if k != "session"}
+
     def claim(self, record, takeover=None):
         arguments = {"kind": CLAIM_KIND, "key": repo(), "purpose": record.get("purpose") or "release", "phase": record.get("phase"),
-                     "payload": clean_record(record), "expiryMinutes": STALE_MINUTES, "holder": self.me, "machine": claim_record.machine_name(), **session_name()}
+                     "payload": self.payload(record), "expiryMinutes": STALE_MINUTES, "holder": self.me, "machine": claim_record.machine_name(), **session_name()}
         if takeover:
             arguments["takeover"] = {"expectedHolderDigest": takeover}
         if not (self.call("claim_work", arguments) or {}).get("won"):
@@ -642,7 +652,7 @@ class DevStrideStore(Store):
         # The server renews its holder's lapsed claim too, unless someone took it over (NOT_HOLDER):
         # never claim_work here, which would win afresh a claim released a moment ago.
         self.refuse_unless(self.call("heartbeat_claim", {
-            "kind": CLAIM_KIND, "key": repo(), "phase": record.get("phase"), "payload": clean_record(record),
+            "kind": CLAIM_KIND, "key": repo(), "phase": record.get("phase"), "payload": self.payload(record),
             "expiryMinutes": STALE_MINUTES, "holder": self.me}))
 
     def beat(self, record):
@@ -653,7 +663,7 @@ class DevStrideStore(Store):
     def adopt(self, record, expected):
         self.refuse_unless(self.call("adopt_claim", {
             "kind": CLAIM_KIND, "key": repo(), "expectedHolderDigest": expected["holder"], "phase": record.get("phase"),
-            "payload": clean_record(record), "holder": self.me, "machine": claim_record.machine_name(),
+            "payload": self.payload(record), "holder": self.me, "machine": claim_record.machine_name(),
             **session_name()}))
 
     def delete(self, expected, force=False):
@@ -666,10 +676,34 @@ class DevStrideStore(Store):
             raise lost()
 
 
+SESSION_MAX = 64
+
+
+def display_session():
+    """This session's display name for the record: CLEARANCE_SESSION_NAME (a repository wrapper's
+    own name for the session; empty reads as unset), else the claim naming rule (claim_record.py). Control characters and
+    `|` removed, at most 64 characters, None when empty. Display only: never used to decide who
+    holds the clearance — the holder does that."""
+    raw = os.environ.get("CLEARANCE_SESSION_NAME")
+    name = claim_record.displayable(raw) if raw else claim_record.session_name(os.environ)
+    name = (name or "")[:SESSION_MAX].strip()
+    return name or None
+
+
 def session_name():
     """The claim's sessionName argument, only when this session has a name."""
-    name = claim_record.session_name(os.environ)
+    name = display_session()
     return {"sessionName": name} if name else {}
+
+
+def stamp_session(record):
+    """Record this session's display name on a record it now holds (claim, renewing claim, adoption);
+    a session with no name drops the previous holder's."""
+    name = display_session()
+    if name:
+        record["session"] = name
+    else:
+        record.pop("session", None)
 
 
 def clean_record(record):
@@ -812,7 +846,7 @@ def write_local(record, me, keeper_pid=None):
     current = read_local() or {}
     payload = {
         "repo": repo(), "holder": me, "user": record.get("user"),
-        "machine": record.get("machine"), "branch": record.get("branch"), "pr": record.get("pr"),
+        "machine": record.get("machine"), "session": record.get("session"), "branch": record.get("branch"), "pr": record.get("pr"),
         "takenAt": record.get("takenAt"),
         "keeperPid": keeper_pid if keeper_pid is not None else (current.get("keeperPid") if current.get("repo") == repo() else None),
     }
@@ -933,8 +967,10 @@ def describe(record, at):
     if unreadable(record):
         return "UNREADABLE record at %s (not a clearance record) — the owner clears it with release --force" % record["_version"][:12]
     beat = parse_iso(record.get("heartbeatAt") or record.get("takenAt"))
-    line = "held by %s on %s since %s, phase %s, heartbeat %s" % (
-        record.get("user") or "?", record.get("machine") or "?", record.get("takenAt") or "?",
+    line = "held by %s on %s%s since %s, phase %s, heartbeat %s" % (
+        record.get("user") or "?", record.get("machine") or "?",
+        (" (session %s)" % record["session"]) if isinstance(record.get("session"), str) and record.get("session") else "",
+        record.get("takenAt") or "?",
         record.get("phase") or "?", age_text(beat, at))
     where = []
     if record.get("branch"):
@@ -1033,6 +1069,7 @@ def cmd_claim(args):
                 "purpose": purpose, "phase": "claimed", "branch": None, "pr": None,
                 "takenAt": iso(at), "heartbeatAt": iso(at), "phaseStartedAt": iso(at),
             }
+            stamp_session(record)
             try:
                 # Absent → the store expects nothing there; stale → it expects exactly the stale
                 # record. Either way the store decides, and a loser reads who won.
@@ -1052,6 +1089,7 @@ def cmd_claim(args):
             print("CLEARED %s %s" % (STORE.shown(record["holder"]), record["takenAt"]))
             return 0
         if STORE.holds(current, me):
+            stamp_session(current)
             rejected = renew(current, me, at)
             if rejected is not None:
                 stuck = lost_race(rejected, current["_version"], stuck)
@@ -1339,6 +1377,7 @@ def cmd_adopt(args):
         print("ERROR: " + describe(record, at))
         return 1
     if STORE.holds(record, me):
+        stamp_session(record)
         if renew(record, me, at) is None:
             write_local(record, me, keeper_for(me))
             print("ADOPTED (already held by this session; heartbeat renewed) %s %s" % (record.get("branch") or "-", ("#%s" % record["pr"]) if record.get("pr") else "-"))
@@ -1363,6 +1402,7 @@ def cmd_adopt(args):
     previous = dict(record)
     record.update({"holder": STORE.rid(me), "user": gh_user(), "machine": claim_record.machine_name(), "heartbeatAt": iso(at),
                    "phaseStartedAt": iso(at)})
+    stamp_session(record)
     try:
         STORE.adopt(record, previous)
     except ToolError as error:

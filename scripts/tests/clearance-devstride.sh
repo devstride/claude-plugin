@@ -340,6 +340,26 @@ printf '%s\n' "$OUT1" >> "$LOG"
 WINS="$(printf '%s\n' "$OUT1" | grep -c '^CLEARED')"; BUSY="$(printf '%s\n' "$OUT1" | grep -c '^BUSY')"
 if [ "$WINS" -eq 1 ] && [ "$BUSY" -eq 1 ]; then ok "(11) two concurrent takeovers of one lapsed claim → one CLEARED, one BUSY (the server decides)"; else bad "(11) wins=$WINS busy=$BUSY: $OUT1"; fi
 
+# (13) the session's display name travels as the claim's own sessionName, never as the payload key
+#      `session` (the server reserves it and refuses the whole call); status reads it back from
+#      sessionName; a heartbeat keeps it; an adopter's own name replaces it
+fresh sessname
+CLEARANCE_SESSION_NAME="wt2-9f" run claim --purpose release; A="$RC"
+P1="$(claimfile "'session' in (r['payload'] or {})")"; N1="$(claimfile "r['sessionName']")"
+J="$(bash "$P" status --json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["record"].get("session"))')"
+LINE="$(bash "$P" status 2>/dev/null | head -1)"
+CLEARANCE_SESSION_NAME="" DEVSTRIDE_SESSION="" run heartbeat cut --branch release/26-10-18; B="$RC"
+P2="$(claimfile "'session' in (r['payload'] or {})")"; N2="$(claimfile "r['sessionName']")"
+fresh sessadopt; held claude:other review release/26-10-18 3981 2026-10-18T09:00:00Z
+CLEARANCE_SESSION_NAME="adopter" run adopt --yes; C="$RC"
+P3="$(claimfile "'session' in (r['payload'] or {})")"; N3="$(claimfile "r['sessionName']")"
+if [ "$A" -eq 0 ] && [ "$P1" = False ] && [ "$N1" = wt2-9f ] && [ "$J" = wt2-9f ] \
+   && printf '%s' "$LINE" | grep -q '^Clearance: held by alice on m9-dan (session wt2-9f) since ' \
+   && [ "$B" -eq 0 ] && [ "$P2" = False ] && [ "$N2" = wt2-9f ] \
+   && [ "$C" -eq 0 ] && [ "$P3" = False ] && [ "$N3" = adopter ]; then
+  ok "(13) session name: sent as sessionName, never the reserved payload key; status shows it; a heartbeat keeps it; an adopter's name replaces it"
+else bad "(13) a=$A p1=$P1 n1=$N1 j=$J line=$LINE b=$B p2=$P2 n2=$N2 c=$C p3=$P3 n3=$N3"; fi
+
 # (12) nothing a script printed, in any case above, contains the key, the secret or a holder
 LEAK=""
 for needle in test-key test-secret wrong-secret-xyz claude:me-1 claude:other claude:me-2 codex:c-9 tok-1 old-1; do

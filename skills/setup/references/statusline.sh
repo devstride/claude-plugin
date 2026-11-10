@@ -1,5 +1,5 @@
 #!/bin/bash
-# ds-statusline: managed v3.26.0 — installed and kept up to date by the devstride
+# ds-statusline: managed v3.48.0 — installed and kept up to date by the devstride
 # plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
 # replaces a file that still carries it, and never touches one that does not.
 #
@@ -8,10 +8,11 @@
 # Two lines, each segment led by a one-character symbol instead of a word:
 #
 #   ◆ Opus 5 · ↯ high · ▣ acme · ⑂ i123-widget · ⎇ phil/26-08-28/widget
-#   ⊞ 3.16.0 · ▲ phil-mac · ⇄ #412 draft · ⚑ release/26-10-17 · alice · ci
+#   ⊞ 3.16.0 · ☻ blue-fox · ▲ phil-mac · ⇄ #412 draft · ⚑ release/26-10-17 · alice · ci
 #
 #   ◆ model   ↯ effort   ▣ repository   ⑂ checkout (a worktree's name, or main)   ⎇ branch
-#   ⊞ devstride plugin this session runs   ▲ stage   ⇄ pull request   ⚑ release in flight
+#   ⊞ devstride plugin this session runs   ☻ this session's name   ▲ stage   ⇄ pull request
+#   ⚑ release in flight
 #
 # The plugin segment is dim while current, and loud while this session runs an older plugin than
 # it could:
@@ -66,6 +67,7 @@ emit("SL_TRANSCRIPT", d.get("transcript_path"))
 # the Stage segment whenever you cd into backend/ is worse than no segment.
 # Every failure is tolerated: a status line must never be the thing that breaks.
 cfg = {}
+cfg_root = ""
 start = cwd or os.getcwd()
 try:
     here = os.path.abspath(start)
@@ -74,6 +76,7 @@ try:
         if os.path.isfile(candidate):
             with open(candidate) as fh:
                 cfg = json.load(fh)
+            cfg_root = here
             break
         parent = os.path.dirname(here)
         if parent == here:
@@ -88,6 +91,22 @@ emit("SL_PROD_STAGES", " ".join(stage.get("productionStages") or []))
 # already dropped; this is for one that WOULD render and is not wanted.
 sl = cfg.get("statusLine") or {}
 emit("SL_HIDDEN", " ".join(str(x) for x in (sl.get("hiddenSegments") or [])))
+
+# The session: its own name from the payload (present when it has a custom name or a title), else
+# the `session.nameCommand` of the repository, run from the config directory (see the Session segment).
+# The id only keys the cache file of that command, so anything but a plain id is dropped.
+sid = str(d.get("session_id") or "")
+emit("SL_SESSION_ID", sid if sid.replace("-", "").isalnum() else "")
+def display(value):
+    """One line, no control characters or `|`, at most 64 characters (never cut inside a character)."""
+    if not isinstance(value, str):
+        return ""
+    return " ".join("".join(" " if ord(c) < 32 or ord(c) == 127 or c == "|" else c for c in value).split())[:64].strip()
+emit("SL_SESSION_NAME", display(d.get("session_name")))
+session_cfg = cfg.get("session") if isinstance(cfg.get("session"), dict) else {}
+name_cmd = session_cfg.get("nameCommand")
+emit("SL_SESSION_CMD", name_cmd if isinstance(name_cmd, str) and name_cmd.strip() else "")
+emit("SL_CFG_ROOT", cfg_root)
 
 # The installed copies of this plugin, from the Claude Code plugin registry (a status line runs
 # outside any skill, so it cannot assume a plugin root). Read once; both lookups below use it.
@@ -247,6 +266,56 @@ if [ -n "$SL_PLUGIN" ]; then
     current) seg 2 plugin "⊞" "$pfrom" "${DIM}${pfrom}${RESET}" ;;
   esac
 fi
+
+# --- session: this session's name ---------------------------------------------
+# The payload's session_name when the session has a custom name, else the first line of the
+# repository's `session.nameCommand`, run from the config's directory with the payload's session id
+# exported as CLAUDE_CODE_SESSION_ID. A status line redraws constantly and that command may start a
+# runtime, so it is refreshed out of band (the PR segment's serve-the-cache shape, 10 s): the very
+# first draw of a new session can lack the segment for a moment. Read-only: the cache and its lock
+# under $TMPDIR are its only writes, never the plugin directory or the repository. Shown before the
+# git checks, so it shows outside a repository too. A hidden segment never runs the command.
+session="$SL_SESSION_NAME"
+case " $SL_HIDDEN " in *" session "*) SL_SESSION_CMD="" ;; esac
+if [ -z "$session" ] && [ -n "$SL_SESSION_CMD" ] && [ -n "$SL_SESSION_ID" ] && [ -n "$SL_CFG_ROOT" ]; then
+  ncache="${TMPDIR:-/tmp}/ds-statusline-session-$SL_SESSION_ID"; nlock="$ncache.lock"
+  nrefresh() {
+    local name ntmp
+    sh -c 'echo "$PPID"' >"$nlock/pid" 2>/dev/null
+    name=$( (cd "$SL_CFG_ROOT" && CLAUDE_CODE_SESSION_ID="$SL_SESSION_ID" eval "$SL_SESSION_CMD") 2>/dev/null </dev/null ) || name=""
+    if ntmp=$(mktemp "$ncache.XXXXXX" 2>/dev/null); then
+      printf '%s' "$name" | python3 -c 'import sys
+line = (sys.stdin.read().splitlines() or [""])[0]
+sys.stdout.write(" ".join("".join(" " if ord(c) < 32 or ord(c) == 127 or c == "|" else c for c in line).split())[:64].strip())' >"$ntmp" 2>/dev/null
+      mv -f "$ntmp" "$ncache" 2>/dev/null || rm -f "$ntmp"
+    fi
+    rm -rf "$nlock" 2>/dev/null
+  }
+  # One refresh in flight per session: a command that hangs keeps its lock, so no redraw starts a
+  # second copy while its refresher lives (else one more would pile up every 10 s). The lock of a
+  # refresher that is gone (its pid dead, or none written within 10 s) is taken over.
+  nspawn() {
+    touch "$ncache" 2>/dev/null
+    if ! mkdir "$nlock" 2>/dev/null; then
+      local npid; npid=$(cat "$nlock/pid" 2>/dev/null)
+      if [ -n "$npid" ]; then
+        kill -0 "$npid" 2>/dev/null && return 0
+      elif [ $(( $(date +%s) - $(stat -c %Y "$nlock" 2>/dev/null || stat -f %m "$nlock" 2>/dev/null || echo 0) )) -lt 10 ]; then
+        return 0
+      fi
+      rm -rf "$nlock" 2>/dev/null; mkdir "$nlock" 2>/dev/null || return 0
+    fi
+    (nrefresh &) >/dev/null 2>&1
+  }
+  if [ -f "$ncache" ]; then
+    nage=$(( $(date +%s) - $(stat -c %Y "$ncache" 2>/dev/null || stat -f %m "$ncache" 2>/dev/null || echo 0) ))
+    session=$(head -1 "$ncache" 2>/dev/null)
+    [ "$nage" -ge 10 ] && nspawn
+  else
+    nspawn
+  fi
+fi
+seg 2 session "☻" "$session" "${MAGENTA}${session}${RESET}"
 
 toplevel=$(git rev-parse --show-toplevel 2>/dev/null)
 if [ -z "$toplevel" ]; then

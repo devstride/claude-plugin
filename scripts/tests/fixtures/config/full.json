@@ -107,7 +107,7 @@
   "docs": { "updateSkill": "docs-update", "releaseNotesSkill": null, "updateOnEpicRelease": false,
             "knowledgeBaseSyncSkill": "kb-sync" },
   "plugin": { "updateCheck": true, "autoUpdate": true, "pin": null },
-  "session": { "jobClassGate": true },
+  "session": { "jobClassGate": true, "nameCommand": "echo wt1-ab" },
   "localEnvironment": {
     "create": "tool create <name> --from <base> -b <branch>",
     "recreate": "tool reset <name>",

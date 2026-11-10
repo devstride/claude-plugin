@@ -3,7 +3,7 @@
 <!-- Written ONLY by devstride:review at settle time. Read-only everywhere else.
      Format + curation rules: the devstride:review skill's references/lessons-format.md -->
 
-Next-ID: 3
+Next-ID: 5
 
 ## L-001 · Free-text git subjects classified by loose words
 
@@ -34,3 +34,30 @@ sources: review settle (unwritable-directory tests; keepers left beating into a 
 - **Avoid:** give the case its own isolated copy (its own cache or `XDG_*` root, its own repo)
   instead of altering shared state; stop every process a case started before the case ends; and
   count only the case's own entries in anything shared.
+
+## L-003 · Test fake accepts what the real service refuses
+
+class: general · recurrences: 1 · first-seen: 2026-11-09 · last-seen: 2026-11-09
+sources: review settle (a record field sent as a remote claim payload under a reserved key)
+
+- **Pattern:** a client starts sending a new field (or a whole local record) to a remote API,
+  and the only test is a repository fake (`scripts/tests/fixtures/**/fake-*.py`) that stores any
+  shape it is given.
+- **Why:** the fake is more permissive than the server's request schema, so every case passes
+  while every real call is refused; nothing goes red until production.
+- **Avoid:** read the real server's request schema for each field the client now sends; make the
+  fake refuse what the server refuses, and prove the old code fails against it.
+
+## L-004 · Timer-driven background job with no in-flight guard
+
+class: general · recurrences: 1 · first-seen: 2026-11-09 · last-seen: 2026-11-09
+sources: review settle (status-line name refresh re-spawned on every stale redraw)
+
+- **Pattern:** a redraw or tick spawns a detached refresh when a cache is older than N seconds
+  (`touch cache; (refresh &)`), with no lock or live-pid check, around a command that can run
+  longer than N or hang.
+- **Why:** each run passes alone; a slow or hung command adds one more process every N seconds,
+  and concurrent writers share one temp file.
+- **Avoid:** hold one lock per key recording the refresher's pid; skip while it lives, take over
+  only a dead one; write through `mktemp`; prove it with a hanging-command case that kills what it starts.
+
