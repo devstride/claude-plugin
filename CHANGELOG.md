@@ -8,6 +8,36 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Soft shape targets for plans.** The delivery-profile contract has a new "Shape targets (soft)"
+  table: how many stories an epic and how many epics a capability usually hold at each profile's
+  grain (`prototype` 2–4 and 2–4, `standard` 3–8 and 3–7, `extended` 2–5 and 3–7), with the
+  calibration behind them. They are starting points from one team's data, not knobs or override
+  keys. `plan` quotes them with the grain when it proposes stories and asks once about merging an
+  epic above its range; `plan`'s final review and `rebalance`'s report carry a shape-against-target
+  line. Nothing refuses or blocks a plan for missing a range.
+- **`scripts/tests/profile-default.sh`** checks that the contract, every skill that resolves a
+  profile, setup, doctor, the config registry and the README name the same default, that an
+  unknown or retired value still falls back to `standard`, and that the shape targets stay a soft
+  table.
+
+### Changed
+
+- **The shipped default delivery profile is now `extended`** (it was `standard`). It reaches only a
+  repository whose `.claude/ds-config.json` has no `profile` key: its next plan is cut at the larger
+  grain, about a release-unit-day per story, with the shape targets in the planning summary. Every
+  safety knob, fix floor and floor is unchanged, because `extended` already uses `standard`'s, and
+  so are the three keys setup writes from the profile. A repository that wants the previous default
+  sets `"profile": "standard"`. An explicit `profile`, a plan root's `Delivery profile:` marker and
+  a profile word in a skill's arguments are untouched, plans already sliced are not re-sliced, and
+  an unknown or retired value (`enterprise`) still reads as `standard`, said out loud.
+- **Setup and doctor say which default is in force.** Setup's profile question offers `extended`
+  first, as the default, and on a config with no `profile` key says that the default moved and
+  that `standard` keeps the finer grain. Doctor reports an absent key as `profile: extended — key
+  absent, shipped default`, with the one-key way back; the explanation lives in
+  `skills/doctor/references/silent-failures.md` and `skills/setup/references/config-defaults.md`.
+
 ## [3.48.0] — 2026-11-09
 
 ### Added
