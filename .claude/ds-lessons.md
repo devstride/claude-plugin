@@ -3,7 +3,7 @@
 <!-- Written ONLY by devstride:review at settle time. Read-only everywhere else.
      Format + curation rules: the devstride:review skill's references/lessons-format.md -->
 
-Next-ID: 5
+Next-ID: 6
 
 ## L-001 · Free-text git subjects classified by loose words
 
@@ -61,3 +61,17 @@ sources: review settle (status-line name refresh re-spawned on every stale redra
 - **Avoid:** hold one lock per key recording the refresher's pid; skip while it lives, take over
   only a dead one; write through `mktemp`; prove it with a hanging-command case that kills what it starts.
 
+## L-005 · Grep consistency check passes on the wrong text or on nothing
+
+class: repeat · recurrences: 1 · first-seen: 2026-11-09 · last-seen: 2026-11-09
+sources: review settle (shipped-default test: shape-target rows and the no-override guard)
+
+- **Pattern:** a `scripts/tests/*.sh` check extracts a section with `awk` and greps it for words:
+  the words also occur in nearby prose, not only in the rows it claims to guard; a negative check
+  (`if grep …; then bad; else ok`) runs on an extraction that can be empty; or a denylist names
+  only one vocabulary for the thing it forbids.
+- **Why:** each passes on today's tree, and deleting the guarded rows, renaming the heading or
+  using the other name still leaves it green, so nothing ever fails.
+- **Avoid:** match the structure itself (an anchored table row with its cells); fail when an
+  extraction is empty; check the real vocabulary source (registry keys, the knob table); and prove
+  each check with a mutation that must turn it red.
