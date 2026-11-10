@@ -410,7 +410,7 @@ M18. The production merge waits for the owner's in-the-moment yes unless `standi
      migration it adds or changes approved by content, its blob id, on the owner's own words).
 M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exactly its `MERGE`
      line; `REFUSE` or `ERROR` stops. It merges only an open, non-draft pull request at the
-     expected head, pinned with `--match-head-commit`, with every required check (rulesets,
+     expected head, pinned with `sha=<head>`, with every required check (rulesets,
      classic protection, and what GitHub marks required) completed SUCCESS on its newest run there
      (passed is GitHub's reading: SUCCESS, SKIPPED or NEUTRAL, but a skipped newest run never hides
      an older executed run of that check that failed or is pending, and a required one passes only
@@ -419,13 +419,13 @@ M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exac
      does a newer run ended red, and a later re-run's red counts; same-name jobs are siblings), green on the test merge commit too where it ran there,
      no unresolved thread, and no reviewer whose latest review requests changes (the aggregate
      decision is empty when reviews are not required). A strict base is compared: behind refuses.
-     `--admin` only when GitHub reads it BLOCKED with all of that true and at least one required
-     check, no unmet approval it would skip, and no ruleset rule type or classic requirement it
-     cannot judge: an admin merge never bypasses a conflict, an
-     out-of-date branch or a red check. Production uses `--all-green` (every check). A check
+     The merge goes through GitHub's merge API with no admin flag: GitHub applies every
+     rule to the identity that calls it. While GitHub reads it BLOCKED the gate also needs at least
+     one required check, no unmet approval and no ruleset rule type or classic requirement it
+     cannot judge; it never merges past a conflict, an out-of-date branch or a red check. Production uses `--all-green` (every check). A check
      is one (name, app, workflow) or one commit status; a same-name check elsewhere must pass too,
      and a rule's app restriction is kept. The printed command names `--repo`. No skill
-     text carries its own `--admin` (`scripts/tests/merge-gate.sh` greps for one).
+     text carries `--admin` (`scripts/tests/merge-gate.sh` greps for one).
 M20. The release backstop (`release.backstop`) never delays or caps a release: `backstop.py due`
      starts one only when the landing on the train with the smallest committer time waited over
      `maxWaitMinutes`, no release is in progress (no open release pull request by `gh`, always;

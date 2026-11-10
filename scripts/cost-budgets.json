@@ -66,7 +66,7 @@
     "skills/release/references/release-gates.md": 1371,
     "skills/release/references/review-once.md": 1252,
     "skills/review/references/ci-settle.md": 1800,
-    "skills/review/references/delivery-loop-invariants.md": 26208,
+    "skills/review/references/delivery-loop-invariants.md": 26227,
     "skills/review/references/delta-re-review.md": 2310,
     "skills/review/references/final-head-request.md": 910,
     "skills/review/references/github-review-api.md": 4700,
@@ -83,7 +83,7 @@
     "skills/setup/references/docs-skill-templates/update-release-notes.md": 1200,
     "skills/setup/references/interview-rationale.md": 1900,
     "skills/setup/references/review-engines.md": 2700,
-    "skills/setup/references/seam-registry.md": 14390,
+    "skills/setup/references/seam-registry.md": 14702,
     "skills/setup/references/statusline-segments.md": 2461,
     "skills/setup/references/validation-checklist.md": 6000,
     "skills/ultracode-build/references/engineering-economy.md": 1400,
@@ -109,9 +109,10 @@
     "skills/build-item/references/consequence-notices.md": 2803,
     "skills/setup/references/session-presence.md": 1439,
     "skills/release/references/release-pr.md": 1978,
-    "skills/release/references/merge-and-deploy.md": 1395,
+    "skills/release/references/merge-and-deploy.md": 1498,
     "skills/release/references/backstop.md": 2630,
-    "skills/release/references/estimates.md": 1892
+    "skills/release/references/estimates.md": 1892,
+    "skills/review/references/independent-review.md": 304
   },
   "paths": {
     "epicReleaseGate": {
@@ -200,7 +201,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 89651,
+      "budget": 89754,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

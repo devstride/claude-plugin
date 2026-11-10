@@ -18,9 +18,10 @@ standing yes replaces only the per-pull-request question that used to follow it.
 ## Conditions (all of them, at the exact head merged)
 
 1. The pull request is open, not a draft, based on `main`, from a branch of this repository (never
-   a fork), authored by the owner's account, with the owner as the author of every commit and the
-   only account that pushed to its branch, and linked to a tracked work item whose build the owner
-   started.
+   a fork), authored by the builder App (`devstride-builder[bot]`, the identity the owner's builds run
+   under since I15316) or by the owner's own account, with one of those two as the author of every
+   commit and the only accounts that pushed to its branch, and linked to a tracked work item whose
+   build the owner started.
 2. It changes nothing that guards merges, compared in any letter case: nothing under a `.claude/`
    directory at any depth (this file and the release skill) or `.github/` (the required checks); nothing under `scripts/` (the checks themselves)
    except `scripts/cost-budgets.json` and the test cases in `scripts/tests/` (`run.sh` is
@@ -32,7 +33,7 @@ standing yes replaces only the per-pull-request question that used to follow it.
    owner's own yes on that pull request.
 3. The review settled clean: the last local round (Claude and Codex) found no P1 and no serious P2,
    and the head carries a `devstride/reviewed` status for that pull request into `main`, posted
-   under the owner's account after that round.
+   by the build's identity after that round.
 4. The version-bump, neutrality and public-hygiene checks pass, and `scripts/validate.sh --needles`
    passed on the head, run by the build in its own checkout; the merge session never runs the pull
    request's code.

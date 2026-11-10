@@ -8,6 +8,28 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **An independent review that the builder cannot produce.** With `review.independentReview` set,
+  `review` starts the repository's review workflow on the final head of a pull request, before CI is
+  released, and reads the result that workflow posts under its own identity. A withheld result comes
+  back as findings; no answer stops the loop. A result already on the commit is reused, so nothing is
+  reviewed twice. `release` confirms the same result before it merges.
+
+### Changed
+
+- **`merge-gate.py` no longer offers `--admin`.** It prints a call to GitHub's merge API, pinned to
+  the head, which applies every rule to whichever identity makes it. GitHub reads a pull request as
+  BLOCKED for an identity that is only allowed through by a ruleset, and `gh pr merge` refuses that
+  without the flag; the API does not. A GitHub App, which cannot read classic branch protection and
+  holds no bypass, is no longer refused for that.
+- **Review proof can come from the reviewer App.** With `review.independentReview` set,
+  `reviewed-status.py` counts the reviewer App's pass on the exact commit, naming the pull request
+  and its base, as proof the commit was reviewed, so a builder App's own status is no longer the only
+  proof. `--proof-app <slug>` lets a guarded procedure count only one App's statuses.
+- **`independent-review.py` rides out a few failed reads.** While it waits for a result, up to five
+  GitHub reads in a row may fail before it gives up with ERROR; a failed read is never a pass.
+
 ## [3.50.0] — 2026-11-10
 
 ### Added

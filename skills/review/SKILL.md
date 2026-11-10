@@ -263,9 +263,10 @@ reads `skipping`, or CI is red.**
    heads" says; otherwise **continue to 7.1b, NOT the flip** — a release PR always takes this path.
    Disposable: fetch, rebase, push via `/devstride:push` (`--force-with-lease`); unresolvable
    conflict → STOP. **If the rebase CHANGED the patch**, compare pre/post patches: identical → carry
-   receipt and ledger; different → step 5's target/safety rule (past the target, noncritical change
-   gets affected checks, main-agent inspection and human review; P1/serious-P2 fixes continue). A
+   receipt and ledger; different → step 5's target/safety rule. A
    rebase never resets the count.
+
+   **7.1a.** `review.independentReview` set → follow `${CLAUDE_PLUGIN_ROOT}/skills/review/references/independent-review.md` first.
 
    **7.1b. PRE-SHIP HOLD** — caller-declared (`pr`/`release` step 2b): **STOP HERE and hand back**
    (review settled, head current, still draft, pre-ship outstanding) — even with no CI or CI on

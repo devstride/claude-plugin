@@ -872,6 +872,36 @@
             ]
           },
           "description": "path-selected review lenses"
+        },
+        "independentReview": {
+          "type": "object",
+          "properties": {
+            "workflow": {
+              "type": "string",
+              "description": "the review workflow's file name, run from review.independentReview.ref, taking only pr_number"
+            },
+            "ref": {
+              "type": "string",
+              "description": "the branch whose copy of the workflow runs: the production branch, so a pull request cannot rewrite its own reviewer"
+            },
+            "check": {
+              "type": "string",
+              "description": "the check the workflow posts on every pull request head it reviews"
+            },
+            "reviewerApp": {
+              "type": "string",
+              "description": "the slug of the GitHub App whose result counts; no other identity's result is read"
+            },
+            "timeoutMinutes": {
+              "type": "number",
+              "description": "how long to wait for a result; default 45"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "description": "a review run from the production branch under an identity the builder cannot use; absent means no such review"
         }
       },
       "patternProperties": {

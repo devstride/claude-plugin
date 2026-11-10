@@ -169,6 +169,12 @@ starting with `_` and `$schema` are never reported as unknown.
 | `review.mandatoryLenses[].name` | string | — | — | **Required.** the lens name | pre-registry |
 | `review.mandatoryLenses[].paths` | string[] | — | — | **Required.** anchored globs that select the lens | pre-registry |
 | `review.mandatoryLenses[].question` | string | — | — | **Required.** the question the lens's finder answers | pre-registry |
+| `review.independentReview` | object | — | — | a review run from the production branch under an identity the builder cannot use; absent means no such review | 3.50.0 |
+| `review.independentReview.workflow` | string | — | — | the review workflow's file name, run from review.independentReview.ref, taking only pr_number | 3.50.0 |
+| `review.independentReview.ref` | string | — | — | the branch whose copy of the workflow runs: the production branch, so a pull request cannot rewrite its own reviewer | 3.50.0 |
+| `review.independentReview.check` | string | — | — | the check the workflow posts on every pull request head it reviews | 3.50.0 |
+| `review.independentReview.reviewerApp` | string | — | — | the slug of the GitHub App whose result counts; no other identity's result is read | 3.50.0 |
+| `review.independentReview.timeoutMinutes` | number | — | — | how long to wait for a result; default 45 | 3.50.0 |
 | `release` | object | — | — | production release settings | pre-registry |
 | `release.productionBranch` | string | — | master | the production release target | pre-registry |
 | `release.holdTimeZone` | string | — | UTC | the IANA time zone a release hold's date is read in ("America/Chicago") | 3.36.0 |

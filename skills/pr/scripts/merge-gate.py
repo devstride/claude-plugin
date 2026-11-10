@@ -7,20 +7,23 @@ then runs exactly the command it prints, never its own `gh pr merge`. It reads G
   merge-gate.py <pr-number> <expected-head-sha> [--all-green] [--delete-branch] [--subject <text>]
                 [--repo <owner>/<name>]
 
-  MERGE gh pr merge <n> --repo <owner>/<name> --merge --match-head-commit <sha> [--admin]
-        [--delete-branch] [--subject '<text>']   exit 0: the repository it inspected is named, and
-        the subject is shell-quoted, so the line runs as printed from any directory
+  MERGE gh api -X PUT repos/<owner>/<name>/pulls/<n>/merge -f merge_method=merge -f sha=<sha>
+        [-f commit_title='<text>'] [&& gh api -X DELETE repos/<owner>/<name>/git/refs/heads/<head>]
+        exit 0: the repository it inspected is named, and the title is shell-quoted, so the line
+        runs as printed from any directory
         then one line naming the required checks that are green at <sha>
   REFUSE <reason>                                                                        exit 2
   ERROR <reason>   GitHub could not be read: nothing is known, so nothing merges          exit 1
 
-The rule (an approver's admin merge exactly when every required check is green, never otherwise):
+The rule (a merge exactly when every required check is green, never otherwise, and never with an
+admin flag: GitHub's merge API applies every rule to whichever identity calls it):
 - Only through a pull request: the number must name an OPEN, non-draft pull request.
 - Pinned to the head: the pull request's head must be the expected SHA, and the command carries
-  `--match-head-commit <sha>`, so GitHub refuses it if the head moves in between.
+  `sha=<sha>`, so GitHub refuses it if the head moves in between.
 - Every required check green there: the required checks are the union of the base branch's
   rulesets (`rules/branches/<base>`), its classic protection (`protection/required_status_checks`;
-  unreadable is a REFUSE, because a required check that never ran would then go unseen) and every
+  unreadable is a REFUSE for a login, because a required check that never ran would then go unseen;
+  a GitHub App cannot read it and holds no bypass, so GitHub refuses the merge if the rule is unmet) and every
   check GitHub marks required on this pull request, each with the app it must come from when the
   rule names one (`integration_id`, `app_id`). A check is one (name, app, workflow) or one commit
   status: a re-run of the same check supersedes the run before it, but a same-name check from
@@ -47,7 +50,7 @@ The rule (an approver's admin merge exactly when every required check is green, 
   cannot show which app sent it, so a rule bound to an app is met only by that app's check run.
   `--all-green` holds every check at the head to the same rule, not only the required ones
   (`release` uses it for production).
-- When the merge would need `--admin`, the classic protection rule that applies (read through
+- When GitHub reads the pull request BLOCKED, the classic protection rule that applies (read through
   GraphQL, which resolves its pattern) must require nothing the gate cannot prove: deployments,
   signed commits, linear history or a locked branch refuse, and so do required reviews, code
   owners or last-push approval without an APPROVED decision.
@@ -61,32 +64,28 @@ The rule (an approver's admin merge exactly when every required check is green, 
   the verdict follows with no further read. The second reading of the pull request must agree
   with the first (state, draft, head, base, merge state, review decision, test merge commit), or
   the gate reads everything afresh.
-- Known limit: the verdict is one reading. GitHub does not re-check required checks at an
-  `--admin` merge, so a check or status that turns red after it was read (during the reads that
-  follow it: one run listing for the head's checks, plus the test merge commit's three reads when
-  there is one; or before the printed command runs) is not seen. Reading the checks last narrows
-  that window; only GitHub enforcing the checks at merge time (auto-merge or a merge queue
-  instead of `--admin`) closes it. The other facts are read first, so a protection rule an admin
-  changes during the check reads is not seen either. Run the command at once.
+- The verdict is one reading, and GitHub applies its own rules again at the merge: for an identity
+  on no bypass list a required check that is not green stops the merge there, whatever this gate
+  read. A login that does hold a bypass is not re-checked by GitHub, so run the command at once.
 - Classic protection answering 404 means none only with GitHub's two messages for it ("Branch
   not protected", "Required status checks not enabled"); any other 404 is an ERROR.
 - A base that requires branches to be up to date (a ruleset's strict policy, or classic `strict`)
-  is checked with the compare API: a head behind its base is a REFUSE, so `--admin` never merges
+  is checked with the compare API: a head behind its base is a REFUSE, so this gate never merges
   an out-of-date head even when GitHub reads the pull request BLOCKED rather than BEHIND.
-- No bypassed approval: when the merge would need `--admin`, a REVIEW_REQUIRED decision or an
+- No bypassed approval: when GitHub reads it BLOCKED, a REVIEW_REQUIRED decision or an
   unmet approval requirement of the base's pull_request rule (approving count, code owners, last
-  push, required reviewers) is a REFUSE: `--admin` would skip the approval. Any other setting of
+  push, required reviewers) is a REFUSE. Any other setting of
   that rule (for example `require_extra_approval_for_unattributed_changes`) is judged only through
   GitHub's REVIEW_REQUIRED decision.
 - No open conversation: a CHANGES_REQUESTED decision, any reviewer whose latest review requests
   changes (even when reviews are not required and the decision is empty), or any unresolved
   review thread is a REFUSE.
-- `--admin` only when GitHub reads the pull request BLOCKED with all of the above true, at least
+- A merge while GitHub reads the pull request BLOCKED needs all of the above true, at least
   one required check, and no rule on the base this gate cannot judge (KNOWN_RULES; a
-  `workflows`, `code_scanning`, `required_deployments`, `merge_queue`, `required_signatures` or other rule would be
-  bypassed silently, so it refuses): the base's rules let only an admin's merge through. CLEAN, HAS_HOOKS or
-  UNSTABLE (a failing check that is not required) merges without it. DIRTY, BEHIND, UNKNOWN and
-  any other state is a REFUSE: an admin merge never bypasses a conflict, an out-of-date branch or
+  `workflows`, `code_scanning`, `required_deployments`, `merge_queue`, `required_signatures` or other rule refuses): the
+  base's rules admit only named identities, and BLOCKED is how GitHub shows that to every reader.
+  CLEAN, HAS_HOOKS or UNSTABLE (a failing check that is not required) merges too. DIRTY, BEHIND, UNKNOWN and
+  any other state is a REFUSE: this gate never merges past a conflict, an out-of-date branch or
   a state GitHub has not finished computing.
 """
 import json
@@ -106,11 +105,11 @@ ELIGIBLE = ("push", "pull_request", "pull_request_review", "pull_request_target"
             "deployment_status", "merge_group")
 UNEARNED = "skipped in a run where nothing ran"
 NO_PROTECTION = ("Branch not protected", "Required status checks not enabled")
-# Rule types an admin merge may pass knowing what it bypasses: required checks are judged here;
+# Rule types a merge may pass while GitHub reads BLOCKED: required checks are judged here;
 # reviews by the open-thread and change-request checks; the rest guard pushes, not merges.
 KNOWN_RULES = ("required_status_checks", "pull_request", "copilot_code_review", "update", "deletion",
                "non_fast_forward", "creation")
-# A pull_request rule's approval requirements: an admin merge would bypass any of these unmet.
+# A pull_request rule's approval requirements: this gate refuses while any of these is unmet.
 APPROVALS = ("required_approving_review_count", "require_code_owner_review", "require_last_push_approval",
              "required_reviewers")
 PLAIN = ("CLEAN", "HAS_HOOKS", "UNSTABLE")
@@ -118,7 +117,7 @@ PLAIN = ("CLEAN", "HAS_HOOKS", "UNSTABLE")
 PR_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      number state isDraft headRefOid baseRefName mergeStateStatus reviewDecision
+      number state isDraft headRefOid headRefName baseRefName mergeStateStatus reviewDecision
       latestOpinionatedReviews(first: 100) { pageInfo { hasNextPage } nodes { state author { login } } }
       potentialMergeCommit { oid }
       commits(last: 1) { nodes { commit { oid statusCheckRollup {
@@ -337,12 +336,14 @@ def protection_checks(owner, name, base):
             except (ValueError, AttributeError):
                 message = None
             if message in NO_PROTECTION:
-                return set(), False
+                return set(), False, True
             raise Unreadable("reading the branch protection of %s answered 404 %r, not one of GitHub's "
                              "no-protection answers" % (base, message))
+        if "HTTP 403" in said and "not accessible by integration" in said:
+            return set(), False, False
         if "HTTP 403" in said:
             raise Refuse("the classic branch protection of %s cannot be read with this login, so a required check "
-                         "that never ran would go unseen: merge as an admin of the repository" % base)
+                         "that never ran would go unseen" % base)
         raise Unreadable("reading the branch protection of %s failed: %s" % (base, said.strip()[:200]))
     try:
         data = json.loads(out)
@@ -355,7 +356,7 @@ def protection_checks(owner, name, base):
         if isinstance(c, dict) and c.get("context"):
             required.discard((c["context"], None))
             required.add((c["context"], app_of(c.get("app_id"))))
-    return required, data.get("strict") is True
+    return required, data.get("strict") is True, True
 
 
 def worst(states):
@@ -603,7 +604,7 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     if not isinstance(base, str) or not base:
         raise Unreadable("#%d names no base branch" % number)
     ruled, ruled_strict, types, approvals = ruleset_checks(owner, name, base)
-    protected, protected_strict = protection_checks(owner, name, base)
+    protected, protected_strict, classic_visible = protection_checks(owner, name, base)
     if ruled_strict or protected_strict:
         compared = gh_json("api", "repos/%s/%s/compare/%s...%s" % (owner, name, quote(base, safe=""), expected))
         behind = compared.get("behind_by") if isinstance(compared, dict) else None
@@ -612,21 +613,21 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
         if behind:
             raise Refuse("#%d is %d commit(s) behind %s, which requires it to be up to date: update it, then check the new head"
                          % (number, behind, base))
-    admin = state == "BLOCKED"
-    if admin and (pr.get("reviewDecision") == "REVIEW_REQUIRED" or (approvals and pr.get("reviewDecision") != "APPROVED")):
-        raise Refuse("#%d still needs an approving review (%s): an admin merge would bypass it"
+    restricted = state == "BLOCKED"
+    if restricted and (pr.get("reviewDecision") == "REVIEW_REQUIRED" or (approvals and pr.get("reviewDecision") != "APPROVED")):
+        raise Refuse("#%d still needs an approving review (%s): this gate never merges past it"
                      % (number, ", ".join(sorted(set(approvals))) or "GitHub reads REVIEW_REQUIRED"))
-    classic = classic_rule(owner, name, base) if admin else None
+    classic = classic_rule(owner, name, base) if restricted and classic_visible else None
     if classic:
         cannot = [k for k in ("requiresDeployments", "requiresCommitSignatures", "requiresLinearHistory", "lockBranch") if classic.get(k)]
         if pr.get("reviewDecision") != "APPROVED":
             cannot += [k for k in ("requiresApprovingReviews", "requiresCodeOwnerReviews", "requireLastPushApproval") if classic.get(k)]
         if cannot:
             raise Refuse("#%d is blocked and the classic protection of %s (%s) requires %s, which this gate cannot "
-                         "prove met: an admin merge would bypass it" % (number, base, classic.get("pattern"), ", ".join(cannot)))
+                         "prove met" % (number, base, classic.get("pattern"), ", ".join(cannot)))
     unknown = sorted(t for t in types if t not in KNOWN_RULES)
-    if admin and unknown:
-        raise Refuse("#%d is blocked and %s has rule(s) this gate cannot judge (%s): an admin merge would bypass them"
+    if restricted and unknown:
+        raise Refuse("#%d is blocked and %s has rule(s) this gate cannot judge (%s)"
                      % (number, base, ", ".join(str(t) for t in unknown)))
 
     # The checks, last: the head's run listing, the pull request read again with its check rollup,
@@ -664,12 +665,13 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
         red = problems_with({(k[1], None) for k in every}, every)
         if red:
             raise Refuse("--all-green: not every check is green at %s: %s" % (expected[:12], "; ".join(red)))
-    if admin and not required:
+    if restricted and not required:
         raise Refuse("#%d is blocked and %s requires no check, so nothing proves this head green: "
-                     "an admin merge would bypass a block it cannot name" % (number, base))
-    command = "gh pr merge %d --repo %s/%s --merge --match-head-commit %s%s%s%s" % (
-        number, owner, name, expected, " --admin" if admin else "", " --delete-branch" if delete_branch else "",
-        " --subject " + shlex.quote(subject) if subject else "")
+                     "the gate will not merge past a block it cannot name" % (number, base))
+    command = "gh api -X PUT repos/%s/%s/pulls/%d/merge -f merge_method=merge -f sha=%s%s%s" % (
+        owner, name, number, expected, " -f " + shlex.quote("commit_title=" + subject) if subject else "",
+        " && gh api -X DELETE repos/%s/%s/git/refs/heads/%s" % (owner, name, quote(pr.get("headRefName") or "", safe="/"))
+        if delete_branch else "")
     why = ("required checks green at %s: %s" % (expected[:12], ", ".join(sorted({r[0] for r in required})))) if required \
         else "%s requires no check; GitHub reads #%d as %s" % (base, number, state)
     return command, why
