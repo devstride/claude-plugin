@@ -272,27 +272,47 @@ fi
 # repository's `session.nameCommand`, run from the config's directory with the payload's session id
 # exported as CLAUDE_CODE_SESSION_ID. A status line redraws constantly and that command may start a
 # runtime, so it is refreshed out of band (the PR segment's serve-the-cache shape, 10 s): the very
-# first draw of a new session can lack the segment for a moment. Read-only: the cache under $TMPDIR is
-# its only write, never the plugin directory or the repository. Shown before the git checks, so it
-# shows outside a repository too.
+# first draw of a new session can lack the segment for a moment. Read-only: the cache and its lock
+# under $TMPDIR are its only writes, never the plugin directory or the repository. Shown before the
+# git checks, so it shows outside a repository too. A hidden segment never runs the command.
 session="$SL_SESSION_NAME"
+case " $SL_HIDDEN " in *" session "*) SL_SESSION_CMD="" ;; esac
 if [ -z "$session" ] && [ -n "$SL_SESSION_CMD" ] && [ -n "$SL_SESSION_ID" ] && [ -n "$SL_CFG_ROOT" ]; then
-  ncache="${TMPDIR:-/tmp}/ds-statusline-session-$SL_SESSION_ID"
+  ncache="${TMPDIR:-/tmp}/ds-statusline-session-$SL_SESSION_ID"; nlock="$ncache.lock"
   nrefresh() {
-    local name
+    local name ntmp
+    sh -c 'echo "$PPID"' >"$nlock/pid" 2>/dev/null
     name=$( (cd "$SL_CFG_ROOT" && CLAUDE_CODE_SESSION_ID="$SL_SESSION_ID" eval "$SL_SESSION_CMD") 2>/dev/null </dev/null ) || name=""
-    printf '%s' "$name" | python3 -c 'import sys
+    if ntmp=$(mktemp "$ncache.XXXXXX" 2>/dev/null); then
+      printf '%s' "$name" | python3 -c 'import sys
 line = (sys.stdin.read().splitlines() or [""])[0]
-sys.stdout.write(" ".join("".join(" " if ord(c) < 32 or ord(c) == 127 or c == "|" else c for c in line).split())[:64].strip())' >"$ncache.tmp" 2>/dev/null
-    mv -f "$ncache.tmp" "$ncache" 2>/dev/null
+sys.stdout.write(" ".join("".join(" " if ord(c) < 32 or ord(c) == 127 or c == "|" else c for c in line).split())[:64].strip())' >"$ntmp" 2>/dev/null
+      mv -f "$ntmp" "$ncache" 2>/dev/null || rm -f "$ntmp"
+    fi
+    rm -rf "$nlock" 2>/dev/null
   }
-  nspawn() { touch "$ncache" 2>/dev/null; (nrefresh &) >/dev/null 2>&1; }
+  # One refresh in flight per session: a command that hangs keeps its lock, so no redraw starts a
+  # second copy while its refresher lives (else one more would pile up every 10 s). The lock of a
+  # refresher that is gone (its pid dead, or none written within 10 s) is taken over.
+  nspawn() {
+    touch "$ncache" 2>/dev/null
+    if ! mkdir "$nlock" 2>/dev/null; then
+      local npid; npid=$(cat "$nlock/pid" 2>/dev/null)
+      if [ -n "$npid" ]; then
+        kill -0 "$npid" 2>/dev/null && return 0
+      elif [ $(( $(date +%s) - $(stat -c %Y "$nlock" 2>/dev/null || stat -f %m "$nlock" 2>/dev/null || echo 0) )) -lt 10 ]; then
+        return 0
+      fi
+      rm -rf "$nlock" 2>/dev/null; mkdir "$nlock" 2>/dev/null || return 0
+    fi
+    (nrefresh &) >/dev/null 2>&1
+  }
   if [ -f "$ncache" ]; then
     nage=$(( $(date +%s) - $(stat -c %Y "$ncache" 2>/dev/null || stat -f %m "$ncache" 2>/dev/null || echo 0) ))
     session=$(head -1 "$ncache" 2>/dev/null)
     [ "$nage" -ge 10 ] && nspawn
   else
-    : >"$ncache"; nspawn
+    nspawn
   fi
 fi
 seg 2 session "☻" "$session" "${MAGENTA}${session}${RESET}"

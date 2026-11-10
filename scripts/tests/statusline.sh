@@ -228,23 +228,49 @@ N1="$(mkrepo sess1 '{}')"
 A="$(render "$N1" ",\"session_id\":\"$SID\",\"session_name\":\"wt2-9f\"")"
 B="$(render "$N1" ",\"session_id\":\"$SID\"")"
 N2="$(mkrepo sess2 '{"session":{"nameCommand":"printf \"%s\\n%s\\n\" \"cmd-$CLAUDE_CODE_SESSION_ID\" extra; pwd > \"$TMPDIR/sess-pwd\""}}')"
-BEFORE="$(git -C "$N2" status --porcelain)"
-C1="$(render "$N2" ",\"session_id\":\"$SID\"")"; sleep 1
+BEFORE="$(git -C "$N2" status --porcelain --untracked-files=all)"
+settled() { local n=0; until [ ! -d "$TMPDIR/ds-statusline-session-$1.lock" ] || [ $n -ge 50 ]; do sleep 0.1; n=$((n + 1)); done; }
+C1="$(render "$N2" ",\"session_id\":\"$SID\"")"; settled "$SID"
 C2="$(render "$N2" ",\"session_id\":\"$SID\"")"
 CACHED="$(cat "$TMPDIR/ds-statusline-session-$SID" 2>/dev/null)"; RAN_IN="$(cat "$TMPDIR/sess-pwd" 2>/dev/null)"
 P2="$(render "$N2" ",\"session_id\":\"$SID\",\"session_name\":\"named\"")"
 N3="$(mkrepo sess3 '{"session":{"nameCommand":"echo nope; exit 3"},"statusLine":{}}')"
 SID3=0b1c2d3e-0000-4000-8000-000000000003
-render "$N3" ",\"session_id\":\"$SID3\"" >/dev/null; sleep 1; D="$(render "$N3" ",\"session_id\":\"$SID3\"")"
+render "$N3" ",\"session_id\":\"$SID3\"" >/dev/null; settled "$SID3"; D="$(render "$N3" ",\"session_id\":\"$SID3\"")"
 N4="$(mkrepo sess4 '{"statusLine":{"hiddenSegments":["session"]}}')"
 E="$(render "$N4" ",\"session_id\":\"$SID\",\"session_name\":\"wt2-9f\"")"
 F="$(render "$WORK" ",\"session_id\":\"$SID\",\"session_name\":\"$(printf 'x|y')\"")"
-DIRTY="$(git -C "$N2" status --porcelain)"
+DIRTY="$(git -C "$N2" status --porcelain --untracked-files=all)"
 if printf '%s' "$A" | grep -q '☻ wt2-9f' && no_dangling "$A" && ! printf '%s' "$B" | grep -q '☻' && no_dangling "$B" \
    && printf '%s' "$C2" | grep -qE "☻ cmd-$SID( |\$)" && [ "$CACHED" = "cmd-$SID" ] && [ "$RAN_IN" = "$(cd "$N2" && pwd -P)" -o "$RAN_IN" = "$N2" ] \
    && printf '%s' "$P2" | grep -q '☻ named' && ! printf '%s' "$D" | grep -q '☻' && no_dangling "$D" \
    && ! printf '%s' "$E" | grep -q '☻' && printf '%s' "$F" | grep -q '☻ x y' && [ "$DIRTY" = "$BEFORE" ]; then
   ok "(22) Session: payload name; else nameCommand (first line, session id exported, run from the repo, cached under TMPDIR); none, failing or hidden → no segment; outside a repo too; repo left clean"
 else bad "(22) a=$A | b=$B | c1=$C1 | c2=$C2 | cached=$CACHED | ran=$RAN_IN | p2=$P2 | d=$D | e=$E | f=$F | dirty=$DIRTY"; fi
+
+# (22b) one refresh in flight per session: a nameCommand that hangs is not started again by a stale
+#       redraw while its refresher lives; once it is gone, the next stale redraw runs it again, and a
+#       lock left by a dead refresher is taken over; a hidden Session segment never runs the command.
+#       Every process the case starts is stopped before it ends.
+N5="$(mkrepo sess5 '{"session":{"nameCommand":"sh hang.sh"}}')"
+printf 'echo $$ >> "$TMPDIR/hang-pids"; exec sleep 30\n' > "$N5/hang.sh"
+N6="$(mkrepo sess6 '{"session":{"nameCommand":"sh ran.sh"},"statusLine":{"hiddenSegments":["session"]}}')"
+printf 'echo ran > "$TMPDIR/hidden-ran"\n' > "$N6/ran.sh"
+SID5=0b1c2d3e-0000-4000-8000-000000000005; SC5="$TMPDIR/ds-statusline-session-$SID5"
+runs() { [ -f "$TMPDIR/hang-pids" ] && wc -l < "$TMPDIR/hang-pids" | tr -d ' ' || echo 0; }
+until_runs() { local n=0; until [ "$(runs)" -ge "$1" ] || [ $n -ge 50 ]; do sleep 0.1; n=$((n + 1)); done; }
+stale() { touch -t 202001010000 "$SC5"; }
+render "$N6" ",\"session_id\":\"0b1c2d3e-0000-4000-8000-000000000006\"" >/dev/null
+render "$N5" ",\"session_id\":\"$SID5\"" >/dev/null; until_runs 1
+stale; render "$N5" ",\"session_id\":\"$SID5\"" >/dev/null; sleep 1; H1="$(runs)"
+kill $(cat "$TMPDIR/hang-pids") 2>/dev/null; settled "$SID5"
+stale; render "$N5" ",\"session_id\":\"$SID5\"" >/dev/null; until_runs 2; H2="$(runs)"
+kill $(cat "$TMPDIR/hang-pids") 2>/dev/null; settled "$SID5"
+sh -c 'exit 0' & DEAD=$!; wait "$DEAD"; mkdir "$SC5.lock"; echo "$DEAD" > "$SC5.lock/pid"
+stale; render "$N5" ",\"session_id\":\"$SID5\"" >/dev/null; until_runs 3; H3="$(runs)"
+kill $(cat "$TMPDIR/hang-pids") 2>/dev/null; settled "$SID5"
+if [ "$H1" = 1 ] && [ "$H2" = 2 ] && [ "$H3" = 3 ] && [ ! -e "$TMPDIR/hidden-ran" ]; then
+  ok "(22b) Session refresh: a hung nameCommand is never started twice; rerun once it is gone; a dead refresher's lock is taken over; hidden → never run"
+else bad "(22b) h1=$H1 h2=$H2 h3=$H3 hidden-ran=$([ -e "$TMPDIR/hidden-ran" ] && echo yes || echo no)"; fi
 
 exit $FAIL

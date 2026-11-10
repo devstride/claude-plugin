@@ -557,29 +557,35 @@ else bad "(30b) ra=$RA a=$A rb=$RB b=$B"; fi
 
 # (32) the optional `session` display name: CLEARANCE_SESSION_NAME is recorded beside the holder
 #      (cleaned: no control characters or `|`, at most 64 characters), kept by a heartbeat, renewed
-#      by a renewing claim, replaced by an adopter's own name, absent with no name, and an older
+#      (even one run under another name), renewed by a renewing claim, replaced by an adopter's own
+#      name, absent with no name, and an older
 #      record without it still reads. Display only: the holder decides who holds it.
+hasfield() { # hasfield FIELD — True/False from the ref's tag object; empty when it cannot be read
+  local sha; sha="$(refsha)"; [ -n "$sha" ] || return
+  git fetch -q origin refs/clearance/release 2>/dev/null
+  git cat-file -p "$sha" | sed -n '/^$/,$p' | tail -n +2 | python3 -c 'import json,sys; print(sys.argv[1] in json.load(sys.stdin))' "$1" 2>/dev/null
+}
 fresh sess; unset DEVSTRIDE_SESSION
 LONG="$(printf 'n%.0s' $(seq 1 90))"
 CLEARANCE_SESSION_NAME="wt2-9f" run claim --purpose release; A="$RC"; S1="$(record session)"
 L1="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("session"))' "$CLEARANCE_RECORD")"
-CLEARANCE_SESSION_NAME="wt2-9f" run heartbeat cut --branch release/26-10-18; B="$RC"; S2="$(record session)"
+CLEARANCE_SESSION_NAME="other-name" run heartbeat cut --branch release/26-10-18; B="$RC"; S2="$(record session)"
 CLEARANCE_SESSION_NAME="$(printf 'a|b\tc')$LONG" run claim; C="$RC"; S3="$(record session)"
 J="$(bash "$P" status --json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["record"].get("session"))')"
 SHORT="$(bash "$P" status --short 2>/dev/null)"
 fresh sess2; unset DEVSTRIDE_SESSION
-run claim --purpose release; D="$RC"; S4="$(record session)"
+run claim --purpose release; D="$RC"; S4="$(hasfield session)"
 fresh sess3; unset DEVSTRIDE_SESSION; held claude:other review release/26-10-18 3981 2026-10-18T09:00:00Z
 FULL="$(CLEARANCE_SESSION_NAME=me-name bash "$P" status 2>/dev/null | head -1)"
 CLEARANCE_SESSION_NAME="adopter" run adopt --yes; E="$RC"; S5="$(record session)"
 fresh sess4; unset DEVSTRIDE_SESSION
 seed '{"v":1,"repo":"o/r","holder":"claude:other","user":"bob","machine":"m9","session":"old-name","purpose":"release","phase":"review","branch":null,"pr":null,"takenAt":"2026-10-18T09:50:00Z","heartbeatAt":"2026-10-18T09:00:00Z"}'
-run adopt --yes; F="$RC"; S6="$(record session)"
+run adopt --yes; F="$RC"; S6="$(hasfield session)"
 if [ "$A" -eq 0 ] && [ "$S1" = "wt2-9f" ] && [ "$L1" = "wt2-9f" ] && [ "$B" -eq 0 ] && [ "$S2" = "wt2-9f" ] \
    && [ "$C" -eq 0 ] && [ "$S3" = "a b c$(printf 'n%.0s' $(seq 1 59))" ] && [ "$J" = "$S3" ] \
-   && [ "$SHORT" = "release/26-10-18 · alice · cut" ] && [ "$D" -eq 0 ] && [ "$S4" = "<no field>" -o -z "$S4" ] \
+   && [ "$SHORT" = "release/26-10-18 · alice · cut" ] && [ "$D" -eq 0 ] && [ "$S4" = False ] \
    && [ "$FULL" = "Clearance: held by bob on m9 since 2026-10-18T09:50:00Z, phase review, heartbeat 1 h 5 min ago — release/26-10-18 #3981 — STALE" ] \
-   && [ "$E" -eq 0 ] && [ "$S5" = "adopter" ] && [ "$F" -eq 0 ] && [ -z "$S6" ]; then
+   && [ "$E" -eq 0 ] && [ "$S5" = "adopter" ] && [ "$F" -eq 0 ] && [ "$S6" = False ]; then
   ok "(32) session display name: recorded, cleaned to 64, kept by heartbeat, renewed by a renewing claim, in status --json, not in --short; absent without a name; an adopter's own name (or none) replaces the old one; an old record reads"
 else bad "(32) a=$A s1=$S1 l1=$L1 b=$B s2=$S2 c=$C s3=$S3 j=$J short=$SHORT d=$D s4=$S4 full=$FULL e=$E s5=$S5 f=$F s6=$S6"; fi
 

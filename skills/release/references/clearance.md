@@ -92,10 +92,13 @@ reads the exit code and quotes the line; it never parses further.
   random fallback), so other skills use this one rule. `user` is `gh api user`'s login; `machine` is
   the claim machine name (`claim_record.py`). A claim or adoption by the session that already holds it renews the heartbeat.
 - **Session name (display only).** `claim`, a renewing claim and `adopt` store `session` beside
-  `holder`: `CLEARANCE_SESSION_NAME`, else the claim session name (`claim_record.py`), cleaned and
-  at most 64 characters; a session with no name drops the previous one. Heartbeats keep it;
-  `status --json` and the human line (`… on <machine> (session <name>)`) show it; `--short` does
-  not. Never used to decide who holds the clearance; records without it read as before.
+  `holder`: `CLEARANCE_SESSION_NAME` (empty reads as unset), else the claim session name
+  (`claim_record.py`), cleaned and at most 64 characters; a session with no name drops the previous
+  one. Heartbeats keep it; `status --json` and the human line (`… on <machine> (session <name>)`)
+  show it; `--short` does not. Never used to decide who holds the clearance; records without it
+  read as before. **The DevStride provider never sends it in the payload** — the server reserves
+  the key `session` and refuses the call — but as the claim's own `sessionName`, read back from
+  there; the server decides what a nameless renewal keeps.
 - **The local record.** On `claim` and `adopt` the provider writes
   `${XDG_CACHE_HOME:-$HOME/.cache}/devstride/release-clearance/<owner>__<repo>.json` — `{ repo,
   holder, user, machine, session, branch, pr, takenAt, keeperPid }`, mode 0600, the real holder under either
