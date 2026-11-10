@@ -48,9 +48,11 @@ to an explicit sub-branch and tell the user you scoped it.
 For the root and every descendant: `get_item(view:"full")` (description, status, dates,
 relationships) and `list_comments` (whole thread). Fan out with a `Workflow`, ~8–10 items per
 agent, each returning a SUMMARIZED record, never raw HTML — `{number, title, workType, status,
-description_summary, key_comments, relationships: {blocked_by, blocks}}`, plus `isBug`,
-`completedAt`, `endedOutcome` and the `related_to` edge for deferred-container members. Read `args` defensively
+description_summary, key_comments, relationships: {blocked_by, blocks}, originating_tickets}`,
+plus `isBug`, `completedAt`, `endedOutcome` and the `related_to` edge for deferred-container members. Read `args` defensively
 (`const items = Array.isArray(args) ? args : JSON.parse(args)` — it can arrive JSON-stringified).
+`originating_tickets` and each ticket's status are read per
+`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/originating-ticket.md` ("Reading the links").
 
 ## 3. Synthesize
 
@@ -69,6 +71,9 @@ Organize by the tree's own hierarchy (root → grouping items → leaves), not a
   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`, "Finding it"; its
   members never count as open plan work), any duplicates, and **Still open in Deferred** — number,
   title, kind and the item each relates to. No container → say so.
+- **Linked tickets** — each ticket, its status and the plan item it is linked to, read per
+  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/originating-ticket.md` ("Reading the links").
+  None → say so.
 - **Sub-plan shape** — which grouping items and release units exist (this org: Capabilities/Epics)
   and roughly what each owns.
 - A focus question gets a direct, explicit answer backed by evidence — not buried in the synthesis.

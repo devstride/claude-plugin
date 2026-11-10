@@ -24,7 +24,7 @@ to plan under: $ARGUMENTS
 - **The DevStride MCP targets PRODUCTION** (`api.devstride.com`): every `create_item`,
   `update_item`, `add_relationship` and `bulk_update_items` writes live roadmap data immediately —
   no draft mode. Nothing is written before the explicit hierarchy sign-off (step 2) except that
-  sign-off's root marker, and nothing is created before the content review (step 3).
+  sign-off's root marker and ticket link, and nothing is created before the content review (step 3).
 - **The discovery loop is the product.** Scope boundaries, sequencing trade-offs, deviations from a
   design doc, V1 vs deferred, parallel vs hard gate — the human makes those calls. About to invent an
   architecture decision the user hasn't weighed in on → STOP and ask. Never average plausible shapes
@@ -58,6 +58,9 @@ to plan under: $ARGUMENTS
 
 ## 0. Orientation — resolve the root, the profile and the org's shape
 
+- **Take any `--ticket <ticket#>[,<ticket#>]` out FIRST**: never the parent. Verify it here, link it
+  at step 2's sign-off (discovery may move the plan), as `originating_ticket` only, never another
+  type: **read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/originating-ticket.md` in full before linking**.
 - The parent comes from `$ARGUMENTS`, or ask — never guess. `get_item(view: 'full')` it to confirm
   its work type (the planning level); the full view carries the `description` the profile needs.
 - **Resolve the delivery profile and announce it with its source** (and any override) in the
@@ -162,7 +165,8 @@ summary and flag the affected descriptions. Never degrade quality silently.
 item → release unit → leaf-title shape and the sequencing intent are confirmed. Summarize the final
 tree in one message (no specs) and get an explicit **"yes, build this"**. Then, at this sign-off:
 
-- **Write the root marker** — the run's first live write and the only one before step 4, in the
+- **Link any `--ticket`** to the confirmed root (that contract), then **write the root marker** —
+  the only live writes before step 4 — in the
   contract's exact one-line form (`<p><strong>Delivery profile:</strong> <name></p>`). `update_item`'s
   `description: { html }` REPLACES the whole description: re-read with `get_item(view: 'full')` AT
   WRITE TIME, PREPEND the marker, write the concatenation — never the marker alone. Skip when the

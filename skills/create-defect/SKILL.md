@@ -12,7 +12,7 @@ description: Create a Defect (inbound bug report / ad-hoc fix not in a sequenced
 
 Use **`/devstride:insert-defect`** instead when the fix belongs in a sequenced plan — it splices into the dependency chain, numbers it, and lets the loop pick it up in order.
 
-Argument — free text describing the defect, optionally with a parent item or workstream number (e.g. `I20100 webhook retries duplicate on 429`, `F42 ...`, or just `webhook retries duplicate on 429`) — a leading `deferred <item#>` selects DEFERRED placement instead: $ARGUMENTS
+Argument — free text describing the defect, optionally with a parent item or workstream number (e.g. `I20100 webhook retries duplicate on 429`, `F42 ...`, or just `webhook retries duplicate on 429`); a leading `deferred <item#>` selects DEFERRED placement instead. **Take any `--ticket <ticket#>[,<ticket#>]` out FIRST**, before reading the `deferred` selector, the parent or the description: it names an originating ticket, never the parent (**read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/originating-ticket.md` in full before linking**): $ARGUMENTS
 
 ## Rules that must hold
 
@@ -32,7 +32,7 @@ Argument — free text describing the defect, optionally with a parent item or w
 ## Steps — ONE-OFF placement (Defect-specific parts)
 
 0. **Placement + assignment at the OUTSET.** Enough to act on = the repro steps and expected-vs-actual behavior; a bare invocation or a fragment like "it's broken" → STOP and ask. A defect often belongs under whichever parent item owns the broken behavior. Parent resolved against the defect-flavored leaf type (this org: `Defect`). Priority: a defect blocking real usage usually warrants above-normal; ask if unclear.
-1. **Create** with workType = the org's defect-flavored leaf type via `get_work_type_hierarchy` (this org: `Defect`), description = an honest one-paragraph repro/root-cause spec with expected-vs-actual (the create mechanics of `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/splice-mechanics.md` step 3, minus its priority rule (priority is step 0's)) — capture repro steps if the user supplied enough, otherwise ask. Set `isBug: true`. No `[N]` prefix, no edges — the missing splice is what separates this skill from `insert-defect`.
+1. **Create** with workType = the org's defect-flavored leaf type via `get_work_type_hierarchy` (this org: `Defect`), description = an honest one-paragraph repro/root-cause spec with expected-vs-actual (the create mechanics of `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/splice-mechanics.md` step 3, minus its priority rule (priority is step 0's)) — capture repro steps if the user supplied enough, otherwise ask. Set `isBug: true`. No `[N]` prefix, no edges — the missing splice is what separates this skill from `insert-defect`. A `--ticket` is verified before this create and linked after it, as an `originating_ticket` relationship only — never another type (that contract).
 2. **Deliver** via `/devstride:build-item <item#>` in its auto-detected one-off mode; follow-ups become their own `create-defect` / `create-story` items.
 
 ## D. DEFERRED placement — park a finding that is a bug, never build it now
@@ -47,6 +47,7 @@ delivery profile. A finding that is not a bug is filed by `/devstride:create-sto
   resolve the plan root, find, reopen or create the ONE container, create the item in it with the
   related-to edge back, and nothing else. Here the kind is Defect: `isBug: true`, its description
   the same honest repro/root-cause spec step 1 requires.
+- **A `--ticket` links nothing here**: report it as not used (that contract).
 - **SKIP phase B.** NEVER invoke `build-item` for a deferred defect — deferral means it is not
   being built this cycle. Report the created number, its title, the container it landed in, and
   the related-to target, then STOP.
