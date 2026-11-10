@@ -94,8 +94,8 @@ $ARGUMENTS
   Dates are not frozen: 3f re-dates every not-Done item but a landed one, In Progress included, and
   build-item's ritual stamps the real dates when it merges.
 - **Current profile** — the nearest EFFECTIVE marker per the contract: the item's own, else the
-  closest ancestor's (walk `hierarchy` up with `get_item(view:"full")`), else config `profile`,
-  else `extended` (unknown: `standard`). On a whole-root run check every release unit for its OWN marker (it wins for its
+  closest ancestor's (walk `hierarchy` up with `get_item(view:"full")`), else config `profile` (unknown: `standard`),
+  else `extended`. On a whole-root run check every release unit for its OWN marker (it wins for its
   subtree; direction is decided per unit). **Announce both ends with sources** ("current:
   enterprise (retired: read as standard) — from the root marker on I20100; target: extended — from
   `$ARGUMENTS`"). Current

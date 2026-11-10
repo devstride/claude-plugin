@@ -1055,9 +1055,9 @@ step. That is the moment a rule goes missing, and it is the only moment this fil
 
 ---
 
-**Total: 150 rule entries (A–T) + 6 editing disciplines (U) = 156.** (M21, honest estimates,
-added with a recount; before it 155, when M20, the release backstop,
-was added with a recount. The total before it claimed 144
+**Total: 151 rule entries (A–T) + 6 editing disciplines (U) = 157.** (N11, shape targets, added
+with a recount; before it 156, when M21, honest estimates, was added with a recount; before that
+155, when M20, the release backstop, was added with a recount. The total before it claimed 144
 while 146 were enumerated — M17 and M18 were added without a recount: the seventh miscount,
 corrected then. Before it, 142 claimed while 143 were enumerated, when M16 was added.)
 The round-by-round revision enumerated 154 facts; 20 of them were near-duplicates stated in two to
