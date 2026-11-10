@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.48.0.
+`.claude/ds-config.json` against. Schema version: 3.49.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -55,7 +55,7 @@ starting with `_` and `$schema` are never reported as unknown.
 
 | Key | Type | Allowed | Default | Meaning | Since |
 |---|---|---|---|---|---|
-| `profile` | string | prototype, standard, extended | standard | the delivery profile; contract: skills/plan/references/delivery-profiles.md | pre-registry |
+| `profile` | string | prototype, standard, extended | extended | the delivery profile; contract: skills/plan/references/delivery-profiles.md | pre-registry |
 | `profileOverrides` | object | — | — | pins one knob under the profile; operator hand-edit, never written by setup | pre-registry |
 | `profileOverrides.grain` | string | — | — | overrides the profile's grain knob | pre-registry |
 | `profileOverrides.specDepth` | string | — | — | overrides the profile's specDepth knob | pre-registry |

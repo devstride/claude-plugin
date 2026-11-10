@@ -16,10 +16,10 @@ move together; single knobs can still be tuned (see [Overrides](#overrides)).
 
 ## The three profiles
 
-| Knob | `prototype` | `standard` (default) | `extended` |
+| Knob | `prototype` | `standard` | `extended` (default) |
 |---|---|---|---|
-| **Who it is for** | A small team validating an idea; no production users yet; small errors are cheap | The default for a working product | A working product built as fewer, larger stories |
-| `grain` — leaf sizing | **One story per vertical slice a user can see or use.** Scaffold, CI, schema and harness work is folded into the first slice that needs it, never its own story | Roughly 1–2 loop-hours: one contract or one subsystem change with its tests | **Roughly one release-unit-day**: a full subsystem or workflow with its own tests, sized so a build agent runs unattended for hours; foundation work sits inside the story that needs it |
+| **Who it is for** | A small team validating an idea; no production users yet; small errors are cheap | A working product that wants finer stories | A working product built as fewer, larger stories — the shipped default |
+| `grain` — leaf sizing | **One story per vertical slice a user can see or use.** Scaffold, CI, schema and harness work is folded into the first slice that needs it, never its own story | Roughly 1–2 loop-hours: one contract or one subsystem change with its tests; foundation work may stand alone as its own story | **Roughly one release-unit-day**: a full subsystem or workflow with its own tests, sized so a build agent runs unattended for hours; foundation work sits inside the story that needs it |
 | `specDepth` — leaf description | Goal, acceptance criteria, the files it touches, Definition of Done. **Cap ~1,500 characters** | The full leaf template (`plan` step 3, Stage C). **Cap ~5,000 characters** | The full leaf template, uncapped |
 | `understandReaders` — `ultracode-build` phase 1 fan-out | **0** — read the relevant files inline, no Workflow | **≤ 2** readers, only for angles the spec does not pin | **≤ 4** — a subsystem story crosses more contracts than its spec pins; under six, as the uncapped spec pins more |
 | `reviewBreadthCeiling` — generic finder breadth at a merge gate | **NARROW** | **CONTAINED** | HIGH-RISK when the diff warrants it — a multi-hour, multi-module diff clamped at CONTAINED would get a standard story's finders |
@@ -37,12 +37,38 @@ move together; single knobs can still be tuned (see [Overrides](#overrides)).
 | `reviewerRegistrationWindowMinutes` — how long to wait for proof that a cloud reviewer was actually asked | 2 | 2 | 2 |
 | `pollTimeoutMinutes` — bound on waiting for a REGISTERED cloud reviewer's review (default written by `setup`) — the UPPER bound of the adaptive wait; see `review` step 2 | 5 | 10 | 10 |
 
-Read `prototype` as "rails and guidance, fast"; `standard` as the middle a working product wants. **`extended` buys size, not lower
+Read `prototype` as "rails and guidance, fast"; `standard` as a working product sliced finely; `extended`, the
+shipped default, as the same rigor in fewer, larger stories. **`extended` buys size, not lower
 rigor**: only the size-shaped knobs (`grain`, `specDepth`, `understandReaders`,
 `reviewBreadthCeiling`) move coarser or wider; every safety-shaped knob (`fixFloor`, `storyVerify`,
 verification, review cycles, …) and every floor below is exactly `standard`'s.
 
 **Grain order** (`grain` row, finest → coarsest): `standard` < `prototype` < `extended`.
+
+## Shape targets (soft)
+
+How many leaves a release unit, and how many release units a grouping item, usually hold at each
+profile's grain (this org: stories per epic, epics per capability). These rows are **not knobs**:
+`profileOverrides` does not accept them, and naming one there is reported and ignored like any
+unknown knob.
+
+| Measure | `prototype` | `standard` | `extended` |
+|---|---|---|---|
+| Stories per epic — leaves per release unit | 2–4 | 3–8 | 2–5 |
+| Epics per capability — release units per grouping item | 2–4 | 3–7 | 3–7 |
+
+The ranges are starting points from one team's data, tuned as plans report their counts: about 20
+epics of a finer-grained plan had a median of 5 stories and a middle half of 3 to 8; one plan
+signed off at the larger grain had 22 stories in 7 epics, about 3 per epic (range 1 to 6); a
+34-story plan became 18 when re-cut at the larger grain; one program produced 70 stories where 28
+sufficed.
+
+**Reported, never enforced.** `plan` quotes the resolved profile's two ranges with its `grain` row
+when it proposes leaf titles; a release unit proposed above the upper end is raised ONCE, as a
+question about merging, never refused or silently re-cut. `plan`'s final review and `rebalance`'s
+report each carry one **shape against target** line: leaves per release unit, release units under
+the grouping item, the two ranges, and every unit outside them. No skill refuses or blocks a plan
+for missing a range.
 
 ## The retired `enterprise` profile (a breaking change in 3.12.0)
 
@@ -53,7 +79,8 @@ so small that review and merge ceremony cost more than the error exposure they r
 program produced 70 stories where 28 sufficed), and every one of its rigor knobs is expressible
 through `profileOverrides` on top of `standard` or `extended`. **A `profile` of `enterprise` — in
 config or in a root marker — is an UNKNOWN profile**: every skill that resolves a profile falls
-back to `standard` and SAYS SO in its orientation line, never silently, quoting this recipe:
+back to `standard` — never to the shipped default, so such a repository keeps the finer grain it
+ran — and SAYS SO in its orientation line, never silently, quoting this recipe:
 
 ```json
 { "profile": "extended",
@@ -114,7 +141,8 @@ result and its source** ("profile: prototype — from the plan root I20100"):
 2. The **root marker** on the resolved plan root — see below. A one-off item (no plan root) has
    none.
 3. `profile` in the consuming repo's `.claude/ds-config.json`.
-4. `standard`.
+4. `extended` — the shipped default (it was `standard` through 3.48.0; a repository that wants the
+   finer grain sets `"profile": "standard"`).
 
 **Explicit config values win over profile defaults.** For the config keys
 `epicIntegrationBranches.autoRelease`, `epicIntegrationBranches.fastStoryMerges.enabled` and
@@ -193,13 +221,13 @@ are reported and ignored.
 
 | Skill | Knobs it honours |
 |---|---|
-| `plan` | `grain`, `specDepth`; writes the root marker |
+| `plan` | `grain`, `specDepth`; writes the root marker; reports against the shape targets |
 | `ultracode-build` | `understandReaders`, `fixFloor`, `storyVerify` |
 | `review` | `reviewBreadthCeiling`, `verificationDefault`, `verificationGrouping`, `localCliEngine`, `maxLocalReviewRounds`, `targetAdversarialCycles`, `fixFloor`, reviewer timeouts, `releaseCiOrdering` |
 | `build-item` | resolves the profile; `perStoryPullRequest`, `storyVerify`, `autoRelease`, `targetAdversarialCycles`, `releaseCiOrdering` |
 | `setup` | asks the profile; writes `profile` and the profile-consistent defaults |
 | `doctor` | reports the effective profile, its source, and any config key that contradicts it |
-| `rebalance` | takes the target profile; rewrites the root marker; re-slices not-started leaves to the new `grain` and `specDepth` |
+| `rebalance` | takes the target profile; rewrites the root marker; re-slices not-started leaves to the new `grain` and `specDepth`; reports against the shape targets |
 
 ## Cited by
 

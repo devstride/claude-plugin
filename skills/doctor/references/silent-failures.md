@@ -50,6 +50,20 @@ value, and what the profile would have written. A present `review.localCommand` 
 scheduling it — the engine still reviews release and PR paths and simply gets no rounds on
 fast-mode stories.
 
+## §4 — why an absent profile is reported with its way back
+
+Through 3.48.0 an absent `profile` key read as `standard`; it now reads as `extended`, the shipped
+default. A repository that never chose a profile therefore changes grain without editing anything:
+its next plan is cut into fewer, larger stories (about a release-unit-day each, with the contract's
+shape targets in the plan summary), and its one-off items and unmarked plans build and review at
+`extended`'s size knobs, while every safety knob, fix floor and floor stays `standard`'s, and so do the three profile-shaped keys setup writes. Plans already sliced keep their
+leaves, and a plan root's own marker or a skill argument still wins, so the line reports the
+repository's default, not a given plan's. A bare "shipped default" would leave a planner who
+expected the finer grain debugging the wrong thing; naming `extended` and the one-key way back
+(`"profile": "standard"`) does not. An unknown or retired value is a different case: skills read it
+as `standard`, never as the shipped default, so a config that still names `enterprise` keeps the
+grain it ran.
+
 ## §4 — why `autoRelease` has three values, and why the table is enough
 
 `true` and `false` decide the release-unit merge in advance; `"ask"` defers the decision to the

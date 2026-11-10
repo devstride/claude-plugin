@@ -282,12 +282,12 @@ never re-applied.
 
 Four things no inspection can reach, asked every run — the first one first:
 
-- **Which delivery profile?** (`profile`) — three options from the contract's table
+- **Which delivery profile?** (`profile`) — three options from the contract
   (`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` — read it before
-  asking): `prototype`, `standard` (default, first), `extended` (fewer, larger stories,
-  safety knobs `standard`'s; `enterprise` → `standard`); say what the answer moves
-  (`epicIntegrationBranches.autoRelease`, `fastStoryMerges.enabled`,
-  `review.pollTimeoutMinutes`); a re-run prefills the file's `profile`. **If
+  asking): `extended` (default, first: fewer, larger stories, safety knobs `standard`'s),
+  `standard` (finer), `prototype`; `enterprise` → `standard`. Say what the answer moves and,
+  when the file has no `profile`, that the default moved (config-defaults "Delivery
+  profile"); a re-run prefills the file's `profile`. **If
   `prototype`, say the consequence now**: `autoRelease` becomes `true` — a release unit merges
   to `baseBranch` unasked; name the branch. The user may answer `ask` (no profile
   produces it): the loop then asks the owner once per release unit. The
@@ -327,7 +327,7 @@ Phase D; else the shipped default.
 |---|---|
 | `baseBranch`, `hotfixBaseBranch`, `protectedBranches` | From A6; `protectedBranches` **always** holds base, production, release-source |
 | `integrationBranch` | `null` — per-release-unit derivation is the default |
-| `profile` | The Phase D answer, the word itself — always written, `standard` included |
+| `profile` | The Phase D answer, the word itself — always written, `extended` included |
 | `epicIntegrationBranches` | Verbatim from the defaults reference; `autoRelease` at the profile's value or an explicit `ask`; `fastStoryMerges.enabled` per below |
 | `verify` | `typecheck` (array), `test`, `lint`, `testSingle`, `testDir`, `skipDuringStoryBuilds: []` |
 | `generated` | Only when detected — omit an empty shape |

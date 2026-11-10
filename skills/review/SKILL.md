@@ -53,7 +53,7 @@ finder/verifier procedure.
 `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`; honoured knobs:
 `localCliEngine`, `maxLocalReviewRounds`, `fixFloor`, reviewer timeouts, `releaseCiOrdering`). A
 caller's name is used as given; else argument → full-view root marker → config `profile` →
-`standard` ("profile: standard — from `.claude/ds-config.json`"). Apply `profileOverrides`, but
+`extended`; an unknown word → `standard`, said so. Apply `profileOverrides`, but
 **reject a cycle-target override** — `targetAdversarialCycles` is two. A PRESENT dedicated key
 (`review.pollTimeoutMinutes`) wins, contradiction reported. Not overrides: **`review.localCommand`
 names the engine, never schedules it**, and **the three CI-ordering booleans describe what the

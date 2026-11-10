@@ -136,10 +136,9 @@ consequence per bullet. Ask as many rounds as the ambiguity needs. Cover at mini
     unit; its items carry a related-to edge — never `blocked_by` or an `[N]` prefix — back.
     Discovered SCOPE still splices into the chain via `insert-story`. A leaf whose theme does not match its release unit is a rehoming signal.
 - **Leaf titles per release unit** (this org: Stories) — titles only, no specs yet. Grain is **the
-  resolved profile's `grain` row, read now and quoted** when proposing, never a remembered size;
-  the row also settles foundation placement (`prototype`/`extended` fold foundation work —
-  scaffold, CI, schema, harness — into the story that needs it; `standard` lets it stand
-  alone — the row wins over any sentence here). Flag foundation stories (under `prototype`: "goes first inside its slice")
+  resolved profile's `grain` row and Shape targets, read now and quoted** when proposing, never a
+  remembered size (above range: ask once about merging, never refuse);
+  the row also settles where foundation work (scaffold, CI, schema, harness) sits. Flag foundation stories (under `prototype`: "goes first inside its slice")
   and mark gate stories (release-blocking checks, leak guards) for step 5. Grain changes; dating
   does not — step 6 still dates every leaf one synthetic day apart, because dates show dependency
   depth, not effort.
@@ -291,7 +290,8 @@ owns only the compute-and-stamp.
 - Report: the profile and its source; grouping-item/release-unit/leaf counts (new vs pre-existing
   when extending; deferred container excluded, saying if it exists); the critical-path spine (root story → gate stories → final story); the parallel
   waves; the `[1] … [N]` range; per-release-unit leaf counts (each reads as its own shippable
-  increment — a `prototype` plan visibly has a few slices per unit, not a dozen layers); recorded
+  increment — a `prototype` plan visibly has a few slices per unit, not a dozen layers); the
+  **shape against target** line (reported, never enforced); recorded
   deviations; and zero orphan leaves confirmed.
 - Point at the plan root: `/devstride:build-item <root-story-number>` (or bare
   `/devstride:build-item` once it is the earliest unblocked item) now runs it end-to-end. Each release

@@ -17,7 +17,7 @@ wins and nothing here applies. This file covers the remainder.
 ## Delivery profile
 
 ```json
-{ "profile": "standard" }
+{ "profile": "extended" }
 ```
 
 The one interview answer that moves several keys at once. What each profile means, every knob it
@@ -37,9 +37,20 @@ next section:
 
 Under every profile `fastStoryMerges.enabled` still turns on the repository's own commands and
 roster — the profile decides which precondition applies, never whether one does.
-`profile` is written on every run, `standard` included: an absent key reads as `standard` too, but a
+`profile` is written on every run, `extended` included: an absent key reads as `extended` too, but a
 re-run cannot tell a chosen default from a question never asked, and the doctor cannot report a
 source for it.
+
+**The shipped default moved from `standard` to `extended` after 3.48.0.** In a repository whose
+file has no `profile` key, the next plan is cut at the larger grain (about a release-unit-day per
+story) with the contract's shape targets in its summary, and one-off items and plans without a
+`Delivery profile:` marker build and review at `extended`'s size knobs (up to four understand
+readers, merge review that may widen to HIGH-RISK). Every safety knob, fix floor and floor is
+unchanged, and so are the three keys above (`extended` writes `standard`'s values). When setup asks
+the question it says what the answer moves (the three keys in the table above), and on a file with
+no `profile` key it also says that the default moved and that answering `standard` keeps the finer
+grain the repository ran before. An explicit `profile`, a plan root's marker and a skill argument
+are untouched; a retired or unknown value still reads as `standard`.
 
 `profileOverrides` is optional and **omitted by default** — setup never writes it. It is the
 operator's hand-edit for pinning one knob under a profile, and its vocabulary is the contract's.
