@@ -17,15 +17,15 @@ citation; never restate its table.
 
 Arguments — a grouping item to re-slice (a whole plan root, or one release unit — this org's Epic —
 to scope the re-slice to it; e.g. `I20100`) and the target profile as a bare word anywhere in the
-arguments (`prototype`, `standard` or `extended` — the contract's argument form; step 0 handles
-the retired `enterprise`), optionally with `--dry-run`; this skill REQUIRES both, so missing either → ask, never guess:
+arguments (`prototype`, `standard` or `extended`, the contract's argument form; step 0 handles a
+retired target), optionally with `--dry-run`; this skill REQUIRES both, so missing either → ask, never guess:
 $ARGUMENTS
 
 ## Hard floors
 
 - **The DevStride MCP writes PRODUCTION immediately** (`api.devstride.com`) — every `create_item`,
-  `add_relationship`, `bulk_update_items`, `update_item` and `archive_item` is real and visible;
-  there is no sandbox. Nothing is created, wired, archived or re-dated before step 2's explicit
+  `add_relationship`, `bulk_update_items`, `update_item` and `archive_item` is real and visible.
+  Nothing is created, wired, archived or re-dated before step 2's explicit
   "yes, rebalance" — the auto-scheduler probe write included; `--dry-run` and a declined proposal
   write nothing. DevStride data only, never the repo.
 - **NEVER `delete_item`; never delete anything.** Absorbed originals are archived, after their
@@ -95,7 +95,7 @@ $ARGUMENTS
   build-item's ritual stamps the real dates when it merges.
 - **Current profile** — the nearest EFFECTIVE marker per the contract: the item's own, else the
   closest ancestor's (walk `hierarchy` up with `get_item(view:"full")`), else config `profile`,
-  else `extended`. On a whole-root run check every release unit for its OWN marker (it wins for its
+  else `extended` (unknown: `standard`). On a whole-root run check every release unit for its OWN marker (it wins for its
   subtree; direction is decided per unit). **Announce both ends with sources** ("current:
   enterprise (retired: read as standard) — from the root marker on I20100; target: extended — from
   `$ARGUMENTS`"). Current

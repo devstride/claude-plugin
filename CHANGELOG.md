@@ -26,7 +26,9 @@ for what each version component means here and how a release is cut.
 
 - **The shipped default delivery profile is now `extended`** (it was `standard`). It reaches only a
   repository whose `.claude/ds-config.json` has no `profile` key: its next plan is cut at the larger
-  grain, about a release-unit-day per story, with the shape targets in the planning summary. Every
+  grain, about a release-unit-day per story, with the shape targets in the planning summary, and its
+  one-off items and plans without a `Delivery profile:` marker build and review at `extended`'s size
+  knobs (up to four understand readers; merge review may widen to HIGH-RISK). Every
   safety knob, fix floor and floor is unchanged, because `extended` already uses `standard`'s, and
   so are the three keys setup writes from the profile. A repository that wants the previous default
   sets `"profile": "standard"`. An explicit `profile`, a plan root's `Delivery profile:` marker and

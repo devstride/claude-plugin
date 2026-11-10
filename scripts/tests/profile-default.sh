@@ -64,16 +64,19 @@ if has skills/setup/SKILL.md 'asking): `extended` (default, first'; then
   ok "(8) setup offers extended first, as the default"
 else bad "(8) setup's profile question does not lead with extended as the default"; fi
 
-# (9) Every skill that resolves a profile falls back to extended when config has none.
-for pair in 'skills/build-item/SKILL.md|config `profile` → `extended`' \
-            'skills/release/SKILL.md|else config `profile`, else `extended`' \
-            'skills/rebalance/SKILL.md|else `extended`. On a whole-root run'; do
+# (9) Every skill that writes the chain out falls back to extended when config has none, AND says
+#     that an unknown word still reads as standard: before, falling off the end of the chain gave
+#     standard by accident; now it would give extended, so the clause must be explicit.
+for pair in 'skills/build-item/SKILL.md|config `profile` → `extended`; an unknown word → `standard`' \
+            'skills/release/SKILL.md|else config `profile` (unknown: `standard`), else `extended`' \
+            'skills/rebalance/SKILL.md|else `extended` (unknown: `standard`).'; do
   f="${pair%%|*}"; n="${pair#*|}"
-  if has "$f" "$n"; then ok "(9) $f falls back to extended"; else bad "(9) $f: missing '$n'"; fi
+  if has "$f" "$n"; then ok "(9) $f: extended by default, unknown → standard"; else bad "(9) $f: missing '$n'"; fi
 done
-if grep -A1 -F 'full-view root marker → config `profile` →' "$ROOT/skills/review/SKILL.md" | grep -qF '`extended` ('; then
-  ok "(9) skills/review/SKILL.md falls back to extended"
-else bad "(9) skills/review/SKILL.md does not fall back to extended"; fi
+if grep -A1 -F 'full-view root marker → config `profile` →' "$ROOT/skills/review/SKILL.md" |
+   grep -qF '`extended`; an unknown word → `standard`, said so'; then
+  ok "(9) skills/review/SKILL.md: extended by default, unknown → standard"
+else bad "(9) skills/review/SKILL.md: chain does not end extended with the unknown → standard clause"; fi
 
 # (10) The config registry, and the schema and table generated from it, carry the same default.
 reg="$(python3 -c 'import json,sys

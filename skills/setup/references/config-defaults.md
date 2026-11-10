@@ -43,7 +43,9 @@ source for it.
 
 **The shipped default moved from `standard` to `extended` after 3.48.0.** In a repository whose
 file has no `profile` key, the next plan is cut at the larger grain (about a release-unit-day per
-story) with the contract's shape targets in its summary; every safety knob, fix floor and floor is
+story) with the contract's shape targets in its summary, and one-off items and plans without a
+`Delivery profile:` marker build and review at `extended`'s size knobs (up to four understand
+readers, merge review that may widen to HIGH-RISK). Every safety knob, fix floor and floor is
 unchanged, and so are the three keys above (`extended` writes `standard`'s values). When setup asks
 the question it says what the answer moves (the three keys in the table above), and on a file with
 no `profile` key it also says that the default moved and that answering `standard` keeps the finer
