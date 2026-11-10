@@ -50,7 +50,7 @@ knobs="$(awk '/^\| Knob \|/{on=1} on && !/^\|/{exit} on' "$ROOT/$CONTRACT")"
 okeys="$(python3 -c 'import json,sys
 d=json.load(open(sys.argv[1]))
 print("\n".join(s["key"] for s in d["settings"] if s["key"].startswith("profileOverrides.")))' "$ROOT/schemas/seam-registry.json" 2>/dev/null)"
-shape_re='per ?epic|per ?capability|shape'
+shape_re='per ?epic|per ?capability|per ?release ?unit|per ?grouping|leaves ?per|release ?units ?per|shape'
 if [ -z "$knobs" ] || [ -z "$okeys" ]; then
   bad "(5) cannot read the knob table or the registry's profileOverrides keys"
 elif printf '%s\n%s\n' "$knobs" "$okeys" | grep -qiE "$shape_re"; then
