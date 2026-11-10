@@ -1619,6 +1619,13 @@
         "null"
       ],
       "properties": {
+        "nameCommand": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — none; run from the repository root with CLAUDE_CODE_SESSION_ID exported (the status-line payload's session id)"
+        },
         "jobClassGate": {
           "type": "boolean",
           "default": true,
@@ -1629,7 +1636,7 @@
         "^_": {}
       },
       "additionalProperties": false,
-      "description": "session job classes; null reads as absent"
+      "description": "session job classes and the session's display name; null reads as absent"
     },
     "localEnvironment": {
       "type": [

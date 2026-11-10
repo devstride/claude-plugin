@@ -8,6 +8,27 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **The status line names the session.** A new Session segment (☻, key `session`) on the second
+  line shows this session's name, right after the plugin version, so two terminals side by side say
+  which agent is which. It reads the status-line payload's `session_name` (a session started with
+  `--name` or renamed), else the first line of a new config key, `session.nameCommand`: a
+  repository's own command for naming sessions, run from the repository root with
+  `CLAUDE_CODE_SESSION_ID` exported. The command runs out of band and is cached for about 10
+  seconds under `$TMPDIR`, so the first draw of a new session can lack the segment for a moment.
+  Nothing is written to the plugin directory or the repository. No name and no command means no
+  segment, and `statusLine.hiddenSegments: ["session"]` hides it. The managed status-line marker is
+  raised, so installed copies are brought forward at the next session start.
+- **The release clearance records the holder's session name.** `claim`, a renewing claim and
+  `adopt` store an optional `session` display name beside the holder:
+  `CLEARANCE_SESSION_NAME` when a repository wrapper sets it, else the claim session name. It is
+  cleaned (no control characters or `|`, at most 64 characters), kept by heartbeats, carried in
+  `status --json`, and shown in the human status line as `held by <user> on <machine> (session
+  <name>)`. `status --short` is unchanged. It is display only: the holder still decides who holds
+  the clearance, and older records without it read as before. The DevStride store's claim
+  `sessionName` follows the same rule.
+
 ## [3.47.0] — 2026-11-09
 
 ### Changed

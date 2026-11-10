@@ -183,9 +183,8 @@ next action. For each failure symptom, read
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
   **array**, so iterate it — `review.localCommand`, `review.localAssistCommand`,
   `generated.regenCommand`, `preShipChecks[].command`, each non-null `localEnvironment.*` command,
-  `stage.resolve`, `pool.checkout` and `pool.checkin`): split on `&&` and `;`, take the first
-  token of **each** segment, and
-  skip shell builtins (`cd backend && pnpm test` starts with `cd`, which always resolves). A
+  `stage.resolve`, `session.nameCommand`, `pool.checkout`/`checkin`): split on `&&` and `;`,
+  take the first token of **each** segment, skip shell builtins (`cd backend && pnpm test`: `cd` always resolves). A
   single-word command that does not resolve may be a shell alias or function — report "not on
   PATH (may be an alias)", not a flat FAIL.
 - **`conventionsDoc` exists** — set → the file must be present; the build engine reads it.

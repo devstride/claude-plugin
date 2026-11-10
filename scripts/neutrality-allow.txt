@@ -6,3 +6,4 @@
 ds-statusline-stage	the plugin's own status-line cache file name, not a repository's skill
 ds-statusline-pr	the plugin's own status-line cache file name, not a repository's skill
 ds-statusline-release	the plugin's own status-line cache file name, not a repository's skill
+ds-statusline-session	the plugin's own status-line cache file name, not a repository's skill

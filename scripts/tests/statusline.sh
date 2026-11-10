@@ -29,7 +29,7 @@ mkrepo() { # mkrepo NAME [CONFIG-JSON] — a git repo with one commit, on branch
 # No label may be left dangling: a segment symbol followed by the separator or the
 # end of a line means a segment rendered with nothing in it. This is the invariant
 # the whole seg() mechanism exists to hold, so it is asserted on every case below.
-no_dangling() { printf '%s\n' "$1" | perl -Mutf8 -CS -ne 'exit 1 if /[◆↯▣⑂⎇⊞▲⇄⚑](?: ·|\s*$)/'; }
+no_dangling() { printf '%s\n' "$1" | perl -Mutf8 -CS -ne 'exit 1 if /[◆↯▣⑂⎇⊞☻▲⇄⚑](?: ·|\s*$)/'; }
 
 R="$(mkrepo plain '{}')"
 
@@ -218,5 +218,33 @@ else bad "(20) got [$O] / [$ONE]"; fi
 if grep -qF '"refreshInterval": 30' "$ROOT/skills/setup/SKILL.md" && grep -qF '"refreshInterval": 30' "$ROOT/skills/doctor/references/repairs.md"; then
   ok "(21) setup and the doctor repair write statusLine.refreshInterval 30"
 else bad "(21) refreshInterval 30 missing from the setup or doctor template"; fi
+
+# (22) the Session segment: the payload's session_name; else the repository's session.nameCommand,
+#      served from a cache under $TMPDIR and refreshed in the background with the payload's session
+#      id exported; nothing (and no dangling ☻) without either; hidden by hiddenSegments; a failing
+#      command prints nothing; nothing written to the repository or the working directory
+SID=0b1c2d3e-0000-4000-8000-000000000001
+N1="$(mkrepo sess1 '{}')"
+A="$(render "$N1" ",\"session_id\":\"$SID\",\"session_name\":\"wt2-9f\"")"
+B="$(render "$N1" ",\"session_id\":\"$SID\"")"
+N2="$(mkrepo sess2 '{"session":{"nameCommand":"printf \"%s\\n%s\\n\" \"cmd-$CLAUDE_CODE_SESSION_ID\" extra; pwd > \"$TMPDIR/sess-pwd\""}}')"
+BEFORE="$(git -C "$N2" status --porcelain)"
+C1="$(render "$N2" ",\"session_id\":\"$SID\"")"; sleep 1
+C2="$(render "$N2" ",\"session_id\":\"$SID\"")"
+CACHED="$(cat "$TMPDIR/ds-statusline-session-$SID" 2>/dev/null)"; RAN_IN="$(cat "$TMPDIR/sess-pwd" 2>/dev/null)"
+P2="$(render "$N2" ",\"session_id\":\"$SID\",\"session_name\":\"named\"")"
+N3="$(mkrepo sess3 '{"session":{"nameCommand":"echo nope; exit 3"},"statusLine":{}}')"
+SID3=0b1c2d3e-0000-4000-8000-000000000003
+render "$N3" ",\"session_id\":\"$SID3\"" >/dev/null; sleep 1; D="$(render "$N3" ",\"session_id\":\"$SID3\"")"
+N4="$(mkrepo sess4 '{"statusLine":{"hiddenSegments":["session"]}}')"
+E="$(render "$N4" ",\"session_id\":\"$SID\",\"session_name\":\"wt2-9f\"")"
+F="$(render "$WORK" ",\"session_id\":\"$SID\",\"session_name\":\"$(printf 'x|y')\"")"
+DIRTY="$(git -C "$N2" status --porcelain)"
+if printf '%s' "$A" | grep -q '☻ wt2-9f' && no_dangling "$A" && ! printf '%s' "$B" | grep -q '☻' && no_dangling "$B" \
+   && printf '%s' "$C2" | grep -qE "☻ cmd-$SID( |\$)" && [ "$CACHED" = "cmd-$SID" ] && [ "$RAN_IN" = "$(cd "$N2" && pwd -P)" -o "$RAN_IN" = "$N2" ] \
+   && printf '%s' "$P2" | grep -q '☻ named' && ! printf '%s' "$D" | grep -q '☻' && no_dangling "$D" \
+   && ! printf '%s' "$E" | grep -q '☻' && printf '%s' "$F" | grep -q '☻ x y' && [ "$DIRTY" = "$BEFORE" ]; then
+  ok "(22) Session: payload name; else nameCommand (first line, session id exported, run from the repo, cached under TMPDIR); none, failing or hidden → no segment; outside a repo too; repo left clean"
+else bad "(22) a=$A | b=$B | c1=$C1 | c2=$C2 | cached=$CACHED | ran=$RAN_IN | p2=$P2 | d=$D | e=$E | f=$F | dirty=$DIRTY"; fi
 
 exit $FAIL

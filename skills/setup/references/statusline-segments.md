@@ -24,6 +24,7 @@ is not?**
 | `model` | ◆ | `model.display_name` in the status-line payload | The payload did not carry it — **transient** |
 | `effort` | ↯ | the last `"effort"` in the session transcript's tail | No assistant record yet — **transient**, fills in on the first reply |
 | `plugin` | ⊞ | `hooks/session-runtime.py check`: the running version, dim; red `3.15.0 → 3.16.0 · /reload-plugins` (newer copy installed), yellow `3.16.0 (3.16.1 out · /devstride:update)` (newer published) | No record yet — **never a finding** |
+| `session` | ☻ | this session's name: the payload's `session_name` (a custom name or title), else the first line of `session.nameCommand`, run from the repository root with `CLAUDE_CODE_SESSION_ID` exported, cached ~10s under `$TMPDIR` | The session has no custom name and no command is configured — **never a finding** |
 | `repo` | ▣ | basename of `git rev-parse --show-toplevel` | Not a git repository — already an §1 finding |
 | `checkout` | ⑂ | linked worktree name, else the word `main` | Not a git repository — already an §1 finding |
 | `branch` | ⎇ | `git branch --show-current`, else `<sha> (detached)` | A repository with no commit yet — **transient** |
@@ -43,6 +44,8 @@ into an interrogation, and trains people to skip the answers that matter. Concre
   normal state of a branch and it is right for the segment to be absent. It is worth raising only
   when §1 found `gh` missing or unauthenticated — and then the fix is `gh`, not the status line.
 - **Never ask about `plugin`**: it fills itself in at the first prompt, and its colour is the finding.
+- **Never ask about `session`**: a session without a custom name is normal, and a repository that
+  wants every session named sets `session.nameCommand` on purpose, not in answer to a blank.
 - **Never ask about `release`.** Clear is the normal state of a repository, and a null
   `release.clearance` is a decision already recorded in the config; the segment exists to show a
   release in flight, nothing more.
