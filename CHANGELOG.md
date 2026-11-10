@@ -8,6 +8,21 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Planning skills accept an optional originating Service Desk ticket and link it to the item they
+  create; `comprehend-plan` reports the tickets linked to a plan.** Pass `--ticket <ticket
+  number>[,<ticket number>]` to `plan`, `create-story`, `create-defect`, `insert-story` or
+  `insert-defect`. Each ticket is checked to be a Service Desk ticket (it has a requester) before
+  anything is written, then linked with an `originating_ticket` relationship: `plan` links the
+  parent item it plans under, once, at the start; the other four link the item they create. A
+  number that is not a ticket is named and skipped. On a DevStride that does not yet support the
+  relationship, the skill says so once and carries on without the link, and never substitutes
+  another relationship type; any other refusal is shown as the server worded it. The procedure
+  lives in one new contract, `skills/plan/references/originating-ticket.md`, which each skill
+  cites. `comprehend-plan` records each item's originating tickets and adds a **Linked tickets**
+  section to its report: each ticket, its status and the plan item it is linked to, read-only.
+
 ## [3.49.0] — 2026-11-09
 
 ### Added
