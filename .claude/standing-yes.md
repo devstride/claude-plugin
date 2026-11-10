@@ -19,7 +19,7 @@ standing yes replaces only the per-pull-request question that used to follow it.
 
 1. The pull request is open, not a draft, based on `main`, from a branch of this repository (never
    a fork), authored by the builder App (`devstride-builder[bot]`, the identity the owner's builds run
-   under since I15316) or by the owner's own account, with one of those two as the author of every
+   under) or by the owner's own account, with one of those two as the author of every
    commit and the only accounts that pushed to its branch, and linked to a tracked work item whose
    build the owner started.
 2. It changes nothing that guards merges, compared in any letter case: nothing under a `.claude/`

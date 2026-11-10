@@ -24,6 +24,8 @@ if "check-runs" in a[1] and dispatched and s.get("failReads", 0):
         sys.stderr.write("gh: HTTP 502\n"); sys.exit(1)
 if "check-runs" in a[1]:
     print(json.dumps({"check_runs": s.get("after", []) if dispatched else s.get("before", [])})); sys.exit(0)
+if a[:2] == ["pr", "view"]:
+    print(json.dumps({"baseRefName": s.get("base", "master")})); sys.exit(0)
 if "/runs" in a[1]:
     print(json.dumps({"workflow_runs": s.get("runs", [])})); sys.exit(0)
 sys.exit(1)
@@ -38,7 +40,8 @@ OUT="$(PATH="$WORK/bin:$PATH" WORK="$WORK" HELPER="$HELPER" INDEPENDENT_REVIEW_P
 import json, os, subprocess, sys, datetime
 work, helper = os.environ["WORK"], os.environ["HELPER"]
 H = "a" * 40
-def check(conclusion="success", slug="reviewer-app", ident=1, title="Passed", text="", status="completed", name="independent-review"):
+RECORD = json.dumps({"pr": 7, "head": H, "base_ref": "master"})
+def check(conclusion="success", slug="reviewer-app", ident=1, title="Passed", text=RECORD, status="completed", name="independent-review"):
     return {"id": ident, "name": name, "status": status, "conclusion": conclusion, "app": {"slug": slug}, "output": {"title": title, "text": text}}
 now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 def run(scenario, cfg="on.json", args=None):
@@ -74,9 +77,15 @@ case("(13) a malformed head is refused before anything runs", {}, 1, "ERROR usag
 case("(14) a malformed pull request number is refused", {}, 1, "ERROR usage", False, args=["7;x", H])
 case("(15) a failed read or two while waiting is not the end", {"after": [check()], "failReads": 2}, 0, "PASS", True)
 case("(16) GitHub staying unreadable: ERROR, never a pass", {"after": [check()], "failReads": 99}, 1, "ERROR gh api", True)
+other_pr = json.dumps({"pr": 8, "head": H, "base_ref": "master"})
+case("(17) a pass recorded for another pull request is no result: a review is started", {"before": [check(text=other_pr)], "after": [check(ident=2)]}, 0, "PASS", True)
+case("(18) a pass recorded against another base is no result, and alone never passes", {"before": [check()], "base": "develop"}, 1, "ERROR no result", True)
+case("(19) a pass whose record cannot be read never passes", {"after": [check(text="not json")]}, 1, "ERROR no result", True)
 EOF
 )"
+PYRC=$?
 echo "$OUT" | sed 's/^/  /'
 FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
-[ "$(echo "$OUT" | grep -c '^ok')" -ge 15 ] || { echo "  FAIL too few cases ran"; FAIL=1; }
+[ "$PYRC" = 0 ] || { echo "  FAIL the test runner itself exited $PYRC"; FAIL=1; }
+[ "$(echo "$OUT" | grep -c '^ok')" -eq 20 ] || { echo "  FAIL not every case ran (20 expected)"; FAIL=1; }
 exit $FAIL

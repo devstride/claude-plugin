@@ -47,6 +47,7 @@ import re
 import subprocess
 import sys
 import time
+from urllib.parse import quote
 
 CONTEXT = "devstride/reviewed"
 SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -136,7 +137,7 @@ def independent_pass(sha, cwd, pr, base):
         return None
     if not isinstance(section, dict) or not section.get("check") or not section.get("reviewerApp"):
         return None
-    out = gh_json(cwd, "api", "repos/{owner}/{repo}/commits/%s/check-runs?check_name=%s&filter=all&per_page=100" % (sha, section["check"]))
+    out = gh_json(cwd, "api", "repos/{owner}/{repo}/commits/%s/check-runs?check_name=%s&filter=all&per_page=100" % (sha, quote(section["check"], safe="")))
     runs = out.get("check_runs") if isinstance(out, dict) else None
     own = [r for r in (runs or []) if (r.get("app") or {}).get("slug") == section["reviewerApp"]]
     own.sort(key=lambda r: r.get("id") or 0, reverse=True)
@@ -255,7 +256,7 @@ def main(argv):
             print(("REVIEWED %s by %s" if ok else "UNREVIEWED %s") % ((sha, why) if ok else (why,)))
             return 0 if ok else 2
         ok, why = post(sha, None, opts["--pr"], opts["--base"], opts.get("--from"),
-                       wait_seconds())
+                       wait_seconds(), opts.get("--proof-app"))
         print(("POSTED %s %s: %s" % (sha, CONTEXT, why)) if ok else "NOT POSTED %s" % why)
         return 0 if ok else 2
     except Unreadable as err:

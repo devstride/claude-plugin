@@ -909,7 +909,7 @@ skills/review/references/review-ledger.md|On a READY outcome only
 skills/release/scripts/train_exclusions.py|reviewed_status.verify
 skills/release/references/release-branch.md|grandfatheredUnits
 skills/build-item/references/epic-release-steps.md|merge-gate.py
-skills/pr/scripts/merge-gate.py|an admin merge would bypass a block it cannot name
+skills/pr/scripts/merge-gate.py|the gate will not merge past a block it cannot name
 skills/build-item/SKILL.md|release-holds.md
 skills/release/SKILL.md|release-holds.md
 skills/release/references/release-branch.md|Release holds.

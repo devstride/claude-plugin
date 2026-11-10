@@ -120,6 +120,9 @@ GH_LOGIN="builder-app[bot]" GH_TYPE=Bot PR_HEAD="$APPHEAD" t post "$APPHEAD" --p
 [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"* ]] && ok "(14) a builder App's status does not count by default" || bad "(14) $RC $OUT"
 t verify "$APPHEAD" --pr 7 --base train --proof-app builder-app; [ "$RC" = 0 ] && [[ "$OUT" == "REVIEWED"* ]] && ok "(14b) it counts where the caller names that App" || bad "(14b) $RC $OUT"
 t verify "$APPHEAD" --pr 7 --base train --proof-app other-app; [ "$RC" = 2 ] && ok "(14c) naming another App does not make it count" || bad "(14c) $RC $OUT"
+git checkout -q -b proof1b "$BASE"; echo pb > pb.txt; git add -A; git commit -qm proof1b; APPHEAD2="$(git rev-parse HEAD)"
+GH_LOGIN="builder-app[bot]" GH_TYPE=Bot PR_HEAD="$APPHEAD2" t post "$APPHEAD2" --pr 7 --base train --proof-app builder-app
+[ "$RC" = 0 ] && [[ "$OUT" == "POSTED"* ]] && ok "(14d) the App a guarded procedure names posts proof that counts" || bad "(14d) $RC $OUT"
 git checkout -q -b proof2 "$BASE"; echo q > q.txt; git add -A; git commit -qm proof2; IR="$(git rev-parse HEAD)"
 mkdir -p .claude; echo '{"review": {"independentReview": {"workflow": "w.yaml", "ref": "main", "check": "independent-review", "reviewerApp": "reviewer-app"}}}' > .claude/ds-config.json
 record() { python3 -c 'import json,sys; print(json.dumps({"check_runs": [{"id": 1, "name": "independent-review", "status": "completed", "conclusion": sys.argv[1], "app": {"slug": sys.argv[2]}, "output": {"text": json.dumps({"head": sys.argv[3], "pr": int(sys.argv[4]), "base_ref": sys.argv[5]})}}]}))' "$@"; }

@@ -4,8 +4,8 @@ load: contract
 
 # The independent pass (review step 7.1a)
 
-With `review.independentReview` set, on the final head and before anything else in step 7, run once,
-in the background:
+With `review.independentReview` set, on the final head after step 7.1's refresh, run once, in the
+background, and wait for its line before step 7.1b or the ready-flip (it can take many minutes):
 
     python3 ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/independent-review.py <pr> <head>
 

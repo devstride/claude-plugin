@@ -52,8 +52,8 @@ Then confirm:
    `status`, else STOP.
 
 6. With `review.independentReview` set, `independent-review.py <n> <reviewedHead>` prints `PASS`
-   (a release whose files match what was approved passes with no model at all; a fix made on the
-   release branch has Codex read just that difference). `WITHHELD` goes back through `review`;
+   (the repository's workflow decides how much of the release it reads; a pass counts only when
+   it names this pull request, this head and this base). `WITHHELD` goes back through `review`;
    `ERROR` stops.
 
 Then run the `MERGE` line of `merge-gate.py <n> <reviewedHead> --all-green` (step 4); else STOP.

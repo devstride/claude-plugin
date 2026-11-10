@@ -49,7 +49,7 @@ What `review` does with one at step 7.1 when the base has advanced:
   (`git merge --no-ff origin/<base>`, never a rebase; a conflict STOPS for the operator, never
   auto-resolved), push, and treat it as a head advance under step 5's rule — receipts for the old
   tree are void — so local pre-ship suites test the combination that will merge. Then continue to
-  7.1b.
+  7.1a.
 - **Any other protected head** → STOP; the owner decides.
 
 **On a release-branch head, or a head whose caller declared `fix-exclusions: true` (the release

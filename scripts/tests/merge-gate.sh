@@ -162,7 +162,7 @@ GREEN = {"pr": {"number": 7, "state": "OPEN", "isDraft": False, "headRefOid": H,
 def sc(**changes):
     s = copy.deepcopy(GREEN)
     for k, v in changes.items():
-        if k in ("state", "isDraft", "headRefOid", "mergeStateStatus", "reviewDecision", "baseRefName"):
+        if k in ("state", "isDraft", "headRefOid", "mergeStateStatus", "reviewDecision", "baseRefName", "isCrossRepository"):
             s["pr"][k] = v
         else:
             s[k] = v
@@ -177,12 +177,14 @@ def refuse(label, scenario, text, code_wanted=2, sha=H):
 
 merge("(1) every required check green, blocked by the base's rules -> MERGE, pinned to the head",
       GREEN, "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
-merge("(2) clean -> MERGE; --delete-branch carried",
-      sc(mergeStateStatus="CLEAN"), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s && gh api -X DELETE repos/acme/widgets/git/refs/heads/I1-fix" % H, "--delete-branch")
+merge("(2) clean -> MERGE; --delete-branch carried, and a head already gone does not fail the merge",
+      sc(mergeStateStatus="CLEAN"), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s && (gh api -X DELETE repos/acme/widgets/git/refs/heads/I1-fix || true)" % H, "--delete-branch")
+merge("(2c) a fork's head is never deleted: its branch name is not this repository's branch",
+      sc(mergeStateStatus="CLEAN", isCrossRepository=True), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H, "--delete-branch")
 SUBJECT = "Merge pull request #7 from acme/I1-fix's"
 code, out, err = run(7, H, sc(mergeStateStatus="CLEAN"), "--delete-branch", "--subject", SUBJECT)
 words = shlex.split(out[0])[1:] if code == 0 else []
-say(words[:10] == ["gh", "api", "-X", "PUT", "repos/acme/widgets/pulls/7/merge", "-f", "merge_method=merge", "-f", "sha=" + H, "-f"] and words[10] == "commit_title=" + SUBJECT and words[11:] == ["&&", "gh", "api", "-X", "DELETE", "repos/acme/widgets/git/refs/heads/I1-fix"],
+say(words[:10] == ["gh", "api", "-X", "PUT", "repos/acme/widgets/pulls/7/merge", "-f", "merge_method=merge", "-f", "sha=" + H, "-f"] and words[10] == "commit_title=" + SUBJECT and words[11:] == ["&&", "(gh", "api", "-X", "DELETE", "repos/acme/widgets/git/refs/heads/I1-fix", "||", "true)"],
     "(2b) a train merge's subject is carried, quoted so the line runs as printed", "rc=%d %r" % (code, out))
 merge("(3) unstable (only a check that is not required failed) -> MERGE",
       sc(mergeStateStatus="UNSTABLE"), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)

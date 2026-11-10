@@ -13,7 +13,8 @@ it can never produce a pass itself.
   ERROR <reason>   no result: the reviewer did not answer, so nothing is known       exit 1
 
 A result already recorded on this exact commit is the answer: a pass is not bought twice, and a
-withheld result stands until a new commit exists. Only the configured reviewer App's result counts.
+withheld result stands until a new commit exists. Only the configured reviewer App's result counts,
+and a pass only when its record names this pull request, this head and the base it targets now.
 """
 import json
 import os
@@ -22,6 +23,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
 REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -67,12 +69,26 @@ def load(path):
     return section
 
 
-def result_on(repo, head, config):
-    """The reviewer App's newest finished result on this commit, or None."""
-    out = gh_json("api", "repos/%s/commits/%s/check-runs?check_name=%s&filter=all&per_page=100" % (repo, head, config["check"]))
+def names(run, pr, head, base):
+    """Does a pass's record name this pull request, this head and the base it targets now?"""
+    try:
+        record = json.loads((run.get("output") or {}).get("text") or "")
+    except ValueError:
+        return False
+    return isinstance(record, dict) and record.get("head") == head and str(record.get("pr")) == str(pr) \
+        and record.get("base_ref") == base
+
+
+def result_on(repo, pr, head, base, config):
+    """The reviewer App's newest finished result on this commit, or None. A pass recorded for
+    another pull request or another base is no result here: that review read a different change."""
+    out = gh_json("api", "repos/%s/commits/%s/check-runs?check_name=%s&filter=all&per_page=100"
+                  % (repo, head, quote(config["check"], safe="")))
     own = [r for r in out.get("check_runs") or [] if (r.get("app") or {}).get("slug") == config["reviewerApp"] and r.get("name") == config["check"]]
     own.sort(key=lambda r: r.get("id") or 0, reverse=True)
     if not own or own[0].get("status") != "completed":
+        return None
+    if own[0].get("conclusion") == "success" and not names(own[0], pr, head, base):
         return None
     return own[0]
 
@@ -98,7 +114,10 @@ def runs_since(repo, config, started):
 
 
 def review(pr, head, repo, config):
-    existing = result_on(repo, head, config)
+    base = gh_json("pr", "view", pr, "--repo", repo, "--json", "baseRefName").get("baseRefName")
+    if not isinstance(base, str) or not base:
+        raise Stop("the base of #%s could not be read" % pr)
+    existing = result_on(repo, pr, head, base, config)
     if existing:
         return report(head, existing)
     started = time.time()
@@ -109,7 +128,7 @@ def review(pr, head, repo, config):
         time.sleep(POLL_SECONDS)
         # One failed read is GitHub having a moment, not the end of a review that is still running.
         try:
-            found = result_on(repo, head, config)
+            found = result_on(repo, pr, head, base, config)
             fresh = None if found else runs_since(repo, config, started)
             misses = 0
         except Stop:
@@ -121,7 +140,7 @@ def review(pr, head, repo, config):
             return report(head, found)
         if time.time() - started > GRACE_SECONDS and fresh and all(r.get("status") == "completed" for r in fresh):
             # One last look: the result is posted before the run ends, so this is not a race.
-            found = result_on(repo, head, config)
+            found = result_on(repo, pr, head, base, config)
             if found:
                 return report(head, found)
             raise Stop("the review run ended with no result for %s: %s" % (head[:12], fresh[0].get("html_url")))

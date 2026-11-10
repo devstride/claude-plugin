@@ -117,7 +117,7 @@ PLAIN = ("CLEAN", "HAS_HOOKS", "UNSTABLE")
 PR_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      number state isDraft headRefOid headRefName baseRefName mergeStateStatus reviewDecision
+      number state isDraft headRefOid headRefName baseRefName isCrossRepository mergeStateStatus reviewDecision
       latestOpinionatedReviews(first: 100) { pageInfo { hasNextPage } nodes { state author { login } } }
       potentialMergeCommit { oid }
       commits(last: 1) { nodes { commit { oid statusCheckRollup {
@@ -670,8 +670,9 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
                      "the gate will not merge past a block it cannot name" % (number, base))
     command = "gh api -X PUT repos/%s/%s/pulls/%d/merge -f merge_method=merge -f sha=%s%s%s" % (
         owner, name, number, expected, " -f " + shlex.quote("commit_title=" + subject) if subject else "",
-        " && gh api -X DELETE repos/%s/%s/git/refs/heads/%s" % (owner, name, quote(pr.get("headRefName") or "", safe="/"))
-        if delete_branch else "")
+        # A head GitHub already deleted (auto-delete) is not a failed merge; a fork's head is not ours.
+        " && (gh api -X DELETE repos/%s/%s/git/refs/heads/%s || true)" % (owner, name, quote(pr.get("headRefName") or "", safe="/"))
+        if delete_branch and not pr.get("isCrossRepository") else "")
     why = ("required checks green at %s: %s" % (expected[:12], ", ".join(sorted({r[0] for r in required})))) if required \
         else "%s requires no check; GitHub reads #%d as %s" % (base, number, state)
     return command, why
