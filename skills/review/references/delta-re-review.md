@@ -95,7 +95,8 @@ pre-ship and code-changing CI repair rechecks; no event resets the count (one ex
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` §1 step 4a). The first wave spends
 cycle 1; each concurrent contextual wave spends one more; `none` spends nothing. At the normal
 target, lower findings get their `fixFloor` disposition, affected checks and one main-agent ledger
-inspection. A verified P1/serious P2 instead requires another contextual cycle after its fix; repeat
+inspection; a rebase (step 7.1) that changes the patch past the target also gets human review. A
+verified P1/serious P2 instead requires another contextual cycle after its fix; repeat
 with no numeric cap until a pass finds none — these safety continuations also override
 `maxLocalReviewRounds`. While one remains, no patch change, no progress or unavailable required
 review is a human gate. A clean cycle may finish early. This prevents routine ping-pong without

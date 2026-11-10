@@ -8,6 +8,70 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.51.0] — 2026-11-10
+
+### Added
+
+- **An independent review that the builder cannot produce.** With `review.independentReview` set,
+  `review` starts the repository's review workflow on the final head of a pull request, before CI is
+  released, and reads the result that workflow posts under its own identity. A withheld result comes
+  back as findings; no answer stops the loop. A result already on the commit is reused, so nothing is
+  reviewed twice, but a pass counts only when its record names this pull request, this head and the
+  base it targets now. `release` confirms the same result before it merges.
+
+### Changed
+
+- **`merge-gate.py` no longer offers `--admin`.** It prints a call to GitHub's merge API, pinned to
+  the head, which applies every rule to whichever identity makes it. GitHub reads a pull request as
+  BLOCKED for an identity that is only allowed through by a ruleset, and `gh pr merge` refuses that
+  without the flag; the API does not. A GitHub App, which cannot read classic branch protection and
+  holds no bypass, is no longer refused for that. With `--delete-branch`, a head GitHub already
+  deleted no longer turns a merged pull request into a failure, and a fork's head is never deleted.
+- **Review proof can come from the reviewer App.** With `review.independentReview` set,
+  `reviewed-status.py` counts the reviewer App's pass on the exact commit, naming the pull request
+  and its base, as proof the commit was reviewed, so a builder App's own status is no longer the only
+  proof. `--proof-app <slug>` lets a guarded procedure count only one App's statuses.
+- **`independent-review.py` rides out a few failed reads.** While it waits for a result, up to five
+  GitHub reads in a row may fail before it gives up with ERROR; a failed read is never a pass.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.50.0 @ 0e625b2, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.50.0 | tokens@devstride--v3.50.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,454 | 8,152 | 24,454 | 8,152 | +0 | 8,152 |
+| skills/review/SKILL.md | 23,980 | 7,994 | 23,978 | 7,993 | -1 | 7,999 |
+| skills/doctor/SKILL.md | 23,942 | 7,981 | 23,942 | 7,981 | +0 | 7,985 |
+| skills/build-item/SKILL.md | 23,745 | 7,915 | 23,745 | 7,915 | +0 | 7,985 |
+| skills/release/SKILL.md | 17,982 | 5,994 | 17,982 | 5,994 | +0 | 5,995 |
+| skills/rebalance/SKILL.md | 17,712 | 5,904 | 17,712 | 5,904 | +0 | 5,910 |
+| skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,655 | 4,885 | +0 | 4,900 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,708 | 2,236 | 6,708 | 2,236 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-story/SKILL.md | 6,299 | 2,100 | 6,299 | 2,100 | +0 | 2,100 |
+| skills/comprehend-plan/SKILL.md | 5,580 | 1,860 | 5,580 | 1,860 | +0 | 1,860 |
+| skills/insert-defect/SKILL.md | 5,120 | 1,707 | 5,120 | 1,707 | +0 | 1,707 |
+| skills/insert-story/SKILL.md | 4,443 | 1,481 | 4,443 | 1,481 | +0 | 1,481 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 270,399 | 90,140 | 270,397 | 90,139 | -1 | |
+
 ## [3.50.0] — 2026-11-10
 
 ### Added
@@ -4520,7 +4584,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.50.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.51.0...HEAD
+[3.51.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.50.0...devstride--v3.51.0
 [3.50.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.49.0...devstride--v3.50.0
 [3.49.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.48.0...devstride--v3.49.0
 [3.48.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.47.0...devstride--v3.48.0

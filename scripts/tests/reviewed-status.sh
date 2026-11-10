@@ -29,8 +29,10 @@ if a[:3] == ["api", "-X", "POST"]:
     path = os.path.join(d, sha + ".json")
     old = json.load(open(path)) if os.path.exists(path) else []
     new = {"id": 1000 + len(old), "context": f["context"], "state": f["state"], "description": f.get("description"),
-           "created_at": later(old), "creator": {"login": os.environ.get("GH_LOGIN", "owner"), "type": "User"}}
+           "created_at": later(old), "creator": {"login": os.environ.get("GH_LOGIN", "owner"), "type": os.environ.get("GH_TYPE", "User")}}
     json.dump([new] + old, open(path, "w")); print(json.dumps(new)); sys.exit(0)
+if a[0] == "api" and "/check-runs?" in a[1]:
+    print(os.environ.get("CHECKS", '{"check_runs": []}')); sys.exit(0)
 if a[0] == "api" and "/statuses?" in a[1]:
     sha = a[1].split("/commits/")[1].split("/")[0]
     path = os.path.join(d, sha + ".json")
@@ -111,4 +113,24 @@ PR_HEAD="$SAME" t post "$SAME" --pr 7 --base "$BASE"
 [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED --base"*"never a remote ref or a SHA" ]] && ok "(10c) a SHA as --base is refused" || bad "(10c) $RC $OUT"
 t verify; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(13) usage" || bad "(13) $RC $OUT"
 t verify "$REVIEWED" --pr 7; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(13b) --pr without --base is a usage error" || bad "(13b) $RC $OUT"
+
+# The builder App's status counts only where a guarded procedure names it; the reviewer App's pass counts when configured.
+git checkout -q -b proof "$BASE"; echo p > p.txt; git add -A; git commit -qm proof; APPHEAD="$(git rev-parse HEAD)"
+GH_LOGIN="builder-app[bot]" GH_TYPE=Bot PR_HEAD="$APPHEAD" t post "$APPHEAD" --pr 7 --base train
+[ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"* ]] && ok "(14) a builder App's status does not count by default" || bad "(14) $RC $OUT"
+t verify "$APPHEAD" --pr 7 --base train --proof-app builder-app; [ "$RC" = 0 ] && [[ "$OUT" == "REVIEWED"* ]] && ok "(14b) it counts where the caller names that App" || bad "(14b) $RC $OUT"
+t verify "$APPHEAD" --pr 7 --base train --proof-app other-app; [ "$RC" = 2 ] && ok "(14c) naming another App does not make it count" || bad "(14c) $RC $OUT"
+git checkout -q -b proof1b "$BASE"; echo pb > pb.txt; git add -A; git commit -qm proof1b; APPHEAD2="$(git rev-parse HEAD)"
+GH_LOGIN="builder-app[bot]" GH_TYPE=Bot PR_HEAD="$APPHEAD2" t post "$APPHEAD2" --pr 7 --base train --proof-app builder-app
+[ "$RC" = 0 ] && [[ "$OUT" == "POSTED"* ]] && ok "(14d) the App a guarded procedure names posts proof that counts" || bad "(14d) $RC $OUT"
+git checkout -q -b proof2 "$BASE"; echo q > q.txt; git add -A; git commit -qm proof2; IR="$(git rev-parse HEAD)"
+mkdir -p .claude; echo '{"review": {"independentReview": {"workflow": "w.yaml", "ref": "main", "check": "independent-review", "reviewerApp": "reviewer-app"}}}' > .claude/ds-config.json
+record() { python3 -c 'import json,sys; print(json.dumps({"check_runs": [{"id": 1, "name": "independent-review", "status": "completed", "conclusion": sys.argv[1], "app": {"slug": sys.argv[2]}, "output": {"text": json.dumps({"head": sys.argv[3], "pr": int(sys.argv[4]), "base_ref": sys.argv[5]})}}]}))' "$@"; }
+CHECKS="$(record success reviewer-app "$IR" 7 train)" t verify "$IR" --pr 7 --base train; [ "$RC" = 0 ] && [[ "$OUT" == "REVIEWED"*"reviewer-app[bot]"* ]] && ok "(15) the reviewer App's pass is proof" || bad "(15) $RC $OUT"
+CHECKS="$(record success reviewer-app "$IR" 8 train)" t verify "$IR" --pr 7 --base train; [ "$RC" = 2 ] && ok "(15b) a pass for another pull request is not" || bad "(15b) $RC $OUT"
+CHECKS="$(record success reviewer-app "$IR" 7 develop)" t verify "$IR" --pr 7 --base train; [ "$RC" = 2 ] && ok "(15c) a pass for another base is not" || bad "(15c) $RC $OUT"
+CHECKS="$(record success builder-app "$IR" 7 train)" t verify "$IR" --pr 7 --base train; [ "$RC" = 2 ] && ok "(15d) another App's pass is not" || bad "(15d) $RC $OUT"
+CHECKS="$(record failure reviewer-app "$IR" 7 train)" t verify "$IR" --pr 7 --base train; [ "$RC" = 2 ] && ok "(15e) a refusal is not" || bad "(15e) $RC $OUT"
+CHECKS="$(record success reviewer-app "$IR" 7 train)" PR_HEAD="$IR" t post "$IR" --pr 7 --base train; [ "$RC" = 0 ] && [[ ! -f "$ST/$IR.json" ]] && ok "(15f) with that pass on record, post adds no status" || bad "(15f) $RC $OUT"
+rm -f .claude/ds-config.json
 exit $FAIL

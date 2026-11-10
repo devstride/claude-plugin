@@ -60,6 +60,7 @@
   "generated": { "regenCommand": "make regen", "paths": ["gen/**"], "toleratedTypeErrors": [] },
   "hierarchyRoles": { "leaf": ["Story", "Defect"], "releaseUnit": "Epic" },
   "review": {
+    "independentReview": {"workflow": "independent-review.yaml", "ref": "main", "check": "independent-review", "reviewerApp": "reviewer-app", "timeoutMinutes": 45},
     "localReviewerName": "Local",
     "localCommand": "reviewer --read-only <context>",
     "localAssistCommand": null,

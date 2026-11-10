@@ -87,13 +87,13 @@ fresh worktree of the then-current `main`.
 2. **The pull request qualifies.** `gh pr view <pr> --json
    state,isDraft,baseRefName,headRefName,headRefOid,isCrossRepository,author,changedFiles`: open,
    not a draft,
-   base `main`, not cross-repository, authored by the owner (`philreynolds`), the account the
-   owner's builds run under. Record `<head>` = `headRefOid`. Every commit (`gh api
+   base `main`, not cross-repository, authored by the builder App (`gh` spells it `app/devstride-builder`, the commits API `devstride-builder[bot]`) or by the owner (`philreynolds`).
+   Those two are the only accepted identities below. Record `<head>` = `headRefOid`. Every commit (`gh api
    repos/{owner}/{repo}/pulls/<pr>/commits --paginate`; the count must equal `gh api
-   repos/{owner}/{repo}/pulls/<pr> --jq .commits`, since the list stops at 250) has the owner as
+   repos/{owner}/{repo}/pulls/<pr> --jq .commits`, since the list stops at 250) has one of them as
    its GitHub author. Commit authorship alone can be set by anyone who can push, so also read
    every push to the head branch (`gh api "repos/{owner}/{repo}/activity?ref=refs/heads/<headRefName>"
-   --paginate`): each entry's `actor` is the owner, and `<head>` is the `after` of one of them. The
+   --paginate`): each entry's `actor` is one of them, and `<head>` is the `after` of one of them. The
    pull request is linked to a tracked work item whose build the owner started; say which item in
    the private tracker comment, never on GitHub.
 3. **It touches nothing that guards merges.** List the files with `gh api
@@ -111,9 +111,9 @@ fresh worktree of the then-current `main`.
    own yes.
 4. **The review settled clean.** The last local review round (Claude and Codex) on `<head>` found
    no P1 and no serious P2. Only then post the proof, `python3 -I
-   <tmp>/skills/review/scripts/reviewed-status.py post <head> --pr <pr> --base main` *(main)*, and
-   check it: `verify <head> --pr <pr> --base main` *(main)* prints `REVIEWED`. Never post it to get
-   past this step. The proof is this session's attestation, posted under the owner's account.
+   <tmp>/skills/review/scripts/reviewed-status.py post <head> --pr <pr> --base main --proof-app devstride-builder` *(main)*, and
+   check it: `verify <head> --pr <pr> --base main --proof-app devstride-builder` *(main)* prints `REVIEWED`. Never post it to get
+   past this step. The proof is this session's attestation, posted by the build's identity.
 5. **The local checks passed at `<head>`.** The build ran them in its own checkout before review:
    `bash scripts/check-version-bump.sh --base origin/main`, `bash scripts/check-neutrality.sh`,
    `bash scripts/check-public-hygiene.sh --base origin/main`, and `bash scripts/validate.sh
@@ -137,7 +137,7 @@ fresh worktree of the then-current `main`.
    - Head: <head>
    - Checks: every check green on that commit (merge gate, `--all-green`): <name: result, ...>
    - Review: <rounds> local rounds (Claude and Codex); the last found no P1 and no serious P2.
-     Review proof: `devstride/reviewed`, posted under the owner's account.
+     Review proof: `devstride/reviewed`, posted by the build's identity.
    - Local checks: version bump, neutrality, public hygiene and the validator passed.
    ```
 

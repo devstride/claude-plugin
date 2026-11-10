@@ -25,6 +25,8 @@ if a[:2] == ["api", "graphql"]:
     q = next(x[6:] for x in a if x.startswith("query="))
     if "branchProtectionRule" in q:
         kind("classic")
+        if s.get("classicForbidden"):
+            sys.stderr.write("gh: Resource not accessible by integration\n"); sys.exit(1)
         print(json.dumps({"data": {"repository": {"ref": {"branchProtectionRule": s.get("classic")}}}})); sys.exit(0)
     after = next((x[6:] for x in a if x.startswith("after=")), None)
     if "reviewThreads" in q:
@@ -117,6 +119,8 @@ if a[0] == "api" and a[1].endswith("/protection/required_status_checks"):
     if p.get("code") == 404:
         m = p.get("message", "Branch not protected")
         print(json.dumps({"message": m})); sys.stderr.write("gh: %s (HTTP 404)\n" % m); sys.exit(1)
+    if p.get("code") == 403 and p.get("integration"):
+        print('{"message":"Resource not accessible by integration"}'); sys.stderr.write("gh: Resource not accessible by integration (HTTP 403)\n"); sys.exit(1)
     if p.get("code") == 403:
         print('{"message":"Must have admin rights"}'); sys.stderr.write("gh: Must have admin rights to Repository. (HTTP 403)\n"); sys.exit(1)
     apps = p.get("checksApp", {})
@@ -151,14 +155,14 @@ def cr(name, conclusion="SUCCESS", status="COMPLETED", ident=1, required=True, a
             "checkSuite": {"app": {"databaseId": app}, "workflowRun": {"databaseId": workflow * 100000 + (run if run is not None else ident), "runNumber": run if run is not None else ident, "event": event, "workflow": {"databaseId": workflow}} if workflow else None}}
 def st(context, state="SUCCESS", required=True):
     return {"__typename": "StatusContext", "context": context, "state": state, "createdAt": "2026-01-15T18:00:00Z", "isRequired": required}
-GREEN = {"pr": {"number": 7, "state": "OPEN", "isDraft": False, "headRefOid": H, "baseRefName": "develop",
+GREEN = {"pr": {"number": 7, "state": "OPEN", "isDraft": False, "headRefOid": H, "headRefName": "I1-fix", "baseRefName": "develop",
                 "mergeStateStatus": "BLOCKED", "reviewDecision": None},
          "pages": [[cr("tests", ident=10), cr("lint", ident=11), cr("optional", "FAILURE", ident=12, required=False)]],
          "rules": ["tests", "lint"], "threads": [True, True]}
 def sc(**changes):
     s = copy.deepcopy(GREEN)
     for k, v in changes.items():
-        if k in ("state", "isDraft", "headRefOid", "mergeStateStatus", "reviewDecision", "baseRefName"):
+        if k in ("state", "isDraft", "headRefOid", "mergeStateStatus", "reviewDecision", "baseRefName", "isCrossRepository"):
             s["pr"][k] = v
         else:
             s[k] = v
@@ -171,23 +175,25 @@ def refuse(label, scenario, text, code_wanted=2, sha=H):
     word = "REFUSE " if code_wanted == 2 else "ERROR "
     say(code == code_wanted and len(out) == 1 and out[0].startswith(word) and text in out[0] and "Traceback" not in err, label, "rc=%d %r %r" % (code, out, err))
 
-merge("(1) every required check green, blocked by the base's rules -> MERGE with --admin, pinned to the head",
-      GREEN, "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
-merge("(2) clean (no admin-only rule) -> MERGE without --admin; --delete-branch carried",
-      sc(mergeStateStatus="CLEAN"), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --delete-branch" % H, "--delete-branch")
+merge("(1) every required check green, blocked by the base's rules -> MERGE, pinned to the head",
+      GREEN, "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
+merge("(2) clean -> MERGE; --delete-branch carried, and a head already gone does not fail the merge",
+      sc(mergeStateStatus="CLEAN"), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s && (gh api -X DELETE repos/acme/widgets/git/refs/heads/I1-fix || true)" % H, "--delete-branch")
+merge("(2c) a fork's head is never deleted: its branch name is not this repository's branch",
+      sc(mergeStateStatus="CLEAN", isCrossRepository=True), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H, "--delete-branch")
 SUBJECT = "Merge pull request #7 from acme/I1-fix's"
 code, out, err = run(7, H, sc(mergeStateStatus="CLEAN"), "--delete-branch", "--subject", SUBJECT)
 words = shlex.split(out[0])[1:] if code == 0 else []
-say(words[-2:] == ["--subject", SUBJECT] and words[:10] == ["gh", "pr", "merge", "7", "--repo", "acme/widgets", "--merge", "--match-head-commit", H, "--delete-branch"],
+say(words[:10] == ["gh", "api", "-X", "PUT", "repos/acme/widgets/pulls/7/merge", "-f", "merge_method=merge", "-f", "sha=" + H, "-f"] and words[10] == "commit_title=" + SUBJECT and words[11:] == ["&&", "(gh", "api", "-X", "DELETE", "repos/acme/widgets/git/refs/heads/I1-fix", "||", "true)"],
     "(2b) a train merge's subject is carried, quoted so the line runs as printed", "rc=%d %r" % (code, out))
-merge("(3) unstable (only a check that is not required failed) -> MERGE without --admin",
-      sc(mergeStateStatus="UNSTABLE"), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s" % H)
+merge("(3) unstable (only a check that is not required failed) -> MERGE",
+      sc(mergeStateStatus="UNSTABLE"), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(4) a required check pending -> REFUSE naming it", sc(pages=[[cr("tests", status="IN_PROGRESS", ident=10), cr("lint", ident=11)]]), "tests is pending")
 refuse("(5) a required check failed -> REFUSE", sc(pages=[[cr("tests", "FAILURE", ident=10), cr("lint", ident=11)]]), "tests is failure")
 merge("(6) a required check skipped in a run where another job succeeded passes (its run found nothing to test)",
       sc(pages=[[cr("tests", "SKIPPED", ident=10), cr("plan", ident=13, run=10, required=False),
                  cr("lint", "NEUTRAL", ident=11), cr("lint-plan", ident=14, run=11, required=False)]]),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(6f) a run where every job skipped (a draft's held CI, newest just after the ready flip) -> REFUSE",
        sc(pages=[[cr("tests", "SKIPPED", ident=10), cr("plan", "SKIPPED", ident=13, run=10, required=False), cr("lint", ident=11)]]),
        "tests is skipped in a run where nothing ran")
@@ -195,7 +201,7 @@ refuse("(6g) a neutral check from outside any workflow proves nothing -> REFUSE"
        sc(pages=[[cr("tests", ident=10), cr("lint", "NEUTRAL", ident=11, workflow=None)]]), "lint is skipped in a run where nothing ran")
 merge("(6h) an all-skipped newest run over an older run of the same check that succeeded passes",
       sc(pages=[[cr("tests", ident=10, run=1), cr("tests", "SKIPPED", ident=20, run=2), cr("lint", ident=11)]]),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(6i) a manual (workflow_dispatch) run never hides an older failed run of the same check",
        sc(pages=[[cr("tests", "FAILURE", ident=10, run=1, event="push"), cr("tests", ident=20, run=2, event="workflow_dispatch"), cr("lint", ident=11)]]),
        "tests is failure")
@@ -205,14 +211,14 @@ refuse("(6l) a later push run's success never hides a failed pull_request run of
        sc(pages=[[cr("tests", "FAILURE", ident=10, run=1), cr("tests", ident=20, run=2, event="push"), cr("lint", ident=11)]]), "tests is failure")
 merge("(6m) a push run where every job skipped beside a pull_request run that succeeded passes (a develop push with its suite off)",
       sc(pages=[[cr("tests", ident=10, run=2), cr("tests", "SKIPPED", ident=20, run=1, event="push"), cr("lint", ident=11)]]),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(6n) an older run re-run after a newer one passed, and failing, counts: re-runs keep their number but start later",
        sc(pages=[[cr("tests", "FAILURE", ident=30, run=1), cr("tests", ident=20, run=2), cr("lint", ident=11)]], runStarted={"100001": "2026-01-15T19:00:00Z"}), "tests is failure")
 refuse("(6o) an older run still running beside a newer one that passed -> REFUSE pending",
        sc(pages=[[cr("tests", status="IN_PROGRESS", ident=10, run=1), cr("tests", ident=20, run=2), cr("lint", ident=11)]]), "tests is pending")
 merge("(6p) an older run cancelled before the newer one started (a concurrency group) does not count",
       sc(pages=[[cr("tests", "CANCELLED", ident=10, run=1), cr("tests", ident=20, run=2), cr("lint", ident=11)]]),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(6q) a re-run's success never skips the failed run the other order still sees (run 2 failed, run 3 skipped, run 1 re-run green)",
        sc(runStarted={"100001": "2026-01-15T19:00:00Z"}, pages=[[cr("tests", ident=40, run=1), cr("tests", "FAILURE", ident=20, run=2),
                   cr("tests", "SKIPPED", ident=30, run=3), cr("lint", ident=11)]]), "tests is failure")
@@ -233,7 +239,7 @@ refuse("(6v) a newer run that ended red without reporting the check refuses",
 merge("(6w) a run of another workflow, or from another event, still going does not hold this check",
       sc(extraRuns=[{"id": 700050, "workflow_id": 7, "run_number": 50, "event": "pull_request", "status": "in_progress", "conclusion": None},
                     {"id": 100051, "workflow_id": 1, "run_number": 51, "event": "workflow_dispatch", "status": "in_progress", "conclusion": None}]),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(6y) a pull_request run still going with no check yet holds a check another event passed",
        sc(pages=[[cr("tests", ident=10, run=2, event="push"), cr("lint", ident=11)]],
           extraRuns=[{"id": 100003, "workflow_id": 1, "run_number": 3, "event": "pull_request", "status": "in_progress", "conclusion": None}]),
@@ -250,13 +256,13 @@ refuse("(6aa) an older run re-run later that failed before creating the check re
 merge("(6ab) an older first-attempt run that failed without the check never supersedes the newer pass (it was cancelled or replaced)",
       sc(pages=[[cr("tests", ident=10, run=2), cr("lint", ident=11)]],
          extraRuns=[{"id": 100001, "workflow_id": 1, "run_number": 1, "event": "pull_request", "status": "completed", "conclusion": "cancelled"}]),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 merge("(6ac) a cancelled run a later green run replaced never refuses a check only some runs report (a matrix placeholder name)",
       sc(pages=[[cr("tests", ident=10, run=10), cr("lint", ident=11), cr("plan", ident=13, run=12, required=False)]],
          extraRuns=[{"id": 100011, "workflow_id": 1, "run_number": 11, "event": "pull_request", "status": "completed", "conclusion": "cancelled"}]),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 merge("(6ad) the workflow runs change once between the reads around the checks: one fresh read, then MERGE",
-      sc(runsMoves=1), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      sc(runsMoves=1), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(6ae) the workflow runs keep changing between the reads around the checks (a re-run landing): REFUSE, never a stale green",
        sc(runsMoves=99), "changed while its checks were being read twice")
 refuse("(6af) a run where every job skipped never clears an earlier failure that omitted the check",
@@ -264,10 +270,10 @@ refuse("(6af) a run where every job skipped never clears an earlier failure that
           extraRuns=[{"id": 100011, "workflow_id": 1, "run_number": 11, "event": "pull_request", "status": "completed", "conclusion": "failure"}]),
        "workflow run #11 ended so without reporting it")
 merge("(6ag) runs from events GitHub does not count (a comment) appearing between the reads never force a fresh read",
-      sc(runsMoves=99, runsMovesEvent="issue_comment"), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      sc(runsMoves=99, runsMovesEvent="issue_comment"), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 merge("(6x) a first attempt never supersedes a higher-numbered run, even when both began in the same second (a concurrency cancel)",
       sc(runStarted={}, pages=[[cr("tests", "CANCELLED", ident=10, run=1), cr("tests", ident=20, run=2), cr("lint", ident=11)]],
-         extraRuns=[]), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+         extraRuns=[]), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(6k) a scheduled run's success does not count either",
        sc(pages=[[cr("tests", ident=20, event="schedule"), cr("lint", ident=11)]]), "tests never ran at this head")
 refuse("(6b) a skipped newest run never hides an older run of the same check that failed",
@@ -276,7 +282,7 @@ refuse("(6c) a skipped newest run never hides one still running",
        sc(pages=[[cr("tests", status="IN_PROGRESS", ident=10), cr("tests", "SKIPPED", ident=20), cr("lint", ident=11)]]), "tests is pending")
 merge("(6d) concurrent runs: the later workflow run counts though its check run has the lower id",
       sc(pages=[[cr("tests", "SKIPPED", ident=50, run=1), cr("tests", ident=40, run=2), cr("lint", ident=11)]]),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(6e) concurrent runs: a later workflow run that failed counts though its id is lower",
        sc(pages=[[cr("tests", ident=50, run=1), cr("tests", "FAILURE", ident=40, run=2), cr("lint", ident=11)]]), "tests is failure")
 refuse("(7) a required check cancelled -> REFUSE", sc(pages=[[cr("tests", "CANCELLED", ident=10), cr("lint", ident=11)]]), "tests is cancelled")
@@ -295,20 +301,31 @@ refuse("(17b) a reviewer's latest review requests changes though reviews are not
        sc(opinions=[{"state": "APPROVED", "author": {"login": "amy"}}, {"state": "CHANGES_REQUESTED", "author": {"login": "bo"}}]),
        "bo requested changes")
 merge("(17c) a reviewer who requested changes and then approved does not block",
-      sc(opinions=[{"state": "APPROVED", "author": {"login": "bo"}}]), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      sc(opinions=[{"state": "APPROVED", "author": {"login": "bo"}}]), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(17d) a required check green on the head but failed on the test merge commit -> REFUSE",
        sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint", "FAILURE")]}), "failed on the test merge commit")
 merge("(17e) the test merge commit carries only green or unrelated checks: merges",
       sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint"), st("unrelated", "FAILURE", required=False)]}),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(17f) a rule bound to an app is not met by a commit status of that name -> REFUSE naming why",
        sc(rules=["lint"], ruleObjects=[{"context": "tests", "integration_id": 15368}], pages=[[st("tests"), cr("lint", ident=11)]]),
        "cannot show which app sent it")
 refuse("(18) blocked with no required check at all -> REFUSE: nothing proves the head green",
        sc(rules=[], pages=[[cr("tests", ident=10, required=False)]]), "requires no check")
 merge("(19) no required check and clean -> MERGE plainly (a train with no rules)",
-      sc(rules=[], mergeStateStatus="CLEAN", pages=[[]]), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s" % H)
+      sc(rules=[], mergeStateStatus="CLEAN", pages=[[]]), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(20) classic protection unreadable -> REFUSE", sc(protection={"code": 403}), "cannot be read with this login")
+merge("(20b) a GitHub App cannot read classic protection and holds no bypass: GitHub decides -> MERGE",
+      sc(protection={"code": 403, "integration": True}, classicForbidden=True),
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
+APP_CHECK = {"__typename": "CheckRun", "name": "codex-approval", "status": "COMPLETED", "conclusion": "SUCCESS", "startedAt": "2026-01-15T18:00:00Z",
+             "databaseId": 50, "isRequired": True, "checkSuite": {"app": {"databaseId": 777}, "workflowRun": None}}
+merge("(20c) a required check posted by the reviewer App, outside any workflow -> MERGE",
+      sc(rules=["lint"], ruleObjects=[{"context": "codex-approval", "integration_id": 777}], pages=[[APP_CHECK, cr("lint", ident=11)]]),
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
+refuse("(20d) the same check name from another App does not count -> REFUSE",
+       sc(rules=["lint"], ruleObjects=[{"context": "codex-approval", "integration_id": 777}],
+          pages=[[dict(APP_CHECK, checkSuite={"app": {"databaseId": 888}, "workflowRun": None}), cr("lint", ident=11)]]), "codex-approval")
 refuse("(21) a check only classic protection requires, failing -> REFUSE",
        sc(protection={"code": 200, "contexts": ["build"]}, pages=[[cr("tests", ident=10), cr("lint", ident=11), cr("build", "FAILURE", ident=12, required=False)]]),
        "build is failure")
@@ -318,7 +335,7 @@ refuse("(22b) two same-name jobs in one workflow run are siblings: a failing one
        sc(pages=[[cr("tests", "FAILURE", ident=10, run=5), cr("tests", ident=20, run=5), cr("lint", ident=11)]]), "tests is failure")
 merge("(23) a later workflow run of the check counts over an earlier failed one",
       sc(pages=[[cr("tests", "FAILURE", ident=10, run=5), cr("tests", ident=20, run=6), cr("lint", ident=11)]]),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(24) a later workflow run still queued counts -> REFUSE",
        sc(pages=[[cr("tests", ident=10, run=5), cr("tests", status="QUEUED", ident=20, run=6), cr("lint", ident=11)]]), "tests is pending")
 refuse("(25) a required commit status pending -> REFUSE",
@@ -333,30 +350,30 @@ refuse("(25d) a check the rules require from one app, green only from another ap
           pages=[[cr("tests", ident=10, app=999, required=False), cr("lint", ident=11)]]), "tests from app 15368 never ran at this head")
 merge("(25e) the required app's green run satisfies its rule",
       sc(rules=[], ruleObjects=[{"context": "tests", "integration_id": 15368}, {"context": "lint"}]),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(25f) classic protection's app-bound check from another app -> REFUSE",
        sc(protection={"code": 200, "contexts": ["tests"], "checksApp": {"tests": 15368}}, pages=[[cr("tests", ident=10, app=7, required=False), cr("lint", ident=11)]]),
        "tests from app 15368 never ran at this head")
 merge("(26) check contexts over two pages are all read",
-      sc(pages=[[cr("tests", ident=10)], [cr("lint", ident=11)]]), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      sc(pages=[[cr("tests", ident=10)], [cr("lint", ident=11)]]), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(26b) a failure on the second page is seen",
        sc(pages=[[cr("tests", ident=10)], [cr("lint", "FAILURE", ident=11)]]), "lint is failure")
 refuse("(27) GitHub unreadable -> ERROR, exit 1, never a merge", sc(graphqlFail=True), "gh api graphql failed", code_wanted=1)
 refuse("(27b) review threads that come back as an error with partial data -> ERROR, never zero threads", sc(threadsPartial=True), "carried errors", code_wanted=1)
 refuse("(27c) a protection answer that is not a required-checks answer -> ERROR", sc(protection={"code": "branch"}), "not a required-status-checks answer", code_wanted=1)
 merge("(27e) classic 404 'Required status checks not enabled' is no protection",
-      sc(protection={"code": 404, "message": "Required status checks not enabled"}), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      sc(protection={"code": 404, "message": "Required status checks not enabled"}), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(27f) any other classic 404 is ERROR, never 'no protection'", sc(protection={"code": 404, "message": "Not Found"}), "not one of GitHub's no-protection answers", code_wanted=1)
 refuse("(27g) a strict base: a head behind it -> REFUSE even though GitHub reads BLOCKED", sc(strict=True, behindBy=2), "2 commit(s) behind develop")
-merge("(27h) a strict base: a head up to date with it merges", sc(strict=True, behindBy=0), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+merge("(27h) a strict base: a head up to date with it merges", sc(strict=True, behindBy=0), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(27m) blocked, one approval required and none given -> REFUSE: --admin would skip it",
        sc(prRule={"required_approving_review_count": 1}, reviewDecision="REVIEW_REQUIRED"), "still needs an approving review")
 refuse("(27n) blocked, code-owner review required, decision empty -> REFUSE", sc(prRule={"require_code_owner_review": True}), "require_code_owner_review")
 merge("(27o) blocked, approval required and given -> MERGE --admin",
-      sc(prRule={"required_approving_review_count": 1}, reviewDecision="APPROVED"), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      sc(prRule={"required_approving_review_count": 1}, reviewDecision="APPROVED"), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(27p) signed commits required: never bypassed with --admin", sc(ruleTypes=["required_signatures"]), "required_signatures")
 merge("(27q) the base moves once during the read: one fresh read, then MERGE",
-      sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, mergeCommitMoves=1), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, mergeCommitMoves=1), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(27r) the base keeps moving: REFUSE asking to run again", sc(mergeCommit={"oid": "d" * 40, "nodes": [st("lint")]}, mergeCommitMoves=9), "run the gate again")
 refuse("(17g) a required app's check on the head, only another app's of that name on the test merge commit -> REFUSE",
        sc(rules=["lint"], ruleObjects=[{"context": "tests", "integration_id": 15368}],
@@ -369,15 +386,15 @@ refuse("(27u) classic protection requires approving reviews, decision empty -> R
        sc(classic={"pattern": "dev*", "requiresApprovingReviews": True}), "requiresApprovingReviews")
 merge("(27v) classic protection requiring nothing the gate cannot prove -> MERGE --admin",
       sc(classic={"pattern": "develop", "requiresDeployments": False, "lockBranch": False}),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(27i) blocked with a rule the gate cannot judge -> REFUSE, never a silent admin bypass", sc(ruleTypes=["workflows"]), "rule(s) this gate cannot judge (workflows)")
 merge("(27j) the same unknown rule on a clean pull request: GitHub enforces it, no --admin",
-      sc(ruleTypes=["code_scanning"], mergeStateStatus="CLEAN"), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s" % H)
+      sc(ruleTypes=["code_scanning"], mergeStateStatus="CLEAN"), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 code, out, err = run(7, H, GREEN, "--all-green")
 say(code == 2 and out[0].startswith("REFUSE --all-green") and "optional is failure" in out[0], "(27k) --all-green refuses a red check that is not required", "rc=%d %r" % (code, out))
 merge("(27l) --all-green with every check green merges",
       sc(pages=[[cr("tests", ident=10), cr("lint", ident=11), cr("optional", "SKIPPED", ident=12, run=10, required=False)]]),
-      "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H, "--all-green")
+      "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H, "--all-green")
 code, out, err = run(7, H, sc(pages=[[cr("tests", ident=10), cr("lint", ident=11), cr("optional", "SKIPPED", ident=12, required=False)]]), "--all-green")
 say(code == 0 and out[0].startswith("MERGE "), "(27m) --all-green reads a check that is not required as GitHub does: a run that only skips passes", "rc=%d %r" % (code, out))
 code, out, err = run(7, H, sc(pages=[[cr("tests", "SKIPPED", ident=10), cr("lint", ident=11)]]), "--all-green")
@@ -397,7 +414,7 @@ say(code == 0 and static <= set(order[:first]) and not static & set(order[first:
     and order[first:] == ["runs-head", "pr", "runs-head", "runs-merge", "merge-checks", "runs-merge"],
     "(32a) static facts first (threads, rules, protection, compare, classic), then the checks of the head (runs, pull request, runs), then those of the test merge commit", "rc=%d %r %r" % (code, out, order))
 merge("(32b) the merge state changes once between the two readings: one fresh read, then MERGE",
-      sc(prChangesOn=[1], prChanges={"mergeStateStatus": "UNSTABLE"}), "MERGE gh pr merge 7 --repo acme/widgets --merge --match-head-commit %s --admin" % H)
+      sc(prChangesOn=[1], prChanges={"mergeStateStatus": "UNSTABLE"}), "MERGE gh api -X PUT repos/acme/widgets/pulls/7/merge -f merge_method=merge -f sha=%s" % H)
 refuse("(32c) the pull request keeps changing between the readings: REFUSE, never a verdict on facts that moved",
        sc(prChangesOn=[1, 3], prChanges={"mergeStateStatus": "CLEAN"}), "changed while it was being read twice")
 refuse("(32d) a review requesting changes lands between the readings: REFUSE",
@@ -419,8 +436,7 @@ FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
 
 # The shipped text: a merge is the gate's printed command, never a skill's own --admin.
 # The invariants catalogue describes the rule and is never run, so it is the one file excluded.
-BARE="$(grep -rn -- '--admin' "$ROOT/skills" "$ROOT/hooks" | grep -v 'skills/pr/scripts/merge-gate.py' \
-  | grep -v 'skills/review/references/delivery-loop-invariants.md' | grep -vi 'merge-gate' || true)"
+BARE="$(grep -rn -- '--admin' "$ROOT/skills" "$ROOT/hooks" | grep -v 'skills/review/references/delivery-loop-invariants.md' || true)"
 [ -z "$BARE" ] && echo "  ok   (30) no shipped text merges with its own --admin" || { echo "  FAIL (30) a bare --admin: $BARE"; FAIL=1; }
 for site in skills/release/SKILL.md skills/release/references/release-branch.md skills/release/references/auto-start.md \
             skills/build-item/SKILL.md skills/build-item/references/epic-release-steps.md; do

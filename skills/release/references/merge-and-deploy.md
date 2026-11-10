@@ -51,6 +51,11 @@ Then confirm:
 5. With `release.clearance` set, this pull request is the one `On final` in the provider's
    `status`, else STOP.
 
+6. With `review.independentReview` set, `independent-review.py <n> <reviewedHead>` prints `PASS`
+   (the repository's workflow decides how much of the release it reads; a pass counts only when
+   it names this pull request, this head and this base). `WITHHELD` goes back through `review`;
+   `ERROR` stops.
+
 Then run the `MERGE` line of `merge-gate.py <n> <reviewedHead> --all-green` (step 4); else STOP.
 
 ## Step 5a — the merge and the deploy

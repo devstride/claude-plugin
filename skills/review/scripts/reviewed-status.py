@@ -29,6 +29,10 @@ A proof names its base, so renaming the train voids the proofs of units still op
 name: an admin re-posts them after the cutover. Withdrawing a proof does not follow a copy already
 carried to a rebased head: withdraw both heads.
 
+With `review.independentReview` set, the reviewer App's pass on the commit, naming this pull request
+and base, is proof too, and `post` adds nothing beside it. `--proof-app <slug>` also counts statuses
+posted by that one App; only a procedure guarded the way the release skill is may pass it.
+
 Trust: only a status posted by an account with ADMIN permission on the repository counts, because
 anyone who can push (a partner's branch, a workflow token) can post a commit status too. Statuses
 from anyone else, from apps and bots, and from deleted accounts are ignored. Permission is read at
@@ -43,6 +47,7 @@ import re
 import subprocess
 import sys
 import time
+from urllib.parse import quote
 
 CONTEXT = "devstride/reviewed"
 SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -91,10 +96,12 @@ def statuses(sha, cwd):
     return sorted(found, key=lambda s: (s["created_at"], s["id"]), reverse=True)
 
 
-def permission(creator, cwd, cache):
+def permission(creator, cwd, cache, proof_app=None):
     """The repository permission of a status's creator; "none" for an app, a bot or a deleted
-    account (their statuses never count)."""
+    account (their statuses never count), except the one App the caller names with --proof-app."""
     login = creator.get("login") if isinstance(creator, dict) else None
+    if isinstance(login, str) and proof_app and creator.get("type") == "Bot" and login == proof_app + "[bot]":
+        return "admin"
     if not isinstance(login, str) or not login or creator.get("type") == "Bot":
         return "none"
     if login not in cache:
@@ -119,19 +126,50 @@ def describes(description, pr, base):
     return description == stem or description.startswith(stem + ", carried from ")
 
 
-def verify(sha, cwd, pr=None, base=None):
+def independent_pass(sha, cwd, pr, base):
+    """The login of the reviewer App when `review.independentReview` is set and its pass on this
+    commit names this pull request and base; else None. That pass was earned on the commit by an
+    identity the builder cannot use, so it needs no person's status beside it."""
+    try:
+        with open(os.path.join(cwd or ".", ".claude/ds-config.json")) as handle:
+            section = (json.load(handle).get("review") or {}).get("independentReview")
+    except (OSError, ValueError):
+        return None
+    if not isinstance(section, dict) or not section.get("check") or not section.get("reviewerApp"):
+        return None
+    out = gh_json(cwd, "api", "repos/{owner}/{repo}/commits/%s/check-runs?check_name=%s&filter=all&per_page=100" % (sha, quote(section["check"], safe="")))
+    runs = out.get("check_runs") if isinstance(out, dict) else None
+    own = [r for r in (runs or []) if (r.get("app") or {}).get("slug") == section["reviewerApp"]]
+    own.sort(key=lambda r: r.get("id") or 0, reverse=True)
+    if not own or own[0].get("status") != "completed" or own[0].get("conclusion") != "success":
+        return None
+    try:
+        record = json.loads((own[0].get("output") or {}).get("text") or "")
+    except ValueError:
+        return None
+    if not isinstance(record, dict) or record.get("head") != sha:
+        return None
+    if pr is not None and (str(record.get("pr")) != str(pr) or record.get("base_ref") != base):
+        return None
+    return section["reviewerApp"] + "[bot]"
+
+
+def verify(sha, cwd, pr=None, base=None, proof_app=None):
     """(True, login) when, read newest first, an admin's `success` status naming pull request <pr>
     into <base> comes before any admin status that is not `success`; else (False, reason). Raises
     Unreadable when GitHub cannot be read."""
     if not SHA.match(sha or ""):
         return False, "%r is not a full commit SHA" % sha
     cache, what = {}, (" for #%s into %s" % (pr, base)) if pr is not None else ""
-    trusted = [s for s in statuses(sha, cwd) if permission(s.get("creator"), cwd, cache) in TRUSTED]
+    trusted = [s for s in statuses(sha, cwd) if permission(s.get("creator"), cwd, cache, proof_app) in TRUSTED]
     for s in trusted:
         if s["state"] != "success":
             return False, "an admin withdrew the %s proof on %s (newest admin status: %s)" % (CONTEXT, sha[:12], s["state"])
         if describes(s.get("description"), pr, base):
             return True, s["creator"]["login"]
+    reviewer = independent_pass(sha, cwd, pr, base)
+    if reviewer:
+        return True, reviewer
     return False, "no %s status from a repository admin on %s%s" % (CONTEXT, sha[:12], what)
 
 
@@ -141,7 +179,7 @@ def tree(sha, cwd):
     return p.stdout.strip() if p.returncode == 0 else None
 
 
-def post(sha, cwd, pr, base, source=None, wait=3):
+def post(sha, cwd, pr, base, source=None, wait=3, proof_app=None):
     if not SHA.match(sha or ""):
         return False, "%r is not a full commit SHA" % sha
     if not re.match(r"^[1-9][0-9]*$", pr or ""):
@@ -167,16 +205,18 @@ def post(sha, cwd, pr, base, source=None, wait=3):
             return False, "the trees of %s and %s could not be read" % (source[:12], sha[:12])
         if a != b:
             return False, "%s is not a tree-identical rebase of the reviewed head %s" % (sha[:12], source[:12])
-        ok, why = verify(source, cwd, pr, base)
+        ok, why = verify(source, cwd, pr, base, proof_app)
         if not ok:
             return False, "the reviewed head carries no proof to carry over: %s" % why
+    if independent_pass(sha, cwd, pr, base):
+        return True, "the independent review of #%s into %s is the proof on this commit" % (pr, base)
     description = "Settled review of #%s into %s%s" % (
         pr, base, ", carried from %s (same tree)" % source[:12] if source else "")
     if len(description) > 140:
         return False, "the base name of #%s is too long for a status description" % pr
     gh_json(cwd, "api", "-X", "POST", "repos/{owner}/{repo}/statuses/%s" % sha, "-f", "state=success",
             "-f", "context=%s" % CONTEXT, "-f", "description=%s" % description)
-    ok, why = verify(sha, cwd, pr, base)
+    ok, why = verify(sha, cwd, pr, base, proof_app)
     if not ok:
         return False, "posted, but it does not count as proof (only a repository admin's status does): %s" % why
     return True, description
@@ -191,13 +231,13 @@ def wait_seconds():
 
 def main(argv):
     args = argv[1:]
-    usage = ("usage: reviewed-status.py post <sha> --pr <n> --base <branch> [--from <reviewed-sha>]"
-             " | verify <sha> [--pr <n> --base <branch>]\n")
+    usage = ("usage: reviewed-status.py post <sha> --pr <n> --base <branch> [--from <reviewed-sha>] [--proof-app <slug>]"
+             " | verify <sha> [--pr <n> --base <branch>] [--proof-app <slug>]\n")
     if not args or args[0] not in ("post", "verify") or len(args) < 2:
         sys.stderr.write(usage)
         return 2
     verb, sha, rest = args[0], args[1], args[2:]
-    allowed = ("--from", "--pr", "--base") if verb == "post" else ("--pr", "--base")
+    allowed = ("--from", "--pr", "--base", "--proof-app") if verb == "post" else ("--pr", "--base", "--proof-app")
     opts = {}
     while rest:
         if rest[0] in allowed and len(rest) > 1 and rest[0] not in opts:
@@ -212,11 +252,11 @@ def main(argv):
         return 2
     try:
         if verb == "verify":
-            ok, why = verify(sha, None, opts.get("--pr"), opts.get("--base"))
+            ok, why = verify(sha, None, opts.get("--pr"), opts.get("--base"), opts.get("--proof-app"))
             print(("REVIEWED %s by %s" if ok else "UNREVIEWED %s") % ((sha, why) if ok else (why,)))
             return 0 if ok else 2
         ok, why = post(sha, None, opts["--pr"], opts["--base"], opts.get("--from"),
-                       wait_seconds())
+                       wait_seconds(), opts.get("--proof-app"))
         print(("POSTED %s %s: %s" % (sha, CONTEXT, why)) if ok else "NOT POSTED %s" % why)
         return 0 if ok else 2
     except Unreadable as err:
