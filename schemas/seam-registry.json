@@ -1401,37 +1401,37 @@
       "key": "review.independentReview",
       "type": "object",
       "description": "a review run from the production branch under an identity the builder cannot use; absent means no such review",
-      "since": "3.50.0"
+      "since": "3.51.0"
     },
     {
       "key": "review.independentReview.workflow",
       "type": "string",
       "description": "the review workflow's file name, run from review.independentReview.ref, taking only pr_number",
-      "since": "3.50.0"
+      "since": "3.51.0"
     },
     {
       "key": "review.independentReview.ref",
       "type": "string",
       "description": "the branch whose copy of the workflow runs: the production branch, so a pull request cannot rewrite its own reviewer",
-      "since": "3.50.0"
+      "since": "3.51.0"
     },
     {
       "key": "review.independentReview.check",
       "type": "string",
       "description": "the check the workflow posts on every pull request head it reviews",
-      "since": "3.50.0"
+      "since": "3.51.0"
     },
     {
       "key": "review.independentReview.reviewerApp",
       "type": "string",
       "description": "the slug of the GitHub App whose result counts; no other identity's result is read",
-      "since": "3.50.0"
+      "since": "3.51.0"
     },
     {
       "key": "review.independentReview.timeoutMinutes",
       "type": "number",
       "description": "how long to wait for a result; default 45",
-      "since": "3.50.0"
+      "since": "3.51.0"
     },
     {
       "key": "release",
