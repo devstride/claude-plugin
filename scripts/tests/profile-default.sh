@@ -29,20 +29,35 @@ if has "$CONTRACT" 'back to `standard` — never to the shipped default'; then
   ok "(3) the retired/unknown fallback is still standard"
 else bad "(3) the retired/unknown fallback no longer names standard"; fi
 
-# (4) The Shape targets section exists, with all three profiles and both measures.
+# (4) The Shape targets section exists, with all three profiles and a data row for each measure
+#     carrying three ranges (the measure names also appear in the section's prose, so the rows
+#     themselves are matched).
 section="$(awk '/^## Shape targets \(soft\)/{on=1; next} on && /^## /{exit} on' "$ROOT/$CONTRACT")"
+range='[0-9]+–[0-9]+'
+row() { printf '%s\n' "$section" | grep -qE "^\| $1 [^|]*\| $range \| $range \| $range \|$"; }
 if [ -n "$section" ] &&
    printf '%s\n' "$section" | grep -qF '| Measure | `prototype` | `standard` | `extended` |' &&
-   printf '%s\n' "$section" | grep -qiF 'stories per epic' &&
-   printf '%s\n' "$section" | grep -qiF 'epics per capability' &&
+   row 'Stories per epic' && row 'Epics per capability' &&
    printf '%s\n' "$section" | grep -qF 'never enforced'; then
-  ok "(4) the soft Shape targets table covers three profiles and both measures"
-else bad "(4) Shape targets section missing or incomplete"; fi
+  ok "(4) the soft Shape targets table has a three-range row for each measure"
+else bad "(4) Shape targets section missing, or a measure's row lost its three ranges"; fi
 
-# (5) Shape targets are not override keys: the override vocabulary never names them.
-if awk '/^## Overrides/{on=1; next} on && /^## /{exit} on' "$ROOT/$CONTRACT" | grep -qiE 'stories per epic|epics per capability|shape target'; then
-  bad "(5) the Overrides section names a shape target as a key"
-else ok "(5) shape targets are not override keys"; fi
+# (5) Shape targets are not override keys. The override vocabulary is the knob table plus the
+#     registry's profileOverrides.* keys: neither may name a shape target, and the section must
+#     still say profileOverrides does not accept them. Each source must be found, or the check
+#     has nothing to look at and fails.
+knobs="$(awk '/^\| Knob \|/{on=1} on && !/^\|/{exit} on' "$ROOT/$CONTRACT")"
+okeys="$(python3 -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+print("\n".join(s["key"] for s in d["settings"] if s["key"].startswith("profileOverrides.")))' "$ROOT/schemas/seam-registry.json" 2>/dev/null)"
+shape_re='per ?epic|per ?capability|shape'
+if [ -z "$knobs" ] || [ -z "$okeys" ]; then
+  bad "(5) cannot read the knob table or the registry's profileOverrides keys"
+elif printf '%s\n%s\n' "$knobs" "$okeys" | grep -qiE "$shape_re"; then
+  bad "(5) a shape target is a knob or a profileOverrides key"
+elif ! printf '%s\n' "$section" | grep -qF '`profileOverrides` does not accept them'; then
+  bad "(5) the Shape targets section no longer says profileOverrides does not accept them"
+else ok "(5) shape targets are not knobs or override keys"; fi
 
 # (6) Doctor's absent-key line names extended and the shipped default on one line.
 if grep -E 'key absent, shipped default' "$ROOT/skills/doctor/SKILL.md" | grep -qF 'profile: extended'; then
@@ -69,7 +84,8 @@ else bad "(8) setup's profile question does not lead with extended as the defaul
 #     standard by accident; now it would give extended, so the clause must be explicit.
 for pair in 'skills/build-item/SKILL.md|config `profile` → `extended`; an unknown word → `standard`' \
             'skills/release/SKILL.md|else config `profile` (unknown: `standard`), else `extended`' \
-            'skills/rebalance/SKILL.md|else `extended` (unknown: `standard`).'; do
+            'skills/rebalance/SKILL.md|else config `profile` (unknown: `standard`),' \
+            'skills/rebalance/SKILL.md|else `extended`. On a whole-root run'; do
   f="${pair%%|*}"; n="${pair#*|}"
   if has "$f" "$n"; then ok "(9) $f: extended by default, unknown → standard"; else bad "(9) $f: missing '$n'"; fi
 done
@@ -77,6 +93,15 @@ if grep -A1 -F 'full-view root marker → config `profile` →' "$ROOT/skills/re
    grep -qF '`extended`; an unknown word → `standard`, said so'; then
   ok "(9) skills/review/SKILL.md: extended by default, unknown → standard"
 else bad "(9) skills/review/SKILL.md: chain does not end extended with the unknown → standard clause"; fi
+
+# (9b) Every other file that states the unknown/retired fallback still names standard.
+for pair in 'skills/doctor/SKILL.md|back to `standard` and say so' \
+            'skills/setup/references/config-defaults.md|a retired or unknown value still reads as `standard`' \
+            'skills/ultracode-build/SKILL.md|the retired `enterprise` alone is read as `standard`' \
+            'skills/setup/SKILL.md|`enterprise` → `standard`'; do
+  f="${pair%%|*}"; n="${pair#*|}"
+  if has "$f" "$n"; then ok "(9b) $f: unknown → standard"; else bad "(9b) $f: missing '$n'"; fi
+done
 
 # (10) The config registry, and the schema and table generated from it, carry the same default.
 reg="$(python3 -c 'import json,sys
