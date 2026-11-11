@@ -10,26 +10,30 @@ for what each version component means here and how a release is cut.
 
 ### Added
 
-- **One "Needs you" list: a run nobody is watching writes an owner's decision down and moves on,
+- **One "Needs you" list: a run nobody is watching writes a judgement call down and moves on,
   instead of sitting idle on it.** A repository switches it on by naming a tracker tag in
   `.claude/ds-config.json` under the new `needsYou` block: `needsYou.label` (the tag),
   `needsYou.view` (optional: the saved view of that tag, only ever quoted to people) and
-  `needsYou.fallbackItem` (optional: the item that holds a question belonging to no item, such as a
-  release). With the label set, a driven or unattended run that reaches a decision that is really
-  the owner's posts ONE comment on the item concerned: it mentions the plan's owner, asks the
-  question in one plain line, gives a recommended answer with its reason, two to four options with
-  their consequences, what is waiting and what the agent is doing meanwhile, and ends with the line
-  `Needs you: open`. It adds the tag, says in its report what it queued, skips that item as it
-  skips a gated one, and carries on with other work; it never waits, never asks twice and never
-  sends a reminder. At the start of the next `build-item` or `release` run, one search on the tag
-  finds the open questions: a reply by the mentioned person, in their own words, is acted on for
-  that question only, answered with one line ending `Needs you: answered`, and the tag comes off.
-  An attended run asks in the conversation as before. A hard stop stays one: the production merge
-  and anything a rule forbids without its own yes still wait, and a thread answer never stands in
-  for that yes. When the tracker cannot be reached, the tag is missing or a write is refused, the
-  run says so once and stops and asks as before. Without `needsYou.label` nothing changes. The rule
-  lives in one new contract, `skills/build-item/references/needs-you.md`, cited once each by
-  `build-item`, `ultracode-build`, `review`, `release` and `doctor`.
+  `needsYou.fallbackItem` (optional: the item that holds an entry belonging to no item, such as a
+  release). The tracker cannot prove who wrote a reply, so a reply is never an authorization, and
+  there are two kinds of entry. A **choice** is a judgement call whose every option the run may
+  already take by its existing rules: the comment mentions the plan's owner, asks in one plain
+  line, recommends a lettered option and ends `Needs you: open`. The next `build-item` run under
+  that plan takes a reply only when it comes from the plan owner's account and is just one of the
+  letters; it records the choice in the thread before acting, removes the tag and builds the item
+  that way. Any other text in a reply is ignored and named in the run's report. A **notice**
+  (`Needs you: in a session`) covers everything that is the owner's own yes: a production merge,
+  approving a migration, waiving a check, taking over another session's work, anything destructive
+  or touching production. No skill acts on a reply to a notice; it only makes the wait visible, and
+  is closed once the action was taken in a session or no longer applies. Whether anyone is there to
+  answer is decided by the top-level run; an attended run asks in the conversation as before. The
+  run that queued an entry skips that item and carries on, never waiting on it or reminding. An
+  unattended release that stops before its merge still sends its one notification and waits; it
+  adds a notice and nothing else changes. When the tracker cannot be reached, the tag is missing or
+  a write is refused, the run says so once and stops that item as before. Without `needsYou.label`
+  nothing changes. The rule lives in one new contract,
+  `skills/build-item/references/needs-you.md`, cited once each by `build-item`, `ultracode-build`,
+  `review`, `release` and `doctor`.
 - **`doctor config` reports whether the Needs-you list is on**, its tag and view, and warns when
   the tracker has no tag of that name or the fallback item cannot be found. It writes nothing.
 

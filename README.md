@@ -428,12 +428,15 @@ under on that board (never a story) and runs your commands as it starts and stop
 ## Needs-you list
 
 Optional: an agent running with nobody watching used to stop and wait whenever it reached a
-decision that was yours. Name a tag in `needsYou.label` and it writes the question on the item
-instead, mentioning the plan's owner, with a recommended answer and the options, tags the item, and
-moves on to other work. Reply in that thread in your own words; the next run acts on your answer and
-removes the tag. A saved view of that tag (`needsYou.view`) is your one list, and
-`needsYou.fallbackItem` holds questions that belong to no item. Nothing that needs your explicit
-yes, such as a production merge, happens any sooner. No `needsYou.label`, no change.
+judgement call. Name a tag in `needsYou.label` and it writes the call on the item instead,
+mentioning the plan's owner, with a recommendation and lettered options, tags the item, and moves
+on to other work. Reply in that thread with a letter and the next run takes that option; anything
+else in a reply is ignored, because the tracker cannot prove who wrote it. Every option is something
+the agent was already allowed to do. Whatever needs your own yes (a production merge, a migration
+approval, a waived check, anything destructive) is listed as a notice only: no reply can start it,
+and it still waits for you in a session. A saved view of the tag (`needsYou.view`) is your one
+list, and `needsYou.fallbackItem` holds entries that belong to no item. No `needsYou.label`, no
+change.
 
 ## Your first plan
 

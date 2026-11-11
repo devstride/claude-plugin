@@ -508,7 +508,7 @@ difference and asks once; `check: false` silences it. Contract:
 
 Optional, written by hand: `needsYou.label` (a tracker tag's name; absent → off, every skill stops
 and asks as before), `needsYou.view` (the saved view's URL or name, quoted in reports) and
-`needsYou.fallbackItem` (an item number for a question that belongs to no item). Contract:
+`needsYou.fallbackItem` (an item number for an entry that belongs to no item). Contract:
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md`.
 
 ## Active Agents

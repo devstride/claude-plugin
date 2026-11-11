@@ -148,10 +148,10 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   when `pool.checkout` is set, kept across iterations), `git fetch --prune origin`, and read
   what OTHER authors landed on the base (and epic) branch since the handoff — say so when another
   session appears active. Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ground-truth-at-start.md`.
-- **`needsYou.label` set** → read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md`
-  now and at any unattended PAUSE.
 - **Plan root**: `$ARGUMENTS`, else handoff memory; not ONE unambiguous root while several plans are
   open → STOP and ask.
+- **`needsYou.label` set** → read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md`
+  once the root resolves and at an unattended PAUSE.
 - **Release scope**: once the root resolves, BEFORE selection, read any `Release scope:` line on it,
   its ancestors and the grouping items above each release unit (`view: 'full'`). The nearest one
   above a unit decides, any case: `plan` → read
@@ -333,6 +333,6 @@ unit at zero and before cutting the release PR.**
 The release target is `routing.py release-target`'s `branch` (`ask` → ask the owner which is live, set `releaseTrain.branch` or cut over, run it again; plan scope: `plan-scope.md`).
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release-steps.md` in full before
-acting on a release that fires, or on step 0's recovery close-out** — refresh, verification, the EPIC RELEASE PR cut, review,
-merge, close-out, docs staging and recap live there. New
+acting on a release that fires, or on step 0's recovery close-out** — refresh, verification, the release PR cut, review,
+merge, close-out, docs and recap live there. New
 findings → 6.5.

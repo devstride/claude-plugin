@@ -12,7 +12,7 @@ CI released once and settled green. `pr` composes it; standalone it runs as
 $ARGUMENTS
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/github-review-api.md` when you execute a
-step that touches the GitHub review APIs** — the exact queries and evidence.
+step that touches the GitHub review APIs**.
 
 ## Hard floors — no profile, override or caller removes these
 
@@ -183,8 +183,8 @@ L-NNN** (step 6.5 takes marks as authoritative); REFUTED never bumps. One bucket
   `create-defect deferred <item#>` (a bug) or `create-story deferred <item#>`
   (standalone; the item under review) — and discovered scope ALWAYS through `insert-story`.
 - **Ambiguous / risky / unverifiable** → ask — the only bucket that stalls a run. Read
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md` when driven and
-  `needsYou.label` is set.
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md` when the top-level run
+  is unattended and `needsYou.label` is set.
 
 ## 5. Fix, push, follow up
 

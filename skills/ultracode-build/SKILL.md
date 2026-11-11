@@ -34,8 +34,8 @@ profile: standard review-moment: release-deferred`): $ARGUMENTS
   proof is a verification receipt, never a remembered result.
 - **Stop and ask ONLY at a genuine fork**: an ambiguous or risky finding, scope that turns out
   human- or infra-gated, a destructive or outward-facing action. Read
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md` when nobody is there to answer
-  and `needsYou.label` is set.
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md` when the top-level run is
+  unattended, `needsYou.label` set.
 
 **Engineering economy.** Read
 `${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/engineering-economy.md` before choosing an
