@@ -73,7 +73,9 @@ On a READY outcome only, then leave the settled review's durable proof on the fi
 --base <the ledger's Base branch>` (a
 `devstride/reviewed` commit status naming the pull request and its base; only an admin's counts).
 `NOT POSTED` is degradation to report, never a stop: a release then checks that unit file by file.
-Post only here and in `build-item` 5b's carry, never to clear a release refusal.
+Into the train with a `release.releaseBranchFixExclusions` path, `NOT POSTED` is a STOP before the
+merge: the merge gate refuses it, and a merged pull request takes no proof. Post only here and in
+`build-item` 5b's carry, never to clear a release refusal.
 
 If a configured local command cannot accept context, never spend a follow-up cycle on a blind
 repeat. Use Claude effective-scope validation for that engine's slot, report the local engine as

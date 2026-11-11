@@ -8,8 +8,6 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
-## [3.53.0] — 2026-11-11
-
 ### Changed
 
 - **The status line always comes from the plugin version your session has loaded, and a plugin
@@ -52,14 +50,35 @@ for what each version component means here and how a release is cut.
   work branch. Maintainers: `statusline.sh` no longer carries a `managed` marker and a release no
   longer raises one; only a change to the launcher itself raises the launcher's own number.
 
+## [3.53.0] — 2026-11-11
+
+### Changed
+
+- **The merge gate refuses a merge onto the release train that would carry a migration or deploy
+  configuration without its review proof.** When a pull request's base is the configured release
+  train (`releaseTrain.branch`) and any file it changes, by new or old name, matches
+  `release.releaseBranchFixExclusions`, `merge-gate.py` now prints `MERGE` only if the head carries
+  the settled review's `devstride/reviewed` proof for that pull request into that base (the same
+  `reviewed-status.py verify` the release's train check uses). With no proof it refuses and prints
+  the exact `post` command, pinned to the repository and still valid because the pull request is
+  open. A proof GitHub cannot read is an `ERROR`. A head that is not an epic or plan integration
+  branch is refused even with a proof, because the train check would refuse it anyway. Before, a reviewed pull request could merge onto the train without
+  its proof. Nothing complained until the next release's train check refused the unit's
+  migrations, usually unattended and hours later, when a merged pull request can no longer take a
+  proof. `review` treats `NOT POSTED` for such a pull request as a stop before the merge instead of
+  degradation. The gate reads the consuming repository's `.claude/ds-config.json` (new `--config`
+  to name another). It must run in a checkout of the repository it inspects, or be given
+  `--config`: outside one it is now an `ERROR` instead of a silent pass. A checkout with no config,
+  or a config with no train, leaves the rule doing nothing.
+
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.52.0 @ a26bd13, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.52.0 @ cd96ddc, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.52.0 | tokens@devstride--v3.52.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
-| skills/setup/SKILL.md | 32,095 | 10,699 | 32,100 | 10,700 | +1 | 10,700 |
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
 | skills/plan/SKILL.md | 24,592 | 8,198 | 24,592 | 8,198 | +0 | 8,198 |
-| skills/doctor/SKILL.md | 23,972 | 7,991 | 23,973 | 7,991 | +0 | 7,992 |
+| skills/doctor/SKILL.md | 23,972 | 7,991 | 23,972 | 7,991 | +0 | 7,992 |
 | skills/review/SKILL.md | 23,971 | 7,991 | 23,971 | 7,991 | +0 | 7,999 |
 | skills/build-item/SKILL.md | 23,953 | 7,985 | 23,953 | 7,985 | +0 | 7,985 |
 | skills/release/SKILL.md | 18,139 | 6,047 | 18,139 | 6,047 | +0 | 6,049 |
@@ -88,7 +107,7 @@ for what each version component means here and how a release is cut.
 | skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
-| **total (bodies)** | 271,655 | 90,560 | 271,661 | 90,561 | +1 | |
+| **total (bodies)** | 271,655 | 90,560 | 271,655 | 90,560 | +0 | |
 
 ## [3.52.0] — 2026-11-11
 
