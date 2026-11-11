@@ -8,6 +8,37 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **The status line always comes from the plugin version your session has loaded, and a plugin
+  release no longer changes a file in your repository.** Until now `setup` copied the whole status
+  line into the repository as `.claude/statusline.sh`, and the session-start hook brought that copy
+  forward after each release that changed the bar. The hook does not run on `/reload-plugins`, and
+  it deliberately leaves a committed file alone on the base branch, a detached checkout and
+  protected branches, so after such a release the bar stayed old until someone refreshed the copy
+  and committed it. Now the repository commits a small launcher under the same name. Each time the
+  bar is drawn, the launcher finds the plugin copy this session has loaded and runs the status
+  line that copy ships. After `/devstride:update` and `/reload-plugins` the new bar appears by
+  itself at your next prompt: no modified file, nothing to commit. Two sessions on different
+  plugin versions each show their own. Your `statusLine` setting stays exactly as it is, including
+  a command that runs `.claude/statusline.sh` and then a script of your own.
+  **The one-time move.** A repository that already has the copy is moved by the session-start hook
+  the first time a session starts on a work branch (or by `doctor`, which now reports a copy and
+  offers the move): the hook replaces the copy with the launcher, keeps the old file as
+  `devstride/statusline.bak` in the git directory, and asks you to commit it. Commit and merge it
+  once and every checkout has it. The rules are the ones the refresh always had: a file whose
+  `managed` line you deleted is yours and is never touched, `statusLine.autoUpdate: false` switches
+  the hook off, and a committed file is not rewritten on the base branch, a detached checkout or a
+  protected branch, where the old copy keeps working until the launcher arrives by a pull.
+  Sessions still running an older plugin leave the launcher alone: it carries a marker of its own
+  that they do not take for a copy. `setup` writes the launcher for a new repository.
+  **When no plugin can be found** (the plugin is not installed for this person, or its files are
+  gone) the launcher shows a plain line with the directory and the branch instead of an empty bar.
+  The session-start record's `statusLine` value names a launcher as `launcher-<n>`, for example
+  `updated:3.48.0:launcher-1` for the move and `held:3.48.0:launcher-1` for a copy waiting on a
+  work branch. Maintainers: `statusline.sh` no longer carries a `managed` marker and a release no
+  longer raises one; only a change to the launcher itself raises the launcher's own number.
+
 ## [3.52.0] — 2026-11-11
 
 ### Added
