@@ -35,13 +35,13 @@ loaded() { # loaded SESSION ROOT — the record the loaded copy's hook writes
   printf '{"session_id":"%s","hook_event_name":"UserPromptSubmit"}' "$1" \
     | CLAUDE_PLUGIN_ROOT="$2" "$REAL_PY" "$ROOT/hooks/session-runtime.py" record
 }
-registry() { # registry ROW... — rows are "scope|installPath|projectPath"
+registry() { # registry ROW... — rows are "scope|installPath|projectPath[|version]"
   "$REAL_PY" - "$REGISTRY" "$@" <<'PY'
 import json, sys
 rows = []
 for spec in sys.argv[2:]:
-    scope, path, project = spec.split("|")
-    row = {"scope": scope, "installPath": path, "version": "0.0.0"}
+    scope, path, project, version = (spec.split("|") + ["0.0.0"])[:4]
+    row = {"scope": scope, "installPath": path, "version": version}
     if project:
         row["projectPath"] = project
     rows.append(row)
@@ -119,11 +119,14 @@ if [ "$O" = "▣ repo · ⎇ feature" ] && [ "$RC" = 0 ]; then
   ok "(8) the plugin's status line fails or prints nothing → the plain line, exit 0"
 else bad "(8) got: $O rc=$RC"; fi
 
-# (9) a plugin path that JSON escapes in the record is still found (through the python lookup)
-ODD="$(plugin 'pläce' 3.4.0)"; loaded s9 "$ODD"; registry "user|$A|"
+# (9) a plugin path that JSON escapes in the record still comes first: with no registry at all,
+#     and ahead of the environment
+ODD="$(plugin 'pläce' 3.4.0)"; loaded s9 "$ODD"; rm -f "$REGISTRY"
 O="$(draw s9 "$REPO")"
-if [ "$O" = "bar-3.4.0 payload $ODD" ]; then ok "(9) a non-ASCII plugin path in the record is read correctly"
-else bad "(9) got: $O"; fi
+O2="$(printf '{"session_id":"s9","marker":"whole"}' | CLAUDE_PLUGIN_ROOT="$A" /bin/bash "$L" 2>&1)"
+if [ "$O" = "bar-3.4.0 payload $ODD" ] && [ "$O2" = "$O" ]; then
+  ok "(9) a non-ASCII plugin path in the record wins without a registry and over \$CLAUDE_PLUGIN_ROOT"
+else bad "(9) got: $O | $O2"; fi
 
 # (10) the launcher's marker: its own, with a version, and one that NO released session-start hook
 #      takes for a full copy — neither the first form (sed) nor the current one (python)
@@ -148,5 +151,73 @@ O="$(draw real "$REPO")"
 if printf '%s' "$O" | grep -q '▣ repo · ⑂ main · ⎇ feature' && printf '%s' "$O" | grep -q '⊞ '; then
   ok "(12) launcher → the shipped status line: repository, checkout, branch and the plugin segment"
 else bad "(12) got: $O"; fi
+
+# (13) the record and the kept answer name a script that gets RUN, so neither is believed unless
+#      the sessions directory and the file are this user's own, real, and writable by nobody else.
+#      An untrusted one is skipped and the next source (here the registry's install, A) answers.
+EVIL="$(plugin evil 6.6.6)"; registry "user|$A|"
+mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
+record_for() { printf '{"at":1,"root":"%s","running":"6.6.6","schema":1}\n' "$EVIL" > "$1"; chmod 600 "$1"; }
+record_for "$SESSIONS/t-ok.json"; T0="$(draw t-ok "$REPO")"                      # the control: a trusted record IS used
+record_for "$WORK/outside.json"; ln -s "$WORK/outside.json" "$SESSIONS/t-link.json"; T1="$(draw t-link "$REPO")"
+record_for "$SESSIONS/t-group.json"; chmod 660 "$SESSIONS/t-group.json"; T2="$(draw t-group "$REPO")"
+record_for "$SESSIONS/t-world.json"; chmod 646 "$SESSIONS/t-world.json"; T3="$(draw t-world "$REPO")"
+record_for "$SESSIONS/t-dir.json"; chmod 777 "$SESSIONS"; T4="$(draw t-dir "$REPO")"; chmod 700 "$SESSIONS"
+mv "$SESSIONS" "$WORK/real-sessions"; ln -s "$WORK/real-sessions" "$SESSIONS"; T5="$(draw t-dir "$REPO")"
+rm "$SESSIONS"; mv "$WORK/real-sessions" "$SESSIONS"
+WANT="bar-3.1.0 payload $A"
+if [ "$T0" = "bar-6.6.6 payload $EVIL" ] && [ "$T1" = "$WANT" ] && [ "$T2" = "$WANT" ] && [ "$T3" = "$WANT" ] \
+   && [ "$T4" = "$WANT" ] && [ "$T5" = "$WANT" ]; then
+  ok "(13) a record that is a link, or group- or world-writable, or in a directory that is, is never run"
+else bad "(13) control=$T0 link=$T1 group=$T2 world=$T3 dir=$T4 dirlink=$T5"; fi
+
+# (13b) the same for the kept answer, and writing it never goes through a link left in its place
+NOW="$(date +%s)"
+printf '%s\n%s\n' "$NOW" "$EVIL" > "$SESSIONS/k-ok.root"; chmod 600 "$SESSIONS/k-ok.root"; K0="$(draw k-ok "$REPO")"
+printf '%s\n%s\n' "$NOW" "$EVIL" > "$SESSIONS/k-group.root"; chmod 660 "$SESSIONS/k-group.root"; K1="$(draw k-group "$REPO")"
+printf '%s\n%s\n' "$NOW" "$EVIL" > "$WORK/victim"; chmod 600 "$WORK/victim"; cp -p "$WORK/victim" "$WORK/victim.before"
+ln -s "$WORK/victim" "$SESSIONS/k-link.root"; K2="$(draw k-link "$REPO")"
+if [ "$K0" = "bar-6.6.6 payload $EVIL" ] && [ "$K1" = "$WANT" ] && [ "$K2" = "$WANT" ] \
+   && cmp -s "$WORK/victim" "$WORK/victim.before" && [ ! -L "$SESSIONS/k-link.root" ] \
+   && [ "$(sed -n 2p "$SESSIONS/k-link.root")" = "$A" ] && [ "$(mode "$SESSIONS/k-link.root")" = 600 ] \
+   && [ -z "$(find "$SESSIONS" -name '*.root.*')" ]; then
+  ok "(13b) an untrusted kept answer is ignored; the new one replaces a link instead of writing through it"
+else bad "(13b) control=$K0 group=$K1 link=$K2 file=$(cat "$SESSIONS/k-link.root" 2>&1) mode=$(mode "$SESSIONS/k-link.root")"; fi
+
+# (14) --which names the plugin copy the launcher would run, by the same lookup, and prints
+#      nothing (exit 0) when there is none — whatever the bar shows
+which() { printf '{"session_id":"%s","workspace":{"current_dir":"%s"}}' "$1" "$2" | PATH="$WORK/bin:$PATH" /bin/bash "$L" --which 2>&1; }
+loaded s14 "$B"; W1="$(which s14 "$REPO")"; W2="$(which nobody14 "$REPO")"
+rm -f "$REGISTRY"; W3="$(which nobody14 "$REPO")"; which nobody14 "$REPO" >/dev/null; RC=$?
+W4="$(printf '{"session_id":"nobody14"}' | CLAUDE_PLUGIN_ROOT="$A" /bin/bash "$L" --which 2>&1)"
+if [ "$W1" = "$B" ] && [ "$W2" = "$A" ] && [ -z "$W3" ] && [ "$RC" = 0 ] && [ "$W4" = "$A" ]; then
+  ok "(14) --which prints the loaded copy, the registry's or the environment's, and nothing when none is found"
+else bad "(14) record=$W1 registry=$W2 none=$W3 rc=$RC env=$W4"; fi
+
+# (15) the kept answer's timestamp: a leading zero is not an arithmetic error, one from the future
+#      is not fresh for ever, and a sessions directory that cannot be written prints nothing
+registry "user|$A|"
+printf '08\n%s\n' "$B" > "$SESSIONS/z-octal.root"; chmod 600 "$SESSIONS/z-octal.root"; Z1="$(draw z-octal "$REPO")"
+printf '%s\n%s\n' "$(( $(date +%s) + 100000 ))" "$B" > "$SESSIONS/z-future.root"; chmod 600 "$SESSIONS/z-future.root"; Z2="$(draw z-future "$REPO")"
+printf '99999999999999999999999\n%s\n' "$B" > "$SESSIONS/z-huge.root"; chmod 600 "$SESSIONS/z-huge.root"; Z3="$(draw z-huge "$REPO")"
+chmod 500 "$SESSIONS"; Z4="$(draw z-readonly "$REPO")"; chmod 700 "$SESSIONS"
+if [ "$Z1" = "$WANT" ] && [ "$Z2" = "$WANT" ] && [ "$Z3" = "$WANT" ] && [ "$Z4" = "$WANT" ] \
+   && [ ! -e "$SESSIONS/z-readonly.root" ]; then
+  ok "(15) timestamps 08, far future and oversized are stale, not errors; an unwritable directory stays silent"
+else bad "(15) octal=$Z1 future=$Z2 huge=$Z3 readonly=$Z4"; fi
+
+# (16) two installs of one scope in linked worktrees of one repository: the one recorded for the
+#      checkout being drawn wins, whatever the registry's order; from a third worktree the higher
+#      version wins; and one root listed twice is one install
+git -C "$REPO" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -q --allow-empty -m init
+git -C "$REPO" worktree add -q "$WORK/wt-a" -b wt-a 2>/dev/null; git -C "$REPO" worktree add -q "$WORK/wt-b" -b wt-b 2>/dev/null
+registry "project|$A|$REPO|3.1.0" "project|$B|$WORK/wt-a|3.2.0" "project|$A|$REPO|3.1.0"
+G1="$(draw g1 "$REPO")"; G2="$(draw g2 "$WORK/wt-a")"; G3="$(draw g3 "$WORK/wt-b")"
+registry "project|$B|$WORK/wt-a|3.2.0" "project|$A|$REPO|3.1.0"
+G4="$(draw g4 "$REPO")"; G5="$(draw g5 "$WORK/wt-a")"; G6="$(draw g6 "$WORK/wt-b")"
+if [ "$G1" = "bar-3.1.0 payload $A" ] && [ "$G2" = "bar-3.2.0 payload $B" ] && [ "$G3" = "bar-3.2.0 payload $B" ] \
+   && [ "$G4" = "$G1" ] && [ "$G5" = "$G2" ] && [ "$G6" = "$G3" ]; then
+  ok "(16) same-scope installs across worktrees: this checkout's own, else the higher version, in either registry order"
+else bad "(16) $G1 | $G2 | $G3 | $G4 | $G5 | $G6"; fi
 
 exit $FAIL

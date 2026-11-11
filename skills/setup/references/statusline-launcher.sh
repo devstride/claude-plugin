@@ -18,10 +18,18 @@
 #   2. $CLAUDE_PLUGIN_ROOT;
 #   3. the Claude Code plugin registry: the install recorded for this repository (local, then
 #      project scope; another repository's is never used), else the user's, else a managed
-#      one. This lookup starts python3, so its
-#      answer is kept for a minute beside the session record.
+#      one. Among installs of one scope, the one recorded for this very checkout comes first,
+#      then the highest version, then the path that sorts first. This lookup starts python3, so
+#      its answer is kept for a minute beside the session record.
 # Nothing found, or the plugin's script printed nothing: a plain directory-and-branch line.
 # It never prints an error and never exits non-zero.
+#
+# `--which` prints the plugin copy it would run, and nothing when it finds none: the one way to
+# tell the plugin's bar from the plain line, whatever segments a repository shows.
+#
+# The record and the kept answer name a script this file then RUNS, so both are read only when
+# the sessions directory and the file itself are this user's own, are not symbolic links and
+# are writable by nobody else. Anything else is ignored and the next source is tried.
 
 input=$(cat)
 rel="skills/setup/references/statusline.sh"
@@ -30,13 +38,32 @@ sessions="${XDG_CACHE_HOME:-$HOME/.cache}/devstride-plugin/sessions"
 sid=""; re='"session_id"[[:space:]]*:[[:space:]]*"([A-Za-z0-9_-][A-Za-z0-9._-]*)"'
 [[ $input =~ $re ]] && [ "${#BASH_REMATCH[1]}" -le 128 ] && sid="${BASH_REMATCH[1]}"
 
-# 1. The session's record, read without starting a process. A path that JSON had to escape is
-#    left to the python lookup below, which reads the same record properly.
+# trusted [FILE] — the sessions directory, and FILE when given, pass the rule above. The
+# ownership and link tests are the shell's own; the permission bits cost one `ls`.
+trusted() {
+  [ -d "$sessions" ] && [ ! -L "$sessions" ] && [ -O "$sessions" ] || return 1
+  if [ $# -gt 0 ]; then [ -f "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || return 1; fi
+  local listing mode rest
+  listing=$(ls -ldn "$sessions" "$@" 2>/dev/null) || return 1
+  [ -n "$listing" ] || return 1
+  while IFS=' ' read -r mode rest; do
+    case "$mode" in ?????w*|????????w*) return 1 ;; esac
+  done <<<"$listing"
+  return 0
+}
+
+# 1. The session's record, read without a JSON parser. Only a path that JSON had to escape
+#    (a non-ASCII directory) starts python3, here, so it still comes before every other source.
 root=""; line=""
-if [ -n "$sid" ] && [ -f "$sessions/$sid.json" ]; then
+if [ -n "$sid" ] && trusted "$sessions/$sid.json"; then
   { IFS= read -r line <"$sessions/$sid.json"; } 2>/dev/null
   case "$line" in *'"root":"'*) root="${line#*\"root\":\"}"; root="${root%%\"*}" ;; esac
-  case "$root" in *\\*) root="" ;; esac
+  case "$root" in
+    *\\*) root=$(python3 -c 'import json, sys
+with open(sys.argv[1]) as handle:
+    value = json.load(handle).get("root")
+sys.stdout.write(value if isinstance(value, str) else "")' "$sessions/$sid.json" 2>/dev/null) ;;
+  esac
   [ -n "$root" ] && [ -f "$root/$rel" ] || root=""
 fi
 
@@ -54,10 +81,13 @@ if [ -z "$root" ]; then
     *'@devstride"'*)
       now=$(date +%s 2>/dev/null); case "$now" in ''|*[!0-9]*) now=0 ;; esac
       hit=""; at=""; cached=""
-      if [ -n "$sid" ] && [ -f "$sessions/$sid.root" ]; then
+      if [ -n "$sid" ] && trusted "$sessions/$sid.root"; then
         { { IFS= read -r at; IFS= read -r cached; } <"$sessions/$sid.root"; } 2>/dev/null
+        # Digits only, short enough for arithmetic, read as base 10 (a leading 0 is not octal).
         case "$at" in ''|*[!0-9]*) at=0 ;; esac
-        if [ $(( now - at )) -lt 60 ] && { [ -z "$cached" ] || [ -f "$cached/$rel" ]; }; then
+        [ "${#at}" -le 12 ] || at=0
+        age=$(( 10#$now - 10#$at ))
+        if [ "$age" -ge 0 ] && [ "$age" -lt 60 ] && { [ -z "$cached" ] || [ -f "$cached/$rel" ]; }; then
           hit=1; root="$cached"
         fi
       fi
@@ -65,7 +95,7 @@ if [ -z "$root" ]; then
         root=$(printf '%s' "$input" | python3 -c '
 import json, os, sys
 
-rel, sid, sessions, registry = sys.argv[1:5]
+rel, registry = sys.argv[1:3]
 
 def load(path):
     try:
@@ -75,34 +105,38 @@ def load(path):
     except Exception:
         return {}
 
-def usable(root):
-    return isinstance(root, str) and bool(root) and os.path.isfile(os.path.join(root, rel))
-
-def common(start):
-    """The shared git directory of the checkout holding `start` (one for every linked worktree)."""
+def checkout(start):
+    """(top directory, shared git directory) of the checkout holding `start`; every linked
+    worktree of one repository shares the second."""
     try:
         here = os.path.realpath(start)
         while True:
             dot = os.path.join(here, ".git")
             if os.path.isdir(dot):
-                return os.path.realpath(dot)
+                return here, os.path.realpath(dot)
             if os.path.isfile(dot):
                 with open(dot) as handle:
                     text = handle.readline().strip()
                 if not text.startswith("gitdir:"):
-                    return None
+                    return here, None
                 gitdir = os.path.normpath(os.path.join(here, text[7:].strip()))
                 link = os.path.join(gitdir, "commondir")
                 if os.path.isfile(link):
                     with open(link) as handle:
                         gitdir = os.path.normpath(os.path.join(gitdir, handle.readline().strip()))
-                return os.path.realpath(gitdir)
+                return here, os.path.realpath(gitdir)
             parent = os.path.dirname(here)
             if parent == here:
-                return None
+                return None, None
             here = parent
     except Exception:
-        return None
+        return None, None
+
+def number(value):
+    try:
+        return tuple(-int(part) for part in str(value).split("."))
+    except Exception:
+        return (1,)
 
 try:
     payload = json.load(sys.stdin)
@@ -111,41 +145,49 @@ except Exception:
 if not isinstance(payload, dict):
     payload = {}
 
-found = ""
-if sid:
-    root = load(os.path.join(sessions, sid + ".json")).get("root")
-    if usable(root):
-        found = root
-if not found:
-    workspace = payload.get("workspace") if isinstance(payload.get("workspace"), dict) else {}
-    mine = common(workspace.get("current_dir") or payload.get("cwd") or os.getcwd())
-    order = {"local": 0, "project": 1, "user": 2, "managed": 3}
-    rows = []
-    plugins = load(registry).get("plugins")
-    for key in ("devstride@devstride", "ds@devstride"):
-        for row in (plugins.get(key) if isinstance(plugins, dict) else None) or []:
-            if not isinstance(row, dict):
+workspace = payload.get("workspace") if isinstance(payload.get("workspace"), dict) else {}
+top, mine = checkout(workspace.get("current_dir") or payload.get("cwd") or os.getcwd())
+order = {"local": 0, "project": 1, "user": 2, "managed": 3}
+rows = {}
+plugins = load(registry).get("plugins")
+for key in ("devstride@devstride", "ds@devstride"):
+    for row in (plugins.get(key) if isinstance(plugins, dict) else None) or []:
+        if not isinstance(row, dict):
+            continue
+        scope, path, elsewhere = row.get("scope"), row.get("installPath"), 1
+        if not (isinstance(path, str) and path and os.path.isfile(os.path.join(path, rel))):
+            continue
+        if scope in ("local", "project"):
+            project = row.get("projectPath")
+            there = checkout(project) if isinstance(project, str) else (None, None)
+            if not (mine and there[1] == mine):
                 continue
-            scope = row.get("scope")
-            if scope in ("local", "project"):
-                project = row.get("projectPath")
-                if not (mine and isinstance(project, str) and common(project) == mine):
-                    continue
-            rows.append((order.get(scope, 4) if isinstance(scope, str) else 4, len(rows), row.get("installPath")))
-    for _, _, path in sorted(rows, key=lambda item: item[:2]):
-        if usable(path):
-            found = path
-            break
-sys.stdout.write(found)
-' "$rel" "$sid" "$sessions" "$registry" 2>/dev/null)
+            elsewhere = 0 if there[0] == top else 1
+        rank = (order.get(scope, 4) if isinstance(scope, str) else 4, elsewhere, number(row.get("version")), path)
+        rows[path] = min(rank, rows.get(path, rank))
+sys.stdout.write(min(rows.values())[3] if rows else "")
+' "$rel" "$registry" 2>/dev/null)
         [ -n "$root" ] && [ -f "$root/$rel" ] || root=""
-        if [ -n "$sid" ] && (umask 077; mkdir -p "$sessions") 2>/dev/null; then
-          printf '%s\n%s\n' "$now" "$root" >"$sessions/$sid.root.$$" 2>/dev/null \
-            && mv -f "$sessions/$sid.root.$$" "$sessions/$sid.root" 2>/dev/null
+        # Keep the answer: only in a directory that passes the rule, through a temporary file
+        # that is created new (never written through a link someone left there).
+        if [ -n "$sid" ]; then
+          {
+            (umask 077; mkdir -p "$sessions")
+            if trusted; then
+              rm -f "$sessions/$sid.root.$$"
+              (umask 077; set -C; printf '%s\n%s\n' "$now" "$root" >"$sessions/$sid.root.$$") \
+                && mv -f "$sessions/$sid.root.$$" "$sessions/$sid.root"
+            fi
+          } 2>/dev/null
         fi
       fi
       ;;
   esac
+fi
+
+if [ "${1:-}" = "--which" ]; then
+  [ -n "$root" ] && printf '%s\n' "$root"
+  exit 0
 fi
 
 if [ -n "$root" ]; then
