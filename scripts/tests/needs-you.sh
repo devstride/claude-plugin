@@ -101,7 +101,7 @@ parts = {
     "a choice only where an answer is read": "**A CHOICE is queued ONLY where a pick-up will read the answer**: by `build-item`, on a story or defect it is building or about to build",
     "the release queues notices only": "Everywhere else the entry is a NOTICE: `release` as the top-level skill",
     "the fallback item holds notices only": "anything filed on `needsYou.fallbackItem`",
-    "no item number in the pattern: a pushed story is a notice": "branch-naming pattern carries no item number, a story that has already pushed commits: its NOTICE names the branch for the reader and says the story resumes in an attended session",
+    "no item number in the pattern: a pushed story is a notice": "branch-naming pattern carries no item number, a story with a commit of its own: its NOTICE names the branch for the reader and says the story resumes in an attended session",
     "a fork before any commit is unaffected": "A fork reached BEFORE any commit is unaffected",
     "never guess a branch": "No item number in the pattern → never guess a branch.",
     "build-item closes its own fallback notices": "`build-item` also reads `needsYou.fallbackItem`, for its own entries, only ever to close a stale NOTICE (the root now resolves), never to act.",

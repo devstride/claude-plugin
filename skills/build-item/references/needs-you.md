@@ -39,7 +39,7 @@ All three, else behave exactly as before:
 defect it is building or about to build. Everywhere else the entry is a NOTICE: `release` as the
 top-level skill (a finding its `review` cannot settle too), a stop before any item is selected (an
 ambiguous root), anything filed on `needsYou.fallbackItem`, and, where the repository's
-branch-naming pattern carries no item number, a story that has already pushed commits: its NOTICE
+branch-naming pattern carries no item number, a story with a commit of its own: its NOTICE
 names the branch for the reader and says the story resumes in an attended session. A fork reached
 BEFORE any commit is unaffected: there is nothing to resume.
 
