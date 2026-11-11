@@ -76,7 +76,7 @@ REFRESH_AFTER = 1800          # a prompt refreshes a newest-release cache older 
 REFRESH_LOCK = 300            # one background refresh at a time; a dead one's lock lapses
 FETCH_TIMEOUT = 30            # the background fetch's own bound
 NUDGED = re.compile(r"^(reload|update):[0-9]+\.[0-9]+\.[0-9]+$")
-MODEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,127}$")
+MODEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@\[\]-]{0,127}$")
 MODEL_NAME = re.compile(r"^[^\x00-\x1f\x7f]{1,64}$")
 EFFORT = re.compile(r"^[a-z]{1,16}$")
 MODEL_ALIASES = ("default", "best", "fable", "opus", "sonnet", "haiku", "opusplan")
@@ -398,25 +398,32 @@ def check(session, repo=None):
     return result
 
 
-def model_base(value):
-    """A model name or id, lower-cased, without what only says HOW the same model is reached: a
-    context-window suffix (`[1m]`), a provider prefix before `claude-` (`us.anthropic.`, an ARN),
-    a provider version (`-v1:0`) and a release date (`-20261001`)."""
+def model_parts(value):
+    """(base, release date or None): a model name or id, lower-cased, without what only says HOW
+    the same model is reached — a context-window suffix (`[1m]`), a provider prefix before
+    `claude-` (`us.anthropic.`, an ARN) and a provider version (`-v1:0`) — and its release date
+    (`-20261001`, `@20261001`) apart, since two dates of one name are two models."""
     value = re.sub(r"\[[0-9a-z]+\]$", "", value.strip().lower())
     value = re.sub(r"^.*[./:](?=claude-)", "", value)
     value = re.sub(r"-v[0-9]+(:[0-9]+)?$", "", value)
-    return re.sub(r"-[0-9]{8}$", "", value)
+    dated = re.match(r"^(.*)[-@]([0-9]{8})$", value)
+    return (dated.group(1), dated.group(2)) if dated else (value, None)
+
+
+def model_base(value):
+    return model_parts(value)[0]
 
 
 def model_matches(expected, running):
-    """True / False, or None when the two cannot be compared. A full id matches the same model however it is reached (see model_base). An
+    """True / False, or None when the two cannot be compared. A full id matches the same model
+    however it is reached (see model_parts); a release date matters only when BOTH name one. An
     alias matches a running id by FAMILY: the alias is one whole hyphen-separated segment of the id
     (`opus` matches claude-opus-5, never claude-opusplan-x), not a substring of it."""
     if not isinstance(expected, str) or not isinstance(running, str) or not running:
         return None
-    expected, running = model_base(expected), model_base(running)
+    (expected, wanted), (running, dated) = model_parts(expected), model_parts(running)
     if expected.startswith("claude-"):
-        return expected == running
+        return expected == running and (wanted is None or dated is None or wanted == dated)
     if expected not in MODEL_ALIASES or expected in UNCOMPARABLE:
         return None
     return expected in running.split("-")

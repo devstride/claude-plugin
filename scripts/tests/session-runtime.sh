@@ -413,6 +413,9 @@ for running in ("claude-opus-5-5-20261001", "us.anthropic.claude-opus-5-5-v1:0",
     assert rt.model_matches("claude-opus-5-5", running) is True, running
     assert rt.model_matches("opus", running) is True, running
 assert rt.model_matches("claude-opus-5-5", "claude-opus-5-6") is False
+assert rt.model_matches("claude-opus-5-5", "claude-opus-5-5@20261001") is True
+assert rt.model_matches("claude-3-5-sonnet-20240620", "anthropic.claude-3-5-sonnet-20241022-v2:0") is False, "two dates of one name are two models"
+assert rt.model_matches("claude-3-5-sonnet-20240620", "claude-3-5-sonnet-20240620") is True
 assert rt.model_matches("opus", "claude-fable-5-2") is False
 hooks = json.load(open(os.path.dirname(helper) + "/hooks.json"))["hooks"]
 assert any("session-runtime.py\" seen" in h["command"] for e in hooks["PostModelSwitch"] for h in e["hooks"])
