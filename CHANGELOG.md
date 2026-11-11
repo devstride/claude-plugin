@@ -8,6 +8,46 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Planning and build skills say when the session is not running the model and effort the
+  repository expects, and ask once whether to switch.** A repository sets what it expects in
+  `.claude/ds-config.json` under the new `sessionModels` block: `sessionModels.planning.model` and
+  `sessionModels.planning.effort` for `plan`, `insert-story`, `insert-defect` and `rebalance`
+  (defaults `fable` and `high`), `sessionModels.runner.model` and `sessionModels.runner.effort`
+  for `build-item` and `ultracode-build` (defaults `opus` and `high`), and `sessionModels.check`
+  (`false` switches the check off). When one of those skills starts in a session running something
+  else, it says so in one line and asks once: switch, or carry on. Only the person can switch, so
+  on "switch" it names the two commands to type (`/model <name>`, `/effort <level>`) and waits; on
+  "carry on" it proceeds. It says nothing when the session matches or its model and effort are not
+  known. A run driven by another skill, a loop or a scheduled prompt is never asked and never
+  waits: it carries on and names the difference in its final report. Planning also says, in the
+  same line and without asking, when the delivery profile in force is not `extended`. Helper agents
+  keep their task-sized routing. The rule lives in one new contract,
+  `skills/plan/references/session-models.md`, which each of the six skills cites.
+- **The per-session record now holds the session's live model and effort.**
+  `hooks/session-runtime.py` takes the model from the session-start payload when it carries one,
+  the effort from a new `PreToolUse` hook (`seen`: one small local read before each tool call, no
+  network, no subprocess, and a write only when the value changed), and both from the shipped
+  status line, whose payload carries them live. Its new `models --role planning|runner` mode prints
+  one JSON line, `{role, expected, running, verdict}`, with the verdict `match`, `mismatch`,
+  `unknown` or `off`. A model alias matches a running id by family and never as a substring, a
+  `[1m]` suffix is ignored, a full id matches only itself, and `default`, `best` and `opusplan`
+  cannot be compared, so they read as `unknown`. Every error reads as `unknown`.
+- **`doctor config` reports the two expected models and efforts** with their source (configured or
+  shipped default), and warns about a model name that is neither a documented alias nor a full
+  `claude-…` id, or an effort outside the five levels. It checks the shape of a name only: which
+  models an account offers cannot be read locally. The config validator accepts the new keys and
+  rejects an effort outside `low`, `medium`, `high`, `xhigh`, `max`.
+
+### Changed
+
+- **The shipped status line passes its payload's model and effort to the session record.** The
+  bar itself looks the same. A repository's managed copy picks the change up at the release that
+  raises the file's `ds-statusline: managed` marker.
+- **`doctor` body trimmed to make room:** the worked example beside "skip shell builtins" and the
+  reason beside the `conventionsDoc` check are gone; both rules stay.
+
 ## [3.50.0] — 2026-11-10
 
 ### Added
