@@ -228,4 +228,199 @@ if [ "$R1" = 1 ] && [ "$R2" = 2 ] && [ -e "$LOCK" ] && grep -q '3.16.0' "$NJ"; t
   ok "(17) a failed fetch keeps newest.json and its lock: no retry on the next prompt, one retry once the lock is 5 minutes old"
 else bad "(17) runs after 2 prompts=$R1, after the lock aged=$R2"; fi
 
+# --- the live model and effort, and the `models` verdict -----------------------------------
+# event SESSION EVENT EXTRA-JSON [MODE] — a hook payload carrying a model and/or an effort
+event() { printf '{"session_id":"%s","hook_event_name":"%s"%s}' "$1" "$2" "$3" | CLAUDE_PLUGIN_ROOT="$P16" python3 "$HELPER" "${4:-record}" 2>&1; }
+field() { python3 -c 'import json,sys
+v = json.load(open(sys.argv[1]))
+for k in sys.argv[2].split("."): v = v.get(k) if isinstance(v, dict) else None
+print(v)' "$SESSIONS/$1.json" "$2"; }
+mverdict() { python3 "$HELPER" models --role "$1" --session "$2" --repo "${3:-$R}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["verdict"])'; }
+stamp() { python3 -c 'import os,sys; s=os.stat(sys.argv[1]); print(s.st_ino, s.st_mtime_ns)' "$SESSIONS/$1.json"; }
+
+# (18) SessionStart's model is recorded (a bare id or an object), a tool event's effort is added,
+#      and a later prompt, which carries neither, keeps both
+event m1 SessionStart ',"model":"claude-fable-5-2"' >/dev/null
+M1="$(field m1 model.id)/$(field m1 effort.level)"
+OUT="$(event m1 PreToolUse ',"effort":{"level":"high"}' seen)"
+event m1 UserPromptSubmit '' prompt >/dev/null
+M2="$(field m1 model.id)/$(field m1 effort.level)/$(field m1 running)"
+event m2 SessionStart ',"model":{"id":"claude-opus-5","display_name":"Opus 5"}' >/dev/null
+if [ "$M1" = "claude-fable-5-2/None" ] && [ -z "$OUT" ] && [ "$M2" = "claude-fable-5-2/high/3.16.0" ] \
+   && [ "$(field m2 model.id)/$(field m2 model.name)" = "claude-opus-5/Opus 5" ] \
+   && python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert r["schema"]==1 and isinstance(r["model"]["at"],(int,float)) and isinstance(r["effort"]["at"],(int,float))' "$SESSIONS/m1.json"; then
+  ok "(18) SessionStart records the model (bare id or object), a tool event adds the effort, a prompt keeps both; schema stays 1"
+else bad "(18) m1=$M1 m2=$M2 out=$OUT $(cat "$SESSIONS/m1.json")"; fi
+
+# (19) `seen` rewrites nothing when nothing changed, rewrites once when the effort changes, never
+#      moves the record's own `at`, and never creates a record
+AT="$(field m1 at)"; S0="$(stamp m1)"
+event m1 PreToolUse ',"effort":{"level":"high"}' seen >/dev/null; event m1 PostToolUse '' seen >/dev/null; S1="$(stamp m1)"
+EAT="$(field m1 effort.at)"; sleep 0.05
+event m1 Stop ',"effort":{"level":"xhigh"}' seen >/dev/null; S2="$(stamp m1)"
+event nosuch PreToolUse ',"effort":{"level":"high"}' seen >/dev/null
+if [ "$S0" = "$S1" ] && [ "$S1" != "$S2" ] && [ "$(field m1 effort.level)" = xhigh ] && [ "$(field m1 effort.at)" != "$EAT" ] \
+   && [ "$(field m1 at)" = "$AT" ] && [ "$(field m1 model.id)" = claude-fable-5-2 ] && [ ! -e "$SESSIONS/nosuch.json" ]; then
+  ok "(19) seen: unchanged effort → no write; a new effort → one write with a new time; record 'at' and the model kept; no record → none created"
+else bad "(19) $S0 | $S1 | $S2 $(cat "$SESSIONS/m1.json")"; fi
+
+# (20) garbage fails open: unparsable input, wrong shapes and hostile values write nothing, print
+#      nothing and exit 0; the registered PreToolUse command is bounded and survives no python3
+S2="$(stamp m1)"; G=""
+G="$G$(printf 'not json' | python3 "$HELPER" seen 2>&1)$?"
+G="$G$(event m1 PreToolUse ',"effort":{"level":"HIGH; rm"},"model":["x"]' seen)$?"
+G="$G$(event m1 PreToolUse ',"effort":7,"model":{"id":"a b","display_name":7}' seen)$?"
+G="$G$(event '../m1' PreToolUse ',"effort":{"level":"low"}' seen)$?"
+G="$G$(printf '{"session_id":"m1","effort":{"level":"low"}}' | XDG_CACHE_HOME="$WORK/ro" python3 "$HELPER" seen 2>&1)$?"
+CMD="$(python3 -c 'import json,sys
+h = json.load(open(sys.argv[1]))["hooks"]["PreToolUse"]
+c = [x for g in h for x in g["hooks"] if "hooks/session-runtime.py\" seen;" in x["command"] and x.get("timeout") == 5 and x["command"].endswith("exit 0")]
+assert len(c) == 1 and all("matcher" not in g for g in h); print(c[0]["command"])' "$ROOT/hooks/hooks.json")"
+G="$G$(printf '{"session_id":"m1"}' | env -i PATH="$WORK/nobin" CLAUDE_PLUGIN_ROOT="$ROOT" /bin/sh -c "$CMD" 2>&1)$?"
+if [ "$G" = 000000 ] && [ "$(stamp m1)" = "$S2" ] && [ -n "$CMD" ]; then
+  ok "(20) seen fails open on garbage (no write, silent, exit 0); hooks.json runs it on every PreToolUse, 5 s timeout, exit 0 without python3"
+else bad "(20) g=$G cmd=$CMD"; fi
+
+# (21) the status line's path: observe() notes the payload's model and effort in an existing
+#      record, writes only when one changed, and never raises
+OBS="$(python3 - "$HELPER" <<'PY'
+import os, sys, types
+helper = sys.argv[1]; rt = types.ModuleType("rt"); rt.__file__ = helper
+exec(compile(open(helper, "rb").read(), helper, "exec"), rt.__dict__)
+out = [rt.observe("m2", "claude-opus-5", "Opus 5", "medium"), rt.observe("m2", "claude-opus-5", "Opus 5", "medium"),
+       rt.observe("m2", "claude-opus-5", None, None), rt.observe("m2", "claude-sonnet-5", "Sonnet 5", "medium"),
+       rt.observe("m2", None, None, None), rt.observe("absent", "claude-opus-5", "Opus 5", "high"),
+       rt.observe(None, {"x": 1}, 7, ["high"])]
+print("".join("1" if o else "0" for o in out))
+PY
+)"
+if [ "$OBS" = 1001000 ] && [ "$(field m2 model.id)/$(field m2 model.name)/$(field m2 effort.level)" = "claude-sonnet-5/Sonnet 5/medium" ]; then
+  ok "(21) observe: first sight writes, the same values do not, a new model does; nothing to note, no record and garbage → False, no error"
+else bad "(21) obs=$OBS $(cat "$SESSIONS/m2.json")"; fi
+
+# (22) verdicts: an alias matches by family, [1m] is ignored on either side, a full id matches its dated form too
+seed() { # seed SESSION MODEL EFFORT
+  event "$1" SessionStart ",\"model\":\"$2\"" >/dev/null; [ -z "${3:-}" ] || event "$1" PreToolUse ",\"effort\":{\"level\":\"$3\"}" seen >/dev/null
+}
+seed v1 claude-fable-5-2 high; seed v2 'claude-opus-5[1m]' high; seed v3 claude-opus-5-20270101 high
+RF="$(mkrepo models-full '{"sessionModels":{"runner":{"model":"claude-opus-5","effort":"high"},"planning":{"model":"fable[1m]"}}}')"
+V="$(mverdict planning v1) $(mverdict runner v2) $(mverdict runner v2 "$RF") $(mverdict runner v3 "$RF") $(mverdict planning v1 "$RF") $(mverdict runner v1)"
+LINE="$(python3 "$HELPER" models --role planning --session v1 --repo "$R")"
+if [ "$V" = "match match match match match mismatch" ] \
+   && [ "$LINE" = '{"expected": {"effort": "high", "model": "fable"}, "role": "planning", "running": {"effort": "high", "model": "claude-fable-5-2"}, "verdict": "match"}' ]; then
+  ok "(22) models: alias ↔ family, [1m] ignored either side, a full id also in its dated form, a different family mismatches; one JSON line"
+else bad "(22) $V | $LINE"; fi
+
+# (23) anchored, never a substring: `opus` does not match an id whose segment merely starts with it
+seed v4 claude-opusplan-x high; seed v5 claude-3-5-sonnet-20241022 high
+RS="$(mkrepo models-sonnet '{"sessionModels":{"runner":{"model":"sonnet"}}}')"
+V="$(mverdict runner v4) $(mverdict runner v1) $(mverdict runner v5 "$RS") $(mverdict runner v2 "$RS")"
+if [ "$V" = "mismatch mismatch match mismatch" ]; then
+  ok "(23) models: opus ≠ claude-opusplan-x and ≠ claude-fable-…; sonnet matches an id carrying it as a whole segment"
+else bad "(23) $V"; fi
+
+# (24) the effort alone mismatches; a configured override decides; the default session id is CLAUDE_CODE_SESSION_ID
+seed v6 claude-opus-5 medium
+RE="$(mkrepo models-effort '{"sessionModels":{"runner":{"effort":"medium"},"planning":{"model":"opus","effort":"medium"}}}')"
+ENVV="$(CLAUDE_CODE_SESSION_ID=v6 python3 "$HELPER" models --role runner --repo "$RE" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["verdict"], d["expected"]["effort"], d["running"]["effort"])')"
+V="$(mverdict runner v6) $(mverdict runner v6 "$RE") $(mverdict planning v6 "$RE") $(mverdict planning v6)"
+if [ "$V" = "mismatch match match mismatch" ] && [ "$ENVV" = "match medium medium" ]; then
+  ok "(24) models: effort-only mismatch; a repository's own sessionModels decide; the session defaults to CLAUDE_CODE_SESSION_ID"
+else bad "(24) $V | $ENVV"; fi
+
+# (25) unknown is never a mismatch: no record, no session, an effort or model not seen yet, a name
+#      that cannot be compared, a bad role, an unreadable config; a KNOWN difference still mismatches
+seed v7 claude-opus-5; event v8 SessionStart '' >/dev/null; event v8 PreToolUse ',"effort":{"level":"high"}' seen >/dev/null
+RD="$(mkrepo models-default '{"sessionModels":{"runner":{"model":"opusplan"},"planning":{"model":"best"}}}')"
+RB="$(mkrepo models-bad '{"sessionModels":{"runner":{"model":"gpt-9","effort":"huge"}}}')"; RJ="$(mkrepo models-junk 'not json')"
+V="$(mverdict runner nosuch) $(env -u CLAUDE_CODE_SESSION_ID python3 "$HELPER" models --role runner --repo "$R" | grep -c '"verdict": "unknown"')"
+V="$V $(mverdict runner v7) $(mverdict runner v8) $(mverdict runner v2 "$RD") $(mverdict planning v2 "$RD") $(mverdict runner v2 "$RB")"
+V="$V $(mverdict nobody v2) $(mverdict runner v2 "$RJ") $(mverdict runner v6 "$RD") $(mverdict planning v7)"
+RCS="$(python3 "$HELPER" models >/dev/null 2>&1; echo $?)$(python3 "$HELPER" models --role >/dev/null 2>&1; echo $?)"
+if [ "$V" = "unknown 1 unknown unknown unknown unknown unknown unknown match mismatch mismatch" ] && [ "$RCS" = 00 ]; then
+  ok "(25) models: no record / no session / value not seen / default, best, opusplan / an unusable name / a bad role → unknown, exit 0; a known difference still mismatches"
+else bad "(25) $V rc=$RCS"; fi
+
+# (26) sessionModels.check: false → off, whatever runs
+RO="$(mkrepo models-off '{"sessionModels":{"check":false}}')"
+if [ "$(mverdict runner v1 "$RO") $(mverdict planning nosuch "$RO")" = "off off" ]; then
+  ok "(26) models: sessionModels.check false → off"; else bad "(26) $(mverdict runner v1 "$RO")"; fi
+
+# (27) doctor's lines: each role's effective values and their source; a WARN per unusable name
+REP="$(python3 "$HELPER" models-report --repo "$R")"; REPB="$(python3 "$HELPER" models-report --repo "$RB")"; REPO_OFF="$(python3 "$HELPER" models-report --repo "$RO")"
+if printf '%s\n' "$REP" | grep -q '^sessionModels.planning: model "fable" (shipped default), effort "high" (shipped default)$' \
+   && printf '%s\n' "$REP" | grep -q '^sessionModels.runner: model "opus" (shipped default), effort "high" (shipped default)$' \
+   && ! printf '%s\n' "$REP" | grep -q '^WARN' && printf '%s\n' "$REP" | head -1 | grep -q 'which models this account offers cannot be read' \
+   && printf '%s\n' "$REPB" | grep -q '^sessionModels.runner: model "gpt-9" (configured), effort "huge" (configured)$' \
+   && [ "$(printf '%s\n' "$REPB" | grep -c '^WARN sessionModels.runner.\(model\|effort\): ')" = 2 ] \
+   && printf '%s\n' "$REPO_OFF" | grep -q '^sessionModels.check: false' \
+   && ! python3 "$HELPER" models-report --repo "$RF" | grep -q '^WARN'; then
+  ok "(27) models-report: effective values with their source; WARN for a name that is no alias or claude-… id and an effort outside the five; the switch reported"
+else bad "(27) $REP | $REPB"; fi
+
+# (28) the contract and its six citing skills: each cites session-models.md with its role, and
+#      the defaults the contract states are the ones the helper and the registry ship
+if python3 - "$ROOT" "$HELPER" <<'PY'
+import json, re, sys, types
+root, helper = sys.argv[1:3]
+ref = "`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/session-models.md`"
+roles = {"plan": "planning", "insert-story": "planning", "insert-defect": "planning", "rebalance": "planning",
+         "build-item": "runner", "ultracode-build": "runner"}
+for skill, role in roles.items():
+    lines = [l for l in open("%s/skills/%s/SKILL.md" % (root, skill), encoding="utf-8") if ref in l]
+    assert len(lines) == 1 and "once per top-level run" in lines[0] and "role `%s`" % role in lines[0], skill
+assert "`build-item` invoked" in [l for l in open(root + "/skills/ultracode-build/SKILL.md", encoding="utf-8") if ref in l][0]
+text = open(root + "/skills/plan/references/session-models.md", encoding="utf-8").read()
+assert text.startswith("---\nload: contract\n---\n") and "## Cited by" in text
+rt = types.ModuleType("rt"); rt.__file__ = helper
+exec(compile(open(helper, "rb").read(), helper, "exec"), rt.__dict__)
+reg = {e["key"]: e for e in json.load(open(root + "/schemas/seam-registry.json"))["settings"]}
+for role, (model, effort) in rt.ROLES.items():
+    assert reg["sessionModels.%s.model" % role]["default"] == model and reg["sessionModels.%s.effort" % role]["default"] == effort
+    assert reg["sessionModels.%s.effort" % role]["enum"] == list(rt.EFFORTS)
+    assert re.search(r"\| `%s` \|[^\n]*default `%s`[^\n]*default `%s`" % (role, model, effort), text), role
+assert reg["sessionModels.check"]["default"] is True
+for word in list(rt.MODEL_ALIASES) + list(rt.EFFORTS) + ["match", "mismatch", "unknown", "off", "/model", "/effort", "models --role"]:
+    assert word in text, word
+schema = json.load(open(root + "/schemas/ds-config.schema.json"))["properties"]["sessionModels"]["properties"]
+assert set(schema) == {"check", "planning", "runner"} and schema["runner"]["properties"]["effort"]["enum"] == list(rt.EFFORTS)
+assert "session-runtime.py models-report" in open(root + "/skills/doctor/SKILL.md", encoding="utf-8").read()
+PY
+then ok "(28) plan, insert-story, insert-defect, rebalance (planning) and build-item, ultracode-build (runner) each cite the contract once; contract, helper, registry and schema agree; doctor runs models-report"
+else bad "(28) a citing skill, the contract or the registry disagrees"; fi
+
+# (29) what the review found: a helper agent's tool call never changes the session's effort, a
+# model switch is learned from its own event, and a full id matches its dated and provider forms.
+if python3 - "$HELPER" <<'PY'
+import json, os, subprocess, sys, tempfile, types
+helper = sys.argv[1]
+home = tempfile.mkdtemp()
+env = dict(os.environ, HOME=home, XDG_CACHE_HOME=home + "/cache", CLAUDE_PLUGIN_ROOT=os.path.dirname(os.path.dirname(helper)))
+def run(mode, payload):
+    done = subprocess.run([sys.executable, helper, mode], input=json.dumps(payload), text=True, env=env, capture_output=True)
+    assert done.returncode == 0 and done.stdout == "", (mode, done)
+def record():
+    return json.load(open(home + "/cache/devstride-plugin/sessions/s29.json"))
+run("record", {"session_id": "s29", "model": "claude-opus-5-5", "transcript_path": "/dev/null"})
+run("seen", {"session_id": "s29", "effort": {"level": "high"}})
+run("seen", {"session_id": "s29", "agent_id": "a1", "agent_type": "general-purpose", "effort": {"level": "low"}})
+assert record()["effort"]["level"] == "high", "a helper's effort was recorded"
+run("seen", {"session_id": "s29", "hook_event_name": "PostModelSwitch", "from_model": "claude-opus-5-5", "to_model": "claude-fable-5-2"})
+assert record()["model"]["id"] == "claude-fable-5-2", "the switch was not learned"
+rt = types.ModuleType("rt"); rt.__file__ = helper
+exec(compile(open(helper, "rb").read(), helper, "exec"), rt.__dict__)
+for running in ("claude-opus-5-5-20261001", "us.anthropic.claude-opus-5-5-v1:0", "claude-opus-5-5[1m]"):
+    assert rt.model_matches("claude-opus-5-5", running) is True, running
+    assert rt.model_matches("opus", running) is True, running
+assert rt.model_matches("claude-opus-5-5", "claude-opus-5-6") is False
+assert rt.model_matches("claude-opus-5-5", "claude-opus-5-5@20261001") is True
+assert rt.model_matches("claude-3-5-sonnet-20240620", "anthropic.claude-3-5-sonnet-20241022-v2:0") is False, "two dates of one name are two models"
+assert rt.model_matches("claude-3-5-sonnet-20240620", "claude-3-5-sonnet-20240620") is True
+assert rt.model_matches("opus", "claude-fable-5-2") is False
+hooks = json.load(open(os.path.dirname(helper) + "/hooks.json"))["hooks"]
+assert any("session-runtime.py\" seen" in h["command"] for e in hooks["PostModelSwitch"] for h in e["hooks"])
+PY
+then ok "(29) a helper's effort is ignored, a model switch is learned from its event, a full id matches its dated and provider forms"
+else bad "(29) a helper's effort, a model switch or a full id's other forms is misread"; fi
+
 exit $FAIL

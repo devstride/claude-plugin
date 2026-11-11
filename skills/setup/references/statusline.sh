@@ -1,5 +1,5 @@
 #!/bin/bash
-# ds-statusline: managed v3.48.0 — installed and kept up to date by the devstride
+# ds-statusline: managed v3.51.0 — installed and kept up to date by the devstride
 # plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
 # replaces a file that still carries it, and never touches one that does not.
 #
@@ -145,6 +145,12 @@ if d.get("session_id"):
             with open(helper, "rb") as source:
                 exec(compile(source.read(), helper, "exec"), runtime.__dict__)
             verdict = runtime.check(d.get("session_id"), cwd or None)
+            # The payload carries the live model and effort: note them in the same record (a write
+            # only when one changed), for the skills that compare them with what the repository expects.
+            if hasattr(runtime, "observe"):
+                model = d.get("model") if isinstance(d.get("model"), dict) else {}
+                effort = d.get("effort") if isinstance(d.get("effort"), dict) else {}
+                runtime.observe(d.get("session_id"), model.get("id"), model.get("display_name"), effort.get("level"))
             if verdict.get("verdict") == "reload":
                 plugin_state = "reload|%s|%s" % (verdict["running"], verdict["installed"])
             elif verdict.get("verdict") == "update":

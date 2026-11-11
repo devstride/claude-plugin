@@ -5,6 +5,8 @@ description: "Build engine for a scoped DevStride story: understand, build, veri
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
+**Session model.** Read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/session-models.md` once per top-level run, role `runner`, first — never when `build-item` invoked this skill.
+
 **Goal:** one scoped story built, verified green at its profile's width, risk-checked and handed
 back with evidence — understand → build → verify → risk check → hand back. Invoked by `build-item`
 once the branch exists and the item is In Progress; it never opens a PR or merges.

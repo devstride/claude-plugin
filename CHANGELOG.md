@@ -8,6 +8,86 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.51.0] — 2026-11-11
+
+### Added
+
+- **Planning and build skills say when the session is not running the model and effort the
+  repository expects, and ask once whether to switch.** A repository sets what it expects in
+  `.claude/ds-config.json` under the new `sessionModels` block: `sessionModels.planning.model` and
+  `sessionModels.planning.effort` for `plan`, `insert-story`, `insert-defect` and `rebalance`
+  (defaults `fable` and `high`), `sessionModels.runner.model` and `sessionModels.runner.effort`
+  for `build-item` and `ultracode-build` (defaults `opus` and `high`), and `sessionModels.check`
+  (`false` switches the check off). When one of those skills starts in a session running something
+  else, it says so in one line and asks once: switch, or carry on. Only the person can switch, so
+  on "switch" it names the two commands to type (`/model <name>`, `/effort <level>`) and waits; on
+  "carry on" it proceeds. It says nothing when the session matches or its model and effort are not
+  known. A run driven by another skill, a loop or a scheduled prompt is never asked and never
+  waits: it carries on and names the difference in its final report. Planning also says, in the
+  same line and without asking, when the delivery profile in force is not `extended`. Helper agents
+  keep their task-sized routing. The rule lives in one new contract,
+  `skills/plan/references/session-models.md`, which each of the six skills cites.
+- **The per-session record now holds the session's live model and effort.**
+  `hooks/session-runtime.py` takes the model from the session-start payload when it carries one,
+  the effort from a new `PreToolUse` hook (`seen`: one small local read before each tool call, no
+  network, no subprocess, and a write only when the value changed), and both from the shipped
+  status line, whose payload carries them live. Its new `models --role planning|runner` mode prints
+  one JSON line, `{role, expected, running, verdict}`, with the verdict `match`, `mismatch`,
+  `unknown` or `off`. A model alias matches a running id by family and never as a substring, a
+  `[1m]` suffix is ignored, a full id matches the same model however it is reached (a provider prefix or version and a release date are ignored too), and `default`, `best` and `opusplan`
+  cannot be compared, so they read as `unknown`. Every error reads as `unknown`.
+- **`doctor config` reports the two expected models and efforts** with their source (configured or
+  shipped default), and warns about a model name that is neither a documented alias nor a full
+  `claude-…` id, or an effort outside the five levels. It checks the shape of a name only: which
+  models an account offers cannot be read locally. The config validator accepts the new keys and
+  rejects an effort outside `low`, `medium`, `high`, `xhigh`, `max`.
+
+### Changed
+
+- **The shipped status line passes its payload's model and effort to the session record.** The
+  bar itself looks the same. A repository's managed copy picks the change up at the release that
+  raises the file's `ds-statusline: managed` marker.
+- **`doctor` body trimmed to make room:** the worked example beside "skip shell builtins" and the
+  reason beside the `conventionsDoc` check are gone; both rules stay.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.50.0 @ 6640654, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.50.0 | tokens@devstride--v3.50.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,454 | 8,152 | 24,592 | 8,198 | +46 | 8,198 |
+| skills/review/SKILL.md | 23,980 | 7,994 | 23,980 | 7,994 | +0 | 7,999 |
+| skills/doctor/SKILL.md | 23,942 | 7,981 | 23,974 | 7,992 | +11 | 7,992 |
+| skills/build-item/SKILL.md | 23,745 | 7,915 | 23,881 | 7,961 | +46 | 7,985 |
+| skills/release/SKILL.md | 17,982 | 5,994 | 17,982 | 5,994 | +0 | 5,995 |
+| skills/rebalance/SKILL.md | 17,712 | 5,904 | 17,850 | 5,950 | +46 | 5,950 |
+| skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,838 | 4,946 | +61 | 4,946 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,708 | 2,236 | 6,708 | 2,236 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-story/SKILL.md | 6,299 | 2,100 | 6,299 | 2,100 | +0 | 2,100 |
+| skills/comprehend-plan/SKILL.md | 5,580 | 1,860 | 5,580 | 1,860 | +0 | 1,860 |
+| skills/insert-defect/SKILL.md | 5,120 | 1,707 | 5,258 | 1,753 | +46 | 1,753 |
+| skills/insert-story/SKILL.md | 4,443 | 1,481 | 4,581 | 1,527 | +46 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 270,399 | 90,140 | 271,302 | 90,442 | +302 | |
+
 ## [3.50.0] — 2026-11-10
 
 ### Added
@@ -4520,7 +4600,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.50.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.51.0...HEAD
+[3.51.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.50.0...devstride--v3.51.0
 [3.50.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.49.0...devstride--v3.50.0
 [3.49.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.48.0...devstride--v3.49.0
 [3.48.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.47.0...devstride--v3.48.0

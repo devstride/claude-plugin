@@ -5,6 +5,8 @@ description: Insert a new Defect into a live DevStride roadmap, spliced into the
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
+**Session model.** Read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/session-models.md` once per top-level run, role `planning`, first.
+
 **Goal.** Insert a NEW Defect (the one-day leaf role — this org's Defect type) into a live DevStride roadmap, spliced into the dependency chain and dated so the `/devstride:build-item` loop picks it up NEXT. Its POSITION looks native to the plan; its DESCRIPTION stays an honest repro/root-cause of the real bug. `build-item` step 6.5 never uses it: a review finding worth filing goes to `/devstride:create-defect` DEFERRED, beside the chain, never into it.
 
 Argument — free text describing the defect, optionally with a parent item number at any grouping level (this org: Module/Capability/Epic — e.g. `I20100 webhook retries duplicate on 429`, or just `webhook retries duplicate on 429`). **Take any `--ticket <ticket#>[,<ticket#>]` out FIRST**, before reading the parent or the description: it names an originating ticket, never the parent (**read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/originating-ticket.md` in full before linking**): $ARGUMENTS
