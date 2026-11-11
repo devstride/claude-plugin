@@ -67,6 +67,8 @@ Optional arguments: $ARGUMENTS
 ## 0. Preconditions and the release delta
 
 - **`claims` set → the train claim first** (`auto-start.md`).
+- **`needsYou.label` set** → read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md`
+  now and at step 4's unattended stop (the merge still waits).
 - **Confirm the shape**: `releaseSource` (**develop**) → `productionBranch` (**master**), whatever
   branch the checkout is on. An open PR into `productionBranch` headed by a release branch (with
   `release.releaseBranchPattern` absent: headed by `releaseSource`) is ADOPTED, never duplicated —

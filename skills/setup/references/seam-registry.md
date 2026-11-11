@@ -270,6 +270,10 @@ starting with `_` and `$schema` are never reported as unknown.
 | `sessionModels.runner` | object | — | — | what the build runner (build-item, ultracode-build) expects | 3.51.0 |
 | `sessionModels.runner.model` | string | — | opus | a model alias (optionally with [1m]) or a full claude-… id | 3.51.0 |
 | `sessionModels.runner.effort` | string | low, medium, high, xhigh, max | high | the effort level | 3.51.0 |
+| `needsYou` | object | — | — | the Needs-you list: where an unattended run queues a question only the owner can answer; contract: skills/build-item/references/needs-you.md | unreleased |
+| `needsYou.label` | string | — | — | the tracker tag that marks an item with an open question; absent means the feature is off and every skill stops and asks as before | unreleased |
+| `needsYou.view` | string | — | — | the saved view that shows the tagged items, a URL or a name; only ever quoted to people | unreleased |
+| `needsYou.fallbackItem` | string | — | — | the item number a question that belongs to no item (a release, a machine problem) is queued on | unreleased |
 | `localEnvironment` | object, null | — | — | this repository's isolated local instances; null reads as absent | pre-registry |
 | `localEnvironment.recreateMode` | string, null | inPlace, newInstance, `null` | `null` | which shape recreate is | pre-registry |
 | `pool` | object, null | — | — | the repository's checkout-pool commands, set both or neither (one alone is an error); null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md | 3.20.0 |

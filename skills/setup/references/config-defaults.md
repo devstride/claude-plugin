@@ -504,6 +504,13 @@ session to run; every key is optional and these are the defaults. A skill only r
 difference and asks once; `check: false` silences it. Contract:
 `skills/plan/references/session-models.md`.
 
+## Needs-you list
+
+Optional, written by hand: `needsYou.label` (a tracker tag's name; absent → off, every skill stops
+and asks as before), `needsYou.view` (the saved view's URL or name, quoted in reports) and
+`needsYou.fallbackItem` (an item number for a question that belongs to no item). Contract:
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md`.
+
 ## Active Agents
 
 Optional, and only `/devstride:setup agents` writes it, after a typed yes:

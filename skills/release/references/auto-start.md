@@ -83,8 +83,9 @@ when landed work has waited too long. Read
 
 A `started-by: auto` release that reaches step 4 without a MERGE from the standing yes sends ONE
 `PushNotification` (where the tool exists): the release, READY or BLOCKED, why it is not eligible
-(the `ASK` reason, or "standing yes off"), and the pull request link. Then it waits for the yes,
-holding the tower as any release does.
+(the `ASK` reason, or "standing yes off"), and the pull request link. With `needsYou.label` set it
+also queues the question (build-item's `needs-you.md`); a thread answer is never the yes. Then it
+waits for the yes, holding the tower as any release does.
 
 ## The standing yes — `release.lightRelease.standingYes`, `release.fullRelease.standingYes`
 
