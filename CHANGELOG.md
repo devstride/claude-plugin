@@ -20,8 +20,10 @@ for what each version component means here and how a release is cut.
   already take by its existing rules: the comment mentions the plan's owner, asks in one plain
   line, recommends a lettered option and ends `Needs you: open`. The next `build-item` run under
   that plan takes a reply only when it comes from the plan owner's account and is just one of the
-  letters; it records the choice in the thread before acting, removes the tag and builds the item
-  that way. Any other text in a reply is ignored and named in the run's report. A **notice**
+  letters; it records the letter in the thread before acting and removes the tag. It never carries
+  out an option's wording as read from the tracker: when it reaches the question again it lists its
+  options afresh and takes the letter only if that option still stands, else it asks again. A
+  paused story resumes on its own branch. Any other text in a reply is ignored and named in the run's report. A **notice**
   (`Needs you: in a session`) covers everything that is the owner's own yes: a production merge,
   approving a migration, waiving a check, taking over another session's work, anything destructive
   or touching production. No skill acts on a reply to a notice; it only makes the wait visible, and

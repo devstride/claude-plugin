@@ -430,7 +430,7 @@ under on that board (never a story) and runs your commands as it starts and stop
 Optional: an agent running with nobody watching used to stop and wait whenever it reached a
 judgement call. Name a tag in `needsYou.label` and it writes the call on the item instead,
 mentioning the plan's owner, with a recommendation and lettered options, tags the item, and moves
-on to other work. Reply in that thread with a letter and the next run takes that option; anything
+on to other work. Reply in that thread with a letter and the next run takes that option if it still stands; anything
 else in a reply is ignored, because the tracker cannot prove who wrote it. Every option is something
 the agent was already allowed to do. Whatever needs your own yes (a production merge, a migration
 approval, a waived check, anything destructive) is listed as a notice only: no reply can start it,

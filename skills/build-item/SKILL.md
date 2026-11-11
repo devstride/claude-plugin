@@ -151,7 +151,7 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
 - **Plan root**: `$ARGUMENTS`, else handoff memory; not ONE unambiguous root while several plans are
   open → STOP and ask.
 - **`needsYou.label` set** → read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md`
-  once the root resolves and at an unattended PAUSE.
+  here (a given item too) and at an unattended PAUSE.
 - **Release scope**: once the root resolves, BEFORE selection, read any `Release scope:` line on it,
   its ancestors and the grouping items above each release unit (`view: 'full'`). The nearest one
   above a unit decides, any case: `plan` → read
