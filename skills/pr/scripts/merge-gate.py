@@ -8,9 +8,10 @@ consuming repository's `.claude/ds-config.json` for the one rule that needs it (
   merge-gate.py <pr-number> <expected-head-sha> [--all-green] [--delete-branch] [--subject <text>]
                 [--repo <owner>/<name>] [--config <ds-config.json>]
 
-  --config defaults to `.claude/ds-config.json` at the top of the git checkout the gate runs in. No
-  such file (a repository without the loop's config) leaves the train proof rule inert; a file that
-  cannot be read or parsed is an ERROR.
+  --config defaults to `.claude/ds-config.json` at the top of the git checkout the gate runs in,
+  which must be a checkout of the repository inspected. Only a confirmed checkout of it without
+  that file (a repository without the loop's config) leaves the train proof rule inert; no
+  checkout, a checkout of another repository, or a file that cannot be read or parsed is an ERROR.
 
   MERGE gh pr merge <n> --repo <owner>/<name> --merge --match-head-commit <sha> [--admin]
         [--delete-branch] [--subject '<text>']   exit 0: the repository it inspected is named, and
@@ -25,10 +26,13 @@ The rule (an approver's admin merge exactly when every required check is green, 
   configured release train (`releaseTrain.branch`) and any changed file, by new or old name (the
   pull request's file list, every page, its count checked against GitHub's), matches
   `release.releaseBranchFixExclusions` (the one anchored matcher, `routing.py`'s `first_match`),
-  the head must carry the settled review's proof for THIS pull request into THIS base
-  (`reviewed-status.py verify <head> --pr <n> --base <base>`, its admin-trust rules unchanged). No
-  proof is a REFUSE naming the `post` command, which still works because the pull request is open;
-  a proof GitHub cannot read is an ERROR. The release's train exclusion check refuses an unproven
+  the head must be a release unit the train check accepts (its name matches
+  `epicIntegrationBranches.pattern` or `planIntegrationBranches.pattern`, as `train_exclusions.py`
+  matches it; anything else is a REFUSE, since a proof would not save it) and must carry the settled
+  review's proof for THIS pull request into THIS base (`reviewed-status.py verify <head> --pr <n>
+  --base <base>`, its admin-trust rules unchanged). No proof is a REFUSE naming the `post` command,
+  pinned to the repository with `GH_REPO`, which still works because the pull request is open; a
+  proof GitHub cannot read is an ERROR. The release's train exclusion check refuses an unproven
   unit's migrations and deploy configuration hours later, when a merged pull request can no longer
   take a proof, so the gate asks for it while it still can. No train configured, another base, or
   no excluded path changed: the rule does nothing.
@@ -142,7 +146,7 @@ PLAIN = ("CLEAN", "HAS_HOOKS", "UNSTABLE")
 PR_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      number state isDraft headRefOid baseRefName mergeStateStatus reviewDecision changedFiles
+      number state isDraft headRefOid headRefName baseRefName mergeStateStatus reviewDecision changedFiles
       latestOpinionatedReviews(first: 100) { pageInfo { hasNextPage } nodes { state author { login } } }
       potentialMergeCommit { oid }
       commits(last: 1) { nodes { commit { oid statusCheckRollup {
@@ -626,15 +630,22 @@ def load(module_name, path):
     return module
 
 
-def read_config(path):
-    """(train, exclusions) from the consuming repository's config; (None, []) when it has none."""
+def read_config(path, owner, name):
+    """(train, exclusions, unit patterns) from the consuming repository's config; (None, [], [])
+    only when a confirmed checkout of the inspected repository has no config."""
     if path is None:
         code, out, _ = git_out("rev-parse", "--show-toplevel")
         if code != 0 or not out.strip():
-            return None, []
-        path = os.path.join(out.strip(), ".claude", "ds-config.json")
+            raise Unreadable("not in a git checkout, so the repository's config cannot be found: run from a "
+                             "checkout of %s/%s or pass --config" % (owner, name))
+        top = out.strip()
+        code, here, err = gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
+        if code != 0 or here.strip().lower() != ("%s/%s" % (owner, name)).lower():
+            raise Unreadable("this checkout is not %s/%s (%s), so its config is not that repository's: run "
+                             "from a checkout of it or pass --config" % (owner, name, (here or err).strip()[:80] or "unknown"))
+        path = os.path.join(top, ".claude", "ds-config.json")
         if not os.path.exists(path):
-            return None, []
+            return None, [], []
     try:
         with open(path) as f:
             config = json.load(f)
@@ -653,7 +664,15 @@ def read_config(path):
         raise Unreadable("config: release.releaseBranchFixExclusions must be a list of patterns")
     if train is not None and (not isinstance(train, str) or not train):
         raise Unreadable("config: releaseTrain.branch must be a non-empty string when set")
-    return (train if exclusions else None), exclusions
+    units = []
+    for key in ("epicIntegrationBranches", "planIntegrationBranches"):
+        pattern = (config.get(key) or {}).get("pattern") if isinstance(config.get(key), dict) else None
+        if isinstance(pattern, str) and pattern:
+            try:
+                units.append(routing.template_regex(pattern, {}))
+            except SystemExit:
+                raise Unreadable("config: %s.pattern cannot be read" % key)
+    return (train if exclusions else None), exclusions, units
 
 
 def git_out(*args):
@@ -694,7 +713,7 @@ def changed_paths(owner, name, number, expected_count):
 
 def train_proof(pr, number, expected, owner, name, base, config_path):
     """REFUSE a merge onto the train of excluded paths whose head carries no review proof."""
-    train, exclusions = read_config(config_path)
+    train, exclusions, units = read_config(config_path, owner, name)
     if not train or base != train:
         return
     routing = load("merge_gate_routing", ROUTING)
@@ -705,6 +724,11 @@ def train_proof(pr, number, expected, owner, name, base, config_path):
         raise Unreadable("a release.releaseBranchFixExclusions pattern cannot be read")
     if hit is None:
         return
+    head = pr.get("headRefName")
+    if not isinstance(head, str) or not any(u.match(head) for u in units):
+        raise Refuse("#%d carries %s onto the train %s (it matches release.releaseBranchFixExclusions), but its head %s "
+                     "is not an epic or plan integration branch, so the release refuses it even with a review proof: "
+                     "merge it to the release source through its own pull request" % (number, hit, base, head))
     reviewed = load("merge_gate_reviewed_status", REVIEWED)
     previous = os.environ.get("GH_REPO")
     os.environ["GH_REPO"] = "%s/%s" % (owner, name)   # its `{owner}/{repo}` reads name this repository
@@ -720,8 +744,9 @@ def train_proof(pr, number, expected, owner, name, base, config_path):
     if not ok:
         raise Refuse("#%d carries %s onto the train %s (it matches release.releaseBranchFixExclusions) and its head "
                      "has no review proof (%s); once its review has settled, post it while the pull request is open: "
-                     "python3 %s post %s --pr %d --base %s"
-                     % (number, hit, base, why, shlex.quote(REVIEWED), expected, number, shlex.quote(base)))
+                     "GH_REPO=%s python3 %s post %s --pr %d --base %s"
+                     % (number, hit, base, why, shlex.quote("%s/%s" % (owner, name)), shlex.quote(REVIEWED), expected,
+                        number, shlex.quote(base)))
 
 
 def decide(number, expected, owner, name, delete_branch, subject=None, all_green=False, config_path=None):

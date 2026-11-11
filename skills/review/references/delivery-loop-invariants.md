@@ -267,7 +267,8 @@ K6. Infra-touching fixes never land on a release branch: a commit staging any pa
     posted only at settle or 5b's carry, never to clear a refusal; a branch name is never proof.
     The merge gate enforces it at the merge, not hours later at the release: a pull request into
     the train that changes such a path (new or old name, every page of its file list) merges only
-    when `reviewed-status.py verify <head> --pr <n> --base <train>` passes; no proof is a REFUSE
+    when its head is an epic or plan integration branch and `reviewed-status.py verify <head> --pr
+    <n> --base <train>` passes; no proof is a REFUSE
     naming the `post` command (the pull request is still open), an unreadable proof an ERROR, and
     for such a pull request review's `NOT POSTED` is a stop, not degradation.
 K7. One matching rule for `protectedBranches`, `releaseBranchPattern` and
@@ -917,7 +918,7 @@ skills/release/references/release-branch.md|grandfatheredUnits
 skills/build-item/references/epic-release-steps.md|merge-gate.py
 skills/pr/scripts/merge-gate.py|an admin merge would bypass a block it cannot name
 skills/pr/scripts/merge-gate.py|has no review proof
-skills/review/references/review-ledger.md|There `NOT POSTED` is a STOP before the merge
+skills/review/references/review-ledger.md|`NOT POSTED` is a STOP before the
 skills/build-item/SKILL.md|release-holds.md
 skills/release/SKILL.md|release-holds.md
 skills/release/references/release-branch.md|Release holds.

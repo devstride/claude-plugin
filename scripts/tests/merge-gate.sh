@@ -428,7 +428,10 @@ CFG = os.path.join(work, "ds-config.json")
 def cfg(value):
     json.dump(value, open(CFG, "w")) if not isinstance(value, str) else open(CFG, "w").write(value)
     return ["--config", CFG]
-TRAIN = {"releaseTrain": {"branch": "train/release"}, "release": {"releaseBranchFixExclusions": ["db/migrations/**", "stacks/**"]}}
+TRAIN = {"releaseTrain": {"branch": "train/release"}, "release": {"releaseBranchFixExclusions": ["db/migrations/**", "stacks/**"]},
+         "epicIntegrationBranches": {"pattern": "<prefix>/<YY-MM-DD>/epic-<slug>"},
+         "planIntegrationBranches": {"pattern": "<prefix>/<YY-MM-DD>/plan-<slug>"}}
+EPIC = "kim/26-01-15/epic-export"
 MIG = [{"filename": "db/migrations/0042_add.sql"}, {"filename": "src/app.ts"}]
 def proof(pr=7, base="train/release", state="success", login="owner", ident=1, when="2026-01-15T18:30:00Z"):
     return {"context": "devstride/reviewed", "state": state, "id": ident, "created_at": when,
@@ -436,10 +439,13 @@ def proof(pr=7, base="train/release", state="success", login="owner", ident=1, w
 def onto_train(**changes):
     base = dict(baseRefName="train/release", changedFiles=len(changes.get("files", MIG)), files=MIG)
     base.update(changes)
+    head = base.pop("headRefName", EPIC)
     s = sc(**{k: v for k, v in base.items() if k != "changedFiles"})
     s["pr"]["changedFiles"] = base["changedFiles"]
+    s["pr"]["headRefName"] = head
     return s
 POST = "reviewed-status.py post %s --pr 7 --base train/release" % H
+PIN = "GH_REPO=acme/widgets python3 "
 def gate(scenario, config):
     for f in (".ghrepo",):
         try:
@@ -449,8 +455,8 @@ def gate(scenario, config):
     return run(7, H, scenario, *cfg(config))
 code, out, err = gate(onto_train(), TRAIN)
 say(code == 2 and out[0].startswith("REFUSE ") and "db/migrations/0042_add.sql" in out[0] and "no review proof" in out[0]
-    and POST in out[0] and "Traceback" not in err,
-    "(33a) onto the train with a migration and no review proof -> REFUSE naming the post command", "rc=%d %r %r" % (code, out, err))
+    and POST in out[0] and PIN in out[0] and "Traceback" not in err,
+    "(33a) onto the train with a migration and no review proof -> REFUSE naming the post command, pinned to the repository", "rc=%d %r %r" % (code, out, err))
 code, out, err = gate(onto_train(statuses=[proof()]), TRAIN)
 ghrepo = open(os.environ["GH_LOG"] + ".ghrepo").read().split() if os.path.exists(os.environ["GH_LOG"] + ".ghrepo") else []
 say(code == 0 and out[0].startswith("MERGE gh pr merge 7") and ghrepo == ["acme/widgets"],
@@ -486,9 +492,27 @@ code, out, err = gate(onto_train(), {"releaseTrain": {"branch": "train/release"}
 say(code == 1 and "must be a list" in out[0], "(33o) exclusions that are not a list -> ERROR", "rc=%d %r" % (code, out))
 code, out, err = gate(onto_train(), dict(TRAIN, supportTrain={"branch": "x"}))
 say(code == 1 and out[0].startswith("ERROR ") and "Traceback" not in err, "(33p) both train names set -> ERROR, never a crash", "rc=%d %r %r" % (code, out, err))
+json.dump(onto_train(), open(os.path.join(work, "scenario.json"), "w"))
 p = subprocess.run([sys.executable, helper, "7", H], capture_output=True, text=True, cwd=work,
                    env=dict(os.environ, GH_SCENARIO=os.path.join(work, "scenario.json")))
-say(p.returncode == 0 and p.stdout.startswith("MERGE"), "(33q) outside any git checkout and with no --config: the rule does nothing", repr(p.stdout + p.stderr))
+say(p.returncode == 1 and p.stdout.startswith("ERROR ") and "--config" in p.stdout,
+    "(33q) outside any git checkout and with no --config -> ERROR, never a silent pass", repr(p.stdout + p.stderr))
+BARE = os.path.join(work, "bare-checkout"); os.makedirs(BARE, exist_ok=True)
+subprocess.run(["git", "init", "-q", BARE], check=True)
+p = subprocess.run([sys.executable, helper, "7", H], capture_output=True, text=True, cwd=BARE,
+                   env=dict(os.environ, GH_SCENARIO=os.path.join(work, "scenario.json")))
+say(p.returncode == 0 and p.stdout.startswith("MERGE"), "(33r) a checkout of the repository with no config: the rule does nothing", repr(p.stdout + p.stderr))
+p = subprocess.run([sys.executable, helper, "7", H, "--repo", "acme/other"], capture_output=True, text=True, cwd=BARE,
+                   env=dict(os.environ, GH_SCENARIO=os.path.join(work, "scenario.json")))
+say(p.returncode == 1 and p.stdout.startswith("ERROR ") and "is not acme/other" in p.stdout,
+    "(33s) a checkout of another repository than --repo, no --config -> ERROR", repr(p.stdout + p.stderr))
+code, out, err = gate(onto_train(headRefName="kim/26-01-15/I1-fix", statuses=[proof()]), TRAIN)
+say(code == 2 and "not an epic or plan integration branch" in out[0],
+    "(33t) a one-off head with a proof -> REFUSE: the train check would refuse it anyway", "rc=%d %r" % (code, out))
+code, out, err = gate(onto_train(headRefName="kim/26-01-15/plan-billing", statuses=[proof()]), TRAIN)
+say(code == 0 and out[0].startswith("MERGE"), "(33u) a plan integration head with a proof -> MERGE", "rc=%d %r" % (code, out))
+code, out, err = gate(onto_train(headRefName="kim/26-01-15/I1-fix", files=[{"filename": "src/app.ts"}]), TRAIN)
+say(code == 0 and out[0].startswith("MERGE"), "(33v) a one-off head with no excluded path -> MERGE (the rule does nothing)", "rc=%d %r" % (code, out))
 for label, args in (("no arguments", []), ("a short SHA", ["7", "abc123"]), ("a number that is not one", ["x", H]), ("a bad --repo", ["7", H, "--repo", "a b"])):
     p = subprocess.run([sys.executable, helper] + args, capture_output=True, text=True, env=dict(os.environ, GH_SCENARIO=os.path.join(work, "scenario.json")))
     say(p.returncode == 2 and p.stdout == "" and p.stderr.startswith("usage:"), "(28) usage: " + label, repr(p.stderr))

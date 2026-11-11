@@ -16,13 +16,16 @@ for what each version component means here and how a release is cut.
   `release.releaseBranchFixExclusions`, `merge-gate.py` now prints `MERGE` only if the head carries
   the settled review's `devstride/reviewed` proof for that pull request into that base (the same
   `reviewed-status.py verify` the release's train check uses). With no proof it refuses and prints
-  the exact `post` command, which still works because the pull request is open. A proof GitHub
-  cannot read is an `ERROR`. Before, a reviewed pull request could merge onto the train without
+  the exact `post` command, pinned to the repository and still valid because the pull request is
+  open. A proof GitHub cannot read is an `ERROR`. A head that is not an epic or plan integration
+  branch is refused even with a proof, because the train check would refuse it anyway. Before, a reviewed pull request could merge onto the train without
   its proof. Nothing complained until the next release's train check refused the unit's
   migrations, usually unattended and hours later, when a merged pull request can no longer take a
   proof. `review` treats `NOT POSTED` for such a pull request as a stop before the merge instead of
   degradation. The gate reads the consuming repository's `.claude/ds-config.json` (new `--config`
-  to name another); without one, or with no train configured, the rule does nothing.
+  to name another). It must run in a checkout of the repository it inspects, or be given
+  `--config`: outside one it is now an `ERROR` instead of a silent pass. A checkout with no config,
+  or a config with no train, leaves the rule doing nothing.
 
 ## [3.52.0] — 2026-11-11
 
