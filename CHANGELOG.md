@@ -37,12 +37,13 @@ for what each version component means here and how a release is cut.
   **When no plugin can be found** (the plugin is not installed for this person, or its files are
   gone) the launcher shows a plain line with the directory and the branch instead of an empty bar.
   Because the launcher always shows something, a bar alone no longer proves the plugin's status
-  line ran: `bash .claude/statusline.sh --which` prints the plugin copy the launcher would run,
-  and nothing when it found none. `setup` and `doctor` pass a status line only when that answer
+  line ran: `bash .claude/statusline.sh --which` prints the plugin copy whose status line drew
+  the bar, and nothing when the bar is only the plain line (no copy found, or its status line
+  failed or printed nothing). `setup` and `doctor` pass a status line only when that answer
   names a plugin copy and the bar is not empty, and `doctor` refuses to remove a personal
   `statusLine` setting until the shared launcher passes the same test. `doctor` warns only about a
   leftover full copy; a file whose `managed` line you deleted is reported as yours, with no
-  warning.
+  warning, and `doctor` does not offer the personal-setting cleanup beside it.
   **What the launcher trusts.** The session's record and the launcher's own one-minute note of
   where the plugin is both name a script that then runs, so the launcher reads them only when
   their folder and the file are your own, are not links, and cannot be written by anyone else.
@@ -54,13 +55,13 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.53.0 @ 27655c1, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.53.0 @ 396944b, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.53.0 | tokens@devstride--v3.53.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,095 | 10,699 | 32,100 | 10,700 | +1 | 10,700 |
 | skills/plan/SKILL.md | 24,592 | 8,198 | 24,592 | 8,198 | +0 | 8,198 |
-| skills/doctor/SKILL.md | 23,972 | 7,991 | 23,973 | 7,991 | +0 | 7,992 |
 | skills/review/SKILL.md | 23,971 | 7,991 | 23,971 | 7,991 | +0 | 7,999 |
+| skills/doctor/SKILL.md | 23,972 | 7,991 | 23,973 | 7,991 | +0 | 7,992 |
 | skills/build-item/SKILL.md | 23,953 | 7,985 | 23,953 | 7,985 | +0 | 7,985 |
 | skills/release/SKILL.md | 18,139 | 6,047 | 18,139 | 6,047 | +0 | 6,049 |
 | skills/rebalance/SKILL.md | 17,850 | 5,950 | 17,850 | 5,950 | +0 | 5,950 |
