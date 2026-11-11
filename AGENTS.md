@@ -101,8 +101,8 @@ paths individually) rather than trusting a single root-level run.
 - Shared reference docs belong to the skill that owns them (`skills/<name>/references/`), not to
   a repo-level directory.
 - `hooks/` holds `hooks.json` and the hook scripts it registers: `version-check.sh`
-  (SessionStart), `session-gate.sh` (UserPromptSubmit), `session-runtime.py` (SessionStart,
-  UserPromptSubmit and PreToolUse) and `presence.py` (SessionStart, UserPromptSubmit, Stop and SessionEnd, only
+  (SessionStart), `session-gate.sh` (UserPromptSubmit), `session-runtime.py` (SessionStart and
+  UserPromptSubmit) and `presence.py` (SessionStart, UserPromptSubmit, Stop and SessionEnd, only
   when the consuming repository names a presence command). All fail open and never block a
   session by accident. Skill-owned helpers live under `skills/<name>/scripts/` and are run by
   the skill's text, never read as context.
