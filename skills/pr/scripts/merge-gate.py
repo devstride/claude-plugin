@@ -212,9 +212,9 @@ class Retry(Exception):
     """The base or head moved while the gate was reading: one fresh read, then a REFUSE."""
 
 
-def gh(*args):
+def gh(*args, env=None):
     try:
-        done = subprocess.run(["gh"] + list(args), capture_output=True, text=True, timeout=60)
+        done = subprocess.run(["gh"] + list(args), capture_output=True, text=True, timeout=60, env=env)
     except (OSError, subprocess.TimeoutExpired) as err:
         raise Unreadable("gh could not run: %s" % err)
     return done.returncode, done.stdout, done.stderr
@@ -639,7 +639,9 @@ def read_config(path, owner, name):
             raise Unreadable("not in a git checkout, so the repository's config cannot be found: run from a "
                              "checkout of %s/%s or pass --config" % (owner, name))
         top = out.strip()
-        code, here, err = gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
+        # The checkout's own repository: GH_REPO would make gh report whatever it names instead.
+        code, here, err = gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner",
+                             env={k: v for k, v in os.environ.items() if k != "GH_REPO"})
         if code != 0 or here.strip().lower() != ("%s/%s" % (owner, name)).lower():
             raise Unreadable("this checkout is not %s/%s (%s), so its config is not that repository's: run "
                              "from a checkout of it or pass --config" % (owner, name, (here or err).strip()[:80] or "unknown"))

@@ -18,7 +18,7 @@ s = json.load(open(os.environ["GH_SCENARIO"]))
 def kind(k):   # the order of reads, one word each, for the cases that check it
     open(os.environ["GH_LOG"] + ".order", "a").write(k + "\n")
 if a[:2] == ["repo", "view"]:
-    print(s.get("repo", "acme/widgets")); sys.exit(0)
+    print(os.environ.get("GH_REPO") or s.get("repo", "acme/widgets")); sys.exit(0)
 if a[:2] == ["api", "graphql"]:
     if s.get("graphqlFail"):
         sys.stderr.write("gh: Something went wrong (HTTP 502)\n"); sys.exit(1)
@@ -506,6 +506,16 @@ p = subprocess.run([sys.executable, helper, "7", H, "--repo", "acme/other"], cap
                    env=dict(os.environ, GH_SCENARIO=os.path.join(work, "scenario.json")))
 say(p.returncode == 1 and p.stdout.startswith("ERROR ") and "is not acme/other" in p.stdout,
     "(33s) a checkout of another repository than --repo, no --config -> ERROR", repr(p.stdout + p.stderr))
+json.dump(dict(onto_train(), repo="acme/other"), open(os.path.join(work, "scenario.json"), "w"))
+p = subprocess.run([sys.executable, helper, "7", H, "--repo", "acme/widgets"], capture_output=True, text=True, cwd=BARE,
+                   env=dict(os.environ, GH_SCENARIO=os.path.join(work, "scenario.json"), GH_REPO="acme/widgets"))
+say(p.returncode == 1 and "is not acme/widgets" in p.stdout,
+    "(33w) GH_REPO naming the inspected repository cannot disguise a checkout of another one -> ERROR", repr(p.stdout + p.stderr))
+json.dump(onto_train(), open(os.path.join(work, "scenario.json"), "w"))
+p = subprocess.run([sys.executable, helper, "7", H, "--repo", "acme/widgets"], capture_output=True, text=True, cwd=BARE,
+                   env=dict(os.environ, GH_SCENARIO=os.path.join(work, "scenario.json"), GH_REPO="someone/else"))
+say(p.returncode == 0 and p.stdout.startswith("MERGE"),
+    "(33x) an unrelated GH_REPO does not reject the right checkout", repr(p.stdout + p.stderr))
 code, out, err = gate(onto_train(headRefName="kim/26-01-15/I1-fix", statuses=[proof()]), TRAIN)
 say(code == 2 and "not an epic or plan integration branch" in out[0],
     "(33t) a one-off head with a proof -> REFUSE: the train check would refuse it anyway", "rc=%d %r" % (code, out))
