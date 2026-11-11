@@ -30,11 +30,15 @@ p() { printf '{"session_id":"%s","workspace":{"current_dir":"%s"}}' "$CLAUDE_COD
 p --which; p
 ```
 
-**Pass: both lines are non-empty.** `--which` prints the plugin copy the launcher would run, and
-nothing when it found none; the second line is the bar. An empty first line is a FAIL (say the
-launcher found no devstride plugin for this session), whatever the bar shows. Never judge by a
-particular segment: `statusLine.hiddenSegments` may hide any of them. `--which` belongs to the
-launcher only: for a script with the full-copy marker or with none, the pass is a non-empty bar.
+**Pass: both lines are non-empty.** `--which` prints the plugin copy whose status line drew the
+bar for this payload, and nothing when the bar is only the plain line: no copy found, or its
+script failed or printed nothing. The second line is the bar. An empty first line is a FAIL (say
+the launcher found no working devstride status line for this session), whatever the bar shows.
+Never judge by a particular segment: `statusLine.hiddenSegments` may hide any of them. `--which`
+belongs to the launcher only: for a script with the full-copy marker, or with none, the pass is
+a non-empty bar. **An owner-managed script (no marker) that passes is reported as owner-managed
+and working, and is not eligible for the personal-settings cleanup `doctor` offers:** the helper
+refuses it, so do not offer that cleanup.
 
 ## Markers, and moving a full copy
 
