@@ -33,7 +33,9 @@ profile: standard review-moment: release-deferred`): $ARGUMENTS
 - **Green means observed.** A red required check is stop-and-fix, never commit-anyway; the gate's
   proof is a verification receipt, never a remembered result.
 - **Stop and ask ONLY at a genuine fork**: an ambiguous or risky finding, scope that turns out
-  human- or infra-gated, a destructive or outward-facing action.
+  human- or infra-gated, a destructive or outward-facing action. Read
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md` when the top-level run is
+  unattended, `needsYou.label` set.
 
 **Engineering economy.** Read
 `${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/engineering-economy.md` before choosing an

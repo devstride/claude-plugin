@@ -134,7 +134,7 @@ next action. For each failure symptom, read
 - **Delivery profile — the effective one, and its source.** Read `profile`; report one line:
   `profile: <name> — from .claude/ds-config.json`, or
   `profile: extended — key absent, shipped default (fewer, larger stories; set "profile":
-  "standard" to keep the previous default)` (why: `silent-failures.md` §4). Per the resolution order in
+  "standard" to keep the previous default)`. Per the resolution order in
   `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`, say that a plan root's
   marker or a skill argument outranks the file at run time; never call a DevStride tool for it. Any other value is a FAIL: skills read it as unknown, fall
   back to `standard` and say so. Fix: set one of the three names, or run `/devstride:setup`.
@@ -147,7 +147,7 @@ next action. For each failure symptom, read
   type error, and a contradiction only where it differs from the profile's.
   A present key that differs is **informational, not a FAIL** — the
   explicit key wins by contract — but say which key, which value, and what the profile would
-  have written (`silent-failures.md` holds why). A present `review.localCommand` under
+  have written. A present `review.localCommand` under
   `prototype` is NOT a contradiction — it names the engine without scheduling it.
   `profileOverrides`: an unknown knob is the validator's WARNING; nothing else.
 - **`localEnvironment`** — report the block. Absent → the shipped default is in force (every
@@ -163,7 +163,7 @@ next action. For each failure symptom, read
   error. A non-zero exit WITH output, or output spanning several lines, is a FAIL. Report
   `productionStages`, and WARN when the resolved stage is in it: this checkout points at
   production. **Never infer a stage from the branch name, and never report
-  `localEnvironment.instanceName` as one** — different axes; `silent-failures.md` §4 has why.
+  `localEnvironment.instanceName` as one** — different axes.
 - **Status line / personal settings** — run the helper as `inspect --local <repo-root>` and
   `inspect --user <repo-root>`; it lives at
   `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/statusline-override.py`. Read shared settings too;
@@ -192,6 +192,7 @@ next action. For each failure symptom, read
   ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/consequence-notices.py doctor` (`ERROR` FAILs)
   and `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/session-runtime.py models-report` (`WARN` warns); a
   `notify` name `resolve_user` cannot find WARNs.
+- **`needsYou`** — `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md` "Doctor".
 
 ## 5. The CI draft gate (`ci`)
 

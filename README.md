@@ -425,6 +425,19 @@ Tags); running it again changes nothing. From then on `build-item` puts the plan
 under on that board (never a story) and runs your commands as it starts and stops, failing open.
 `/devstride:doctor agents` reports drift without writing anything. No block, no writes.
 
+## Needs-you list
+
+Optional: an agent running with nobody watching used to stop and wait whenever it reached a
+judgement call. Name a tag in `needsYou.label` and it writes the call on the item instead,
+mentioning the plan's owner, with a recommendation and lettered options, tags the item, and moves
+on to other work. Reply in that thread with a letter and the next run takes that option if it still stands; anything
+else in a reply is ignored, because the tracker cannot prove who wrote it. Every option is something
+the agent was already allowed to do. Whatever needs your own yes (a production merge, a migration
+approval, a waived check, anything destructive) is listed as a notice only: no reply can start it,
+and it still waits for you in a session. A saved view of the tag (`needsYou.view`) is your one
+list, and `needsYou.fallbackItem` holds notices that belong to no item. No `needsYou.label`, no
+change.
+
 ## Your first plan
 
 With the plugin installed, DevStride connected, and a config file in place:
@@ -534,7 +547,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.51.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.52.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

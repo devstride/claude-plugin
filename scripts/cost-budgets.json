@@ -20,10 +20,10 @@
     "push": 1100,
     "rationalize-gantt": 3200,
     "rebalance": 5950,
-    "release": 5995,
+    "release": 6049,
     "review": 7999,
     "setup": 10700,
-    "ultracode-build": 4946,
+    "ultracode-build": 4991,
     "update": 1000,
     "update-docs": 900,
     "sync-knowledge-base": 900,
@@ -77,14 +77,14 @@
     "skills/review/references/roster-and-modes.md": 2120,
     "skills/review/references/slow-suite-gating.md": 1700,
     "skills/setup/references/ci-cost-patterns.md": 5000,
-    "skills/setup/references/config-defaults.md": 17812,
+    "skills/setup/references/config-defaults.md": 17935,
     "skills/setup/references/detector-evidence.digest.md": 900,
     "skills/setup/references/detector-evidence.md": 4300,
     "skills/setup/references/docs-skill-templates/update-documentation.md": 1400,
     "skills/setup/references/docs-skill-templates/update-release-notes.md": 1200,
     "skills/setup/references/interview-rationale.md": 1900,
     "skills/setup/references/review-engines.md": 2700,
-    "skills/setup/references/seam-registry.md": 14745,
+    "skills/setup/references/seam-registry.md": 14962,
     "skills/setup/references/statusline-segments.md": 2461,
     "skills/setup/references/validation-checklist.md": 6000,
     "skills/ultracode-build/references/engineering-economy.md": 1400,
@@ -94,6 +94,7 @@
     "skills/release/references/release-safety-hooks.md": 1200,
     "skills/build-item/references/checkout-pool-commands.md": 1400,
     "skills/build-item/references/story-claims.md": 1557,
+    "skills/build-item/references/needs-you.md": 3383,
     "skills/doctor/references/claims-checks.md": 450,
     "skills/build-item/references/epic-release-steps.md": 1691,
     "skills/review/references/cloud-reviewers.md": 700,
@@ -101,7 +102,7 @@
     "skills/setup/references/agents-mode.md": 1670,
     "skills/doctor/references/agents.md": 620,
     "skills/build-item/references/active-agents.md": 540,
-    "skills/release/references/auto-start.md": 3289,
+    "skills/release/references/auto-start.md": 3329,
     "skills/build-item/references/plan-scope.md": 2500,
     "skills/build-item/references/item-status.md": 660,
     "skills/review/references/local-full.md": 933,
@@ -116,7 +117,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 90460,
+      "budget": 90481,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -158,7 +159,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 74894,
+      "budget": 74960,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -203,7 +204,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 89651,
+      "budget": 89746,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.51.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.52.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -1706,6 +1706,28 @@
       },
       "additionalProperties": false,
       "description": "the model and effort a session is expected to run, per role; contract: skills/plan/references/session-models.md"
+    },
+    "needsYou": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "the tracker tag that marks an item with an open question; absent means the feature is off and every skill stops and asks as before"
+        },
+        "view": {
+          "type": "string",
+          "description": "the saved view that shows the tagged items, a URL or a name; only ever quoted to people"
+        },
+        "fallbackItem": {
+          "type": "string",
+          "description": "the item number a question that belongs to no item (a release, a machine problem) is queued on"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "the Needs-you list: where an unattended run queues a question only the owner can answer; contract: skills/build-item/references/needs-you.md"
     },
     "localEnvironment": {
       "type": [

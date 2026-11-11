@@ -8,6 +8,88 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.52.0] — 2026-11-11
+
+### Added
+
+- **One "Needs you" list: a run nobody is watching writes a judgement call down and moves on,
+  instead of sitting idle on it.** A repository switches it on by naming a tracker tag in
+  `.claude/ds-config.json` under the new `needsYou` block: `needsYou.label` (the tag),
+  `needsYou.view` (optional: the saved view of that tag, only ever quoted to people) and
+  `needsYou.fallbackItem` (optional: the item that holds an entry belonging to no item, such as a
+  release). The tracker cannot prove who wrote a reply, so a reply is never an authorization, and
+  there are two kinds of entry. A **choice** is a judgement call whose every option the run may
+  already take by its existing rules: the comment mentions the plan's owner, asks in one plain
+  line, recommends a lettered option and ends `Needs you: open`. The next `build-item` run under
+  that plan takes a reply only when it comes from the plan owner's account and is just one of the
+  letters; it records the letter in the thread before acting and removes the tag. It never carries
+  out an option's wording as read from the tracker: when it reaches the question again it lists its
+  options afresh and takes the letter only if that option still stands, else it asks again, saying
+  the options changed. A choice is queued only by `build-item` on an item it is building; a
+  release, a stop before any item is chosen, and anything on the fallback item are notices. A
+  paused story resumes on its own unmerged branch, found in git by the item number, never from
+  tracker text. Any other text in a reply is ignored and named in the run's report. A **notice**
+  (`Needs you: in a session`) covers everything that is the owner's own yes: a production merge,
+  approving a migration, waiving a check, taking over another session's work, anything destructive
+  or touching production. No skill acts on a reply to a notice; it only makes the wait visible, and
+  is closed once the action was taken in a session or no longer applies. Whether anyone is there to
+  answer is decided by the top-level run; an attended run asks in the conversation as before. The
+  run that queued an entry skips that item and carries on, never waiting on it or reminding. An
+  unattended release that stops before its merge still sends its one notification and waits; it
+  adds a notice and nothing else changes. When the tracker cannot be reached, the tag is missing or
+  a write is refused, the run says so once and stops that item as before. Without `needsYou.label`
+  nothing changes. The rule lives in one new contract,
+  `skills/build-item/references/needs-you.md`, cited once each by `build-item`, `ultracode-build`,
+  `review`, `release` and `doctor`.
+- **`doctor config` reports whether the Needs-you list is on**, its tag and view, and warns when
+  the tracker has no tag of that name or the fallback item cannot be found. It writes nothing.
+
+### Changed
+
+- **Budgets.** `release` 5,995 → 6,049 and `ultracode-build` 4,946 → 4,991 for their one-sentence
+  citations; `auto-start.md`, `config-defaults.md` and the generated `seam-registry.md` for the new
+  keys; the three composed paths that load those bodies by the same amounts. `build-item`, `review`
+  and `doctor` gained their citation inside their existing budgets, by dropping duplicated
+  rationale pointers and descriptive wording, no rule.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.51.0 @ 1f331c8, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.51.0 | tokens@devstride--v3.51.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,592 | 8,198 | 24,592 | 8,198 | +0 | 8,198 |
+| skills/review/SKILL.md | 23,980 | 7,994 | 23,971 | 7,991 | -3 | 7,999 |
+| skills/doctor/SKILL.md | 23,974 | 7,992 | 23,972 | 7,991 | -1 | 7,992 |
+| skills/build-item/SKILL.md | 23,881 | 7,961 | 23,953 | 7,985 | +24 | 7,985 |
+| skills/release/SKILL.md | 17,982 | 5,994 | 18,139 | 6,047 | +53 | 6,049 |
+| skills/rebalance/SKILL.md | 17,850 | 5,950 | 17,850 | 5,950 | +0 | 5,950 |
+| skills/ultracode-build/SKILL.md | 14,838 | 4,946 | 14,973 | 4,991 | +45 | 4,991 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,708 | 2,236 | 6,708 | 2,236 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-story/SKILL.md | 6,299 | 2,100 | 6,299 | 2,100 | +0 | 2,100 |
+| skills/comprehend-plan/SKILL.md | 5,580 | 1,860 | 5,580 | 1,860 | +0 | 1,860 |
+| skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 271,302 | 90,442 | 271,655 | 90,560 | +118 | |
+
 ## [3.51.0] — 2026-11-11
 
 ### Added
@@ -4600,7 +4682,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.51.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.52.0...HEAD
+[3.52.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.51.0...devstride--v3.52.0
 [3.51.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.50.0...devstride--v3.51.0
 [3.50.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.49.0...devstride--v3.50.0
 [3.49.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.48.0...devstride--v3.49.0
