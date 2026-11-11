@@ -234,7 +234,7 @@ else bad "(6) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
 setup_case invalid-types 2.9.0 \
   '{"plugin":{"autoUpdate":"false"},"statusLine":{"autoUpdate":1}}' project 2.9.0
 mkdir -p "$PLUGIN/skills/setup/references"
-printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline.sh"
+printf '# ds-statusline-launcher: managed v1 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
 OUT="$(run_hook)"
 if result_is invalid-config && [ -z "$OUT" ] && grep -q 'echo old' "$REPO/.claude/statusline.sh" \
@@ -280,10 +280,10 @@ else bad "(6e) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
 # (7) Status-line refresh is independent of plugin.updateCheck.
 setup_case status-independent 2.9.0 '{"plugin":{"updateCheck":false},"statusLine":{"autoUpdate":true}}' project 2.9.0
 mkdir -p "$PLUGIN/skills/setup/references"
-printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline.sh"
+printf '# ds-statusline-launcher: managed v1 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
 OUT="$(run_hook)"
-if printf '%s' "$OUT" | grep -q 'status line: updated 2.8.0 → 2.9.0' \
+if printf '%s' "$OUT" | grep -q 'status line: the v2.8.0 copy is now a launcher' \
    && grep -q 'echo shipped' "$REPO/.claude/statusline.sh" && [ ! -f "$VC_LOG" ]; then
   ok "(7) plugin check disabled → opted-in managed status line still refreshes"
 else bad "(7) out=$OUT file=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null)"; fi
@@ -291,7 +291,7 @@ else bad "(7) out=$OUT file=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null)"; f
 # (8) Status-line refresh refuses links in the source, target, or preexisting backup.
 setup_case status-target-symlink 2.9.0 '{"plugin":{"updateCheck":false},"statusLine":{"autoUpdate":true}}' project 2.9.0
 mkdir -p "$PLUGIN/skills/setup/references"
-printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline.sh"
+printf '# ds-statusline-launcher: managed v1 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 printf '# ds-statusline: managed v2.8.0 — marker\necho outside\n' > "$CASE_DIR/outside-target"
 ln -s "$CASE_DIR/outside-target" "$REPO/.claude/statusline.sh"
 OUT="$(run_hook)"
@@ -302,7 +302,7 @@ else bad "(8a) out=$OUT target=$(cat "$CASE_DIR/outside-target")"; fi
 
 setup_case status-target-hardlink 2.9.0 '{"plugin":{"updateCheck":false},"statusLine":{"autoUpdate":true}}' project 2.9.0
 mkdir -p "$PLUGIN/skills/setup/references"
-printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline.sh"
+printf '# ds-statusline-launcher: managed v1 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 printf '# ds-statusline: managed v2.8.0 — marker\necho hard-target\n' > "$CASE_DIR/outside-target"
 ln "$CASE_DIR/outside-target" "$REPO/.claude/statusline.sh"
 OUT="$(run_hook)"
@@ -313,7 +313,7 @@ else bad "(8b) out=$OUT target=$(cat "$CASE_DIR/outside-target")"; fi
 
 setup_case status-backup-link 2.9.0 '{"plugin":{"updateCheck":false},"statusLine":{"autoUpdate":true}}' project 2.9.0
 mkdir -p "$PLUGIN/skills/setup/references"
-printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline.sh"
+printf '# ds-statusline-launcher: managed v1 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
 printf 'outside-backup\n' > "$CASE_DIR/outside-backup"; mkdir -p "$REPO/.git/devstride"; ln -s "$CASE_DIR/outside-backup" "$REPO/.git/devstride/statusline.bak"
 OUT="$(run_hook)"
@@ -324,7 +324,7 @@ else bad "(8c) out=$OUT target=$(cat "$REPO/.claude/statusline.sh")"; fi
 
 setup_case status-backup-hardlink 2.9.0 '{"plugin":{"updateCheck":false},"statusLine":{"autoUpdate":true}}' project 2.9.0
 mkdir -p "$PLUGIN/skills/setup/references"
-printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline.sh"
+printf '# ds-statusline-launcher: managed v1 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
 printf 'outside-hard-backup\n' > "$CASE_DIR/outside-backup"; mkdir -p "$REPO/.git/devstride"; ln "$CASE_DIR/outside-backup" "$REPO/.git/devstride/statusline.bak"
 OUT="$(run_hook)"
@@ -336,8 +336,8 @@ else bad "(8d) out=$OUT target=$(cat "$REPO/.claude/statusline.sh")"; fi
 setup_case status-source-link 2.9.0 '{"plugin":{"updateCheck":false},"statusLine":{"autoUpdate":true}}' project 2.9.0
 mkdir -p "$PLUGIN/skills/setup/references"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
-printf '# ds-statusline: managed v2.9.0 — marker\necho linked-source\n' > "$CASE_DIR/outside-source"
-ln -s "$CASE_DIR/outside-source" "$PLUGIN/skills/setup/references/statusline.sh"
+printf '# ds-statusline-launcher: managed v1 — marker\necho linked-source\n' > "$CASE_DIR/outside-source"
+ln -s "$CASE_DIR/outside-source" "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 OUT="$(run_hook)"
 if grep -q 'echo old' "$REPO/.claude/statusline.sh" && [ ! -e "$REPO/.git/devstride/statusline.bak" ] && [ ! -e "$REPO/.claude/statusline.sh.bak" ] \
    && [ -z "$OUT" ]; then
@@ -347,8 +347,8 @@ else bad "(8e) out=$OUT target=$(cat "$REPO/.claude/statusline.sh")"; fi
 setup_case status-source-hardlink 2.9.0 '{"plugin":{"updateCheck":false},"statusLine":{"autoUpdate":true}}' project 2.9.0
 mkdir -p "$PLUGIN/skills/setup/references"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
-printf '# ds-statusline: managed v2.9.0 — marker\necho hard-source\n' > "$CASE_DIR/outside-source"
-ln "$CASE_DIR/outside-source" "$PLUGIN/skills/setup/references/statusline.sh"
+printf '# ds-statusline-launcher: managed v1 — marker\necho hard-source\n' > "$CASE_DIR/outside-source"
+ln "$CASE_DIR/outside-source" "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 OUT="$(run_hook)"
 if grep -q 'echo old' "$REPO/.claude/statusline.sh" && [ ! -e "$REPO/.git/devstride/statusline.bak" ] && [ ! -e "$REPO/.claude/statusline.sh.bak" ] \
    && [ -z "$OUT" ]; then
@@ -364,10 +364,10 @@ setup_case status-concurrent 2.9.0 '{"plugin":{"updateCheck":false},"statusLine"
 mkdir -p "$PLUGIN/skills/setup/references"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
 {
-  printf '# ds-statusline: managed v2.9.0 — marker\n'
+  printf '# ds-statusline-launcher: managed v1 — marker\n'
   dd if=/dev/zero bs=1000 count=900 2>/dev/null | tr '\000' '#'
   printf '\necho shipped\n'
-} > "$PLUGIN/skills/setup/references/statusline.sh"
+} > "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 (
   while [ ! -e "$REPO/.git/devstride/statusline.bak" ]; do :; done
   printf '# owner concurrent edit\necho newer\n' > "$REPO/.claude/statusline.sh"
@@ -433,7 +433,7 @@ PY
 setup_case status-backup-race 2.9.0 \
   '{"plugin":{"updateCheck":false},"statusLine":{"autoUpdate":true}}' project 2.9.0
 mkdir -p "$PLUGIN/skills/setup/references"
-printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline.sh"
+printf '# ds-statusline-launcher: managed v1 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
 install_statusline_race_injector
 RACE_LOG="$CASE_DIR/race-fired"
@@ -450,7 +450,7 @@ else bad "(10) out=$OUT target=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null) 
 setup_case status-final-target-race 2.9.0 \
   '{"plugin":{"updateCheck":false},"statusLine":{"autoUpdate":true}}' project 2.9.0
 mkdir -p "$PLUGIN/skills/setup/references"
-printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline.sh"
+printf '# ds-statusline-launcher: managed v1 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
 install_statusline_race_injector
 RACE_LOG="$CASE_DIR/race-fired"
@@ -467,7 +467,7 @@ else bad "(11) out=$OUT target=$(cat "$REPO/.claude/statusline.sh" 2>/dev/null) 
 setup_case status-post-link-race 2.9.0 \
   '{"plugin":{"updateCheck":false},"statusLine":{"autoUpdate":true}}' project 2.9.0
 mkdir -p "$PLUGIN/skills/setup/references"
-printf '# ds-statusline: managed v2.9.0 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline.sh"
+printf '# ds-statusline-launcher: managed v1 — marker\necho shipped\n' > "$PLUGIN/skills/setup/references/statusline-launcher.sh"
 printf '# ds-statusline: managed v2.8.0 — marker\necho old\n' > "$REPO/.claude/statusline.sh"
 install_statusline_race_injector
 RACE_LOG="$CASE_DIR/race-fired"
