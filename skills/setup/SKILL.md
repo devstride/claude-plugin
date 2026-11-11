@@ -378,19 +378,15 @@ Only when Phase D said yes. Copy
 { "statusLine": { "type": "command", "command": "bash .claude/statusline.sh", "padding": 0, "refreshInterval": 30 } }
 ```
 
-**Copy it verbatim**: it is a launcher that runs the loaded plugin's status line, so no release
-changes it.
+**Copy it verbatim**: the launcher runs the loaded plugin's status line, so no release changes
+it.
 
 **Never overwrite an existing `.claude/statusline.sh`** — the owner may have edited it. Say so
-and leave it.
+and leave it. Exception: a full copy still carrying `# ds-statusline: managed` moves to the
+launcher by "Moving a full copy" in the reference cited below.
 
-Then prove it runs — a status line fails silently:
-
-```bash
-printf '{"session_id":"%s","workspace":{"current_dir":"%s"}}' "$CLAUDE_CODE_SESSION_ID" "$PWD" | bash .claude/statusline.sh; echo
-```
-
-A line with `⑂` is the pass. Confirm neither file is gitignored (`git check-ignore` exits 1).
+Then prove it runs — a status line fails silently — by "The proof" there: the launcher names a
+plugin copy AND draws a bar. Confirm neither file is gitignored (`git check-ignore` exits 1).
 
 Then **look at which segments that render actually produced**, and ask about the structurally
 absent ones — in practice `stage`. Answers

@@ -174,8 +174,8 @@ next action. For each failure symptom, read
   works, a user fallback is INFO.
 
   Require the canonical shared pair regular, unignored, committed in `HEAD`, clean in index/tree,
-  rendering non-empty output from `bash .claude/statusline.sh`, with `refreshInterval` and the
-  launcher marker (else WARN). No shared/personal setting is N/A; one shared half FAILs. Phase 2 repairs shared first,
+  passing "The proof" in Details, with `refreshInterval` (else WARN). A full-copy marker WARNs;
+  none is INFO, owner-managed. No shared/personal setting is N/A; one shared half FAILs. Phase 2 repairs shared first,
   then asks separately per personal key. After removal restart, rerun `doctor config`, inspect
   `/status`, report rendered segments. Only structural `stage` absence becomes a question; never
   ask about transient blanks. Details:

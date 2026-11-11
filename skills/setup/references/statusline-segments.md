@@ -18,9 +18,38 @@ Line 2 prints only when it has a value; `"refreshInterval": 30` redraws every 30
 `statusline.sh` of the plugin the session has loaded, found through the session's record
 (rewritten at every prompt, so a reload shows at the next one), then `$CLAUDE_PLUGIN_ROOT`, then
 the registry's install for this repository; no release changes the repository. Finding no plugin
-it prints only `▣ <directory> · ⎇ <branch>`: no `⑂` means no plugin was found, not a blank
-segment. The older `# ds-statusline: managed v<x.y.z>` marker is a full copy from before the
-launcher: `doctor` WARNs, and its repair or the session-start hook replaces it once.
+it prints only `▣ <directory> · ⎇ <branch>`, so a bar alone never proves the plugin's status line
+ran.
+
+## The proof
+
+`setup` E3, `doctor` §4 and the repair all use this, from the repository root:
+
+```bash
+p() { printf '{"session_id":"%s","workspace":{"current_dir":"%s"}}' "$CLAUDE_CODE_SESSION_ID" "$PWD" | bash .claude/statusline.sh "$@"; echo; }
+p --which; p
+```
+
+**Pass: both lines are non-empty.** `--which` prints the plugin copy the launcher would run, and
+nothing when it found none; the second line is the bar. An empty first line is a FAIL (say the
+launcher found no devstride plugin for this session), whatever the bar shows. Never judge by a
+particular segment: `statusLine.hiddenSegments` may hide any of them. `--which` belongs to the
+launcher only: for a script with the full-copy marker or with none, the pass is a non-empty bar.
+
+## Markers, and moving a full copy
+
+| Line 2 of `.claude/statusline.sh` | It is | `doctor` |
+| --- | --- | --- |
+| `# ds-statusline-launcher: managed v<n>` | the launcher | nothing to say |
+| `# ds-statusline: managed v<x.y.z>` | a full copy from before the launcher | WARN; repair: move it |
+| neither | the owner's own (deleting the line is the supported takeover) | INFO `owner-managed`; never a WARN, never repaired or replaced |
+
+**Moving a full copy** (`setup` E3, `doctor`'s repair; the session-start hook does the same by
+itself): only for a file still carrying the full-copy marker, and only on a work branch. Leave
+it alone on a detached checkout and on a base, production or protected branch, and when the
+branch's upstream or `origin/<baseBranch>` already has the launcher (say "pull"). Copy the old
+file to `devstride/statusline.bak` in the git directory (`git rev-parse --git-common-dir`), never
+into the work tree; copy the launcher over it; run The proof; leave it for the owner to commit.
 
 That leaves one real question, and it is the one `setup` and `doctor` ask: **is this segment blank
 because the repository genuinely has no such fact, or because something that should be configured
