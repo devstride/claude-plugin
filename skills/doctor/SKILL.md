@@ -184,12 +184,13 @@ next action. For each failure symptom, read
   **array**, so iterate it — `review.localCommand`, `review.localAssistCommand`,
   `generated.regenCommand`, `preShipChecks[].command`, each non-null `localEnvironment.*` command,
   `stage.resolve`, `session.nameCommand`, `pool.checkout`/`checkin`): split on `&&` and `;`,
-  take the first token of **each** segment, skip shell builtins (`cd backend && pnpm test`: `cd` always resolves). A
+  take the first token of **each** segment, skip shell builtins. A
   single-word command that does not resolve may be a shell alias or function — report "not on
   PATH (may be an alias)", not a flat FAIL.
-- **`conventionsDoc` exists** — set → the file must be present; the build engine reads it.
-- **`consequenceNotices`** — report the lines of `python3
-  ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/consequence-notices.py doctor` (`ERROR` FAILs); a
+- **`conventionsDoc` exists** — set → the file must be present.
+- **`consequenceNotices`, `sessionModels`** — report the lines of `python3
+  ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/consequence-notices.py doctor` (`ERROR` FAILs)
+  and `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/session-runtime.py models-report` (`WARN` warns); a
   `notify` name `resolve_user` cannot find WARNs.
 
 ## 5. The CI draft gate (`ci`)

@@ -5,6 +5,8 @@ description: Insert a new Story into a live DevStride roadmap, spliced into the 
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
+**Session model.** Read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/session-models.md` once per top-level run, role `planning`, first.
+
 **Goal.** Insert a NEW Story (the one-day leaf role — this org's Story type) into a live DevStride roadmap, spliced into the dependency chain and dated so the `/devstride:build-item` loop picks it up NEXT. Its POSITION looks native to the plan; its DESCRIPTION stays an honest spec of the real work. It is also the path `build-item` step 6.5 uses to turn discovered scope into tracked, dependency-ordered work; a review finding worth filing goes to `/devstride:create-defect` DEFERRED instead.
 
 Argument — free text describing the story, optionally with a parent item number at any grouping level (this org: Module/Capability/Epic — e.g. `I20100 add rate limiting to webhook intake`, or just `add rate limiting to webhook intake`). **Take any `--ticket <ticket#>[,<ticket#>]` out FIRST**, before reading the parent or the description: it names an originating ticket, never the parent (**read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/originating-ticket.md` in full before linking**): $ARGUMENTS

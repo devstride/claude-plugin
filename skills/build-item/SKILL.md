@@ -5,6 +5,8 @@ description: "Orchestrate one DevStride work item end-to-end: select, branch, bu
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
+**Session model.** Read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/session-models.md` once per top-level run, role `runner`, first.
+
 **Goal:** ONE DevStride one-day leaf item (this org's Story or Defect types) delivered end-to-end —
 select → In Progress → branch → build → review → merge → ritual → sync → next. This ORCHESTRATOR
 owns ONLY the DevStride glue (selection, status moves, the completion ritual); it composes the other

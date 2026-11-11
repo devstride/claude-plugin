@@ -305,4 +305,9 @@ if printf '%s\n' "$OUT" | grep -q Traceback || ! printf '%s\n' "$OUT" | head -1 
 cfg '{"release": {"clearance": {"provider": "github"}, "fullRelease": {"standingYes": true, "ownerDecision": "2999-01-01", "migrationGlobs": ["db/*.sql"], "approvedMigrations": [{"blob": "0123456789abcdef0123456789abcdef01234567", "path": "db/1.sql", "item": "I20100", "approved": "2999-01-01"}]}}}'
 expect "(64) a future ownerDecision is a WARN and a future approval an ERROR, as the helper asks" 1 "^CONFIG: 1 error(s), 1 warning(s)" "not after today"
 
+cfg '{"sessionModels": {"check": false, "planning": {"model": "fable[1m]", "effort": "max"}, "runner": {"model": "claude-opus-5", "effort": "low"}}}'
+expect "(65) sessionModels with both roles and the switch is clean" 0 "$CLEAN"
+cfg '{"sessionModels": {"runner": {"effort": "huge"}, "planning": {"model": 7}, "check": "no"}}'
+expect "(66) an effort outside the five levels, a model that is not a string and a non-boolean switch are three ERRORs" 1 "^CONFIG: 3 error(s)" "^ERROR sessionModels.runner.effort"
+
 exit "$FAIL"

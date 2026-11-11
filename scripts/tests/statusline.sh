@@ -273,4 +273,21 @@ if [ "$H1" = 1 ] && [ "$H2" = 2 ] && [ "$H3" = 3 ] && [ ! -e "$TMPDIR/hidden-ran
   ok "(22b) Session refresh: a hung nameCommand is never started twice; rerun once it is gone; a dead refresher's lock is taken over; hidden → never run"
 else bad "(22b) h1=$H1 h2=$H2 h3=$H3 hidden-ran=$([ -e "$TMPDIR/hidden-ran" ] && echo yes || echo no)"; fi
 
+# (23) the payload's live model and effort reach the session record through the plugin copy the
+#      status line loads, and a redraw with the same values rewrites nothing
+export XDG_CACHE_HOME="$WORK/xdg" CLAUDE_CONFIG_DIR="$WORK/claude"
+REC="$XDG_CACHE_HOME/devstride-plugin/sessions/sl1.json"
+LIVE=',"session_id":"sl1","model":{"id":"claude-opus-5","display_name":"Opus 5"},"effort":{"level":"xhigh"}'
+render "$PL" "$LIVE" >/dev/null
+SEEN="$(python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["model"]["id"], r["model"]["name"], r["effort"]["level"], r["running"])' "$REC" 2>&1)"
+B0="$(python3 -c 'import os,sys; s=os.stat(sys.argv[1]); print(s.st_ino, s.st_mtime_ns)' "$REC")"
+O="$(render "$PL" "$LIVE")"; B1="$(python3 -c 'import os,sys; s=os.stat(sys.argv[1]); print(s.st_ino, s.st_mtime_ns)' "$REC")"
+VERDICT="$(python3 "$ROOT/hooks/session-runtime.py" models --role runner --session sl1 --repo "$PL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["verdict"])')"
+render "$PL" ',"session_id":"nosuch","model":{"id":"claude-opus-5"},"effort":{"level":"high"}' >/dev/null
+if [ "$SEEN" = "claude-opus-5 Opus 5 xhigh 3.15.0" ] && [ "$B0" = "$B1" ] && [ "$VERDICT" = mismatch ] \
+   && printf '%s' "$O" | grep -q '⊞ 3.15.0' && [ ! -e "$XDG_CACHE_HOME/devstride-plugin/sessions/nosuch.json" ]; then
+  ok "(23) the status line notes the payload's model and effort in the session record; the same values → no rewrite; no record → none created"
+else bad "(23) seen=$SEEN b0=$B0 b1=$B1 verdict=$VERDICT o=$O"; fi
+unset XDG_CACHE_HOME CLAUDE_CONFIG_DIR
+
 exit $FAIL

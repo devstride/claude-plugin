@@ -5,6 +5,8 @@ description: Re-slice a live DevStride plan's not-started leaves to a different 
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
+**Session model.** Read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/session-models.md` once per top-level run, role `planning`, first.
+
 **Goal:** a live plan's NOT-STARTED leaves re-sliced in place to a new delivery profile's grain,
 with every existing spec carried into its successor, the dependency chain intact, and nothing
 shipped or in flight touched. Nothing is deleted. Building the re-sliced stories is

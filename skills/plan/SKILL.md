@@ -5,6 +5,8 @@ description: Drive a high-quality DevStride plan into existence under a parent i
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
+**Session model.** Read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/session-models.md` once per top-level run, role `planning`, first.
+
 **Goal:** a top-2%-quality plan under a parent item (any grouping level of the org's hierarchy; this
 org's Module/Capability/Epic), reached through an interactive discovery loop with the user — NOT a
 one-shot generated document. It ends as a full grouping item → release unit → leaf hierarchy (this

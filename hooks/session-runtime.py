@@ -8,8 +8,13 @@ plugin data, so the loaded copy writes down what it is:
 
   record   (SessionStart, every source) reads the hook payload on stdin and writes
            ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/sessions/<session_id>.json =
-           {schema: 1, running, root, transcript, at[, nudged]}. Records older than 7 days are
-           pruned at session start.
+           {schema: 1, running, root, transcript, at[, nudged][, model][, effort]}. Records older
+           than 7 days are pruned at session start. `model` = {id[, name], at} and `effort` =
+           {level, at} are the session's live model and effort as last seen, `at` being when that
+           value was first seen: taken from this payload when it carries them, else carried over.
+  seen     (every PreToolUse) reads the hook payload and, only when its effort (or model) differs
+           from the record's, rewrites the record: one small read, no network, no subprocess, and
+           no write at all when nothing changed or the session has no record yet.
   prompt   (every UserPromptSubmit) rewrites the same record, so the first prompt after a reload
            records what was actually loaded; refreshes the newest-release cache IN THE BACKGROUND
            when it is older than 30 minutes (so a release published mid-session reaches the status
@@ -29,8 +34,23 @@ plugin data, so the loaded copy writes down what it is:
            malformed one, or no single applicable install. A `/reload-plugins` in the transcript
            after the record was written reads as `current` until the next prompt rewrites it, so a
            successful reload never shows a false warning and a failed one shows again.
+  models --role planning|runner [--session <id>] [--repo <dir>]
+           prints one JSON line {role, expected: {model, effort}, running: {model, effort},
+           verdict}: the model and effort the repository expects a session in that role to run
+           (`sessionModels` in .claude/ds-config.json; planning fable/high, runner opus/high when
+           absent) against what this session was last seen running. `off` when the repository
+           switches the check off, `mismatch` when a value that can be compared differs, `match`
+           when both agree, `unknown` otherwise (no record, a value not seen yet, or a model name
+           that cannot be compared) and on any error. The session defaults to
+           CLAUDE_CODE_SESSION_ID. It reports only: nothing but the person changes a session's
+           model or effort. Contract: skills/plan/references/session-models.md.
+  models-report [--repo <dir>]
+           prints the lines doctor reports: each role's effective model and effort with its source
+           (configured or shipped default), then one `WARN` line per model name that is neither a
+           documented alias nor a full claude-… id and per effort outside the five levels.
 
-The status line imports `check` in-process; a repository's tooling runs `check`. Fails open: every
+The status line imports `check` and `observe` in-process (the status-line payload carries the live
+model and effort); a repository's tooling runs `check`. Fails open: every
 error exits 0 silently (record) or reads as `unknown` (check). python3 and the standard library only.
 """
 import json
@@ -54,6 +74,13 @@ REFRESH_AFTER = 1800          # a prompt refreshes a newest-release cache older 
 REFRESH_LOCK = 300            # one background refresh at a time; a dead one's lock lapses
 FETCH_TIMEOUT = 30            # the background fetch's own bound
 NUDGED = re.compile(r"^(reload|update):[0-9]+\.[0-9]+\.[0-9]+$")
+MODEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,127}$")
+MODEL_NAME = re.compile(r"^[^\x00-\x1f\x7f]{1,64}$")
+EFFORT = re.compile(r"^[a-z]{1,16}$")
+MODEL_ALIASES = ("default", "best", "fable", "opus", "sonnet", "haiku", "opusplan")
+UNCOMPARABLE = ("default", "best", "opusplan")   # names that do not say which model runs
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+ROLES = {"planning": ("fable", "high"), "runner": ("opus", "high")}
 LOOP_PROMPT = re.compile(r"^\s*(/loop\b|/devstride:update\b|/reload-plugins\b|<<autonomous-loop|<task-notification>)")
 
 
@@ -129,9 +156,47 @@ def read_payload():
         return {}
 
 
+def seen_values(payload):
+    """(model id, model display name, effort level) as a hook or status-line payload carries them;
+    None for each one that is absent or not in a shape worth recording. `model` is an object
+    ({id, display_name}) in the status-line payload and may be a bare id in a hook payload."""
+    model, effort = payload.get("model"), payload.get("effort")
+    name = None
+    if isinstance(model, dict):
+        model, name = model.get("id"), model.get("display_name")
+    level = effort.get("level") if isinstance(effort, dict) else effort
+    return (model if isinstance(model, str) and MODEL_ID.match(model) else None,
+            name if isinstance(name, str) and MODEL_NAME.match(name) else None,
+            level if isinstance(level, str) and EFFORT.match(level) else None)
+
+
+def merge_seen(entry, previous, model, name, effort, now):
+    """Put the live model and effort into `entry`: the value just seen, else the one `previous`
+    held. A value keeps its `at` while it stays the same. True when `entry` now differs from
+    `previous` in either."""
+    previous = previous if isinstance(previous, dict) else {}
+    old_model = previous.get("model") if isinstance(previous.get("model"), dict) else None
+    old_effort = previous.get("effort") if isinstance(previous.get("effort"), dict) else None
+    new_model, new_effort = old_model, old_effort
+    if model:
+        same = bool(old_model) and old_model.get("id") == model
+        new_model = {"id": model, "at": old_model.get("at", now) if same else now}
+        name = name or (old_model.get("name") if same else None)
+        if name:
+            new_model["name"] = name
+    if effort and not (old_effort and old_effort.get("level") == effort):
+        new_effort = {"level": effort, "at": now}
+    if new_model:
+        entry["model"] = new_model
+    if new_effort:
+        entry["effort"] = new_effort
+    return new_model != old_model or new_effort != old_effort
+
+
 def write_record(payload):
     """Write this session's record from the loaded copy; (directory, session id, entry) or None.
-    A `nudged` marker already in the record is carried over, so a prompt never asks twice."""
+    A `nudged` marker already in the record is carried over, so a prompt never asks twice, and so
+    are the live model and effort unless this payload carries newer ones."""
     sid = payload.get("session_id") or ""
     root = os.environ.get("CLAUDE_PLUGIN_ROOT") or ""
     if not isinstance(sid, str) or not SESSION_ID.match(sid) or not root:
@@ -149,8 +214,37 @@ def write_record(payload):
     nudged = previous.get("nudged") if isinstance(previous, dict) else None
     if isinstance(nudged, str) and NUDGED.match(nudged):
         entry["nudged"] = nudged
+    merge_seen(entry, previous, *seen_values(payload), now=entry["at"])
     write_atomic(directory, sid + ".json", entry)
     return directory, sid, entry
+
+
+def observe(session, model=None, name=None, effort=None):
+    """Note the live model and effort in a session's EXISTING record, writing only when one of them
+    changed. True when it wrote. Never creates a record (only the loaded copy knows what it is)
+    and never moves `at`, which `check` compares with the transcript. Never raises."""
+    try:
+        if not isinstance(session, str) or not SESSION_ID.match(session):
+            return False
+        model, name, effort = seen_values({"model": {"id": model, "display_name": name}, "effort": effort})
+        if not model and not effort:
+            return False
+        directory = os.path.join(cache_dir(), "sessions")
+        entry = read_json(os.path.join(directory, session + ".json"), limit=16384)
+        if not isinstance(entry, dict) or entry.get("schema") != 1:
+            return False
+        if not merge_seen(entry, dict(entry), model, name, effort, round(time.time(), 3)):
+            return False
+        write_atomic(private_dir(directory), session + ".json", entry)
+        return True
+    except Exception:
+        return False
+
+
+def seen():
+    payload = read_payload()
+    model, name, effort = seen_values(payload)
+    observe(payload.get("session_id"), model, name, effort)
 
 
 def record():
@@ -297,6 +391,98 @@ def check(session, repo=None):
     return result
 
 
+def model_base(value):
+    """A model name or id without its context-window suffix (`[1m]`), lower-cased."""
+    return re.sub(r"\[[0-9a-z]+\]$", "", value.strip().lower())
+
+
+def model_matches(expected, running):
+    """True / False, or None when the two cannot be compared. A full id matches only itself. An
+    alias matches a running id by FAMILY: the alias is one whole hyphen-separated segment of the id
+    (`opus` matches claude-opus-5, never claude-opusplan-x), not a substring of it."""
+    if not isinstance(expected, str) or not isinstance(running, str) or not running:
+        return None
+    expected, running = model_base(expected), model_base(running)
+    if expected.startswith("claude-"):
+        return expected == running
+    if expected not in MODEL_ALIASES or expected in UNCOMPARABLE:
+        return None
+    return expected in running.split("-")
+
+
+def models_block(repo=None):
+    """The repository's `sessionModels` settings as written; {} when absent or not an object."""
+    top = git_common_dir(repo or os.getcwd())[0]
+    config = read_json(os.path.join(top, ".claude", "ds-config.json")) if top else None
+    block = config.get("sessionModels") if isinstance(config, dict) else None
+    return block if isinstance(block, dict) else {}
+
+
+def models_report(repo=None):
+    """The lines doctor reports: each role's effective model and effort and where each comes from,
+    then one WARN per value the check cannot use. Whether the account offers a model is not
+    something a local read can know, and the first line says so."""
+    try:
+        block = models_block(repo)
+    except Exception:
+        block = {}
+    lines = ["session models: the model and effort each role expects (names are checked for shape "
+             "only; which models this account offers cannot be read from here)"]
+    if block.get("check", True) is False:
+        lines.append("sessionModels.check: false — the check is switched off; skills say nothing")
+    warnings = []
+    for role in ROLES:
+        wanted = block.get(role) if isinstance(block.get(role), dict) else {}
+        parts = []
+        for key, default in zip(("model", "effort"), ROLES[role]):
+            value = wanted.get(key, default)
+            parts.append("%s %s (%s)" % (key, json.dumps(value), "configured" if key in wanted else "shipped default"))
+            if key == "model":
+                base = model_base(value) if isinstance(value, str) else ""
+                if base not in MODEL_ALIASES and not re.match(r"^claude-[a-z0-9][a-z0-9.-]*$", base):
+                    warnings.append("WARN sessionModels.%s.model: %s is neither a documented alias (%s; [1m] may follow) "
+                                    "nor a full claude-… id; the check reads it as unknown"
+                                    % (role, json.dumps(value), ", ".join(MODEL_ALIASES)))
+            elif value not in EFFORTS:
+                warnings.append("WARN sessionModels.%s.effort: %s is not one of %s; the check reads it as unknown"
+                                % (role, json.dumps(value), ", ".join(EFFORTS)))
+        lines.append("sessionModels.%s: %s" % (role, ", ".join(parts)))
+    return lines + warnings
+
+
+def models(role, session=None, repo=None):
+    result = {"role": role, "expected": {"model": None, "effort": None},
+              "running": {"model": None, "effort": None}, "verdict": "unknown"}
+    try:
+        if role not in ROLES:
+            return result
+        block = models_block(repo)
+        wanted = block.get(role) if isinstance(block.get(role), dict) else {}
+        expected = result["expected"]
+        expected["model"] = wanted.get("model", ROLES[role][0])
+        expected["effort"] = wanted.get("effort", ROLES[role][1])
+        if block.get("check", True) is False:
+            result["verdict"] = "off"
+            return result
+        session = session or os.environ.get("CLAUDE_CODE_SESSION_ID")
+        entry = None
+        if isinstance(session, str) and SESSION_ID.match(session):
+            entry = read_json(os.path.join(cache_dir(), "sessions", session + ".json"), limit=16384)
+        if not isinstance(entry, dict) or entry.get("schema") != 1:
+            return result
+        model, _, effort = seen_values({"model": entry.get("model"), "effort": entry.get("effort")})
+        result["running"] = {"model": model, "effort": effort}
+        same_model = model_matches(expected["model"], model)
+        same_effort = (expected["effort"] == effort) if expected["effort"] in EFFORTS and effort else None
+        if same_model is False or same_effort is False:
+            result["verdict"] = "mismatch"
+        elif same_model and same_effort:
+            result["verdict"] = "match"
+    except Exception:
+        result["verdict"] = "unknown"
+    return result
+
+
 def check_enabled():
     return os.environ.get("DEVSTRIDE_PLUGIN_UPDATE_CHECK", "1") != "0"
 
@@ -410,6 +596,20 @@ def main(argv):
         return 0
     if argv[:1] == ["prompt"]:
         prompt()
+        return 0
+    if argv[:1] == ["seen"]:
+        try:
+            seen()
+        except Exception:
+            pass
+        return 0
+    if argv[:1] == ["models"]:
+        options = dict(zip(argv[1::2], argv[2::2]))
+        print(json.dumps(models(options.get("--role"), options.get("--session"), options.get("--repo")), sort_keys=True))
+        return 0
+    if argv[:1] == ["models-report"]:
+        options = dict(zip(argv[1::2], argv[2::2]))
+        print("\n".join(models_report(options.get("--repo"))))
         return 0
     if argv[:1] == ["refresh-newest"]:
         refresh_newest()

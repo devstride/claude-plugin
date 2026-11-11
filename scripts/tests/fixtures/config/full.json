@@ -131,5 +131,10 @@
     "enabled": true, "notify": ["ops-lead"],
     "categories": [{ "id": "data-retention", "title": "Changes how long data is kept", "means": "a retention period, expiry or deletion schedule changes" }]
   },
-  "presence": { "command": "./tools/presence report", "intervalMinutes": 5 }
+  "presence": { "command": "./tools/presence report", "intervalMinutes": 5 },
+  "sessionModels": {
+    "check": true,
+    "planning": { "model": "fable[1m]", "effort": "xhigh" },
+    "runner": { "model": "claude-opus-5", "effort": "high" }
+  }
 }

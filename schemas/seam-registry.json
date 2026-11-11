@@ -2098,6 +2098,73 @@
       "since": "pre-registry"
     },
     {
+      "key": "sessionModels",
+      "type": "object",
+      "description": "the model and effort a session is expected to run, per role; contract: skills/plan/references/session-models.md",
+      "since": "unreleased"
+    },
+    {
+      "key": "sessionModels.check",
+      "type": "boolean",
+      "default": true,
+      "description": "compare the session with the expected model and effort when a planning or build skill starts; false switches it off",
+      "since": "unreleased"
+    },
+    {
+      "key": "sessionModels.planning",
+      "type": "object",
+      "description": "what the planning skills expect",
+      "since": "unreleased"
+    },
+    {
+      "key": "sessionModels.planning.model",
+      "type": "string",
+      "default": "fable",
+      "description": "a model alias (optionally with [1m]) or a full claude-… id",
+      "since": "unreleased"
+    },
+    {
+      "key": "sessionModels.planning.effort",
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "default": "high",
+      "description": "the effort level",
+      "since": "unreleased"
+    },
+    {
+      "key": "sessionModels.runner",
+      "type": "object",
+      "description": "what the build runner (build-item, ultracode-build) expects",
+      "since": "unreleased"
+    },
+    {
+      "key": "sessionModels.runner.model",
+      "type": "string",
+      "default": "opus",
+      "description": "a model alias (optionally with [1m]) or a full claude-… id",
+      "since": "unreleased"
+    },
+    {
+      "key": "sessionModels.runner.effort",
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "default": "high",
+      "description": "the effort level",
+      "since": "unreleased"
+    },
+    {
       "key": "localEnvironment",
       "type": [
         "object",

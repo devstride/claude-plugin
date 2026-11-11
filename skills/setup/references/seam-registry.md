@@ -262,6 +262,14 @@ starting with `_` and `$schema` are never reported as unknown.
 | `plugin.pin` | string, null | — | `null` | a version this repository holds at | pre-registry |
 | `session` | object, null | — | — | session job classes and the session's display name; null reads as absent | pre-registry |
 | `session.jobClassGate` | boolean | — | `true` | block mixing authoring and execution in one session | pre-registry |
+| `sessionModels` | object | — | — | the model and effort a session is expected to run, per role; contract: skills/plan/references/session-models.md | unreleased |
+| `sessionModels.check` | boolean | — | `true` | compare the session with the expected model and effort when a planning or build skill starts; false switches it off | unreleased |
+| `sessionModels.planning` | object | — | — | what the planning skills expect | unreleased |
+| `sessionModels.planning.model` | string | — | fable | a model alias (optionally with [1m]) or a full claude-… id | unreleased |
+| `sessionModels.planning.effort` | string | low, medium, high, xhigh, max | high | the effort level | unreleased |
+| `sessionModels.runner` | object | — | — | what the build runner (build-item, ultracode-build) expects | unreleased |
+| `sessionModels.runner.model` | string | — | opus | a model alias (optionally with [1m]) or a full claude-… id | unreleased |
+| `sessionModels.runner.effort` | string | low, medium, high, xhigh, max | high | the effort level | unreleased |
 | `localEnvironment` | object, null | — | — | this repository's isolated local instances; null reads as absent | pre-registry |
 | `localEnvironment.recreateMode` | string, null | inPlace, newInstance, `null` | `null` | which shape recreate is | pre-registry |
 | `pool` | object, null | — | — | the repository's checkout-pool commands, set both or neither (one alone is an error); null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md | 3.20.0 |

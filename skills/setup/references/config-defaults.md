@@ -487,6 +487,23 @@ headless runs. The recipe and the record it writes are in
 - **`build-item`'s loop over many stories is ONE job**, not a new one per story: the gate never
   blocks the loop as it walks a plan.
 
+## Session models
+
+```json
+{
+  "sessionModels": {
+    "check": true,
+    "planning": { "model": "fable", "effort": "high" },
+    "runner": { "model": "opus", "effort": "high" }
+  }
+}
+```
+
+The model and effort the planning skills (`planning`) and the build runner (`runner`) expect their
+session to run; every key is optional and these are the defaults. A skill only reports a
+difference and asks once; `check: false` silences it. Contract:
+`skills/plan/references/session-models.md`.
+
 ## Active Agents
 
 Optional, and only `/devstride:setup agents` writes it, after a typed yes:
