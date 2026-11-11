@@ -435,7 +435,7 @@ else in a reply is ignored, because the tracker cannot prove who wrote it. Every
 the agent was already allowed to do. Whatever needs your own yes (a production merge, a migration
 approval, a waived check, anything destructive) is listed as a notice only: no reply can start it,
 and it still waits for you in a session. A saved view of the tag (`needsYou.view`) is your one
-list, and `needsYou.fallbackItem` holds entries that belong to no item. No `needsYou.label`, no
+list, and `needsYou.fallbackItem` holds notices that belong to no item. No `needsYou.label`, no
 change.
 
 ## Your first plan

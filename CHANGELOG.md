@@ -22,8 +22,11 @@ for what each version component means here and how a release is cut.
   that plan takes a reply only when it comes from the plan owner's account and is just one of the
   letters; it records the letter in the thread before acting and removes the tag. It never carries
   out an option's wording as read from the tracker: when it reaches the question again it lists its
-  options afresh and takes the letter only if that option still stands, else it asks again. A
-  paused story resumes on its own branch. Any other text in a reply is ignored and named in the run's report. A **notice**
+  options afresh and takes the letter only if that option still stands, else it asks again, saying
+  the options changed. A choice is queued only by `build-item` on an item it is building; a
+  release, a stop before any item is chosen, and anything on the fallback item are notices. A
+  paused story resumes on its own unmerged branch, found in git by the item number, never from
+  tracker text. Any other text in a reply is ignored and named in the run's report. A **notice**
   (`Needs you: in a session`) covers everything that is the owner's own yes: a production merge,
   approving a migration, waiving a check, taking over another session's work, anything destructive
   or touching production. No skill acts on a reply to a notice; it only makes the wait visible, and

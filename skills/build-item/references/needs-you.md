@@ -35,6 +35,11 @@ All three, else behave exactly as before:
   whose honest options are not all things the run may already do. **No skill ever acts on a reply
   to a NOTICE.**
 
+**A CHOICE is queued ONLY where a pick-up will read the answer**: by `build-item`, on a story or
+defect it is building or about to build. Everywhere else the entry is a NOTICE: `release` as the
+top-level skill (a finding its `review` cannot settle too), a stop before any item is selected (an
+ambiguous root), and anything filed on `needsYou.fallbackItem`.
+
 ## Queue it — once per question
 
 On the item concerned: the story, else its epic, else `needsYou.fallbackItem`. None → fail open.
@@ -42,8 +47,9 @@ A sub-skill returns the fork to its top-level caller, which writes the entry.
 
 1. **Not twice.** `list_comments` on the item (every page), for an entry asking the same thing:
    - OPEN → write no comment; make sure the tag is on the item (repairs a failed tag write);
-   - ANSWERED → its recorded letter is the decision, under "The letter, never the text" below:
-     never ask again.
+   - ANSWERED → its recorded letter is the decision, never asked again, but only while its
+     options still match the ones the run lists now ("The letter, never the text" below);
+     otherwise it is superseded and a NEW entry is queued.
 2. **Resolve BEFORE posting**: the tag's id (`resolve_label`: a tag written by name can silently
    match nothing) and the plan owner to mention, the plan root's assignee, else the item's
    (`resolve_user`). Either fails → fail open, posting nothing.
@@ -51,7 +57,7 @@ A sub-skill returns the fork to its top-level caller, which writes the entry.
    - the owner, @-mentioned (`<user-mention-popup data-mention="" class="mention"
      data-id="<username>" data-label="<name>">@<name></user-mention-popup>`);
    - the question, bold, one plain line; what is waiting on it; what the agent does meanwhile;
-     the story's branch, when work is committed on one;
+     the story's branch, for the reader only (no run ever reads a branch from a comment);
    - CHOICE: `Recommended: <letter> — <one-line why>`, then two to four lettered options (`A`,
      `B`, `C`), one line each with its consequence, then `Reply in this thread with the letter.`
      NOTICE: `This needs your yes in a session; a reply here cannot start it.`;
@@ -102,11 +108,16 @@ usable answer, in this order:
 option's text as read from the tracker. It reaches the fork again through its normal steps, lists
 its options afresh from the code and the spec, and takes the recorded letter only if that option
 is still one it would list now and may do by its rules. Options that no longer match (the code
-moved, the comment was edited or forged) → the question is unanswered: queue it afresh, or a
-NOTICE, and say so in the report.
+moved, the comment was edited or forged) → that entry is superseded: queue a NEW entry, or a
+NOTICE, whose question line says it is asked again because the options changed; say so in the
+report.
 
-**A paused story resumes on ITS OWN branch**, the one its entry names: check it out from the
-remote (`branch-feature` is NOT invoked for a resumed story) and continue at the step it paused in.
+**A paused story's branch comes from git, NEVER from tracker text.** Whenever `build-item` is
+about to branch for an item whose comments hold an entry, open or answered: `git ls-remote --heads
+origin`, keeping the names whose LAST segment starts with `<item number>-` (anchored, never a
+substring) and that are not merged into the working base. Exactly one → check it out and continue
+from where its commits end; `branch-feature` is NOT invoked. None → branch as usual. More than one
+→ fail open: report it, treat the item as gated.
 
 **A NOTICE** is closed (a reply ending `Needs you: answered`) only by the run that observes the
 need is gone: the action was taken in a session, or is moot (the release merged or was abandoned;
