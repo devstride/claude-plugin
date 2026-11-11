@@ -298,7 +298,7 @@ if [ "$OBS" = 1001000 ] && [ "$(field m2 model.id)/$(field m2 model.name)/$(fiel
   ok "(21) observe: first sight writes, the same values do not, a new model does; nothing to note, no record and garbage → False, no error"
 else bad "(21) obs=$OBS $(cat "$SESSIONS/m2.json")"; fi
 
-# (22) verdicts: an alias matches by family, [1m] is ignored on either side, a full id matches only itself
+# (22) verdicts: an alias matches by family, [1m] is ignored on either side, a full id matches its dated form too
 seed() { # seed SESSION MODEL EFFORT
   event "$1" SessionStart ",\"model\":\"$2\"" >/dev/null; [ -z "${3:-}" ] || event "$1" PreToolUse ",\"effort\":{\"level\":\"$3\"}" seen >/dev/null
 }
@@ -306,9 +306,9 @@ seed v1 claude-fable-5-2 high; seed v2 'claude-opus-5[1m]' high; seed v3 claude-
 RF="$(mkrepo models-full '{"sessionModels":{"runner":{"model":"claude-opus-5","effort":"high"},"planning":{"model":"fable[1m]"}}}')"
 V="$(mverdict planning v1) $(mverdict runner v2) $(mverdict runner v2 "$RF") $(mverdict runner v3 "$RF") $(mverdict planning v1 "$RF") $(mverdict runner v1)"
 LINE="$(python3 "$HELPER" models --role planning --session v1 --repo "$R")"
-if [ "$V" = "match match match mismatch match mismatch" ] \
+if [ "$V" = "match match match match match mismatch" ] \
    && [ "$LINE" = '{"expected": {"effort": "high", "model": "fable"}, "role": "planning", "running": {"effort": "high", "model": "claude-fable-5-2"}, "verdict": "match"}' ]; then
-  ok "(22) models: alias ↔ family, [1m] ignored either side, full id only itself, a different family mismatches; one JSON line"
+  ok "(22) models: alias ↔ family, [1m] ignored either side, a full id also in its dated form, a different family mismatches; one JSON line"
 else bad "(22) $V | $LINE"; fi
 
 # (23) anchored, never a substring: `opus` does not match an id whose segment merely starts with it

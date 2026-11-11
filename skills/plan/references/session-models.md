@@ -29,8 +29,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/hooks/session-runtime.py" models --role <planning
 ```
 
 It prints one JSON line, `{role, expected: {model, effort}, running: {model, effort}, verdict}`,
-and always exits 0. `running` is what the plugin's hooks and status line last saw this session
-running. Follow `verdict`:
+and always exits 0. `running` is what the plugin last saw this session running. Follow `verdict`:
 
 | Verdict | Meaning | Do |
 |---|---|---|
@@ -41,7 +40,7 @@ running. Follow `verdict`:
 
 An alias matches a running id by family (`fable` matches `claude-fable-5-2`); a full id matches
 the same model however it is reached (a `[1m]` suffix, a provider prefix or version and a release
-date are ignored). The command also fails open: any error is `unknown`.
+date are ignored). Any error is `unknown`.
 
 ## On a mismatch
 
