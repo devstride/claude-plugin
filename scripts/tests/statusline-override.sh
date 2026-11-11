@@ -21,7 +21,8 @@ repo() {
   git -C "$root" config user.email test@example.invalid
   git -C "$root" config user.name "Status Line Test"
   printf '%s\n' '{"statusLine":{"type":"command","command":"bash .claude/statusline.sh","padding":0},"shared":true}' > "$root/.claude/settings.json"
-  printf '%s\n' '#!/bin/bash' '# ds-statusline: managed v3.0.0 — test marker' 'echo "Repo: test"' > "$root/.claude/statusline.sh"
+  # The launcher's marker here; the later cases keep a full copy's marker, which still counts as managed.
+  printf '%s\n' '#!/bin/bash' '# ds-statusline-launcher: managed v1 — test marker' 'echo "Repo: test"' > "$root/.claude/statusline.sh"
   chmod 755 "$root/.claude/statusline.sh"
   git -C "$root" add .claude/settings.json .claude/statusline.sh
   git -C "$root" commit -qm "add shared status line"

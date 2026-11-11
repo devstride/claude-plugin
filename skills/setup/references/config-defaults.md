@@ -646,13 +646,13 @@ side effect in the repository.
 
 ## Status line
 
-`setup` offers to write the repository a status line, copying
-`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline.sh` to `.claude/statusline.sh` and
-pointing `statusLine.command` at it in `.claude/settings.json`. **Whether the repository has one is
+`setup` offers to write the repository a status line, copying the launcher
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-launcher.sh` to `.claude/statusline.sh`
+and pointing `statusLine.command` at it in `.claude/settings.json`. **Whether the repository has one is
 still not a config key** — the presence of the file and the setting is the whole state, and a key
 that only restated them would be a third thing to keep in sync. The optional `statusLine` block
 covers two other things: `hiddenSegments`, the segments this repository has confirmed do not apply,
-and `autoUpdate`, whether the session-start hook may refresh the copied script. Both are documented
+and `autoUpdate`, whether the session-start hook may replace the committed script. Both are documented
 in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
 
 It renders two lines of symbol-labelled segments (`statusline-segments.md`) and **omits any
@@ -665,12 +665,13 @@ those segments are the reason it ships here rather than being left to each repos
 - **Stage** is `stage.resolve`, so it appears only in repositories that have one, and turns red
   for a `productionStages` name.
 
-The script is repo-agnostic and identical everywhere (it reads the consuming repository's config at
-runtime), so copying needs no substitution and re-copying is always safe. It is the owner's to edit
-afterwards; `setup` never overwrites a `.claude/statusline.sh` it did not write.
-Line 2 carries a `# ds-statusline: managed v<x.y.z>` marker, which is what lets the session-start
-hook bring an older copy forward (backup in the git directory; see `statusline-segments.md`); **deleting that line is the
-supported way to take the file over**, and nothing replaces it afterwards.
+The committed script is a launcher: it runs the status line of the plugin version each session
+has loaded, which reads the repository's config at runtime, so it is identical everywhere and no
+release changes it. `setup` never overwrites a `.claude/statusline.sh` it did not write. Line 2
+carries a `# ds-statusline-launcher: managed v<n>` marker, which lets the session-start hook
+replace an older launcher, or a full copy from before the launcher, once (backup in the git
+directory; see `statusline-segments.md`); **deleting that line is the supported way to take the
+file over**, and nothing replaces it afterwards.
 
 ## Known cloud reviewers
 

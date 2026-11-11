@@ -283,7 +283,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `stage.productionStages` | string[] | — | — | stage names that are production | pre-registry |
 | `statusLine` | object | — | — | the shipped status line's settings | pre-registry |
 | `statusLine.hiddenSegments` | string[] | — | — | segments confirmed not to apply | pre-registry |
-| `statusLine.autoUpdate` | boolean | — | `true` | the session-start hook may refresh the copied script | pre-registry |
+| `statusLine.autoUpdate` | boolean | — | `true` | the session-start hook may replace the committed launcher | pre-registry |
 
 ## Cited by
 

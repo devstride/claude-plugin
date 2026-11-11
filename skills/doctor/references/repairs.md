@@ -27,6 +27,7 @@ config beyond the narrow personal `statusLine` exception.
 | Finding | Tier | What Phase 2 does |
 | --- | --- | --- |
 | Status line missing or half-configured (§4) | **A** | Write it — mechanics below |
+| `.claude/statusline.sh` carries `# ds-statusline: managed` — a full copy, not the launcher (§4) | **A** | Replace it with the launcher, step 1 |
 | Status line set only in `~/.claude/settings.json` (§4) | **A** | Offer the same repair, which is what makes it repository-wide |
 | Personal `statusLine` in local or user settings (§4) | **A, narrow exception** | After the shared pair is committed and clean, offer key-only cleanup separately |
 | A structurally absent status-line segment (§4) | **A** | Ask what it should read from; write `stage.resolve`, or record `statusLine.hiddenSegments` |
@@ -51,9 +52,11 @@ Anything absent from this table is **tier C**.
 
 Phase E3 of `/devstride:setup` is authoritative:
 
-1. Copy `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline.sh` verbatim to
-   `.claude/statusline.sh`; `chmod +x`. It reads repo config at runtime—substitute nothing.
-2. **Never overwrite an existing script.** Say it exists and leave it.
+1. Copy `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-launcher.sh` verbatim to
+   `.claude/statusline.sh`; `chmod +x`. It runs the loaded plugin's status line—substitute nothing.
+2. **Never overwrite an existing script**, except a full copy still carrying
+   `# ds-statusline: managed v<x.y.z>`: the launcher replaces it, on a work branch only. A script
+   with neither marker is the owner's: say it exists and leave it.
 3. MERGE this into `.claude/settings.json` — never replace the document:
 
    ```json
@@ -65,7 +68,7 @@ Phase E3 of `/devstride:setup` is authoritative:
 4. Verify non-empty output (failure is otherwise silent):
 
    ```bash
-   printf '{"workspace":{"current_dir":"%s"}}' "$PWD" | bash .claude/statusline.sh; echo
+   printf '{"session_id":"%s","workspace":{"current_dir":"%s"}}' "$CLAUDE_CODE_SESSION_ID" "$PWD" | bash .claude/statusline.sh; echo
    ```
 
    Confirm neither file is ignored. Leave both **unstaged and uncommitted**; until committed, the

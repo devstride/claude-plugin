@@ -164,9 +164,9 @@ next action. For each failure symptom, read
   `productionStages`, and WARN when the resolved stage is in it: this checkout points at
   production. **Never infer a stage from the branch name, and never report
   `localEnvironment.instanceName` as one** — different axes.
-- **Status line / personal settings** — run the helper as `inspect --local <repo-root>` and
-  `inspect --user <repo-root>`; it lives at
-  `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/statusline-override.py`. Read shared settings too;
+- **Status line / personal settings** — run
+  `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/statusline-override.py` as
+  `inspect --local <repo-root>` and `inspect --user <repo-root>`. Read shared settings too;
   user settings use `CLAUDE_CONFIG_DIR`, else `~/.claude`. Never print a personal command.
   Precedence is managed > CLI > local > shared project > user. Resolve accessible
   `disableAllHooks`; effective `true` FAILs and blocks cleanup. Known managed/CLI disables also
@@ -174,8 +174,8 @@ next action. For each failure symptom, read
   works, a user fallback is INFO.
 
   Require the canonical shared pair regular, unignored, committed in `HEAD`, clean in index/tree,
-  rendering non-empty output from `bash .claude/statusline.sh`, with `refreshInterval` (else
-  WARN). No shared/personal setting is N/A; one shared half FAILs. Phase 2 repairs shared first,
+  rendering non-empty output from `bash .claude/statusline.sh`, with `refreshInterval` and the
+  launcher marker (else WARN). No shared/personal setting is N/A; one shared half FAILs. Phase 2 repairs shared first,
   then asks separately per personal key. After removal restart, rerun `doctor config`, inspect
   `/status`, report rendered segments. Only structural `stage` absence becomes a question; never
   ask about transient blanks. Details:

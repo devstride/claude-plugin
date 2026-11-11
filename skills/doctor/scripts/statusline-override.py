@@ -436,7 +436,8 @@ def require_working_shared_statusline(repository: Path) -> None:
         prefix = bounded_script_prefix(script).decode("utf-8")
     except UnicodeDecodeError as exc:
         raise Refusal(f"managed .claude/statusline.sh is not UTF-8: {exc}") from exc
-    if not re.search(r"^# ds-statusline: managed v[0-9]", prefix, re.MULTILINE):
+    # The launcher's marker, or the marker of a full copy written before the launcher existed.
+    if not re.search(r"^# ds-statusline(?:-launcher)?: managed v[0-9]", prefix, re.MULTILINE):
         raise Refusal(".claude/statusline.sh does not carry the managed status-line marker")
     for relative in (".claude/settings.json", ".claude/statusline.sh"):
         if is_ignored(repository, relative):

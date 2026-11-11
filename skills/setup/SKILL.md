@@ -371,15 +371,15 @@ the skills are the owner's to refine.
 ## Phase E3 — write the status line
 
 Only when Phase D said yes. Copy
-`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline.sh` to `.claude/statusline.sh`,
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-launcher.sh` to `.claude/statusline.sh`,
 `chmod +x` it, and MERGE into `.claude/settings.json` — never replace the document:
 
 ```json
 { "statusLine": { "type": "command", "command": "bash .claude/statusline.sh", "padding": 0, "refreshInterval": 30 } }
 ```
 
-**Copy it verbatim — nothing is substituted**: it reads the repository's config at runtime, and
-a `{{PLACEHOLDER}}` edited in is a bug, not a customization.
+**Copy it verbatim**: it is a launcher that runs the loaded plugin's status line, so no release
+changes it.
 
 **Never overwrite an existing `.claude/statusline.sh`** — the owner may have edited it. Say so
 and leave it.
@@ -387,11 +387,10 @@ and leave it.
 Then prove it runs — a status line fails silently:
 
 ```bash
-printf '{"workspace":{"current_dir":"%s"}}' "$PWD" | bash .claude/statusline.sh; echo
+printf '{"session_id":"%s","workspace":{"current_dir":"%s"}}' "$CLAUDE_CODE_SESSION_ID" "$PWD" | bash .claude/statusline.sh; echo
 ```
 
-Non-empty output is the pass. Confirm neither file is gitignored (`git check-ignore` exits 1);
-both are the owner's to edit.
+A line with `⑂` is the pass. Confirm neither file is gitignored (`git check-ignore` exits 1).
 
 Then **look at which segments that render actually produced**, and ask about the structurally
 absent ones — in practice `stage`. Answers
