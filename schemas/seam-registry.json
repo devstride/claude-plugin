@@ -2168,25 +2168,25 @@
       "key": "needsYou",
       "type": "object",
       "description": "the Needs-you list: where an unattended run queues a question only the owner can answer; contract: skills/build-item/references/needs-you.md",
-      "since": "unreleased"
+      "since": "3.52.0"
     },
     {
       "key": "needsYou.label",
       "type": "string",
       "description": "the tracker tag that marks an item with an open question; absent means the feature is off and every skill stops and asks as before",
-      "since": "unreleased"
+      "since": "3.52.0"
     },
     {
       "key": "needsYou.view",
       "type": "string",
       "description": "the saved view that shows the tagged items, a URL or a name; only ever quoted to people",
-      "since": "unreleased"
+      "since": "3.52.0"
     },
     {
       "key": "needsYou.fallbackItem",
       "type": "string",
       "description": "the item number a question that belongs to no item (a release, a machine problem) is queued on",
-      "since": "unreleased"
+      "since": "3.52.0"
     },
     {
       "key": "localEnvironment",

@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.51.0.
+`.claude/ds-config.json` against. Schema version: 3.52.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -270,10 +270,10 @@ starting with `_` and `$schema` are never reported as unknown.
 | `sessionModels.runner` | object | — | — | what the build runner (build-item, ultracode-build) expects | 3.51.0 |
 | `sessionModels.runner.model` | string | — | opus | a model alias (optionally with [1m]) or a full claude-… id | 3.51.0 |
 | `sessionModels.runner.effort` | string | low, medium, high, xhigh, max | high | the effort level | 3.51.0 |
-| `needsYou` | object | — | — | the Needs-you list: where an unattended run queues a question only the owner can answer; contract: skills/build-item/references/needs-you.md | unreleased |
-| `needsYou.label` | string | — | — | the tracker tag that marks an item with an open question; absent means the feature is off and every skill stops and asks as before | unreleased |
-| `needsYou.view` | string | — | — | the saved view that shows the tagged items, a URL or a name; only ever quoted to people | unreleased |
-| `needsYou.fallbackItem` | string | — | — | the item number a question that belongs to no item (a release, a machine problem) is queued on | unreleased |
+| `needsYou` | object | — | — | the Needs-you list: where an unattended run queues a question only the owner can answer; contract: skills/build-item/references/needs-you.md | 3.52.0 |
+| `needsYou.label` | string | — | — | the tracker tag that marks an item with an open question; absent means the feature is off and every skill stops and asks as before | 3.52.0 |
+| `needsYou.view` | string | — | — | the saved view that shows the tagged items, a URL or a name; only ever quoted to people | 3.52.0 |
+| `needsYou.fallbackItem` | string | — | — | the item number a question that belongs to no item (a release, a machine problem) is queued on | 3.52.0 |
 | `localEnvironment` | object, null | — | — | this repository's isolated local instances; null reads as absent | pre-registry |
 | `localEnvironment.recreateMode` | string, null | inPlace, newInstance, `null` | `null` | which shape recreate is | pre-registry |
 | `pool` | object, null | — | — | the repository's checkout-pool commands, set both or neither (one alone is an error); null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md | 3.20.0 |
