@@ -469,10 +469,23 @@ printf '{"statusLine":{"type":"command","command":"bash mine.sh"},"keep":1}\n' >
 SHA="$(sha_from "$(python3 "$HELPER" inspect --local "$R")")"
 BAR="$(printf '{"workspace":{"current_dir":"%s"}}' "$R" | bash "$R/.claude/statusline.sh")"
 OUT="$(python3 "$HELPER" remove --local "$R" --expect-sha256 "$SHA" 2>&1)"; RC=$?
-if [ -n "$BAR" ] && [ "$RC" -eq 2 ] && printf '%s' "$OUT" | grep -q 'found no plugin copy' \
+if [ -n "$BAR" ] && [ "$RC" -eq 2 ] && printf '%s' "$OUT" | grep -q 'found no plugin copy that draws its bar' \
    && cmp -s "$PERSONAL" "$WORK/launcher-before.json"; then
   ok "(L1) the launcher draws its plain line but finds no plugin → personal removal refused"
 else bad "(L1) bar=$BAR rc=$RC out=$OUT"; fi
+
+# A plugin copy is found, but its status line is broken (exits 3): the bar is still only the
+# plain line, so removal is refused.
+BROKEN="$WORK/broken-plugin"; mkdir -p "$BROKEN/.claude-plugin" "$BROKEN/skills/setup/references"
+printf '{"name":"devstride","version":"9.9.9"}' > "$BROKEN/.claude-plugin/plugin.json"
+printf '#!/bin/bash\nexit 3\n' > "$BROKEN/skills/setup/references/statusline.sh"
+printf '{"session_id":"override-broken","hook_event_name":"SessionStart"}' \
+  | CLAUDE_PLUGIN_ROOT="$BROKEN" python3 "$ROOT/hooks/session-runtime.py" record
+OUT="$(CLAUDE_CODE_SESSION_ID=override-broken python3 "$HELPER" remove --local "$R" --expect-sha256 "$SHA" 2>&1)"; RC=$?
+if [ "$RC" -eq 2 ] && printf '%s' "$OUT" | grep -q 'found no plugin copy that draws its bar' \
+   && cmp -s "$PERSONAL" "$WORK/launcher-before.json"; then
+  ok "(L1b) the launcher's plugin copy has a broken status line → personal removal refused"
+else bad "(L1b) rc=$RC out=$OUT"; fi
 
 # The plugin is found through this session's record, as in a real session: removal goes ahead.
 printf '{"session_id":"override-test","hook_event_name":"SessionStart"}' \

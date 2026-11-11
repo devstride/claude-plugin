@@ -24,8 +24,9 @@
 # Nothing found, or the plugin's script printed nothing: a plain directory-and-branch line.
 # It never prints an error and never exits non-zero.
 #
-# `--which` prints the plugin copy it would run, and nothing when it finds none: the one way to
-# tell the plugin's bar from the plain line, whatever segments a repository shows.
+# `--which` prints the plugin copy whose status line drew the bar for this payload, and nothing
+# when the bar would be the plain line (no copy found, or its script failed or printed nothing):
+# the one way to tell the plugin's bar from the plain line, whatever segments a repository shows.
 #
 # The record and the kept answer name a script this file then RUNS, so both are read only when
 # the sessions directory and the file itself are this user's own, are not symbolic links and
@@ -39,17 +40,25 @@ sid=""; re='"session_id"[[:space:]]*:[[:space:]]*"([A-Za-z0-9_-][A-Za-z0-9._-]*)
 [[ $input =~ $re ]] && [ "${#BASH_REMATCH[1]}" -le 128 ] && sid="${BASH_REMATCH[1]}"
 
 # trusted [FILE] — the sessions directory, and FILE when given, pass the rule above. The
-# ownership and link tests are the shell's own; the permission bits cost one `ls`.
+# ownership and link tests are the shell's own; the permission bits cost one `ls`, whose lines
+# are taken apart in the shell (no temporary file). Anything it cannot read as a permission
+# string for every path asked about is a refusal.
 trusted() {
   [ -d "$sessions" ] && [ ! -L "$sessions" ] && [ -O "$sessions" ] || return 1
   if [ $# -gt 0 ]; then [ -f "$1" ] && [ ! -L "$1" ] && [ -O "$1" ] || return 1; fi
-  local listing mode rest
-  listing=$(ls -ldn "$sessions" "$@" 2>/dev/null) || return 1
-  [ -n "$listing" ] || return 1
-  while IFS=' ' read -r mode rest; do
-    case "$mode" in ?????w*|????????w*) return 1 ;; esac
-  done <<<"$listing"
-  return 0
+  local rest entry want=$(( $# + 1 )) seen=0
+  rest=$(ls -ldn "$sessions" "$@" 2>/dev/null) || return 1
+  while [ -n "$rest" ]; do
+    entry="${rest%%$'\n'*}"
+    case "$entry" in
+      ?????w*|????????w*) return 1 ;;
+      [d-][r-][w-][xsS-][r-]-[xsS-][r-]-[xtT-]*) seen=$(( seen + 1 )) ;;
+      *) return 1 ;;
+    esac
+    [ "$rest" = "$entry" ] && break
+    rest="${rest#*$'\n'}"
+  done
+  [ "$seen" -eq "$want" ]
 }
 
 # 1. The session's record, read without a JSON parser. Only a path that JSON had to escape
@@ -185,15 +194,14 @@ sys.stdout.write(min(rows.values())[3] if rows else "")
   esac
 fi
 
-if [ "${1:-}" = "--which" ]; then
-  [ -n "$root" ] && printf '%s\n' "$root"
-  exit 0
-fi
-
 if [ -n "$root" ]; then
   out=$(printf '%s' "$input" | CLAUDE_PLUGIN_ROOT="$root" bash "$root/$rel" 2>/dev/null)
-  if [ -n "$out" ]; then printf '%s' "$out"; exit 0; fi
+  if [ -n "$out" ]; then
+    if [ "${1:-}" = "--which" ]; then printf '%s\n' "$root"; else printf '%s' "$out"; fi
+    exit 0
+  fi
 fi
+[ "${1:-}" = "--which" ] && exit 0
 
 # The plain line: the directory and its branch, in the full bar's own symbols.
 cwd=""; re='"current_dir"[[:space:]]*:[[:space:]]*"([^"\\]+)"'

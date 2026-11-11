@@ -184,6 +184,22 @@ if [ "$K0" = "bar-6.6.6 payload $EVIL" ] && [ "$K1" = "$WANT" ] && [ "$K2" = "$W
   ok "(13b) an untrusted kept answer is ignored; the new one replaces a link instead of writing through it"
 else bad "(13b) control=$K0 group=$K1 link=$K2 file=$(cat "$SESSIONS/k-link.root" 2>&1) mode=$(mode "$SESSIONS/k-link.root")"; fi
 
+# (13c) the check fails CLOSED and silently when the shell has nowhere to write a temporary file
+mkdir -p "$WORK/notmp"; chmod 500 "$WORK/notmp"; chmod 777 "$SESSIONS"
+C1="$(TMPDIR="$WORK/notmp" draw t-ok "$REPO")"; chmod 770 "$SESSIONS"; C2="$(TMPDIR="$WORK/notmp" draw t-ok "$REPO")"
+chmod 700 "$SESSIONS"; C3="$(TMPDIR="$WORK/notmp" draw t-ok "$REPO")"
+# ... and when the listing is not one clean permission line per path asked about: an `ls` that
+# answers for one path only, or with something else, is a refusal, never a pass
+mkdir -p "$WORK/ls-short" "$WORK/ls-odd"
+printf '#!/bin/bash\necho "drwx------ 2 0 0 64 Jan 1 00:00 x"\n' > "$WORK/ls-short/ls"
+printf '#!/bin/bash\necho "total 0"; echo "total 0"\n' > "$WORK/ls-odd/ls"; chmod +x "$WORK/ls-short/ls" "$WORK/ls-odd/ls"
+lsdraw() { printf '{"session_id":"t-ok","marker":"whole"}' | PATH="$1:$WORK/bin:$PATH" /bin/bash "$L" 2>&1; }
+C4="$(lsdraw "$WORK/ls-short")"; C5="$(lsdraw "$WORK/ls-odd")"
+if [ "$C1" = "$WANT" ] && [ "$C2" = "$WANT" ] && [ "$C3" = "bar-6.6.6 payload $EVIL" ] \
+   && [ "$C4" = "$WANT" ] && [ "$C5" = "$WANT" ]; then
+  ok "(13c) the check fails closed and silent: unwritable TMPDIR, a listing short of a line, a listing it cannot read"
+else bad "(13c) world=$C1 group=$C2 trusted=$C3 short=$C4 odd=$C5"; fi
+
 # (14) --which names the plugin copy the launcher would run, by the same lookup, and prints
 #      nothing (exit 0) when there is none — whatever the bar shows
 which() { printf '{"session_id":"%s","workspace":{"current_dir":"%s"}}' "$1" "$2" | PATH="$WORK/bin:$PATH" /bin/bash "$L" --which 2>&1; }
@@ -193,6 +209,15 @@ W4="$(printf '{"session_id":"nobody14"}' | CLAUDE_PLUGIN_ROOT="$A" /bin/bash "$L
 if [ "$W1" = "$B" ] && [ "$W2" = "$A" ] && [ -z "$W3" ] && [ "$RC" = 0 ] && [ "$W4" = "$A" ]; then
   ok "(14) --which prints the loaded copy, the registry's or the environment's, and nothing when none is found"
 else bad "(14) record=$W1 registry=$W2 none=$W3 rc=$RC env=$W4"; fi
+
+# (14b) --which answers "which copy drew the bar": a copy whose status line fails or prints
+#       nothing is not named, because the bar a draw shows is then only the plain line
+SILENT="$(plugin silent 3.5.0)"; printf '#!/bin/bash\ncat >/dev/null\n' > "$SILENT/skills/setup/references/statusline.sh"
+loaded s8 "$BROKEN"; loaded s14b "$SILENT"
+W5="$(which s8 "$REPO")"; which s8 "$REPO" >/dev/null; RC=$?; W6="$(which s14b "$REPO")"
+if [ -z "$W5" ] && [ "$RC" = 0 ] && [ -z "$W6" ] && [ "$(draw s8 "$REPO")" = "▣ repo · ⎇ feature" ]; then
+  ok "(14b) a resolved copy whose status line exits 3 or prints nothing → --which is empty, the draw is the plain line"
+else bad "(14b) broken=$W5 rc=$RC silent=$W6"; fi
 
 # (15) the kept answer's timestamp: a leading zero is not an arithmetic error, one from the future
 #      is not fresh for ever, and a sessions directory that cannot be written prints nothing

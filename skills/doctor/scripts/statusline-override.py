@@ -322,8 +322,8 @@ def stop_process_group(process: subprocess.Popen[bytes]) -> None:
 
 
 def render_statusline(script: Path, repository: Path, which: bool = False) -> bytes:
-    """The bar the shared script draws; with `which`, the plugin copy a launcher would run (its
-    `--which` answer, which may be empty). The payload carries this session's id when the
+    """The bar the shared script draws; with `which`, the plugin copy whose status line drew a
+    launcher's bar (its `--which` answer, empty when the bar would be the plain line). The payload carries this session's id when the
     environment has one, so a launcher resolves the plugin this session has loaded."""
     probe: Dict[str, object] = {"workspace": {"current_dir": str(repository)}}
     session = os.environ.get("CLAUDE_CODE_SESSION_ID") or ""
@@ -456,7 +456,7 @@ def require_working_shared_statusline(repository: Path) -> None:
         # alone proves nothing: it must also name a plugin copy that holds the status line.
         found = render_statusline(script, repository, which=True).decode("utf-8", "replace").strip()
         if not found or not os.path.isfile(os.path.join(found, "skills", "setup", "references", "statusline.sh")):
-            raise Refusal("the shared status-line launcher found no plugin copy to run, so the shared status line is not proven to work")
+            raise Refusal("the shared status-line launcher found no plugin copy that draws its bar, so the shared status line is not proven to work")
     render_statusline(script, repository)
     require_hooks_enabled(repository)
     require_clean_committed_shared(repository)
