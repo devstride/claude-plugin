@@ -425,6 +425,16 @@ Tags); running it again changes nothing. From then on `build-item` puts the plan
 under on that board (never a story) and runs your commands as it starts and stops, failing open.
 `/devstride:doctor agents` reports drift without writing anything. No block, no writes.
 
+## Needs-you list
+
+Optional: an agent running with nobody watching used to stop and wait whenever it reached a
+decision that was yours. Name a tag in `needsYou.label` and it writes the question on the item
+instead, mentioning the plan's owner, with a recommended answer and the options, tags the item, and
+moves on to other work. Reply in that thread in your own words; the next run acts on your answer and
+removes the tag. A saved view of that tag (`needsYou.view`) is your one list, and
+`needsYou.fallbackItem` holds questions that belong to no item. Nothing that needs your explicit
+yes, such as a production merge, happens any sooner. No `needsYou.label`, no change.
+
 ## Your first plan
 
 With the plugin installed, DevStride connected, and a config file in place:

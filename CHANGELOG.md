@@ -8,6 +8,39 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **One "Needs you" list: a run nobody is watching writes an owner's decision down and moves on,
+  instead of sitting idle on it.** A repository switches it on by naming a tracker tag in
+  `.claude/ds-config.json` under the new `needsYou` block: `needsYou.label` (the tag),
+  `needsYou.view` (optional: the saved view of that tag, only ever quoted to people) and
+  `needsYou.fallbackItem` (optional: the item that holds a question belonging to no item, such as a
+  release). With the label set, a driven or unattended run that reaches a decision that is really
+  the owner's posts ONE comment on the item concerned: it mentions the plan's owner, asks the
+  question in one plain line, gives a recommended answer with its reason, two to four options with
+  their consequences, what is waiting and what the agent is doing meanwhile, and ends with the line
+  `Needs you: open`. It adds the tag, says in its report what it queued, skips that item as it
+  skips a gated one, and carries on with other work; it never waits, never asks twice and never
+  sends a reminder. At the start of the next `build-item` or `release` run, one search on the tag
+  finds the open questions: a reply by the mentioned person, in their own words, is acted on for
+  that question only, answered with one line ending `Needs you: answered`, and the tag comes off.
+  An attended run asks in the conversation as before. A hard stop stays one: the production merge
+  and anything a rule forbids without its own yes still wait, and a thread answer never stands in
+  for that yes. When the tracker cannot be reached, the tag is missing or a write is refused, the
+  run says so once and stops and asks as before. Without `needsYou.label` nothing changes. The rule
+  lives in one new contract, `skills/build-item/references/needs-you.md`, cited once each by
+  `build-item`, `ultracode-build`, `review`, `release` and `doctor`.
+- **`doctor config` reports whether the Needs-you list is on**, its tag and view, and warns when
+  the tracker has no tag of that name or the fallback item cannot be found. It writes nothing.
+
+### Changed
+
+- **Budgets.** `release` 5,995 → 6,049 and `ultracode-build` 4,946 → 4,991 for their one-sentence
+  citations; `auto-start.md`, `config-defaults.md` and the generated `seam-registry.md` for the new
+  keys; the three composed paths that load those bodies by the same amounts. `build-item`, `review`
+  and `doctor` gained their citation inside their existing budgets, by dropping duplicated
+  rationale pointers and descriptive wording, no rule.
+
 ## [3.51.0] — 2026-11-11
 
 ### Added
