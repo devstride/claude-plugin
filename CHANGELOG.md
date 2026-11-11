@@ -36,6 +36,17 @@ for what each version component means here and how a release is cut.
   that they do not take for a copy. `setup` writes the launcher for a new repository.
   **When no plugin can be found** (the plugin is not installed for this person, or its files are
   gone) the launcher shows a plain line with the directory and the branch instead of an empty bar.
+  Because the launcher always shows something, a bar alone no longer proves the plugin's status
+  line ran: `bash .claude/statusline.sh --which` prints the plugin copy the launcher would run,
+  and nothing when it found none. `setup` and `doctor` pass a status line only when that answer
+  names a plugin copy and the bar is not empty, and `doctor` refuses to remove a personal
+  `statusLine` setting until the shared launcher passes the same test. `doctor` warns only about a
+  leftover full copy; a file whose `managed` line you deleted is reported as yours, with no
+  warning.
+  **What the launcher trusts.** The session's record and the launcher's own one-minute note of
+  where the plugin is both name a script that then runs, so the launcher reads them only when
+  their folder and the file are your own, are not links, and cannot be written by anyone else.
+  Anything else is ignored and the next place is tried.
   The session-start record's `statusLine` value names a launcher as `launcher-<n>`, for example
   `updated:3.48.0:launcher-1` for the move and `held:3.48.0:launcher-1` for a copy waiting on a
   work branch. Maintainers: `statusline.sh` no longer carries a `managed` marker and a release no
@@ -43,12 +54,12 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.52.0 @ 3257907, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.52.0 @ a26bd13, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.52.0 | tokens@devstride--v3.52.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
-| skills/setup/SKILL.md | 32,095 | 10,699 | 32,068 | 10,690 | -9 | 10,700 |
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,100 | 10,700 | +1 | 10,700 |
 | skills/plan/SKILL.md | 24,592 | 8,198 | 24,592 | 8,198 | +0 | 8,198 |
-| skills/doctor/SKILL.md | 23,972 | 7,991 | 23,972 | 7,991 | +0 | 7,992 |
+| skills/doctor/SKILL.md | 23,972 | 7,991 | 23,973 | 7,991 | +0 | 7,992 |
 | skills/review/SKILL.md | 23,971 | 7,991 | 23,971 | 7,991 | +0 | 7,999 |
 | skills/build-item/SKILL.md | 23,953 | 7,985 | 23,953 | 7,985 | +0 | 7,985 |
 | skills/release/SKILL.md | 18,139 | 6,047 | 18,139 | 6,047 | +0 | 6,049 |
@@ -77,7 +88,7 @@ for what each version component means here and how a release is cut.
 | skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
-| **total (bodies)** | 271,655 | 90,560 | 271,628 | 90,551 | -9 | |
+| **total (bodies)** | 271,655 | 90,560 | 271,661 | 90,561 | +1 | |
 
 ## [3.52.0] — 2026-11-11
 
