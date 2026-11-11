@@ -45,7 +45,7 @@ run it rather than these steps by hand.
   the rule-loss needles — a budget breach or a DEAD REFERENCE blocks exactly like a manifest error;
   a needle MISS is a prompt to read), then the CHANGELOG move with its comparison links and the
   generated `### Cost` table, the version in `plugin.json` and the README's `Current version:` line,
-  the status-line marker when that script changed, and one `release: v<version>` commit that
+  and one `release: v<version>` commit that
   `scripts/check-version-bump.sh` accepts.
 - **The pull request merges**, after the delivery loop's review and the three required checks
   (`release-guard`, `merge-path`, `public-hygiene`; AGENTS.md, "How a change reaches `main`"),
@@ -72,9 +72,12 @@ Three rules the skill applies, and why:
     assert len({e['source'] for e in p})==1 and not [e for e in p if 'version' in e]; print('ok')"
   ```
 
-- **If `skills/setup/references/statusline.sh` changed, its `# ds-statusline: managed v<x.y.z>`
-  marker rises with the release.** The session-start hook compares that marker with each
-  repository's copy, so an unchanged marker strands the fix in the field.
+- **A release never touches a status-line marker.** Repositories commit only the launcher
+  (`skills/setup/references/statusline-launcher.sh`), which runs the `statusline.sh` of the plugin
+  a session has loaded, so a change to `statusline.sh` reaches people with the plugin and needs
+  nothing else. The launcher's own `# ds-statusline-launcher: managed v<n>` marker rises by one in
+  the commit that changes the launcher, never at release time: the session-start hook compares it
+  with each repository's launcher, so an unchanged marker strands a launcher fix in the field.
 
 **Commits after a release that touch only maintainer files** — the paths
 `skills/update/scripts/update-plugin.py` lists as inert: the root documents, `CLAUDE.md`,

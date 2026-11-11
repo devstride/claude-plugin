@@ -8,6 +8,89 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.54.0] — 2026-11-11
+
+### Changed
+
+- **The status line always comes from the plugin version your session has loaded, and a plugin
+  release no longer changes a file in your repository.** Until now `setup` copied the whole status
+  line into the repository as `.claude/statusline.sh`, and the session-start hook brought that copy
+  forward after each release that changed the bar. The hook does not run on `/reload-plugins`, and
+  it deliberately leaves a committed file alone on the base branch, a detached checkout and
+  protected branches, so after such a release the bar stayed old until someone refreshed the copy
+  and committed it. Now the repository commits a small launcher under the same name. Each time the
+  bar is drawn, the launcher finds the plugin copy this session has loaded and runs the status
+  line that copy ships. After `/devstride:update` and `/reload-plugins` the new bar appears by
+  itself at your next prompt: no modified file, nothing to commit. Two sessions on different
+  plugin versions each show their own. Your `statusLine` setting stays exactly as it is, including
+  a command that runs `.claude/statusline.sh` and then a script of your own.
+  **The one-time move.** A repository that already has the copy is moved by the session-start hook
+  the first time a session starts on a work branch (or by `doctor`, which now reports a copy and
+  offers the move): the hook replaces the copy with the launcher, keeps the old file as
+  `devstride/statusline.bak` in the git directory, and asks you to commit it. Commit and merge it
+  once and every checkout has it. The rules are the ones the refresh always had: a file whose
+  `managed` line you deleted is yours and is never touched, `statusLine.autoUpdate: false` switches
+  the hook off, and a committed file is not rewritten on the base branch, a detached checkout or a
+  protected branch, where the old copy keeps working until the launcher arrives by a pull.
+  Sessions still running an older plugin leave the launcher alone: it carries a marker of its own
+  that they do not take for a copy. `setup` writes the launcher for a new repository.
+  **When no plugin can be found** (the plugin is not installed for this person, or its files are
+  gone) the launcher shows a plain line with the directory and the branch instead of an empty bar.
+  Because the launcher always shows something, a bar alone no longer proves the plugin's status
+  line ran: `bash .claude/statusline.sh --which` prints the plugin copy whose status line drew
+  the bar, and nothing when the bar is only the plain line (no copy found, or its status line
+  failed or printed nothing). `setup` and `doctor` pass a status line only when that answer
+  names a plugin copy and the bar is not empty, and `doctor` refuses to remove a personal
+  `statusLine` setting until the shared launcher passes the same test. `doctor` warns only about a
+  leftover full copy; a file whose `managed` line you deleted is reported as yours, with no
+  warning, and `doctor` does not offer the personal-setting cleanup beside it.
+  **What the launcher trusts.** The session's record and the launcher's own one-minute note of
+  where the plugin is both name a script that then runs, so the launcher reads them only when
+  their folder and the file are your own, are not links, and cannot be written by anyone else.
+  Anything else is ignored and the next place is tried.
+  The session-start record's `statusLine` value names a launcher as `launcher-<n>`, for example
+  `updated:3.48.0:launcher-1` for the move and `held:3.48.0:launcher-1` for a copy waiting on a
+  work branch. Maintainers: `statusline.sh` no longer carries a `managed` marker and a release no
+  longer raises one; only a change to the launcher itself raises the launcher's own number.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.53.0 @ 396944b, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.53.0 | tokens@devstride--v3.53.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,100 | 10,700 | +1 | 10,700 |
+| skills/plan/SKILL.md | 24,592 | 8,198 | 24,592 | 8,198 | +0 | 8,198 |
+| skills/review/SKILL.md | 23,971 | 7,991 | 23,971 | 7,991 | +0 | 7,999 |
+| skills/doctor/SKILL.md | 23,972 | 7,991 | 23,973 | 7,991 | +0 | 7,992 |
+| skills/build-item/SKILL.md | 23,953 | 7,985 | 23,953 | 7,985 | +0 | 7,985 |
+| skills/release/SKILL.md | 18,139 | 6,047 | 18,139 | 6,047 | +0 | 6,049 |
+| skills/rebalance/SKILL.md | 17,850 | 5,950 | 17,850 | 5,950 | +0 | 5,950 |
+| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,708 | 2,236 | 6,708 | 2,236 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-story/SKILL.md | 6,299 | 2,100 | 6,299 | 2,100 | +0 | 2,100 |
+| skills/comprehend-plan/SKILL.md | 5,580 | 1,860 | 5,580 | 1,860 | +0 | 1,860 |
+| skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 271,655 | 90,560 | 271,661 | 90,561 | +1 | |
+
 ## [3.53.0] — 2026-11-11
 
 ### Changed
@@ -4741,7 +4824,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.53.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.54.0...HEAD
+[3.54.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.53.0...devstride--v3.54.0
 [3.53.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.52.0...devstride--v3.53.0
 [3.52.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.51.0...devstride--v3.52.0
 [3.51.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.50.0...devstride--v3.51.0

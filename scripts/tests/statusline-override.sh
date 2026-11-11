@@ -5,8 +5,8 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; HELPER="$ROOT/skills/doctor/scripts
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
-export HOME="$WORK/home" XDG_STATE_HOME="$WORK/state"; mkdir -p "$HOME/.claude"
-unset CLAUDE_CONFIG_DIR
+export HOME="$WORK/home" XDG_STATE_HOME="$WORK/state" XDG_CACHE_HOME="$WORK/cache"; mkdir -p "$HOME/.claude"
+unset CLAUDE_CONFIG_DIR CLAUDE_PLUGIN_ROOT CLAUDE_CODE_SESSION_ID
 
 if PYTHONPYCACHEPREFIX="$WORK/pycache" python3 -m py_compile "$HELPER"; then
   ok "(0) helper compiles"
@@ -21,6 +21,8 @@ repo() {
   git -C "$root" config user.email test@example.invalid
   git -C "$root" config user.name "Status Line Test"
   printf '%s\n' '{"statusLine":{"type":"command","command":"bash .claude/statusline.sh","padding":0},"shared":true}' > "$root/.claude/settings.json"
+  # A full copy's marker (still managed): a stub that only echoes. The launcher cases at the end
+  # commit the REAL launcher, because a launcher must also prove it found a plugin copy.
   printf '%s\n' '#!/bin/bash' '# ds-statusline: managed v3.0.0 — test marker' 'echo "Repo: test"' > "$root/.claude/statusline.sh"
   chmod 755 "$root/.claude/statusline.sh"
   git -C "$root" add .claude/settings.json .claude/statusline.sh
@@ -457,5 +459,40 @@ if grep -qF 'on every invocation' "$DOCTOR" \
    && grep -qF 'skills/doctor/references/repairs.md|ask outside the batch' "$INVARIANTS"; then
   ok "(16) doctor integration pins unconditional inspection, precedence, consent, race and recovery"
 else bad "(16) doctor/helper prose contract is incomplete"; fi
+
+# (L) The real launcher always draws a line, so a bar proves nothing by itself: removal also needs
+# the launcher to name a plugin copy that holds the status line.
+R="$(repo launcher)"; PERSONAL="$R/.claude/settings.local.json"
+cp "$ROOT/skills/setup/references/statusline-launcher.sh" "$R/.claude/statusline.sh"; chmod 755 "$R/.claude/statusline.sh"
+git -C "$R" add .claude/statusline.sh; git -C "$R" commit -qm "the launcher"
+printf '{"statusLine":{"type":"command","command":"bash mine.sh"},"keep":1}\n' > "$PERSONAL"; cp "$PERSONAL" "$WORK/launcher-before.json"
+SHA="$(sha_from "$(python3 "$HELPER" inspect --local "$R")")"
+BAR="$(printf '{"workspace":{"current_dir":"%s"}}' "$R" | bash "$R/.claude/statusline.sh")"
+OUT="$(python3 "$HELPER" remove --local "$R" --expect-sha256 "$SHA" 2>&1)"; RC=$?
+if [ -n "$BAR" ] && [ "$RC" -eq 2 ] && printf '%s' "$OUT" | grep -q 'found no plugin copy that draws its bar' \
+   && cmp -s "$PERSONAL" "$WORK/launcher-before.json"; then
+  ok "(L1) the launcher draws its plain line but finds no plugin → personal removal refused"
+else bad "(L1) bar=$BAR rc=$RC out=$OUT"; fi
+
+# A plugin copy is found, but its status line is broken (exits 3): the bar is still only the
+# plain line, so removal is refused.
+BROKEN="$WORK/broken-plugin"; mkdir -p "$BROKEN/.claude-plugin" "$BROKEN/skills/setup/references"
+printf '{"name":"devstride","version":"9.9.9"}' > "$BROKEN/.claude-plugin/plugin.json"
+printf '#!/bin/bash\nexit 3\n' > "$BROKEN/skills/setup/references/statusline.sh"
+printf '{"session_id":"override-broken","hook_event_name":"SessionStart"}' \
+  | CLAUDE_PLUGIN_ROOT="$BROKEN" python3 "$ROOT/hooks/session-runtime.py" record
+OUT="$(CLAUDE_CODE_SESSION_ID=override-broken python3 "$HELPER" remove --local "$R" --expect-sha256 "$SHA" 2>&1)"; RC=$?
+if [ "$RC" -eq 2 ] && printf '%s' "$OUT" | grep -q 'found no plugin copy that draws its bar' \
+   && cmp -s "$PERSONAL" "$WORK/launcher-before.json"; then
+  ok "(L1b) the launcher's plugin copy has a broken status line → personal removal refused"
+else bad "(L1b) rc=$RC out=$OUT"; fi
+
+# The plugin is found through this session's record, as in a real session: removal goes ahead.
+printf '{"session_id":"override-test","hook_event_name":"SessionStart"}' \
+  | CLAUDE_PLUGIN_ROOT="$ROOT" python3 "$ROOT/hooks/session-runtime.py" record
+OUT="$(CLAUDE_CODE_SESSION_ID=override-test python3 "$HELPER" remove --local "$R" --expect-sha256 "$SHA" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && python3 -c 'import json,sys; assert json.load(open(sys.argv[1])) == {"keep": 1}' "$PERSONAL"; then
+  ok "(L2) the launcher resolves this session's plugin and its bar renders → personal removal allowed"
+else bad "(L2) rc=$RC out=$OUT"; fi
 
 exit "$FAIL"

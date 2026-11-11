@@ -2272,7 +2272,7 @@
       "key": "statusLine.autoUpdate",
       "type": "boolean",
       "default": true,
-      "description": "the session-start hook may refresh the copied script",
+      "description": "the session-start hook may replace the committed launcher",
       "since": "pre-registry"
     }
   ]

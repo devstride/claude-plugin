@@ -52,7 +52,9 @@ plugin data, so the loaded copy writes down what it is:
            documented alias nor a full claude-… id and per effort outside the five levels.
 
 The status line imports `check` and `observe` in-process (the status-line payload carries the live
-model and effort); a repository's tooling runs `check`. Fails open: every
+model and effort); a repository's tooling runs `check`. The launcher a repository commits as its
+status line (skills/setup/references/statusline-launcher.sh) reads `root` from the record's one
+line, without a JSON parser, to run the loaded copy's status line. Fails open: every
 error exits 0 silently (record) or reads as `unknown` (check). python3 and the standard library only.
 """
 import json

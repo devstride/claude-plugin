@@ -45,9 +45,10 @@ into `main` here is its own release), with a clean tree and that branch up to da
    key table carry the new version). `python3 scripts/build-config-schema.py --check --release --base origin/main`
    must print `SCHEMA: ok`: an `UNRELEASED` or `DRIFT` line blocks the commit, exactly as the
    release guard would block the pull request.
-7. **The status-line marker**, only if `skills/setup/references/statusline.sh` changed since the
-   previous tag: raise its `# ds-statusline: managed v<x.y.z>` line to `<version>`. Otherwise leave
-   it alone.
+7. **The status-line launcher's marker** is not raised here. Check only: if
+   `skills/setup/references/statusline-launcher.sh` changed since the previous tag, its
+   `# ds-statusline-launcher: managed v<n>` line must be higher than at that tag (a new file starts at 1); if
+   it is not, stop and say so. `statusline.sh` carries no marker.
 8. **Commit, then check the commit.** Commit everything as `release: v<version>` (no item
    numbers, no session trailer — this repository is public). Both checks read COMMITTED history,
    never the work tree, so they run after the commit:

@@ -13,6 +13,48 @@ The status line renders two lines, each segment led by its symbol:
 Line 2 prints only when it has a value; `"refreshInterval": 30` redraws every 30 seconds.
 **A segment with no value is not rendered**: a bare symbol reads as a failed load.
 
+**The repository holds a launcher, not the bar.** `.claude/statusline.sh` is
+`statusline-launcher.sh` (marker `# ds-statusline-launcher: managed v<n>`): each redraw runs the
+`statusline.sh` of the plugin the session has loaded, found through the session's record
+(rewritten at every prompt, so a reload shows at the next one), then `$CLAUDE_PLUGIN_ROOT`, then
+the registry's install for this repository; no release changes the repository. Finding no plugin
+it prints only `▣ <directory> · ⎇ <branch>`, so a bar alone never proves the plugin's status line
+ran.
+
+## The proof
+
+`setup` E3, `doctor` §4 and the repair all use this, from the repository root:
+
+```bash
+p() { printf '{"session_id":"%s","workspace":{"current_dir":"%s"}}' "$CLAUDE_CODE_SESSION_ID" "$PWD" | bash .claude/statusline.sh "$@"; echo; }
+p --which; p
+```
+
+**Pass: both lines are non-empty.** `--which` prints the plugin copy whose status line drew the
+bar for this payload, and nothing when the bar is only the plain line: no copy found, or its
+script failed or printed nothing. The second line is the bar. An empty first line is a FAIL (say
+the launcher found no working devstride status line for this session), whatever the bar shows.
+Never judge by a particular segment: `statusLine.hiddenSegments` may hide any of them. `--which`
+belongs to the launcher only: for a script with the full-copy marker, or with none, the pass is
+a non-empty bar. **An owner-managed script (no marker) that passes is reported as owner-managed
+and working, and is not eligible for the personal-settings cleanup `doctor` offers:** the helper
+refuses it, so do not offer that cleanup.
+
+## Markers, and moving a full copy
+
+| Line 2 of `.claude/statusline.sh` | It is | `doctor` |
+| --- | --- | --- |
+| `# ds-statusline-launcher: managed v<n>` | the launcher | nothing to say |
+| `# ds-statusline: managed v<x.y.z>` | a full copy from before the launcher | WARN; repair: move it |
+| neither | the owner's own (deleting the line is the supported takeover) | INFO `owner-managed`; never a WARN, never repaired or replaced |
+
+**Moving a full copy** (`setup` E3, `doctor`'s repair; the session-start hook does the same by
+itself): only for a file still carrying the full-copy marker, and only on a work branch. Leave
+it alone on a detached checkout and on a base, production or protected branch, and when the
+branch's upstream or `origin/<baseBranch>` already has the launcher (say "pull"). Copy the old
+file to `devstride/statusline.bak` in the git directory (`git rev-parse --git-common-dir`), never
+into the work tree; copy the launcher over it; run The proof; leave it for the owner to commit.
+
 That leaves one real question, and it is the one `setup` and `doctor` ask: **is this segment blank
 because the repository genuinely has no such fact, or because something that should be configured
 is not?**
@@ -90,17 +132,17 @@ Both keys are optional, and a repository with neither behaves exactly as before.
 - **`hiddenSegments`** (default `[]`) — segment keys, from the table above, that this repository has
   confirmed do not apply. It suppresses a segment that WOULD render, and it records the decision so
   neither skill asks again. An unrecognized key is inert.
-**Bumping the marker.** The version in the marker is the **status line's own**, not the plugin's.
-Raise it in the same commit that changes `statusline.sh`, and leave it alone in every release that
-does not — the hook compares marker to marker, so a version bumped for unrelated reasons would
-rewrite a file that is already identical, and a version left stale after a real change would strand
-every copy in the field.
+**Bumping the marker.** The launcher's marker carries the **launcher's own** version, a whole
+number. Raise it by one in the same commit that changes `statusline-launcher.sh`, and never
+otherwise: the hook compares marker to marker, so a stale one strands every launcher in the
+field. `statusline.sh` has no marker; a change to it reaches a session with the plugin.
 
-- **`autoUpdate`** (default `true`) — whether the session-start hook may refresh
-  `.claude/statusline.sh` when the plugin ships a newer one. It replaces the file **only** while it
-  still carries the shipped `# ds-statusline: managed v<x.y.z>` marker on line 2, keeps the
-  previous copy as `devstride/statusline.bak` in the repository's git directory, and never creates
-  a status line that is not already there. A committed copy that is only behind is left alone when
-  the branch's upstream (or `origin/<baseBranch>`) already carries the newer one, and on a
-  detached checkout or a base, production or protected branch. **Deleting the marker line is how an owner takes the file over permanently** — that is the
+- **`autoUpdate`** (default `true`) — whether the session-start hook may replace
+  `.claude/statusline.sh`: a full copy with the launcher, once, and a launcher with a newer
+  launcher. It replaces the file **only** while it still carries one of the two markers, keeps
+  the previous file as `devstride/statusline.bak` in the repository's git directory, and never
+  creates a status line that is not already there. A committed file is left alone when the
+  branch's upstream (or `origin/<baseBranch>`) already carries the launcher, and on a detached
+  checkout or a base, production or protected branch, so the move is committed once from a work
+  branch. **Deleting the marker line is how an owner takes the file over permanently** — that is the
   supported way to hand-edit it, and it is what the marker's own text says.

@@ -321,11 +321,18 @@ def stop_process_group(process: subprocess.Popen[bytes]) -> None:
             raise Refusal("managed status-line process group could not be stopped safely") from second_exc
 
 
-def render_statusline(script: Path, repository: Path) -> bytes:
-    payload = json.dumps({"workspace": {"current_dir": str(repository)}}).encode("utf-8")
+def render_statusline(script: Path, repository: Path, which: bool = False) -> bytes:
+    """The bar the shared script draws; with `which`, the plugin copy whose status line drew a
+    launcher's bar (its `--which` answer, empty when the bar would be the plain line). The payload carries this session's id when the
+    environment has one, so a launcher resolves the plugin this session has loaded."""
+    probe: Dict[str, object] = {"workspace": {"current_dir": str(repository)}}
+    session = os.environ.get("CLAUDE_CODE_SESSION_ID") or ""
+    if re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}", session):
+        probe["session_id"] = session
+    payload = json.dumps(probe).encode("utf-8")
     try:
         process = subprocess.Popen(
-            ["bash", str(script)],
+            ["bash", str(script)] + (["--which"] if which else []),
             cwd=str(repository),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -383,7 +390,7 @@ def render_statusline(script: Path, repository: Path) -> bytes:
             stop_process_group(process)
             stopped = True
             raise Refusal("managed .claude/statusline.sh did not exit within the 3-second safety check") from exc
-        if return_code != 0 or not bytes(buffers["stdout"]).strip():
+        if return_code != 0 or not (which or bytes(buffers["stdout"]).strip()):
             raise Refusal("managed .claude/statusline.sh did not render non-empty output")
         return bytes(buffers["stdout"])
     finally:
@@ -436,12 +443,20 @@ def require_working_shared_statusline(repository: Path) -> None:
         prefix = bounded_script_prefix(script).decode("utf-8")
     except UnicodeDecodeError as exc:
         raise Refusal(f"managed .claude/statusline.sh is not UTF-8: {exc}") from exc
-    if not re.search(r"^# ds-statusline: managed v[0-9]", prefix, re.MULTILINE):
+    # The launcher's marker, or the marker of a full copy written before the launcher existed.
+    launcher = re.search(r"^# ds-statusline-launcher: managed v[0-9]", prefix, re.MULTILINE)
+    if not launcher and not re.search(r"^# ds-statusline: managed v[0-9]", prefix, re.MULTILINE):
         raise Refusal(".claude/statusline.sh does not carry the managed status-line marker")
     for relative in (".claude/settings.json", ".claude/statusline.sh"):
         if is_ignored(repository, relative):
             raise Refusal(f"shared {relative} is gitignored")
 
+    if launcher:
+        # A launcher always draws something (a plain line when it finds no plugin), so a bar
+        # alone proves nothing: it must also name a plugin copy that holds the status line.
+        found = render_statusline(script, repository, which=True).decode("utf-8", "replace").strip()
+        if not found or not os.path.isfile(os.path.join(found, "skills", "setup", "references", "statusline.sh")):
+            raise Refusal("the shared status-line launcher found no plugin copy that draws its bar, so the shared status line is not proven to work")
     render_statusline(script, repository)
     require_hooks_enabled(repository)
     require_clean_committed_shared(repository)

@@ -38,9 +38,10 @@ it stops being obvious exactly when it starts to matter: the loop puts release-u
 worktrees, and a main-checkout-versus-worktree mistake is invisible without it. The prove-it step
 in E3 exists because a status line fails silently — Claude Code renders nothing and reports no
 error — and the gitignore check exists because a status line only one machine has is the commonest
-fresh-clone surprise. `.claude/statusline.sh` is copied verbatim because it is repo-agnostic and
-reads the consuming repository's config at runtime for `stage.*`: that is what lets one file serve
-every repository and makes re-copying it safe. Of the segments that can render blank, `stage` is
+fresh-clone surprise. `.claude/statusline.sh` is a launcher copied verbatim: it runs the status
+line of the plugin the session has loaded, which reads the repository's config at runtime for
+`stage.*`. A full copy went stale after every release that changed the bar, on exactly the
+branches nobody commits to; the launcher never needs changing. Of the segments that can render blank, `stage` is
 the only one whose cause is genuinely ambiguous, which is why it is the one asked about.
 
 ## Phase E — why the roster must be literal

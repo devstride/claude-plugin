@@ -19,14 +19,18 @@
 #     `/devstride:update` is separate user authority and stops for reload after changing disk.
 #     A successful command or matching version is not enough: the canonical tag and installed
 #     payload must match before reload is allowed.
-#   - It also refreshes the repository's COPY of the status line, which no plugin update can
-#     reach on its own. Only a file still carrying the shipped `ds-statusline: managed v<x.y.z>`
-#     marker is ever replaced, and a repo without a status line never gets one created here —
-#     that needs consent, which is setup's and doctor's job. A COMMITTED copy is never rewritten
-#     when the checkout's upstream (or origin/<baseBranch>) already carries the new one — the
-#     checkout is only behind, so it says "pull" — nor on a detached HEAD or a base/production/
-#     protected branch, where a dirty tree blocks tooling and nobody commits. The previous copy
-#     goes to <git-common-dir>/devstride/statusline.bak, never into the work tree.
+#   - It also keeps the repository's `.claude/statusline.sh` a current LAUNCHER: the small file
+#     that runs the status line of whichever plugin version a session has loaded, so a release
+#     changes nothing in the repository. A full COPY of the status line from before the launcher
+#     (the `ds-statusline: managed v<x.y.z>` marker) is replaced by it once; a launcher
+#     (`ds-statusline-launcher: managed v<n>`) only when this plugin ships a newer launcher.
+#     Only a file still carrying one of those markers is ever replaced, and a repo without a
+#     status line never gets one created here — that needs consent, which is setup's and
+#     doctor's job. A COMMITTED file is never rewritten when the checkout's upstream (or
+#     origin/<baseBranch>) already carries the new one — the checkout is only behind, so it says
+#     "pull" — nor on a detached HEAD or a base/production/protected branch, where a dirty tree
+#     blocks tooling and nobody commits. The previous file goes to
+#     <git-common-dir>/devstride/statusline.bak, never into the work tree.
 #   - Recipe for "newest release": skills/doctor/references/version-currency.md — TAGS not
 #     GitHub Releases; accept only the exact `devstride--v<semver>` prefix; compare numerically.
 # DEVSTRIDE_PLUGIN_UPDATE_CHECK=0 disables only the plugin check; status-line refresh remains an
@@ -100,21 +104,24 @@ try: a,b=(tuple(map(int,v.split("."))) for v in sys.argv[1:]); raise SystemExit(
 except Exception: raise SystemExit(1)' "$1" "$2"; } # newer A B: B > A
 
 # --- the repository's status line -------------------------------------------
-# `.claude/statusline.sh` is a COPY of the file this plugin ships, so a fix to it
-# reaches nobody who already has one unless something refreshes it. That is this, on the same
-# session-start pass as the version check — and it is a local file compare, no network.
+# `.claude/statusline.sh` is the LAUNCHER this plugin ships: it runs the status line of the plugin
+# version each session has loaded, so nothing here changes per release. Two things still need a
+# write, on the same session-start pass as the version check — a local file compare, no network:
+# a full COPY of the status line, written before the launcher existed, moves to the launcher
+# once; and a launcher moves to a newer launcher on the rare release that changes it. A launcher
+# always outranks a copy, whatever the copy's version.
 #
-# Replaced ONLY while it still carries the shipped marker; deleting that line is how an owner
-# takes the file over for good. The previous copy is kept as a backup so even a clobbered edit is
-# recoverable, and this never CREATES a status line: a repo without one has not asked for one.
+# Replaced ONLY while it still carries one of the two shipped markers; deleting that line is how
+# an owner takes the file over for good. The previous file is kept as a backup so even a clobbered
+# edit is recoverable, and this never CREATES a status line: a repo without one has not asked.
 #
-# A COMMITTED copy is the repository's, so the work tree is left alone when (1) the upstream, or
+# A COMMITTED file is the repository's, so the work tree is left alone when (1) the upstream, or
 # origin/<baseBranch> without one, already carries a marker at least the shipped one — the
 # checkout is behind and a pull fixes it — or (2) HEAD is detached or on a base, production or
 # protectedBranches branch: a dirty tree there blocks checkout tooling and nobody commits it. Local
 # refs only: this never fetches. The backup lives in <git-common-dir>/devstride/, never the tree.
 SL_RESULT="n/a"
-SL_REPO="$REPO/.claude/statusline.sh"; SL_SHIPPED="$ROOT/skills/setup/references/statusline.sh"
+SL_REPO="$REPO/.claude/statusline.sh"; SL_SHIPPED="$ROOT/skills/setup/references/statusline-launcher.sh"
 if [ "$SLAUTO" = "1" ] && { [ -e "$SL_REPO" ] || [ -L "$SL_REPO" ]; } \
    && { [ -e "$SL_SHIPPED" ] || [ -L "$SL_SHIPPED" ]; }; then
   SL_RESULT=$(python3 - "$SL_REPO" "$SL_SHIPPED" "$REPO" "$SL_BASE" "$SL_PROTECTED" <<'PY' 2>/dev/null || echo update-refused
@@ -196,8 +203,16 @@ def safe_read_at(directory_fd, name, label):
     return data, after
 
 def marker(data):
+    """(rank, label) of a managed file, or None for one the owner has taken over. A launcher
+    outranks every full copy: the copy's marker is the one older plugins wrote and still read,
+    the launcher's is one they do not match, so they leave a launcher alone."""
+    match = re.search(rb"^# ds-statusline-launcher: managed v([0-9]+(?:\.[0-9]+)*) .*$", data, re.M)
+    if match:
+        return (1,) + version(match.group(1).decode()), "launcher-" + match.group(1).decode()
     match = re.search(rb"^# ds-statusline: managed v([0-9]+(?:\.[0-9]+)*) .*$", data, re.M)
-    return match.group(1).decode() if match else ""
+    if match:
+        return (0,) + version(match.group(1).decode()), match.group(1).decode()
+    return None
 
 def temp_write(directory_fd, stem, data, mode):
     for _ in range(32):
@@ -263,7 +278,7 @@ def move_into_hold(directory_fd, source_name, stem):
     return held_name
 
 def decide(have, want):
-    """(skip-result, git-common-dir, feature-branch) for a copy behind the shipped one."""
+    """(skip-result, git-common-dir, feature-branch) for a file behind the shipped launcher."""
     code, out = git("rev-parse", "--is-inside-work-tree")
     if code != 0 or out.strip() != b"true":
         return None, None, False          # not a repository: the backup stays beside the file
@@ -282,11 +297,11 @@ def decide(have, want):
             refs.append(("refs/remotes/origin/" + base, "origin/" + base))
         for ref, label in refs:
             code, out = git("cat-file", "blob", ref + ":" + RELATIVE)
-            there = marker(out[:limit]) if code == 0 else ""
-            if there and version(there) >= version(want):
-                return "on-upstream:%s:%s:%s" % (have, there, label), None, False
+            there = marker(out[:limit]) if code == 0 else None
+            if there and there[0] >= want[0]:
+                return "on-upstream:%s:%s:%s" % (have[1], there[1], label), None, False
         if held:
-            return "held:%s:%s" % (have, want), None, False
+            return "held:%s:%s" % (have[1], want[1]), None, False
     code, out = git("rev-parse", "--git-common-dir")
     common = out.decode("utf-8", "replace").strip() if code == 0 else ""
     if not common:
@@ -296,11 +311,11 @@ def decide(have, want):
 
 try:
     target_data, target_stat = safe_read(target, "repository status line")
-    source_data, source_stat = safe_read(source, "shipped status line")
+    source_data, source_stat = safe_read(source, "shipped status-line launcher")
     have, want = marker(target_data), marker(source_data)
     if not have:
         print("owner-managed")
-    elif not want or version(want) <= version(have):
+    elif not want or want[0] <= have[0]:
         print("current")
     else:
         skipped, common, feature = decide(have, want)
@@ -407,26 +422,31 @@ try:
                     except FileNotFoundError: pass
             if backup_fd != parent_fd: os.close(backup_fd)
             os.close(parent_fd)
-        print("updated:" + have + ":" + want + (":commit" if feature else ":git" if common else ""))
+        print("updated:" + have[1] + ":" + want[1] + (":commit" if feature else ":git" if common else ""))
 except SystemExit:
     raise
 except Exception:
     print("update-refused")
 PY
 )
+  # A label is a full copy's version ("3.48.0") or a launcher's ("launcher-1").
   SL_HAVE=$(printf '%s' "$SL_RESULT" | cut -d: -f2); SL_WANT=$(printf '%s' "$SL_RESULT" | cut -d: -f3)
+  case "$SL_HAVE" in
+    launcher-*) SL_DID="launcher updated ${SL_HAVE#launcher-} → ${SL_WANT#launcher-}" ;;
+    *) SL_DID="the v$SL_HAVE copy is now a launcher that runs the status line of the plugin version each session has loaded, so plugin releases no longer change it" ;;
+  esac
   case "$SL_RESULT" in
     updated:*:commit|updated:*:git)
       SL_NEXT=""; case "$SL_RESULT" in *:commit) SL_NEXT=" Commit it so every clone gets it." ;; esac
       SL_GITDIR=$(cd "$REPO" 2>/dev/null && cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && pwd)
       SL_RESULT="updated:$SL_HAVE:$SL_WANT"
-      echo "devstride status line: updated $SL_HAVE → $SL_WANT (.claude/statusline.sh; previous copy kept as ${SL_GITDIR:-the git directory}/devstride/statusline.bak). Live now — no restart needed.$SL_NEXT"
+      echo "devstride status line: $SL_DID (.claude/statusline.sh; previous file kept as ${SL_GITDIR:-the git directory}/devstride/statusline.bak). Live now — no restart needed.$SL_NEXT"
       ;;
     updated:*)
-      echo "devstride status line: updated $SL_HAVE → $SL_WANT (.claude/statusline.sh; previous kept as .bak). Live now — no restart needed."
+      echo "devstride status line: $SL_DID (.claude/statusline.sh; previous kept as .bak). Live now — no restart needed."
       ;;
     on-upstream:*)
-      echo "devstride status line: v$SL_WANT is already on $(printf '%s' "$SL_RESULT" | cut -d: -f4-); pull to get it."
+      echo "devstride status line: the launcher (v${SL_WANT#launcher-}) is already on $(printf '%s' "$SL_RESULT" | cut -d: -f4-); pull to get it."
       ;;
   esac
 fi
@@ -472,8 +492,8 @@ PYFETCH
   esac
 fi
 
-# Plugin checks and copied-status-line refreshes have separate opt-outs. In particular, a repo
-# that pins or disables plugin updates can still receive a safe fix to its managed status line.
+# Plugin checks and the status-line launcher's upkeep have separate opt-outs. In particular, a
+# repo that pins or disables plugin updates still has its managed status line moved to the launcher.
 [ "${DEVSTRIDE_PLUGIN_UPDATE_CHECK:-1}" = "0" ] && exit 0
 [ "$CHECK" = "0" ] && [ "$CONFIG_VALID" = "1" ] && exit 0
 
