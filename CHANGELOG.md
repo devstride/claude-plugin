@@ -8,6 +8,22 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **The merge gate refuses a merge onto the release train that would carry a migration or deploy
+  configuration without its review proof.** When a pull request's base is the configured release
+  train (`releaseTrain.branch`) and any file it changes, by new or old name, matches
+  `release.releaseBranchFixExclusions`, `merge-gate.py` now prints `MERGE` only if the head carries
+  the settled review's `devstride/reviewed` proof for that pull request into that base (the same
+  `reviewed-status.py verify` the release's train check uses). With no proof it refuses and prints
+  the exact `post` command, which still works because the pull request is open. A proof GitHub
+  cannot read is an `ERROR`. Before, a reviewed pull request could merge onto the train without
+  its proof. Nothing complained until the next release's train check refused the unit's
+  migrations, usually unattended and hours later, when a merged pull request can no longer take a
+  proof. `review` treats `NOT POSTED` for such a pull request as a stop before the merge instead of
+  degradation. The gate reads the consuming repository's `.claude/ds-config.json` (new `--config`
+  to name another); without one, or with no train configured, the rule does nothing.
+
 ## [3.52.0] — 2026-11-11
 
 ### Added

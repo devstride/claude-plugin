@@ -2,10 +2,15 @@
 """May this pull request merge now, and with which command? The one gate before every merge.
 
 Every place the plugin merges (`release`, `build-item`, a departure's merge) runs this file and
-then runs exactly the command it prints, never its own `gh pr merge`. It reads GitHub only.
+then runs exactly the command it prints, never its own `gh pr merge`. It reads GitHub, and the
+consuming repository's `.claude/ds-config.json` for the one rule that needs it (the train proof below).
 
   merge-gate.py <pr-number> <expected-head-sha> [--all-green] [--delete-branch] [--subject <text>]
-                [--repo <owner>/<name>]
+                [--repo <owner>/<name>] [--config <ds-config.json>]
+
+  --config defaults to `.claude/ds-config.json` at the top of the git checkout the gate runs in. No
+  such file (a repository without the loop's config) leaves the train proof rule inert; a file that
+  cannot be read or parsed is an ERROR.
 
   MERGE gh pr merge <n> --repo <owner>/<name> --merge --match-head-commit <sha> [--admin]
         [--delete-branch] [--subject '<text>']   exit 0: the repository it inspected is named, and
@@ -16,6 +21,17 @@ then runs exactly the command it prints, never its own `gh pr merge`. It reads G
 
 The rule (an approver's admin merge exactly when every required check is green, never otherwise):
 - Only through a pull request: the number must name an OPEN, non-draft pull request.
+- A train merge carrying excluded paths needs its review proof first: when the base is the
+  configured release train (`releaseTrain.branch`) and any changed file, by new or old name (the
+  pull request's file list, every page, its count checked against GitHub's), matches
+  `release.releaseBranchFixExclusions` (the one anchored matcher, `routing.py`'s `first_match`),
+  the head must carry the settled review's proof for THIS pull request into THIS base
+  (`reviewed-status.py verify <head> --pr <n> --base <base>`, its admin-trust rules unchanged). No
+  proof is a REFUSE naming the `post` command, which still works because the pull request is open;
+  a proof GitHub cannot read is an ERROR. The release's train exclusion check refuses an unproven
+  unit's migrations and deploy configuration hours later, when a merged pull request can no longer
+  take a proof, so the gate asks for it while it still can. No train configured, another base, or
+  no excluded path changed: the rule does nothing.
 - Pinned to the head: the pull request's head must be the expected SHA, and the command carries
   `--match-head-commit <sha>`, so GitHub refuses it if the head moves in between.
 - Every required check green there: the required checks are the union of the base branch's
@@ -89,12 +105,20 @@ The rule (an approver's admin merge exactly when every required check is green, 
   any other state is a REFUSE: an admin merge never bypasses a conflict, an out-of-date branch or
   a state GitHub has not finished computing.
 """
+import importlib.util
 import json
+import os
 import re
 import shlex
 import subprocess
 import sys
 from urllib.parse import quote
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SKILLS = os.path.dirname(os.path.dirname(HERE))
+ROUTING = os.path.join(SKILLS, "build-item/scripts/routing.py")
+REVIEWED = os.path.join(SKILLS, "review/scripts/reviewed-status.py")
+FILES_LIMIT = 3000   # GitHub's pull-request files listing stops here
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
 REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -118,7 +142,7 @@ PLAIN = ("CLEAN", "HAS_HOOKS", "UNSTABLE")
 PR_QUERY = """query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      number state isDraft headRefOid baseRefName mergeStateStatus reviewDecision
+      number state isDraft headRefOid baseRefName mergeStateStatus reviewDecision changedFiles
       latestOpinionatedReviews(first: 100) { pageInfo { hasNextPage } nodes { state author { login } } }
       potentialMergeCommit { oid }
       commits(last: 1) { nodes { commit { oid statusCheckRollup {
@@ -590,7 +614,117 @@ def admissible(pr, number, expected):
 SAME = ("state", "isDraft", "headRefOid", "_oid", "baseRefName", "mergeStateStatus", "reviewDecision")
 
 
-def decide(number, expected, owner, name, delete_branch, subject=None, all_green=False):
+def load(module_name, path):
+    """The one glob matcher lives in routing.py and the one review proof in reviewed-status.py:
+    reuse them, never a second copy. Loaded only when the train rule applies."""
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except (OSError, SyntaxError, AttributeError, ImportError) as err:
+        raise Unreadable("%s could not be loaded: %s" % (os.path.basename(path), err))
+    return module
+
+
+def read_config(path):
+    """(train, exclusions) from the consuming repository's config; (None, []) when it has none."""
+    if path is None:
+        code, out, _ = git_out("rev-parse", "--show-toplevel")
+        if code != 0 or not out.strip():
+            return None, []
+        path = os.path.join(out.strip(), ".claude", "ds-config.json")
+        if not os.path.exists(path):
+            return None, []
+    try:
+        with open(path) as f:
+            config = json.load(f)
+    except (OSError, ValueError) as err:
+        raise Unreadable("the config %s cannot be read: %s" % (path, err))
+    if not isinstance(config, dict):
+        raise Unreadable("the config %s is not a JSON object" % path)
+    routing = load("merge_gate_routing", ROUTING)
+    try:
+        train = routing.train_section(config).get("branch")
+    except SystemExit:
+        raise Unreadable("the config %s names the train under both releaseTrain and supportTrain" % path)
+    release = config.get("release") if isinstance(config.get("release"), dict) else {}
+    exclusions = release.get("releaseBranchFixExclusions") or []
+    if not isinstance(exclusions, list) or not all(isinstance(x, str) for x in exclusions):
+        raise Unreadable("config: release.releaseBranchFixExclusions must be a list of patterns")
+    if train is not None and (not isinstance(train, str) or not train):
+        raise Unreadable("config: releaseTrain.branch must be a non-empty string when set")
+    return (train if exclusions else None), exclusions
+
+
+def git_out(*args):
+    try:
+        done = subprocess.run(["git"] + list(args), capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return 1, "", ""
+    return done.returncode, done.stdout, done.stderr
+
+
+def changed_paths(owner, name, number, expected_count):
+    """Every changed file of the pull request, new and old names, every page; the count must match."""
+    if not isinstance(expected_count, int):
+        raise Unreadable("#%d's changed-file count could not be read" % number)
+    if expected_count > FILES_LIMIT:
+        raise Refuse("#%d changes %d files, more than GitHub lists (%d), so this gate cannot see whether it "
+                     "carries a migration or deploy configuration onto the train" % (number, expected_count, FILES_LIMIT))
+    files, page = [], 1
+    while True:
+        batch = gh_json("api", "repos/%s/%s/pulls/%d/files?per_page=100&page=%d" % (owner, name, number, page))
+        if not isinstance(batch, list):
+            raise Unreadable("the files of #%d could not be read" % number)
+        files += batch
+        if len(batch) < 100:
+            break
+        page += 1
+    if len(files) != expected_count:
+        raise Unreadable("#%d lists %d changed files but GitHub counts %d" % (number, len(files), expected_count))
+    paths = []
+    for f in files:
+        if not isinstance(f, dict) or not isinstance(f.get("filename"), str):
+            raise Unreadable("a changed file of #%d could not be read" % number)
+        paths.append(f["filename"])
+        if isinstance(f.get("previous_filename"), str):
+            paths.append(f["previous_filename"])
+    return paths
+
+
+def train_proof(pr, number, expected, owner, name, base, config_path):
+    """REFUSE a merge onto the train of excluded paths whose head carries no review proof."""
+    train, exclusions = read_config(config_path)
+    if not train or base != train:
+        return
+    routing = load("merge_gate_routing", ROUTING)
+    try:
+        hit = next((p for p in changed_paths(owner, name, number, pr.get("changedFiles"))
+                    if routing.first_match(p, exclusions) is not None), None)
+    except SystemExit:
+        raise Unreadable("a release.releaseBranchFixExclusions pattern cannot be read")
+    if hit is None:
+        return
+    reviewed = load("merge_gate_reviewed_status", REVIEWED)
+    previous = os.environ.get("GH_REPO")
+    os.environ["GH_REPO"] = "%s/%s" % (owner, name)   # its `{owner}/{repo}` reads name this repository
+    try:
+        ok, why = reviewed.verify(expected, None, str(number), base)
+    except reviewed.Unreadable as err:
+        raise Unreadable("the review proof on %s could not be read: %s" % (expected[:12], err))
+    finally:
+        if previous is None:
+            os.environ.pop("GH_REPO", None)
+        else:
+            os.environ["GH_REPO"] = previous
+    if not ok:
+        raise Refuse("#%d carries %s onto the train %s (it matches release.releaseBranchFixExclusions) and its head "
+                     "has no review proof (%s); once its review has settled, post it while the pull request is open: "
+                     "python3 %s post %s --pr %d --base %s"
+                     % (number, hit, base, why, shlex.quote(REVIEWED), expected, number, shlex.quote(base)))
+
+
+def decide(number, expected, owner, name, delete_branch, subject=None, all_green=False, config_path=None):
     # The static facts first: the pull request's state, threads, rules, protection, the base
     # compare and the classic rule. None of them is a check, so the reads that are (the run
     # listings and the check rollup) come last, right before the verdict.
@@ -602,6 +736,7 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     base = pr.get("baseRefName")
     if not isinstance(base, str) or not base:
         raise Unreadable("#%d names no base branch" % number)
+    train_proof(pr, number, expected, owner, name, base, config_path)
     ruled, ruled_strict, types, approvals = ruleset_checks(owner, name, base)
     protected, protected_strict = protection_checks(owner, name, base)
     if ruled_strict or protected_strict:
@@ -676,7 +811,7 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
 
 
 def main(argv):
-    args, delete_branch, repo, subject, all_green = [], False, None, None, False
+    args, delete_branch, repo, subject, all_green, config_path = [], False, None, None, False, None
     it = iter(argv[1:])
     for a in it:
         if a == "--delete-branch":
@@ -685,6 +820,11 @@ def main(argv):
             all_green = True
         elif a == "--repo":
             repo = next(it, None)
+        elif a == "--config":
+            config_path = next(it, None)
+            if not config_path:
+                sys.stderr.write("usage: --config takes a path\n")
+                return 2
         elif a == "--subject":
             subject = next(it, "")
             if not subject.strip() or "\n" in subject:
@@ -694,7 +834,7 @@ def main(argv):
             args.append(a)
     if len(args) != 2 or not args[0].isdigit() or int(args[0]) < 1 or not SHA.match(args[1]) \
             or (repo is not None and not REPO.match(repo)):
-        sys.stderr.write("usage: merge-gate.py <pr-number> <expected-head-sha (40 hex)> [--all-green] [--delete-branch] [--subject <text>] [--repo <owner>/<name>]\n")
+        sys.stderr.write("usage: merge-gate.py <pr-number> <expected-head-sha (40 hex)> [--all-green] [--delete-branch] [--subject <text>] [--repo <owner>/<name>] [--config <ds-config.json>]\n")
         return 2
     number, expected = int(args[0]), args[1]
     try:
@@ -705,10 +845,10 @@ def main(argv):
                 raise Unreadable("the repository could not be resolved: %s" % (err or out).strip()[:200])
         owner, name = repo.split("/")
         try:
-            command, why = decide(number, expected, owner, name, delete_branch, subject, all_green)
+            command, why = decide(number, expected, owner, name, delete_branch, subject, all_green, config_path)
         except Retry:
             try:
-                command, why = decide(number, expected, owner, name, delete_branch, subject, all_green)
+                command, why = decide(number, expected, owner, name, delete_branch, subject, all_green, config_path)
             except Retry as again:
                 raise Refuse("%s twice: run the gate again once it settles" % again)
     except Refuse as err:
