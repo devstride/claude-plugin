@@ -127,11 +127,11 @@ if printf '%s' "$O" | grep -q '⇄ #412 open' && printf '%s' "$O2" | grep -q '�
   ok "(13) PR from cache renders '#412 open'; a truncated line renders '#412' with no empty state"
 else bad "(13) got: $O | $O2"; fi
 
-# (14) the managed marker is present and carries a version — the session-start
-#      hook keys its refresh on exactly this line
-if head -3 "$SL" | grep -qE '^# ds-statusline: managed v[0-9]+\.[0-9]+\.[0-9]+ '; then
-  ok "(14) the shipped file carries its 'ds-statusline: managed v<x.y.z>' marker"
-else bad "(14) marker line missing or malformed"; fi
+# (14) this file runs from the plugin, through the launcher a repository commits: it carries no
+#      managed marker of its own (the launcher does; scripts/tests/statusline-launcher.sh)
+if ! grep -qE '^# ds-statusline(-launcher)?: managed' "$SL"; then
+  ok "(14) the shipped status line carries no managed marker — only the launcher is ever copied"
+else bad "(14) the full status line still carries a managed marker"; fi
 
 # (15) nothing renders in ANSI bright black (90). Themes are free to set that
 #      slot AT the background - most put comment text there - so a value in it

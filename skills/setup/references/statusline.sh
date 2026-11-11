@@ -1,9 +1,10 @@
 #!/bin/bash
-# ds-statusline: managed v3.51.0 — installed and kept up to date by the devstride
-# plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
-# replaces a file that still carries it, and never touches one that does not.
-#
 # Claude Code status line for a repository running the DevStride delivery loop.
+#
+# It runs FROM THE PLUGIN, never from a copy: a repository's `.claude/statusline.sh` is the
+# launcher beside this file (statusline-launcher.sh), which runs this script from the plugin
+# version the session has loaded. So this file carries no "managed" marker and must never
+# assume where it lives: everything about the repository comes from the payload's directory.
 #
 # Two lines, each segment led by a one-character symbol instead of a word:
 #
@@ -24,11 +25,8 @@
 # as on Claude Code's own events, so an update installed or published mid-session shows within
 # half a minute.
 #
-# `setup` copies this into the consuming repository as `.claude/statusline.sh`
-# and points `statusLine.command` at it. It is deliberately repo-AGNOSTIC: every
-# repository-specific fact it shows is read at runtime from that repository's
-# own `.claude/ds-config.json`, so this file is identical everywhere and needs
-# no substitution when it is copied.
+# It is deliberately repo-AGNOSTIC: every repository-specific fact it shows is read at
+# runtime from that repository's own `.claude/ds-config.json`.
 #
 # NO VALUE MEANS NO SEGMENT. Every segment is emitted through `seg`, which drops
 # it when its guard is empty, so a fact this repository does not have never
