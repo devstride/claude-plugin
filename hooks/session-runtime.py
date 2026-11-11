@@ -12,7 +12,9 @@ plugin data, so the loaded copy writes down what it is:
            than 7 days are pruned at session start. `model` = {id[, name], at} and `effort` =
            {level, at} are the session's live model and effort as last seen, `at` being when that
            value was first seen: taken from this payload when it carries them, else carried over.
-  seen     (every PreToolUse) reads the hook payload and, only when its effort (or model) differs
+  seen     (every PreToolUse of the main conversation, and every PostModelSwitch, whose payload
+           names the new model as `to_model`; a helper agent's call is ignored, since it carries
+           the helper's effort) reads the hook payload and, only when its effort (or model) differs
            from the record's, rewrites the record: one small read, no network, no subprocess, and
            no write at all when nothing changed or the session has no record yet.
   prompt   (every UserPromptSubmit) rewrites the same record, so the first prompt after a reload
@@ -160,7 +162,8 @@ def seen_values(payload):
     """(model id, model display name, effort level) as a hook or status-line payload carries them;
     None for each one that is absent or not in a shape worth recording. `model` is an object
     ({id, display_name}) in the status-line payload and may be a bare id in a hook payload."""
-    model, effort = payload.get("model"), payload.get("effort")
+    # A model-switch payload names the model the session moved to as `to_model`.
+    model, effort = payload.get("to_model") or payload.get("model"), payload.get("effort")
     name = None
     if isinstance(model, dict):
         model, name = model.get("id"), model.get("display_name")
@@ -243,6 +246,10 @@ def observe(session, model=None, name=None, effort=None):
 
 def seen():
     payload = read_payload()
+    # A helper agent's tool call carries the helper's own effort (and shares the session id): only
+    # the main conversation's calls say what the session runs.
+    if payload.get("agent_id"):
+        return
     model, name, effort = seen_values(payload)
     observe(payload.get("session_id"), model, name, effort)
 
@@ -392,12 +399,17 @@ def check(session, repo=None):
 
 
 def model_base(value):
-    """A model name or id without its context-window suffix (`[1m]`), lower-cased."""
-    return re.sub(r"\[[0-9a-z]+\]$", "", value.strip().lower())
+    """A model name or id, lower-cased, without what only says HOW the same model is reached: a
+    context-window suffix (`[1m]`), a provider prefix before `claude-` (`us.anthropic.`, an ARN),
+    a provider version (`-v1:0`) and a release date (`-20261001`)."""
+    value = re.sub(r"\[[0-9a-z]+\]$", "", value.strip().lower())
+    value = re.sub(r"^.*[./:](?=claude-)", "", value)
+    value = re.sub(r"-v[0-9]+(:[0-9]+)?$", "", value)
+    return re.sub(r"-[0-9]{8}$", "", value)
 
 
 def model_matches(expected, running):
-    """True / False, or None when the two cannot be compared. A full id matches only itself. An
+    """True / False, or None when the two cannot be compared. A full id matches the same model however it is reached (see model_base). An
     alias matches a running id by FAMILY: the alias is one whole hyphen-separated segment of the id
     (`opus` matches claude-opus-5, never claude-opusplan-x), not a substring of it."""
     if not isinstance(expected, str) or not isinstance(running, str) or not running:

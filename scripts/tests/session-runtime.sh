@@ -389,4 +389,35 @@ PY
 then ok "(28) plan, insert-story, insert-defect, rebalance (planning) and build-item, ultracode-build (runner) each cite the contract once; contract, helper, registry and schema agree; doctor runs models-report"
 else bad "(28) a citing skill, the contract or the registry disagrees"; fi
 
+# (29) what the review found: a helper agent's tool call never changes the session's effort, a
+# model switch is learned from its own event, and a full id matches its dated and provider forms.
+if python3 - "$HELPER" <<'PY'
+import json, os, subprocess, sys, tempfile, types
+helper = sys.argv[1]
+home = tempfile.mkdtemp()
+env = dict(os.environ, HOME=home, XDG_CACHE_HOME=home + "/cache", CLAUDE_PLUGIN_ROOT=os.path.dirname(os.path.dirname(helper)))
+def run(mode, payload):
+    done = subprocess.run([sys.executable, helper, mode], input=json.dumps(payload), text=True, env=env, capture_output=True)
+    assert done.returncode == 0 and done.stdout == "", (mode, done)
+def record():
+    return json.load(open(home + "/cache/devstride-plugin/sessions/s29.json"))
+run("record", {"session_id": "s29", "model": "claude-opus-5-5", "transcript_path": "/dev/null"})
+run("seen", {"session_id": "s29", "effort": {"level": "high"}})
+run("seen", {"session_id": "s29", "agent_id": "a1", "agent_type": "general-purpose", "effort": {"level": "low"}})
+assert record()["effort"]["level"] == "high", "a helper's effort was recorded"
+run("seen", {"session_id": "s29", "hook_event_name": "PostModelSwitch", "from_model": "claude-opus-5-5", "to_model": "claude-fable-5-2"})
+assert record()["model"]["id"] == "claude-fable-5-2", "the switch was not learned"
+rt = types.ModuleType("rt"); rt.__file__ = helper
+exec(compile(open(helper, "rb").read(), helper, "exec"), rt.__dict__)
+for running in ("claude-opus-5-5-20261001", "us.anthropic.claude-opus-5-5-v1:0", "claude-opus-5-5[1m]"):
+    assert rt.model_matches("claude-opus-5-5", running) is True, running
+    assert rt.model_matches("opus", running) is True, running
+assert rt.model_matches("claude-opus-5-5", "claude-opus-5-6") is False
+assert rt.model_matches("opus", "claude-fable-5-2") is False
+hooks = json.load(open(os.path.dirname(helper) + "/hooks.json"))["hooks"]
+assert any("session-runtime.py\" seen" in h["command"] for e in hooks["PostModelSwitch"] for h in e["hooks"])
+PY
+then ok "(29) a helper's effort is ignored, a model switch is learned from its event, a full id matches its dated and provider forms"
+else bad "(29) a helper's effort, a model switch or a full id's other forms is misread"; fi
+
 exit $FAIL

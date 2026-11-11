@@ -32,7 +32,7 @@ for what each version component means here and how a release is cut.
   status line, whose payload carries them live. Its new `models --role planning|runner` mode prints
   one JSON line, `{role, expected, running, verdict}`, with the verdict `match`, `mismatch`,
   `unknown` or `off`. A model alias matches a running id by family and never as a substring, a
-  `[1m]` suffix is ignored, a full id matches only itself, and `default`, `best` and `opusplan`
+  `[1m]` suffix is ignored, a full id matches the same model however it is reached (a provider prefix or version and a release date are ignored too), and `default`, `best` and `opusplan`
   cannot be compared, so they read as `unknown`. Every error reads as `unknown`.
 - **`doctor config` reports the two expected models and efforts** with their source (configured or
   shipped default), and warns about a model name that is neither a documented alias nor a full

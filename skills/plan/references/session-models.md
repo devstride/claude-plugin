@@ -39,8 +39,9 @@ running. Follow `verdict`:
 | `off` | the repository switched the check off | say nothing, carry on |
 | `mismatch` | the model or the effort differs | the one line below, then the question or the unattended rule |
 
-An alias matches a running id by family (`fable` matches `claude-fable-5-2`), a full id matches
-only itself, and a `[1m]` suffix is ignored. The command also fails open: any error is `unknown`.
+An alias matches a running id by family (`fable` matches `claude-fable-5-2`); a full id matches
+the same model however it is reached (a `[1m]` suffix, a provider prefix or version and a release
+date are ignored). The command also fails open: any error is `unknown`.
 
 ## On a mismatch
 
@@ -54,9 +55,7 @@ only itself, and a `[1m]` suffix is ignored. The command also fails open: any er
 - **Switch** → tell the person to type `/model <expected.model>` and then
   `/effort <expected.effort>` themselves (only the one that differs when the other already
   matches); no skill, hook or setting can do it for them. Wait for their reply, re-run the check
-  once, say its result in one line, and carry on whatever it says: the record learns a new effort
-  at the next tool call but a new model only from the status line or the next session start, so it
-  may trail the switch.
+  once, say its result in one line, and carry on whatever it says.
 - **Carry on** → proceed as the session is.
 - **A model the account does not offer** (the person says so, or `/model` refuses it) → say so in
   one line and carry on.
@@ -82,7 +81,8 @@ again: its caller already has. An unattended loop is never stalled by this file.
   skill resolved differs, add to the same one line: `The delivery profile here is <name>; planning
   expects extended.` Never ask about it: the `profile` key and its resolution order
   (`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`) stay the authority. With
-  no model or effort mismatch, say that sentence alone, once, and carry on.
+  no model or effort mismatch, say that sentence alone, once, and carry on. Never say it when the
+  verdict is `off`, nor in `rebalance`, whose job is to change the profile.
 
 ## Cited by
 
