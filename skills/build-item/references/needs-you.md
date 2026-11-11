@@ -38,7 +38,10 @@ All three, else behave exactly as before:
 **A CHOICE is queued ONLY where a pick-up will read the answer**: by `build-item`, on a story or
 defect it is building or about to build. Everywhere else the entry is a NOTICE: `release` as the
 top-level skill (a finding its `review` cannot settle too), a stop before any item is selected (an
-ambiguous root), and anything filed on `needsYou.fallbackItem`.
+ambiguous root), anything filed on `needsYou.fallbackItem`, and, where the repository's
+branch-naming pattern carries no item number, a story that has already pushed commits: its NOTICE
+names the branch for the reader and says the story resumes in an attended session. A fork reached
+BEFORE any commit is unaffected: there is nothing to resume.
 
 ## Queue it — once per question
 
@@ -88,6 +91,8 @@ THIS skill.
 - `build-item`, plan mode: once the plan root resolves, the items under it.
 - `build-item`, a given item or a one-off (no root needed): before step 1, that item itself.
 - `release`: step 0, only to close stale notices.
+- `build-item` also reads `needsYou.fallbackItem`, for its own entries, only ever to close a
+  stale NOTICE (the root now resolves), never to act.
 
 **A CHOICE with a reply.** The reply counts only when all hold: (a) its author is the account of
 the item's CURRENT plan owner (re-resolve the assignee; never trust the mention); (b) trimmed, it
@@ -117,7 +122,8 @@ about to branch for an item whose comments hold an entry, open or answered: `git
 origin`, keeping the names whose LAST segment starts with `<item number>-` (anchored, never a
 substring) and that are not merged into the working base. Exactly one → check it out and continue
 from where its commits end; `branch-feature` is NOT invoked. None → branch as usual. More than one
-→ fail open: report it, treat the item as gated.
+→ fail open: report it, treat the item as gated. No item number in the pattern → never guess a
+branch.
 
 **A NOTICE** is closed (a reply ending `Needs you: answered`) only by the run that observes the
 need is gone: the action was taken in a session, or is moot (the release merged or was abandoned;
