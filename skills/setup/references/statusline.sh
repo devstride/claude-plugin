@@ -1,5 +1,5 @@
 #!/bin/bash
-# ds-statusline: managed v3.48.0 — installed and kept up to date by the devstride
+# ds-statusline: managed v3.51.0 — installed and kept up to date by the devstride
 # plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
 # replaces a file that still carries it, and never touches one that does not.
 #

@@ -8,6 +8,8 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.51.0] — 2026-11-11
+
 ### Added
 
 - **Planning and build skills say when the session is not running the model and effort the
@@ -47,6 +49,44 @@ for what each version component means here and how a release is cut.
   raises the file's `ds-statusline: managed` marker.
 - **`doctor` body trimmed to make room:** the worked example beside "skip shell builtins" and the
   reason beside the `conventionsDoc` check are gone; both rules stay.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.50.0 @ a0e9bb6, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.50.0 | tokens@devstride--v3.50.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,454 | 8,152 | 24,592 | 8,198 | +46 | 8,198 |
+| skills/review/SKILL.md | 23,980 | 7,994 | 23,980 | 7,994 | +0 | 7,999 |
+| skills/doctor/SKILL.md | 23,942 | 7,981 | 23,974 | 7,992 | +11 | 7,992 |
+| skills/build-item/SKILL.md | 23,745 | 7,915 | 23,881 | 7,961 | +46 | 7,985 |
+| skills/release/SKILL.md | 17,982 | 5,994 | 17,982 | 5,994 | +0 | 5,995 |
+| skills/rebalance/SKILL.md | 17,712 | 5,904 | 17,850 | 5,950 | +46 | 5,950 |
+| skills/ultracode-build/SKILL.md | 14,655 | 4,885 | 14,838 | 4,946 | +61 | 4,946 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,708 | 2,236 | 6,708 | 2,236 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-story/SKILL.md | 6,299 | 2,100 | 6,299 | 2,100 | +0 | 2,100 |
+| skills/comprehend-plan/SKILL.md | 5,580 | 1,860 | 5,580 | 1,860 | +0 | 1,860 |
+| skills/insert-defect/SKILL.md | 5,120 | 1,707 | 5,258 | 1,753 | +46 | 1,753 |
+| skills/insert-story/SKILL.md | 4,443 | 1,481 | 4,581 | 1,527 | +46 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 270,399 | 90,140 | 271,302 | 90,442 | +302 | |
 
 ## [3.50.0] — 2026-11-10
 
@@ -4560,7 +4600,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.50.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.51.0...HEAD
+[3.51.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.50.0...devstride--v3.51.0
 [3.50.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.49.0...devstride--v3.50.0
 [3.49.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.48.0...devstride--v3.49.0
 [3.48.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.47.0...devstride--v3.48.0
