@@ -73,7 +73,10 @@ reason; nothing is merged and nothing is bypassed.
 A pull request that changes the standing yes, this procedure, the checks, the workflows or the
 instruction files is covered like any other (the owner's words of 2026-11-12: his standing yes
 applies here exactly as in the main DevStride repository). It still cannot change the rules for its
-own merge, because the merge reads all of them from `main`, as the trusted copy below says.
+own merge, because the merge reads the standing yes, this procedure and both gate scripts from
+`main`, as the trusted copy below says. The `merge-path` and `public-hygiene` checks run `main`'s
+copy too; `release-guard` runs the pull request's own copy, so review reads a change to it like any
+other.
 
 **Trusted copy.** This procedure, the standing yes and both gate scripts are read and run from
 `origin/main`, never from the pull request. Run `merge` only in a session started in a clean

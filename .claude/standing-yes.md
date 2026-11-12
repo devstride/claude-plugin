@@ -29,7 +29,9 @@ A pull request that changes this file, the release procedure, the checks, the wo
 instruction files (`CLAUDE.md`, `AGENTS.md`) is covered like any other. It still cannot change the
 rules for its own merge: the merge session reads this file, its procedure and both gate scripts
 from `main`, never from the pull request (see below), so a change to them applies only to the
-pull requests merged after it.
+pull requests merged after it. The `merge-path` and `public-hygiene` checks also run `main`'s copy.
+`release-guard` runs the pull request's own copy of its workflow and scripts, so a change to it is
+read in review like any other change.
 
 ## Conditions (all of them, at the exact head merged)
 
