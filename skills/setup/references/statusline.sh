@@ -319,7 +319,14 @@ sys.stdout.write(" ".join("".join(" " if ord(c) < 32 or ord(c) == 127 or c == "|
       fi
       rm -rf "$nlock" 2>/dev/null; mkdir "$nlock" 2>/dev/null || return 0
     fi
-    (umask 077; printf '%s' "$SL_SESSION_NAME" >"$nseen") 2>/dev/null  # a generated title can describe the work
+    # owner-only (a generated title can describe the work), and through a new file moved into place,
+    # so a symlink left at that path is replaced, never followed
+    local nseentmp
+    [ -L "$nseen" ] && rm -f "$nseen"
+    if nseentmp=$(mktemp "$nseen.XXXXXX" 2>/dev/null); then
+      printf '%s' "$SL_SESSION_NAME" >"$nseentmp" 2>/dev/null
+      mv -f "$nseentmp" "$nseen" 2>/dev/null || rm -f "$nseentmp"
+    fi
     (nrefresh &) >/dev/null 2>&1
   }
   if [ -f "$ncache" ]; then

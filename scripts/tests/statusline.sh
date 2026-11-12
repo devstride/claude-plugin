@@ -253,10 +253,11 @@ else bad "(22) a=$A | b=$B | c1=$C1 | c2=$C2 | cached=$CACHED | ran=$RAN_IN | p2
 
 # (22a) a nameCommand's cold cache shows nothing, never the payload's generated title in its place;
 #       within the 10 s cache the same payload name refreshes nothing, and a changed payload name
-#       (a /rename, or a title a hook set) refreshes at once
+#       (a /rename, or a title a hook set) refreshes at once; a symlink at the payload note is replaced, never followed
 N7="$(mkrepo sess7 '{"session":{"nameCommand":"echo run >> \"$TMPDIR/n7-runs\"; cat name.txt"}}')"
 printf 'first\n' > "$N7/name.txt"; SID7=0b1c2d3e-0000-4000-8000-000000000007
 n7runs() { [ -f "$TMPDIR/n7-runs" ] && wc -l < "$TMPDIR/n7-runs" | tr -d ' ' || echo 0; }
+printf 'victim' > "$TMPDIR/n7-victim"; ln -s "$TMPDIR/n7-victim" "$TMPDIR/ds-statusline-session-$SID7.payload"   # never followed
 G0="$(render "$N7" ",\"session_id\":\"$SID7\",\"session_name\":\"Generated title\"")"; settled "$SID7"
 G1="$(render "$N7" ",\"session_id\":\"$SID7\",\"session_name\":\"Generated title\"")"; settled "$SID7"; R1="$(n7runs)"
 printf 'second\n' > "$N7/name.txt"
@@ -267,6 +268,7 @@ if ! printf '%s' "$G0" | grep -q '☻' && no_dangling "$G0" && printf '%s' "$G1"
    && [ "$R1" = 1 ] && [ "$R2" = 1 ] && printf '%s' "$G2" | grep -qE '☻ first( |$)' && [ "$R3" = 2 ] \
    && printf '%s' "$G4" | grep -qE '☻ second( |$)' && [ "$(cat "$TMPDIR/ds-statusline-session-$SID7.payload")" = renamed ] \
    && [ "$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode)))' "$TMPDIR/ds-statusline-session-$SID7.payload")" = 0o600 ] \
+   && [ "$(cat "$TMPDIR/n7-victim")" = victim ] && [ ! -L "$TMPDIR/ds-statusline-session-$SID7.payload" ] \
    && ! printf '%s%s%s' "$G1" "$G3" "$G4" | grep -qE 'Generated|☻ renamed'; then
   ok "(22a) Session: a cold nameCommand cache shows nothing; an unchanged payload name waits out the cache; a changed one refreshes at once; the payload name never shows"
 else bad "(22a) g0=$G0 | g1=$G1 r1=$R1 | g2=$G2 r2=$R2 | g3=$G3 r3=$R3 | g4=$G4"; fi

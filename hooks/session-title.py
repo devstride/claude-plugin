@@ -49,6 +49,7 @@ import time
 sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
 
 SESSION_ID = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}$")
+RECORD_TEMP = re.compile(r"^\.[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}\.[0-9a-f]{16}\.tmp$")   # remember()'s temporary file
 EVENTS = ("UserPromptSubmit", "SessionStart")
 SOURCES = ("startup", "resume", "fork")   # the SessionStart sources whose sessionTitle Claude Code applies
 COMMAND_TIMEOUT = 3
@@ -107,14 +108,20 @@ def remember(sid, title, own):
 
 
 def prune(own, now):
-    """Remove other sessions' records (and temporary files) untouched for KEEP."""
+    """Remove other sessions' records (and temporary files) untouched for KEEP: only files this hook
+    names, in a records directory that is ours and no symlink, so nothing else is ever removed."""
     directory = records_path()
     try:
+        info = os.lstat(directory)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+            return
         names = os.listdir(directory)
     except OSError:
         return
     for name in names:
         if name == own + ".json":
+            continue
+        if not (name.endswith(".json") and SESSION_ID.match(name[:-5])) and not RECORD_TEMP.match(name):
             continue
         path = os.path.join(directory, name)
         try:

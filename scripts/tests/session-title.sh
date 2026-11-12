@@ -182,19 +182,21 @@ chmod 700 "$RECORDS"
 if [ "$W1" = 0 ]; then ok "(10) an unwritable record → no title printed, exit 0"; else bad "(10) w1=$W1"; fi
 
 # (11) records: owner-only under XDG_CACHE_HOME only; another session's record older than 7 days is
-#      pruned at a new session's start, a fresh one, the session's own and one whose session still runs
-#      the hook (its title unchanged) are kept; the repository and
+#      pruned at a new session's start, a fresh one, the session's own, one whose session still runs
+#      the hook (its title unchanged) and a file the hook does not name are kept; the repository and
 #      the plugin directory stay clean (no compiled files)
 MODE="$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode)), oct(stat.S_IMODE(os.stat(sys.argv[2]).st_mode)))' "$RECORDS" "$RECORDS/s2.json")"
 printf '{"title":"old","own":true}' > "$RECORDS/gone.json"; touch -t 202001010000 "$RECORDS/gone.json"
 printf '{"title":"old","own":true}' > "$RECORDS/s11.json"; touch -t 202001010000 "$RECORDS/s11.json"
+printf 'keep' > "$RECORDS/notes.txt"; touch -t 202001010000 "$RECORDS/notes.txt"   # not a file the hook names
 touch -t 202001010000 "$RECORDS/s4.json"; say "Auto name two"
 fire UserPromptSubmit s4 "$R" ',"prompt":"x","session_title":"Auto name two"'
 say "Fresh"; fire SessionStart s11 "$R" ',"source":"startup"'
 if [ "$MODE" = "0o700 0o600" ] && [ ! -e "$RECORDS/gone.json" ] && [ -e "$RECORDS/s11.json" ] && [ -e "$RECORDS/s4.json" ] \
+   && [ -e "$RECORDS/notes.txt" ] \
    && [ -z "$(git -C "$R" status --porcelain --untracked-files=all)" ] && [ ! -e "$ROOT/hooks/__pycache__" ] \
    && [ "$(title_of)" = "SessionStart|Fresh" ]; then
-  ok "(11) records owner-only under XDG_CACHE_HOME; a stale record of another session pruned at start, one still in use kept; repository and plugin clean"
+  ok "(11) records owner-only under XDG_CACHE_HOME; a stale record of another session pruned at start, one still in use and a file it does not name kept; repository and plugin clean"
 else bad "(11) mode=$MODE gone=$([ -e "$RECORDS/gone.json" ] && echo kept) repo=$(git -C "$R" status --porcelain) out=$OUT"; fi
 
 # (12) the hook is wired for UserPromptSubmit and for SessionStart startup|resume|fork, bounded and
