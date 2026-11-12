@@ -532,8 +532,12 @@ Optional, and only `/devstride:setup agents` writes it, after a typed yes:
 
 | Key | Shape | Absent means |
 | --- | --- | --- |
-| `activeAgents` | `null`, or `{ "boardId": <id> \| null, "tagName"?: "agent active", "tagColor"?: "green", "staleMinutes"?: 20, "commands": { "start": "… <root> …", "end": "…" } }` | nothing on any board, no tag, no command: the plugin writes nothing to DevStride for this feature |
+| `activeAgents` | `null`, or `{ "boardId": <id> \| null, "tagName"?: "agent active", "tagColor"?: "green", "staleMinutes"?: 20, "rootLevel"?: <work type> \| null, "commands": { "start": "… <root> …", "end": "…" } }` | nothing on any board, no tag, no command: the plugin writes nothing to DevStride for this feature |
+| `activeAgents.rootLevel` | a work type name, or `null` | the level directly above the release unit (`hierarchyRoles.releaseUnit`, else as the hierarchy resolves it): at every pickup the build loop puts the nearest item of this level above the picked-up item on the board, matched case-insensitively, and takes it off once nothing under it is left to build |
 
+- **The board root is resolved, never asked**: a `--board-root` argument, then an item whose
+  description carries `<p><strong>Active Agents root:</strong> this item</p>`, then the nearest
+  `rootLevel` item, then the run's plan root, else nothing is placed.
 - **The commands are the repository's** — its presence implementation (what "active" means, how a
   session heartbeats and expires) is its own; the plugin only renders `<root>` (an item number,
   nothing else) and runs them through the build loop:

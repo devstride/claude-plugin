@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """The Active Agents block — validate it, merge a tag into a tag group, render and run its
-commands, classify board drift. Deterministic and dependency-free.
+commands, resolve and settle a plan's board root, pick the shared view, classify board drift.
+Deterministic and dependency-free.
 
 The single implementation behind `skills/setup/references/agents-mode.md` (setup agents),
 `skills/doctor/references/agents.md` (doctor agents) and
@@ -21,15 +22,38 @@ The single implementation behind `skills/setup/references/agents-mode.md` (setup
          repository root with ACTIVE_AGENTS_ROOT, ACTIVE_AGENTS_TAG and
          ACTIVE_AGENTS_STALE_MINUTES exported; always exit 0 (presence never blocks a turn),
          except 2 for a refused root or a bad verb.
-  classify   stdin {"board": {"exists", "archived"} | null, "boardItems": [{"number",
-             "workType", "done"}], "leafTypes": […], "tag": {"id"} | null,
+  resolve-root   stdin {"chain": [{"number", "workType", "marker"? | "description"?,
+                 "deferred"?}…], "rootLevel": <name> | null, "leafTypes": […],
+                 "argument": {"number", "workType"} | null, "planRoot": <number> | null}
+      -> one line: ROOT I<n> (<source>) | ROOT NONE (<reason>). `chain` is the picked-up item
+         first, then each ancestor upward. First match wins: the argument; the nearest item
+         carrying the marker; the nearest item whose work type is rootLevel (case-insensitive);
+         the run's plan root. A workstream, a leaf type and anything flagged `deferred` (the
+         deferred container and everything under it) are never a root.
+  comment <placed|removed> [--board <id> --label <text>]
+      -> the { html } of the placement comment (the board the root came from) or the removal
+         comment (the board it went back to); no --board means no board.
+  came-from   stdin {"comments": [{"html", "dateAdded"}…]}
+      -> one line: FROM <board id> | FROM NONE (<reason>), read from the newest placement comment.
+  settle   stdin {"remaining": <n>, "onBoard": bool, "boardId": <id>,
+           "cameFrom": {"id", "exists", "archived"} | null}
+      -> one line: SETTLE KEEP (<reason>) | SETTLE MOVE <board id> | SETTLE OFF (<reason>).
+  pick-view   stdin {"views": [{"id", "label", "visibility", "location"?, "boardView"?,
+              "dataVersion"}…]}
+      -> VIEW ADOPT <id>, then one VIEW DUPLICATE <id> line per other candidate; or VIEW CREATE.
+  classify   stdin {"configured"?: bool (default true), "boards"?: [{"id", "label", "archived"}],
+             "board": {"exists", "archived"} | null, "boardItems": [{"number", "workType", "done",
+             "remaining"?}], "leafTypes": […], "tag": {"id"} | null, "rootLevel"?: <name> | null,
              "planRootTypes": [{"name", "labelCollectionId"}], "labelCollections": {"<id>": [<label
-             id>…]}, "taggedItems": [{"number", "workType", "done"}]}
-      -> {"findings": [{"check", "message", "items"?: […]}…]}; an empty list is a clean board.
+             id>…]}, "taggedItems": [{"number", "workType", "done"}], "views"?: [{…, "columns":
+             [{"identifier", "visible"}] | null}]}
+      -> {"findings": [{"check", "severity", "message", "items"?: […]}…]}; an empty list is a
+         clean board. `configured: false` (no block) scans `boards` only, and is INFO at most.
 
 Bad input exits 2 with one `{"error": …}` line. `--config` defaults to
 `.claude/ds-config.json` under the repository root.
 """
+import html
 import json
 import os
 import re
@@ -38,11 +62,21 @@ import subprocess
 import sys
 import tempfile
 
-DEFAULTS = {"boardId": None, "tagName": "agent active", "tagColor": "green", "staleMinutes": 20}
+DEFAULTS = {"boardId": None, "tagName": "agent active", "tagColor": "green", "staleMinutes": 20,
+            "rootLevel": None}
 COLOURS = ("gray-medium-dark", "red", "pink", "orange", "yellow", "lime", "green", "teal", "blue",
            "blue-medium", "purple")  # create_label's colours; the registry carries the same enum
 KEYS = set(DEFAULTS) | {"commands"}
 ROOT_RE = re.compile(r"^[IF][0-9]+$")
+ITEM_RE = re.compile(r"^I[0-9]+$")
+BOARD_LABEL = "active agents"
+VIEW_LABEL = "Active Agents"
+# The starting columns, in order (the DevStride MCP's view column identifiers).
+STARTING_COLUMNS = ("identifier", "status", "progress", "priority", "pullRequests", "tags")
+# The one-line per-plan override an owner writes in an item's description.
+MARKER_RE = re.compile(r"<strong>\s*Active Agents root:\s*</strong>\s*this item", re.I)
+PLACED_RE = re.compile(r"<strong>Active Agents:</strong> placed on the Active Agents board")
+CAME_FROM_RE = re.compile(r"Came from: (?:no board\.|.*\(board ([A-Za-z0-9-]+)\)\.)", re.S)
 
 
 def fail(message):
@@ -104,6 +138,10 @@ def load_block(path):
     if isinstance(block.get("tagColor"), str) and block["tagColor"].strip() \
             and block["tagColor"] not in COLOURS:
         problems.append("ERROR activeAgents.tagColor: must be one of " + ", ".join(COLOURS))
+    level = block.get("rootLevel")
+    if "rootLevel" in block and level is not None and (not isinstance(level, str)
+                                                       or not level.strip()):
+        problems.append("ERROR activeAgents.rootLevel: must be a non-empty work type name or null")
     stale = block.get("staleMinutes", DEFAULTS["staleMinutes"])
     if isinstance(stale, bool) or not isinstance(stale, int) or stale < 1:
         problems.append("ERROR activeAgents.staleMinutes: must be a positive whole number")
@@ -241,57 +279,270 @@ def cmd_run(args):
     return 0
 
 
+def fold(name):
+    return name.strip().casefold() if isinstance(name, str) else None
+
+
+def chain_entry(entry, what):
+    if not isinstance(entry, dict) or not isinstance(entry.get("number"), str) \
+            or not ROOT_RE.match(entry["number"]):
+        fail("every %s needs an item number" % what)
+    return entry
+
+
+def has_marker(entry):
+    if "marker" in entry:
+        return entry["marker"] is True
+    description = entry.get("description")
+    return isinstance(description, str) and bool(MARKER_RE.search(description))
+
+
+def cmd_resolve_root(_args):
+    request = read_stdin()
+    chain = request.get("chain")
+    if not isinstance(chain, list):
+        fail("chain must be an array, the picked-up item first")
+    chain = [chain_entry(e, "chain entry") for e in chain]
+    leaves = {fold(t) for t in request.get("leafTypes") or [] if isinstance(t, str)}
+    deferred = {e["number"] for e in chain if e.get("deferred") is True}
+
+    def eligible(entry):
+        return ITEM_RE.match(entry["number"]) and entry["number"] not in deferred \
+            and fold(entry.get("workType")) not in leaves
+
+    argument = request.get("argument")
+    if argument is not None:
+        argument = chain_entry(argument, "argument")
+        if eligible(argument):
+            print("ROOT %s (argument)" % argument["number"])
+            return 0
+    for entry in chain:
+        if eligible(entry) and has_marker(entry):
+            print("ROOT %s (marker)" % entry["number"])
+            return 0
+    level = request.get("rootLevel")
+    if level is not None and (not isinstance(level, str) or not level.strip()):
+        fail("rootLevel must be a work type name or null")
+    if level:
+        for entry in chain:
+            if eligible(entry) and fold(entry.get("workType")) == fold(level):
+                print("ROOT %s (level %s)" % (entry["number"], entry.get("workType")))
+                return 0
+    plan_root = request.get("planRoot")
+    if plan_root is not None and (not isinstance(plan_root, str) or not ROOT_RE.match(plan_root)):
+        fail("planRoot must be an item number or null")
+    if plan_root and ITEM_RE.match(plan_root) and plan_root not in deferred:
+        print("ROOT %s (plan root)" % plan_root)
+        return 0
+    reasons = ["no argument" if argument is None else "the argument cannot be a root",
+               "no marker", "no %s above" % level if level else "no root level",
+               "no plan root" if not plan_root else "the plan root cannot be a root"]
+    print("ROOT NONE (%s)" % ", ".join(reasons))
+    return 0
+
+
+def cmd_comment(args):
+    board = option(args, "--board")
+    label = option(args, "--label")
+    if len(args) != 1 or args[0] not in ("placed", "removed"):
+        fail("usage: comment <placed|removed> [--board <id> --label <text>]")
+    if board is not None and not re.match(r"^[A-Za-z0-9-]+$", board):
+        fail("--board must be a board id")
+    where = "no board." if board is None else "%s (board %s)." % (
+        html.escape(label or "a board", quote=False), board)
+    if args[0] == "placed":
+        text = ("<strong>Active Agents:</strong> placed on the Active Agents board while its plan"
+                " is built. Came from: " + where)
+    else:
+        text = ("<strong>Active Agents:</strong> its plan is finished, so it came off the Active"
+                " Agents board. Moved to: " + where)
+    print(json.dumps({"html": "<p>%s</p>" % text}))
+    return 0
+
+
+def cmd_came_from(_args):
+    request = read_stdin()
+    comments = request.get("comments")
+    if not isinstance(comments, list):
+        fail("comments must be an array")
+    placed = [c for c in comments if isinstance(c, dict) and isinstance(c.get("html"), str)
+              and PLACED_RE.search(c["html"])]
+    if not placed:
+        print("FROM NONE (no placement comment)")
+        return 0
+    newest = max(placed, key=lambda c: str(c.get("dateAdded") or ""))
+    match = CAME_FROM_RE.search(newest["html"])
+    if not match:
+        print("FROM NONE (the placement comment names no board)")
+    elif match.group(1):
+        print("FROM %s" % match.group(1))
+    else:
+        print("FROM NONE (it was on no board)")
+    return 0
+
+
+def cmd_settle(_args):
+    request = read_stdin()
+    remaining = request.get("remaining")
+    if isinstance(remaining, bool) or not isinstance(remaining, int) or remaining < 0:
+        fail("remaining must be a whole number")
+    if remaining:
+        print("SETTLE KEEP (%d remaining)" % remaining)
+        return 0
+    if request.get("onBoard") is not True:
+        print("SETTLE KEEP (not on the Active Agents board)")
+        return 0
+    came = request.get("cameFrom")
+    if not isinstance(came, dict) or not came.get("id"):
+        print("SETTLE OFF (it came from no board)")
+    elif came["id"] == request.get("boardId"):
+        print("SETTLE OFF (it came from the Active Agents board itself)")
+    elif not came.get("exists"):
+        print("SETTLE OFF (the board it came from no longer exists)")
+    elif came.get("archived"):
+        print("SETTLE OFF (the board it came from is archived)")
+    else:
+        print("SETTLE MOVE %s" % came["id"])
+    return 0
+
+
+def view_candidates(views):
+    if not isinstance(views, list):
+        fail("views must be an array")
+    out = []
+    for v in views:
+        if not isinstance(v, dict) or not isinstance(v.get("id"), str):
+            fail("every view needs an id")
+        label = fold(v.get("label")) or ""
+        if v.get("visibility") != "internal" or v.get("location", "board") != "board" \
+                or v.get("boardView", "table") != "table":
+            continue
+        if label == BOARD_LABEL or label.startswith("active agent"):
+            out.append(v)
+    version = lambda v: v.get("dataVersion") if isinstance(v.get("dataVersion"), int) else 0
+    return sorted(out, key=lambda v: (-version(v), v["id"]))
+
+
+def cmd_pick_view(_args):
+    candidates = view_candidates(read_stdin().get("views"))
+    if not candidates:
+        print("VIEW CREATE")
+        return 0
+    print("VIEW ADOPT %s" % candidates[0]["id"])
+    for v in candidates[1:]:
+        print("VIEW DUPLICATE %s" % v["id"])
+    return 0
+
+
+def finding(check, message, severity="FAIL", **extra):
+    out = {"check": check, "severity": severity, "message": message}
+    out.update(extra)
+    return out
+
+
+def scan_boards(boards):
+    if not isinstance(boards, list):
+        fail("boards must be an array")
+    found = [b["id"] for b in boards if isinstance(b, dict) and isinstance(b.get("id"), str)
+             and fold(b.get("label")) == BOARD_LABEL and not b.get("archived")]
+    if found:
+        return [finding("not-adopted", "an Active Agents board exists but is not adopted; run "
+                        "/devstride:setup agents", "INFO", items=found)]
+    return [finding("no-board", "no Active Agents board; /devstride:setup agents creates one",
+                    "INFO")]
+
+
+def view_findings(views):
+    candidates = view_candidates(views)
+    if not candidates:
+        return [finding("view", "no shared Active Agents table view", "INFO")]
+    out = []
+    if len(candidates) > 1:
+        out.append(finding("view", "more than one shared Active Agents view; %s is the one in "
+                           "use, the rest are for the owner to remove" % candidates[0]["id"],
+                           "INFO", items=[v["id"] for v in candidates[1:]]))
+    columns = candidates[0].get("columns")
+    if isinstance(columns, list):
+        shown = {c.get("identifier") for c in columns if isinstance(c, dict)
+                 and c.get("visible") is not False}
+        hidden = [c for c in STARTING_COLUMNS if c not in shown]
+        if hidden:
+            out.append(finding("view", "the view does not show: " + ", ".join(hidden), "INFO",
+                               items=hidden))
+    return out
+
+
 def cmd_classify(_args):
     request = read_stdin()
+    if request.get("configured", True) is False:
+        print(json.dumps({"findings": scan_boards(request.get("boards"))}))
+        return 0
     findings = []
     board = request.get("board")
     if not isinstance(board, dict) or not board.get("exists"):
-        findings.append({"check": "board", "message": "the Active Agents board does not exist"})
+        findings.append(finding("board", "the Active Agents board does not exist"))
     elif board.get("archived"):
-        findings.append({"check": "board", "message": "the Active Agents board is archived"})
+        findings.append(finding("board", "the Active Agents board is archived"))
     tag = request.get("tag")
     tag_id = tag.get("id") if isinstance(tag, dict) else None
     if not tag_id:
-        findings.append({"check": "tag", "message": "the agent-active tag does not exist"})
+        findings.append(finding("tag", "the agent-active tag does not exist"))
     collections = request.get("labelCollections") or {}
     if not isinstance(collections, dict):
         fail("labelCollections must be an object")
+    root_types = request.get("planRootTypes") or []
+    for t in root_types:
+        if not isinstance(t, dict) or not isinstance(t.get("name"), str):
+            fail("every planRootTypes entry needs a name")
     if tag_id:
         missing, ungrouped = [], []
-        for t in request.get("planRootTypes") or []:
-            if not isinstance(t, dict) or not isinstance(t.get("name"), str):
-                fail("every planRootTypes entry needs a name")
+        for t in root_types:
             group = t.get("labelCollectionId")
             if not group:
                 ungrouped.append(t["name"])
             elif tag_id not in (collections.get(group) or []):
                 missing.append(t["name"])
         if missing:
-            findings.append({"check": "tag-allowed", "items": missing,
-                             "message": "the tag is not allowed on: " + ", ".join(missing)})
+            findings.append(finding("tag-allowed", "the tag is not allowed on: " + ", ".join(missing),
+                                    items=missing))
         if ungrouped:
-            findings.append({"check": "tag-group", "items": ungrouped,
-                             "message": "no tag group, skipped: " + ", ".join(ungrouped)})
+            findings.append(finding("tag-group", "no tag group, skipped: " + ", ".join(ungrouped),
+                                    "INFO", items=ungrouped))
+    level = request.get("rootLevel")
+    if isinstance(level, str) and level.strip() and root_types \
+            and fold(level) not in {fold(t["name"]) for t in root_types}:
+        findings.append(finding("root-level", "activeAgents.rootLevel %r names no work type above "
+                                "the leaves" % level, items=[level]))
     leaves = set(request.get("leafTypes") or [])
     on_board = [i for i in request.get("boardItems") or [] if isinstance(i, dict)]
     leaf_items = [i["number"] for i in on_board if i.get("workType") in leaves and i.get("number")]
     if leaf_items:
-        findings.append({"check": "leaf-on-board", "items": leaf_items[:5], "count": len(leaf_items),
-                         "message": "%d leaf item(s) on the board" % len(leaf_items)})
+        findings.append(finding("leaf-on-board", "%d leaf item(s) on the board" % len(leaf_items),
+                                items=leaf_items[:5], count=len(leaf_items)))
+    finished = [i["number"] for i in on_board if i.get("number")
+                and i.get("workType") not in leaves and i.get("remaining") == 0
+                and not isinstance(i.get("remaining"), bool)]
+    if finished:
+        findings.append(finding("done-on-board", "plan root(s) on the board with nothing left to "
+                                "build: " + ", ".join(finished), items=finished))
     done_roots = [i["number"] for i in request.get("taggedItems") or []
                   if isinstance(i, dict) and i.get("done") and i.get("number")]
     if done_roots:
-        findings.append({"check": "tag-on-done", "items": done_roots,
-                         "message": "the tag sits on Done item(s)"})
+        findings.append(finding("tag-on-done", "the tag sits on Done item(s)", items=done_roots))
+    if "views" in request:
+        findings.extend(view_findings(request.get("views")))
     print(json.dumps({"findings": findings}))
     return 0
 
 
 def main():
     commands = {"validate": cmd_validate, "merge-labels": cmd_merge_labels, "render": cmd_render,
-                "run": cmd_run, "classify": cmd_classify}
+                "run": cmd_run, "resolve-root": cmd_resolve_root, "comment": cmd_comment,
+                "came-from": cmd_came_from, "settle": cmd_settle, "pick-view": cmd_pick_view,
+                "classify": cmd_classify}
     if len(sys.argv) < 2 or sys.argv[1] not in commands:
-        fail("usage: active-agents.py validate|merge-labels|render|run|classify …")
+        fail("usage: active-agents.py validate|merge-labels|render|run|resolve-root|comment|"
+             "came-from|settle|pick-view|classify …")
     sys.exit(commands[sys.argv[1]](sys.argv[2:]))
 
 

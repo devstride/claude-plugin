@@ -32,7 +32,8 @@ Optional argument: $ARGUMENTS
 - **`agents`** — the Active Agents mode, the only run that writes to DevStride: A1, then
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/agents-mode.md` end to end (inventory, plan, a
   typed yes, apply).
-- **Nothing** — the full run: inspect, ask, write, scaffold, validate.
+- **Nothing** — the full run: inspect, ask, write, scaffold, validate, plus the `agents` mode's
+  read-only §0 scan.
 
 **Run each mode's prerequisites silently — A1 always, A2–A3 before A4.** A narrowed run reports
 fewer keys, never worse ones, and **stops after Phase B, writing nothing**; a full run writes. **`docs`,
@@ -234,8 +235,7 @@ existing config per A8.
 **When a detector's result is `ambiguous`, read
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.digest.md`** — why that detector
 declines to decide, and what evidence would settle it. **Read the full
-`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.md` before changing a detector**;
-A5 and A6 address their own sections of it above.
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.md` before changing a detector**.
 
 ## The prefill summary — the contract
 
