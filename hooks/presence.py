@@ -31,7 +31,9 @@ the repository's. The contract: skills/setup/references/session-presence.md.
                                call a deny rule, a hook or a person refused fires PreToolUse but never
                                PostToolUse; state "working"
            Notification     -> only permission_prompt, elicitation_dialog and elicitation_url_dialog
-                               (state "waiting": a prompt waits on the person) and idle_prompt (about
+                               (state "waiting": a prompt waits on the person), elicitation_response and
+                               elicitation_complete (state "working": the person answered, the call
+                               goes on; not while a question is open) and idle_prompt (about
                                60 seconds after a finished turn or an interrupt, which fires no hook of
                                its own: every open call is dropped and the state is "waiting", unless
                                the turn left background work running or ended on an API error, when
@@ -134,7 +136,9 @@ FIRST = ("SessionStart", "UserPromptSubmit")  # the events that may start a repo
 # events that only update a session already reported
 LATER = ("PreToolUse", "PostToolUse", "PostToolUseFailure", "PostToolBatch", "Notification", "Stop", "StopFailure",
          "SessionEnd")
-NOTICES = ("permission_prompt", "idle_prompt", "elicitation_dialog", "elicitation_url_dialog")
+NOTICES = ("permission_prompt", "idle_prompt", "elicitation_dialog", "elicitation_url_dialog", "elicitation_response",
+           "elicitation_complete")
+ANSWERED = ("elicitation_response", "elicitation_complete")  # the person answered an MCP prompt
 QUESTIONS = ("AskUserQuestion", "ExitPlanMode")  # the main conversation asking its person
 OPEN_LIMIT = 64          # open calls kept per session; the oldest is dropped beyond it
 TOOL_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
@@ -464,6 +468,8 @@ def transition(event, payload, record, now_ms):
                 active = False  # the session is waiting on its own work, or cannot continue
             else:
                 state = "waiting"
+        elif payload.get("notification_type") in ANSWERED:
+            state = None if asking else "working"
         else:
             state = "waiting"  # a permission or elicitation prompt
     elif event == "Stop":

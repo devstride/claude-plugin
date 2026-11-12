@@ -62,7 +62,7 @@
     ],
     "Notification": [
       {
-        "matcher": "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog",
+        "matcher": "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|elicitation_response|elicitation_complete",
         "hooks": [
           { "type": "command", "command": "command -v python3 >/dev/null 2>&1 && python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/presence.py\" hook; exit 0", "timeout": 5 }
         ]

@@ -459,6 +459,18 @@ if [ "$(of s30 2 PRESENCE_STATE)" = working ] && [ "$(of s30 3 PRESENCE_STATE)" 
   ok "(30) Notification permission_prompt → beat waiting (the call still open); its PostToolUse → beat working, not busy"
 else bad "(30) $(grep '"s30"' "$LOG")"; fi
 
+# (30b) an MCP elicitation waits on the person; the person's answer → working while the call goes on
+begin s30b; age s30b 31; fire PreToolUse s30b "$R29" "" "$(tool mcp__x__login e1)" >/dev/null; upto s30b 2
+age s30b 31; fire Notification s30b "$R29" "" '{"notification_type":"elicitation_dialog"}' >/dev/null; upto s30b 3
+age s30b 31; fire Notification s30b "$R29" "" '{"notification_type":"elicitation_response"}' >/dev/null; upto s30b 4
+E1="$(rec s30b 'r["tools"]["e1"]')"
+age s30b 31; fire Notification s30b "$R29" "" '{"notification_type":"elicitation_url_dialog"}' >/dev/null; upto s30b 5
+age s30b 31; fire Notification s30b "$R29" "" '{"notification_type":"elicitation_complete"}' >/dev/null; upto s30b 6
+if [ "$(of s30b 3 PRESENCE_STATE)" = waiting ] && [ "$(of s30b 4 PRESENCE_STATE)" = working ] && [ "$(of s30b 4 PRESENCE_BUSY_SINCE)" = "$E1" ] \
+   && [ "$(of s30b 5 PRESENCE_STATE)" = waiting ] && [ "$(of s30b 6 PRESENCE_STATE)" = working ]; then
+  ok "(30b) elicitation_dialog / _url_dialog → waiting; elicitation_response / _complete → working, the call still busy"
+else bad "(30b) $(grep '"s30b"' "$LOG")"; fi
+
 # (31) the idle prompt (about 60 s after an interrupt, which fires no hook): open calls dropped, waiting;
 #      the next prompt → working
 begin s31; age s31 31; fire UserPromptSubmit s31 "$R29" >/dev/null; upto s31 2
@@ -552,7 +564,7 @@ if [ "$L1" = "(['h1'], {'h1': 'helper-3'})" ] && [ "$L2" = "([], {}, 'working')"
 else bad "(36) l1=$L1 l2=$L2"; fi
 
 # (12) hooks.json registers the hook on all ten events, bounded and failing open; Notification only for
-#      the four prompt types the hook reads, and PreToolUse after the model recorder
+#      the six prompt types the hook reads, and PreToolUse after the model recorder
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'
 import json, sys
 h = json.load(open(sys.argv[1]))["hooks"]
@@ -561,13 +573,13 @@ for event in ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "
     found = [(g, c) for g in h[event] for c in g["hooks"] if "hooks/presence.py\" hook" in c["command"]]
     assert len(found) == 1 and found[0][1].get("timeout") == 5 and found[0][1]["command"].endswith("exit 0"), event
     if event == "Notification":
-        assert found[0][0].get("matcher") == "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog"
+        assert found[0][0].get("matcher") == "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog|elicitation_response|elicitation_complete"
     elif event != "SessionStart":
         assert "matcher" not in found[0][0], event
 pre = [c["command"] for g in h["PreToolUse"] for c in g["hooks"]]
 assert "session-runtime.py\" seen" in pre[0] and "presence.py\" hook" in pre[1], pre
 PY
-then ok "(12) hooks.json → presence hook on ten events (timeout 5, exit 0); Notification for the four prompt types only"
+then ok "(12) hooks.json → presence hook on ten events (timeout 5, exit 0); Notification for the six prompt types only"
 else bad "(12) hooks.json registration"; fi
 
 exit $FAIL
