@@ -1835,7 +1835,7 @@
         "object",
         "null"
       ],
-      "description": "the Active Agents board, tag and the repository's presence commands; absent or null means the plugin writes nothing to DevStride for this feature and runs nothing",
+      "description": "the Active Agents board, tag and the repository's presence commands; absent or null means the plugin writes nothing to DevStride for this feature and runs no command (doctor and setup still look for the board, read-only)",
       "since": "3.25.0"
     },
     {

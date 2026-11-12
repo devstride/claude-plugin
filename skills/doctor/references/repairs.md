@@ -44,7 +44,7 @@ config beyond the narrow personal `statusLine` exception.
 | Merge gates / branch protection (§6) | **C** | Repository settings affecting every contributor |
 | A named docs skill missing, or a legacy `release.docsRepo` (§7) | **B** | `/devstride:setup docs` |
 | Active Agents board, tag or view missing, or a board not adopted (§8) | **B** | `/devstride:setup agents` |
-| A finished plan root still on the Active Agents board, `done-on-board` (§8) | **B** | `/devstride:build-item <root> --board-root <root>`, once per root: its terminal exit takes it off |
+| A finished plan root still on the Active Agents board, `done-on-board` (§8) | **C** | A build-item run that would take it off may first cut a release, so it is never a repair; report §8's fix for the owner |
 | More than one DevStride MCP server connected (§3) | **C** | Doctor cannot know which organization is the right one, and removing the wrong server disconnects work elsewhere |
 | Not a git repository, no `origin`, `git`/`gh` not installed (§1) | **C** | Outside the repository, or the precondition for having one |
 

@@ -27,8 +27,8 @@ for what each version component means here and how a release is cut.
   plain `setup` run) now report whether an **Active Agents** board exists but is not adopted, or
   does not exist, as INFO with `/devstride:setup agents` as the fix; neither is a failure. With a
   block, doctor adds three checks: a `rootLevel` that names no level above the leaves (FAIL), a
-  finished plan still on the board (FAIL; the repair is `/devstride:build-item <root> --board-root
-  <root>`, whose exit takes it off), and the shared view (INFO only: none, more than one, or a starting column
+  finished plan still on the board (FAIL, reported only: move it back by hand, or run
+  `/devstride:build-item <root> --board-root <root>` yourself, whose exit takes it off), and the shared view (INFO only: none, more than one, or a starting column
   not shown).
 - **The starting view adds Pull Requests and is adopted before it is created.** `setup agents`
   now adopts an existing shared board table view named "Active Agents" or starting "Active

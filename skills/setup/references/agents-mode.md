@@ -21,8 +21,8 @@ commands: { start, end } }`. `rootLevel` is the level whose nearest item above a
 counts as its plan on the board. `commands.start` must contain `<root>`; `commands.end` may. Both
 are the repository's own commands; the plugin never writes or guesses them, and asks for them when the
 block has none. `boardId: null` means "not adopted yet": the build loop places no root until this
-mode sets it. **An absent or null block writes nothing and runs nothing, ever** — in the build loop
-and doctor. This mode is how a block comes to exist: with none, it asks for the two commands
+mode sets it. **An absent or null block writes nothing and runs no command, ever** — in the build
+loop and doctor; only §0's read-only board scan looks. This mode is how a block comes to exist: with none, it asks for the two commands
 first and writes nothing anywhere until they and the plan get the typed yes.
 
 ## 0. The scan — every full `/devstride:setup` run too

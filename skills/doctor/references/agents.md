@@ -31,9 +31,10 @@ load: contract
     group lacks the tag. Fix for these three: `/devstride:setup agents`.
   - `root-level` — `rootLevel` names no work type above the leaves (matched case-insensitively,
     so an organization's own spelling works when written that way). Fix: the block, by hand.
-  - `done-on-board` — a plan root on the board with nothing left to build: the numbers. Fix:
-    `/devstride:build-item <root> --board-root <root>` for each (its terminal exit takes that
-    finished root off, back to the board it came from) — a repair command, never run by doctor.
+  - `done-on-board` — a plan root on the board with nothing left to build: the numbers. Fix, by
+    the owner: move it back by hand, or run `/devstride:build-item <root> --board-root <root>`
+    (its terminal exit takes that root off, back to the board it came from, but the run may first
+    carry landed work on to its release). Report only: doctor never runs or offers that run.
   - `leaf-on-board` — leaf items (Stories, Defects) on the board: the count, then the first five
     numbers. `tag-on-done` — the tag on a Done item: the numbers. Fix: those items, by hand.
   - `tag-group` — a plan-root type with no tag group: INFO, skipped by setup.

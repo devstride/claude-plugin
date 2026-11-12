@@ -229,7 +229,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `consequenceNotices.categories[].id` | string | — | — | **Required.** lower-case words joined by hyphens, unique, never a default's id | 3.41.0 |
 | `consequenceNotices.categories[].title` | string | — | — | **Required.** the notice's heading for a finding, one line of at most 80 characters | 3.41.0 |
 | `consequenceNotices.categories[].means` | string | — | — | **Required.** what counts, in plain words; the agent judges the diff against it | 3.41.0 |
-| `activeAgents` | object, null | — | — | the Active Agents board, tag and the repository's presence commands; absent or null means the plugin writes nothing to DevStride for this feature and runs nothing | 3.25.0 |
+| `activeAgents` | object, null | — | — | the Active Agents board, tag and the repository's presence commands; absent or null means the plugin writes nothing to DevStride for this feature and runs no command (doctor and setup still look for the board, read-only) | 3.25.0 |
 | `activeAgents.boardId` | string, null | — | `null` | the board plan roots are placed on; null until /devstride:setup agents adopts or creates it, and build-item places no root meanwhile | 3.25.0 |
 | `activeAgents.tagName` | string | — | agent active | the tag that marks a root an agent is working under, allowed on every plan-root type | 3.25.0 |
 | `activeAgents.tagColor` | string | gray-medium-dark, red, pink, orange, yellow, lime, green, teal, blue, blue-medium, purple | green | the tag's colour | 3.25.0 |

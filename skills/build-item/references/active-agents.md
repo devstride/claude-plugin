@@ -28,7 +28,7 @@ At **each** item picked up (every iteration, a given item number too), after ste
 - **Place** (`boardId` set): `get_item` the root; Done or already on that board → no write. Else
   `add_comment` with the `{ html }` of `comment placed --board <its old board id> --label <its
   label>` (bare `comment placed` from no board), the reversal record, written BEFORE the move;
-  then `move_to_board` it to `boardId`. A root taken off by hand comes back at the next pickup.
+  then `move_to_board` it to `boardId`. A failed comment → no move. A root taken off by hand comes back at the next pickup.
   Only a resolved root is ever placed — never a leaf (a Story or Defect). `boardId` null → nothing placed; commands run.
 - **`start` once per root per run**, after its first placement check. A pickup resolving another
   root (or `ROOT NONE`) runs `end` for the old one first.
@@ -41,7 +41,7 @@ pickup: the root `resolve-root` gives with the plan root as the item):
 
 1. `remaining` — its value leaves by step 7's count: `hierarchyRoles.leaf` descendants neither
    Done nor landed; the deferred container counts in neither.
-2. `get_item` it (on `boardId`?); `came-from` on `list_comments` (html, `dateAdded`); `get_board`
+2. `get_item` it (on `boardId`?); `came-from` on `list_comments` (every page; html, `dateAdded`); `get_board`
    the board that names (exists, archived).
 3. `settle`: `KEEP` → nothing; `MOVE <id>` → `move_to_board` there; `OFF` → `update_item` with
    `boardId: null`. After either, `add_comment` with `comment removed` (`--board <id> --label

@@ -14,8 +14,8 @@ delivery skills — **invoke them by name; never re-spell what they do.**
 
 Argument — an item number, or `next`/empty for the next unblocked item; `next under I20100`, or
 **`I20100` alone, means "the next unblocked item under this root"** — a bare plan root (any grouping
-level) is a SCOPE, never a story to build. An item outside a sequenced plan is auto-detected as a
-one-off: $ARGUMENTS
+level) is a SCOPE, never a story to build. `--board-root I<n>` is set aside first (Active Agents).
+An item outside a sequenced plan is auto-detected as a one-off: $ARGUMENTS
 
 ## Hard floors — no profile, override or shortcut removes these
 
@@ -159,8 +159,7 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   another value → STOP.
 - **Active Agents** (`activeAgents` set, plan mode only): at EVERY pickup, after each merge and at
   every terminal exit (step 0's, step 7's, a STOP — before it exits), apply
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`; `--board-root I<n>` in
-  the argument names the board root. Never asks; fails open.
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`. Never asks; fails open.
 - A given story number IS the story; merged or Done → never step 1 (`next-unblocked.md`).
   Otherwise apply `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full
   (projection warning too). **Never auto-select from the deferred container.** Surface the
