@@ -25,8 +25,11 @@ request ready first would let a pre-ship fix reach production past no reviewer.
 Scope `merge-and-deploy` runs these checks before the tower claim, at the commit the release
 branch is cut from, and still tests what merges: a merge into production is a function of the
 head's tree and production's tip, so the check stamp (`release_checks.py`) holding both unchanged
-at every claim and just before the merge means the tested tree IS the merged tree. Either moving
-runs the checks again.
+at every claim and just before the merge, with production's tip contained in the head, means the
+tested tree IS the merged tree (an unchanged pair alone is not enough: a tip the head does not
+contain would add commits nobody tested, so `verify` says `BEHIND`). The stamp's baseline is the tip
+read BEFORE the checks ran, so a merge that lands during them is a change too. Any of these runs
+the checks again.
 
 ## Why `<sourceHead>` and `<reviewedHead>` are immutable SHAs
 

@@ -18,11 +18,13 @@ echo a > a; git add -A; git commit -qm base; git remote add origin "$WORK/origin
 git checkout -q -b release/26-10-18; echo b > b; git add b; git commit -qm work; HEAD1="$(git rev-parse HEAD)"
 run() { OUT="$(python3 "$RC_PY" "$@" 2>&1)"; RC=$?; }
 
-# (1) stamp names head, tree, production tip, class and time; verify on the same state is UNCHANGED
-run stamp --head "$HEAD1" --class light; S="$OUT"
-T1="$(git rev-parse "$HEAD1^{tree}")"; M1="$(git rev-parse origin/main)"
+# (1) tip reads the production tip before the checks; stamp names head, tree, that tip, class and
+#     time; verify on the same state is UNCHANGED
+run tip; TIP="$OUT"; M1="$(git rev-parse origin/main)"
+run stamp --head "$HEAD1" --class light --master "$M1"; S="$OUT"
+T1="$(git rev-parse "$HEAD1^{tree}")"
 run verify --stamp "$S" --head "$HEAD1"
-if [ "$S" = "CHECKS STAMP head $HEAD1 tree $T1 master $M1 class LIGHT at 2026-10-18T10:05:00Z" ] && [ "$RC" -eq 0 ] && [ "$OUT" = "UNCHANGED head $HEAD1 tree $T1 master $M1" ]; then
+if [ "$TIP" = "PRODUCTION TIP $M1" ] && [ "$S" = "CHECKS STAMP head $HEAD1 tree $T1 master $M1 class LIGHT at 2026-10-18T10:05:00Z" ] && [ "$RC" -eq 0 ] && [ "$OUT" = "UNCHANGED head $HEAD1 tree $T1 master $M1" ]; then
   ok "(1) stamp → CHECKS STAMP head/tree/master/class/at; verify unchanged → UNCHANGED, exit 0"
 else bad "(1) s=$S rc=$RC out=$OUT"; fi
 
@@ -40,7 +42,7 @@ run verify --stamp "$S" --head "$HEAD1"
 if [ "$RC" -eq 3 ] && [ "$OUT" = "CHANGED master ${M1:0:12}..$(git rev-parse origin/main | cut -c1-12)" ]; then ok "(4) production advanced → CHANGED master, exit 3"; else bad "(4) rc=$RC: $OUT"; fi
 
 # (5) production merged into the release branch: the checks must re-run against the new tip
-git reset -q --hard "$HEAD1"; git merge -q --no-edit origin/main; run stamp --head HEAD --class FULL; S2="$OUT"
+git reset -q --hard "$HEAD1"; git merge -q --no-edit origin/main; run stamp --head HEAD --class FULL --master "$(git rev-parse origin/main)"; S2="$OUT"
 git checkout -q main; git merge -q --ff-only release/26-10-18; git push -q origin main; git checkout -q release/26-10-18
 run verify --stamp "$S2" --head HEAD
 if [ "$RC" -eq 3 ] && printf '%s' "$OUT" | grep -q '^CHANGED master' && ! printf '%s' "$OUT" | grep -q 'CHANGED tree'; then
@@ -49,12 +51,33 @@ else bad "(5) rc=$RC: $OUT"; fi
 
 # (6) a stamp that cannot be parsed, a bad class, or an unknown head is an ERROR (exit 1), never UNCHANGED
 run verify --stamp "CHECKS STAMP head nope" --head HEAD; A="$RC:$OUT"
-run stamp --head HEAD --class MEDIUM; B="$RC:$OUT"
+run stamp --head HEAD --class MEDIUM --master "$M1"; B="$RC:$OUT"
 run verify --stamp "$S" --head 0000000000000000000000000000000000000000; C="$RC:$OUT"
 run verify --head HEAD; D="$RC:$OUT"
 if [ "${A%%:*}" -eq 1 ] && printf '%s' "$A" | grep -q '^1:ERROR the stamp cannot be parsed' && [ "${B%%:*}" -eq 1 ] && [ "${C%%:*}" -eq 1 ] && [ "${D%%:*}" -eq 1 ] \
    && ! printf '%s%s%s%s' "$A" "$B" "$C" "$D" | grep -q UNCHANGED; then
   ok "(6) an unparsable stamp, a bad class, an unknown head or a missing stamp → ERROR, exit 1"
 else bad "(6) a=$A b=$B c=$C d=$D"; fi
+
+# (7) production moved while the checks ran (between tip and stamp) → stamp says CHANGED master,
+#     exit 3, and prints no stamp: the checks run again; stamp without --master is an ERROR
+git checkout -q -b r7 "$HEAD1"; BEGAN="$(git rev-parse origin/main)"
+git checkout -q main; echo m7 > m7; git add m7; git commit -qm "release ahead merged"; git push -q origin main; git checkout -q r7
+git merge -q --no-edit "$BEGAN" 2>/dev/null
+run stamp --head HEAD --class FULL --master "$BEGAN"; A="$RC:$OUT"; run stamp --head HEAD --class FULL; B="$RC:$OUT"
+if [ "${A%%:*}" -eq 3 ] && printf '%s' "$A" | grep -q "^3:CHANGED master ${BEGAN:0:12}\.\." && ! printf '%s' "$A" | grep -q 'CHECKS STAMP' \
+   && [ "${B%%:*}" -eq 1 ] && printf '%s' "$B" | grep -q '^1:ERROR usage'; then
+  ok "(7) production moved between tip and stamp → CHANGED master (exit 3), no stamp; no --master → ERROR"
+else bad "(7) a=$A b=$B"; fi
+
+# (8) an unchanged pair whose production tip the head does not contain (a hotfix not yet in the
+#     release source) is BEHIND, exit 3: merging would combine the release with untested commits
+git checkout -q -b r8 "$HEAD1"; NOW_TIP="$(git rev-parse origin/main)"
+run stamp --head HEAD --class LIGHT --master "$NOW_TIP"; S8="$OUT"; run verify --stamp "$S8" --head HEAD; A="$RC:$OUT"
+git merge -q --no-edit origin/main; run stamp --head HEAD --class LIGHT --master "$NOW_TIP"; S9="$OUT"; run verify --stamp "$S9" --head HEAD; B="$RC:$OUT"
+if printf '%s' "$S8" | grep -q '^CHECKS STAMP' && [ "${A%%:*}" -eq 3 ] && printf '%s' "$A" | grep -q "^3:BEHIND master ${NOW_TIP:0:12} " \
+   && [ "${B%%:*}" -eq 0 ] && printf '%s' "$B" | grep -q '^0:UNCHANGED'; then
+  ok "(8) a stamped production tip the head does not contain → BEHIND (exit 3); merged in and checked again → UNCHANGED"
+else bad "(8) s8=$S8 a=$A b=$B"; fi
 
 exit $FAIL

@@ -38,6 +38,16 @@ if printf '%s' "$A" | grep -q '^2:WAIT status unreadable (the store could not be
   ok "(5) UNKNOWN, not derived, or unparsable status → WAIT, never CLEAR"
 else bad "(5) a=$A b=$B c=$C"; fi
 
+# (7) waited staleMinutes behind another release pull request → ASK once (exit 3), naming it; under
+#     the threshold, or with no other pull request open, it is WAIT or CLEAR as before
+st '{"state": "clear", "derived": true, "onFinal": {"number": 41, "head": "release/26-10-18"}, "waiting": []}'
+run check --own-pr 44 --waited-minutes 19; A="$RC:$OUT"; run check --own-pr 44 --waited-minutes 20; B="$RC:$OUT"
+run check --own-pr 41 --waited-minutes 90; C="$RC:$OUT"; run check --waited-minutes soon; D="$RC:$OUT"
+if printf '%s' "$A" | grep -q '^2:WAIT #41 ' && printf '%s' "$B" | grep -q '^3:ASK #41 release/26-10-18 (this release has waited 20 min behind it' \
+   && printf '%s' "$C" | grep -q '^0:CLEAR' && printf '%s' "$D" | grep -q '^1:ERROR --waited-minutes'; then
+  ok "(7) --waited-minutes ≥ staleMinutes (default 20) behind another pull request → ASK (exit 3); below it WAIT; our own → CLEAR; a bad value → ERROR"
+else bad "(7) a=$A b=$B c=$C d=$D"; fi
+
 printf '{"release": {}}' > .claude/ds-config.json; run check; A="$RC:$OUT"; run check --own-pr x; B="$RC:$OUT"
 if [ "${A%%:*}" -eq 1 ] && printf '%s' "$A" | grep -q '^1:ERROR release.clearance is not set' && [ "${B%%:*}" -eq 1 ]; then
   ok "(6) no release.clearance or a bad --own-pr → ERROR, exit 1"

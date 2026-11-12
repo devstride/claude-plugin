@@ -7,11 +7,21 @@ request still open, waiting for the owner or the previous release's post-deploy 
 the tower free when it claims again, and releases merge oldest first, one at a time
 (references/clearance.md, § Scope `merge-and-deploy`).
 
-  check [--own-pr <n>]
+  check [--own-pr <n>] [--waited-minutes <m>]
       CLEAR (<why>)                       no release pull request but <n> is open        exit 0
       WAIT #<n> <head> (<why>)            another release pull request is open           exit 2
+      ASK #<n> <head> (<why>)             the same, and this release has waited at least exit 3
+                                          staleMinutes behind it (`--waited-minutes`)
       WAIT status unreadable (<why>)      unknown, not derived, or no provider           exit 2
       ERROR <why>                         a config error                                 exit 1
+
+ASK exists because a release that stepped aside holds nothing that heartbeats: if its session ended
+while it waited for the owner, nothing would ever say so, and every later release would wait the
+whole of `waitMinutes` (default 180) before it could even ask. So once a release has waited
+`release.clearance.staleMinutes` (default 20) behind another release pull request, the queue says
+ASK once: the caller tells the owner which pull request it waits behind (it may only be waiting for
+their go-ahead, or its session may have stopped) and keeps waiting; it adopts that release only on
+the owner's yes and their word that its session stopped.
 
 It reads the clearance provider's `status --json` (`release.clearance.commands.status`, or the
 built-in `provider`), whose `onFinal` and `waiting` list only release heads (a hotfix pull request is
@@ -61,6 +71,13 @@ def check(args):
             print("ERROR --own-pr needs a pull request number")
             return 1
         own = int(args[i + 1].lstrip("#"))
+    waited = None
+    if "--waited-minutes" in args:
+        i = args.index("--waited-minutes")
+        if i + 1 >= len(args) or not args[i + 1].isdigit():
+            print("ERROR --waited-minutes needs a whole number of minutes")
+            return 1
+        waited = int(args[i + 1])
     try:
         config, root = load_config()
     except (OSError, ValueError) as error:
@@ -100,6 +117,13 @@ def check(args):
         number = pr.get("number")
         if number is None or (own is not None and int(number) == own):
             continue
+        stale = block.get("staleMinutes")
+        stale = stale if isinstance(stale, int) and not isinstance(stale, bool) and stale > 0 else 20
+        if waited is not None and waited >= stale:
+            print("ASK #%s %s (this release has waited %d min behind it, outside the tower; it may be waiting for the "
+                  "owner's go-ahead, or its session may have stopped: tell the owner once, keep waiting, and adopt it "
+                  "only on their yes and their word that its session stopped)" % (number, pr.get("head") or "?", waited))
+            return 3
         print("WAIT #%s %s (another release pull request is open into production; it merges first)" % (number, pr.get("head") or "?"))
         return 2
     print("CLEAR (%s)" % ("only this release's pull request #%d is open" % own if own is not None and queue else "no other release pull request is open"))
@@ -108,7 +132,7 @@ def check(args):
 
 def main(argv):
     if not argv or argv[0] != "check":
-        print("usage: tower-queue.py check [--own-pr <n>]")
+        print("usage: tower-queue.py check [--own-pr <n>] [--waited-minutes <m>]")
         return 2 if argv else 1
     return check(argv[1:])
 

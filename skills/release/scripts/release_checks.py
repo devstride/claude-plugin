@@ -8,13 +8,25 @@ its tree, the production tip at that moment, and the release class. Every later 
 moment before the merge verify it: a tested tree is the merged tree only while both the head's
 tree and the production tip are unchanged (the merge result is a function of the two).
 
-  stamp --head <sha> --class <LIGHT|FULL>
+  tip
+      PRODUCTION TIP <m>                                                           exit 0
+  stamp --head <sha> --class <LIGHT|FULL> --master <m>
       CHECKS STAMP head <h> tree <t> master <m> class <c> at <iso>                 exit 0
+      CHANGED master <m>..<now>  (production moved while the checks ran)          exit 3
   verify --stamp '<stamp line>' --head <sha>
       UNCHANGED head <h> tree <t> master <m>                                       exit 0
       CHANGED tree <old>..<new> | CHANGED master <old>..<new> (both when both)     exit 3
+      BEHIND master <m> (production holds commits the head does not)              exit 3
   Any error (a stamp that cannot be parsed, an unknown commit, a failed fetch)  → ERROR <why>, exit 1;
   never UNCHANGED.
+
+`tip` runs FIRST, before the checks, and `stamp --master` takes its sha: the stamp's baseline is the
+production tip the checks STARTED against, so a merge that lands while they run (the release ahead
+merging during a long dev-deploy wait) is CHANGED, never silently adopted as the baseline.
+UNCHANGED also needs the production tip to be contained in the head: an unchanged pair proves the
+merged tree is the tested tree only when merging adds nothing from production. A tip the head does
+not contain (a hotfix, or the release ahead's own fix commits, not yet in the release source) is
+BEHIND: merge production into the release branch (release-branch.md §4) and run the checks again.
 
 `master` in the line is the production branch's tip (`release.productionBranch`, default master),
 read from origin after a fetch. Git only; no gh, no network beyond `git fetch origin`. Test seam:
@@ -80,11 +92,22 @@ def option(args, name):
     return None
 
 
+def cmd_tip(_args):
+    production = production_branch()
+    if os.environ.get("RELEASE_CHECKS_NO_FETCH") != "1":
+        git("fetch", "-q", "origin", "+refs/heads/%s:refs/remotes/origin/%s" % (production, production))
+    print("PRODUCTION TIP %s" % git("rev-parse", "--verify", "refs/remotes/origin/%s^{commit}" % production))
+    return 0
+
+
 def cmd_stamp(args):
-    head, klass = option(args, "--head"), (option(args, "--class") or "").upper()
-    if not head or klass not in ("LIGHT", "FULL"):
-        raise Error("usage: release_checks.py stamp --head <sha> --class <LIGHT|FULL>")
+    head, klass, began = option(args, "--head"), (option(args, "--class") or "").upper(), option(args, "--master")
+    if not head or klass not in ("LIGHT", "FULL") or not began or not re.match("^%s$" % SHA, began):
+        raise Error("usage: release_checks.py stamp --head <sha> --class <LIGHT|FULL> --master <the PRODUCTION TIP sha read before the checks>")
     commit, tree, tip = facts(head)
+    if tip != began:
+        print("CHANGED master %s..%s (production moved while the checks ran: run them again)" % (began[:12], tip[:12]))
+        return 3
     at = os.environ.get("RELEASE_CHECKS_NOW") or datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     print("CHECKS STAMP head %s tree %s master %s class %s at %s" % (commit, tree, tip, klass, at))
     return 0
@@ -107,14 +130,20 @@ def cmd_verify(args):
     if changed:
         print("\n".join(changed))
         return 3
+    contained = subprocess.run(["git", "merge-base", "--is-ancestor", tip, commit], capture_output=True, text=True)
+    if contained.returncode not in (0, 1):
+        raise Error("git merge-base --is-ancestor failed: %s" % (contained.stderr or "").strip()[:200])
+    if contained.returncode == 1:
+        print("BEHIND master %s (production holds commits %s does not: merge it in, then run the checks again)" % (tip[:12], commit[:12]))
+        return 3
     print("UNCHANGED head %s tree %s master %s" % (commit, tree, tip))
     return 0
 
 
 def main(argv):
-    commands = {"stamp": cmd_stamp, "verify": cmd_verify}
+    commands = {"tip": cmd_tip, "stamp": cmd_stamp, "verify": cmd_verify}
     if not argv or argv[0] not in commands:
-        print("usage: release_checks.py stamp --head <sha> --class <LIGHT|FULL> | verify --stamp '<line>' --head <sha>")
+        print("usage: release_checks.py tip | stamp --head <sha> --class <LIGHT|FULL> --master <sha> | verify --stamp '<line>' --head <sha>")
         return 2
     try:
         return commands[argv[0]](argv[1:])

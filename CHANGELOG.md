@@ -34,23 +34,49 @@ for what each version component means here and how a release is cut.
   was never retried. With `release.autoStart.enabled`, the build loop now runs the start check
   after every story it lands and when its loop begins, so the next train starts soon after the
   releasing session hands the train claim on at its cut.
+- **A release that levels the train after its deploy starts the next one itself.** With
+  `release.autoStart.enabled`, the release that wins the train claim to level the train after its
+  deploy runs the start check there (trigger 5 in `auto-start.md`); on `START` it keeps the claim,
+  hands the tower back, runs its own post-deploy check and then starts the next release, instead of
+  handing the claim on and waiting for another session to notice.
+- **`tower-queue.py --waited-minutes <m>`.** A release that stepped aside and has waited at the
+  head of the queue past `release.clearance.staleMinutes` gets `ASK` (exit 3): tell the owner once
+  and keep polling. It never adopts on its own.
 
 ### Changed
+
+- **Under `merge-and-deploy` every claim after the cut names the release** (`clearance claim
+  --branch <b> --pr <n>`, written on a new record and on a renewal), so a re-claim never reads as a
+  release with no pull request.
+- **The check stamp reads production first.** `release_checks.py tip` prints the production tip
+  before the checks run and `stamp` now requires `--master <sha>`, printing `CHANGED master` (exit
+  3) when production moved while the checks ran. `verify` prints `BEHIND master <tip>` (exit 3)
+  when production is not contained in the release head.
+- **After a re-claim the previous-release gate is read once more** before the merge, after the
+  final heartbeat: a pending status steps aside again, a failure stops (an override only in the
+  owner's words on the pull request), and still pending after 45 minutes stops naming the release
+  and `release post-deploy only`.
+- **A pre-ship hold under `merge-and-deploy`** is discharged at the final check when the settled
+  tree is the stamped one, and otherwise steps aside, re-stamps, queues and claims before it resumes.
+- **The backstop under `cut-to-deploy` and `merge-and-deploy`** no longer counts an open release
+  pull request or a held tower as a release in flight: the train claim alone decides.
+- Every later check round of a release reports against the cut head (`RELEASE_COMMIT` stays the
+  first round's `<sourceHead>`).
 
 - The post-deploy status, the previous-release gate and release holds treat `merge-and-deploy`
   exactly like `cut-to-deploy`.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.58.0 @ caf03b3, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.58.0 @ 68e2283, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.58.0 | tokens@devstride--v3.58.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
 | skills/plan/SKILL.md | 24,592 | 8,198 | 24,592 | 8,198 | +0 | 8,198 |
 | skills/doctor/SKILL.md | 23,998 | 8,000 | 23,998 | 8,000 | +0 | 8,000 |
+| skills/build-item/SKILL.md | 23,991 | 7,997 | 23,990 | 7,997 | +0 | 7,999 |
 | skills/review/SKILL.md | 23,971 | 7,991 | 23,971 | 7,991 | +0 | 7,999 |
-| skills/build-item/SKILL.md | 23,991 | 7,997 | 23,963 | 7,988 | -9 | 7,999 |
-| skills/release/SKILL.md | 18,139 | 6,047 | 18,406 | 6,136 | +89 | 6,136 |
+| skills/release/SKILL.md | 18,139 | 6,047 | 18,477 | 6,159 | +112 | 6,159 |
 | skills/rebalance/SKILL.md | 17,850 | 5,950 | 17,850 | 5,950 | +0 | 5,950 |
 | skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
 | skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
@@ -76,7 +102,7 @@ for what each version component means here and how a release is cut.
 | skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
-| **total (bodies)** | 271,721 | 90,581 | 272,010 | 90,678 | +97 | |
+| **total (bodies)** | 271,721 | 90,581 | 272,108 | 90,710 | +129 | |
 
 ## [3.58.0] — 2026-11-12
 

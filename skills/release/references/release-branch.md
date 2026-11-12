@@ -267,10 +267,21 @@ hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
    `claims` block and the train claim already handed on, it pushes the train only under that claim
    again: one claim, no wait, decided in mode `select` however the release started (the one
    exception to `auto-start.md`'s train-then-tower order, safe because it never waits); won →
-   level, then release it `handed-on`; `takeover` (its holder lapsed) → ONE immediate takeover
+   level, then, with `release.autoStart.enabled`, `auto-start.py check` (`auto-start.md`'s
+   trigger 5): `START` → KEEP the claim and start the next release from here (below); anything
+   else → release it `handed-on`. `takeover` (its holder lapsed) → ONE immediate takeover
    claim with that digest, decided the same way, never a third; held by a live session → SKIP the
    leveling, said so (that holder re-levels once it holds the tower, `clearance.md`); a final
    claim, `stop` or `degrade` → STOP. Never a push beside a live holder.
+   **Starting the next release from the leveling** (a won claim and `START`): hand clearance back
+   (step 4), run the first owed item (`post-deploy-check` under scopes `cut-to-deploy` and
+   `merge-and-deploy`: the next release's merge waits on it anyway), heartbeating the train claim
+   through it, then invoke **`release`** in this session declaring `started-by: auto`; its step 0
+   refreshes the train claim this session already holds. This release's other owed items (`docs`,
+   `close-out`, `release-notes`) run when that release first waits for the owner (its step 4) or
+   stops, whichever comes first, settled by `owed --done` as always; its own step 6 runs then too,
+   without trigger 3 (the next release is already running). A failed post-deploy check STOPs as
+   it always does, and the train claim is then released `handed-on`.
 4. **Hand clearance back** (`release.clearance` set): the provider's `release --owed <item>` for
    each later step still to run (`post-deploy-check` under scopes `cut-to-deploy` and `merge-and-deploy`, then `docs`,
    `close-out`, `release-notes` — only those that will run),

@@ -54,7 +54,12 @@ script and then the claim calls below. A run that does not START does nothing mo
   `status --json` reads `clear`, `derived`, with no release pull request on final. Held (stale
   included: the owner settles a stale release), unreadable, a failed or truncated list, an origin
   with no host to read, or a status not derived → SKIP. A release holding the train claim is found
-  by claiming it (below): `claim_work` decides, a listing never does.
+  by claiming it (below): `claim_work` decides, a listing never does. **Under
+  `release.clearance.scope` `cut-to-deploy` or `merge-and-deploy` neither the pull-request list
+  nor the provider's status is read**: a release there holds the tower only from its cut and hands
+  the train claim on at the cut, so an open release pull request or a held tower is a release that
+  has already left this waiting work behind. The train claim alone decides, and the `--json`
+  record's `releasePullRequests` and `clearance` say "not read".
 - **Holds** are `release-holds.md`'s, decided by `release-holds.py` after fetching
   `origin/<productionBranch>`, over every item the release itself would check: the commits on the
   train or the source that are not on production. A line it cannot parse holds.

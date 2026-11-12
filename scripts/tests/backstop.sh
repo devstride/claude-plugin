@@ -213,6 +213,24 @@ expect "(19) in progress is decided before any item is asked for: SKIP, never HO
 prs '[]'
 conf shadow
 
+# --- a gated scope: the train claim alone decides -----------------------------------------------
+for scope in cut-to-deploy merge-and-deploy; do
+  cfg "{\"baseBranch\": \"develop\", \"claims\": {\"provider\": \"devstride\"}, \"releaseTrain\": {\"branch\": \"train/release\"},
+        \"release\": {\"productionBranch\": \"master\", \"releaseSource\": \"develop\", \"mergeTrainBeforeCut\": true,
+                      \"releaseBranchPattern\": \"release/<YY-MM-DD>[-n]\",
+                      \"clearance\": {\"scope\": \"$scope\", \"commands\": {\"claim\": \"x\", \"status\": \"bash $WORK/tower-status.sh\", \"heartbeat\": \"x\", \"release\": \"x\", \"adopt\": \"x\"}},
+                      \"backstop\": {\"mode\": \"shadow\"}}}"
+  tower '{"state": "held", "stale": false, "derived": true, "record": {"branch": "release/26-11-09", "machine": "m1", "phase": "deploy"}, "onFinal": {"number": 41, "head": "release/26-11-09"}}'
+  prs '[{"number": 41, "headRefName": "release/26-11-09"}]'
+  rm -f "$WORK/gh-calls"
+  expect "(19g $scope) a held tower and an open release pull request are not read: the train claim decides → SHADOW" 10 '^SHADOW ' due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json"
+  out="$(run due --now 2026-11-09T10:01:00Z --holds "$WORK/clear.json" --json)"
+  printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["clearance"].startswith("not read: under release.clearance.scope") and d["releasePullRequests"] == d["clearance"], d' \
+    && ! grep -q 'pr list' "$WORK/gh-calls" 2>/dev/null && ok "(19h $scope) the record says why neither was read; no pull request list was asked for" || bad "(19h $scope) $out"
+done
+tower "$CLEAR_TOWER"; prs '[]'
+conf shadow
+
 # --- shadow changes nothing ------------------------------------------------------------------------
 snapshot() { (cd "$WORK/repo" && git for-each-ref --format='%(refname) %(objectname)' && git status --porcelain && find .claude -type f | sort; \
               git -C "$WORK/origin.git" for-each-ref --format='%(refname) %(objectname)'); }

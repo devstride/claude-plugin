@@ -190,6 +190,19 @@ if [ "$A" -eq 1 ] && [ "$B" -eq 1 ] && [ "$KEPT" = 1 ] && [ "${C%%:*}" -eq 0 ] \
   ok "(11s) release --step-aside → ref deleted, (stepped aside), nothing owed; refuses --owed/--force; the next claim wins, the original is BUSY and NOT HOLDER"
 else bad "(11s) a=$A b=$B kept=$KEPT c=$C gone=$GONE d=$D e=$E f=$F"; fi
 
+# (11t) a re-claim after a step-aside names the pull request in the claim itself (--branch, --pr),
+#       so when its session dies after the merge the next claim is STALE … never closed out
+#       (exit 3: adopt on the owner's yes), never a silent takeover of "a pull request never opened"
+fresh reclaim; run claim; run heartbeat pr --branch release/26-10-18 --pr 3990; run release --step-aside
+run claim --branch release/26-10-18 --pr 3990; A="$RC:$OUT"; P1="$(record pr):$(record branch)"
+run heartbeat merging; P2="$(record pr)"; run claim --pr x; X="$RC"
+printf '[{"number":3990,"headRefName":"release/26-10-18","state":"MERGED","mergedAt":"2026-10-18T10:10:00Z"}]' > "$STATE/prs.json"
+CLAUDE_CODE_SESSION_ID=me-2 CLEARANCE_NOW=2026-10-18T10:40:00Z CLEARANCE_RECORD="$WORK/reclaim.record2.json" run claim; B="$RC:$OUT"
+if printf '%s' "$A" | grep -q '^0:CLEARED' && [ "$P1" = "3990:release/26-10-18" ] && [ "$P2" = 3990 ] && [ "$X" -eq 1 ] \
+   && [ "${B%%:*}" -eq 3 ] && printf '%s' "$B" | grep -q 'pull request #3990 merged but the release was never closed out — adopt or wait'; then
+  ok "(11t) claim --branch --pr after a step-aside records the pull request at once; stale after its merge → STALE … never closed out (exit 3); a bad --pr is exit 1"
+else bad "(11t) a=$A p1=$P1 p2=$P2 x=$X b=$B"; fi
+
 # (12) release on a clear ref is a no-op that still clears a leftover local record
 fresh rel3; printf '{"repo":"o/r","holder":"claude:me-1"}' > "$CLEARANCE_RECORD"
 run release

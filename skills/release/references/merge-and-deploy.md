@@ -38,9 +38,11 @@ In this order, after the yes and before the merge:
 
 1. **Scope `cut-to-deploy`**: the previous-release gate again
    (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`, § Scope `cut-to-deploy`).
-   **Scope `merge-and-deploy`** instead: re-claim if this release stepped aside, then `heartbeat
-   final`, the stamp verify, the pre-merge check, every `rerunAtMerge` entry and the standing yes
-   again, in that order (§ Scope `merge-and-deploy`); 0p already ran the dev deploy wait.
+   **Scope `merge-and-deploy`** instead: re-claim if this release stepped aside (`--branch
+   --pr`), then `heartbeat final`, the previous-release gate once more (one read; pending steps
+   aside again, a failure STOPs, and no yes lifts either), the stamp verify, the pre-merge check,
+   every `rerunAtMerge` entry and the standing yes again, in that order (§ Scope
+   `merge-and-deploy`); 0p already ran the dev deploy wait.
 2. **The dev deploy wait**, when it applies (a standing yes ran it before the decision instead).
 
 Then confirm:

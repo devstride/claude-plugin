@@ -66,14 +66,23 @@ Honoured only with a `claims` block (doctor: an ERROR; at run time it does nothi
 4. `build-item`, at every clean story boundary (step 7's sync, after ANY story lands, epic stories
    included) and when its loop starts. A trigger lost to a live holder is never retried by itself,
    and the release that holds the claim hands it on at its cut so the next train phase can run
-   during the deploy; this is the look that notices the hand-on.
+   during the deploy; this is the look that notices the hand-on;
+5. `release`, at step 5b's train leveling after its deploy (`release-branch.md` §5 step 3), which
+   holds the train claim at that moment: work that landed while this release ran lost its own
+   trigger to this release's claim, so the leveling looks for it. `START` → this session keeps the
+   claim and starts the next release once its tower is handed back and its post-deploy check has
+   run, instead of handing the claim on to a session that may never come (`release-branch.md`).
+
+A repository's own landing command may run `check` itself after a landing on the train and print
+the instruction to release now (trigger 1's look, made where the landing happens): the caller
+then follows this section from `START`, claiming the train claim first like any trigger.
 
 At a trigger run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/auto-start.py check`
 (it fetches the train and the release source; a renamed train is an `ERROR` naming the cutover). `SKIP <reason>` → carry on, saying nothing;
 `ERROR` → say it once and carry on. `START …` → claim the train (above, mode `select`): lost → carry on
 silently; won → invoke **`release`** in this session, declaring `started-by: auto`; its step 0b
 finds and adopts any open train pull request itself. When that release stops — at the owner's yes,
-or merged — return to the caller's own loop. The caller keeps its checkout lease until then and
+or merged — return to the caller's own loop (trigger 5: to the releasing session's owed items). The caller keeps its checkout lease until then and
 the release runs in that checkout; it is returned only after (a pool member handed back mid-release
 could be leased by another session while the release still uses it). Never resume, message or adopt another session's
 release; the fleet's hourly machine check never starts one. No batching wait: each release carries

@@ -1030,6 +1030,14 @@ def cmd_claim(args):
     wait = "--wait" in args
     stop_on_stuck = wait and "--ignore-stuck" not in args
     purpose = option(args, "--purpose") or "release"
+    # --branch/--pr: a claim made after the cut (a re-claim under scope merge-and-deploy) names the
+    # release branch and pull request in the SAME write that creates the record, so a session that
+    # dies under it is judged by its pull request (STALE, adopt only on the owner's yes), never
+    # taken over as "pull request never opened".
+    claim_branch = option(args, "--branch")
+    claim_pr = option(args, "--pr")
+    if claim_pr is not None and not str(claim_pr).lstrip("#").strip().isdigit():
+        fail("--pr needs a pull request number", 1)
     me, print_token = whoami()
     if print_token:
         progress("holder token %s — export it as CLEARANCE_HOLDER_TOKEN for heartbeat and release" % me)
@@ -1066,7 +1074,8 @@ def cmd_claim(args):
                     return 3
             record = {
                 "v": RECORD_VERSION, "repo": repo(), "holder": STORE.rid(me), "user": user, "machine": claim_record.machine_name(),
-                "purpose": purpose, "phase": "claimed", "branch": None, "pr": None,
+                "purpose": purpose, "phase": "claimed", "branch": claim_branch or None,
+                "pr": pr_number(claim_pr) if claim_pr else None,
                 "takenAt": iso(at), "heartbeatAt": iso(at), "phaseStartedAt": iso(at),
             }
             stamp_session(record)
@@ -1090,6 +1099,10 @@ def cmd_claim(args):
             return 0
         if STORE.holds(current, me):
             stamp_session(current)
+            if claim_branch:
+                current["branch"] = claim_branch
+            if claim_pr:
+                current["pr"] = pr_number(claim_pr)
             rejected = renew(current, me, at)
             if rejected is not None:
                 stuck = lost_race(rejected, current["_version"], stuck)
@@ -1442,7 +1455,7 @@ def main(argv):
     provider, argv = argv[0], argv[1:]
     script = "clearance-%s.sh" % provider
     if not argv or argv[0] in ("-h", "--help"):
-        print("usage: %s <claim [--wait [--ignore-stuck]] [--purpose t] | status [--short] [--json] | "
+        print("usage: %s <claim [--wait [--ignore-stuck]] [--purpose t] [--branch b] [--pr n] | status [--short] [--json] | "
               "heartbeat <phase> [--branch b] [--pr n] | release [--force] [--owed item]... [--step-aside] | "
               "adopt --yes [--original-stopped] | owed [--done item]... [--clear] [--release name] [--pr n] | identity>" % script)
         return 0 if argv else 1

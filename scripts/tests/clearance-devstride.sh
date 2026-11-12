@@ -211,6 +211,19 @@ wait "$TAKER1"; OUT1="$(cat "$WORK/aside1.out" "$WORK/aside2.out")"; printf '%s\
 WINS="$(printf '%s\n' "$OUT1" | grep -c '^CLEARED')"; BUSY="$(printf '%s\n' "$OUT1" | grep -c '^BUSY')"
 if [ "$WINS" -eq 1 ] && [ "$BUSY" -eq 1 ]; then ok "(3f) two concurrent claims after a step-aside → exactly one CLEARED"; else bad "(3f) wins=$WINS busy=$BUSY: $OUT1"; fi
 
+# (3g) a re-claim after a step-aside names the pull request in the claim itself (--branch, --pr):
+#      once it merged and the claim lapsed, the next session's claim is STALE … never closed out
+fresh reclaim; run claim; run heartbeat pr --branch release/26-10-18 --pr 3990; run release --step-aside
+run claim --branch release/26-10-18 --pr 3990; A="$RC:$OUT"; P1="$(field pr):$(field branch)"
+run heartbeat merging; P2="$(field pr)"
+printf '[{"number":3990,"headRefName":"release/26-10-18","state":"MERGED","mergedAt":"2026-10-18T10:10:00Z"}]' > "$STATE/prs.json"
+printf '2026-10-18T10:40:00Z' > "$DS/now"
+CLAUDE_CODE_SESSION_ID=me-2 CLEARANCE_NOW=2026-10-18T10:40:00Z CLEARANCE_RECORD="$WORK/reclaim.record2.json" run claim; B="$RC:$OUT"
+if printf '%s' "$A" | grep -q '^0:CLEARED' && [ "$P1" = "3990:release/26-10-18" ] && [ "$P2" = 3990 ] \
+   && [ "${B%%:*}" -eq 3 ] && printf '%s' "$B" | grep -q 'pull request #3990 merged but the release was never closed out — adopt or wait'; then
+  ok "(3g) claim --branch --pr after a step-aside records the pull request in the claim; lapsed after its merge → STALE … never closed out (exit 3)"
+else bad "(3g) a=$A p1=$P1 p2=$P2 b=$B"; fi
+
 # (4) adopt --yes: a lapsed claim, the digest of the claim read goes with the call
 fresh adopt; held claude:other review release/26-10-17 3970 2026-10-18T09:30:00Z
 run adopt --yes

@@ -253,4 +253,5 @@ never decides a release deserves one. Otherwise call **`write-release-notes`**
   whether clearance was handed back (kept, with the reason, when a check failed or 5b stopped
   early), consequence notices again, anything still `owed`, and any owner action left.
 - Update any project memory tracking release state: epics now in production, the date, docs and
-  notes. Then `release.autoStart.enabled` → its trigger (`auto-start.md`).
+  notes. Then `release.autoStart.enabled` → its trigger 3 (`auto-start.md`), unless 5b's
+  leveling already started the next release (trigger 5).
