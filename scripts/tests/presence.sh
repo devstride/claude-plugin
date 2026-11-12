@@ -421,8 +421,9 @@ probe() { # probe SESSION — run one report now, as the keeper would, and print
   python3 "$HOOK" send beat "$(rec "$1" 'r["state"]')" "$1" "$(rec "$1" 'r["id"]')" "$(rec "$1" 'r["queued"]')" "$(now_ms)"
   of "$1" "$(of "$1" 0)" PRESENCE_BUSY_SINCE
 }
-begin() { # begin SESSION — a reported session with no keeper (the cases drive every send themselves)
-  fire SessionStart "$1" "$R29" >/dev/null; upto "$1" 1; stop_keeper "$1"
+begin() { # begin SESSION — a reported session with no keeper (the cases drive every send themselves); with
+  #           no known process, no later tool call starts one again (a prompt re-reads the process)
+  fire SessionStart "$1" "$R29" >/dev/null; upto "$1" 1; stop_keeper "$1"; edit "$1" 'r["owner"] = 0'
 }
 tool() { printf '{"tool_name":"%s","tool_use_id":"%s"%s}' "$1" "$2" "${3:+,\"agent_id\":\"$3\"}"; }
 R29="$(mkrepo r29 "$(config)")"
@@ -693,19 +694,22 @@ if [ "$(rec s47 'r["version"]')" = "$OWNV" ] && [ "$(of s47 1 PRESENCE_PLUGIN_VE
   ok "(39) the record holds the hook's own version; a report sent by another version's code carries that code's version"
 else bad "(39) record=$(rec s47 'r["version"]') $(grep '"s47"' "$LOG")"; fi
 
-# (40) a keeper leaves once the session's hooks run another version (the record names it), and the
-#      session's next hook event of any kind, here a tool call, starts one from the loaded version
+# (40) a keeper leaves once the session's hooks run another version: the loaded version's hook records
+#      its own version, the old keeper sees it and leaves by itself, and the session's next hook event
+#      of any kind, here a tool call ending, starts one from the loaded version
 : > "$LOG"; O38="$(owner)"
 HOOK_RUN="$OLDP/hooks/presence.py" DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O38" fire SessionStart s48 "$K60" >/dev/null
-wait_keeper s48; OLDK="$(keeper_cmd s48)"
-edit s48 'r["version"] = "'"$OWNV"'"; r["swept"] = "'"$OWNV"'"'   # an updated hook's record, nothing left to end
-i=0; while keeper_alive s48 && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; LEFT38=$i
+wait_keeper s48; OLDK="$(keeper_cmd s48)"; V0="$(rec s48 'r["version"]')"
+edit s48 'r["swept"] = "'"$OWNV"'"'   # no process scan: the old keeper's own check is what is tested
 DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O38" fire PreToolUse s48 "$K60" "" "$(tool Bash k38)" >/dev/null
+V1="$(rec s48 'r["version"]')"
+i=0; while keeper_alive s48 && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; LEFT38=$i
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O38" fire PostToolUse s48 "$K60" "" "$(tool Bash k38)" >/dev/null
 wait_keeper s48; NEWK="$(keeper_cmd s48)"
-if case "$OLDK" in *"$OLDP/hooks/presence.py keeper s48") true;; *) false;; esac && [ "$LEFT38" -lt 50 ] \
-   && [ -n "$NEWK" ] && case "$NEWK" in *"$OLDP"*) false;; *"/hooks/presence.py keeper s48") true;; *) false;; esac; then
-  ok "(40) the record names another version → that keeper leaves by itself; the next tool call starts the loaded version's keeper"
-else bad "(40) old=$OLDK left=$LEFT38 new=$NEWK"; fi
+if case "$OLDK" in *"$OLDP/hooks/presence.py keeper s48") true;; *) false;; esac && [ "$V0" = 1.0.0 ] && [ "$V1" = "$OWNV" ] \
+   && [ "$LEFT38" -lt 50 ] && [ -n "$NEWK" ] && case "$NEWK" in *"$OLDP"*) false;; *"/hooks/presence.py keeper s48") true;; *) false;; esac; then
+  ok "(40) the loaded version's tool call records its version → the old keeper leaves by itself; the call's end starts the loaded version's keeper"
+else bad "(40) old=$OLDK v=$V0/$V1 left=$LEFT38 new=$NEWK"; fi
 stop_keeper s48
 
 # (41) after an update, a keeper an earlier version started (it never checks the version) is ended
