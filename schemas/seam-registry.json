@@ -593,7 +593,7 @@
       ],
       "unset": "the plugin never sets a session title; the session keeps the name a person gave it or Claude Code's own",
       "contract": "skills/setup/references/config-defaults.md",
-      "since": "unreleased"
+      "since": "3.55.0"
     },
     {
       "key": "review.localCommand",
