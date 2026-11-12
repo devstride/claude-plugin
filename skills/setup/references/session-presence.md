@@ -62,7 +62,7 @@ name. Its exit code is kept in the session's local record; nothing reads it as a
 - **Expire on the server.** A report not renewed within a few intervals means the session is gone:
   a machine that sleeps or loses power sends no `end`.
 - **Alive is not active.** A hung turn still beats. Activity is stamped before and after each tool
-  call, so `working` with an old `PRESENCE_ACTIVE_AT` and no `PRESENCE_BUSY_SINCE` is hung (or
+  call (a refused call closes when its batch ends), so `working` with an old `PRESENCE_ACTIVE_AT` and no `PRESENCE_BUSY_SINCE` is hung (or
   stopped by a usage limit, which stamps nothing); `working` with a `PRESENCE_BUSY_SINCE` is inside
   one long step or waiting on its own background work, and deserves a longer allowance, not none.
   `waiting` is the person's turn and is never hung. Two blind spots: no hook marks a permission

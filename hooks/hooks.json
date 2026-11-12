@@ -1,5 +1,5 @@
 {
-  "description": "Session-start version check (reports newer releases, safely applies an opted-in repository-scoped update, gives a verified reload handoff; silent when current), a per-session record of the plugin version this session has loaded (written at every session start and every prompt, read by the status line; it also holds the session's live model and effort, noted before each tool call of the main conversation and after each model switch, with one small local read and a write only when one changed, which the planning and build skills compare with the repository's expected ones; at a prompt it also refreshes the newest-release cache in the background when older than 30 minutes and, once per new version, asks Claude to tell or ask the person about a reload or update, changing nothing itself; fails open), a prompt-time session gate (one job class per session: an authoring job and an execution job do not share a session; fails open) and, only in a repository whose .claude/ds-config.json names a presence command, a presence report for every session (at session start, on prompts and finished turns, throttled, with the time of its last activity, stamped before and after each tool call, and when the session has been inside one call or waiting on its own background work since; it notes when Claude waits on its person: a finished turn, a question, a permission or elicitation prompt, the idle prompt after an interrupt; and at session end, plus a detached per-session keeper every few minutes while the session's process lives; the repository's command decides what a report means; fails open). Every operation is bounded.",
+  "description": "Session-start version check (reports newer releases, safely applies an opted-in repository-scoped update, gives a verified reload handoff; silent when current), a per-session record of the plugin version this session has loaded (written at every session start and every prompt, read by the status line; it also holds the session's live model and effort, noted before each tool call of the main conversation and after each model switch, with one small local read and a write only when one changed, which the planning and build skills compare with the repository's expected ones; at a prompt it also refreshes the newest-release cache in the background when older than 30 minutes and, once per new version, asks Claude to tell or ask the person about a reload or update, changing nothing itself; fails open), a prompt-time session gate (one job class per session: an authoring job and an execution job do not share a session; fails open) and, only in a repository whose .claude/ds-config.json names a presence command, a presence report for every session (at session start, on prompts and finished turns, throttled, with the time of its last activity, stamped before and after each tool call, and, while the session is inside one call or its finished turn left background work running, since when; it reports waiting while Claude waits on its person: a finished turn, a question, a permission or elicitation prompt, the idle prompt after an interrupt; and at session end, plus a detached per-session keeper every few minutes while the session's process lives; the repository's command decides what a report means; fails open). Every operation is bounded.",
   "hooks": {
     "SessionStart": [
       {
@@ -47,6 +47,13 @@
       }
     ],
     "PostToolUseFailure": [
+      {
+        "hooks": [
+          { "type": "command", "command": "command -v python3 >/dev/null 2>&1 && python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/presence.py\" hook; exit 0", "timeout": 5 }
+        ]
+      }
+    ],
+    "PostToolBatch": [
       {
         "hooks": [
           { "type": "command", "command": "command -v python3 >/dev/null 2>&1 && python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/presence.py\" hook; exit 0", "timeout": 5 }

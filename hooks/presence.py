@@ -26,6 +26,10 @@ the repository's. The contract: skills/setup/references/session-presence.md.
                                "waiting", and that call is not opened
            PostToolUse, PostToolUseFailure -> the call is closed; state "working" (a turn a
                                notification started has no prompt)
+           PostToolBatch    -> every call it lists, and every open call of the same agent (the main
+                               conversation, or the helper agent its agent_id names), is closed: a
+                               call a deny rule, a hook or a person refused fires PreToolUse but never
+                               PostToolUse; state "working"
            Notification     -> only permission_prompt, elicitation_dialog and elicitation_url_dialog
                                (state "waiting": a prompt waits on the person) and idle_prompt (about
                                60 seconds after a finished turn or an interrupt, which fires no hook of
@@ -128,7 +132,8 @@ STATES = ("starting", "working", "waiting", "ended")
 EVENTS = ("start", "beat", "end")
 FIRST = ("SessionStart", "UserPromptSubmit")  # the events that may start a report
 # events that only update a session already reported
-LATER = ("PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "StopFailure", "SessionEnd")
+LATER = ("PreToolUse", "PostToolUse", "PostToolUseFailure", "PostToolBatch", "Notification", "Stop", "StopFailure",
+         "SessionEnd")
 NOTICES = ("permission_prompt", "idle_prompt", "elicitation_dialog", "elicitation_url_dialog")
 QUESTIONS = ("AskUserQuestion", "ExitPlanMode")  # the main conversation asking its person
 OPEN_LIMIT = 64          # open calls kept per session; the oldest is dropped beyond it
@@ -415,9 +420,11 @@ def transition(event, payload, record, now_ms):
     and failed-turn flag. Returns (the new state, or None to keep the state; whether it is a sign of
     the session's own activity)."""
     calls = open_calls(record)
+    callers = record.get("callers") if isinstance(record.get("callers"), dict) else {}
     asking = record.get("asking") if isinstance(record.get("asking"), str) else ""
     call = payload.get("tool_use_id") if isinstance(payload.get("tool_use_id"), str) else ""
     main = not payload.get("agent_id")
+    agent = "" if main else str(payload.get("agent_id"))[:128]
     state, active = None, event != "SessionEnd"
     if event in ("SessionStart", "UserPromptSubmit", "Stop", "StopFailure") or (
             event == "Notification" and payload.get("notification_type") == "idle_prompt"):
@@ -434,12 +441,21 @@ def transition(event, payload, record, now_ms):
             state = None if asking else "working"
             if TOOL_ID.match(call):
                 calls[call] = now_ms
+                if agent:
+                    callers[call] = agent
                 for oldest in sorted(calls, key=calls.get)[:max(0, len(calls) - OPEN_LIMIT)]:
                     del calls[oldest]
     elif event in ("PostToolUse", "PostToolUseFailure"):
         calls.pop(call, None)
         if asking and (call == asking or (asking == "-" and main)):
             asking = ""  # the person answered
+        state = None if asking else "working"
+    elif event == "PostToolBatch":
+        listed = payload.get("tool_calls") if isinstance(payload.get("tool_calls"), list) else []
+        listed = {c.get("tool_use_id") for c in listed if isinstance(c, dict) and isinstance(c.get("tool_use_id"), str)}
+        calls = {key: start for key, start in calls.items() if key not in listed and callers.get(key, "") != agent}
+        if asking and (asking in listed or (asking == "-" and main)):
+            asking = ""
         state = None if asking else "working"
     elif event == "Notification":
         if payload.get("notification_type") == "idle_prompt":
@@ -466,6 +482,7 @@ def transition(event, payload, record, now_ms):
     elif event == "SessionEnd":
         state = "ended"
     record["tools"] = calls
+    record["callers"] = {key: str(callers[key])[:128] for key in calls if key in callers}
     record["asking"] = asking
     return state, active
 

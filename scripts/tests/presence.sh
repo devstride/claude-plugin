@@ -536,13 +536,28 @@ if [ "$(cat "$RECORDS/s35.json")" = "$BEFORE35" ] && [ "$(of s35 0)" = "$N35" ] 
   ok "(35) auth_success / agent_needs_input / no type → nothing; new events for an unknown session → nothing written or sent"
 else bad "(35) $(diff <(echo "$BEFORE35") "$RECORDS/s35.json") $(grep '"s35' "$LOG")"; fi
 
-# (12) hooks.json registers the hook on all nine events, bounded and failing open; Notification only for
+# (36) a finished batch closes every call it lists and every other open call of the same agent (a call
+#      a deny rule or a hook refused never gets its PostToolUse); a helper agent's calls stay open
+#      until its own batch ends
+begin s36
+for c in b1 b2; do fire PreToolUse s36 "$R29" "" "$(tool Bash "$c")" >/dev/null; done
+fire PreToolUse s36 "$R29" "" "$(tool Read h1 helper-3)" >/dev/null
+fire PostToolUse s36 "$R29" "" "$(tool Bash b1)" >/dev/null
+fire PostToolBatch s36 "$R29" "" '{"tool_calls":[{"tool_name":"Bash","tool_use_id":"b1","tool_response":"ok"}]}' >/dev/null
+L1="$(rec s36 'sorted(r["tools"]), r["callers"]')"
+fire PostToolBatch s36 "$R29" "" '{"agent_id":"helper-3","tool_calls":[]}' >/dev/null
+L2="$(rec s36 'sorted(r["tools"]), r["callers"], r["state"]')"
+if [ "$L1" = "(['h1'], {'h1': 'helper-3'})" ] && [ "$L2" = "([], {}, 'working')" ]; then
+  ok "(36) PostToolBatch → its calls and the same agent's refused call closed; a helper's call kept until its own batch ends"
+else bad "(36) l1=$L1 l2=$L2"; fi
+
+# (12) hooks.json registers the hook on all ten events, bounded and failing open; Notification only for
 #      the four prompt types the hook reads, and PreToolUse after the model recorder
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'
 import json, sys
 h = json.load(open(sys.argv[1]))["hooks"]
-for event in ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification",
-              "Stop", "StopFailure", "SessionEnd"):
+for event in ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "PostToolBatch",
+              "Notification", "Stop", "StopFailure", "SessionEnd"):
     found = [(g, c) for g in h[event] for c in g["hooks"] if "hooks/presence.py\" hook" in c["command"]]
     assert len(found) == 1 and found[0][1].get("timeout") == 5 and found[0][1]["command"].endswith("exit 0"), event
     if event == "Notification":
@@ -552,7 +567,7 @@ for event in ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "
 pre = [c["command"] for g in h["PreToolUse"] for c in g["hooks"]]
 assert "session-runtime.py\" seen" in pre[0] and "presence.py\" hook" in pre[1], pre
 PY
-then ok "(12) hooks.json → presence hook on nine events (timeout 5, exit 0); Notification for the four prompt types only"
+then ok "(12) hooks.json → presence hook on ten events (timeout 5, exit 0); Notification for the four prompt types only"
 else bad "(12) hooks.json registration"; fi
 
 exit $FAIL
