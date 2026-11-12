@@ -8,6 +8,103 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.55.0] — 2026-11-11
+
+### Added
+
+- **Your repository can name a session that nobody named, and Claude Code shows that same name.**
+  A new config key, `session.titleCommand` (off by default), names a command the plugin runs at
+  each prompt and whenever a session starts, resumes or is forked. Whatever the command prints on
+  its first line becomes the session's own title, exactly as if someone had typed `/rename`, so
+  the session list, the status line and anything else that reads Claude Code's name for the
+  session all agree. A name a person chose with `--name` or `/rename` is never replaced: the
+  plugin only changes a title it set itself, or one the command marks as a person's request with
+  a second line reading `replace`. The command gets the prompt on standard input (at most 8 KB),
+  the session's id and its current title, and has 3 seconds; if it fails, is slow or prints
+  nothing, the session's name stays as it is and the prompt goes ahead. Claude Code only takes a
+  new title at a prompt, a start, a resume or a fork, so a rename lands at the session's next
+  prompt, never in the middle of a turn.
+
+### Changed
+
+- **Session presence now tells "waiting on you" apart from "busy in one long step".** In a
+  repository that names a presence command, a session that asks you a question, shows a plan for
+  approval, or sits at a permission or MCP prompt now reports `waiting`, the same as a finished
+  turn; before, it kept reporting `working` until the turn ended. The idle prompt Claude Code shows
+  about a minute after a finished turn or an interrupt (Esc fires no hook of its own) also reports
+  `waiting`. Activity is now stamped when each tool call starts as well as when it ends, and a
+  failed tool call counts too, so one long command no longer looks idle the whole time it runs.
+  The command receives a new variable, `PRESENCE_BUSY_SINCE`: when the session is inside one tool
+  call, or finished its turn while its own background work (a test run, a background helper)
+  is still running, it holds when that started, in epoch milliseconds; otherwise it is empty. A
+  finished turn with background work still running reports `working`, not `waiting`. A turn that
+  ends on an API error, such as a usage limit, stamps no activity and keeps reporting `working`,
+  so a repository can still tell that it has stopped. Nothing changes for a repository without a
+  presence command; the extra hook on each tool call returns at once there. Two known gaps, both
+  limits of Claude Code's hooks: after you approve a permission prompt the session reads `waiting`
+  until that command finishes, and after an interrupt it reads `working` for about a minute.
+
+- **The status line shows the name your repository gives the session, not a title Claude Code
+  made up.** When the repository sets `session.nameCommand`, the Session segment (☻) now always
+  shows that command's name. Before, once Claude Code generated its own summary title for a
+  session, the bar showed that title, while everything else that used the repository's command
+  still showed the repository's name, so the same session went by two names. When the session is
+  renamed, the bar now looks the name up again right away instead of waiting up to 10 seconds. A
+  repository without `session.nameCommand` keeps today's behaviour: the bar shows the name or title
+  Claude Code has.
+
+### Fixed
+
+- **A reviewed epic counts as reviewed whatever its merge is titled.** The release's train check
+  lets migrations and deploy configuration through only inside an epic whose pull request was
+  reviewed and merged onto the train. It used to recognise that pull request only from GitHub's
+  default merge title ("Merge pull request #N from ..."), so an epic merged under a custom title
+  was treated as unreviewed work and its migrations were refused. The check now asks GitHub which
+  pull request the merge commit belongs to, and accepts only a merged pull request whose merge
+  commit is exactly that commit. The default title is read only when GitHub cannot be asked (no
+  `gh`, a network error, a commit GitHub does not hold). Everything else is unchanged: the pull
+  request must still be confirmed as merged onto the train from an epic or plan branch and carry
+  the settled-review proof, and anything the check cannot confirm is still checked file by file
+  and refused.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.54.0 @ 5df7b00, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.54.0 | tokens@devstride--v3.54.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,100 | 10,700 | 32,100 | 10,700 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,592 | 8,198 | 24,592 | 8,198 | +0 | 8,198 |
+| skills/doctor/SKILL.md | 23,973 | 7,991 | 23,988 | 7,996 | +5 | 7,996 |
+| skills/review/SKILL.md | 23,971 | 7,991 | 23,971 | 7,991 | +0 | 7,999 |
+| skills/build-item/SKILL.md | 23,953 | 7,985 | 23,953 | 7,985 | +0 | 7,985 |
+| skills/release/SKILL.md | 18,139 | 6,047 | 18,139 | 6,047 | +0 | 6,049 |
+| skills/rebalance/SKILL.md | 17,850 | 5,950 | 17,850 | 5,950 | +0 | 5,950 |
+| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,708 | 2,236 | 6,708 | 2,236 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-story/SKILL.md | 6,299 | 2,100 | 6,299 | 2,100 | +0 | 2,100 |
+| skills/comprehend-plan/SKILL.md | 5,580 | 1,860 | 5,580 | 1,860 | +0 | 1,860 |
+| skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 271,661 | 90,561 | 271,676 | 90,566 | +5 | |
+
 ## [3.54.0] — 2026-11-11
 
 ### Changed
@@ -4824,7 +4921,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.54.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.55.0...HEAD
+[3.55.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.54.0...devstride--v3.55.0
 [3.54.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.53.0...devstride--v3.54.0
 [3.53.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.52.0...devstride--v3.53.0
 [3.52.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.51.0...devstride--v3.52.0

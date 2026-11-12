@@ -90,9 +90,10 @@ emit("SL_PROD_STAGES", " ".join(stage.get("productionStages") or []))
 sl = cfg.get("statusLine") or {}
 emit("SL_HIDDEN", " ".join(str(x) for x in (sl.get("hiddenSegments") or [])))
 
-# The session: its own name from the payload (present when it has a custom name or a title), else
-# the `session.nameCommand` of the repository, run from the config directory (see the Session segment).
-# The id only keys the cache file of that command, so anything but a plain id is dropped.
+# The session: the `session.nameCommand` of the repository, run from the config directory, when one
+# is configured; only without one, its own name from the payload (a custom name or a generated
+# title). See the Session segment. The id only keys the cache file of that command, so anything but
+# a plain id is dropped.
 sid = str(d.get("session_id") or "")
 emit("SL_SESSION_ID", sid if sid.replace("-", "").isalnum() else "")
 def display(value):
@@ -272,17 +273,24 @@ if [ -n "$SL_PLUGIN" ]; then
 fi
 
 # --- session: this session's name ---------------------------------------------
-# The payload's session_name when the session has a custom name, else the first line of the
-# repository's `session.nameCommand`, run from the config's directory with the payload's session id
-# exported as CLAUDE_CODE_SESSION_ID. A status line redraws constantly and that command may start a
-# runtime, so it is refreshed out of band (the PR segment's serve-the-cache shape, 10 s): the very
-# first draw of a new session can lack the segment for a moment. Read-only: the cache and its lock
-# under $TMPDIR are its only writes, never the plugin directory or the repository. Shown before the
-# git checks, so it shows outside a repository too. A hidden segment never runs the command.
-session="$SL_SESSION_NAME"
+# With a `session.nameCommand`, the first line of that command, run from the config's directory with
+# the payload's session id exported as CLAUDE_CODE_SESSION_ID: the name the repository reports
+# everywhere else, so the bar never shows a different one. The payload's session_name (a custom name,
+# else the title Claude Code generates) is shown only when no command is configured, because the
+# generated title is a name nothing else uses. A status line redraws constantly and that command may
+# start a runtime, so it is refreshed out of band (the PR segment's serve-the-cache shape, 10 s): the
+# very first draw of a new session lacks the segment for a moment (never the generated title in its
+# place). The payload's name at the last refresh is kept beside the cache, and a redraw whose payload
+# name differs (a /rename, or a title a hook set) refreshes at once instead of waiting out the 10 s.
+# Read-only: the cache, its payload note and its lock under $TMPDIR are its only writes, never the
+# plugin directory or the repository. Shown before the git checks, so it shows outside a repository
+# too. A hidden segment never runs the command.
+session=""
 case " $SL_HIDDEN " in *" session "*) SL_SESSION_CMD="" ;; esac
-if [ -z "$session" ] && [ -n "$SL_SESSION_CMD" ] && [ -n "$SL_SESSION_ID" ] && [ -n "$SL_CFG_ROOT" ]; then
-  ncache="${TMPDIR:-/tmp}/ds-statusline-session-$SL_SESSION_ID"; nlock="$ncache.lock"
+if [ -z "$SL_SESSION_CMD" ]; then
+  session="$SL_SESSION_NAME"
+elif [ -n "$SL_SESSION_ID" ] && [ -n "$SL_CFG_ROOT" ]; then
+  ncache="${TMPDIR:-/tmp}/ds-statusline-session-$SL_SESSION_ID"; nlock="$ncache.lock"; nseen="$ncache.payload"
   nrefresh() {
     local name ntmp
     sh -c 'echo "$PPID"' >"$nlock/pid" 2>/dev/null
@@ -297,7 +305,9 @@ sys.stdout.write(" ".join("".join(" " if ord(c) < 32 or ord(c) == 127 or c == "|
   }
   # One refresh in flight per session: a command that hangs keeps its lock, so no redraw starts a
   # second copy while its refresher lives (else one more would pile up every 10 s). The lock of a
-  # refresher that is gone (its pid dead, or none written within 10 s) is taken over.
+  # refresher that is gone (its pid dead, or none written within 10 s) is taken over. The payload
+  # name is noted only when a refresh actually starts, so a change seen while one is in flight is
+  # refreshed again once it ends.
   nspawn() {
     touch "$ncache" 2>/dev/null
     if ! mkdir "$nlock" 2>/dev/null; then
@@ -309,12 +319,21 @@ sys.stdout.write(" ".join("".join(" " if ord(c) < 32 or ord(c) == 127 or c == "|
       fi
       rm -rf "$nlock" 2>/dev/null; mkdir "$nlock" 2>/dev/null || return 0
     fi
+    # owner-only (a generated title can describe the work), and through a new file moved into place,
+    # so a symlink left at that path is replaced, never followed
+    local nseentmp
+    [ -L "$nseen" ] && rm -f "$nseen"
+    if nseentmp=$(mktemp "$nseen.XXXXXX" 2>/dev/null); then
+      printf '%s' "$SL_SESSION_NAME" >"$nseentmp" 2>/dev/null
+      mv -f "$nseentmp" "$nseen" 2>/dev/null || rm -f "$nseentmp"
+    fi
     (nrefresh &) >/dev/null 2>&1
   }
   if [ -f "$ncache" ]; then
     nage=$(( $(date +%s) - $(stat -c %Y "$ncache" 2>/dev/null || stat -f %m "$ncache" 2>/dev/null || echo 0) ))
     session=$(head -1 "$ncache" 2>/dev/null)
-    [ "$nage" -ge 10 ] && nspawn
+    nprev=""; { IFS= read -r nprev <"$nseen"; } 2>/dev/null
+    if [ "$nage" -ge 10 ] || [ "$SL_SESSION_NAME" != "$nprev" ]; then nspawn; fi
   else
     nspawn
   fi

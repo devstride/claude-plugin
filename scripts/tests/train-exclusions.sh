@@ -9,6 +9,9 @@ mkdir "$WORK/bin" "$WORK/pr"
 # gh stub: `gh pr view <n> --json …` prints $WORK/pr/<n>.json, and fails when there is none. The
 # review proof: `gh api …/commits/<sha>/statuses?…` prints $WORK/pr/status-<sha>.json (else []), and
 # `gh api …/collaborators/<login>/permission` answers admin for "owner", write for anyone else.
+# The merge's own pull requests: `gh api …/commits/<sha>/pulls?…` prints $WORK/pr/pulls-<sha>.json;
+# with none it fails as GitHub does for a commit it does not hold (HTTP 422), so every case without
+# a lookup answer exercises the subject fallback; GH_PULLS_FAIL=1 fails it as a network error.
 cat > "$WORK/bin/gh" <<'STUB'
 #!/bin/bash
 [ "$1" = pr ] && [ "$2" = view ] && [ -f "$GH_STUB_DIR/$3.json" ] && { cat "$GH_STUB_DIR/$3.json"; exit 0; }
@@ -16,6 +19,9 @@ if [ "$1" = api ]; then
   case "$2" in
     */statuses\?*) [ -n "${GH_STATUS_FAIL:-}" ] && { echo "HTTP 502" >&2; exit 1; }; sha="${2#*/commits/}"; sha="${sha%%/*}"
       [ -f "$GH_STUB_DIR/status-$sha.json" ] && cat "$GH_STUB_DIR/status-$sha.json" || echo '[]'; exit 0 ;;
+    */commits/*/pulls\?*) [ -n "${GH_PULLS_FAIL:-}" ] && { echo "HTTP 502" >&2; exit 1; }; sha="${2#*/commits/}"; sha="${sha%%/*}"
+      [ -f "$GH_STUB_DIR/pulls-$sha.json" ] && { cat "$GH_STUB_DIR/pulls-$sha.json"; exit 0; }
+      echo "No commit found for SHA: $sha (HTTP 422)" >&2; exit 1 ;;
     */collaborators/*/permission) login="${2#*/collaborators/}"; login="${login%%/*}"
       [ "$login" = owner ] && echo '{"permission":"admin"}' || echo '{"permission":"write"}'; exit 0 ;;
   esac
@@ -40,7 +46,7 @@ PY
 }
 # repo NAME: a repository with develop (also origin/develop), a train branch cut from it, SB = the source at the cut
 repo() {
-  R="$WORK/$1"; mkdir "$R"; cd "$R" || exit 2; rm -f "$GH_STUB_DIR"/status-*.json   # fixture SHAs repeat across repos
+  R="$WORK/$1"; mkdir "$R"; cd "$R" || exit 2; rm -f "$GH_STUB_DIR"/status-*.json "$GH_STUB_DIR"/pulls-*.json   # fixture SHAs repeat across repos
   git init -q -b develop; mkdir -p db/migrations/meta infra src
   echo "select 1;" > db/migrations/0001_init.sql; echo "{}" > db/migrations/meta/_journal.json
   echo a > infra/main.tf; echo a > src/a.txt; git add -A; git commit -qm base
@@ -69,6 +75,19 @@ proof() {
     i=$((i + 1)); shift 2
   done
   echo "$out]" > "$GH_STUB_DIR/status-$sha.json"
+}
+# pulls SHA N HEAD [MERGE-OID] [MERGED-AT]: GitHub's list of pull requests for commit SHA, one entry for pull
+# request N from branch HEAD, merged (MERGED-AT; "" for an open one) with MERGE-OID (default SHA) as its
+# merge commit; PULLS_APPEND=1 adds the entry to the list already written instead of replacing it
+pulls() {
+  python3 - "$GH_STUB_DIR/pulls-$1.json" "$1" "$2" "$3" "${4:-$1}" "${5-2026-12-01T10:00:00Z}" "${PULLS_APPEND:-}" <<'PY3'
+import json, os, sys
+path, sha, n, head, oid, at, append = sys.argv[1:8]
+items = json.load(open(path)) if append and os.path.exists(path) else []
+items.append({"number": int(n), "merge_commit_sha": oid, "merged_at": at or None,
+              "base": {"ref": "train"}, "head": {"ref": head}})
+json.dump(items, open(path, "w"))
+PY3
 }
 # run NAME [renumber]: the tool over SB..train; sets RC and OUT
 run() { config "$WORK/c-$1.json" "${2:-}"; OUT="$(python3 "$TOOL" --config "$WORK/c-$1.json" --source-before "${SB_OVERRIDE:-$SB}" --head "${HEAD_REF:-train}" --repo "$WORK/$1" 2>&1)"; RC=$?; }
@@ -323,4 +342,46 @@ repo t41; unit epic "$E" infra/queue.tf; NOPROOF=1 MERGED_AT=2026-11-01T12:00:00
 expect "(41) a grandfathered unit never needs GitHub's statuses" 0 "d['grandfatheredUnits']==[30]"
 repo t42; unit epic "Merge pull request #42 from acme/jane/26-10-01/epic-checkout" infra/queue.tf; run t42
 expect "(42) a pull request gh cannot confirm is listed with the reason and checked file by file" 1 "d['refused']==['infra/queue.tf'] and d['unprovenUnits'][0]['number']==42 and d['unprovenUnits'][0]['reason'].startswith('gh could not confirm #42')"
+
+# The pull request is the one GitHub lists for the merge commit itself, whatever the merge's subject.
+C="Epic checkout: faster checkout (#43)"; EPIC=jane/26-10-01/epic-checkout
+repo t43; unit epic "$C" db/migrations/0002_col.sql infra/queue.tf; M="$(git rev-parse HEAD)"; stub 43 train MERGED "$M"; pulls "$M" 43 "$EPIC"; run t43
+expect "(43) a reviewed epic merged under a custom subject is found from its merge commit and allowed" 0 "d['refused']==[] and d['reviewedUnits']==[43]"
+repo t44; unit epic "$C" db/migrations/0002_col.sql infra/queue.tf; M="$(git rev-parse HEAD)"; stub 43 train MERGED "$M"; pulls "$M" 43 "$EPIC"; GH_PULLS_FAIL=1 run t44
+expect "(44) the lookup failing falls back to the subject: a custom subject is refused" 1 "d['refused']==['db/migrations/0002_col.sql','infra/queue.tf'] and d['reviewedUnits']==[]"
+repo t44b; unit epic "$C" infra/queue.tf; stub 43 train MERGED "$(git rev-parse HEAD)"; run t44b
+expect "(44b) ... and so does a commit GitHub does not hold (HTTP 422)" 1 "d['refused']==['infra/queue.tf'] and d['reviewedUnits']==[]"
+repo t45; unit hand "$C" infra/queue.tf; M="$(git rev-parse HEAD)"; stub 43 train MERGED "$M"; pulls "$M" 43 jane/26-10-01/not-an-epic; run t45
+expect "(45) the lookup naming a pull request whose head is not an integration branch is refused" 1 "d['refused']==['infra/queue.tf']"
+repo t46; unit epic "$C" infra/queue.tf; M="$(git rev-parse HEAD)"; stub 43 train MERGED "$M"; pulls "$M" 50 train-to-develop 0000000000000000000000000000000000000000 ""; run t46
+expect "(46) a listed pull request that merely contains the commit (another merge commit, open) is not the unit" 1 "d['refused']==['infra/queue.tf'] and d['reviewedUnits']==[]"
+repo t46b; unit epic "$C" infra/queue.tf; M="$(git rev-parse HEAD)"; stub 43 train MERGED "$M"; pulls "$M" 50 train-to-develop 0000000000000000000000000000000000000000 ""
+PULLS_APPEND=1 pulls "$M" 43 "$EPIC"; run t46b
+expect "(46b) ... and beside the real merged pull request only that one is taken" 0 "d['refused']==[] and d['reviewedUnits']==[43]"
+repo t47; unit epic "$C" infra/queue.tf; M="$(git rev-parse HEAD)"; stub 43 develop MERGED "$M"; pulls "$M" 43 "$EPIC"; run t47
+expect "(47) the lookup's pull request still has to be confirmed by gh pr view (here based on another branch)" 1 "d['refused']==['infra/queue.tf']"
+repo t48; unit epic "Merge pull request #7 from acme/$EPIC" infra/queue.tf; M="$(git rev-parse HEAD)"; stub 7 train MERGED "$M"; echo '[]' > "$GH_STUB_DIR/pulls-$M.json"; run t48
+expect "(48) once GitHub answers that no pull request has this merge commit, the default subject is not trusted" 1 "d['refused']==['infra/queue.tf'] and d['reviewedUnits']==[]"
+repo t48b; unit epic "Merge pull request #7 from acme/$EPIC" infra/queue.tf; M="$(git rev-parse HEAD)"; stub 7 train MERGED "$M"; pulls "$M" 7 "$EPIC"; PULLS_APPEND=1 pulls "$M" 8 "$EPIC"; run t48b
+expect "(48b) two merged pull requests listed with the same merge commit name no unit" 1 "d['refused']==['infra/queue.tf'] and d['reviewedUnits']==[]"
+repo t48c; unit epic "Merge pull request #7 from acme/$EPIC" infra/queue.tf; M="$(git rev-parse HEAD)"; stub 7 train MERGED "$M"; echo '{"message":"odd"}' > "$GH_STUB_DIR/pulls-$M.json"; run t48c
+expect "(48c) a lookup answer that is not a list is unavailable: the default subject is read" 0 "d['refused']==[] and d['reviewedUnits']==[7]"
+# (49) plan scope under custom subjects: the plan release and the epic merged onto the plan branch
+PLAN=jane/26-10-01/plan-I303-checkout
+custom_plan() {  # custom_plan NAME [DIRECT-FILE]
+  repo "$1"; git checkout -q -b plan train
+  git checkout -q -b epic plan; echo "epic" > db/migrations/0002_col.sql; git add -A; git commit -qm "story"
+  git checkout -q plan; git merge -q --no-ff -m "Epic checkout (#11)" epic; M="$(git rev-parse HEAD)"; stub 11 "$PLAN" MERGED "$M"; pulls "$M" 11 "$EPIC"
+  git checkout -q train; echo t > src/t.txt; git add -A; git commit -qm "train moves"
+  git checkout -q plan; git merge -q --no-ff -m "refresh from the train" train
+  if [ -n "${2:-}" ]; then echo direct > "$2"; git add -A; git commit -qm "direct commit"; fi
+  git checkout -q train; git merge -q --no-ff -m "Plan checkout (#13)" plan; M="$(git rev-parse HEAD)"; stub 13 train MERGED "$M"; pulls "$M" 13 "$PLAN"
+}
+custom_plan t49; run t49
+expect "(49) a plan release and its epic, both under custom subjects, are judged as a plan and allowed" 0 "d['refused']==[] and 13 in d['reviewedUnits'] and 11 in d['reviewedUnits']"
+custom_plan t49b infra/direct.tf; run t49b
+expect "(49b) ... and a commit on that plan branch no pull request reviewed is still checked" 1 "d['refused']==['infra/direct.tf']"
+# (50) a reviewed epic under a custom subject, absorbed late into the snapshot
+late t50 "$C"; stub 7 train MERGED "$TRAIN_TIP"; pulls "$TRAIN_TIP" 7 "$EPIC"; run t50; unset HEAD_REF
+expect "(50) a custom-subject reviewed epic absorbed late into the snapshot passes" 0 "d['refused']==[] and d['reviewedUnits']==[7]"
 exit $FAIL

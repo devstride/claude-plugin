@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.54.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.55.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -1395,7 +1395,7 @@
       "properties": {
         "command": {
           "type": "string",
-          "description": "command hook — PRESENCE_EVENT (start, beat or end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE, PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM, PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON, PRESENCE_AT (epoch milliseconds the report was queued), PRESENCE_ACTIVE_AT (epoch milliseconds of the session's last activity), CLAUDE_CODE_SESSION_ID and CLAUDE_PID exported; run from the repository root through the shell"
+          "description": "command hook — PRESENCE_EVENT (start, beat or end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE, PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM, PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON, PRESENCE_AT (epoch milliseconds the report was queued), PRESENCE_ACTIVE_AT (epoch milliseconds of the session's last activity), PRESENCE_BUSY_SINCE (epoch milliseconds since the session has been inside one tool call or waiting on its own background work; empty when neither), CLAUDE_CODE_SESSION_ID and CLAUDE_PID exported; run from the repository root through the shell"
         },
         "intervalMinutes": {
           "type": "integer",
@@ -1625,6 +1625,13 @@
             "null"
           ],
           "description": "command hook — none; run from the repository root with CLAUDE_CODE_SESSION_ID exported (the status-line payload's session id)"
+        },
+        "titleCommand": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — the prompt on stdin, cut to 8 KB (empty at session start); CLAUDE_CODE_SESSION_ID, SESSION_TITLE (the session's custom title, empty when none; a generated title never counts) and SESSION_TITLE_OWNED=1 when that title is the one the hook last set on its own exported; run through the shell from the repository root at a prompt and at session start, resume and fork, at most 3 seconds"
         },
         "jobClassGate": {
           "type": "boolean",

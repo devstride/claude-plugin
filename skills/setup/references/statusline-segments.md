@@ -66,7 +66,7 @@ is not?**
 | `model` | ◆ | `model.display_name` in the status-line payload | The payload did not carry it — **transient** |
 | `effort` | ↯ | the last `"effort"` in the session transcript's tail | No assistant record yet — **transient**, fills in on the first reply |
 | `plugin` | ⊞ | `hooks/session-runtime.py check`: the running version, dim; red `3.15.0 → 3.16.0 · /reload-plugins` (newer copy installed), yellow `3.16.0 (3.16.1 out · /devstride:update)` (newer published) | No record yet — **never a finding** |
-| `session` | ☻ | this session's name: the payload's `session_name` (a custom name or title), else the first line of `session.nameCommand`, run from the repository root with `CLAUDE_CODE_SESSION_ID` exported, cached ~10s under `$TMPDIR` | The session has no custom name and no command is configured — **never a finding** |
+| `session` | ☻ | this session's name: the first line of `session.nameCommand`, run from the repository root with `CLAUDE_CODE_SESSION_ID` exported, cached ~10s under `$TMPDIR` and refreshed at once when the payload's `session_name` changes; only without a command, the payload's `session_name` (a custom name, else Claude Code's generated title, which nothing else uses, so a repository that names its sessions never shows it) | The session has no custom name and no command is configured, or the command's first result is not cached yet — **never a finding** |
 | `repo` | ▣ | basename of `git rev-parse --show-toplevel` | Not a git repository — already an §1 finding |
 | `checkout` | ⑂ | linked worktree name, else the word `main` | Not a git repository — already an §1 finding |
 | `branch` | ⎇ | `git branch --show-current`, else `<sha> (detached)` | A repository with no commit yet — **transient** |
