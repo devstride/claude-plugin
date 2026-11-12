@@ -39,8 +39,9 @@ the repository's. The contract: skills/setup/references/session-presence.md.
                                the turn left background work running or ended on an API error, when
                                the state is kept and no activity is stamped); any other type does nothing
            Stop             -> every open call is dropped; state "waiting", or "working" when the
-                               payload's background_tasks holds one with status `running` (the turn
-                               left its own background work running; that moment is the background mark)
+                               payload's background_tasks holds one with status `running` that is not
+                               a teammate (the turn left its own background work running; that moment
+                               is the background mark)
            StopFailure      -> a turn ended on an API error (a usage limit, an outage): every open
                                call and the background mark are dropped, the state is kept and no
                                activity is stamped, so a session that cannot continue still reads as
@@ -414,9 +415,12 @@ def busy_since(record):
 
 
 def background_running(payload):
-    """Whether a finished turn left its own background work running (Stop's background_tasks)."""
+    """Whether a finished turn left its own background work running (Stop's background_tasks). A
+    teammate is left out: its entry reads `running` for the whole session, idle or not, and a busy
+    teammate's own tool calls report it."""
     tasks = payload.get("background_tasks")
-    return isinstance(tasks, list) and any(isinstance(t, dict) and t.get("status") == "running" for t in tasks)
+    return isinstance(tasks, list) and any(isinstance(t, dict) and t.get("status") == "running"
+                                           and t.get("type") != "teammate" for t in tasks)
 
 
 def transition(event, payload, record, now_ms):

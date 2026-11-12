@@ -27,7 +27,7 @@ of range reads as 5, and doctor warns) is the keeper's beat.
 | A tool call starting or ending, or an MCP prompt answered, while `starting` or `waiting` (a turn with no prompt), except while a question is open | `beat` | `working` |
 | A question or plan approval from the main conversation (`AskUserQuestion`, `ExitPlanMode`), or a permission or elicitation prompt unanswered for about 6 seconds | `beat` | `waiting` |
 | A finished turn (Claude waits for its person); nothing after an `end` | `beat` | `waiting` |
-| A finished turn that left its own background work running (a test run, a background helper) | `beat` | `working` |
+| A finished turn that left its own background work running (a test run, a background helper; not a teammate) | `beat` | `working` |
 | The idle prompt, about 60 seconds after a finished turn or an interrupt, unless background work runs or the turn ended on an API error | `beat` | `waiting` |
 | The keeper, when the last report is `intervalMinutes` old, or a held change is 30 seconds old | `beat` | the latest |
 | Session end (`PRESENCE_END_REASON`: `clear`, `logout`, …) | `end` | `ended` |

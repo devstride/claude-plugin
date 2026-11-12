@@ -515,10 +515,10 @@ fire Stop s33 "$R29" "" '{"background_tasks":[{"id":"b1","type":"shell","status"
 sleep 0.4; N33="$(of s33 0)"; BG="$(rec s33 'r["background"]')"; ST33="$(rec s33 'r["state"]')"; ACT33="$(rec s33 'r["activeAt"]')"
 age s33 31; fire Notification s33 "$R29" "" '{"notification_type":"idle_prompt"}' >/dev/null; sleep 0.4
 AFTER="$(rec s33 'r["state"], r["background"], r["activeAt"]')"; B33="$(probe s33)"; N33B="$(of s33 0)"
-age s33 31; fire Stop s33 "$R29" "" '{"background_tasks":[{"id":"b1","type":"shell","status":"completed"}]}' >/dev/null; upto s33 $((N33B + 1))
+age s33 31; fire Stop s33 "$R29" "" '{"background_tasks":[{"id":"b1","type":"shell","status":"completed"},{"id":"t1","type":"teammate","status":"running"}]}' >/dev/null; upto s33 $((N33B + 1))
 if [ "$N33" = 2 ] && [ "$ST33" = working ] && [ "$BG" -ge "$T1" ] && [ "$AFTER" = "('working', $BG, $ACT33)" ] && [ "$B33" = "$BG" ] \
    && [ "$(of s33 "$((N33B + 1))" PRESENCE_STATE)" = waiting ] && [ -z "$(of s33 "$((N33B + 1))" PRESENCE_BUSY_SINCE)" ]; then
-  ok "(33) Stop with background work running → working, busy since the Stop; idle_prompt → unchanged; Stop with none → waiting"
+  ok "(33) Stop with background work running → working, busy since the Stop; idle_prompt → unchanged; Stop with none (an idle teammate is none) → waiting"
 else bad "(33) n=$N33 st=$ST33 bg=$BG t1=$T1 after=$AFTER b=$B33 $(grep '"s33"' "$LOG")"; fi
 
 # (34) a turn ended on an API error (a usage limit) stays working, not busy, with no new activity, so it
