@@ -86,8 +86,10 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            and not already applied, the turn was interrupted and it is the person's move: every
            open call, the background mark and the failed-turn flag are dropped, the state is
            "waiting" and the interrupt's time is the last activity. The change is sent as any held
-           change is. Anything said after that entry, a transcript that is missing, unreadable, not
-           the user's own file or cut mid-line, or an entry without a time changes nothing.
+           change is. A background helper still running after the interrupt sets the state back to
+           "working" at its next tool call, and the interrupt already applied does not undo that.
+           Anything said after that entry, a transcript that is missing, unreadable, not the user's
+           own file or cut mid-line, or an entry without a time changes nothing.
   send <event> <state> <session> <record> <sequence> <at>  (detached) runs the command once,
            holding the session's send lock so reports run one at a time, and only for the record
            that queued it (a record recreated since is another) and when its sequence number is

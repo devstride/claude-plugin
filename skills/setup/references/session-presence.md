@@ -69,9 +69,10 @@ name. Its exit code is kept in the session's local record; nothing reads it as a
   `waiting` is the person's turn and is never hung. An interrupt fires no hook, not even the idle
   prompt: the keeper reads Claude Code's interrupt entry at the end of the transcript and reports
   `waiting` (a transcript it cannot read changes nothing; a local command typed within ten seconds
-  of the interrupt hides it until the idle prompt 60 seconds after that command). One blind spot:
-  no hook marks a permission approval, so an approved command that runs long reads `waiting` until
-  it ends.
+  of the interrupt hides it until the idle prompt 60 seconds after that command). A background
+  helper still running after the interrupt reports `working` again at its next tool call. One
+  blind spot: no hook marks a permission approval, so an approved command that runs long reads
+  `waiting` until it ends.
 - **Fail fast and quietly.** A slow or failing command costs that one report, never a turn.
 - **Quote every variable.** A branch name can hold shell syntax: pass `"$PRESENCE_BRANCH"`
   quoted, or read the variables from the environment in code.

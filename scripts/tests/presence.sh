@@ -604,7 +604,8 @@ settle() { sleep 0.6; }   # three keeper checks at DEVSTRIDE_PRESENCE_MINUTE=1
 
 # (37) an interrupt (Esc) fires no hook: the keeper reads it from the end of the transcript. A working
 #      session whose transcript ends on the interrupt entry → waiting, open calls dropped, sent as a
-#      held change; applied once: the next prompt → working, even while the transcript still ends there
+#      held change; applied once: a helper's call with no prompt → working and its call kept, and the
+#      next prompt → working, even while the transcript still ends there
 : > "$LOG"; O37="$(owner)"; T37="$WORK/t37.jsonl"
 entry "$T37" prompt,assistant >/dev/null
 DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O37" fire SessionStart s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 1
@@ -614,15 +615,19 @@ BEFORE37="$(rec s37 'r["state"], len(r["tools"])')"; sleep 0.05
 M37="$(entry "$T37" esc-tool,bookkeeping,helper)"; settle
 HELD37="$(rec s37 'r["state"], len(r["tools"]), r["interrupt"], r["activeAt"]')"; N37="$(of s37 0)"   # held: sent within 30 s
 age s37 31; upto s37 3
+fire PreToolUse s37 "$K60" "" "$(tool Read h37 helper-37)" >/dev/null; settle   # a helper that outlived the Esc works on; no prompt
+HELPER37="$(rec s37 'r["state"], len(r["tools"]), r["interrupt"]')"            # the same interrupt is not applied a second time
+fire Stop s37 "$K60" >/dev/null                                               # the helper is done: waiting again, as reported
 age s37 31; CLAUDE_PID="$O37" fire UserPromptSubmit s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 4; settle
 AGAIN37="$(rec s37 'r["state"]')"
 M37B="$(entry "$T37" esc)"; settle; age s37 31; upto s37 5   # interrupted again, while Claude was writing
 if [ "$BEFORE37" = "('working', 1)" ] && [ "$HELD37" = "('waiting', 0, $M37, $M37)" ] && [ "$N37" = 2 ] \
    && [ "$(of s37 3 PRESENCE_EVENT)" = beat ] && [ "$(of s37 3 PRESENCE_STATE)" = waiting ] && [ -z "$(of s37 3 PRESENCE_BUSY_SINCE)" ] \
-   && [ "$(of s37 3 PRESENCE_ACTIVE_AT)" = "$M37" ] && [ "$(of s37 4 PRESENCE_STATE)" = working ] && [ "$AGAIN37" = working ] \
+   && [ "$(of s37 3 PRESENCE_ACTIVE_AT)" = "$M37" ] && [ "$HELPER37" = "('working', 1, $M37)" ] \
+   && [ "$(of s37 4 PRESENCE_STATE)" = working ] && [ "$AGAIN37" = working ] \
    && [ "$(of s37 5 PRESENCE_STATE)" = waiting ] && [ "$(rec s37 'r["interrupt"]')" = "$M37B" ]; then
-  ok "(37) transcript ends on the interrupt entry (past a 300 KB entry, bookkeeping and a helper's entry) → the keeper sends waiting, not busy; a prompt → working, the old interrupt not applied again; a new interrupt → waiting"
-else bad "(37) before=$BEFORE37 held=$HELD37 m=$M37 n=$N37 again=$AGAIN37 m2=$M37B $(grep '"s37"' "$LOG") $(cat "$RECORDS/s37.json")"; fi
+  ok "(37) transcript ends on the interrupt entry (past a 300 KB entry, bookkeeping and a helper's entry) → the keeper sends waiting, not busy; a helper's call or a prompt → working, the old interrupt not applied again; a new interrupt → waiting"
+else bad "(37) before=$BEFORE37 held=$HELD37 m=$M37 n=$N37 helper=$HELPER37 again=$AGAIN37 m2=$M37B $(grep '"s37"' "$LOG") $(cat "$RECORDS/s37.json")"; fi
 stop_keeper s37
 
 # (38) never waiting on a doubt: an interrupt older than the last prompt, one followed by anything the
