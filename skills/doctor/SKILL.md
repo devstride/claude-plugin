@@ -315,7 +315,7 @@ release safety hooks …), each against its registry `contract`:
 
 ## 8. Active Agents (`agents`)
 
-Read-only, by `references/agents.md`; no block → its board scan, INFO only.
+Read-only: `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/agents.md`; no block → board scan, INFO.
 
 ## Closing — the report, then the offer
 
