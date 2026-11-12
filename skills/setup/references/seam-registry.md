@@ -247,6 +247,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `releaseTrain.smallFixes.maxFiles` | integer | >= 1 | — | **Required.** at most this many changed files | 3.23.0 |
 | `releaseTrain.smallFixes.maxChangedLines` | integer | >= 1 | — | **Required.** at most this many changed lines, added plus removed | 3.23.0 |
 | `releaseTrain.lateArrivals` | string | restart, offer | offer | restart: a one-off landing during the train's review restarts that review over the whole snapshot; offer: it joins only on the owner's word | 3.23.0 |
+| `releaseTrain.reviewEveryLanding` | boolean | — | `false` | true: every train one-off, small or not, lands only with a settled LOCAL-FULL review receipt (sized to the change), and the train's pull request reviews only what no receipt covers | 3.59.0 |
 | `supportTrain` | object, null | — | — | the old name of releaseTrain, still read when releaseTrain is absent (doctor notes it; both together is an error) | 3.22.0 |
 | `supportTrain.branch` | string | — | — | the old name of releaseTrain.branch | 3.22.0 |
 | `supportTrain.fastMerges` | boolean | — | — | the old name of releaseTrain.fastMerges | 3.22.0 |

@@ -102,7 +102,8 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    one-off(s) for release <date>`, the body listing each one-off and carrying the range marker
    (scope `cut-to-deploy` or a `claims` block: and the holder marker) —
    flagged as a release-unit pull request exactly as `build-item` step 8 flags an epic release, so
-   `review` takes the FULL diff (a one-off merged fast onto the train had no full review yet — this
+   `review` takes the FULL diff (with `releaseTrain.reviewEveryLanding` true, step 4r decides
+   instead) (a one-off merged fast onto the train had no full review yet — this
    is its first and only full review before production; with `release.productionReview` set, a
    release unit that joined through its own reviewed pull request is excluded, `review-once.md`),
    and declaring `merge-only: true`,
@@ -113,6 +114,28 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    the source by its own pull request); once cut (and again on an adopted pull request) run the
    exclusion check with `--source-before <sourceBefore> --head <snapshot head>` and put each
    `allowedRenumbers` entry in the body.
+4r. **Review receipts** (`releaseTrain.reviewEveryLanding` true; else step 4 as written). Once the
+   snapshot is cut, run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/train_receipts.py
+   --config .claude/ds-config.json --source-before <sourceBefore> --head <snapshot head>` (its
+   header has the rules; exit 2 STOPS). Its `body` goes into the pull request's body under
+   `## Review evidence`: every item the train carries with its receipt (engines, cycles), every unit
+   its own pull request reviewed, and everything with neither. That list is the pull request's
+   review evidence.
+   - **`receipted`** (exit 0): no review round. `pr` runs as driven, step 4's declarations kept;
+     instead of a review cycle its pre-ship checks run at the snapshot head (as if `review` had
+     reached its 7.1b hold), then `review` in PRE-SHIP RESUME mode marks it ready and settles CI,
+     once. With no pre-ship hold, PRE-SHIP RESUME runs straight away.
+   - **`needs-review`** (exit 1): `review` runs as a short review of only the `unreviewed` entries,
+     its scope manifest naming each one's diff (`git diff <from> <to>`) — a landing with no receipt,
+     a conflict resolution, a direct or snapshot-fix commit — and listing the receipted items and
+     reviewed units as already reviewed, never re-read. Its cycle target, P1 continuation and the
+     ready-flip are as for any `review`.
+   - Every fix committed on the snapshot is itself a direct commit: rerun the script on the final
+     head before the ready-flip, and anything new it lists joins the review. The tree that settles
+     counts as the reviewed tree for `review-once.md`'s production comparison, so its one
+     `highRiskEngine` pass over the high-risk files on the production pull request stays.
+   - What it does not cover, said in the body: no reviewer reads how the one-offs interact with
+     each other; the one CI run over the combined train is the check for that.
 4a. **Late landings.** Each progress report runs `git fetch origin <releaseSource> <train>` and
    names any late one-offs in `git log --no-merges --oneline <trainSnapshot>..origin/<train>`. To
    ABSORB them: resolve `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said
@@ -141,6 +164,8 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
      ready-flip; the absorbed range then gets one FULL-scope cycle of every configured engine
      with the ledger, outside the cycle budget (a required engine that cannot run STOPS). Later
      landings ship next time, said so; after the flip the offer closes (a push would restart CI).
+     With step 4r, rerun its script on the new head: the cycle covers only the new `unreviewed`
+     entries (none → no cycle), and the body's list is rewritten with the marker.
 4b. **Train-run pre-ship checks** (a new and an adopted train pull request both run this before
    step 5). Once `pr` has settled the pull request's review and its CI is running, run
    **`pre-ship train run`** at the snapshot head: every `preShipChecks` entry with `when:

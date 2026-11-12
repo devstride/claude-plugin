@@ -57,7 +57,10 @@ train through its own release pull request — its full review — and the train
 (`release-branch.md` §1 step 4) then reviews only what no pull request has reviewed: the commits
 the fast one-offs brought, NOT the commits a merged, reviewed release pull request brought (list
 those in the scope manifest as already reviewed, with their pull request numbers). CI still runs
-once over the whole train.
+once over the whole train. With `releaseTrain.reviewEveryLanding` true, the one-offs that landed
+with a review receipt are already reviewed too (`release-branch.md` §1 step 4r), and the train pull
+request's settled tree is the reviewed tree this file's identical-tree rule compares with: the
+production pull request's one `highRiskEngine` pass still runs.
 
 ## Cited by
 

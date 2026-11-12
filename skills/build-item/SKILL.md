@@ -207,7 +207,7 @@ per `releaseTrain.fastMerges`. Never mix: 4a toward develop reaches production n
 lenses included) or no valid verification receipt → **4b**, saying why.
 
 - **`review` in LOCAL-ONLY mode** with the base, profile and caller ledger: no second engine, but
-  it owns triage, fixes and lessons. On the train a small fix skips it and a larger one runs
+  it owns triage, fixes and lessons. On the train a small fix may skip it; any other runs
   LOCAL-FULL instead (`release-train.md`).
 - **Fix every fix-in-story finding it returns** (its `fixFloor` triage; a reasoned deferral is not
   re-imposed) per `commitConventions.reviewFixFormat` (fallback

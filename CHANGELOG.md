@@ -39,6 +39,18 @@ for what each version component means here and how a release is cut.
   deploy runs the start check there (trigger 5 in `auto-start.md`); on `START` it keeps the claim,
   hands the tower back, runs its own post-deploy check and then starts the next release, instead of
   handing the claim on and waiting for another session to notice.
+- **Every one-off can be reviewed when it lands, so the train's pull request needs only CI.** With
+  the new `releaseTrain.reviewEveryLanding: true`, the landing gate (`review-gate.py check`) no
+  longer lets a small fix land unreviewed: every one-off lands with a settled LOCAL-FULL review
+  receipt at the exact commit that lands, sized to the change (a small fix gets one cycle with a
+  narrower Claude pass; the CLI engine runs on every one). The receipt's first line rides in the
+  landing's merge commit. The release reads those lines back with a new helper,
+  `train_receipts.py`, lists every item the train carries with its receipt in the train pull
+  request's body as its review evidence, and runs no review round when every commit is covered: the
+  pre-ship checks run and CI starts once. Anything without a receipt (a landing from before the
+  setting, a conflict resolution, a direct or snapshot-fix commit) gets a short review of just that
+  difference. The production pull request's one pass over the high-risk files stays. Without the
+  setting nothing changes.
 - **`tower-queue.py --waited-minutes <m>`.** A release that stepped aside and has waited at the
   head of the queue past `release.clearance.staleMinutes` gets `ASK` (exit 3): tell the owner once
   and keep polling. It never adopts on its own.

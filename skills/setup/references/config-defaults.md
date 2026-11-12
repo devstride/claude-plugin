@@ -285,6 +285,7 @@ work lands, which is the operator's decision. Absent, the loop behaves as before
 | `releaseTrain.fastMerges` | boolean | `false`: a one-off on the train takes the full per-story pull-request ritual, into the train |
 | `releaseTrain.smallFixes` | `{ "maxFiles": 5, "maxChangedLines": 500 }` | no fix counts as small: every fast one-off gets its own local review pass |
 | `releaseTrain.lateArrivals` | `"restart"` or `"offer"` | `"offer"`: a one-off landing during the train's review joins only on the owner's word, before the ready-flip |
+| `releaseTrain.reviewEveryLanding` | `true` | `false`: a small fix lands with no review of its own and the train's pull request reviews it; `true`: every one-off lands with a review receipt and the train's pull request needs only CI (`release-branch.md` §1 step 4) |
 | `protectedBranches` entries | exact names or patterns, e.g. `"release/*"` | exact names only |
 
 `releaseTrain` was called `supportTrain` before this release. The plugin reads `releaseTrain` first and,

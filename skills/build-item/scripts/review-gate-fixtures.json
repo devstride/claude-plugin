@@ -228,6 +228,215 @@
     "riskFiles": [],
     "mergeBody": ""
    }
+  },
+  {
+   "name": "every landing: a small fix with a settled receipt is reviewed",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ]
+    }
+   ],
+   "expect": {
+    "verdict": "reviewed",
+    "files": 1,
+    "lines": 4,
+    "riskFiles": [],
+    "mergeBody": "Review: LOCAL-FULL at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa over origin/train/release (merge base eeeeeeeeeeee), 2 cycle(s), engines: claude (findings), codex (no findings)\n- R001 P2 fixed: null check on the retry path\n- R002 P3 dismissed"
+   }
+  },
+  {
+   "name": "every landing: no size rule, with a settled receipt, is reviewed",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ]
+    }
+   ],
+   "expect": {
+    "verdict": "reviewed",
+    "files": 0,
+    "lines": 0,
+    "riskFiles": [],
+    "mergeBody": "Review: LOCAL-FULL at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa over origin/train/release (merge base eeeeeeeeeeee), 2 cycle(s), engines: claude (findings), codex (no findings)\n- R001 P2 fixed: null check on the retry path\n- R002 P3 dismissed"
+   }
+  },
+  {
+   "name": "every landing off: a small fix still lands as small",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": false
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ]
+    }
+   ],
+   "expect": {
+    "verdict": "small",
+    "files": 1,
+    "lines": 4,
+    "riskFiles": [],
+    "mergeBody": "Review: small fix (1 file(s), 4 changed line(s)), covered by the train's release review"
+   }
   }
  ],
  "errors": [
@@ -1123,6 +1332,131 @@
     }
    ],
    "contains": "configured CLI engine"
+  },
+  {
+   "name": "every landing: a small fix without a receipt",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000"
+   },
+   "receipts": [],
+   "contains": "every train landing is reviewed before it lands (releaseTrain.reviewEveryLanding)"
+  },
+  {
+   "name": "every landing: no size rule and no receipt",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000"
+   },
+   "receipts": [],
+   "contains": "no size rule: review it at full depth"
+  },
+  {
+   "name": "reviewEveryLanding is not a boolean",
+   "request": {
+    "base": "origin/train/release",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree": "cccccccccccccccccccccccccccccccccccccccc",
+    "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": "yes"
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ]
+    }
+   ],
+   "contains": "releaseTrain.reviewEveryLanding must be true or false"
   }
  ],
  "record": [

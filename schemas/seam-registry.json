@@ -1994,6 +1994,13 @@
       "since": "3.23.0"
     },
     {
+      "key": "releaseTrain.reviewEveryLanding",
+      "type": "boolean",
+      "default": false,
+      "description": "true: every train one-off, small or not, lands only with a settled LOCAL-FULL review receipt (sized to the change), and the train's pull request reviews only what no receipt covers",
+      "since": "3.59.0"
+    },
+    {
       "key": "supportTrain",
       "type": [
         "object",

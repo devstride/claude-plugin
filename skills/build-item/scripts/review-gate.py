@@ -29,11 +29,17 @@ together, with `head`: the fixtures' git-free mode).
 `check`:
 - `targetKind` other than "train" (default "train") -> `not-applicable`: epic stories get their full
   review at the epic's release pull request.
+- `releaseTrain.reviewEveryLanding` true -> every train landing needs the receipt below, small or
+  not: the size rule only sizes the review (the reason says which), and the verdict is `reviewed`.
 - `releaseTrain.smallFixes` not set -> `not-applicable`: the repository set no size rule.
 - `small: true` -> `small`.
 - else a receipt for this head whose tree and merge base match, and which is itself settled (the
   same rules `record` applies) -> `reviewed`.
 - else exit 2, one line naming the review to run. Never merge on a non-zero exit.
+
+The receipt's first `mergeBody` line is the review's record in git: the landing's merge commit
+carries it, and the release reads it back with `parse_receipt` (`release/scripts/train_receipts.py`),
+so its wording changes only together with that parser.
 
 **No result, no review.** An engine's `result` is `findings`, `no-findings` (its explicit verdict
 that it found nothing) or `failed` with a one-line `reason`: a crash, kill, timeout, non-zero exit,
@@ -89,7 +95,7 @@ def git(*args):
     return p.stdout.decode("utf-8", "surrogateescape")
 
 
-def small_rule(config, numstat):
+def routing_module():
     spec = importlib.util.spec_from_file_location("routing", ROUTING)
     routing = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(routing)
@@ -97,7 +103,18 @@ def small_rule(config, numstat):
     def refuse(msg):
         raise Refuse(msg.replace("small: ", "", 1))
     routing.fail = refuse
-    return routing.cmd_small({"config": config, "numstat": numstat})
+    return routing
+
+
+def small_rule(config, numstat):
+    return routing_module().cmd_small({"config": config, "numstat": numstat})
+
+
+def review_every_landing(config):
+    """`releaseTrain.reviewEveryLanding` (the old `supportTrain` name read as routing reads it)."""
+    value = routing_module().train_section(config).get("reviewEveryLanding")
+    need(value is None or isinstance(value, bool), "config: releaseTrain.reviewEveryLanding must be true or false")
+    return value is True
 
 
 def subject(req, with_diff=True):
@@ -211,6 +228,24 @@ def settled(r, config):
     return clean
 
 
+RECEIPT_LINE = re.compile(r"^Review: LOCAL-FULL at ([0-9a-f]{40}(?:[0-9a-f]{24})?) over (\S+) "
+                          r"\(merge base ([0-9a-f]{12})\), ([0-9]+) cycle\(s\), engines: (.+)$", re.M)
+ENGINE_LABEL = re.compile(r"([^\s,()]+) \((no findings|findings|failed: [^)]*)\)")
+
+
+def parse_receipt(message):
+    """The receipt `body` wrote into a merge commit's message, read back: {head, base, mergeBase,
+    cycles, engines: [{engine, result}]}, or None when the message carries none. Only the first
+    receipt line counts; a message is never searched for a second one."""
+    m = RECEIPT_LINE.search(message or "")
+    if not m:
+        return None
+    engines = [{"engine": e, "result": "failed" if r.startswith("failed") else r.replace(" ", "-")}
+               for e, r in ENGINE_LABEL.findall(m.group(5))]
+    return {"head": m.group(1), "base": m.group(2), "mergeBase": m.group(3), "cycles": int(m.group(4)),
+            "engines": engines}
+
+
 def label(e):
     return "%s (%s)" % (e["engine"], "failed: " + e["reason"] if e["result"] == "failed" else e["result"].replace("-", " "))
 
@@ -233,14 +268,22 @@ def check(req):
         return {"verdict": "not-applicable", "files": 0, "lines": 0, "riskFiles": [],
                 "reason": "a %s landing gets its full review at its release pull request" % kind, "mergeBody": ""}
     config = config_of(req)
+    every = review_every_landing(config)
     small = small_rule(config, numstat)
     shape = {"files": small["files"], "lines": small["lines"], "riskFiles": small["riskFiles"]}
-    if small["reason"] == "releaseTrain.smallFixes is not set":
+    unsized = small["reason"] == "releaseTrain.smallFixes is not set"
+    if every:
+        size = ("no size rule: review it at full depth" if unsized else
+                "a small fix (%s): a sized review" % small["reason"] if small["small"] else
+                "not a small fix (%s): a full review" % small["reason"])
+    elif unsized:
         return dict(shape, verdict="not-applicable", reason="releaseTrain.smallFixes is not set: no size rule",
                     mergeBody="")
-    if small["small"]:
+    elif small["small"]:
         return dict(shape, verdict="small", reason=small["reason"],
                     mergeBody="Review: small fix (%s), covered by the train's release review" % small["reason"])
+    else:
+        size = "not a small fix (%s)" % small["reason"]
     path = os.path.join(receipts_dir(req), head + ".json")
     try:
         with open(path) as f:
@@ -251,7 +294,10 @@ def check(req):
         raise Refuse("the receipt %s is not JSON: delete it and review again" % path)
     run = "run /devstride:review local-full %s" % req["base"]
     if receipt is None:
-        raise Refuse("not a small fix (%s) and no LOCAL-FULL review settled at %s: %s" % (small["reason"], head[:12], run))
+        if every:
+            raise Refuse("every train landing is reviewed before it lands (releaseTrain.reviewEveryLanding), and no "
+                         "LOCAL-FULL review settled at %s; it is %s: %s" % (head[:12], size, run))
+        raise Refuse("%s and no LOCAL-FULL review settled at %s: %s" % (size, head[:12], run))
     need(isinstance(receipt, dict) and receipt.get("head") == head, "the receipt %s names another head: %s" % (path, run))
     need(receipt.get("tree") == tree and receipt.get("mergeBase") == merge_base,
          "the LOCAL-FULL review at %s covered another diff (tree or merge base changed): %s" % (head[:12], run))
@@ -259,7 +305,7 @@ def check(req):
         settled(receipt, config)
     except Refuse as err:
         raise Refuse("the receipt %s is not a settled LOCAL-FULL review (%s): %s" % (path, err, run))
-    return dict(shape, verdict="reviewed", reason="%s; LOCAL-FULL settled at %s" % (small["reason"], head[:12]),
+    return dict(shape, verdict="reviewed", reason="%s; LOCAL-FULL settled at %s" % (size if every else small["reason"], head[:12]),
                 mergeBody=body(receipt))
 
 
