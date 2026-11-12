@@ -1891,7 +1891,7 @@
       ],
       "default": null,
       "description": "the work type whose nearest item above a picked-up item is its plan on the board (matched case-insensitively); null means the level directly above the release unit",
-      "since": "unreleased"
+      "since": "3.56.0"
     },
     {
       "key": "activeAgents.commands",

@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.55.0.
+`.claude/ds-config.json` against. Schema version: 3.56.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -234,7 +234,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `activeAgents.tagName` | string | — | agent active | the tag that marks a root an agent is working under, allowed on every plan-root type | 3.25.0 |
 | `activeAgents.tagColor` | string | gray-medium-dark, red, pink, orange, yellow, lime, green, teal, blue, blue-medium, purple | green | the tag's colour | 3.25.0 |
 | `activeAgents.staleMinutes` | integer | >= 1 | `20` | minutes without a heartbeat after which the repository's presence implementation treats a session as gone; exported to both commands | 3.25.0 |
-| `activeAgents.rootLevel` | string, null | — | `null` | the work type whose nearest item above a picked-up item is its plan on the board (matched case-insensitively); null means the level directly above the release unit | unreleased |
+| `activeAgents.rootLevel` | string, null | — | `null` | the work type whose nearest item above a picked-up item is its plan on the board (matched case-insensitively); null means the level directly above the release unit | 3.56.0 |
 | `activeAgents.commands` | object | — | — | **Required.** the repository's own start and end commands | 3.25.0 |
 | `presence` | object, null | — | — | the repository's own presence command, run by the plugin's hooks for every session (session start, prompts, tool uses and finished turns, throttled; a keeper every intervalMinutes; session end); absent or null, or a blank command, runs nothing and writes nothing | 3.42.0 |
 | `presence.intervalMinutes` | integer | 1..60, else warned and the default stands | `5` | minutes between the keeper's beats while the session's process lives; a value outside 1 to 60 is ignored with a warning and reads as 5 | 3.42.0 |

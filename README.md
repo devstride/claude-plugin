@@ -552,7 +552,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.55.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.56.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added
