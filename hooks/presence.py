@@ -34,10 +34,10 @@ the repository's. The contract: skills/setup/references/session-presence.md.
                                (state "waiting": a prompt waits on the person), elicitation_response and
                                elicitation_complete (state "working": the person answered, the call
                                goes on; not while a question is open) and idle_prompt (about
-                               60 seconds after a finished turn or an interrupt, which fires no hook of
-                               its own: every open call is dropped and the state is "waiting", unless
-                               the turn left background work running or ended on an API error, when
-                               the state is kept and no activity is stamped); any other type does nothing
+                               60 seconds after a finished turn: every open call is dropped and the
+                               state is "waiting", unless the turn left background work running or
+                               ended on an API error, when the state is kept and no activity is
+                               stamped); any other type does nothing
            Stop             -> every open call is dropped; state "waiting", or "working" when the
                                payload's background_tasks holds one with status `running` that is not
                                a teammate (the turn left its own background work running; that moment
@@ -48,9 +48,13 @@ the repository's. The contract: skills/setup/references/session-presence.md.
                                idle while working
            SessionEnd       -> state "ended", sends `end` (PRESENCE_END_REASON = the payload's
                                reason, such as `clear` or `logout`)
+           An interrupt (the person pressing Esc mid-turn, or refusing a permission prompt) fires no
+           hook at all, not Stop and not the idle prompt, which follows only a finished turn or a
+           local command: the keeper reads it from the session's transcript (below).
            Every event but SessionEnd, StopFailure and an ignored idle_prompt stamps the session's last
            activity (PRESENCE_ACTIVE_AT). SessionStart and UserPromptSubmit drop every open call, the
-           background mark and the failed-turn flag. At most 64 calls are open (the oldest dropped).
+           background mark and the failed-turn flag, and keep their own time and the payload's
+           transcript_path for the keeper. At most 64 calls are open (the oldest dropped).
            Every event but SessionStart and UserPromptSubmit only updates a session already reported:
            for a session with no record, or one already ended, it does nothing. Every event but those
            two and SessionEnd sends `beat` only on a state change.
@@ -75,6 +79,17 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            process id now belongs to a process with another known start time, it sends `end`
            (reason `gone`) and exits; and it sends `beat` when the last send is `intervalMinutes`
            old or a held change is due. It covers a long turn with no prompt, and a killed session.
+           While the state is "working" it also reads the end of the session's transcript (its last
+           256 KB, never under the state lock): when the main conversation's last user or assistant
+           entry is Claude Code's own interrupt entry (a user entry whose one text block starts
+           "[Request interrupted by user"), stamped later than the session's last start or prompt
+           and not already applied, the turn was interrupted and it is the person's move: every
+           open call, the background mark and the failed-turn flag are dropped, the state is
+           "waiting" and the interrupt's time is the last activity. The change is sent as any held
+           change is. A background helper still running after the interrupt sets the state back to
+           "working" at its next tool call, and the interrupt already applied does not undo that.
+           Anything said after that entry, a transcript that is missing, unreadable, not the user's
+           own file or cut mid-line, or an entry without a time changes nothing.
   send <event> <state> <session> <record> <sequence> <at>  (detached) runs the command once,
            holding the session's send lock so reports run one at a time, and only for the record
            that queued it (a record recreated since is another) and when its sequence number is
@@ -142,6 +157,9 @@ NOTICES = ("permission_prompt", "idle_prompt", "elicitation_dialog", "elicitatio
 ANSWERED = ("elicitation_response", "elicitation_complete")  # the person answered an MCP prompt
 QUESTIONS = ("AskUserQuestion", "ExitPlanMode")  # the main conversation asking its person
 OPEN_LIMIT = 64          # open calls kept per session; the oldest is dropped beyond it
+TRANSCRIPT_TAIL = 262144  # bytes at the end of the transcript the keeper reads to find an interrupt
+INTERRUPTED = "[Request interrupted by user"  # how Claude Code's transcript opens the entry for an Esc
+ISO_TIME = re.compile(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z$")
 TOOL_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 
 
@@ -423,10 +441,63 @@ def background_running(payload):
                                            and t.get("type") != "teammate" for t in tasks)
 
 
+def epoch_ms(text):
+    """An ISO 8601 UTC time, as Claude Code stamps a transcript entry, in epoch milliseconds; else 0."""
+    match = ISO_TIME.match(text) if isinstance(text, str) else None
+    if not match:
+        return 0
+    try:
+        seconds = calendar.timegm(time.strptime(match.group(1), "%Y-%m-%dT%H:%M:%S"))
+    except ValueError:
+        return 0
+    return seconds * 1000 + int((match.group(2) or "0").ljust(3, "0")[:3])
+
+
+def interrupted(path):
+    """When the turn this transcript ends on was interrupted by its person, in epoch milliseconds;
+    0 when it was not, or on any doubt. Claude Code fires no hook for an interrupt, but writes a
+    user entry whose one text block starts with INTERRUPTED. It counts only as the main
+    conversation's LAST user or assistant entry: anything said after it means the session moved on.
+    Only the file's last TRANSCRIPT_TAIL bytes are read, from a regular file the user (or root) owns."""
+    if not isinstance(path, str) or not path:
+        return 0
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    except (OSError, ValueError):
+        return 0
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (os.getuid(), 0):
+            return 0
+        start = max(0, info.st_size - TRANSCRIPT_TAIL)
+        lines = os.pread(fd, TRANSCRIPT_TAIL, start).split(b"\n")
+    except OSError:
+        return 0
+    finally:
+        os.close(fd)
+    for line in reversed(lines[1:] if start else lines):  # the window's first line may be cut
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except Exception:
+            return 0  # an entry still being written: the next check reads it whole
+        if not isinstance(entry, dict) or entry.get("type") not in ("user", "assistant") or entry.get("isSidechain"):
+            continue  # the session's own bookkeeping, or a helper agent's conversation
+        message = entry.get("message") if isinstance(entry.get("message"), dict) else {}
+        content = message.get("content")
+        if (entry["type"] == "user" and isinstance(content, list) and len(content) == 1 and isinstance(content[0], dict)
+                and isinstance(content[0].get("text"), str) and content[0]["text"].startswith(INTERRUPTED)):
+            return epoch_ms(entry.get("timestamp"))
+        return 0
+    return 0
+
+
 def transition(event, payload, record, now_ms):
     """Apply one hook event to the record (the state lock is held): its open calls, background mark
     and failed-turn flag. Returns (the new state, or None to keep the state; whether it is a sign of
-    the session's own activity)."""
+    the session's own activity). "Interrupt" is no hook event: the keeper applies it when the
+    transcript shows the person interrupted the turn, which ends it as a Stop with nothing running does."""
     calls = open_calls(record)
     callers = record.get("callers") if isinstance(record.get("callers"), dict) else {}
     asking = record.get("asking") if isinstance(record.get("asking"), str) else ""
@@ -434,12 +505,14 @@ def transition(event, payload, record, now_ms):
     main = not payload.get("agent_id")
     agent = "" if main else str(payload.get("agent_id"))[:128]
     state, active = None, event != "SessionEnd"
-    if event in ("SessionStart", "UserPromptSubmit", "Stop", "StopFailure") or (
+    if event in ("SessionStart", "UserPromptSubmit", "Stop", "StopFailure", "Interrupt") or (
             event == "Notification" and payload.get("notification_type") == "idle_prompt"):
         asking = ""
     if event in FIRST:
         calls = {}
-        record.update({"background": 0, "failed": False})
+        record.update({"background": 0, "failed": False, "prompted": now_ms})
+        if isinstance(payload.get("transcript_path"), str) and 0 < len(payload["transcript_path"]) <= 4096:
+            record["transcript"] = payload["transcript_path"]
         state = "starting" if event == "SessionStart" else "working"
     elif event == "PreToolUse":
         if payload.get("tool_name") in QUESTIONS and main:
@@ -476,7 +549,7 @@ def transition(event, payload, record, now_ms):
             state = None if asking else "working"
         else:
             state = "waiting"  # a permission or elicitation prompt
-    elif event == "Stop":
+    elif event in ("Stop", "Interrupt"):
         calls = {}
         record["failed"] = False
         if background_running(payload):
@@ -649,6 +722,18 @@ def replaced(record):
     return bool(now and abs(now - was) > STARTED_SLACK)
 
 
+def interrupt(record, peek, mark):
+    """Apply an interrupt the transcript showed at `mark` (the state lock is held): only to a session
+    still working, on the transcript that was read, and only one later than the session's last
+    start or prompt and than the last interrupt applied. Returns whether the record changed."""
+    if (not mark or record.get("state") != "working" or record.get("transcript") != peek.get("transcript")
+            or mark <= max(stamp(record.get("prompted")), stamp(record.get("interrupt")))):
+        return False
+    state, _ = transition("Interrupt", {}, record, mark)
+    record.update({"state": state, "interrupt": mark, "activeAt": max(stamp(record.get("activeAt")), mark)})
+    return True
+
+
 def keeper(sid):
     if load(sid) is None:
         return  # no session to keep
@@ -664,6 +749,7 @@ def keeper(sid):
             settings = block(peek.get("top"))
             due = bool(settings) and time.time() - (peek.get("sent") or 0) >= settings["intervalMinutes"] * MINUTE
             reused = due and replaced(peek)  # `ps` runs outside the state lock
+            mark = interrupted(peek.get("transcript")) if peek.get("state") == "working" else 0  # so does this read
             job = None
             with state_lock(sid):
                 record = load(sid)
@@ -674,7 +760,6 @@ def keeper(sid):
                     continue
                 owner, now = record.get("owner"), time.time()
                 due = now - (record.get("sent") or 0) >= settings["intervalMinutes"] * MINUTE
-                held = record.get("state") != record.get("reported") and now - (record.get("sent") or 0) >= CHANGE_AFTER
                 same = owner == peek.get("owner") and record.get("ownerStarted") == peek.get("ownerStarted")
                 if not alive(owner) or (reused and same):
                     record.update({"state": "ended", "reason": "gone"})
@@ -682,9 +767,13 @@ def keeper(sid):
                     save(sid, record)
                     os.close(fd)
                     fd = None
-                elif due or held:
-                    job = ("beat", record["state"]) + queue(record, now)
-                    save(sid, record)
+                else:
+                    noted = interrupt(record, peek, mark)
+                    held = record.get("state") != record.get("reported") and now - (record.get("sent") or 0) >= CHANGE_AFTER
+                    if due or held:
+                        job = ("beat", record["state"]) + queue(record, now)
+                    if job or noted:
+                        save(sid, record)
             if job:
                 send(job[0], job[1], sid, record["id"], job[2], job[3])
     finally:
