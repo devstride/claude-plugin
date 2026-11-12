@@ -22,8 +22,8 @@ sources: review settle (honest-estimates, six cycles)
 
 ## L-002 · Tests share state with detached processes from other cases
 
-class: general · recurrences: 2 · first-seen: 2026-11-09 · last-seen: 2026-11-09
-sources: review settle (unwritable-directory tests; keepers left beating into a shared log)
+class: general · recurrences: 4 · first-seen: 2026-11-09 · last-seen: 2026-11-12
+sources: review settle (unwritable-directory tests; keepers left beating into a shared log; stand-in keepers outside the exit trap; helper sessions whose tool calls restart keepers)
 
 - **Pattern:** a test case moves, deletes, chmods or replaces a directory or file (`mv x x.away`,
   `rm` then restore) that keepers, watchers or other detached processes started by earlier cases

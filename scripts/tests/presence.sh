@@ -18,9 +18,11 @@ RECORDS="$XDG_CACHE_HOME/devstride-plugin/presence"
 LOG="$WORK/sent.log"
 ITEM_NO="I$((20000 + 100))"   # an example item number, built at run time (public-repo hygiene)
 
+# CLAUDE_PLUGIN_ROOT names another version: a report carries the version of the code sending it
 PLUGIN="$WORK/plugin"; mkdir -p "$PLUGIN/.claude-plugin"
 printf '{"name":"devstride","version":"9.8.7"}' > "$PLUGIN/.claude-plugin/plugin.json"
 export CLAUDE_PLUGIN_ROOT="$PLUGIN"
+OWNV="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$ROOT/.claude-plugin/plugin.json")"
 
 # The repository's command: one JSON line per send, with every exported variable it should see.
 REPORT='python3 -c "import json,os; print(json.dumps({k:v for k,v in os.environ.items() if k.startswith(\"PRESENCE_\") or k in (\"CLAUDE_CODE_SESSION_ID\",\"CLAUDE_PID\")}))" >> '"$LOG"
@@ -33,7 +35,7 @@ config() { python3 -c 'import json,sys; print(json.dumps({"presence":{"command":
 fire() { # fire EVENT SESSION CWD [REASON-OR-SOURCE] [EXTRA-JSON] — run the hook as Claude Code does; prints its
   #        stdout. EXTRA-JSON (an object) is merged into the payload: tool_name, tool_use_id, agent_id, …
   python3 -c 'import json,sys; p={"hook_event_name":sys.argv[1],"session_id":sys.argv[2],"cwd":sys.argv[3],"reason":sys.argv[4],"source":sys.argv[4]}; p.update(json.loads(sys.argv[5] or "{}")); print(json.dumps(p))' \
-    "$1" "$2" "$3" "${4:-}" "${5:-}" | python3 "$HOOK" hook
+    "$1" "$2" "$3" "${4:-}" "${5:-}" | python3 "${HOOK_RUN:-$HOOK}" hook
 }
 sent() { [ -f "$LOG" ] && wc -l < "$LOG" | tr -d ' ' || echo 0; }
 wait_sent() { # wait_sent N — until the log holds N lines (detached sends), at most 10 s
@@ -91,10 +93,10 @@ OUT="$(CLAUDE_PID="$O1" fire SessionStart s1 "$R/sub/dir" 2>&1)"
 if [ -z "$OUT" ] && wait_sent 1 && [ "$(field 1 PRESENCE_EVENT)" = start ] && [ "$(field 1 PRESENCE_STATE)" = starting ] \
   && [ "$(field 1 PRESENCE_SESSION_ID)" = s1 ] && [ "$(field 1 CLAUDE_CODE_SESSION_ID)" = s1 ] && [ "$(field 1 CLAUDE_PID)" = "$O1" ] \
   && [ "$(field 1 PRESENCE_CHECKOUT)" = "$(cd "$R" && pwd -P)" ] && [ "$(field 1 PRESENCE_BRANCH)" = "phil/26-01-01/$ITEM_NO-some-story" ] \
-  && [ "$(field 1 PRESENCE_ITEM)" = "$ITEM_NO" ] && [ "$(field 1 PRESENCE_PLUGIN_VERSION)" = 9.8.7 ] \
+  && [ "$(field 1 PRESENCE_ITEM)" = "$ITEM_NO" ] && [ "$(field 1 PRESENCE_PLUGIN_VERSION)" = "$OWNV" ] \
   && [ "$(field 1 PRESENCE_INTERVAL_MINUTES)" = 5 ] && [ -n "$(field 1 PRESENCE_MACHINE)" ] && [ -z "$(field 1 PRESENCE_END_REASON)" ] \
   && [ "$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode)))' "$RECORDS/s1.json")" = 0o600 ]; then
-  ok "(2) SessionStart → start: state, session, CLAUDE_PID, checkout root, branch, item, version, interval, machine; mode 600"
+  ok "(2) SessionStart → start: state, session, CLAUDE_PID, checkout root, branch, item, the code's own version (not CLAUDE_PLUGIN_ROOT's), interval, machine; mode 600"
 else bad "(2) out=$OUT $(cat "$LOG" 2>/dev/null)"; fi
 
 # (3) a prompt right after a send waits; a prompt a minute later beats as working
@@ -419,8 +421,9 @@ probe() { # probe SESSION — run one report now, as the keeper would, and print
   python3 "$HOOK" send beat "$(rec "$1" 'r["state"]')" "$1" "$(rec "$1" 'r["id"]')" "$(rec "$1" 'r["queued"]')" "$(now_ms)"
   of "$1" "$(of "$1" 0)" PRESENCE_BUSY_SINCE
 }
-begin() { # begin SESSION — a reported session with no keeper (the cases drive every send themselves)
-  fire SessionStart "$1" "$R29" >/dev/null; upto "$1" 1; stop_keeper "$1"
+begin() { # begin SESSION — a reported session with no keeper (the cases drive every send themselves); with
+  #           no known process, no later tool call starts one again (a prompt re-reads the process)
+  fire SessionStart "$1" "$R29" >/dev/null; upto "$1" 1; stop_keeper "$1"; edit "$1" 'r["owner"] = 0'
 }
 tool() { printf '{"tool_name":"%s","tool_use_id":"%s"%s}' "$1" "$2" "${3:+,\"agent_id\":\"$3\"}"; }
 R29="$(mkrepo r29 "$(config)")"
@@ -657,6 +660,98 @@ if [ "$D38" = "$WANT38" ] && [ "$N38" = 2 ] && [ "$(of s38 3 PRESENCE_STATE)" = 
   ok "(38) an interrupt that is stale, answered, a helper's, untimed, typed, cut mid-line, behind a symlink or missing, or a session not working → nothing; a real one after them → waiting"
 else bad "(38) got=$D38 n=$N38 $(grep '"s38"' "$LOG") $(cat "$RECORDS/s38.json")"; fi
 stop_keeper s38
+
+# Helpers for (39)-(42): a copy of this plugin at another version (the same code, so its keeper
+# checks the version), and a stand-in for a keeper an earlier version started, which holds the
+# session's keeper lock and never checks anything.
+OLDP="$WORK/oldplugin"; mkdir -p "$OLDP/.claude-plugin" "$OLDP/hooks" "$OLDP/skills/build-item/scripts"
+printf '{"name":"devstride","version":"1.0.0"}' > "$OLDP/.claude-plugin/plugin.json"
+cp "$HOOK" "$OLDP/hooks/presence.py"; cp "$ROOT/skills/build-item/scripts/claim_record.py" "$OLDP/skills/build-item/scripts/"
+LEGACY="$WORK/legacyplugin"; mkdir -p "$LEGACY/hooks"
+cat > "$LEGACY/hooks/presence.py" <<'PY'
+import fcntl, os, sys, time
+fd = os.open(os.path.join(os.environ["XDG_CACHE_HOME"], "devstride-plugin", "presence", sys.argv[2] + ".keeper.lock"),
+             os.O_RDWR | os.O_CREAT, 0o600)
+fcntl.flock(fd, fcntl.LOCK_EX)
+time.sleep(300)
+PY
+keeper_pid() { pgrep -f "hooks/presence.py keeper $1\$" | head -1; }
+keeper_cmd() { local p; p="$(keeper_pid "$1")"; [ -n "$p" ] && ps -ww -o command= -p "$p"; }
+wait_keeper() { # wait_keeper SESSION — until a keeper holds the session's lock, at most 5 s
+  local i=0; while ! keeper_alive "$1" && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; keeper_alive "$1"
+}
+legacy() { # legacy SESSION — start a stand-in earlier-version keeper for SESSION and wait for its lock
+  python3 "$LEGACY/hooks/presence.py" keeper "$1" >/dev/null 2>&1 &
+  echo "$!" >> "$WORK/owners"; wait_keeper "$1"   # the EXIT trap stops it, however the case ends
+}
+
+# (39) each report carries the version of the code sending it: an older copy's send reports its
+#      own version, whatever the record holds
+begin s47; edit s47 'r["queued"] = int(r.get("queued") or 0) + 1'
+python3 "$OLDP/hooks/presence.py" send beat "$(rec s47 'r["state"]')" s47 "$(rec s47 'r["id"]')" "$(rec s47 'r["queued"]')" "$(now_ms)"
+if [ "$(rec s47 'r["version"]')" = "$OWNV" ] && [ "$(of s47 1 PRESENCE_PLUGIN_VERSION)" = "$OWNV" ] \
+   && [ "$(of s47 2 PRESENCE_PLUGIN_VERSION)" = 1.0.0 ]; then
+  ok "(39) the record holds the hook's own version; a report sent by another version's code carries that code's version"
+else bad "(39) record=$(rec s47 'r["version"]') $(grep '"s47"' "$LOG")"; fi
+
+# (40) a keeper leaves once the session's hooks run another version: the loaded version's hook records
+#      its own version, the old keeper sees it and leaves by itself, and the session's next hook event
+#      of any kind, here a tool call ending, starts one from the loaded version
+: > "$LOG"; O38="$(owner)"
+HOOK_RUN="$OLDP/hooks/presence.py" DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O38" fire SessionStart s48 "$K60" >/dev/null
+wait_keeper s48; OLDK="$(keeper_cmd s48)"; V0="$(rec s48 'r["version"]')"
+edit s48 'r["swept"] = "'"$OWNV"'"'   # no process scan: the old keeper's own check is what is tested
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O38" fire PreToolUse s48 "$K60" "" "$(tool Bash k38)" >/dev/null
+V1="$(rec s48 'r["version"]')"
+i=0; while keeper_alive s48 && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; LEFT38=$i
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O38" fire PostToolUse s48 "$K60" "" "$(tool Bash k38)" >/dev/null
+wait_keeper s48; NEWK="$(keeper_cmd s48)"
+if case "$OLDK" in *"$OLDP/hooks/presence.py keeper s48") true;; *) false;; esac && [ "$V0" = 1.0.0 ] && [ "$V1" = "$OWNV" ] \
+   && [ "$LEFT38" -lt 50 ] && [ -n "$NEWK" ] && case "$NEWK" in *"$OLDP"*) false;; *"/hooks/presence.py keeper s48") true;; *) false;; esac; then
+  ok "(40) the loaded version's tool call records its version → the old keeper leaves by itself; the call's end starts the loaded version's keeper"
+else bad "(40) old=$OLDK v=$V0/$V1 left=$LEFT38 new=$NEWK"; fi
+stop_keeper s48
+
+# (41) after an update, a keeper an earlier version started (it never checks the version) is ended
+#      once by the new hook, which starts its own; only this session's: another session's keeper and
+#      a keeper running this very code are never touched. The replacement's reports carry the busy
+#      mark while a call is open and while the finished turn's background work runs.
+: > "$LOG"; O39="$(owner)"
+CLAUDE_PID="$O39" fire SessionStart s49 "$K" >/dev/null; upto s49 1; stop_keeper s49
+edit s49 'r.pop("swept", None)'            # written by an earlier version: no sweep recorded
+legacy s49; legacy s49x; LPID="$(keeper_pid s49)"; XPID="$(keeper_pid s49x)"
+# another session (s49y) whose keeper runs this code, and whose record names no sweep either
+CLAUDE_PID="$O39" fire SessionStart s49y "$K60" >/dev/null; wait_keeper s49y; YPID="$(keeper_pid s49y)"
+edit s49y 'r.pop("swept", None)'; age s49y 61; CLAUDE_PID="$O39" fire UserPromptSubmit s49y "$K60" >/dev/null
+T39="$(now_ms)"; DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O39" fire PreToolUse s49 "$K" "" "$(tool Bash c39)" >/dev/null
+wait_keeper s49; RPID="$(keeper_pid s49)"; RCMD="$(keeper_cmd s49)"; C39="$(rec s49 'r["tools"]["c39"]')"
+N39="$(of s49 0)"; upto s49 $((N39 + 2)); CALLBUSY="$(of s49 "$((N39 + 2))" PRESENCE_BUSY_SINCE)"
+fire PostToolUse s49 "$K" "" "$(tool Bash c39)" >/dev/null
+fire Stop s49 "$K" "" '{"background_tasks":[{"id":"b39","type":"shell","status":"running","command":"sleep 900"}]}' >/dev/null
+BG39="$(rec s49 'r["background"]')"; N39B="$(of s49 0)"; upto s49 $((N39B + 2))
+BGBUSY="$(of s49 "$((N39B + 2))" PRESENCE_BUSY_SINCE)"; BGVER="$(of s49 "$((N39B + 2))" PRESENCE_PLUGIN_VERSION)"
+if ! kill -0 "$LPID" 2>/dev/null && kill -0 "$XPID" 2>/dev/null && [ "$(keeper_pid s49y)" = "$YPID" ] && [ "$(rec s49y 'r.get("swept")')" = "$OWNV" ] \
+   && [ -n "$RPID" ] && [ "$RPID" != "$LPID" ] && case "$RCMD" in *"$LEGACY"*) false;; *"/hooks/presence.py keeper s49") true;; *) false;; esac \
+   && [ "$(rec s49 'r["swept"]')" = "$OWNV" ] && [ "$C39" -ge "$T39" ] && [ "$CALLBUSY" = "$C39" ] \
+   && [ -n "$BG39" ] && [ "$BG39" != 0 ] && [ "$BGBUSY" = "$BG39" ] && [ "$BGVER" = "$OWNV" ]; then
+  ok "(41) an earlier version's keeper → ended at the next tool call and replaced; another session's untouched; the replacement beats busy (open call, then background work), with its own version"
+else bad "(41) legacy=$LPID other=$XPID y=$YPID/$(keeper_pid s49y) new=$RPID cmd=$RCMD swept=$(rec s49 'r.get("swept")') c=$C39 t=$T39 callbusy=$CALLBUSY bg=$BG39 bgbusy=$BGBUSY ver=$BGVER"; fi
+kill "$XPID" "$LPID" 2>/dev/null; stop_keeper s49; stop_keeper s49y
+
+# (42) the hook that ends an earlier version's keeper sends a report from this version at once, busy
+#      since the call it opens: the ended keeper may have dropped one, and the replacement's first
+#      ordinary beat is an interval away (here an hour; a held change waits 30 s)
+: > "$LOG"; O40="$(owner)"
+CLAUDE_PID="$O40" fire SessionStart s50 "$K60" >/dev/null; upto s50 1; stop_keeper s50
+edit s50 'r.pop("swept", None)'; legacy s50; L40="$(keeper_pid s50)"
+CLAUDE_PID="$O40" fire PreToolUse s50 "$K60" "" "$(tool Bash c40)" >/dev/null; upto s50 2
+C40="$(rec s50 'r["tools"]["c40"]')"
+if ! kill -0 "$L40" 2>/dev/null && [ "$(of s50 0)" = 2 ] && [ "$(of s50 2 PRESENCE_EVENT)" = beat ] \
+   && [ "$(of s50 2 PRESENCE_STATE)" = working ] && [ "$(of s50 2 PRESENCE_BUSY_SINCE)" = "$C40" ] \
+   && [ "$(of s50 2 PRESENCE_PLUGIN_VERSION)" = "$OWNV" ] && keeper_alive s50; then
+  ok "(42) ending an earlier version's keeper → a beat from this version at once (busy since the open call), its own keeper running"
+else bad "(42) legacy=$L40 $(grep '"s50"' "$LOG")"; fi
+kill "$L40" 2>/dev/null; stop_keeper s50
 
 # (12) hooks.json registers the hook on all ten events, bounded and failing open; Notification only for
 #      the six prompt types the hook reads, and PreToolUse after the model recorder

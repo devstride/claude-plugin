@@ -38,7 +38,8 @@ A state change within 30 seconds of the last report is held and carried by the n
 Reports for one session run one at a time; each is numbered when queued, and one overtaken by a
 newer report is dropped, so a late `end` never follows a resumed session's `start`. The keeper,
 one detached process per session, checks every 10 seconds, keeps a long turn visible and exits
-once the session ends, its record goes or the block is removed. A session that moves to a
+once the session ends, its record goes, the block is removed or the session loads another plugin
+version, whose next hook event starts its own. A session that moves to a
 checkout without the block keeps reporting under the one it came from.
 
 ## What the command receives
@@ -48,7 +49,7 @@ clock (the hook spawns it and returns). Exported: `PRESENCE_EVENT`, `PRESENCE_ST
 `PRESENCE_SESSION_ID`, `PRESENCE_MACHINE` (the claim machine name),
 `PRESENCE_CHECKOUT` (the checkout's root), `PRESENCE_BRANCH`, `PRESENCE_ITEM` (an item number the branch name carries as its own
 segment, such as `I20100` in `jane/03-14-26/I20100-attachment-storage`; else empty),
-`PRESENCE_PLUGIN_VERSION`, `PRESENCE_INTERVAL_MINUTES`, `PRESENCE_END_REASON` (on `end` only),
+`PRESENCE_PLUGIN_VERSION` (the sender's), `PRESENCE_INTERVAL_MINUTES`, `PRESENCE_END_REASON` (on `end` only),
 `PRESENCE_AT` (when queued, in epoch milliseconds, rising with each report, so an
 older one can be dropped), `PRESENCE_ACTIVE_AT` (the last hook event or interrupt, epoch milliseconds, but never
 `end`, a turn ended on an API error or an idle prompt the state ignores; may be empty), `PRESENCE_BUSY_SINCE` (epoch milliseconds, digits only:

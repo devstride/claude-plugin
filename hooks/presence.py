@@ -13,8 +13,8 @@ plugin never talks to a tracker itself: what a report means, where it goes and w
 the repository's. The contract: skills/setup/references/session-presence.md.
 
   hook     (the hook command; the event comes from the payload's hook_event_name)
-           SessionStart     -> state "starting", sends `start`, starts this session's keeper
-                               (source `compact`, the session carrying on after a compaction, is
+           SessionStart     -> state "starting", sends `start`, starts this session's keeper when
+                               none runs (as every event does; source `compact`, the session carrying on after a compaction, is
                                ignored); the session's process and its start time are always re-read
            UserPromptSubmit -> state "working"; sends `beat` on a state change, when the last send
                                is a minute old, or when the session moved to another checkout; with
@@ -72,9 +72,19 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            start and prompt.
            Every read-modify-write of the record holds the session's state lock (never while the
            command runs), and every queued report takes the next number in the record's sequence.
+           The keeper follows the loaded plugin: every event records this file's own plugin version
+           (read from the plugin it belongs to, never from CLAUDE_PLUGIN_ROOT) as the session's, and
+           any event but SessionEnd, for a session with a known process, starts a keeper when none
+           runs. Once per session and version, when a keeper runs that this version did not start
+           (its record names no sweep by this version), the hook ends this session's keepers whose
+           command line runs another copy's presence.py (`ps`, this user's processes, matched on
+           `/hooks/presence.py keeper <this session>`; never another session's), waits up to half a
+           second for the lock, starts its own and, when it ended one, sends `beat` at once (the ended
+           keeper may have dropped a queued report): a keeper from before this check never leaves.
   keeper <session>  (detached, one per session, holding the session's keeper lock, which is how a
            hook knows one runs) checks every 10 seconds: it exits once the session has ended, its
-           record is gone or the block is removed, releasing its lock under the state lock so a
+           record is gone, the block is removed or the record names another plugin version than its
+           own code's (an update the session has loaded), releasing its lock under the state lock so a
            resume never sees a keeper that is leaving; when the session's process is gone, or its
            process id now belongs to a process with another known start time, it sends `end`
            (reason `gone`) and exits; and it sends `beat` when the last send is `intervalMinutes`
@@ -99,7 +109,8 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            at most 20 seconds, its exit code kept in the record. It exports
            PRESENCE_EVENT (start|beat|end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE,
            PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM (an item number the branch name carries,
-           else empty), PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON,
+           else empty), PRESENCE_PLUGIN_VERSION (the version of the code sending this report, hook
+           or keeper, never one copied from the record), PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON,
            PRESENCE_AT (when the hook or keeper queued the report, epoch milliseconds, always later
            than the session's previous report, so a repository can drop one older than it stored),
            PRESENCE_ACTIVE_AT (the session's last activity, epoch milliseconds; empty when unknown),
@@ -128,6 +139,8 @@ import sys
 import time
 
 sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
+SCRIPT = os.path.realpath(__file__)
+PLUGIN_ROOT = os.path.dirname(os.path.dirname(SCRIPT))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills/build-item/scripts"))
 import claim_record  # noqa: E402  the one machine naming every claim uses
 
@@ -290,11 +303,18 @@ def block(top):
     return {"command": command, "intervalMinutes": interval}
 
 
-def running_version():
-    root = os.environ.get("CLAUDE_PLUGIN_ROOT") or ""
-    manifest = read_json(os.path.join(os.path.realpath(root), ".claude-plugin", "plugin.json")) if root else None
-    version = manifest.get("version") if isinstance(manifest, dict) and manifest.get("name") == "devstride" else None
-    return version if isinstance(version, str) and SEMVER.match(version) else ""
+_VERSION = []
+
+
+def own_version():
+    """The version of the plugin this file belongs to, read once per process: the code actually
+    running. Hooks run the loaded plugin's copy, so a hook records the loaded version, and a keeper
+    or send reports its own, never one copied from the record. "" when unreadable."""
+    if not _VERSION:
+        manifest = read_json(os.path.join(PLUGIN_ROOT, ".claude-plugin", "plugin.json"))
+        version = manifest.get("version") if isinstance(manifest, dict) and manifest.get("name") == "devstride" else None
+        _VERSION.append(version if isinstance(version, str) and SEMVER.match(version) else "")
+    return _VERSION[0]
 
 
 def alive(pid):
@@ -392,8 +412,38 @@ def keeper_running(sid):
     return False
 
 
+def retire_keepers(sid):
+    """End THIS session's keeper when it runs another copy of this script: one started by a plugin
+    version from before keepers checked the version, which would otherwise run (and report without
+    the busy mark) until the session ends. Only this user's processes whose command line ends with
+    `/hooks/presence.py keeper <this session>`, never this file's own: another session's keeper is
+    never touched. Waits up to half a second for its lock to be released (with `ps`, well inside the
+    hook's own limit). Returns whether it ended one."""
+    try:
+        out = subprocess.run(["ps", "-ww", "-U", str(os.getuid()), "-o", "pid=,command="], capture_output=True,
+                             text=True, timeout=1)
+    except Exception:
+        return False
+    tail, own = "/hooks/presence.py keeper " + sid, " %s keeper %s" % (SCRIPT, sid)
+    ended = False
+    for line in out.stdout.splitlines():
+        pid, _, command = line.strip().partition(" ")
+        command = command.strip()
+        if pid.isdigit() and int(pid) != os.getpid() and command.endswith(tail) and not command.endswith(own):
+            try:
+                os.kill(int(pid), signal.SIGTERM)
+                ended = True
+            except OSError:
+                pass
+    for _ in range(10 if ended else 0):
+        if not keeper_running(sid):
+            break
+        time.sleep(0.05)
+    return ended
+
+
 def spawn(*args):
-    subprocess.Popen([sys.executable, os.path.realpath(__file__)] + list(args), stdin=subprocess.DEVNULL,
+    subprocess.Popen([sys.executable, SCRIPT] + list(args), stdin=subprocess.DEVNULL,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True,
                      start_new_session=True)
 
@@ -586,7 +636,7 @@ def run_command(sid, record, event, state, at):
         "PRESENCE_EVENT": event, "PRESENCE_STATE": state,
         "PRESENCE_SESSION_ID": sid, "PRESENCE_MACHINE": claim_record.machine_name(),
         "PRESENCE_CHECKOUT": top, "PRESENCE_BRANCH": branch, "PRESENCE_ITEM": item_of(branch),
-        "PRESENCE_PLUGIN_VERSION": str(record.get("version") or ""),
+        "PRESENCE_PLUGIN_VERSION": own_version(),  # the code sending this report, never the record's
         "PRESENCE_INTERVAL_MINUTES": str(settings["intervalMinutes"]),
         "PRESENCE_END_REASON": str(record.get("reason") or "") if event == "end" else "",
         "PRESENCE_AT": str(at), "PRESENCE_ACTIVE_AT": active_at(record),
@@ -659,6 +709,12 @@ def hook():
         return  # nothing to report, and nothing written
     if event in LATER and (peek is None or peek.get("state") == "ended"):
         return  # never reported here, or already ended
+    version = own_version()
+    # Once per session and version, when a keeper runs that this version did not start: a keeper from
+    # before keepers checked the version never leaves by itself, so it is ended here (and a newer
+    # one's own check would only catch it at its next beat).
+    swept = bool(peek) and peek.get("state") != "ended" and peek.get("swept") != version and keeper_running(sid)
+    retired = swept and retire_keepers(sid)  # the keeper it ended may have dropped a queued report
     mine = int(os.environ["CLAUDE_PID"]) if os.environ.get("CLAUDE_PID", "").isdigit() else 0
     # every `ps` runs here, before the state lock is taken
     owner = owner_pid() if event in FIRST else 0
@@ -684,7 +740,7 @@ def hook():
         moved = not fresh and record.get("top") != top
         state, active = transition(event, payload, record, int(now * 1000))
         sent, state = record.get("sent") or 0, state or previous
-        record.update({"top": top, "state": state, "version": running_version() or record.get("version") or ""})
+        record.update({"top": top, "state": state, "version": version or record.get("version") or ""})
         if active:
             record["activeAt"] = int(now * 1000)  # the session's last sign of life: start, prompt, tool call, stop
         if owner and (event == "SessionStart" or owner_started or owner != record.get("owner")):
@@ -699,13 +755,20 @@ def hook():
             verb = "beat"
         elif (state != record.get("reported") or moved) and now - sent >= CHANGE_AFTER:
             verb = "beat"
+        elif retired:
+            verb = "beat"  # a report from this version now, not at the replacement's first interval
         else:
             verb = None
         sequence, at = queue(record, now) if verb else (0, 0)
+        # any event starts a keeper when none runs: one that left for a version change is replaced
+        # by this, the loaded version, at the session's next hook event
+        start_keeper = state != "ended" and bool(record.get("owner")) and not keeper_running(sid)
+        if swept or start_keeper:
+            record["swept"] = version  # no keeper of another version is left for this one to end
         save(sid, record)
         if verb:
             spawn("send", verb, state, sid, record["id"], str(sequence), str(at))
-        if event in FIRST and record.get("owner") and not keeper_running(sid):
+        if start_keeper:
             spawn("keeper", sid)
     if fresh and event == "SessionStart":
         prune(sid, now)
@@ -741,6 +804,7 @@ def keeper(sid):
     if fd is None:
         return  # another keeper runs for this session
     poll = 10 * MINUTE / 60
+    version = own_version()
     try:
         while fd is not None:
             time.sleep(poll)
@@ -754,7 +818,10 @@ def keeper(sid):
             with state_lock(sid):
                 record = load(sid)
                 settings = block(record.get("top")) if record else None
-                if not settings or record.get("state") == "ended":
+                # the session's hooks now run another version: leave, and its next hook event
+                # starts a keeper of that version
+                moved_on = bool(record and version and record.get("version") not in (None, "", version))
+                if not settings or record.get("state") == "ended" or moved_on:
                     os.close(fd)  # released under the state lock: a resume then starts a new keeper
                     fd = None
                     continue
