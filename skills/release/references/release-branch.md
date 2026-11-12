@@ -42,7 +42,8 @@ never the live train, is what closes items later. A pull request from before the
 check is `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/train_exclusions.py --config
 .claude/ds-config.json --source-before <from> --head <to>` (its header documents the rules): over
 each first-parent commit in the range it leaves out merges of `releaseSource` and merges of a pull
-request that `gh` confirms was merged onto the train as a release unit whose merged head carries an
+request (GitHub's for that merge commit, whatever its subject; the default subject only if GitHub
+cannot be asked) that `gh` confirms was merged onto the train as a release unit whose merged head carries an
 admin's `devstride/reviewed` status for that pull request into the train (the settled review's
 proof, `reviewed-status.py verify`), and checks every other commit (a fast-merged one-off, a direct
 commit, a snapshot fix, a unit without proof, listed in `unprovenUnits` with the reason). A unit

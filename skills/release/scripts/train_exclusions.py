@@ -30,8 +30,13 @@ Checked set: the files each FIRST-PARENT commit in `<source-before>..<head>` cha
 (`git diff --name-only --no-renames <c>^1 <c>`). Left out of it:
   (i)  a merge of the release source (its second parent is an ancestor of `origin/<releaseSource>`),
        for what the source changed — anything else it does to the train side is checked;
-  (ii) a merge that brought a REVIEWED release-unit pull request onto the train: the subject is
-       `Merge pull request #<n> from <owner>/<head>`, `<head>` matches `epicIntegrationBranches.pattern`
+  (ii) a merge that brought a REVIEWED release-unit pull request onto the train: pull request `<n>`
+       is the one GitHub lists for the merge commit itself (`gh api repos/{owner}/{repo}/commits/<sha>/pulls`,
+       the single merged entry whose merge_commit_sha is that commit), whatever the merge's subject;
+       only when that lookup cannot be answered (gh missing or failing, a commit GitHub does not
+       hold) is GitHub's default subject `Merge pull request #<n> from <owner>/<head>` read instead,
+       and a lookup that answers with no such pull request leaves the merge checked file by file.
+       Its head branch `<head>` matches `epicIntegrationBranches.pattern`
        (matched as in `skills/release/references/branch-patterns.md`, with date tokens and every other
        token a wildcard), `gh pr view <n> --json baseRefName,state,mergeCommit,mergedAt` says the pull
        request is MERGED, based on the train, with exactly that commit as its merge commit, AND its
@@ -39,7 +44,7 @@ Checked set: the files each FIRST-PARENT commit in `<source-before>..<head>` cha
        into THAT base: an admin's `devstride/reviewed` status naming both
        (`skills/review/scripts/reviewed-status.py verify`). The branch name alone is never enough:
        anyone can name a branch like an epic. A unit merged before GRANDFATHERED_BEFORE (GitHub's
-       mergedAt) keeps the old rule and is listed in `grandfatheredUnits`. A hand-written subject gh
+       mergedAt) keeps the old rule and is listed in `grandfatheredUnits`. A pull request gh pr view
        does not confirm, or a unit without proof (listed in `unprovenUnits` with the reason), is
        checked like any other commit. GitHub unreadable while reading a proof: exit 2.
   (iii) a merge that brought a REVIEWED plan release onto the train (plan scope): the same test with
@@ -131,14 +136,48 @@ def pull_request_head(subject):
     return (m.group(1), m.group(2)) if m else None
 
 
-def reviewed_unit(repo, commit, subject, head_regex, train, grandfathered=None, unproven=None):
+def merged_pull_request(repo, commit, subject):
+    """`(number, head)` of the pull request GitHub lists for `commit` itself (`commits/<sha>/pulls`)
+    as merged with exactly `commit` as its merge commit, whatever the subject says; None when GitHub
+    answers with no such pull request or with several. The list also names open pull requests whose
+    heads merely contain the commit (the train's own release pull request), so only an exact
+    merge_commit_sha counts. Only when the lookup cannot be answered (gh missing or failing, a
+    commit GitHub does not hold, an answer that is not a list) is GitHub's default merge subject
+    read instead. Either way the caller still confirms the pull request with `gh pr view`."""
+    found, page = {}, 1
+    try:
+        while True:
+            batch = reviewed_status.gh_json(repo, "api", "repos/{owner}/{repo}/commits/%s/pulls?per_page=100&page=%d" % (commit, page))
+            if not isinstance(batch, list):
+                raise reviewed_status.Unreadable("the pull requests of %s could not be read" % commit[:12])
+            for p in batch:
+                if not (isinstance(p, dict) and p.get("merge_commit_sha") == commit
+                        and isinstance(p.get("merged_at"), str) and p["merged_at"]):
+                    continue
+                number, head = p.get("number"), p.get("head")
+                ref = head.get("ref") if isinstance(head, dict) else None
+                if isinstance(number, bool) or not isinstance(number, int) or not isinstance(ref, str) or not ref:
+                    return None   # a merged pull request with this merge commit that cannot be read: no unit
+                found[number] = ref
+            if len(batch) < 100:
+                break
+            page += 1
+    except reviewed_status.Unreadable:
+        return pull_request_head(subject)
+    if len(found) != 1:
+        return None
+    (number, ref), = found.items()
+    return (str(number), ref)
+
+
+def reviewed_unit(repo, commit, found, head_regex, train, grandfathered=None, unproven=None):
     """The pull request number when `commit` is the confirmed merge of a pull request whose head
     matches `head_regex` into `train` (the base it must have been reviewed against) AND whose merged
     head (the merge's second parent) carries proof of a settled review of that pull request into
-    `train` (`reviewed-status.py verify`). A unit merged before GRANDFATHERED_BEFORE keeps the old
+    `train` (`reviewed-status.py verify`). `found` is `merged_pull_request`'s answer for `commit`.
+    A unit merged before GRANDFATHERED_BEFORE keeps the old
     rule and is added to `grandfathered`; a confirmed unit without proof is added to `unproven`
     with the reason, as is one gh could not confirm. A proof unreadable: exit 2. The branch name alone never makes a unit reviewed."""
-    found = pull_request_head(subject)
     if not found or not head_regex.match(found[1]):
         return None
     number = found[0]
@@ -321,7 +360,7 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
                     for p in names(parents[0], c) - brought:
                         flag_merge_path(p)
                     continue
-                number = reviewed_unit(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip(),
+                number = reviewed_unit(repo, c, merged_pull_request(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip()),
                                        epic_regex, plan_branch, grandfathered, unproven) if epic_regex else None
                 if number is not None:
                     accept_unit(number, c, parents[0])
@@ -351,18 +390,19 @@ def analyse(repo, config, source_before, head, train, start_on="source"):
                     for p in names(parents[0], c) - brought:
                         flag_merge_path(p)
                     continue
-                subject = git_text(repo, "log", "-1", "--format=%s", c).strip()
-                head_name = (pull_request_head(subject) or (None, ""))[1]
+                # the pull request GitHub lists for this merge commit, whatever its subject
+                found = merged_pull_request(repo, c, git_text(repo, "log", "-1", "--format=%s", c).strip())
+                head_name = (found or (None, ""))[1]
                 # a plan head is judged as a plan, never as an epic: default patterns can match both
                 if plan_regex and plan_regex.match(head_name):
-                    plan = reviewed_unit(repo, c, subject, plan_regex, train, grandfathered, unproven)
+                    plan = reviewed_unit(repo, c, found, plan_regex, train, grandfathered, unproven)
                     if plan is not None:
                         reviewed.append(plan)
                         walk_plan(git_text(repo, "rev-list", "--first-parent", "--reverse", parents[1], "^" + parents[0]).split(),
                                   head_name, parents[0])
                         continue
                 else:
-                    number = reviewed_unit(repo, c, subject, epic_regex, train, grandfathered, unproven) if epic_regex else None
+                    number = reviewed_unit(repo, c, found, epic_regex, train, grandfathered, unproven) if epic_regex else None
                     if number is not None:
                         accept_unit(number, c, parents[0])
                         continue
