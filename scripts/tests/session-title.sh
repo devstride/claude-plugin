@@ -115,6 +115,19 @@ if [ "$Q1" = "UserPromptSubmit|Asked for" ] && [ "$Q2" = "|" ] && [ "$Q3" = "Use
   ok "(5) line 2 'replace' applies over a person's title and is never OWNED; any other second line is not replace"
 else bad "(5) q1=$Q1 q2=$Q2 q3=$Q3 q4=$Q4"; fi
 
+# (5b) a person's rename disowns the hook's title, even when they later name it back to the same
+#      text; `replace` on the title the session already has makes it a person's without printing
+say "Hook name"; fire UserPromptSubmit s5b "$R" ',"prompt":"x"'; V1="$(title_of)"
+say "Other auto"; fire UserPromptSubmit s5b "$R" ',"prompt":"x","session_title":"Person B"'; V2="$OUT"
+fire UserPromptSubmit s5b "$R" ',"prompt":"x","session_title":"Hook name"'; V3="$OUT|$(said owned)"
+say "Pinned"; fire UserPromptSubmit s5c "$R" ',"prompt":"x"'; V4="$(title_of)"
+say "Pinned" replace; fire UserPromptSubmit s5c "$R" ',"prompt":"x","session_title":"Pinned"'; V5="$OUT"
+say "Auto later"; fire UserPromptSubmit s5c "$R" ',"prompt":"x","session_title":"Pinned"'; V6="$OUT|$(said owned)"
+if [ "$V1" = "UserPromptSubmit|Hook name" ] && [ -z "$V2" ] && [ "$V3" = "|" ] && [ "$V4" = "UserPromptSubmit|Pinned" ] \
+   && [ -z "$V5" ] && [ "$V6" = "|" ]; then
+  ok "(5b) a rename seen at a prompt disowns the hook's title for good; 'replace' on the same title pins it as a person's"
+else bad "(5b) v1=$V1 v2=$V2 v3=$V3 v4=$V4 v5=$V5 v6=$V6"; fi
+
 # (6) cleaning: control characters and | become spaces, whitespace collapses, 64 characters at most;
 #     a title that cleans to nothing, or empty output, prints nothing
 say "$(printf 'a|b\tc   d')"; fire UserPromptSubmit s6 "$R" ',"prompt":"x"'; K1="$(title_of)"

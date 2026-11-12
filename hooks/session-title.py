@@ -22,11 +22,13 @@ An absent, null or blank command, or a session outside a repository, runs nothin
            Line 1 is cleaned (no control characters or `|`, whitespace collapsed, at most 64
            characters) and applied only when the session has no custom title, or its custom title
            is this hook's own, or line 2 is `replace`; never otherwise, so a name set with --name
-           or /rename wins. A title set because of `replace` is a person's, so it is never OWNED.
+           or /rename wins. A title set because of `replace` is a person's, so it is never OWNED, and
+           neither is the hook's own title once a prompt has seen the session renamed to another.
            The hook prints `{"hookSpecificOutput":{"hookEventName":<event>,"sessionTitle":<t>}}`
            only when the title differs from the custom title the session already has.
 Records: ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/session-title/<session>.json (the title this hook
-last set, and whether it set it on its own), owner-only, written only when a title is printed;
+last set, and whether it set it on its own), owner-only, written only when a title is printed or
+stops being the hook's own;
 another session's record untouched for 7 days is pruned at a new session's start. Nothing is
 written in the repository or the plugin directory. FAILS OPEN: every hook exits 0, and prints
 nothing but that one JSON line (a prompt hook's other stdout would become context), whatever goes
@@ -204,6 +206,10 @@ def hook():
     current = payload.get("session_title") if isinstance(payload.get("session_title"), str) else ""
     mine = last_set(sid)
     owned = bool(current) and mine.get("own") is True and mine.get("title") == current
+    if current and mine.get("own") is True and not owned:
+        # a person renamed the session since: the hook's title is no longer its own, even if the
+        # person later names it back to that same text
+        remember(sid, mine["title"], False)
     prompt = payload.get("prompt") if event == "UserPromptSubmit" and isinstance(payload.get("prompt"), str) else ""
     out = run(command, root, sid, current, owned, prompt)
     if out is None:
@@ -211,6 +217,9 @@ def hook():
     lines = out.splitlines()
     title = clean(lines[0]) if lines else ""
     replace = len(lines) > 1 and lines[1].strip() == "replace"
+    if title and title == current and owned and replace:
+        remember(sid, title, False)  # the same text, now a person's request: never replaced on its own again
+        return
     if not title or title == current or not (not current or owned or replace):
         return
     remember(sid, title, not replace)  # before printing: a title the hook cannot record is never set
