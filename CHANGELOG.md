@@ -8,6 +8,38 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **Every item an agent picks up puts its plan on the Active Agents board, and a finished plan
+  comes off.** Until now `build-item` placed the root it was given once per run and never took
+  anything off. Now, at each item it picks up, it works out which plan the item belongs to and
+  makes sure that plan is on the board, without asking: a `--board-root` argument for the run,
+  else the nearest item whose description carries the line **Active Agents root:** this item,
+  else the nearest item at the level the new `activeAgents.rootLevel` setting names (by default
+  the level directly above the release unit; matched case-insensitively), else the run's plan
+  root. A plan someone took off by hand comes back at the next pickup. After each merge and when
+  the run ends, a plan with nothing left to build goes back to the board it came from (named in
+  the placement comment, which now records that board's id), or off every board when that board
+  is gone; the removal is commented. The tag is untouched: it still follows the repository's
+  claims.
+- **Setup and doctor always look for the board.** With no `activeAgents` block, `doctor` (and a
+  plain `setup` run) now report whether an **Active Agents** board exists but is not adopted, or
+  does not exist, as INFO with `/devstride:setup agents` as the fix; neither is a failure. With a
+  block, doctor adds three checks: a `rootLevel` that names no level above the leaves (FAIL), a
+  finished plan still on the board (FAIL; the repair is `/devstride:build-item <root>`, whose
+  exit takes it off), and the shared view (INFO only: none, more than one, or a starting column
+  not shown).
+- **The starting view adds Pull Requests and is adopted before it is created.** `setup agents`
+  now adopts an existing shared board table view named "Active Agents" or starting "Active
+  Agent" (the one saved most often when there are several; the rest are reported for you to
+  remove, never deleted), and otherwise creates one with Item, Status, Progress, Priority, Pull
+  Requests and Tags through the DevStride connection's view tools, reading it back to confirm.
+  It no longer copies another view's saved format, so the "no view to learn from" owner step is
+  gone. An adopted view's columns are never changed.
+- `active-agents.py` gains `resolve-root`, `comment`, `came-from`, `settle` and `pick-view`;
+  `classify` gains the no-block board scan, `root-level`, `done-on-board` and `view`, and every
+  finding now carries its `severity`. Tested in `scripts/tests/active-agents.sh`.
+
 ## [3.55.0] — 2026-11-11
 
 ### Added

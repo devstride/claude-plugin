@@ -1355,12 +1355,20 @@
           "default": 20,
           "description": "minutes without a heartbeat after which the repository's presence implementation treats a session as gone; exported to both commands"
         },
+        "rootLevel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "description": "the work type whose nearest item above a picked-up item is its plan on the board (matched case-insensitively); null means the level directly above the release unit"
+        },
         "commands": {
           "type": "object",
           "properties": {
             "start": {
               "type": "string",
-              "description": "command hook — <root>, the plan root's item number (only ^[IF][0-9]+$ is ever substituted); ACTIVE_AGENTS_ROOT, ACTIVE_AGENTS_TAG and ACTIVE_AGENTS_STALE_MINUTES exported"
+              "description": "command hook — <root>, the board root's item number (only ^[IF][0-9]+$ is ever substituted); ACTIVE_AGENTS_ROOT, ACTIVE_AGENTS_TAG and ACTIVE_AGENTS_STALE_MINUTES exported"
             },
             "end": {
               "type": "string",

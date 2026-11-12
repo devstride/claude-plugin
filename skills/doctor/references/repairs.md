@@ -43,6 +43,8 @@ config beyond the narrow personal `statusLine` exception.
 | Missing `on.pull_request.types`, ungated jobs, absent `concurrency` (§5) | **C** | Workflow files are code and reach CI for everyone; report the edit |
 | Merge gates / branch protection (§6) | **C** | Repository settings affecting every contributor |
 | A named docs skill missing, or a legacy `release.docsRepo` (§7) | **B** | `/devstride:setup docs` |
+| Active Agents board, tag or view missing, or a board not adopted (§8) | **B** | `/devstride:setup agents` |
+| A finished plan root still on the Active Agents board, `done-on-board` (§8) | **B** | `/devstride:build-item <root>`, once per root: its terminal exit takes it off |
 | More than one DevStride MCP server connected (§3) | **C** | Doctor cannot know which organization is the right one, and removing the wrong server disconnects work elsewhere |
 | Not a git repository, no `origin`, `git`/`gh` not installed (§1) | **C** | Outside the repository, or the precondition for having one |
 

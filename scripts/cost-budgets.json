@@ -7,7 +7,7 @@
   "bodies": {
     "branch-feature": 900,
     "branch-hotfix": 2200,
-    "build-item": 7985,
+    "build-item": 7999,
     "ci-audit": 2600,
     "comprehend-plan": 1860,
     "create-defect": 2500,
@@ -45,7 +45,7 @@
     "skills/build-item/references/release-train.md": 2940,
     "skills/build-item/references/verification-receipts.md": 800,
     "skills/create-story/references/one-off-handoff.md": 1800,
-    "skills/doctor/references/repairs.md": 2797,
+    "skills/doctor/references/repairs.md": 2890,
     "skills/doctor/references/silent-failures.md": 3602,
     "skills/doctor/references/version-currency.md": 2200,
     "skills/plan/references/delivery-profiles.md": 5737,
@@ -77,14 +77,14 @@
     "skills/review/references/roster-and-modes.md": 2120,
     "skills/review/references/slow-suite-gating.md": 1700,
     "skills/setup/references/ci-cost-patterns.md": 5000,
-    "skills/setup/references/config-defaults.md": 18351,
+    "skills/setup/references/config-defaults.md": 18569,
     "skills/setup/references/detector-evidence.digest.md": 900,
     "skills/setup/references/detector-evidence.md": 4300,
     "skills/setup/references/docs-skill-templates/update-documentation.md": 1400,
     "skills/setup/references/docs-skill-templates/update-release-notes.md": 1200,
     "skills/setup/references/interview-rationale.md": 1900,
     "skills/setup/references/review-engines.md": 2700,
-    "skills/setup/references/seam-registry.md": 15321,
+    "skills/setup/references/seam-registry.md": 15399,
     "skills/setup/references/statusline-segments.md": 3416,
     "skills/setup/references/validation-checklist.md": 6000,
     "skills/ultracode-build/references/engineering-economy.md": 1400,
@@ -99,9 +99,9 @@
     "skills/build-item/references/epic-release-steps.md": 1691,
     "skills/review/references/cloud-reviewers.md": 700,
     "skills/build-item/references/deferred-container.md": 2380,
-    "skills/setup/references/agents-mode.md": 1670,
-    "skills/doctor/references/agents.md": 620,
-    "skills/build-item/references/active-agents.md": 540,
+    "skills/setup/references/agents-mode.md": 2199,
+    "skills/doctor/references/agents.md": 1226,
+    "skills/build-item/references/active-agents.md": 1349,
     "skills/release/references/auto-start.md": 3329,
     "skills/build-item/references/plan-scope.md": 2500,
     "skills/build-item/references/item-status.md": 660,
@@ -117,7 +117,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 90538,
+      "budget": 91363,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -159,7 +159,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 75017,
+      "budget": 75842,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",

@@ -157,9 +157,10 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   above a unit decides, any case: `plan` → read
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md` now; `epic` or none → default;
   another value → STOP.
-- **Active Agents** (`activeAgents` set, plan mode only): once the root resolves, place it on the
-  board and run `start`, once per run; every terminal exit (step 0's, step 7's, a STOP) runs `end`
-  first — `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`. Fails open.
+- **Active Agents** (`activeAgents` set, plan mode only): at EVERY pickup, after each merge and at
+  every terminal exit (step 0's, step 7's, a STOP — before it exits), apply
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`; `--board-root I<n>` in
+  the argument names the board root. Never asks; fails open.
 - A given story number IS the story; merged or Done → never step 1 (`next-unblocked.md`).
   Otherwise apply `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full
   (projection warning too). **Never auto-select from the deferred container.** Surface the

@@ -20,9 +20,13 @@ run "$FIX/minimal.json"; expect "(1) a minimal config is clean, and the first li
 run "$FIX/full.json"; expect "(2) the full-coverage config is clean" 0 "$CLEAN"
 run "$FIX/commands-clearance.json"; expect "(3) the commands shapes of release.clearance and claims are clean" 0 "$CLEAN"
 run "$ROOT/.claude/ds-config.json"; expect "(4) this repository's own config is clean" 0 "$CLEAN"
+# (4b) keys added since the committed fixtures were last regenerated, in a scratch fixture that
+# must itself be clean; (5) counts it as a full-coverage fixture
+printf '%s\n' '{"activeAgents": {"boardId": "board-1", "rootLevel": "Capability", "commands": {"start": "./tools/presence start <root>", "end": "./tools/presence end <root>"}}}' > "$WORK/added.json"
+run "$WORK/added.json"; expect "(4b) the scratch fixture of newly added keys is clean" 0 "$CLEAN"
 
 # (5) the full-coverage fixtures name every registered key (deprecated ones aside)
-MISSING="$(python3 - "$ROOT" <<'PY'
+MISSING="$(python3 - "$ROOT" "$WORK/added.json" <<'PY'
 import json, sys
 root = sys.argv[1]
 reg = json.load(open(root + "/schemas/seam-registry.json"))
@@ -39,6 +43,7 @@ def paths(o, p=""):
 have = set()
 for f in ("full.json", "commands-clearance.json"):
     have |= set(paths(json.load(open(root + "/scripts/tests/fixtures/config/" + f))))
+have |= set(paths(json.load(open(sys.argv[2]))))
 print(" ".join(k for k in keys if k not in have))
 PY
 )"

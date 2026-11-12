@@ -421,9 +421,14 @@ Optional: to see which plans your agents are building, add an `activeAgents` blo
 start and end commands, then run `/devstride:setup agents`. It shows exactly what it will create,
 waits for a typed yes, then creates or adopts an **Active Agents** board, a green **agent active**
 tag allowed on every plan-root type, and a shared table view (Item, Status, Progress, Priority,
-Tags); running it again changes nothing. From then on `build-item` puts the plan root it works
-under on that board (never a story) and runs your commands as it starts and stops, failing open.
-`/devstride:doctor agents` reports drift without writing anything. No block, no writes.
+Pull Requests, Tags; an existing view of that name is adopted, never duplicated); running it again
+changes nothing. From then on, every time `build-item` picks up an item, the plan it belongs to is
+on that board: the nearest item above it at the level `activeAgents.rootLevel` names (by default
+the level above your release unit), never a story, and never a question. When nothing under that
+plan is left to build, it goes back to the board it came from. Your commands run as it starts and
+stops, failing open. `/devstride:doctor` and a plain `/devstride:setup` look for the board even
+without the block and tell you when it exists but is not adopted; doctor reports drift without
+writing anything. No block, no writes.
 
 ## Needs-you list
 
