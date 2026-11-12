@@ -8,6 +8,20 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A reviewed epic counts as reviewed whatever its merge is titled.** The release's train check
+  lets migrations and deploy configuration through only inside an epic whose pull request was
+  reviewed and merged onto the train. It used to recognise that pull request only from GitHub's
+  default merge title ("Merge pull request #N from ..."), so an epic merged under a custom title
+  was treated as unreviewed work and its migrations were refused. The check now asks GitHub which
+  pull request the merge commit belongs to, and accepts only a merged pull request whose merge
+  commit is exactly that commit. The default title is read only when GitHub cannot be asked (no
+  `gh`, a network error, a commit GitHub does not hold). Everything else is unchanged: the pull
+  request must still be confirmed as merged onto the train from an epic or plan branch and carry
+  the settled-review proof, and anything the check cannot confirm is still checked file by file
+  and refused.
+
 ## [3.54.0] — 2026-11-11
 
 ### Changed
