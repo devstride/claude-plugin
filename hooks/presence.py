@@ -78,8 +78,9 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            runs. Once per session and version, when a keeper runs that this version did not start
            (its record names no sweep by this version), the hook ends this session's keepers whose
            command line runs another copy's presence.py (`ps`, this user's processes, matched on
-           `/hooks/presence.py keeper <this session>`; never another session's), waits up to a
-           second for the lock, and starts its own: a keeper from before this check never leaves.
+           `/hooks/presence.py keeper <this session>`; never another session's), waits up to half a
+           second for the lock, starts its own and, when it ended one, sends `beat` at once (the ended
+           keeper may have dropped a queued report): a keeper from before this check never leaves.
   keeper <session>  (detached, one per session, holding the session's keeper lock, which is how a
            hook knows one runs) checks every 10 seconds: it exits once the session has ended, its
            record is gone, the block is removed or the record names another plugin version than its
@@ -416,12 +417,13 @@ def retire_keepers(sid):
     version from before keepers checked the version, which would otherwise run (and report without
     the busy mark) until the session ends. Only this user's processes whose command line ends with
     `/hooks/presence.py keeper <this session>`, never this file's own: another session's keeper is
-    never touched. Waits up to a second for its lock to be released."""
+    never touched. Waits up to half a second for its lock to be released (with `ps`, well inside the
+    hook's own limit). Returns whether it ended one."""
     try:
         out = subprocess.run(["ps", "-ww", "-U", str(os.getuid()), "-o", "pid=,command="], capture_output=True,
-                             text=True, timeout=2)
+                             text=True, timeout=1)
     except Exception:
-        return
+        return False
     tail, own = "/hooks/presence.py keeper " + sid, " %s keeper %s" % (SCRIPT, sid)
     ended = False
     for line in out.stdout.splitlines():
@@ -433,10 +435,11 @@ def retire_keepers(sid):
                 ended = True
             except OSError:
                 pass
-    for _ in range(20 if ended else 0):
+    for _ in range(10 if ended else 0):
         if not keeper_running(sid):
             break
         time.sleep(0.05)
+    return ended
 
 
 def spawn(*args):
@@ -711,8 +714,7 @@ def hook():
     # before keepers checked the version never leaves by itself, so it is ended here (and a newer
     # one's own check would only catch it at its next beat).
     swept = bool(peek) and peek.get("state") != "ended" and peek.get("swept") != version and keeper_running(sid)
-    if swept:
-        retire_keepers(sid)
+    retired = swept and retire_keepers(sid)  # the keeper it ended may have dropped a queued report
     mine = int(os.environ["CLAUDE_PID"]) if os.environ.get("CLAUDE_PID", "").isdigit() else 0
     # every `ps` runs here, before the state lock is taken
     owner = owner_pid() if event in FIRST else 0
@@ -753,6 +755,8 @@ def hook():
             verb = "beat"
         elif (state != record.get("reported") or moved) and now - sent >= CHANGE_AFTER:
             verb = "beat"
+        elif retired:
+            verb = "beat"  # a report from this version now, not at the replacement's first interval
         else:
             verb = None
         sequence, at = queue(record, now) if verb else (0, 0)

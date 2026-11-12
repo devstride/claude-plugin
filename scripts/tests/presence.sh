@@ -680,7 +680,8 @@ wait_keeper() { # wait_keeper SESSION — until a keeper holds the session's loc
   local i=0; while ! keeper_alive "$1" && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; keeper_alive "$1"
 }
 legacy() { # legacy SESSION — start a stand-in earlier-version keeper for SESSION and wait for its lock
-  (python3 "$LEGACY/hooks/presence.py" keeper "$1" >/dev/null 2>&1 &); wait_keeper "$1"
+  python3 "$LEGACY/hooks/presence.py" keeper "$1" >/dev/null 2>&1 &
+  echo "$!" >> "$WORK/owners"; wait_keeper "$1"   # the EXIT trap stops it, however the case ends
 }
 
 # (37) each report carries the version of the code sending it: an older copy's send reports its
@@ -731,7 +732,22 @@ if ! kill -0 "$LPID" 2>/dev/null && kill -0 "$XPID" 2>/dev/null && [ "$(keeper_p
    && [ -n "$BG39" ] && [ "$BG39" != 0 ] && [ "$BGBUSY" = "$BG39" ] && [ "$BGVER" = "$OWNV" ]; then
   ok "(39) an earlier version's keeper → ended at the next tool call and replaced; another session's untouched; the replacement beats busy (open call, then background work), with its own version"
 else bad "(39) legacy=$LPID other=$XPID y=$YPID/$(keeper_pid s39y) new=$RPID cmd=$RCMD swept=$(rec s39 'r.get("swept")') c=$C39 t=$T39 callbusy=$CALLBUSY bg=$BG39 bgbusy=$BGBUSY ver=$BGVER"; fi
-kill "$XPID" 2>/dev/null; stop_keeper s39; stop_keeper s39y
+kill "$XPID" "$LPID" 2>/dev/null; stop_keeper s39; stop_keeper s39y
+
+# (40) the hook that ends an earlier version's keeper sends a report from this version at once, busy
+#      since the call it opens: the ended keeper may have dropped one, and the replacement's first
+#      ordinary beat is an interval away (here an hour; a held change waits 30 s)
+: > "$LOG"; O40="$(owner)"
+CLAUDE_PID="$O40" fire SessionStart s40 "$K60" >/dev/null; upto s40 1; stop_keeper s40
+edit s40 'r.pop("swept", None)'; legacy s40; L40="$(keeper_pid s40)"
+CLAUDE_PID="$O40" fire PreToolUse s40 "$K60" "" "$(tool Bash c40)" >/dev/null; upto s40 2
+C40="$(rec s40 'r["tools"]["c40"]')"
+if ! kill -0 "$L40" 2>/dev/null && [ "$(of s40 0)" = 2 ] && [ "$(of s40 2 PRESENCE_EVENT)" = beat ] \
+   && [ "$(of s40 2 PRESENCE_STATE)" = working ] && [ "$(of s40 2 PRESENCE_BUSY_SINCE)" = "$C40" ] \
+   && [ "$(of s40 2 PRESENCE_PLUGIN_VERSION)" = "$OWNV" ] && keeper_alive s40; then
+  ok "(40) ending an earlier version's keeper → a beat from this version at once (busy since the open call), its own keeper running"
+else bad "(40) legacy=$L40 $(grep '"s40"' "$LOG")"; fi
+kill "$L40" 2>/dev/null; stop_keeper s40
 
 # (12) hooks.json registers the hook on all ten events, bounded and failing open; Notification only for
 #      the six prompt types the hook reads, and PreToolUse after the model recorder
