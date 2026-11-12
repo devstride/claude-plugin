@@ -8,6 +8,16 @@ Given by Phil Reynolds, the repository owner, on 2026-11-08, in his words:
 > still show that I approved (which I did and am) but I don't actually want to have to manually
 > approved anything beyond kicking off the build."
 
+Widened by him on 2026-11-12, in his words:
+
+> "I need you to accept my standing yes in that repo exactly as you do in the main devstride repo."
+
+In the main DevStride repository his standing yes covers every change whose review settled clean
+and whose checks are all green at the exact reviewed head, with one carve-out: a database migration
+needs his approval of that migration. It makes no exception for instruction files, guard files,
+workflows or the release procedure. This repository has no database migrations, so here it covers
+every pull request that meets the conditions below.
+
 ## What it covers
 
 A pull request into `main` of this repository, merged by `plugin-release merge <pr>`
@@ -15,28 +25,25 @@ A pull request into `main` of this repository, merged by `plugin-release merge <
 merges. The per-change authorization is the owner starting the build of the tracked work item; this
 standing yes replaces only the per-pull-request question that used to follow it.
 
+A pull request that changes this file, the release procedure, the checks, the workflows or the
+instruction files (`CLAUDE.md`, `AGENTS.md`) is covered like any other. It still cannot change the
+rules for its own merge: the merge session reads this file, its procedure and both gate scripts
+from `main`, never from the pull request (see below), so a change to them applies only to the
+pull requests merged after it.
+
 ## Conditions (all of them, at the exact head merged)
 
 1. The pull request is open, not a draft, based on `main`, from a branch of this repository (never
    a fork), authored by the owner's account, with the owner as the author of every commit and the
    only account that pushed to its branch, and linked to a tracked work item whose build the owner
    started.
-2. It changes nothing that guards merges, compared in any letter case: nothing under a `.claude/`
-   directory at any depth (this file and the release skill) or `.github/` (the required checks); nothing under `scripts/` (the checks themselves)
-   except `scripts/cost-budgets.json` and the test cases in `scripts/tests/` (`run.sh` is
-   guarded); and none of the files the checks load or run: `skills/pr/scripts/merge-gate.py`,
-   `skills/review/scripts/reviewed-status.py`, `skills/update/scripts/update-plugin.py`,
-   `skills/doctor/scripts/validate-config.py`, `skills/build-item/scripts/routing.py` and
-   `skills/review/references/delivery-loop-invariants.md`; nor any `CLAUDE.md`, `CLAUDE.local.md`,
-   `AGENTS.md` or `.mcp.json` (what a merging session loads); by old or new name. Such a change always needs the
-   owner's own yes on that pull request.
-3. The review settled clean: the last local round (Claude and Codex) found no P1 and no serious P2,
+2. The review settled clean: the last local round (Claude and Codex) found no P1 and no serious P2,
    and the head carries a `devstride/reviewed` status for that pull request into `main`, posted
    under the owner's account after that round.
-4. The version-bump, neutrality and public-hygiene checks pass, and `scripts/validate.sh --needles`
+3. The version-bump, neutrality and public-hygiene checks pass, and `scripts/validate.sh --needles`
    passed on the head, run by the build in its own checkout; the merge session never runs the pull
    request's code.
-5. `skills/pr/scripts/merge-gate.py <pr> <head> --all-green`, run from `main`, prints `MERGE`: every
+4. `skills/pr/scripts/merge-gate.py <pr> <head> --all-green`, run from `main`, prints `MERGE`: every
    check, required or not, green on that exact commit. `main` requires `release-guard`,
    `merge-path` and `public-hygiene`, and only org owners can update it, through a pull request.
 
