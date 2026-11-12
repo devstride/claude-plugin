@@ -33,8 +33,8 @@ shown, and `release` runs exactly as before.** Nothing ever blocks a hotfix.
   the verb's own arguments are appended). It honours the same contract. A block with BOTH keys is a
   config error (`doctor` and `setup validate` report it); so is a `provider` other than `github` or
   `devstride`.
-- **`"scope"`** — `"release"` (default) or `"cut-to-deploy"` (§ Scope `cut-to-deploy`), in either
-  shape; any other value is a config error.
+- **`"scope"`** — `"release"` (default), `"cut-to-deploy"` (§ Scope `cut-to-deploy`) or
+  `"merge-and-deploy"` (§ Scope `merge-and-deploy`), in either shape; any other value is a config error.
 - **`releaseTower`** — read by the `release-tower` check and the built-in `status`: `overrideLabel`
   passes a pull request an owner approved by hand; `hotfixPattern` names hotfix heads (the
   branch-patterns rule, `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`).
@@ -50,7 +50,7 @@ reads the exit code and quotes the line; it never parses further.
 | `claim [--wait [--ignore-stuck]] [--purpose <text>]` | `CLEARED <holder> <takenAt>` | `2` BUSY: `BUSY held by <user> on <machine> since <takenAt>, phase <phase>, heartbeat <age> — <branch> #<pr>` (plus `— STUCK …` when it is) · `3` STALE with a pull request still open, or merged but never closed out: `STALE … pull request #<n> still open — adopt or wait` · `5` STUCK (`--wait` only, ended at the first poll that finds the holder stuck): `STUCK <the BUSY line>` · `1` error, a killed call included (never proceed uncleared) |
 | `status [--short] [--json]` | the clearance line (or `CLEAR`), then `On final: #<n> <head>` for the oldest open release pull request into the production branch, `Waiting: #<n> <head>` for each later one, `Hotfix landed: #<n> <head> <mergedAt>` for each hotfix merged into production since `takenAt`, `Close-out owed: <release> #<pr> — <items> (handed back <age> by <user> on <machine>, session …)` for each entry in this machine's owed file | `1` the store could not be read: `UNKNOWN (…)` — never shown as clear |
 | `heartbeat <phase> [--branch <b>] [--pr <n>]` | `HEARTBEAT <phase> <at>` | `4` NOT HOLDER: another session owns the clearance now — STOP |
-| `release [--force] [--owed <item>]…` | `RELEASED <branch>`, or `CLEAR (nothing to release)`; with `--owed`, a second line `Close-out owed: <items>` | `4` NOT HOLDER (`--force` releases anyway, prints the record first, and is the owner's command) |
+| `release [--force] [--owed <item>]… [--step-aside]` | `RELEASED <branch>`, or `CLEAR (nothing to release)`; with `--owed`, a second line `Close-out owed: <items>`; with `--step-aside`, `RELEASED <branch> (stepped aside)` | `4` NOT HOLDER (`--force` releases anyway, prints the record first, and is the owner's command) · `1` `--step-aside` with `--owed` or `--force` |
 | `adopt --yes [--original-stopped]` | `ADOPTED <branch> #<pr>` then `Resume: branch …, pull request …, phase …` | `2` not stale (nothing to adopt), or STUCK and still alive without `--original-stopped` · `4` nothing held |
 | `owed [--done <item>]… [--clear] [--release <name>] [--pr <n>]` | `OWED <release> #<pr> — <items> (…)` per entry, or `NONE` | never fails: the file is local and advisory |
 | `identity` | this session's holder, alone (the one verb that prints it; needs no `gh`, git or network) | `1` `ERROR: no identity` when no source below exists |
@@ -64,7 +64,8 @@ reads the exit code and quotes the line; it never parses further.
   with `· STALE` past the stale threshold and `· STUCK` past the phase budget — or, when clear,
   `close-out owed · <release> · <items>` while this machine owes close-out work, else nothing.
   `--json` prints `{ state: clear|held|unknown, stale, stuck, phaseMinutes, phaseBudgetMinutes,
-  record, onFinal, waiting, hotfixesLanded, closeOutOwed, warnings, staleMinutes }`.
+  record, onFinal, waiting, hotfixesLanded, closeOutOwed, warnings, staleMinutes }`; a provider may
+  add `record.pluginVersion`, the plugin version the holder claimed with.
 - **Stale** = heartbeat older than `staleMinutes`. A stale clearance with no pull request, or one
   CLOSED unmerged, is taken over by the next `claim` (one atomic change on the stale record, so two
   takers cannot both win). One whose pull request is OPEN, or MERGED but never closed out (its
@@ -155,7 +156,8 @@ nothing on any failure. `gh` still serves pull-request facts.
 
 ## Where the release skill calls it
 
-Only when `release.clearance` is set; scope `cut-to-deploy` changes 0a, 4 and 5a–5b (below). **0a** `claim --wait --purpose release` before anything else (with a `claims` block, after the `release-train` claim only: `auto-start.md`'s lock order),
+Only when `release.clearance` is set; scope `cut-to-deploy` changes 0a, 4 and 5a–5b, and
+`merge-and-deploy` also 2 (below). **0a** `claim --wait --purpose release` before anything else (with a `claims` block, after the `release-train` claim only: `auto-start.md`'s lock order),
 in the background with a long timeout: `0` continue (say who was waiting when stderr said so); `3`
 ask the owner once — adopt `<branch>` / `#<n>`, or keep waiting — and on adopt run `adopt --yes`
 and enter the adopted path (0b skips the train, 0c skips the cut, step 2 reviews the open pull
@@ -221,6 +223,59 @@ the release skill calls it does.
 - `post-deploy-status.sh` and `previous-release-gate.sh` print `SKIPPED` / `NOT GATED` and do
   nothing under the default scope, so a repository that never sets the key sees no new status.
 
+## Scope `merge-and-deploy`
+
+`"merge-and-deploy"` is `cut-to-deploy` — the whole section above applies: the train runs
+uncleared, the holder markers, the post-deploy check as the first owed item, the previous-release
+gate — with the tower held only to cut, open, merge and deploy. Every long check and every wait
+runs outside it.
+
+- **0p. Pre-claim checks**, after step 0's delta and class and before any tower claim, on a
+  detached checkout at `<sourceHead>` (exactly where 0c cuts): `classify-release` (`head:
+  <sourceHead>`); `pre-ship release run <class>` (with `--ran-at-train` evidence as usual); the dev
+  deploy wait (`release.devDeployVerification`, `RELEASE_COMMIT=<sourceHead>`, every release); and
+  `pre-merge-check` at `<sourceHead>`. `PRE-SHIP: FAIL` or `HOLD` → STOP, holding nothing. Then
+  `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/release_checks.py stamp --head <sourceHead>
+  --class <class>`; keep its `CHECKS STAMP` line and 0p's verdict lines.
+- **The queue, before every claim.** `python3
+  ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/tower-queue.py check` (`--own-pr <n>` once this
+  release's pull request exists). `WAIT` → do not claim: poll every 60 s, heartbeat the train claim
+  while it is held (`auto-start.md`), and after `waitMinutes` STOP naming the pull request ahead.
+  `CLEAR` → `claim --wait`, its exits as in 0a. No release claims while another release pull
+  request is open into production, so releases still merge oldest first, one at a time.
+- **Verify on every claim.** Right after `CLEARED`, re-read step 0's shape as above, then
+  `release_checks.py verify --stamp '<line>' --head <head>` (`<sourceHead>` before the cut, the
+  release pull request's head after). `UNCHANGED` → go on. `CHANGED` → `release --step-aside`, run
+  0p again at the new head (its stamp replaces the old one), then queue, claim and verify again;
+  after three rounds the checks run under the tower, said so. `ERROR` → step aside, then STOP.
+- **Step 2.** No pre-ship hold while the stamp covers the head's tree: 2b reports 0p's `PRE-SHIP`
+  line, "passed before the claim at <sha>". When the head's tree changes (fix commits, a hotfix
+  merge by `release-branch.md` §4): `release --step-aside`, 0p at the new head, then queue, claim
+  and verify before the next phase.
+- **Step 4 steps aside to wait.** `previous-release-gate.sh` runs WITHOUT `--wait` (one read).
+  Pending (`2`), a standing-yes `ASK`, or this pull request not `On final` → `heartbeat final`,
+  `release --step-aside`, the unattended-stop notice (`auto-start.md`), then wait outside the tower:
+  for the owner's words, and for the gate (one read every 60 s, at most its 45 minutes). On the yes,
+  or with the standing yes once the gate reads `0`: queue (`--own-pr`), claim, `heartbeat final`,
+  verify against the stamp at `<reviewedHead>`, `pre-merge-check` again, `pre-ship release run
+  <class> --only <names>` for every `rerunAtMerge` entry, `standing-yes.py` again (or apply the
+  in-the-moment yes), then `heartbeat merging` and the merge. `CHANGED` → back to step 2; any yes
+  is void.
+- **A stepped-aside release holds nothing.** `release --step-aside` releases with outcome
+  `stepped-aside`, removes the local record and stops the keeper exactly like `release`, and owes
+  nothing, so it vouches for nothing. Every step after a re-claim starts with its `heartbeat`:
+  exit 4 still STOPs.
+- **Adoption.** The release pull request body carries `<!-- devstride:release-holder <digest> on
+  <machine> -->` (the train marker's digest rule), written when step 1 opens it, never after the
+  ready flip. An open release pull request whose marker names another holder is never adopted
+  silently, even with the tower clear (that release may only have stepped aside): this release
+  waits at the queue behind it, and when that wait ends, STOP, name it, and adopt only on the
+  owner's yes and their word that its session stopped.
+- **An older holder.** A re-claim that is BUSY reads `status --json`: a `record.pluginVersion`
+  older than this plugin, with this release's pull request `On final`, sends ONE `PushNotification`
+  naming that session and the fix (`release` in it, or the owner's `release --force`). The STUCK
+  alarm on `final` is the floor.
+
 ## The floor: the `release-tower` check
 
 `/devstride:setup ci` offers, when `release.clearance` is set, the template
@@ -248,4 +303,5 @@ request — then even an administrator cannot land a second release beside the f
 - `skills/doctor/SKILL.md` — the config audit of `release.clearance` and `releaseTower`.
 - `skills/setup/references/statusline-segments.md` — the `release` segment.
 - `skills/branch-hotfix/SKILL.md` — a hotfix never claims.
-- `skills/release/scripts/post-deploy-status.sh`, `previous-release-gate.sh` — scope `cut-to-deploy`.
+- `skills/release/scripts/post-deploy-status.sh`, `previous-release-gate.sh` — scopes `cut-to-deploy`
+  and `merge-and-deploy`; `release_checks.py`, `tower-queue.py` — scope `merge-and-deploy`.

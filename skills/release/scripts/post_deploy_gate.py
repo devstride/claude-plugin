@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """The post-deploy outcome a release records, and the gate the next release reads.
 
-Only under `release.clearance.scope: "cut-to-deploy"`: the release hands its clearance back once
-the deploy is confirmed, so the post-deploy check runs AFTER the hand-back. Its result is the
+Only under `release.clearance.scope` `"cut-to-deploy"` or `"merge-and-deploy"` (the GATED scopes):
+the release hands its clearance back once the deploy is confirmed, so the post-deploy check runs AFTER the hand-back. Its result is the
 commit status `release/post-deploy` on the production merge commit, where every machine can read
 it, and the next release refuses to MERGE (never to cut, review or hotfix) until it is success.
 Under the default scope (`release`, or absent) both commands do nothing and say so.
@@ -32,7 +32,8 @@ import time
 
 CONTEXT = "release/post-deploy"
 STATES = ("pending", "success", "failure", "error")
-SCOPES = ("release", "cut-to-deploy")
+SCOPES = ("release", "cut-to-deploy", "merge-and-deploy")
+GATED_SCOPES = ("cut-to-deploy", "merge-and-deploy")
 DESCRIPTION_LIMIT = 140  # GitHub's own limit for a commit status description
 
 
@@ -85,7 +86,7 @@ def scope():
     if value is None:
         return "release"
     if value not in SCOPES:
-        fail("release.clearance.scope is %r; it must be \"release\" or \"cut-to-deploy\"" % (value,))
+        fail("release.clearance.scope is %r; it must be \"release\", \"cut-to-deploy\" or \"merge-and-deploy\"" % (value,))
     return value
 
 
@@ -135,7 +136,7 @@ def cmd_status(argv):
     if len(argv) != 3:
         fail("usage: post-deploy-status.sh <sha> <pending|success|failure|error> <description>", 2)
     sha, state, description = argv
-    if scope() != "cut-to-deploy":
+    if scope() not in GATED_SCOPES:
         print("POST-DEPLOY STATUS: SKIPPED (release.clearance.scope is release; nothing is posted)")
         return 0
     if not re.match(r"^[0-9a-f]{40}$", sha):
@@ -197,7 +198,7 @@ def cmd_gate(argv):
     wait = argv == ["--wait"]
     if argv and not wait:
         fail("usage: previous-release-gate.sh [--wait]", 2)
-    if scope() != "cut-to-deploy":
+    if scope() not in GATED_SCOPES:
         print("PREVIOUS RELEASE: NOT GATED (release.clearance.scope is release)")
         return 0
     try:

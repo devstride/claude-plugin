@@ -62,7 +62,11 @@ Honoured only with a `claims` block (doctor: an ERROR; at run time it does nothi
 1. `build-item`, after a one-off lands on the release train (`release-train.md`);
 2. `build-item`, after step 8 merges an epic release pull request onto the train
    (`epic-release-steps.md`);
-3. `release`, at the end of step 6, after its own close-out.
+3. `release`, at the end of step 6, after its own close-out;
+4. `build-item`, at every clean story boundary (step 7's sync, after ANY story lands, epic stories
+   included) and when its loop starts. A trigger lost to a live holder is never retried by itself,
+   and the release that holds the claim hands it on at its cut so the next train phase can run
+   during the deploy; this is the look that notices the hand-on.
 
 At a trigger run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/auto-start.py check`
 (it fetches the train and the release source; a renamed train is an `ERROR` naming the cutover). `SKIP <reason>` → carry on, saying nothing;
@@ -85,7 +89,8 @@ A `started-by: auto` release that reaches step 4 without a MERGE from the standi
 `PushNotification` (where the tool exists): the release, READY or BLOCKED, why it is not eligible
 (the `ASK` reason, or "standing yes off"), and the pull request link. With `needsYou.label` set it
 also queues a NOTICE (build-item's `needs-you.md`): no reply to it can start the merge. Then it
-waits for the yes, holding the tower as any release does.
+waits for the yes, holding the tower as any release does — under scope `merge-and-deploy`, after
+stepping aside (`clearance.md`).
 
 ## The standing yes — `release.lightRelease.standingYes`, `release.fullRelease.standingYes`
 
@@ -95,7 +100,9 @@ At step 4, after the pre-merge check and the recap, run
 --pre-ship "<2b verdict line>" --pre-merge "<pre-merge-check verdict line>" --previous-release <gate exit> --dev-deploy <exit>|not-applicable --tower
 "<provider status output>" --reviewed-head <reviewedHead>`. `--head` is the release pull request's
 head; `--reviewed-head` is step 2's `<reviewedHead>`. With `release.devDeployVerification` set the
-dev-deploy wait runs BEFORE this check, whatever the delta, and passes its exit; unset,
+dev-deploy wait runs BEFORE this check, whatever the delta, and passes its exit (scope
+`merge-and-deploy`: `--pre-ship` and `--dev-deploy` come from 0p, and `--tower` is read after the
+claim or re-claim); unset,
 `not-applicable` (omitting it is an ERROR). The script reads the config from the head itself and
 prints `MERGE <sha>` and a `COMMENT <text>` line only when one route's conditions all hold (its
 header lists them); anything else prints `ASK <reason>`. Without `release.clearance` there is no

@@ -80,7 +80,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    pull request, apply step 6 to its marker's range. Step 6 skips any item already Done or already
    carrying that pull request's "reached …" comment, so a finished run is a no-op and a re-opened
    item is never closed again.
-2. **An open release-train pull request is ADOPTED** before anything is cut (scope `cut-to-deploy`:
+2. **An open release-train pull request is ADOPTED** before anything is cut (scope `cut-to-deploy` or `merge-and-deploy`:
    only when its holder marker is this session's or absent; another holder's → STOP and ask,
    `clearance.md`; with a `claims` block the won train claim decides which marker, `auto-start.md`): read `<sourceBefore>`
    and `<trainSnapshot>` from its marker (no marker → STOP and name it; never guess a range), skip
@@ -153,7 +153,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    the hold, `review`'s step 5 follow-up with the cumulative ledger settles to 7.1b, every
    selected check runs on that final head, then PRE-SHIP RESUME flips it ready and settles CI),
    and rerun this step at that head; step 5's `<reviewedHead>` pin is that new head. Under scope `release` the clearance is
-   already held (step 0a); under `cut-to-deploy` it is not claimed until the cut. With no train
+   already held (step 0a); under `cut-to-deploy` and `merge-and-deploy` it is not claimed until the cut. With no train
    pull request, no passing line or a different tree, step 2b runs these entries itself.
 5. **Merge** — first `git fetch origin <releaseSource>` and run the exclusion check with
    `--source-before <sourceBefore> --head <reviewedHead>` (source merges are not train work, and a
@@ -189,7 +189,9 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
   against the pattern before pushing it.
 - **One release at a time.** An open pull request into `productionBranch` whose head matches the
   pattern is ADOPTED by step 0 instead of cutting; a second one open at once — or one still headed
-  by `releaseSource` from before the pattern was set — is a STOP that names both.
+  by `releaseSource` from before the pattern was set — is a STOP that names both. Under scope
+  `merge-and-deploy`, one whose holder marker names another session is neither adopted nor a STOP:
+  this release WAITS at the queue (`tower-queue.py`, `clearance.md`) until it merges.
 - `git switch -c <name> <sourceHead> && git push -u origin <name>` — the SHA the delta was computed
   from, never a re-read `origin/<releaseSource>` that another session's fetch may have moved. It is
   recorded in the release pull request's marker `<!-- devstride:release-branch <name> cut <sha>
@@ -236,7 +238,7 @@ advanced under a release-branch head.
 Default scope: runs right after 5a's post-deploy check passes, BEFORE documentation (5c), the post-deploy
 check's own close-out (5d) and release notes (5e): these steps are what the next release depends
 on, so they finish while this release still holds clearance, and nothing else does. Under scope
-`cut-to-deploy` it runs as soon as 5a confirms the deploy, and the post-deploy check follows the
+`cut-to-deploy` and `merge-and-deploy` it runs as soon as 5a confirms the deploy, and the post-deploy check follows the
 hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
 
 1. **Sync production into the source.** Without it the release branch's fix commits never reach
@@ -270,7 +272,7 @@ hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
    leveling, said so (that holder re-levels once it holds the tower, `clearance.md`); a final
    claim, `stop` or `degrade` → STOP. Never a push beside a live holder.
 4. **Hand clearance back** (`release.clearance` set): the provider's `release --owed <item>` for
-   each later step still to run (`post-deploy-check` under scope `cut-to-deploy`, then `docs`,
+   each later step still to run (`post-deploy-check` under scopes `cut-to-deploy` and `merge-and-deploy`, then `docs`,
    `close-out`, `release-notes` — only those that will run),
    only now — after 1–3, never before — so a session that waits on `claim --wait` starts from a
    synced source and a level train (the next release's step 0 checks only that the source is

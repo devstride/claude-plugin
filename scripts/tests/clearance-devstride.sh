@@ -189,6 +189,28 @@ if [ "${A%%:*}" -eq 0 ] && printf '%s' "$A" | grep -q 'RELEASED' && [ "$(release
 run claim
 if [ "$RC" -eq 0 ] && printf '%s' "$OUT" | grep -q '^CLEARED'; then ok "(3d) a released claim reads as clear: the next claim wins"; else bad "(3d) rc=$RC: $OUT"; fi
 
+# (3e) release --step-aside (scope merge-and-deploy): the holder gives the clearance back with
+#      outcome stepped-aside, owes nothing and keeps no record; it refuses --owed and --force; the
+#      next claim by anyone wins, and the session that stepped aside is then BUSY and NOT HOLDER
+fresh aside; run claim; run heartbeat final --branch release/26-10-18 --pr 3990
+run release --step-aside --owed docs; A="$RC"; run release --step-aside --force; B="$RC"; KEPT="$(released)"
+run release --step-aside; C="$RC:$OUT"; O="$(claimfile "r['outcome']")"; GONE="$(released)"
+CLAUDE_CODE_SESSION_ID=me-2 CLEARANCE_RECORD="$WORK/aside.record2.json" run claim; D="$RC:$OUT"
+run claim; E="$RC:$OUT"; run heartbeat merging; F="$RC"
+if [ "$A" -eq 1 ] && [ "$B" -eq 1 ] && [ "$KEPT" = False ] \
+   && [ "${C%%:*}" -eq 0 ] && [ "$(printf '%s\n' "${C#*:}" | head -n 1)" = "RELEASED release/26-10-18 (stepped aside)" ] \
+   && [ "$O" = stepped-aside ] && [ "$GONE" = True ] && [ ! -f "$CLEARANCE_RECORD" ] && [ ! -f "$WORK/aside.record.owed.json" ] \
+   && ! printf '%s' "$C" | grep -q 'Close-out owed' \
+   && [ "${D%%:*}" -eq 0 ] && printf '%s' "$D" | grep -q '^0:CLEARED' && [ "${E%%:*}" -eq 2 ] && printf '%s' "$E" | grep -q '^2:BUSY' && [ "$F" -eq 4 ]; then
+  ok "(3e) release --step-aside → RELEASED … (stepped aside), outcome stepped-aside, no record, nothing owed; refuses --owed/--force (exit 1); another session's claim then wins, the original is BUSY, its heartbeat NOT HOLDER"
+else bad "(3e) a=$A b=$B kept=$KEPT c=$C o=$O gone=$GONE d=$D e=$E f=$F"; fi
+fresh aside-race; run claim; run release --step-aside
+CLAUDE_CODE_SESSION_ID=me-1 bash "$P" claim > "$WORK/aside1.out" 2>&1 & TAKER1=$!
+CLAUDE_CODE_SESSION_ID=me-2 CLEARANCE_RECORD="$WORK/aside-race.record2.json" bash "$P" claim > "$WORK/aside2.out" 2>&1
+wait "$TAKER1"; OUT1="$(cat "$WORK/aside1.out" "$WORK/aside2.out")"; printf '%s\n' "$OUT1" >> "$LOG"
+WINS="$(printf '%s\n' "$OUT1" | grep -c '^CLEARED')"; BUSY="$(printf '%s\n' "$OUT1" | grep -c '^BUSY')"
+if [ "$WINS" -eq 1 ] && [ "$BUSY" -eq 1 ]; then ok "(3f) two concurrent claims after a step-aside → exactly one CLEARED"; else bad "(3f) wins=$WINS busy=$BUSY: $OUT1"; fi
+
 # (4) adopt --yes: a lapsed claim, the digest of the claim read goes with the call
 fresh adopt; held claude:other review release/26-10-17 3970 2026-10-18T09:30:00Z
 run adopt --yes

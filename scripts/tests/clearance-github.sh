@@ -175,6 +175,20 @@ if [ "$A" -eq 4 ] && [ "$KEPT" = 1 ] && [ "${B%%:*}" -eq 0 ] && printf '%s' "$B"
    && [ "${C%%:*}" -eq 0 ] && printf '%s' "$C" | grep -q 'RELEASED' && [ -z "$(refsha)" ] && [ ! -f "$CLEARANCE_RECORD" ]; then
   ok "(11) release: non-holder → exit 4; --force → released, naming the holder; holder → ref deleted, local record removed"
 else bad "(11) a=$A kept=$KEPT b=$B c=$C"; fi
+# (11s) release --step-aside: the ref is deleted as on release, nothing owed, no record; --owed or
+#       --force with it is refused (exit 1); another session then claims, and the one that stepped
+#       aside is BUSY and NOT HOLDER
+fresh aside; run claim; run heartbeat final --branch release/26-10-18 --pr 3990
+run release --step-aside --owed docs; A="$RC"; run release --step-aside --force; B="$RC"; [ -n "$(refsha)" ] && KEPT=1 || KEPT=0
+run release --step-aside; C="$RC:$OUT"; [ -z "$(refsha)" ] && GONE=1 || GONE=0
+CLAUDE_CODE_SESSION_ID=me-2 CLEARANCE_RECORD="$WORK/aside.record2.json" run claim; D="$RC:$OUT"
+run claim; E="$RC:$OUT"; run heartbeat merging; F="$RC"
+if [ "$A" -eq 1 ] && [ "$B" -eq 1 ] && [ "$KEPT" = 1 ] && [ "${C%%:*}" -eq 0 ] \
+   && [ "$(printf '%s\n' "${C#*:}" | head -n 1)" = "RELEASED release/26-10-18 (stepped aside)" ] && [ "$GONE" = 1 ] \
+   && [ ! -f "$CLEARANCE_RECORD" ] && [ ! -f "$WORK/aside.record.owed.json" ] \
+   && printf '%s' "$D" | grep -q '^0:CLEARED' && printf '%s' "$E" | grep -q '^2:BUSY' && [ "$F" -eq 4 ]; then
+  ok "(11s) release --step-aside → ref deleted, (stepped aside), nothing owed; refuses --owed/--force; the next claim wins, the original is BUSY and NOT HOLDER"
+else bad "(11s) a=$A b=$B kept=$KEPT c=$C gone=$GONE d=$D e=$E f=$F"; fi
 
 # (12) release on a clear ref is a no-op that still clears a leftover local record
 fresh rel3; printf '{"repo":"o/r","holder":"claude:me-1"}' > "$CLEARANCE_RECORD"

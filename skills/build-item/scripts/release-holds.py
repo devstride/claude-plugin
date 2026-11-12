@@ -30,7 +30,7 @@ Live, for `after`: the newest commit whose message names the item as a whole wor
 `origin/<release.productionBranch>`, fetched by the caller), and the production merge that carried
 it, or a later one, has the commit status `release/post-deploy` at success: deployed and checked,
 which a merge alone is not. A repository whose releases record no such status
-(`release.clearance.scope` other than `cut-to-deploy`) counts the merge, and the reason says so.
+(`release.clearance.scope` neither `cut-to-deploy` nor `merge-and-deploy`) counts the merge, and the reason says so.
 `live` (a list of item numbers) replaces the git and GitHub lookups: the fixtures' mode.
 
 Exit 0 with an answer (held or not), 2 with one `release-holds: <reason>` line on stderr (a bad
@@ -174,7 +174,7 @@ def live_check(req, config):
     need(isinstance(ref, str), "productionRef must be a ref")
     git("rev-parse", "--verify", "%s^{commit}" % ref)
     clearance = release.get("clearance") if isinstance(release.get("clearance"), dict) else {}
-    checked = clearance.get("scope") == "cut-to-deploy"
+    checked = clearance.get("scope") in ("cut-to-deploy", "merge-and-deploy")
 
     def on_ref(number):
         commit = git("log", "-1", "--format=%H", "-E", "--grep=(^|[^0-9A-Za-z])%s([^0-9A-Za-z]|$)" % number, ref).strip()

@@ -32,7 +32,7 @@ and **before** the hand-back (5b; default scope only), the documentation update 
 health check before the deploy is confirmed measures the previous release; one after the docs are
 published cannot stop them. Under the default clearance scope the release still holds its
 clearance while `check` runs, so `check` does only what the next release depends on (health, and
-anything it must publish first). Under `release.clearance.scope` `"cut-to-deploy"` it runs right
+anything it must publish first). Under `release.clearance.scope` `"cut-to-deploy"` (or `"merge-and-deploy"`) it runs right
 AFTER the hand-back, as the first owed item; its result is the `release/post-deploy` commit status
 on the merge commit, and the next release cannot merge to production until that status is success
 (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`, § Scope `cut-to-deploy`).
@@ -81,7 +81,7 @@ item owed and is reported to the owner. A skill that prints no such line is neve
 
 | First line | `release` |
 |---|---|
-| `PASS` | Continue to 5b (scope `cut-to-deploy`: post `success`, then the rest of the owed work). Carry the evidence, and any `CLOSE-OUT OWED` line, into the close-out. |
+| `PASS` | Continue to 5b (scopes `cut-to-deploy` and `merge-and-deploy`: post `success`, then the rest of the owed work). Carry the evidence, and any `CLOSE-OUT OWED` line, into the close-out. |
 | `FAIL` | **STOP.** Surface the evidence and ask the owner for a rollback decision. Never continue to documentation, release notes or the close-out on your own — public text about a release that is being rolled back is the failure this gate exists to prevent. |
 | `NOT RUN` | Report it as this-run degradation ("post-deploy health: not run — <reason>") and ask the owner whether to proceed. Not a pass, not a failure. |
 | Key absent | No invocation. The close-out says **post-deploy health: not configured**. |

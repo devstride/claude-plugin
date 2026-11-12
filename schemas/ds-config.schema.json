@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.58.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.59.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -522,6 +522,10 @@
             "type": "boolean",
             "description": "a releaseOnly check runs only when the release touches its pathGlobs"
           },
+          "rerunAtMerge": {
+            "type": "boolean",
+            "description": "under release.clearance.scope merge-and-deploy, a releaseOnly check that passed before the tower claim runs again (pre-ship release run --only) at every re-claim and just before the merge, for a check whose result can lapse while the release waits (a sign-in); only valid with when releaseOnly, never with runAt"
+          },
           "runAt": {
             "type": "string",
             "enum": [
@@ -964,10 +968,11 @@
                   "type": "string",
                   "enum": [
                     "release",
-                    "cut-to-deploy"
+                    "cut-to-deploy",
+                    "merge-and-deploy"
                   ],
                   "default": "release",
-                  "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check) or cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge)"
+                  "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check), cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge) or merge-and-deploy (cut-to-deploy, plus the pre-ship, dev-deploy and pre-merge checks run before the claim at the commit to be cut, a check stamp verified at every claim, stepping aside while waiting for anything but its own merge and deploy, and no claim while another release pull request is open into production; since 3.59.0)"
                 },
                 "credentialsFile": {
                   "type": "string",
@@ -1033,10 +1038,11 @@
                   "type": "string",
                   "enum": [
                     "release",
-                    "cut-to-deploy"
+                    "cut-to-deploy",
+                    "merge-and-deploy"
                   ],
                   "default": "release",
-                  "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check) or cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge)"
+                  "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check), cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge) or merge-and-deploy (cut-to-deploy, plus the pre-ship, dev-deploy and pre-merge checks run before the claim at the commit to be cut, a check stamp verified at every claim, stepping aside while waiting for anything but its own merge and deploy, and no claim while another release pull request is open into production; since 3.59.0)"
                 }
               },
               "patternProperties": {

@@ -16,13 +16,17 @@ fresh() {
 run() { OUT="$(bash "$S" "$@" 2>&1)"; RC=$?; }
 call() { python3 -c 'import json,sys; c=[json.loads(l) for l in open(sys.argv[1])]; print("\n".join(c[-1]))' "$FAKE_GH_STATE/calls.log"; }
 
-fresh cut-to-deploy; run "$A" pending "release/26-11-04 by m5 / wt2-9f: post-deploy check running"
+# Every case runs under BOTH gated scopes (cut-to-deploy and merge-and-deploy): the verdicts must be
+# identical. The default scope (release) stays NOT GATED / SKIPPED in each pass.
+for GATED in cut-to-deploy merge-and-deploy; do
+echo "  -- scope $GATED"
+fresh "$GATED"; run "$A" pending "release/26-11-04 by m5 / wt2-9f: post-deploy check running"
 C="$(call)"
 [ "$RC" = 0 ] && [ "$OUT" = "POST-DEPLOY STATUS: POSTED pending on aaaaaaaaaaaa" ] && printf '%s' "$C" | grep -qx "repos/o/r/statuses/$A" \
   && printf '%s' "$C" | grep -qx 'context=release/post-deploy' && printf '%s' "$C" | grep -qx 'state=pending' \
   && printf '%s' "$C" | grep -qx 'description=release/26-11-04 by m5 / wt2-9f: post-deploy check running' \
   && ok "(1) posts the release/post-deploy context on that sha with the state and description" || bad "(1) rc=$RC: $OUT / $C"
-fresh cut-to-deploy; run "$A" success "$(printf 'x%.0s' $(seq 1 200))"
+fresh "$GATED"; run "$A" success "$(printf 'x%.0s' $(seq 1 200))"
 D="$(call | sed -n 's/^description=//p')"
 [ "$RC" = 0 ] && [ "${#D}" -eq 140 ] && ok "(2) the description is capped at 140 characters" || bad "(2) rc=$RC len=${#D}"
 fresh release; run "$A" success "x"
@@ -31,10 +35,11 @@ fresh release; run "$A" success "x"
 fresh ""; run "$A" success "x"
 [ "$RC" = 0 ] && printf '%s' "$OUT" | grep -q '^POST-DEPLOY STATUS: SKIPPED' && [ ! -s "$FAKE_GH_STATE/calls.log" ] \
   && ok "(4) scope absent (the default) → posts nothing" || bad "(4) rc=$RC: $OUT"
-fresh cut-to-deploy; run abc123 success "x"
+fresh "$GATED"; run abc123 success "x"
 [ "$RC" = 2 ] && ok "(5) a short sha is refused (the full merge commit is required)" || bad "(5) rc=$RC: $OUT"
-fresh cut-to-deploy; run "$A" done "x"
+fresh "$GATED"; run "$A" done "x"
 [ "$RC" = 2 ] && ok "(6) an unknown state is refused" || bad "(6) rc=$RC: $OUT"
-fresh cut-to-deploy; touch "$FAKE_GH_STATE/gh-down"; run "$A" failure "x"
+fresh "$GATED"; touch "$FAKE_GH_STATE/gh-down"; run "$A" failure "x"
 [ "$RC" = 1 ] && printf '%s' "$OUT" | grep -q '^POST-DEPLOY STATUS: FAILED' && ok "(7) a failed post says FAILED and exits 1" || bad "(7) rc=$RC: $OUT"
+done
 exit $FAIL

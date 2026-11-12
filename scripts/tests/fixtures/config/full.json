@@ -37,7 +37,8 @@
   "ci": { "workflowGlobs": [".github/workflows/*.yml"], "draftGateCondition": "github.event.pull_request.draft == false", "gateJobName": null, "expectedRunsPerPullRequest": 1 },
   "preShipChecks": [
     { "name": "slow suite", "command": "make slow", "when": "releaseOnly", "pathGlobs": ["db/**"], "timeoutNote": "about 20 minutes", "onlyWhenTouched": true },
-    { "name": "train suite", "command": "make train", "when": "releaseOnly", "runAt": "train" }
+    { "name": "train suite", "command": "make train", "when": "releaseOnly", "runAt": "train" },
+    { "name": "sign-in", "command": "make signin", "when": "releaseOnly", "rerunAtMerge": true }
   ],
   "preCommitWiringChecks": [],
   "verify": {

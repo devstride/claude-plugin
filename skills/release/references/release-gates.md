@@ -22,6 +22,12 @@ entry and workflow job are added together and the `preShipChecks` entry dropped 
 runs twice. Step 2 declares the pre-ship hold because the order matters too: flipping the pull
 request ready first would let a pre-ship fix reach production past no reviewer.
 
+Scope `merge-and-deploy` runs these checks before the tower claim, at the commit the release
+branch is cut from, and still tests what merges: a merge into production is a function of the
+head's tree and production's tip, so the check stamp (`release_checks.py`) holding both unchanged
+at every claim and just before the merge means the tested tree IS the merged tree. Either moving
+runs the checks again.
+
 ## Why `<sourceHead>` and `<reviewedHead>` are immutable SHAs
 
 The release PR's head IS a branch — the release source, or a release branch cut from it — so the

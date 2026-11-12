@@ -11,8 +11,8 @@ description (usually the epic's), starting `Release hold:`:
 - `Release hold: not before 2026-11-11T08:00-06:00` — an instant, with its offset.
 - `Release hold: after I20101 is live` — until I20101 is deployed and checked: a commit naming it on
   `origin/<release.productionBranch>` whose production merge, or a later one, carries
-  `release/post-deploy` success (`release.clearance.scope: cut-to-deploy`; other scopes count the
-  merge, and say so).
+  `release/post-deploy` success (`release.clearance.scope` `cut-to-deploy` or `merge-and-deploy`;
+  other scopes count the merge, and say so).
 
 A line that does not parse holds, naming the item and the line. Remove the line to lift a hold
 early; that edit is the owner's record.

@@ -130,6 +130,14 @@ expect "(33f) runAt on an entry that is not releaseOnly is an ERROR" 1 "^CONFIG:
 
 cfg '{"preShipChecks": [{"command": "make db", "when": "releaseOnly", "runAt": "train", "onlyWhenTouched": true}]}'
 expect "(33g) runAt train with onlyWhenTouched is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR preShipChecks\\[0\\].runAt: cannot be combined"
+cfg '{"preShipChecks": [{"command": "aws sts get-caller-identity", "when": "releaseOnly", "rerunAtMerge": true}]}'
+expect "(33h) rerunAtMerge on a releaseOnly entry is clean" 0 "$CLEAN"
+cfg '{"preShipChecks": [{"command": "make db", "when": "always", "rerunAtMerge": true}]}'
+expect "(33i) rerunAtMerge on an entry that is not releaseOnly is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR preShipChecks\\[0\\].rerunAtMerge: is only valid"
+cfg '{"preShipChecks": [{"command": "make db", "when": "releaseOnly", "runAt": "train", "rerunAtMerge": true}]}'
+expect "(33j) rerunAtMerge with runAt is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR preShipChecks\\[0\\].rerunAtMerge: cannot be combined with \`runAt\`"
+cfg '{"preShipChecks": [{"command": "make db", "when": "releaseOnly", "rerunAtMerge": "yes"}]}'
+expect "(33k) a rerunAtMerge that is not a boolean is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR preShipChecks\\[0\\].rerunAtMerge: expected boolean"
 
 # slow cloud suites: a closed object with its mapping required
 cfg '{"verify": {"skipDuringStoryBuilds": [{"name": "e2e", "ciChecksByBase": {"baseBranch": ["e2e"]}, "runWhenChangedPaths": ["web/**"]}]}}'
@@ -270,10 +278,12 @@ expect "(48) a null claims block is clean" 0 "$CLEAN"
 # (49)-(51) release.clearance.scope: either shape takes it (with phaseBudgetMinutes); any other value is an ERROR
 cfg '{"release": {"clearance": {"commands": {"claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a"}, "scope": "cut-to-deploy", "phaseBudgetMinutes": {"deploy": 30}}}}'
 expect "(49) a commands clearance with scope and phaseBudgetMinutes is clean" 0 "$CLEAN"
+cfg '{"release": {"clearance": {"commands": {"claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a"}, "scope": "merge-and-deploy"}}}'
+expect "(49b) scope merge-and-deploy is clean" 0 "$CLEAN"
 cfg '{"release": {"clearance": {"provider": "github", "scope": "release"}}}'
 expect "(50) a provider clearance with scope release is clean" 0 "$CLEAN"
 cfg '{"release": {"clearance": {"provider": "github", "scope": "deploy-only"}}}'
-expect "(51) any other scope is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR release.clearance.scope: "deploy-only" is not one of "release", "cut-to-deploy"$'
+expect "(51) any other scope is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR release.clearance.scope: "deploy-only" is not one of "release", "cut-to-deploy", "merge-and-deploy"$'
 
 # (52)-(56) release.autoStart needs a claims block; the standing yes without a classify skill is a WARN
 cfg '{"claims": {"provider": "devstride", "expiryMinutes": {"release-train": 30}}, "release": {"autoStart": {"enabled": true}, "classifySkill": "classify", "clearance": {"provider": "github"}, "lightRelease": {"standingYes": true}}}'

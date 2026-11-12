@@ -10,7 +10,8 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the
 Arguments: $ARGUMENTS — `pr|release|train` (`train`: no class or `--skip`), `select|run`, the final diff's base and head SHAs, and:
 
 - `release run`: the class `classify-release` printed for THIS head (none → `full`).
-- `--only <names>`: re-run just those selected entries — review 7.1b's failed/affected re-run.
+- `--only <names>`: re-run just those selected entries — review 7.1b's failed/affected re-run, or
+  the `rerunAtMerge` entries (`clearance.md`).
 - `--ran-at-train <names>@<sha>` (`release`): those `runAt: train` entries passed at `<sha>`; skipped only if `<sha>` is the commit the release branch was cut from or has the head's tree, else they run.
 - `--skip <name>` (repeatable, `release` only): the owner's explicit waiver of that entry.
 

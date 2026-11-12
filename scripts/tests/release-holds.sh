@@ -65,6 +65,11 @@ env = dict(os.environ, PATH="/usr/bin:/bin", GH_HOST="invalid.example")
 q = subprocess.run([sys.executable, helper, "decide"], input=json.dumps({"items": [{"number": "I20102", "description": "<p>Release hold: after I20110 is live</p>"}], "productionRef": "master"}),
                    capture_output=True, text=True, cwd=repo, env=env)
 say(q.returncode == 2 and "release/post-deploy" in q.stderr, "git: a commit inside a merged branch reaches the status lookup; an unreadable status refuses", q.stdout + q.stderr)
+# merge-and-deploy records the same status, so it is the checked scope too
+json.dump({"release": {"productionBranch": "master", "clearance": {"scope": "merge-and-deploy"}}}, open(cfg, "w"))
+q = subprocess.run([sys.executable, helper, "decide"], input=json.dumps({"items": [{"number": "I20102", "description": "<p>Release hold: after I20110 is live</p>"}], "productionRef": "master"}),
+                   capture_output=True, text=True, cwd=repo, env=env)
+say(q.returncode == 2 and "release/post-deploy" in q.stderr, "git: under merge-and-deploy the status is looked up as under cut-to-deploy", q.stdout + q.stderr)
 p = run(dict(req, productionRef="origin/nowhere"), cwd=repo)
 say(p.returncode == 2, "git: an unknown production ref refuses", p.stderr)
 PY

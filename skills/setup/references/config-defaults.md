@@ -130,6 +130,11 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   the release-train snapshot before the train merges (outside release clearance under
   `release.clearance.scope: "cut-to-deploy"`), and is not repeated at the release's step 2b when it passed there on the same snapshot
   (the only automatic 2b skip for it; otherwise 2b runs it). Absent, a `releaseOnly` check runs at 2b as before.
+- **`preShipChecks[].rerunAtMerge`**: `true` on a `when: "releaseOnly"` entry (anything else, or
+  together with `runAt`, is a config error). Under `release.clearance.scope: "merge-and-deploy"`
+  the entry, which passed before the tower claim, runs again (`pre-ship release run --only`) at
+  every re-claim and just before the merge: for a check whose result can lapse while a release
+  waits, such as a sign-in. Elsewhere it changes nothing.
 - **A story is Done when its release unit reaches `releaseTarget`**, not when it merges onto the
   integration branch. Until then it is *landed*
   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`): it satisfies blockers
@@ -348,7 +353,10 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   alarm, never a takeover. `scope` (either shape) `"release"` (default, the above) or
   `"cut-to-deploy"`: claimed at the cut, handed back once the deploy is confirmed; the post-deploy
   check then runs as owed work, posts the `release/post-deploy` commit status, and the next release
-  refuses to merge until it is success (`clearance.md`).
+  refuses to merge until it is success (`clearance.md`). `"merge-and-deploy"` is `cut-to-deploy`
+  with the pre-ship, dev-deploy and pre-merge checks run BEFORE the claim at the commit to be cut,
+  a check stamp verified at every claim, the release stepping aside while it waits for anything
+  but its own merge and deploy, and no claim while another release pull request is open.
   The built-in `github` provider keeps the clearance in the custom ref `refs/clearance/release`
   (every move a compare-and-swap through `git push --force-with-lease`; neither a branch nor a
   tag) and needs only git and `gh`; a claim starts a detached keeper that heartbeats while the
