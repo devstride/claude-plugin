@@ -325,7 +325,8 @@ sys.stdout.write(" ".join("".join(" " if ord(c) < 32 or ord(c) == 127 or c == "|
   if [ -f "$ncache" ]; then
     nage=$(( $(date +%s) - $(stat -c %Y "$ncache" 2>/dev/null || stat -f %m "$ncache" 2>/dev/null || echo 0) ))
     session=$(head -1 "$ncache" 2>/dev/null)
-    if [ "$nage" -ge 10 ] || [ "$SL_SESSION_NAME" != "$(cat "$nseen" 2>/dev/null)" ]; then nspawn; fi
+    nprev=""; IFS= read -r nprev <"$nseen" 2>/dev/null
+    if [ "$nage" -ge 10 ] || [ "$SL_SESSION_NAME" != "$nprev" ]; then nspawn; fi
   else
     nspawn
   fi
