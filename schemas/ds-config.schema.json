@@ -1626,6 +1626,13 @@
           ],
           "description": "command hook — none; run from the repository root with CLAUDE_CODE_SESSION_ID exported (the status-line payload's session id)"
         },
+        "titleCommand": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "command hook — the prompt on stdin, cut to 8 KB (empty at session start); CLAUDE_CODE_SESSION_ID, SESSION_TITLE (the session's custom title, empty when none; a generated title never counts) and SESSION_TITLE_OWNED=1 when that title is the one the hook last set on its own exported; run through the shell from the repository root at a prompt and at session start, resume and fork, at most 3 seconds"
+        },
         "jobClassGate": {
           "type": "boolean",
           "default": true,

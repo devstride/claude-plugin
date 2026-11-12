@@ -219,10 +219,12 @@ if grep -qF '"refreshInterval": 30' "$ROOT/skills/setup/SKILL.md" && grep -qF '"
   ok "(21) setup and the doctor repair write statusLine.refreshInterval 30"
 else bad "(21) refreshInterval 30 missing from the setup or doctor template"; fi
 
-# (22) the Session segment: the payload's session_name; else the repository's session.nameCommand,
-#      served from a cache under $TMPDIR and refreshed in the background with the payload's session
-#      id exported; nothing (and no dangling ☻) without either; hidden by hiddenSegments; a failing
-#      command prints nothing; nothing written to the repository or the working directory
+# (22) the Session segment: the repository's session.nameCommand when one is configured (even over
+#      a payload session_name, which may be Claude Code's generated title), served from a cache under
+#      $TMPDIR and refreshed in the background with the payload's session id exported; the payload's
+#      session_name only without a command; nothing (and no dangling ☻) without either; hidden by
+#      hiddenSegments; a failing command prints nothing; nothing written to the repository or the
+#      working directory
 SID=0b1c2d3e-0000-4000-8000-000000000001
 N1="$(mkrepo sess1 '{}')"
 A="$(render "$N1" ",\"session_id\":\"$SID\",\"session_name\":\"wt2-9f\"")"
@@ -233,7 +235,7 @@ settled() { local n=0; until [ ! -d "$TMPDIR/ds-statusline-session-$1.lock" ] ||
 C1="$(render "$N2" ",\"session_id\":\"$SID\"")"; settled "$SID"
 C2="$(render "$N2" ",\"session_id\":\"$SID\"")"
 CACHED="$(cat "$TMPDIR/ds-statusline-session-$SID" 2>/dev/null)"; RAN_IN="$(cat "$TMPDIR/sess-pwd" 2>/dev/null)"
-P2="$(render "$N2" ",\"session_id\":\"$SID\",\"session_name\":\"named\"")"
+P2="$(render "$N2" ",\"session_id\":\"$SID\",\"session_name\":\"Generated title\"")"; settled "$SID"
 N3="$(mkrepo sess3 '{"session":{"nameCommand":"echo nope; exit 3"},"statusLine":{}}')"
 SID3=0b1c2d3e-0000-4000-8000-000000000003
 render "$N3" ",\"session_id\":\"$SID3\"" >/dev/null; settled "$SID3"; D="$(render "$N3" ",\"session_id\":\"$SID3\"")"
@@ -243,10 +245,30 @@ F="$(render "$WORK" ",\"session_id\":\"$SID\",\"session_name\":\"$(printf 'x|y')
 DIRTY="$(git -C "$N2" status --porcelain --untracked-files=all)"
 if printf '%s' "$A" | grep -q '☻ wt2-9f' && no_dangling "$A" && ! printf '%s' "$B" | grep -q '☻' && no_dangling "$B" \
    && printf '%s' "$C2" | grep -qE "☻ cmd-$SID( |\$)" && [ "$CACHED" = "cmd-$SID" ] && [ "$RAN_IN" = "$(cd "$N2" && pwd -P)" -o "$RAN_IN" = "$N2" ] \
-   && printf '%s' "$P2" | grep -q '☻ named' && ! printf '%s' "$D" | grep -q '☻' && no_dangling "$D" \
+   && printf '%s' "$P2" | grep -qE "☻ cmd-$SID( |\$)" && ! printf '%s' "$P2" | grep -q 'Generated' \
+   && ! printf '%s' "$C1" | grep -q '☻' && no_dangling "$C1" && ! printf '%s' "$D" | grep -q '☻' && no_dangling "$D" \
    && ! printf '%s' "$E" | grep -q '☻' && printf '%s' "$F" | grep -q '☻ x y' && [ "$DIRTY" = "$BEFORE" ]; then
-  ok "(22) Session: payload name; else nameCommand (first line, session id exported, run from the repo, cached under TMPDIR); none, failing or hidden → no segment; outside a repo too; repo left clean"
+  ok "(22) Session: nameCommand wins over a payload name (first line, session id exported, run from the repo, cached under TMPDIR); payload name only without a command; cold cache, none, failing or hidden → no segment; outside a repo too; repo left clean"
 else bad "(22) a=$A | b=$B | c1=$C1 | c2=$C2 | cached=$CACHED | ran=$RAN_IN | p2=$P2 | d=$D | e=$E | f=$F | dirty=$DIRTY"; fi
+
+# (22a) a nameCommand's cold cache shows nothing, never the payload's generated title in its place;
+#       within the 10 s cache the same payload name refreshes nothing, and a changed payload name
+#       (a /rename, or a title a hook set) refreshes at once
+N7="$(mkrepo sess7 '{"session":{"nameCommand":"echo run >> \"$TMPDIR/n7-runs\"; cat name.txt"}}')"
+printf 'first\n' > "$N7/name.txt"; SID7=0b1c2d3e-0000-4000-8000-000000000007
+n7runs() { [ -f "$TMPDIR/n7-runs" ] && wc -l < "$TMPDIR/n7-runs" | tr -d ' ' || echo 0; }
+G0="$(render "$N7" ",\"session_id\":\"$SID7\",\"session_name\":\"Generated title\"")"; settled "$SID7"
+G1="$(render "$N7" ",\"session_id\":\"$SID7\",\"session_name\":\"Generated title\"")"; settled "$SID7"; R1="$(n7runs)"
+printf 'second\n' > "$N7/name.txt"
+G2="$(render "$N7" ",\"session_id\":\"$SID7\",\"session_name\":\"Generated title\"")"; settled "$SID7"; R2="$(n7runs)"
+G3="$(render "$N7" ",\"session_id\":\"$SID7\",\"session_name\":\"renamed\"")"; settled "$SID7"; R3="$(n7runs)"
+G4="$(render "$N7" ",\"session_id\":\"$SID7\",\"session_name\":\"renamed\"")"
+if ! printf '%s' "$G0" | grep -q '☻' && no_dangling "$G0" && printf '%s' "$G1" | grep -qE '☻ first( |$)' \
+   && [ "$R1" = 1 ] && [ "$R2" = 1 ] && printf '%s' "$G2" | grep -qE '☻ first( |$)' && [ "$R3" = 2 ] \
+   && printf '%s' "$G4" | grep -qE '☻ second( |$)' && [ "$(cat "$TMPDIR/ds-statusline-session-$SID7.payload")" = renamed ] \
+   && ! printf '%s%s%s' "$G1" "$G3" "$G4" | grep -qE 'Generated|☻ renamed'; then
+  ok "(22a) Session: a cold nameCommand cache shows nothing; an unchanged payload name waits out the cache; a changed one refreshes at once; the payload name never shows"
+else bad "(22a) g0=$G0 | g1=$G1 r1=$R1 | g2=$G2 r2=$R2 | g3=$G3 r3=$R3 | g4=$G4"; fi
 
 # (22b) one refresh in flight per session: a nameCommand that hangs is not started again by a stale
 #       redraw while its refresher lives; once it is gone, the next stale redraw runs it again, and a

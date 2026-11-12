@@ -1,11 +1,17 @@
 {
-  "description": "Session-start version check (reports newer releases, safely applies an opted-in repository-scoped update, gives a verified reload handoff; silent when current), a per-session record of the plugin version this session has loaded (written at every session start and every prompt, read by the status line; it also holds the session's live model and effort, noted before each tool call of the main conversation and after each model switch, with one small local read and a write only when one changed, which the planning and build skills compare with the repository's expected ones; at a prompt it also refreshes the newest-release cache in the background when older than 30 minutes and, once per new version, asks Claude to tell or ask the person about a reload or update, changing nothing itself; fails open), a prompt-time session gate (one job class per session: an authoring job and an execution job do not share a session; fails open) and, only in a repository whose .claude/ds-config.json names a presence command, a presence report for every session (at session start, on prompts and finished turns, throttled, with the time of its last tool use or other activity, and at session end, plus a detached per-session keeper every few minutes while the session's process lives; the repository's command decides what a report means; fails open). Every operation is bounded.",
+  "description": "Session-start version check (reports newer releases, safely applies an opted-in repository-scoped update, gives a verified reload handoff; silent when current), a per-session record of the plugin version this session has loaded (written at every session start and every prompt, read by the status line; it also holds the session's live model and effort, noted before each tool call of the main conversation and after each model switch, with one small local read and a write only when one changed, which the planning and build skills compare with the repository's expected ones; at a prompt it also refreshes the newest-release cache in the background when older than 30 minutes and, once per new version, asks Claude to tell or ask the person about a reload or update, changing nothing itself; fails open), a prompt-time session gate (one job class per session: an authoring job and an execution job do not share a session; fails open) and, only in a repository whose .claude/ds-config.json names a presence command, a presence report for every session (at session start, on prompts and finished turns, throttled, with the time of its last tool use or other activity, and at session end, plus a detached per-session keeper every few minutes while the session's process lives; the repository's command decides what a report means; fails open). Only in a repository whose .claude/ds-config.json names a session title command, it also asks that command for a title at session start, resume and fork and at each prompt, and sets it as the session's own title only while the session has no name a person gave it (or the title is the one it set itself, or the command says a person asked for the new one); fails open. Every operation is bounded.",
   "hooks": {
     "SessionStart": [
       {
         "matcher": "startup|resume",
         "hooks": [
           { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/version-check.sh\"" }
+        ]
+      },
+      {
+        "matcher": "startup|resume|fork",
+        "hooks": [
+          { "type": "command", "command": "command -v python3 >/dev/null 2>&1 && python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/session-title.py\" hook; exit 0", "timeout": 5 }
         ]
       },
       {
@@ -16,6 +22,11 @@
       }
     ],
     "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "command -v python3 >/dev/null 2>&1 && python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/session-title.py\" hook; exit 0", "timeout": 5 }
+        ]
+      },
       {
         "hooks": [
           { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-gate.sh\"", "timeout": 10 },
