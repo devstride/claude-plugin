@@ -266,6 +266,7 @@ G4="$(render "$N7" ",\"session_id\":\"$SID7\",\"session_name\":\"renamed\"")"
 if ! printf '%s' "$G0" | grep -q '☻' && no_dangling "$G0" && printf '%s' "$G1" | grep -qE '☻ first( |$)' \
    && [ "$R1" = 1 ] && [ "$R2" = 1 ] && printf '%s' "$G2" | grep -qE '☻ first( |$)' && [ "$R3" = 2 ] \
    && printf '%s' "$G4" | grep -qE '☻ second( |$)' && [ "$(cat "$TMPDIR/ds-statusline-session-$SID7.payload")" = renamed ] \
+   && [ "$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode)))' "$TMPDIR/ds-statusline-session-$SID7.payload")" = 0o600 ] \
    && ! printf '%s%s%s' "$G1" "$G3" "$G4" | grep -qE 'Generated|☻ renamed'; then
   ok "(22a) Session: a cold nameCommand cache shows nothing; an unchanged payload name waits out the cache; a changed one refreshes at once; the payload name never shows"
 else bad "(22a) g0=$G0 | g1=$G1 r1=$R1 | g2=$G2 r2=$R2 | g3=$G3 r3=$R3 | g4=$G4"; fi

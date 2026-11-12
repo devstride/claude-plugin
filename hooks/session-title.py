@@ -13,7 +13,8 @@ An absent, null or blank command, or a session outside a repository, runs nothin
            UserPromptSubmit, and SessionStart whose source is startup, resume or fork (the sources
            whose title Claude Code applies; clear and compact are ignored). Runs the command once,
            through the shell, from the directory holding the config (the nearest one above the
-           payload's cwd), at most 3 seconds, its whole process group killed after that. It exports
+           payload's cwd), at most 3 seconds and 64 KB of output, its whole process group killed
+           past either (or when it outlives its stdout); only an exit code 0 counts. It exports
            CLAUDE_CODE_SESSION_ID, SESSION_TITLE (the payload's session_title: the session's custom
            title, empty when it has none; a generated title is never a custom one) and
            SESSION_TITLE_OWNED=1 when that title is the one this hook last set on its own (absent
@@ -28,7 +29,7 @@ An absent, null or blank command, or a session outside a repository, runs nothin
            only when the title differs from the custom title the session already has.
 Records: ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/session-title/<session>.json (the title this hook
 last set, and whether it set it on its own), owner-only, written only when a title is printed or
-stops being the hook's own;
+stops being the hook's own, and touched whenever the session runs the hook;
 another session's record untouched for 7 days is pruned at a new session's start. Nothing is
 written in the repository or the plugin directory. FAILS OPEN: every hook exits 0, and prints
 nothing but that one JSON line (a prompt hook's other stdout would become context), whatever goes
@@ -38,6 +39,7 @@ import json
 import os
 import re
 import secrets
+import select
 import signal
 import stat
 import subprocess
@@ -162,26 +164,45 @@ def run(command, root, sid, current, owned, prompt):
                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True)
     except Exception:
         return None
+    deadline = time.monotonic() + COMMAND_TIMEOUT
+    out, done = b"", False
     try:
-        out, _ = child.communicate(data, timeout=COMMAND_TIMEOUT)
-    except Exception:  # a timeout, or a command that closed its stdin early
+        try:
+            child.stdin.write(data)  # at most 8 KB: it fits a pipe's buffer whether or not it is read
+            child.stdin.close()
+        except BrokenPipeError:
+            pass  # the command did not read its stdin
+        while len(out) <= OUTPUT_LIMIT:
+            left = deadline - time.monotonic()
+            if left <= 0 or not select.select([child.stdout], [], [], left)[0]:
+                break  # out of time
+            chunk = os.read(child.stdout.fileno(), 65536)
+            if not chunk:
+                done = True
+                break
+            out += chunk
+        if done:
+            child.wait(timeout=max(0.01, deadline - time.monotonic()))
+    except Exception:
+        done = False
+    if not done or child.returncode is None:
+        # out of time, too much output, or the command outlived its stdout: stop all of it
         try:
             os.killpg(child.pid, signal.SIGKILL)
         except OSError:
             pass
-        for stream in (child.stdin, child.stdout):
-            try:
-                stream.close()
-            except Exception:
-                pass
         try:
             child.wait(timeout=1)
         except Exception:
             pass
+    for stream in (child.stdin, child.stdout):
+        try:
+            stream.close()
+        except Exception:
+            pass
+    if not done or child.returncode != 0:
         return None
-    if child.returncode != 0:
-        return None
-    return out[:OUTPUT_LIMIT].decode("utf-8", "replace")
+    return out.decode("utf-8", "replace")
 
 
 def hook():
@@ -205,6 +226,11 @@ def hook():
         prune(sid, time.time())
     current = payload.get("session_title") if isinstance(payload.get("session_title"), str) else ""
     mine = last_set(sid)
+    if mine:
+        try:  # a session still in use keeps its record however long its title stays the same
+            os.utime(os.path.join(records_path(), sid + ".json"))
+        except OSError:
+            pass
     owned = bool(current) and mine.get("own") is True and mine.get("title") == current
     if current and mine.get("own") is True and not owned:
         # a person renamed the session since: the hook's title is no longer its own, even if the

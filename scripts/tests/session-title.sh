@@ -157,6 +157,14 @@ if [ "$H1" = 0 ] && [ "$H2" = 0 ] && [ $((T1 - T0)) -le 5 ] && [ -n "$HP" ] && !
   ok "(8) failing or hanging command → nothing printed, exit 0, within $((T1 - T0)) s; the hung command is killed"
 else bad "(8) h1=$H1 h2=$H2 took=$((T1 - T0)) pid=$HP alive=$(kill -0 "$HP" 2>/dev/null && echo yes)"; kill "$HP" 2>/dev/null; fi
 
+# (8b) a command that floods its output is stopped once past the limit, not read to the end
+F3="$(mkrepo flood "{\"session\":{\"titleCommand\":\"echo \$\$ > '$WORK/flood.pid'; exec yes Flood\"}}")"
+T0=$(date +%s); fire UserPromptSubmit s8b "$F3" ',"prompt":"x"'; T1=$(date +%s); H3="$OUT$RC"
+FP="$(cat "$WORK/flood.pid" 2>/dev/null)"; sleep 0.3
+if [ "$H3" = 0 ] && [ $((T1 - T0)) -le 2 ] && [ -n "$FP" ] && ! kill -0 "$FP" 2>/dev/null; then
+  ok "(8b) a command flooding its output → nothing printed, stopped at once, killed"
+else bad "(8b) h3=$H3 took=$((T1 - T0)) alive=$(kill -0 "$FP" 2>/dev/null && echo yes)"; kill "$FP" 2>/dev/null; fi
+
 # (9) bad payloads (not JSON, no or unsafe session id, another event) → nothing, exit 0
 say "Nope"
 printf 'not json' | python3 "$HOOK" hook >"$WORK/o9" 2>&1; Z1="$?$(cat "$WORK/o9")"
@@ -174,16 +182,19 @@ chmod 700 "$RECORDS"
 if [ "$W1" = 0 ]; then ok "(10) an unwritable record → no title printed, exit 0"; else bad "(10) w1=$W1"; fi
 
 # (11) records: owner-only under XDG_CACHE_HOME only; another session's record older than 7 days is
-#      pruned at a new session's start, a fresh one and the session's own are kept; the repository and
+#      pruned at a new session's start, a fresh one, the session's own and one whose session still runs
+#      the hook (its title unchanged) are kept; the repository and
 #      the plugin directory stay clean (no compiled files)
 MODE="$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode)), oct(stat.S_IMODE(os.stat(sys.argv[2]).st_mode)))' "$RECORDS" "$RECORDS/s2.json")"
 printf '{"title":"old","own":true}' > "$RECORDS/gone.json"; touch -t 202001010000 "$RECORDS/gone.json"
 printf '{"title":"old","own":true}' > "$RECORDS/s11.json"; touch -t 202001010000 "$RECORDS/s11.json"
+touch -t 202001010000 "$RECORDS/s4.json"; say "Auto name two"
+fire UserPromptSubmit s4 "$R" ',"prompt":"x","session_title":"Auto name two"'
 say "Fresh"; fire SessionStart s11 "$R" ',"source":"startup"'
 if [ "$MODE" = "0o700 0o600" ] && [ ! -e "$RECORDS/gone.json" ] && [ -e "$RECORDS/s11.json" ] && [ -e "$RECORDS/s4.json" ] \
    && [ -z "$(git -C "$R" status --porcelain --untracked-files=all)" ] && [ ! -e "$ROOT/hooks/__pycache__" ] \
    && [ "$(title_of)" = "SessionStart|Fresh" ]; then
-  ok "(11) records owner-only under XDG_CACHE_HOME; a stale record of another session pruned at start; repository and plugin clean"
+  ok "(11) records owner-only under XDG_CACHE_HOME; a stale record of another session pruned at start, one still in use kept; repository and plugin clean"
 else bad "(11) mode=$MODE gone=$([ -e "$RECORDS/gone.json" ] && echo kept) repo=$(git -C "$R" status --porcelain) out=$OUT"; fi
 
 # (12) the hook is wired for UserPromptSubmit and for SessionStart startup|resume|fork, bounded and

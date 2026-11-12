@@ -319,13 +319,13 @@ sys.stdout.write(" ".join("".join(" " if ord(c) < 32 or ord(c) == 127 or c == "|
       fi
       rm -rf "$nlock" 2>/dev/null; mkdir "$nlock" 2>/dev/null || return 0
     fi
-    printf '%s' "$SL_SESSION_NAME" >"$nseen" 2>/dev/null
+    (umask 077; printf '%s' "$SL_SESSION_NAME" >"$nseen") 2>/dev/null  # a generated title can describe the work
     (nrefresh &) >/dev/null 2>&1
   }
   if [ -f "$ncache" ]; then
     nage=$(( $(date +%s) - $(stat -c %Y "$ncache" 2>/dev/null || stat -f %m "$ncache" 2>/dev/null || echo 0) ))
     session=$(head -1 "$ncache" 2>/dev/null)
-    nprev=""; IFS= read -r nprev <"$nseen" 2>/dev/null
+    nprev=""; { IFS= read -r nprev <"$nseen"; } 2>/dev/null
     if [ "$nage" -ge 10 ] || [ "$SL_SESSION_NAME" != "$nprev" ]; then nspawn; fi
   else
     nspawn
