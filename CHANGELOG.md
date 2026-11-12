@@ -8,6 +8,27 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A session you interrupted now reads as waiting on you, not as still working.** In a repository
+  that names a presence command, pressing Esc in the middle of a turn and then typing nothing left
+  the session reporting `working` for as long as it stayed open, so a repository that flags
+  sessions gone quiet while working raised a false alarm about a session that was only waiting for
+  its person. Claude Code runs no hook at all when a turn is interrupted: not the finished-turn
+  hook, and not the idle prompt either, which only follows a turn that finished on its own (3.55.0
+  assumed the idle prompt covered it). Now the session's keeper, the small background process that
+  already checks on the session every 10 seconds, looks at the end of the session's transcript
+  while the session reports `working`. When the last thing in the conversation is Claude Code's own
+  note that the person interrupted, whether Claude was writing or running a tool, the session
+  reports `waiting`, usually within 40 seconds, and drops the interrupted tool call from
+  `PRESENCE_BUSY_SINCE`. The same covers a permission prompt refused within its first few seconds,
+  which also ends the turn without a hook. Your next prompt reports `working` again, and one
+  interrupt is never applied twice. It never guesses: an interrupt from before the session's latest
+  prompt, anything said in the conversation after it, a transcript that is missing, unreadable or
+  still being written, or a session that is not `working` changes nothing. If you type a local
+  command such as `/model` within ten seconds of the interrupt, the session reports `waiting` about
+  a minute after that command instead, when Claude Code shows its idle prompt.
+
 ## [3.56.0] — 2026-11-12
 
 ### Changed

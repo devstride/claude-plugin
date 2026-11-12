@@ -563,6 +563,96 @@ if [ "$L1" = "(['h1'], {'h1': 'helper-3'})" ] && [ "$L2" = "([], {}, 'working')"
   ok "(36) PostToolBatch → its calls and the same agent's refused call closed; a helper's call kept until its own batch ends"
 else bad "(36) l1=$L1 l2=$L2"; fi
 
+# Helpers for (37)-(38): a session's transcript, as Claude Code writes it (one JSON entry a line).
+entry() { # entry FILE KIND[,KIND…] [AGE-MS] [new] — append the entries, stamped now or AGE-MS ago, in one
+  #         write (`new`: as a new file, moved into place whole, so a keeper never reads half of it);
+  #         prints their time in epoch ms
+  python3 - "$1" "$2" "${3:-0}" "${4:-}" <<'PY'
+import json, os, sys, time
+path, kinds, age, new = sys.argv[1], sys.argv[2].split(","), int(sys.argv[3]), sys.argv[4] == "new"
+ms = int(time.time() * 1000) - age
+at = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ms // 1000)) + ".%03dZ" % (ms % 1000)
+user = lambda content, **more: dict({"type": "user", "isSidechain": False, "uuid": "u-%d" % ms, "timestamp": at,
+                                     "message": {"role": "user", "content": content}}, **more)
+rows = {
+    "esc": [user([{"type": "text", "text": "[Request interrupted by user]"}], interruptedMessageId="msg_1")],
+    "esc-tool": [user([{"type": "tool_result", "tool_use_id": "i1", "is_error": True, "content": "rejected"}]),
+                 {"type": "attachment", "timestamp": at, "attachment": {"pad": "x" * 300000}},
+                 user([{"type": "text", "text": "[Request interrupted by user for tool use]"}])],
+    "esc-untimed": [{k: v for k, v in user([{"type": "text", "text": "[Request interrupted by user]"}]).items() if k != "timestamp"}],
+    "esc-helper": [user([{"type": "text", "text": "[Request interrupted by user]"}], isSidechain=True)],
+    "prompt": [user("carry on")],
+    "typed": [user("[Request interrupted by user]")],
+    "assistant": [{"type": "assistant", "isSidechain": False, "timestamp": at,
+                   "message": {"role": "assistant", "content": [{"type": "text", "text": "working on it"}]}}],
+    "helper": [{"type": "assistant", "isSidechain": True, "timestamp": at,
+                "message": {"role": "assistant", "content": [{"type": "text", "text": "a helper agent, still going"}]}}],
+    "bookkeeping": [{"type": "last-prompt", "lastPrompt": "x"}, {"type": "custom-title", "customTitle": "x"},
+                    {"type": "system", "subtype": "away_summary", "timestamp": at}, {"type": "bridge-session"}],
+}
+text = "".join(json.dumps(row) + "\n" for kind in kinds if kind != "cut" for row in rows[kind])
+text += '{"type":"user","mess' if "cut" in kinds else ""   # an entry Claude Code is still writing
+with open(path + ".new" if new else path, "a") as f:
+    f.write(text)
+if new:
+    os.replace(path + ".new", path)
+print(ms)
+PY
+}
+transcript() { printf '{"transcript_path":"%s"}' "$1"; }
+settle() { sleep 0.6; }   # three keeper checks at DEVSTRIDE_PRESENCE_MINUTE=1
+
+# (37) an interrupt (Esc) fires no hook: the keeper reads it from the end of the transcript. A working
+#      session whose transcript ends on the interrupt entry → waiting, open calls dropped, sent as a
+#      held change; applied once: the next prompt → working, even while the transcript still ends there
+: > "$LOG"; O37="$(owner)"; T37="$WORK/t37.jsonl"
+entry "$T37" prompt,assistant >/dev/null
+DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O37" fire SessionStart s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 1
+age s37 61; CLAUDE_PID="$O37" fire UserPromptSubmit s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 2
+fire PreToolUse s37 "$K60" "" "$(tool Bash i1)" >/dev/null; settle
+BEFORE37="$(rec s37 'r["state"], len(r["tools"])')"; sleep 0.05
+M37="$(entry "$T37" esc-tool,bookkeeping,helper)"; settle
+HELD37="$(rec s37 'r["state"], len(r["tools"]), r["interrupt"], r["activeAt"]')"; N37="$(of s37 0)"   # held: sent within 30 s
+age s37 31; upto s37 3
+age s37 31; CLAUDE_PID="$O37" fire UserPromptSubmit s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 4; settle
+AGAIN37="$(rec s37 'r["state"]')"
+M37B="$(entry "$T37" esc)"; settle; age s37 31; upto s37 5   # interrupted again, while Claude was writing
+if [ "$BEFORE37" = "('working', 1)" ] && [ "$HELD37" = "('waiting', 0, $M37, $M37)" ] && [ "$N37" = 2 ] \
+   && [ "$(of s37 3 PRESENCE_EVENT)" = beat ] && [ "$(of s37 3 PRESENCE_STATE)" = waiting ] && [ -z "$(of s37 3 PRESENCE_BUSY_SINCE)" ] \
+   && [ "$(of s37 3 PRESENCE_ACTIVE_AT)" = "$M37" ] && [ "$(of s37 4 PRESENCE_STATE)" = working ] && [ "$AGAIN37" = working ] \
+   && [ "$(of s37 5 PRESENCE_STATE)" = waiting ] && [ "$(rec s37 'r["interrupt"]')" = "$M37B" ]; then
+  ok "(37) transcript ends on the interrupt entry (past a 300 KB entry, bookkeeping and a helper's entry) → the keeper sends waiting, not busy; a prompt → working, the old interrupt not applied again; a new interrupt → waiting"
+else bad "(37) before=$BEFORE37 held=$HELD37 m=$M37 n=$N37 again=$AGAIN37 m2=$M37B $(grep '"s37"' "$LOG") $(cat "$RECORDS/s37.json")"; fi
+stop_keeper s37
+
+# (38) never waiting on a doubt: an interrupt older than the last prompt, one followed by anything the
+#      main conversation said, one in a helper's conversation, one with no time, a typed prompt with the
+#      same words, an entry cut mid-line, a symlink, a missing file, a session not working, and a hook
+#      payload naming the event all change nothing; then the same keeper acts on a real one
+: > "$LOG"; O38="$(owner)"; T38="$WORK/t38.jsonl"; D38=""
+entry "$T38" prompt,esc >/dev/null
+DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O38" fire SessionStart s38 "$K60" "" "$(transcript "$T38")" >/dev/null; upto s38 1
+entry "$T38" esc >/dev/null; settle; D38="$D38 starting:$(rec s38 'r["state"]')"                      # not working
+age s38 61; CLAUDE_PID="$O38" fire UserPromptSubmit s38 "$K60" "" "$(transcript "$T38")" >/dev/null; upto s38 2
+doubt() { settle; D38="$D38 $1:$(rec s38 'r["state"], r.get("interrupt")')"; }
+doubt older                                                                                             # before this prompt
+entry "$T38" esc 5000 new >/dev/null; doubt older-by-time
+entry "$T38" esc,assistant 0 new >/dev/null; doubt answered
+entry "$T38" esc,prompt 0 new >/dev/null; doubt prompted
+entry "$T38" assistant,esc-helper 0 new >/dev/null; doubt helper
+entry "$T38" esc-untimed 0 new >/dev/null; doubt untimed
+entry "$T38" typed 0 new >/dev/null; doubt typed
+entry "$T38" esc,cut 0 new >/dev/null; doubt cut
+entry "$WORK/t38.real" esc >/dev/null; ln -s "$WORK/t38.real" "$T38.link"; mv -f "$T38.link" "$T38"; doubt symlink
+rm -f "$T38"; doubt missing
+fire Interrupt s38 "$K60" >/dev/null; doubt named
+N38="$(of s38 0)"; M38="$(entry "$T38" esc)"; settle; age s38 31; upto s38 3
+WANT38=" starting:starting"; for d in older older-by-time answered prompted helper untimed typed cut symlink missing named; do WANT38="$WANT38 $d:('working', None)"; done
+if [ "$D38" = "$WANT38" ] && [ "$N38" = 2 ] && [ "$(of s38 3 PRESENCE_STATE)" = waiting ] && [ "$(rec s38 'r["interrupt"]')" = "$M38" ]; then
+  ok "(38) an interrupt that is stale, answered, a helper's, untimed, typed, cut mid-line, behind a symlink or missing, or a session not working → nothing; a real one after them → waiting"
+else bad "(38) got=$D38 n=$N38 $(grep '"s38"' "$LOG") $(cat "$RECORDS/s38.json")"; fi
+stop_keeper s38
+
 # (12) hooks.json registers the hook on all ten events, bounded and failing open; Notification only for
 #      the six prompt types the hook reads, and PreToolUse after the model recorder
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'

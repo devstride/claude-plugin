@@ -28,7 +28,8 @@ of range reads as 5, and doctor warns) is the keeper's beat.
 | A question or plan approval from the main conversation (`AskUserQuestion`, `ExitPlanMode`), or a permission or elicitation prompt unanswered for about 6 seconds | `beat` | `waiting` |
 | A finished turn (Claude waits for its person); nothing after an `end` | `beat` | `waiting` |
 | A finished turn that left its own background work running (a test run, a background helper; not a teammate) | `beat` | `working` |
-| The idle prompt, about 60 seconds after a finished turn or an interrupt, unless background work runs or the turn ended on an API error | `beat` | `waiting` |
+| The idle prompt, about 60 seconds after a finished turn, unless background work runs or the turn ended on an API error | `beat` | `waiting` |
+| An interrupted turn (Esc), which fires no hook: the keeper reads it from the end of the transcript while `working` | `beat` | `waiting` |
 | The keeper, when the last report is `intervalMinutes` old, or a held change is 30 seconds old | `beat` | the latest |
 | Session end (`PRESENCE_END_REASON`: `clear`, `logout`, …) | `end` | `ended` |
 | The keeper finds the session's process gone (killed, crashed) | `end` (reason `gone`) | `ended` |
@@ -49,7 +50,7 @@ clock (the hook spawns it and returns). Exported: `PRESENCE_EVENT`, `PRESENCE_ST
 segment, such as `I20100` in `jane/03-14-26/I20100-attachment-storage`; else empty),
 `PRESENCE_PLUGIN_VERSION`, `PRESENCE_INTERVAL_MINUTES`, `PRESENCE_END_REASON` (on `end` only),
 `PRESENCE_AT` (when queued, in epoch milliseconds, rising with each report, so an
-older one can be dropped), `PRESENCE_ACTIVE_AT` (the last hook event, epoch milliseconds, but never
+older one can be dropped), `PRESENCE_ACTIVE_AT` (the last hook event or interrupt, epoch milliseconds, but never
 `end`, a turn ended on an API error or an idle prompt the state ignores; may be empty), `PRESENCE_BUSY_SINCE` (epoch milliseconds, digits only:
 the earliest start of a tool call still open, or when a finished turn left background work running;
 empty when neither, and on `end`), and `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PID`, so the repository can resolve the session's own
@@ -65,9 +66,12 @@ name. Its exit code is kept in the session's local record; nothing reads it as a
   call (a refused call closes when its batch ends), so `working` with an old `PRESENCE_ACTIVE_AT` and no `PRESENCE_BUSY_SINCE` is hung (or
   stopped by a usage limit, which stamps nothing); `working` with a `PRESENCE_BUSY_SINCE` is inside
   one long step or waiting on its own background work, and deserves a longer allowance, not none.
-  `waiting` is the person's turn and is never hung. Two blind spots: no hook marks a permission
-  approval, so an approved command that runs long reads `waiting` until it ends; and no hook fires
-  on an interrupt, so it reads `working` until the idle prompt about 60 seconds later.
+  `waiting` is the person's turn and is never hung. An interrupt fires no hook, not even the idle
+  prompt: the keeper reads Claude Code's interrupt entry at the end of the transcript and reports
+  `waiting` (a transcript it cannot read changes nothing; a local command typed within ten seconds
+  of the interrupt hides it until the idle prompt 60 seconds after that command). One blind spot:
+  no hook marks a permission approval, so an approved command that runs long reads `waiting` until
+  it ends.
 - **Fail fast and quietly.** A slow or failing command costs that one report, never a turn.
 - **Quote every variable.** A branch name can hold shell syntax: pass `"$PRESENCE_BRANCH"`
   quoted, or read the variables from the environment in code.
