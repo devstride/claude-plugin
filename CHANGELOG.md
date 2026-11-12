@@ -20,14 +20,15 @@ for what each version component means here and how a release is cut.
   root. A plan someone took off by hand comes back at the next pickup. After each merge and when
   the run ends, a plan with nothing left to build goes back to the board it came from (named in
   the placement comment, which now records that board's id), or off every board when that board
-  is gone; the removal is commented. The tag is untouched: it still follows the repository's
+  is gone; the removal is commented. A root placed by an earlier version, whose comment names no
+  board id, comes off every board. The tag is untouched: it still follows the repository's
   claims.
 - **Setup and doctor always look for the board.** With no `activeAgents` block, `doctor` (and a
   plain `setup` run) now report whether an **Active Agents** board exists but is not adopted, or
   does not exist, as INFO with `/devstride:setup agents` as the fix; neither is a failure. With a
   block, doctor adds three checks: a `rootLevel` that names no level above the leaves (FAIL), a
-  finished plan still on the board (FAIL; the repair is `/devstride:build-item <root>`, whose
-  exit takes it off), and the shared view (INFO only: none, more than one, or a starting column
+  finished plan still on the board (FAIL; the repair is `/devstride:build-item <root> --board-root
+  <root>`, whose exit takes it off), and the shared view (INFO only: none, more than one, or a starting column
   not shown).
 - **The starting view adds Pull Requests and is adopted before it is created.** `setup agents`
   now adopts an existing shared board table view named "Active Agents" or starting "Active

@@ -26,10 +26,10 @@ At **each** item picked up (every iteration, a given item number too), after ste
   `rootLevel` item, the plan root. A workstream, a leaf or a deferred item is never a root.
   `ROOT NONE` → one progress-table line, nothing placed. **Never a question, never a stop.**
 - **Place** (`boardId` set): `get_item` the root; Done or already on that board → no write. Else
-  `move_to_board` it to `boardId`, then `add_comment` with the `{ html }` of `comment placed
-  --board <its old board id> --label <its label>` (bare `comment placed` from no board): the
-  reversal record. A root taken off by hand comes back at the next pickup. Only a resolved root is
-  ever placed — never a leaf (a Story or Defect). `boardId` null → nothing placed; commands run.
+  `add_comment` with the `{ html }` of `comment placed --board <its old board id> --label <its
+  label>` (bare `comment placed` from no board), the reversal record, written BEFORE the move;
+  then `move_to_board` it to `boardId`. A root taken off by hand comes back at the next pickup.
+  Only a resolved root is ever placed — never a leaf (a Story or Defect). `boardId` null → nothing placed; commands run.
 - **`start` once per root per run**, after its first placement check. A pickup resolving another
   root (or `ROOT NONE`) runs `end` for the old one first.
 

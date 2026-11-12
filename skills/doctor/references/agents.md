@@ -4,8 +4,8 @@ load: contract
 # doctor `agents` — the Active Agents block, read-only
 
 **Doctor writes nothing here**, in DevStride or anywhere else: only `list_boards`, `get_board`,
-`search_items`, `get_organization_metadata`, `get_work_type_hierarchy`, `list_views`,
-`get_view_columns` and `python3 ${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/active-agents.py`
+`search_items`, `list_comments`, `get_organization_metadata`, `get_work_type_hierarchy`,
+`list_views`, `get_view_columns` and `python3 ${CLAUDE_PLUGIN_ROOT}/skills/setup/scripts/active-agents.py`
 (`validate`, `classify`). The block and what it needs:
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/agents-mode.md`. Each finding's severity is the
 `severity` `classify` gives it.
@@ -32,8 +32,8 @@ load: contract
   - `root-level` — `rootLevel` names no work type above the leaves (matched case-insensitively,
     so an organization's own spelling works when written that way). Fix: the block, by hand.
   - `done-on-board` — a plan root on the board with nothing left to build: the numbers. Fix:
-    `/devstride:build-item <root>` for each (its terminal exit takes a finished plan off, back to
-    the board it came from) — a repair command, never run by doctor.
+    `/devstride:build-item <root> --board-root <root>` for each (its terminal exit takes that
+    finished root off, back to the board it came from) — a repair command, never run by doctor.
   - `leaf-on-board` — leaf items (Stories, Defects) on the board: the count, then the first five
     numbers. `tag-on-done` — the tag on a Done item: the numbers. Fix: those items, by hand.
   - `tag-group` — a plan-root type with no tag group: INFO, skipped by setup.
