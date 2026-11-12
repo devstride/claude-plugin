@@ -70,6 +70,15 @@ Run once the pull request's review has settled. The owner's standing yes
 holds at one exact head. The first one that fails stops here with `OWNER YES NEEDED` and its
 reason; nothing is merged and nothing is bypassed.
 
+A pull request that changes the standing yes, this procedure, the checks, the workflows or the
+instruction files is covered like any other (the owner's words of 2026-11-12: his standing yes
+applies here exactly as in the main DevStride repository). It still cannot rewrite the merge rules
+for its own merge: the merge reads the standing yes, this procedure and both gate scripts from
+`main`, as the trusted copy below says, and the `merge-path` and `public-hygiene` checks run
+`main`'s copy too. `release-guard` alone runs the pull request's own copy of its workflow and
+scripts, so a pull request that changes them is green only by its own code; review reads that
+change knowing it.
+
 **Trusted copy.** This procedure, the standing yes and both gate scripts are read and run from
 `origin/main`, never from the pull request. Run `merge` only in a session started in a clean
 worktree of `origin/main` (`git fetch origin && git worktree add --detach <tmp> origin/main`, then
@@ -80,13 +89,14 @@ worktree serves one merge: the next `merge` starts again in a fresh session from
 fresh worktree of the then-current `main`.
 
 1. **The standing yes is in force.** `<tmp>/.claude/standing-yes.md` *(main)* exists and says
-   `Status: in force`. Note its date and `<trusted>` = `git -C <tmp> rev-parse HEAD`, then `git
+   `Status: in force`. Note its dates (`<date>` below is every date it gives, in order, for
+   example `2026-11-08, widened 2026-11-12`) and `<trusted>` = `git -C <tmp> rev-parse HEAD`, then `git
    fetch origin`: `origin/main` must equal `<trusted>` (otherwise `<tmp>` is stale; stop). Follow
    this procedure as written in
    `<tmp>/.claude/skills/plugin-release/SKILL.md` *(main)*; where it differs from the branch's copy,
    main's wins.
 2. **The pull request qualifies.** `gh pr view <pr> --json
-   state,isDraft,baseRefName,headRefName,headRefOid,isCrossRepository,author,changedFiles`: open,
+   state,isDraft,baseRefName,headRefName,headRefOid,isCrossRepository,author`: open,
    not a draft,
    base `main`, not cross-repository, authored by the owner (`philreynolds`), the account the
    owner's builds run under. Record `<head>` = `headRefOid`. Every commit (`gh api
@@ -97,25 +107,12 @@ fresh worktree of the then-current `main`.
    --paginate`): each entry's `actor` is the owner, and `<head>` is the `after` of one of them. The
    pull request is linked to a tracked work item whose build the owner started; say which item in
    the private tracker comment, never on GitHub.
-3. **It touches nothing that guards merges.** List the files with `gh api
-   repos/{owner}/{repo}/pulls/<pr>/files --paginate` (the count must equal `changedFiles`) and read
-   both `filename` and `previous_filename`, in any letter case (the owner's disk ignores case, so
-   `.Claude/` is `.claude/`). Neither may be under a `.claude/` directory at any depth or under
-   `.github/`; under `scripts/`, except `scripts/cost-budgets.json` and the test cases in `scripts/tests/` (its
-   `run.sh` is guarded); or be one of the files the checks load or run:
-   `skills/pr/scripts/merge-gate.py`, `skills/review/scripts/reviewed-status.py`,
-   `skills/update/scripts/update-plugin.py`, `skills/doctor/scripts/validate-config.py`,
-   `skills/build-item/scripts/routing.py` (the merge-path check runs it) or
-   `skills/review/references/delivery-loop-invariants.md`; nor any `CLAUDE.md`, `CLAUDE.local.md`,
-   `AGENTS.md` or `.mcp.json`, anywhere (the instructions and tools a merging session loads). A
-   change to any of them, including this procedure and the standing yes, always needs the owner's
-   own yes.
-4. **The review settled clean.** The last local review round (Claude and Codex) on `<head>` found
+3. **The review settled clean.** The last local review round (Claude and Codex) on `<head>` found
    no P1 and no serious P2. Only then post the proof, `python3 -I
    <tmp>/skills/review/scripts/reviewed-status.py post <head> --pr <pr> --base main` *(main)*, and
    check it: `verify <head> --pr <pr> --base main` *(main)* prints `REVIEWED`. Never post it to get
    past this step. The proof is this session's attestation, posted under the owner's account.
-5. **The local checks passed at `<head>`.** The build ran them in its own checkout before review:
+4. **The local checks passed at `<head>`.** The build ran them in its own checkout before review:
    `bash scripts/check-version-bump.sh --base origin/main`, `bash scripts/check-neutrality.sh`,
    `bash scripts/check-public-hygiene.sh --base origin/main`, and `bash scripts/validate.sh
    --needles` (in the background, read from its log, never piped through `head`); the required
@@ -123,14 +120,14 @@ fresh worktree of the then-current `main`.
    it would share a machine with `<tmp>`. If they weren't run on `<head>`, stop with `OWNER YES
    NEEDED`. Then confirm `<tmp>` is untouched: `git -C <tmp> status --porcelain --ignored` prints
    nothing and `git -C <tmp> rev-parse HEAD` is `<trusted>`.
-6. **Every check is green on `<head>`.** `python3 -I <tmp>/skills/pr/scripts/merge-gate.py <pr>
+5. **Every check is green on `<head>`.** `python3 -I <tmp>/skills/pr/scripts/merge-gate.py <pr>
    <head> --all-green --repo devstride/claude-plugin` *(main)* prints `MERGE <command>`. Right
    before running it, `git fetch origin` and compare `origin/main` with `<trusted>`. If it moved (a
    revocation may have landed), `<tmp>` is stale: stop with `OWNER YES NEEDED` (main moved during
    the merge) and start `merge` again in a fresh session. Then run exactly that command.
    `REFUSE` or `ERROR` stops with its reason (wait for pending checks first; a red check is never
    merged).
-7. **The audit comment**, on the pull request at once (`gh pr comment <pr> --body-file <file>`):
+6. **The audit comment**, on the pull request at once (`gh pr comment <pr> --body-file <file>`):
 
    ```
    <!-- devstride:standing-yes -->
