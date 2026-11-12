@@ -8,6 +8,20 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A session's status keeper follows the plugin it has loaded.** The background process that
+  sends each session's status every few minutes was started once and never replaced, so after a
+  plugin update a session could keep reporting through the old version's code for the rest of its
+  life. A keeper from a version that could not report "busy with my own step or background work"
+  made a session waiting on its own landing check, CI or a deploy look stalled after ten minutes.
+  Now a keeper leaves as soon as the session's hooks run another version, and the session's next
+  hook event of any kind starts one from the loaded version. A keeper started by an earlier
+  version, which has no such check, is ended once by the new version's hook; only that session's
+  own keeper is touched, never another session's. Every report now names the version of the code
+  actually sending it, not the version copied from the session's record, so an old sender is
+  visible.
+
 ## [3.57.0] — 2026-11-12
 
 ### Fixed
