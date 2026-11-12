@@ -24,7 +24,7 @@ of range reads as 5, and doctor warns) is the keeper's beat.
 | Session start (new, resumed, after `/clear`; not after a compaction) | `start` | `starting` |
 | A prompt, with no report yet in this session, or after an `end` | `start` | `working` |
 | A prompt, a minute or more after the last report, or from another checkout | `beat` | `working` |
-| A tool call starting or ending while `starting` or `waiting` (an answered prompt; a turn with no prompt) | `beat` | `working` |
+| A tool call starting or ending while `starting` or `waiting` (an answered prompt; a turn with no prompt), except while a question is open | `beat` | `working` |
 | A question or plan approval from the main conversation (`AskUserQuestion`, `ExitPlanMode`), or a permission or elicitation prompt unanswered for about 6 seconds | `beat` | `waiting` |
 | A finished turn (Claude waits for its person); nothing after an `end` | `beat` | `waiting` |
 | A finished turn that left its own background work running (a test run, a background helper) | `beat` | `working` |

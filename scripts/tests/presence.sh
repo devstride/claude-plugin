@@ -479,10 +479,20 @@ age s32 31; fire PostToolUse s32 "$R29" "" "$(tool AskUserQuestion q1)" >/dev/nu
 age s32 31; fire PreToolUse s32 "$R29" "" "$(tool ExitPlanMode q2)" >/dev/null; upto s32 5
 age s32 31; fire PostToolUse s32 "$R29" "" "$(tool ExitPlanMode q2)" >/dev/null; upto s32 6
 age s32 31; fire PreToolUse s32 "$R29" "" "$(tool AskUserQuestion q3 helper-1)" >/dev/null; sleep 0.4
+H32="$(rec s32 'r["state"], "q3" in r["tools"]')"; fire PostToolUse s32 "$R29" "" "$(tool AskUserQuestion q3 helper-1)" >/dev/null
+# while the question is open, a background helper's calls (and a parallel call of the main
+# conversation) change nothing; the question's own answer does
+age s32 31; fire PreToolUse s32 "$R29" "" "$(tool AskUserQuestion q4)" >/dev/null; upto s32 7
+age s32 31; fire PreToolUse s32 "$R29" "" "$(tool Bash h1 helper-2)" >/dev/null
+age s32 31; fire PostToolUse s32 "$R29" "" "$(tool Bash h1 helper-2)" >/dev/null
+age s32 31; fire PostToolUseFailure s32 "$R29" "" "$(tool Read m1)" >/dev/null; sleep 0.4
+W32="$(rec s32 'r["state"]')"; N32="$(of s32 0)"
+age s32 31; fire PostToolUse s32 "$R29" "" "$(tool AskUserQuestion q4)" >/dev/null; upto s32 8
 if [ "$(of s32 3 PRESENCE_STATE)" = waiting ] && [ "$Q1" = False ] && [ "$(of s32 4 PRESENCE_STATE)" = working ] \
-   && [ "$(of s32 5 PRESENCE_STATE)" = waiting ] && [ "$(of s32 6 PRESENCE_STATE)" = working ] && [ "$(of s32 0)" = 6 ] \
-   && [ "$(rec s32 'r["state"]')" = working ] && [ "$(rec s32 '"q3" in r["tools"]')" = True ]; then
-  ok "(32) main-conversation AskUserQuestion / ExitPlanMode → waiting, not busy; answered → working; from a helper agent → nothing"
+   && [ "$(of s32 5 PRESENCE_STATE)" = waiting ] && [ "$(of s32 6 PRESENCE_STATE)" = working ] && [ "$H32" = "('working', True)" ] \
+   && [ "$(of s32 7 PRESENCE_STATE)" = waiting ] && [ "$W32" = waiting ] && [ "$N32" = 7 ] \
+   && [ "$(of s32 8 PRESENCE_STATE)" = working ] && [ "$(rec s32 'r["asking"]')" = "" ]; then
+  ok "(32) main-conversation AskUserQuestion / ExitPlanMode → waiting, not busy; answered → working; from a helper agent → nothing; other calls while it is open → still waiting"
 else bad "(32) $(grep '"s32"' "$LOG") $(cat "$RECORDS/s32.json")"; fi
 
 # (33) a finished turn that left its own background work running stays working, busy since the Stop;

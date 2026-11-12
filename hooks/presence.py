@@ -47,6 +47,20 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            Every event but SessionStart and UserPromptSubmit only updates a session already reported:
            for a session with no record, or one already ended, it does nothing. Every event but those
            two and SessionEnd sends `beat` only on a state change.
+           While the main conversation's question is open, no other tool call changes the state (a
+           background helper's calls go on while the person decides): only that question's own
+           PostToolUse or PostToolUseFailure (any main-conversation one when it carried no
+           tool_use_id), a prompt, a finished turn or the idle prompt ends it.
+           A state change within 30 seconds of the last send is held: the next hook or keeper send
+           carries it, and the keeper sends it once those 30 seconds pass (both compare against the
+           last state REPORTED, so a held change is not lost).
+           The record follows the session, not the checkout: a session that moves to a checkout
+           without the block keeps reporting under the one it came from, and no event is ever
+           dropped for that reason for a session that has a record. The session's process
+           (CLAUDE_PID, else the parent of the hook's shell) and its start time are re-read on every
+           start and prompt.
+           Every read-modify-write of the record holds the session's state lock (never while the
+           command runs), and every queued report takes the next number in the record's sequence.
   keeper <session>  (detached, one per session, holding the session's keeper lock, which is how a
            hook knows one runs) checks every 10 seconds: it exits once the session has ended, its
            record is gone or the block is removed, releasing its lock under the state lock so a
@@ -401,26 +415,32 @@ def transition(event, payload, record, now_ms):
     and failed-turn flag. Returns (the new state, or None to keep the state; whether it is a sign of
     the session's own activity)."""
     calls = open_calls(record)
+    asking = record.get("asking") if isinstance(record.get("asking"), str) else ""
+    call = payload.get("tool_use_id") if isinstance(payload.get("tool_use_id"), str) else ""
+    main = not payload.get("agent_id")
     state, active = None, event != "SessionEnd"
+    if event in ("SessionStart", "UserPromptSubmit", "Stop", "StopFailure") or (
+            event == "Notification" and payload.get("notification_type") == "idle_prompt"):
+        asking = ""
     if event in FIRST:
         calls = {}
         record.update({"background": 0, "failed": False})
         state = "starting" if event == "SessionStart" else "working"
     elif event == "PreToolUse":
-        call = payload.get("tool_use_id")
-        if payload.get("tool_name") in QUESTIONS and not payload.get("agent_id"):
+        if payload.get("tool_name") in QUESTIONS and main:
             state = "waiting"  # a question or a plan approval: the person's turn
+            asking = call if TOOL_ID.match(call) else "-"
         else:
-            state = "working"
-            if isinstance(call, str) and TOOL_ID.match(call):
+            state = None if asking else "working"
+            if TOOL_ID.match(call):
                 calls[call] = now_ms
                 for oldest in sorted(calls, key=calls.get)[:max(0, len(calls) - OPEN_LIMIT)]:
                     del calls[oldest]
     elif event in ("PostToolUse", "PostToolUseFailure"):
-        call = payload.get("tool_use_id")
-        if isinstance(call, str):
-            calls.pop(call, None)
-        state = "working"
+        calls.pop(call, None)
+        if asking and (call == asking or (asking == "-" and main)):
+            asking = ""  # the person answered
+        state = None if asking else "working"
     elif event == "Notification":
         if payload.get("notification_type") == "idle_prompt":
             calls = {}  # an interrupted call never closes
@@ -446,6 +466,7 @@ def transition(event, payload, record, now_ms):
     elif event == "SessionEnd":
         state = "ended"
     record["tools"] = calls
+    record["asking"] = asking
     return state, active
 
 
