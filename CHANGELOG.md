@@ -8,6 +8,25 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **Session presence now tells "waiting on you" apart from "busy in one long step".** In a
+  repository that names a presence command, a session that asks you a question, shows a plan for
+  approval, or sits at a permission or MCP prompt now reports `waiting`, the same as a finished
+  turn; before, it kept reporting `working` until the turn ended. The idle prompt Claude Code shows
+  about a minute after a finished turn or an interrupt (Esc fires no hook of its own) also reports
+  `waiting`. Activity is now stamped when each tool call starts as well as when it ends, and a
+  failed tool call counts too, so one long command no longer looks idle the whole time it runs.
+  The command receives a new variable, `PRESENCE_BUSY_SINCE`: when the session is inside one tool
+  call, or finished its turn while its own background work (a test run, a background helper)
+  is still running, it holds when that started, in epoch milliseconds; otherwise it is empty. A
+  finished turn with background work still running reports `working`, not `waiting`. A turn that
+  ends on an API error, such as a usage limit, stamps no activity and keeps reporting `working`,
+  so a repository can still tell that it has stopped. Nothing changes for a repository without a
+  presence command; the extra hook on each tool call returns at once there. Two known gaps, both
+  limits of Claude Code's hooks: after you approve a permission prompt the session reads `waiting`
+  until that command finishes, and after an interrupt it reads `working` for about a minute.
+
 ## [3.54.0] — 2026-11-11
 
 ### Changed

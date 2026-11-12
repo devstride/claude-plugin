@@ -30,9 +30,10 @@ mkrepo() { # mkrepo NAME [CONFIG-JSON] [BRANCH]
   printf '%s' "${2:-{\}}" > "$d/.claude/ds-config.json"; printf '%s' "$d"
 }
 config() { python3 -c 'import json,sys; print(json.dumps({"presence":{"command":sys.argv[1],"intervalMinutes":int(sys.argv[2])}}))' "$REPORT" "${1:-5}"; }
-fire() { # fire EVENT SESSION CWD [REASON-OR-SOURCE] — run the hook as Claude Code does; prints its stdout
-  python3 -c 'import json,sys; print(json.dumps({"hook_event_name":sys.argv[1],"session_id":sys.argv[2],"cwd":sys.argv[3],"reason":sys.argv[4],"source":sys.argv[4]}))' \
-    "$1" "$2" "$3" "${4:-}" | python3 "$HOOK" hook
+fire() { # fire EVENT SESSION CWD [REASON-OR-SOURCE] [EXTRA-JSON] — run the hook as Claude Code does; prints its
+  #        stdout. EXTRA-JSON (an object) is merged into the payload: tool_name, tool_use_id, agent_id, …
+  python3 -c 'import json,sys; p={"hook_event_name":sys.argv[1],"session_id":sys.argv[2],"cwd":sys.argv[3],"reason":sys.argv[4],"source":sys.argv[4]}; p.update(json.loads(sys.argv[5] or "{}")); print(json.dumps(p))' \
+    "$1" "$2" "$3" "${4:-}" "${5:-}" | python3 "$HOOK" hook
 }
 sent() { [ -f "$LOG" ] && wc -l < "$LOG" | tr -d ' ' || echo 0; }
 wait_sent() { # wait_sent N — until the log holds N lines (detached sends), at most 10 s
@@ -406,15 +407,142 @@ if [ "$A1" = "$A0 starting" ] && [ "$A2" = "$A0 ended" ] && [ "$A3" = "$A0 ended
 else bad "(28b) a0=$A0 a1=$A1 a2=$A2 a3=$A3"; fi
 stop_keeper s28b
 
-# (12) hooks.json registers the hook on all five events, bounded and failing open
+# Helpers for (29)-(35): one session's reports in the shared log, its record, and a report run now.
+now_ms() { python3 -c 'import time; print(int(time.time()*1000))'; }
+of() { # of SESSION N FIELD — FIELD of the session's Nth report (N=0: how many it has)
+  python3 -c 'import json,sys; rows=[json.loads(l) for l in open(sys.argv[1]) if l.strip()]; rows=[r for r in rows if r.get("PRESENCE_SESSION_ID")==sys.argv[2]]; n=int(sys.argv[3]); print(len(rows) if n==0 else (rows[n-1].get(sys.argv[4],"") if len(rows)>=n else "-"))' "$LOG" "$1" "$2" "${3:-}"
+}
+upto() { local i=0; while [ "$(of "$1" 0)" -lt "$2" ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done; [ "$(of "$1" 0)" -ge "$2" ]; }
+rec() { python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(eval(sys.argv[2]))' "$RECORDS/$1.json" "$2"; }
+probe() { # probe SESSION — run one report now, as the keeper would, and print the PRESENCE_BUSY_SINCE it carried
+  edit "$1" 'r["queued"] = int(r.get("queued") or 0) + 1'
+  python3 "$HOOK" send beat "$(rec "$1" 'r["state"]')" "$1" "$(rec "$1" 'r["id"]')" "$(rec "$1" 'r["queued"]')" "$(now_ms)"
+  of "$1" "$(of "$1" 0)" PRESENCE_BUSY_SINCE
+}
+begin() { # begin SESSION — a reported session with no keeper (the cases drive every send themselves)
+  fire SessionStart "$1" "$R29" >/dev/null; upto "$1" 1; stop_keeper "$1"
+}
+tool() { printf '{"tool_name":"%s","tool_use_id":"%s"%s}' "$1" "$2" "${3:+,\"agent_id\":\"$3\"}"; }
+R29="$(mkrepo r29 "$(config)")"
+
+# (29) a call's start stamps activity and opens it: PRESENCE_BUSY_SINCE is the earliest open call's
+#      start; closing one leaves the other's; closing the last (PostToolUse or PostToolUseFailure) empties it
+begin s29; T0="$(now_ms)"
+fire PreToolUse s29 "$R29" "" "$(tool Bash t1)" >/dev/null
+S1="$(rec s29 'r["tools"]["t1"]')"; A1="$(rec s29 'r["activeAt"]')"; ST1="$(rec s29 'r["state"]')"
+sleep 0.05; age s29 31; fire PreToolUse s29 "$R29" "" "$(tool Read t2)" >/dev/null; upto s29 2   # the held change: beat
+S2="$(rec s29 'r["tools"]["t2"]')"
+fire PostToolUse s29 "$R29" "" "$(tool Bash t1)" >/dev/null; B1="$(probe s29)"
+fire PostToolUseFailure s29 "$R29" "" "$(tool Read t2)" >/dev/null; B2="$(probe s29)"
+if [ "$ST1" = working ] && [ "$S1" -ge "$T0" ] && [ "$A1" -ge "$T0" ] && [ "$S2" -gt "$S1" ] \
+   && [ "$(of s29 2 PRESENCE_EVENT)" = beat ] && [ "$(of s29 2 PRESENCE_STATE)" = working ] \
+   && [ "$(of s29 2 PRESENCE_BUSY_SINCE)" = "$S1" ] && [ "$B1" = "$S2" ] && [ -z "$B2" ] && [ "$(rec s29 'len(r["tools"])')" = 0 ] \
+   && [ -z "$(of s29 1 PRESENCE_BUSY_SINCE)" ]; then
+  ok "(29) PreToolUse → activity and an open call; busy-since = the earliest of two; closing each → the other's, then empty"
+else bad "(29) st=$ST1 s1=$S1 s2=$S2 a1=$A1 t0=$T0 b1=$B1 b2=$B2 $(grep '"s29"' "$LOG")"; fi
+
+# (29b) at most 64 calls are open: the oldest is dropped
+begin s29b
+for n in $(seq 1 66); do fire PreToolUse s29b "$R29" "" "$(tool Bash "c$n")" >/dev/null; done
+if [ "$(rec s29b 'len(r["tools"])')" = 64 ] && [ "$(rec s29b '"c1" in r["tools"] or "c2" in r["tools"]')" = False ] \
+   && [ "$(rec s29b '"c3" in r["tools"] and "c66" in r["tools"]')" = True ]; then
+  ok "(29b) 66 calls open → 64 kept, the two oldest dropped"
+else bad "(29b) $(rec s29b 'sorted(r["tools"])')"; fi
+
+# (30) a permission prompt waits on the person: beat waiting once 30 s allow; the call ending → working
+begin s30; age s30 31; fire PreToolUse s30 "$R29" "" "$(tool Bash p1)" >/dev/null; upto s30 2
+P1="$(rec s30 'r["tools"]["p1"]')"
+age s30 31; fire Notification s30 "$R29" "" '{"notification_type":"permission_prompt"}' >/dev/null; upto s30 3
+age s30 31; fire PostToolUse s30 "$R29" "" "$(tool Bash p1)" >/dev/null; upto s30 4
+if [ "$(of s30 2 PRESENCE_STATE)" = working ] && [ "$(of s30 3 PRESENCE_STATE)" = waiting ] && [ "$(of s30 3 PRESENCE_BUSY_SINCE)" = "$P1" ] \
+   && [ "$(of s30 4 PRESENCE_STATE)" = working ] && [ -z "$(of s30 4 PRESENCE_BUSY_SINCE)" ]; then
+  ok "(30) Notification permission_prompt → beat waiting (the call still open); its PostToolUse → beat working, not busy"
+else bad "(30) $(grep '"s30"' "$LOG")"; fi
+
+# (31) the idle prompt (about 60 s after an interrupt, which fires no hook): open calls dropped, waiting;
+#      the next prompt → working
+begin s31; age s31 31; fire UserPromptSubmit s31 "$R29" >/dev/null; upto s31 2
+fire PreToolUse s31 "$R29" "" "$(tool Bash i1)" >/dev/null
+age s31 31; fire Notification s31 "$R29" "" '{"notification_type":"idle_prompt"}' >/dev/null; upto s31 3
+age s31 31; fire UserPromptSubmit s31 "$R29" >/dev/null; upto s31 4
+if [ "$(of s31 2 PRESENCE_STATE)" = working ] && [ "$(of s31 3 PRESENCE_STATE)" = waiting ] && [ -z "$(of s31 3 PRESENCE_BUSY_SINCE)" ] \
+   && [ "$(of s31 4 PRESENCE_STATE)" = working ] && [ "$(rec s31 'len(r["tools"])')" = 0 ]; then
+  ok "(31) working with an open call, then idle_prompt → beat waiting, busy-since empty; a prompt → working"
+else bad "(31) $(grep '"s31"' "$LOG")"; fi
+
+# (32) the main conversation asking its person (AskUserQuestion, ExitPlanMode) waits; the answer → working;
+#      the same tool from a helper agent is an ordinary call
+begin s32; age s32 31; fire UserPromptSubmit s32 "$R29" >/dev/null; upto s32 2
+age s32 31; fire PreToolUse s32 "$R29" "" "$(tool AskUserQuestion q1)" >/dev/null; upto s32 3
+Q1="$(rec s32 '"q1" in r["tools"]')"
+age s32 31; fire PostToolUse s32 "$R29" "" "$(tool AskUserQuestion q1)" >/dev/null; upto s32 4
+age s32 31; fire PreToolUse s32 "$R29" "" "$(tool ExitPlanMode q2)" >/dev/null; upto s32 5
+age s32 31; fire PostToolUse s32 "$R29" "" "$(tool ExitPlanMode q2)" >/dev/null; upto s32 6
+age s32 31; fire PreToolUse s32 "$R29" "" "$(tool AskUserQuestion q3 helper-1)" >/dev/null; sleep 0.4
+if [ "$(of s32 3 PRESENCE_STATE)" = waiting ] && [ "$Q1" = False ] && [ "$(of s32 4 PRESENCE_STATE)" = working ] \
+   && [ "$(of s32 5 PRESENCE_STATE)" = waiting ] && [ "$(of s32 6 PRESENCE_STATE)" = working ] && [ "$(of s32 0)" = 6 ] \
+   && [ "$(rec s32 'r["state"]')" = working ] && [ "$(rec s32 '"q3" in r["tools"]')" = True ]; then
+  ok "(32) main-conversation AskUserQuestion / ExitPlanMode → waiting, not busy; answered → working; from a helper agent → nothing"
+else bad "(32) $(grep '"s32"' "$LOG") $(cat "$RECORDS/s32.json")"; fi
+
+# (33) a finished turn that left its own background work running stays working, busy since the Stop;
+#      the idle prompt then changes nothing; a later Stop with none running → waiting
+begin s33; age s33 31; fire UserPromptSubmit s33 "$R29" >/dev/null; upto s33 2
+T1="$(now_ms)"; age s33 31
+fire Stop s33 "$R29" "" '{"background_tasks":[{"id":"b1","type":"shell","status":"running","command":"npm test"}]}' >/dev/null
+sleep 0.4; N33="$(of s33 0)"; BG="$(rec s33 'r["background"]')"; ST33="$(rec s33 'r["state"]')"; ACT33="$(rec s33 'r["activeAt"]')"
+age s33 31; fire Notification s33 "$R29" "" '{"notification_type":"idle_prompt"}' >/dev/null; sleep 0.4
+AFTER="$(rec s33 'r["state"], r["background"], r["activeAt"]')"; B33="$(probe s33)"; N33B="$(of s33 0)"
+age s33 31; fire Stop s33 "$R29" "" '{"background_tasks":[{"id":"b1","type":"shell","status":"completed"}]}' >/dev/null; upto s33 $((N33B + 1))
+if [ "$N33" = 2 ] && [ "$ST33" = working ] && [ "$BG" -ge "$T1" ] && [ "$AFTER" = "('working', $BG, $ACT33)" ] && [ "$B33" = "$BG" ] \
+   && [ "$(of s33 "$((N33B + 1))" PRESENCE_STATE)" = waiting ] && [ -z "$(of s33 "$((N33B + 1))" PRESENCE_BUSY_SINCE)" ]; then
+  ok "(33) Stop with background work running → working, busy since the Stop; idle_prompt → unchanged; Stop with none → waiting"
+else bad "(33) n=$N33 st=$ST33 bg=$BG t1=$T1 after=$AFTER b=$B33 $(grep '"s33"' "$LOG")"; fi
+
+# (34) a turn ended on an API error (a usage limit) stays working, not busy, with no new activity, so it
+#      still reads as idle while working; the idle prompt keeps it so; the next prompt clears it
+begin s34; age s34 31; fire UserPromptSubmit s34 "$R29" >/dev/null; upto s34 2
+fire PreToolUse s34 "$R29" "" "$(tool Bash f1)" >/dev/null; ACT34="$(rec s34 'r["activeAt"]')"; sleep 0.05
+age s34 31; fire StopFailure s34 "$R29" "" '{"error":"rate_limit"}' >/dev/null
+F1="$(rec s34 'r["state"], r["failed"], len(r["tools"]), r["activeAt"]')"; B34="$(probe s34)"; N34="$(of s34 0)"
+age s34 31; fire Notification s34 "$R29" "" '{"notification_type":"idle_prompt"}' >/dev/null; sleep 0.4
+F2="$(rec s34 'r["state"], r["activeAt"]')"; N34B="$(of s34 0)"
+age s34 31; fire UserPromptSubmit s34 "$R29" >/dev/null
+F3="$(rec s34 'r["state"], r["failed"]')"
+if [ "$F1" = "('working', True, 0, $ACT34)" ] && [ -z "$B34" ] && [ "$F2" = "('working', $ACT34)" ] && [ "$N34B" = "$N34" ] \
+   && [ "$F3" = "('working', False)" ]; then
+  ok "(34) StopFailure → still working, busy empty, activity unchanged; idle_prompt → still working; a prompt clears it"
+else bad "(34) f1=$F1 act=$ACT34 b=$B34 f2=$F2 n=$N34/$N34B f3=$F3"; fi
+
+# (35) any other notification type changes nothing; a new event for a session never reported does nothing
+begin s35; age s35 31; BEFORE35="$(cat "$RECORDS/s35.json")"; N35="$(of s35 0)"
+fire Notification s35 "$R29" "" '{"notification_type":"auth_success"}' >/dev/null
+fire Notification s35 "$R29" "" '{"notification_type":"agent_needs_input"}' >/dev/null
+fire Notification s35 "$R29" "" '{}' >/dev/null
+for e in PreToolUse PostToolUseFailure Notification StopFailure; do
+  fire "$e" s35x "$R29" "" '{"tool_name":"Bash","tool_use_id":"x1","notification_type":"idle_prompt","error":"rate_limit"}' >/dev/null
+done; sleep 0.4
+if [ "$(cat "$RECORDS/s35.json")" = "$BEFORE35" ] && [ "$(of s35 0)" = "$N35" ] && [ ! -e "$RECORDS/s35x.json" ] && [ "$(of s35x 0)" = 0 ]; then
+  ok "(35) auth_success / agent_needs_input / no type → nothing; new events for an unknown session → nothing written or sent"
+else bad "(35) $(diff <(echo "$BEFORE35") "$RECORDS/s35.json") $(grep '"s35' "$LOG")"; fi
+
+# (12) hooks.json registers the hook on all nine events, bounded and failing open; Notification only for
+#      the four prompt types the hook reads, and PreToolUse after the model recorder
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'
 import json, sys
 h = json.load(open(sys.argv[1]))["hooks"]
-for event in ("SessionStart", "UserPromptSubmit", "PostToolUse", "Stop", "SessionEnd"):
-    found = [c for g in h[event] for c in g["hooks"] if "hooks/presence.py\" hook" in c["command"]]
-    assert len(found) == 1 and found[0].get("timeout") == 5 and found[0]["command"].endswith("exit 0"), event
+for event in ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification",
+              "Stop", "StopFailure", "SessionEnd"):
+    found = [(g, c) for g in h[event] for c in g["hooks"] if "hooks/presence.py\" hook" in c["command"]]
+    assert len(found) == 1 and found[0][1].get("timeout") == 5 and found[0][1]["command"].endswith("exit 0"), event
+    if event == "Notification":
+        assert found[0][0].get("matcher") == "permission_prompt|idle_prompt|elicitation_dialog|elicitation_url_dialog"
+    elif event != "SessionStart":
+        assert "matcher" not in found[0][0], event
+pre = [c["command"] for g in h["PreToolUse"] for c in g["hooks"]]
+assert "session-runtime.py\" seen" in pre[0] and "presence.py\" hook" in pre[1], pre
 PY
-then ok "(12) hooks.json → presence hook on SessionStart, UserPromptSubmit, PostToolUse, Stop, SessionEnd (timeout 5, exit 0)"
+then ok "(12) hooks.json → presence hook on nine events (timeout 5, exit 0); Notification for the four prompt types only"
 else bad "(12) hooks.json registration"; fi
 
 exit $FAIL

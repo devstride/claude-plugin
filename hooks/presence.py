@@ -20,23 +20,33 @@ the repository's. The contract: skills/setup/references/session-presence.md.
                                is a minute old, or when the session moved to another checkout; with
                                no record yet (a session that began before the block existed or the
                                plugin was updated) or after an `end`, sends `start`
-           PostToolUse      -> state "working" (a turn a notification started has no prompt); sends
-                               `beat` on a state change; never starts a report
-           Stop             -> state "waiting"; sends `beat` on a state change
+           PreToolUse       -> state "working", and the call is open (its tool_use_id and start
+                               time) until it ends; the main conversation (no agent_id) calling
+                               AskUserQuestion or ExitPlanMode is a question to the person: state
+                               "waiting", and that call is not opened
+           PostToolUse, PostToolUseFailure -> the call is closed; state "working" (a turn a
+                               notification started has no prompt)
+           Notification     -> only permission_prompt, elicitation_dialog and elicitation_url_dialog
+                               (state "waiting": a prompt waits on the person) and idle_prompt (about
+                               60 seconds after a finished turn or an interrupt, which fires no hook of
+                               its own: every open call is dropped and the state is "waiting", unless
+                               the turn left background work running or ended on an API error, when
+                               the state is kept and no activity is stamped); any other type does nothing
+           Stop             -> every open call is dropped; state "waiting", or "working" when the
+                               payload's background_tasks holds one with status `running` (the turn
+                               left its own background work running; that moment is the background mark)
+           StopFailure      -> a turn ended on an API error (a usage limit, an outage): every open
+                               call and the background mark are dropped, the state is kept and no
+                               activity is stamped, so a session that cannot continue still reads as
+                               idle while working
            SessionEnd       -> state "ended", sends `end` (PRESENCE_END_REASON = the payload's
                                reason, such as `clear` or `logout`)
-           Every event but SessionEnd stamps the session's last activity (PRESENCE_ACTIVE_AT).
-           PostToolUse, Stop or SessionEnd for a session with no record, or one already ended,
-           does nothing.
-           A state change within 30 seconds of the last send is held: the next hook or keeper send
-           carries it, and the keeper sends it once those 30 seconds pass (both compare against the
-           last state REPORTED, so a held change is not lost).
-           The record follows the session, not the checkout: a session that moves to a checkout
-           without the block keeps reporting under the one it came from, and Stop or SessionEnd is
-           never dropped for a session that has a record. The session's process (CLAUDE_PID, else
-           the parent of the hook's shell) and its start time are re-read on every start and prompt.
-           Every read-modify-write of the record holds the session's state lock (never while the
-           command runs), and every queued report takes the next number in the record's sequence.
+           Every event but SessionEnd, StopFailure and an ignored idle_prompt stamps the session's last
+           activity (PRESENCE_ACTIVE_AT). SessionStart and UserPromptSubmit drop every open call, the
+           background mark and the failed-turn flag. At most 64 calls are open (the oldest dropped).
+           Every event but SessionStart and UserPromptSubmit only updates a session already reported:
+           for a session with no record, or one already ended, it does nothing. Every event but those
+           two and SessionEnd sends `beat` only on a state change.
   keeper <session>  (detached, one per session, holding the session's keeper lock, which is how a
            hook knows one runs) checks every 10 seconds: it exits once the session has ended, its
            record is gone or the block is removed, releasing its lock under the state lock so a
@@ -48,15 +58,17 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            holding the session's send lock so reports run one at a time, and only for the record
            that queued it (a record recreated since is another) and when its sequence number is
            above the last one sent: a report overtaken by a newer one is dropped, so an old `end`
-           never follows a resumed session's `start`. PostToolUse, Stop or SessionEnd from an older process of
-           the session, while a newer process holds it, does nothing. From the repository root, through the shell,
+           never follows a resumed session's `start`. Any event but SessionStart and UserPromptSubmit from an
+           older process of the session, while a newer process holds it, does nothing. From the repository root, through the shell,
            at most 20 seconds, its exit code kept in the record. It exports
            PRESENCE_EVENT (start|beat|end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE,
            PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM (an item number the branch name carries,
            else empty), PRESENCE_PLUGIN_VERSION, PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON,
            PRESENCE_AT (when the hook or keeper queued the report, epoch milliseconds, always later
            than the session's previous report, so a repository can drop one older than it stored),
-           PRESENCE_ACTIVE_AT (the session's last activity, epoch milliseconds; empty when unknown), and
+           PRESENCE_ACTIVE_AT (the session's last activity, epoch milliseconds; empty when unknown),
+           PRESENCE_BUSY_SINCE (epoch milliseconds, digits only: the earliest start of a call still
+           open, or the background mark when earlier or alone; empty when neither, and on `end`), and
            CLAUDE_CODE_SESSION_ID and CLAUDE_PID so the repository can resolve the session's name.
 
 DEVSTRIDE_PRESENCE_MINUTE (seconds in a keeper minute, default 60) exists for the tests only.
@@ -98,10 +110,15 @@ try:
     MINUTE = max(0.01, float(os.environ.get("DEVSTRIDE_PRESENCE_MINUTE") or 60))
 except ValueError:
     MINUTE = 60.0
-STATES = {"SessionStart": "starting", "UserPromptSubmit": "working", "PostToolUse": "working", "Stop": "waiting",
-          "SessionEnd": "ended"}
+STATES = ("starting", "working", "waiting", "ended")
 EVENTS = ("start", "beat", "end")
-LATER = ("PostToolUse", "Stop", "SessionEnd")  # events that only update a session already reported
+FIRST = ("SessionStart", "UserPromptSubmit")  # the events that may start a report
+# events that only update a session already reported
+LATER = ("PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "Stop", "StopFailure", "SessionEnd")
+NOTICES = ("permission_prompt", "idle_prompt", "elicitation_dialog", "elicitation_url_dialog")
+QUESTIONS = ("AskUserQuestion", "ExitPlanMode")  # the main conversation asking its person
+OPEN_LIMIT = 64          # open calls kept per session; the oldest is dropped beyond it
+TOOL_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 
 
 def cache_dir():
@@ -353,6 +370,85 @@ def active_at(record):
     return str(value) if isinstance(value, int) and not isinstance(value, bool) and value > 0 else ""
 
 
+def stamp(value):
+    """A positive integer epoch-milliseconds value, else 0."""
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+
+def open_calls(record):
+    """The record's open calls, {tool_use_id: start in ms}, with anything malformed left out."""
+    calls = record.get("tools")
+    if not isinstance(calls, dict):
+        return {}
+    return {key: stamp(value) for key, value in calls.items()
+            if isinstance(key, str) and TOOL_ID.match(key) and stamp(value)}
+
+
+def busy_since(record):
+    """The earliest start of an open call, or the background mark; "" when neither."""
+    marks = list(open_calls(record).values()) + ([stamp(record.get("background"))] if stamp(record.get("background")) else [])
+    return str(min(marks)) if marks else ""
+
+
+def background_running(payload):
+    """Whether a finished turn left its own background work running (Stop's background_tasks)."""
+    tasks = payload.get("background_tasks")
+    return isinstance(tasks, list) and any(isinstance(t, dict) and t.get("status") == "running" for t in tasks)
+
+
+def transition(event, payload, record, now_ms):
+    """Apply one hook event to the record (the state lock is held): its open calls, background mark
+    and failed-turn flag. Returns (the new state, or None to keep the state; whether it is a sign of
+    the session's own activity)."""
+    calls = open_calls(record)
+    state, active = None, event != "SessionEnd"
+    if event in FIRST:
+        calls = {}
+        record.update({"background": 0, "failed": False})
+        state = "starting" if event == "SessionStart" else "working"
+    elif event == "PreToolUse":
+        call = payload.get("tool_use_id")
+        if payload.get("tool_name") in QUESTIONS and not payload.get("agent_id"):
+            state = "waiting"  # a question or a plan approval: the person's turn
+        else:
+            state = "working"
+            if isinstance(call, str) and TOOL_ID.match(call):
+                calls[call] = now_ms
+                for oldest in sorted(calls, key=calls.get)[:max(0, len(calls) - OPEN_LIMIT)]:
+                    del calls[oldest]
+    elif event in ("PostToolUse", "PostToolUseFailure"):
+        call = payload.get("tool_use_id")
+        if isinstance(call, str):
+            calls.pop(call, None)
+        state = "working"
+    elif event == "Notification":
+        if payload.get("notification_type") == "idle_prompt":
+            calls = {}  # an interrupted call never closes
+            if stamp(record.get("background")) or record.get("failed") is True:
+                active = False  # the session is waiting on its own work, or cannot continue
+            else:
+                state = "waiting"
+        else:
+            state = "waiting"  # a permission or elicitation prompt
+    elif event == "Stop":
+        calls = {}
+        record["failed"] = False
+        if background_running(payload):
+            state = "working"
+            record["background"] = now_ms
+        else:
+            state = "waiting"
+            record["background"] = 0
+    elif event == "StopFailure":
+        calls = {}
+        record.update({"background": 0, "failed": True})
+        active = False  # a usage limit is no sign of life: it must still read as idle while working
+    elif event == "SessionEnd":
+        state = "ended"
+    record["tools"] = calls
+    return state, active
+
+
 def item_of(branch):
     match = ITEM.search(branch or "")
     return match.group(1) if match else ""
@@ -372,7 +468,8 @@ def run_command(sid, record, event, state, at):
         "PRESENCE_PLUGIN_VERSION": str(record.get("version") or ""),
         "PRESENCE_INTERVAL_MINUTES": str(settings["intervalMinutes"]),
         "PRESENCE_END_REASON": str(record.get("reason") or "") if event == "end" else "",
-        "PRESENCE_AT": str(at), "PRESENCE_ACTIVE_AT": active_at(record), "CLAUDE_CODE_SESSION_ID": sid,
+        "PRESENCE_AT": str(at), "PRESENCE_ACTIVE_AT": active_at(record),
+        "PRESENCE_BUSY_SINCE": busy_since(record) if event != "end" else "", "CLAUDE_CODE_SESSION_ID": sid,
     })
     if record.get("owner"):
         env["CLAUDE_PID"] = str(record["owner"])
@@ -392,7 +489,7 @@ def run_command(sid, record, event, state, at):
 def send(event, state, sid, incarnation, sequence, at):
     """Run the repository's command once for this session: one report at a time, only for the record
     that queued it, and only when no newer report has already been sent."""
-    if event not in EVENTS or state not in STATES.values():
+    if event not in EVENTS or state not in STATES:
         return
     fd = lock(sid, "send", True)
     if fd is None:
@@ -427,8 +524,10 @@ def hook():
     if not payload:
         return
     event, sid = payload.get("hook_event_name"), payload.get("session_id")
-    if event not in STATES or not isinstance(sid, str) or not SESSION_ID.match(sid):
+    if event not in FIRST + LATER or not isinstance(sid, str) or not SESSION_ID.match(sid):
         return
+    if event == "Notification" and payload.get("notification_type") not in NOTICES:
+        return  # only a prompt waiting on the person, or the idle prompt, says anything about the session
     if event == "SessionStart" and payload.get("source") == "compact":
         return  # the session carries on after a compaction
     cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else os.getcwd()
@@ -441,7 +540,7 @@ def hook():
         return  # never reported here, or already ended
     mine = int(os.environ["CLAUDE_PID"]) if os.environ.get("CLAUDE_PID", "").isdigit() else 0
     # every `ps` runs here, before the state lock is taken
-    owner = owner_pid() if event in ("SessionStart", "UserPromptSubmit") else 0
+    owner = owner_pid() if event in FIRST else 0
     owner_started = started(owner) if owner else 0
     with state_lock(sid):
         now = time.time()
@@ -462,10 +561,11 @@ def hook():
         if not record.get("id"):
             record["id"] = secrets.token_hex(6)  # this record's incarnation: sends are bound to it
         moved = not fresh and record.get("top") != top
-        sent, state = record.get("sent") or 0, STATES[event]
+        state, active = transition(event, payload, record, int(now * 1000))
+        sent, state = record.get("sent") or 0, state or previous
         record.update({"top": top, "state": state, "version": running_version() or record.get("version") or ""})
-        if event != "SessionEnd":
-            record["activeAt"] = int(now * 1000)  # the session's last sign of life: start, prompt, tool use, stop
+        if active:
+            record["activeAt"] = int(now * 1000)  # the session's last sign of life: start, prompt, tool call, stop
         if owner and (event == "SessionStart" or owner_started or owner != record.get("owner")):
             # re-read on every start and prompt; a start whose look-up failed keeps no old start time
             record.update({"owner": owner, "ownerStarted": owner_started})
@@ -484,7 +584,7 @@ def hook():
         save(sid, record)
         if verb:
             spawn("send", verb, state, sid, record["id"], str(sequence), str(at))
-        if event in ("SessionStart", "UserPromptSubmit") and record.get("owner") and not keeper_running(sid):
+        if event in FIRST and record.get("owner") and not keeper_running(sid):
             spawn("keeper", sid)
     if fresh and event == "SessionStart":
         prune(sid, now)
