@@ -183,7 +183,7 @@ next action. For each failure symptom, read
 - **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
   **array**, so iterate it — `review.localCommand`, `review.localAssistCommand`,
   `generated.regenCommand`, `preShipChecks[].command`, each non-null `localEnvironment.*` command,
-  `stage.resolve`, `session.nameCommand`, `pool.checkout`/`checkin`): split on `&&` and `;`,
+  `stage.resolve`, `session.nameCommand`/`titleCommand`, `pool.checkout`/`checkin`): split on `&&` and `;`,
   take the first token of **each** segment, skip shell builtins. A
   single-word command that does not resolve may be a shell alias or function — report "not on
   PATH (may be an alias)", not a flat FAIL.

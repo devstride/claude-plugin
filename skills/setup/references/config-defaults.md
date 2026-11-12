@@ -455,7 +455,8 @@ headless runs. The recipe and the record it writes are in
 {
   "session": {
     "jobClassGate": true,
-    "nameCommand": null
+    "nameCommand": null,
+    "titleCommand": null
   }
 }
 ```
@@ -463,10 +464,23 @@ headless runs. The recipe and the record it writes are in
 - **`nameCommand`** is a command whose stdout's first line is this session's display name, for the
   status line's Session segment (☻). It runs from the repository root with
   `CLAUDE_CODE_SESSION_ID` exported, out of band and cached ~10s under `$TMPDIR`; any other output
-  is ignored and a failing command shows nothing. `null` (the default) shows only a name the
-  status-line payload carries (a session started with `--name` or renamed). Set it when the
-  repository has its own rule for naming sessions; the name is display only and never decides who
-  holds anything.
+  is ignored and a failing command shows nothing. When it is set the segment shows only its name,
+  never the payload's `session_name` (for an unnamed session, a title Claude Code generated that
+  nothing else uses); a changed payload name refreshes it at once. `null` (the default) shows only
+  a name the payload carries. Set it when the repository has its own rule for naming sessions; the
+  name is display only and never decides who holds anything.
+
+- **`titleCommand`** names an unnamed session through Claude Code's own title (as `/rename` does),
+  so every surface reading that name agrees. `hooks/session-title.py` runs it at each prompt and at
+  a session's start, resume or fork, from the repository root, at most 3 seconds, with the prompt
+  on stdin (8 KB; empty at a start) and `CLAUDE_CODE_SESSION_ID`, `SESSION_TITLE` (the custom
+  title, empty when none) and `SESSION_TITLE_OWNED=1` (that title is the one the hook last set on
+  its own) exported. Line 1 of stdout is the title; a line 2 `replace` says a person asked for it.
+  It is applied only when there is no custom title, the custom title is the hook's own, or line 2
+  is `replace`, so a `--name` or `/rename` name wins; a title set by `replace` is a person's from
+  then on. Claude Code applies it only at a prompt, start, resume or fork, never mid-turn. A
+  failure changes nothing and never blocks a prompt; keep the command local and quick. `null`
+  (the default) sets no title.
 
 - **`jobClassGate`** turns on the plugin's `UserPromptSubmit` hook (`hooks/session-gate.sh`). The
   hook records the JOB CLASS of each top-level `/devstride:<skill>` command per session, under

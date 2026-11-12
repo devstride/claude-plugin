@@ -8,6 +8,21 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Your repository can name a session that nobody named, and Claude Code shows that same name.**
+  A new config key, `session.titleCommand` (off by default), names a command the plugin runs at
+  each prompt and whenever a session starts, resumes or is forked. Whatever the command prints on
+  its first line becomes the session's own title, exactly as if someone had typed `/rename`, so
+  the session list, the status line and anything else that reads Claude Code's name for the
+  session all agree. A name a person chose with `--name` or `/rename` is never replaced: the
+  plugin only changes a title it set itself, or one the command marks as a person's request with
+  a second line reading `replace`. The command gets the prompt on standard input (at most 8 KB),
+  the session's id and its current title, and has 3 seconds; if it fails, is slow or prints
+  nothing, the session's name stays as it is and the prompt goes ahead. Claude Code only takes a
+  new title at a prompt, a start, a resume or a fork, so a rename lands at the session's next
+  prompt, never in the middle of a turn.
+
 ### Changed
 
 - **Session presence now tells "waiting on you" apart from "busy in one long step".** In a
@@ -26,6 +41,15 @@ for what each version component means here and how a release is cut.
   presence command; the extra hook on each tool call returns at once there. Two known gaps, both
   limits of Claude Code's hooks: after you approve a permission prompt the session reads `waiting`
   until that command finishes, and after an interrupt it reads `working` for about a minute.
+
+- **The status line shows the name your repository gives the session, not a title Claude Code
+  made up.** When the repository sets `session.nameCommand`, the Session segment (☻) now always
+  shows that command's name. Before, once Claude Code generated its own summary title for a
+  session, the bar showed that title, while everything else that used the repository's command
+  still showed the repository's name, so the same session went by two names. When the session is
+  renamed, the bar now looks the name up again right away instead of waiting up to 10 seconds. A
+  repository without `session.nameCommand` keeps today's behaviour: the bar shows the name or title
+  Claude Code has.
 
 ### Fixed
 
