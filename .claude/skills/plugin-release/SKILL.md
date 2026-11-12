@@ -72,11 +72,12 @@ reason; nothing is merged and nothing is bypassed.
 
 A pull request that changes the standing yes, this procedure, the checks, the workflows or the
 instruction files is covered like any other (the owner's words of 2026-11-12: his standing yes
-applies here exactly as in the main DevStride repository). It still cannot change the rules for its
-own merge, because the merge reads the standing yes, this procedure and both gate scripts from
-`main`, as the trusted copy below says. The `merge-path` and `public-hygiene` checks run `main`'s
-copy too; `release-guard` runs the pull request's own copy, so review reads a change to it like any
-other.
+applies here exactly as in the main DevStride repository). It still cannot rewrite the merge rules
+for its own merge: the merge reads the standing yes, this procedure and both gate scripts from
+`main`, as the trusted copy below says, and the `merge-path` and `public-hygiene` checks run
+`main`'s copy too. `release-guard` alone runs the pull request's own copy of its workflow and
+scripts, so a pull request that changes them is green only by its own code; review reads that
+change knowing it.
 
 **Trusted copy.** This procedure, the standing yes and both gate scripts are read and run from
 `origin/main`, never from the pull request. Run `merge` only in a session started in a clean
@@ -88,7 +89,8 @@ worktree serves one merge: the next `merge` starts again in a fresh session from
 fresh worktree of the then-current `main`.
 
 1. **The standing yes is in force.** `<tmp>/.claude/standing-yes.md` *(main)* exists and says
-   `Status: in force`. Note its date and `<trusted>` = `git -C <tmp> rev-parse HEAD`, then `git
+   `Status: in force`. Note its dates (`<date>` below is every date it gives, in order, for
+   example `2026-11-08, widened 2026-11-12`) and `<trusted>` = `git -C <tmp> rev-parse HEAD`, then `git
    fetch origin`: `origin/main` must equal `<trusted>` (otherwise `<tmp>` is stale; stop). Follow
    this procedure as written in
    `<tmp>/.claude/skills/plugin-release/SKILL.md` *(main)*; where it differs from the branch's copy,

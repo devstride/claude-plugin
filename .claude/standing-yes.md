@@ -26,12 +26,13 @@ merges. The per-change authorization is the owner starting the build of the trac
 standing yes replaces only the per-pull-request question that used to follow it.
 
 A pull request that changes this file, the release procedure, the checks, the workflows or the
-instruction files (`CLAUDE.md`, `AGENTS.md`) is covered like any other. It still cannot change the
-rules for its own merge: the merge session reads this file, its procedure and both gate scripts
-from `main`, never from the pull request (see below), so a change to them applies only to the
-pull requests merged after it. The `merge-path` and `public-hygiene` checks also run `main`'s copy.
-`release-guard` runs the pull request's own copy of its workflow and scripts, so a change to it is
-read in review like any other change.
+instruction files (`CLAUDE.md`, `AGENTS.md`) is covered like any other. It still cannot rewrite the
+merge rules for its own merge: the merge session reads this file, its procedure and both gate
+scripts from `main`, never from the pull request (see below), and the `merge-path` and
+`public-hygiene` checks run `main`'s copy too, so a change to any of them applies only to the pull
+requests merged after it. The one required check a pull request runs in its own version is
+`release-guard`: it uses the pull request's copy of its workflow and scripts, so a pull request
+that changes them is green only by its own code, and review reads that change knowing it.
 
 ## Conditions (all of them, at the exact head merged)
 
