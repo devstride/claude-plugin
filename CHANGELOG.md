@@ -8,6 +8,20 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **An epic or plan reaches the release train only with its review proof.** The merge gate now
+  refuses every pull request onto the release train whose head is an epic or plan integration
+  branch until that branch carries the settled review's proof for this pull request (the
+  `devstride/reviewed` status an admin posts when the review settles), whatever files it changes.
+  Before, the gate asked for the proof only when the pull request touched a migration or deploy
+  configuration path, so an epic without one merged with no proof and the release later had to
+  check its whole diff file by file, as if it had never been reviewed. The refusal names the exact
+  `post` command to run while the pull request is still open. A one-off onto the train is unchanged:
+  it still never carries a migration or deploy path, and otherwise needs no proof. Since only an
+  admin's proof counts, an epic now reaches the train only once a repository admin's session has
+  settled its review.
+
 ## [3.58.0] — 2026-11-12
 
 ### Fixed

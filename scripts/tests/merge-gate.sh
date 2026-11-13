@@ -467,7 +467,11 @@ order = open(os.environ["GH_LOG"] + ".order").read().split()
 say(code == 0 and out[0].startswith("MERGE") and "files" not in order and "statuses" not in order,
     "(33c) another base: the rule does nothing, no file list or proof is read", "rc=%d %r %r" % (code, out, order))
 code, out, err = gate(onto_train(files=[{"filename": "src/app.ts"}, {"filename": "docs/db/migrations.md"}]), TRAIN)
-say(code == 0 and out[0].startswith("MERGE"), "(33d) onto the train, no excluded path changed -> MERGE without a proof", "rc=%d %r %r" % (code, out, err))
+say(code == 2 and out[0].startswith("REFUSE ") and "release unit " + EPIC in out[0] and "no review proof" in out[0]
+    and POST in out[0] and PIN in out[0],
+    "(33d) an epic onto the train, no excluded path changed, no proof -> REFUSE naming the post command", "rc=%d %r %r" % (code, out, err))
+code, out, err = gate(onto_train(files=[{"filename": "src/app.ts"}], statuses=[proof()]), TRAIN)
+say(code == 0 and out[0].startswith("MERGE"), "(33d2) the same epic with its proof -> MERGE", "rc=%d %r %r" % (code, out, err))
 code, out, err = gate(onto_train(statusesFail=True), TRAIN)
 say(code == 1 and out[0].startswith("ERROR ") and "review proof" in out[0], "(33e) the proof cannot be read -> ERROR, nothing merges", "rc=%d %r %r" % (code, out, err))
 code, out, err = gate(onto_train(files=[{"filename": "src/new.ts", "previous_filename": "stacks/old.ts"}]), TRAIN)

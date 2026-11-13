@@ -262,15 +262,16 @@ K6. Infra-touching fixes never land on a release branch: a commit staging any pa
     `release.releaseBranchFixExclusions` is refused (merge it to the source, abandon, re-cut), and
     the same check runs over an adopted branch's commits, since a hand-pushed one bypasses the
     commit-time check. The same list keeps such one-offs off the release train. A release unit
-    carries such paths onto the train only with a settled review's proof on its merged head (an
-    admin's `devstride/reviewed` status naming that pull request and base, `reviewed-status.py`),
-    posted only at settle or 5b's carry, never to clear a refusal; a branch name is never proof.
-    The merge gate enforces it at the merge, not hours later at the release: a pull request into
-    the train that changes such a path (new or old name, every page of its file list) merges only
-    when its head is an epic or plan integration branch and `reviewed-status.py verify <head> --pr
-    <n> --base <train>` passes; no proof is a REFUSE
-    naming the `post` command (the pull request is still open), an unreadable proof an ERROR, and
-    for such a pull request review's `NOT POSTED` is a stop, not degradation.
+    merges onto the train only with a settled review's proof on its merged head (an admin's
+    `devstride/reviewed` status naming that pull request and base, `reviewed-status.py`), posted
+    only at settle or 5b's carry, never to clear a refusal; a branch name is never proof. The
+    merge gate enforces it at the merge, not hours later at the release: a pull request into the
+    train whose head is an epic or plan integration branch merges only when `reviewed-status.py
+    verify <head> --pr <n> --base <train>` passes, whatever paths it changes, and one with any
+    other head that changes such a path (new or old name, every page of its file list) never
+    merges; no proof is a REFUSE naming the `post` command (the pull request is still open), an
+    unreadable proof an ERROR, and for a release unit into the train review's `NOT POSTED` is a
+    stop, not degradation.
 K7. One matching rule for `protectedBranches`, `releaseBranchPattern` and
     `releaseBranchFixExclusions`, anchored at both ends: `*` within one path segment, `**` across
     segments, `<YY-MM-DD>` two-digit date parts, trailing `[-n]` an optional `-<digits>`. A shell
@@ -432,7 +433,7 @@ M19. Every merge runs `skills/pr/scripts/merge-gate.py <n> <head>` and then exac
      is one (name, app, workflow) or one commit status; a same-name check elsewhere must pass too,
      and a rule's app restriction is kept. The printed command names `--repo`. No skill
      text carries its own `--admin` (`scripts/tests/merge-gate.sh` greps for one). A pull request
-     into the release train that changes a fix-exclusion path also needs its review proof (K6).
+     into the release train headed by a release unit also needs its review proof (K6).
 M20. The release backstop (`release.backstop`) never delays or caps a release: `backstop.py due`
      starts one only when the landing on the train with the smallest committer time waited over
      `maxWaitMinutes`, no release is in progress (no open release pull request by `gh`, always;
