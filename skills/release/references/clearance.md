@@ -165,7 +165,8 @@ request; a merged one resumes at step 5a's confirmation and close-out); `5` tell
 push notification where there is one) the line's phase, minutes, machine and session, then `claim
 --wait --ignore-stuck`; on their yes AND word that session stopped, `adopt --yes
 --original-stopped` and the adopted path; `1` STOP as a release blocker. **`heartbeat <phase>` at
-the START of each phase**, before its first mutation — `train` before 0b merges anything, `cut
+the START of each phase** (each phase held under clearance: under `merge-and-deploy`, only from
+step 4's claim on), before its first mutation — `train` before 0b merges anything, `cut
 --branch <b>` before 0c pushes, `pr --pr <n>` after step 1 opens it, `review` before 2, `pre-ship`
 before 2b, `final` as step 4 presents READY and waits for the yes (the owner-wait measure reads
 it), `merging` on the owner's yes BEFORE the merge, `deploy` before 5a, `close-out` before
@@ -229,7 +230,10 @@ the release skill calls it does.
 markers, the post-deploy check as the first owed item, the previous-release gate — and holds the
 tower ONLY for the merge into production and the deploy. Where `cut-to-deploy` waits at the tower
 claim before it cuts (and re-reads step 0's shape and re-levels the train once cleared), this scope
-waits at the queue below and does both once the queue says `CLEAR`. Releases line up in a queue that is
+waits at the queue below and does both once the queue says `CLEAR`. **There is no heartbeat before
+step 4's claim**: nothing is held until then, so the phases `train`, `cut`, `pr`, `review` and
+`pre-ship` are never heartbeated here (a heartbeat without clearance answers exit 4, which is a
+STOP), and the first heartbeat is `final`, right after step 4's claim. Releases line up in a queue that is
 strictly first cut, first merged: while one release deploys, the next is already cut on top of its
 merge result, checked and CI-tested, so it can merge the moment the one ahead is confirmed healthy.
 
