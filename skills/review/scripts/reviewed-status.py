@@ -61,8 +61,8 @@ import time
 
 CONTEXT = "devstride/reviewed"
 LANDING = "devstride/landing-reviewed"
-GATE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                    "build-item", "scripts", "review-gate.py")
+SKILLS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+GATE = os.path.join(SKILLS, "build-item/scripts/review-gate.py")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 TRUSTED = ("admin",)
 
