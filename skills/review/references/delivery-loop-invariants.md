@@ -266,12 +266,11 @@ K6. Infra-touching fixes never land on a release branch: a commit staging any pa
     `devstride/reviewed` status naming that pull request and base, `reviewed-status.py`), posted
     only at settle or 5b's carry, never to clear a refusal; a branch name is never proof. The
     merge gate enforces it at the merge, not hours later at the release: a pull request into the
-    train whose head is an epic or plan integration branch merges only when `reviewed-status.py
-    verify <head> --pr <n> --base <train>` passes, whatever paths it changes, and one with any
-    other head that changes such a path (new or old name, every page of its file list) never
-    merges; no proof is a REFUSE naming the `post` command (the pull request is still open), an
-    unreadable proof an ERROR, and for a release unit into the train review's `NOT POSTED` is a
-    stop, not degradation.
+    train headed by an epic or plan integration branch merges only when `reviewed-status.py verify
+    <head> --pr <n> --base <train>` passes, whatever it changes; any other head changing such a
+    path (new or old name, every page of its file list) never merges. No proof is a REFUSE naming
+    the `post` command (the pull request is open), an unreadable proof an ERROR, and there
+    review's `NOT POSTED` is a stop, not degradation.
 K7. One matching rule for `protectedBranches`, `releaseBranchPattern` and
     `releaseBranchFixExclusions`, anchored at both ends: `*` within one path segment, `**` across
     segments, `<YY-MM-DD>` two-digit date parts, trailing `[-n]` an optional `-<digits>`. A shell

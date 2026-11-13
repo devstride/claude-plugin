@@ -472,6 +472,12 @@ say(code == 2 and out[0].startswith("REFUSE ") and "release unit " + EPIC in out
     "(33d) an epic onto the train, no excluded path changed, no proof -> REFUSE naming the post command", "rc=%d %r %r" % (code, out, err))
 code, out, err = gate(onto_train(files=[{"filename": "src/app.ts"}], statuses=[proof()]), TRAIN)
 say(code == 0 and out[0].startswith("MERGE"), "(33d2) the same epic with its proof -> MERGE", "rc=%d %r %r" % (code, out, err))
+NOEXCL = {k: v for k, v in TRAIN.items() if k != "release"}
+code, out, err = gate(onto_train(), NOEXCL)
+say(code == 2 and "release unit " + EPIC in out[0] and "no review proof" in out[0],
+    "(33d3) no exclusions configured: an epic onto the train still needs its proof -> REFUSE", "rc=%d %r %r" % (code, out, err))
+code, out, err = gate(onto_train(headRefName="kim/26-01-15/I1-fix"), NOEXCL)
+say(code == 0 and out[0].startswith("MERGE"), "(33d4) no exclusions configured: a one-off onto the train -> MERGE", "rc=%d %r %r" % (code, out, err))
 code, out, err = gate(onto_train(statusesFail=True), TRAIN)
 say(code == 1 and out[0].startswith("ERROR ") and "review proof" in out[0], "(33e) the proof cannot be read -> ERROR, nothing merges", "rc=%d %r %r" % (code, out, err))
 code, out, err = gate(onto_train(files=[{"filename": "src/new.ts", "previous_filename": "stacks/old.ts"}]), TRAIN)

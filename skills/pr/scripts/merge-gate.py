@@ -674,7 +674,7 @@ def read_config(path, owner, name):
                 units.append(routing.template_regex(pattern, {}))
             except SystemExit:
                 raise Unreadable("config: %s.pattern cannot be read" % key)
-    return (train if exclusions else None), exclusions, units
+    return train, exclusions, units
 
 
 def git_out(*args):
@@ -721,7 +721,7 @@ def train_proof(pr, number, expected, owner, name, base, config_path):
     routing = load("merge_gate_routing", ROUTING)
     try:
         hit = next((p for p in changed_paths(owner, name, number, pr.get("changedFiles"))
-                    if routing.first_match(p, exclusions) is not None), None)
+                    if routing.first_match(p, exclusions) is not None), None) if exclusions else None
     except SystemExit:
         raise Unreadable("a release.releaseBranchFixExclusions pattern cannot be read")
     head = pr.get("headRefName")
