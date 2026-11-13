@@ -278,8 +278,10 @@ expect "(48) a null claims block is clean" 0 "$CLEAN"
 # (49)-(51) release.clearance.scope: either shape takes it (with phaseBudgetMinutes); any other value is an ERROR
 cfg '{"release": {"clearance": {"commands": {"claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a"}, "scope": "cut-to-deploy", "phaseBudgetMinutes": {"deploy": 30}}}}'
 expect "(49) a commands clearance with scope and phaseBudgetMinutes is clean" 0 "$CLEAN"
+cfg '{"release": {"releaseBranchPattern": "release/<YY-MM-DD>[-n]", "clearance": {"commands": {"claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a"}, "scope": "merge-and-deploy"}}}'
+expect "(49b) scope merge-and-deploy with a release branch pattern is clean" 0 "$CLEAN"
 cfg '{"release": {"clearance": {"commands": {"claim": "c", "status": "s", "heartbeat": "h", "release": "r", "adopt": "a"}, "scope": "merge-and-deploy"}}}'
-expect "(49b) scope merge-and-deploy is clean" 0 "$CLEAN"
+expect "(49c) scope merge-and-deploy without a release branch pattern is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR release.clearance.scope: merge-and-deploy needs `release.releaseBranchPattern`'
 cfg '{"release": {"clearance": {"provider": "github", "scope": "release"}}}'
 expect "(50) a provider clearance with scope release is clean" 0 "$CLEAN"
 cfg '{"release": {"clearance": {"provider": "github", "scope": "deploy-only"}}}'

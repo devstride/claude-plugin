@@ -28,7 +28,7 @@ for script in ("post-deploy-status.sh", "previous-release-gate.sh"):
     if script not in scope: problems.append("the section does not name %s" % script)
     if not os.path.isfile(os.path.join(root, "skills/release/scripts", script)): problems.append("%s does not exist" % script)
 for needle in ("post-deploy only", "cut-to-deploy", "merge-and-deploy", "step aside",
-               "no heartbeat before that step 4 claim", "Never proceed uncleared under scopes"):
+               "no heartbeat before that step 4 claim", "(`merge-and-deploy`: never merge uncleared)"):
     if needle not in skill: problems.append("release SKILL.md does not mention %r" % needle)
 # merge-and-deploy: its section exists, every phase it heartbeats is a default phase, and every
 # script it cites exists

@@ -157,6 +157,9 @@ def auto_start_checks(v, config):
     auto = release.get("autoStart")
     if isinstance(auto, dict) and auto.get("enabled") is True and not isinstance(config.get("claims"), dict):
         v.add("ERROR", "release.autoStart.enabled", "needs a `claims` block: without a one-winner release-train claim two sessions could start the same release")
+    clearance = release.get("clearance")
+    if isinstance(clearance, dict) and clearance.get("scope") == "merge-and-deploy" and not release.get("releaseBranchPattern"):
+        v.add("ERROR", "release.clearance.scope", "merge-and-deploy needs `release.releaseBranchPattern`: production is brought into the release branch when the release ahead merged, and without a pattern there is no release branch")
     light = release.get("lightRelease")
     if isinstance(light, dict) and light.get("standingYes") is True and not release.get("classifySkill"):
         v.add("WARN", "release.lightRelease.standingYes", "has no effect without `release.classifySkill`: no release is ever classified LIGHT")

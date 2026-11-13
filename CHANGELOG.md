@@ -85,6 +85,15 @@ for what each version component means here and how a release is cut.
   and `release post-deploy only`.
 - **A pre-ship hold under `merge-and-deploy`** is discharged at the final check when the settled
   tree is the stamped one, and otherwise re-runs the checks and re-stamps before it resumes.
+- **`merge-and-deploy` needs `release.releaseBranchPattern`.** Doctor and setup report the scope
+  without one as an ERROR, and the release stops before its cut: production is brought into the
+  release branch when the release ahead merged, and without a pattern there is no release branch.
+- **A repository with no post-deploy check never holds the next release.** Under `cut-to-deploy`
+  and `merge-and-deploy`, `NOT CONFIGURED` now posts a `success` `release/post-deploy` status
+  ("no post-deploy check configured") over the pending one, instead of leaving it pending.
+- **No tower heartbeat before the `merge-and-deploy` claim.** The phases before step 4 hold
+  nothing, so they are never heartbeated (one would answer not-holder and stop the release); the
+  first heartbeat is `final`.
 - **The backstop under `cut-to-deploy` and `merge-and-deploy`** no longer counts an open release
   pull request or a held tower as a release in flight: the train claim alone decides.
 - Every later check round of a release reports against the cut head (`RELEASE_COMMIT` stays the

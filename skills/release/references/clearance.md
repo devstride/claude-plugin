@@ -165,8 +165,7 @@ request; a merged one resumes at step 5a's confirmation and close-out); `5` tell
 push notification where there is one) the line's phase, minutes, machine and session, then `claim
 --wait --ignore-stuck`; on their yes AND word that session stopped, `adopt --yes
 --original-stopped` and the adopted path; `1` STOP as a release blocker. **`heartbeat <phase>` at
-the START of each phase** (each phase held under clearance: under `merge-and-deploy`, only from
-step 4's claim on), before its first mutation — `train` before 0b merges anything, `cut
+the START of each phase** (under `merge-and-deploy`, only from step 4's claim on), before its first mutation — `train` before 0b merges anything, `cut
 --branch <b>` before 0c pushes, `pr --pr <n>` after step 1 opens it, `review` before 2, `pre-ship`
 before 2b, `final` as step 4 presents READY and waits for the yes (the owner-wait measure reads
 it), `merging` on the owner's yes BEFORE the merge, `deploy` before 5a, `close-out` before
@@ -217,7 +216,10 @@ the release skill calls it does.
   item: `post-deploy check`, its result posted as `release/post-deploy`, then `owed --done
   post-deploy-check`. `PASS` posts `success`. `FAIL` posts `failure`, then STOP for the rollback
   decision; documentation and release notes never run. `NOT RUN` asks the owner: a yes posts
-  `success` with "not run — owner accepted: <reason>", a no posts `error` and stops.
+  `success` with "not run — owner accepted: <reason>", a no posts `error` and stops. `NOT
+  CONFIGURED` (no `release.postDeployCheckSkill`) posts `success` with "no post-deploy check
+  configured", so the pending status never holds the next release (this scope and
+  `merge-and-deploy`).
 - **`post-deploy only`** — for a session that died after the hand-back: on the newest release
   merge, run 5a's confirmation, the `check` and the status post, then stop. Any session may; it
   claims nothing.
@@ -231,11 +233,12 @@ markers, the post-deploy check as the first owed item, the previous-release gate
 tower ONLY for the merge into production and the deploy. Where `cut-to-deploy` waits at the tower
 claim before it cuts (and re-reads step 0's shape and re-levels the train once cleared), this scope
 waits at the queue below and does both once the queue says `CLEAR`. **There is no heartbeat before
-step 4's claim**: nothing is held until then, so the phases `train`, `cut`, `pr`, `review` and
-`pre-ship` are never heartbeated here (a heartbeat without clearance answers exit 4, which is a
-STOP), and the first heartbeat is `final`, right after step 4's claim. Releases line up in a queue that is
+step 4's claim** (nothing is held: one would answer exit 4, a STOP), so `train`, `cut`, `pr`,
+`review` and `pre-ship` are never heartbeated here; the first is `final`. Releases line up in a queue that is
 strictly first cut, first merged: while one release deploys, the next is already cut on top of its
 merge result, checked and CI-tested, so it can merge the moment the one ahead is confirmed healthy.
+It needs `release.releaseBranchPattern`: production is brought into the release branch (§4), and
+without one there is none (doctor ERRORs; the release STOPs at step 0 naming the key).
 
 - **The queue, before the cut.** `python3
   ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/tower-queue.py check` (`--waited-minutes <m>`, the
@@ -349,7 +352,12 @@ request is re-run, so the queue re-settles without a push. One retargeted AWAY f
 fires no event there: run `gh workflow run release-tower.yaml`, or wait — step 4 checks `On final`
 at the moment of merge regardless. **Making it REQUIRED on the production
 branch's ruleset is the owner's change**, after it has posted green on one real release pull
-request — then even an administrator cannot land a second release beside the first.
+request — then no ordinary merge lands a second release beside the first (GitHub does not
+re-check an administrator's bypass merge). Under `merge-and-deploy` it does not cover the release
+ahead's deploy: that pull request has merged, so the next is the oldest OPEN one and reads green
+while the one ahead deploys. There the order is the step 4 claim and the previous-release gate;
+give the production deploy workflow a concurrency group (one run at a time, never cancelled) so a
+hand merge cannot deploy beside it.
 
 ## Cited by
 
