@@ -22,20 +22,20 @@ consuming repository's `.claude/ds-config.json` for the one rule that needs it (
 
 The rule (an approver's admin merge exactly when every required check is green, never otherwise):
 - Only through a pull request: the number must name an OPEN, non-draft pull request.
-- A train merge carrying excluded paths needs its review proof first: when the base is the
-  configured release train (`releaseTrain.branch`) and any changed file, by new or old name (the
-  pull request's file list, every page, its count checked against GitHub's), matches
-  `release.releaseBranchFixExclusions` (the one anchored matcher, `routing.py`'s `first_match`),
-  the head must be a release unit the train check accepts (its name matches
+- A release unit merges onto the train only with its review proof: when the base is the
+  configured release train (`releaseTrain.branch`) and the head is a release unit (its name matches
   `epicIntegrationBranches.pattern` or `planIntegrationBranches.pattern`, as `train_exclusions.py`
-  matches it; anything else is a REFUSE, since a proof would not save it) and must carry the settled
-  review's proof for THIS pull request into THIS base (`reviewed-status.py verify <head> --pr <n>
-  --base <base>`, its admin-trust rules unchanged). No proof is a REFUSE naming the `post` command,
-  pinned to the repository with `GH_REPO`, which still works because the pull request is open; a
-  proof GitHub cannot read is an ERROR. The release's train exclusion check refuses an unproven
-  unit's migrations and deploy configuration hours later, when a merged pull request can no longer
-  take a proof, so the gate asks for it while it still can. No train configured, another base, or
-  no excluded path changed: the rule does nothing.
+  matches it), the head must carry the settled review's proof for THIS pull request into THIS base
+  (`reviewed-status.py verify <head> --pr <n> --base <base>`, its admin-trust rules unchanged),
+  whatever paths it changes. No proof is a REFUSE naming the `post` command, pinned to the
+  repository with `GH_REPO`, which still works because the pull request is open; a proof GitHub
+  cannot read is an ERROR. Without it the release checks the unit file by file, and refuses its
+  migrations and deploy configuration, hours later, when a merged pull request can no longer take a
+  proof, so the gate asks for it while it still can. A head that is NOT a release unit and changes a
+  file, by new or old name (the pull request's file list, every page, its count checked against
+  GitHub's), matching `release.releaseBranchFixExclusions` (the one anchored matcher, `routing.py`'s
+  `first_match`) is a REFUSE, since a proof would not save it. No train configured, another base,
+  or a head that is not a release unit and changes no excluded path: the rule does nothing.
 - Pinned to the head: the pull request's head must be the expected SHA, and the command carries
   `--match-head-commit <sha>`, so GitHub refuses it if the head moves in between.
 - Every required check green there: the required checks are the union of the base branch's
@@ -674,7 +674,7 @@ def read_config(path, owner, name):
                 units.append(routing.template_regex(pattern, {}))
             except SystemExit:
                 raise Unreadable("config: %s.pattern cannot be read" % key)
-    return (train if exclusions else None), exclusions, units
+    return train, exclusions, units
 
 
 def git_out(*args):
@@ -714,20 +714,21 @@ def changed_paths(owner, name, number, expected_count):
 
 
 def train_proof(pr, number, expected, owner, name, base, config_path):
-    """REFUSE a merge onto the train of excluded paths whose head carries no review proof."""
+    """REFUSE a release unit onto the train without its review proof, and a non-unit carrying excluded paths."""
     train, exclusions, units = read_config(config_path, owner, name)
     if not train or base != train:
         return
     routing = load("merge_gate_routing", ROUTING)
     try:
         hit = next((p for p in changed_paths(owner, name, number, pr.get("changedFiles"))
-                    if routing.first_match(p, exclusions) is not None), None)
+                    if routing.first_match(p, exclusions) is not None), None) if exclusions else None
     except SystemExit:
         raise Unreadable("a release.releaseBranchFixExclusions pattern cannot be read")
-    if hit is None:
-        return
     head = pr.get("headRefName")
-    if not isinstance(head, str) or not any(u.match(head) for u in units):
+    unit = isinstance(head, str) and any(u.match(head) for u in units)
+    if not unit and hit is None:
+        return
+    if not unit:
         raise Refuse("#%d carries %s onto the train %s (it matches release.releaseBranchFixExclusions), but its head %s "
                      "is not an epic or plan integration branch, so the release refuses it even with a review proof: "
                      "merge it to the release source through its own pull request" % (number, hit, base, head))
@@ -744,10 +745,11 @@ def train_proof(pr, number, expected, owner, name, base, config_path):
         else:
             os.environ["GH_REPO"] = previous
     if not ok:
-        raise Refuse("#%d carries %s onto the train %s (it matches release.releaseBranchFixExclusions) and its head "
-                     "has no review proof (%s); once its review has settled, post it while the pull request is open: "
-                     "GH_REPO=%s python3 %s post %s --pr %d --base %s"
-                     % (number, hit, base, why, shlex.quote("%s/%s" % (owner, name)), shlex.quote(REVIEWED), expected,
+        what = ("carries %s onto the train %s (it matches release.releaseBranchFixExclusions)" % (hit, base) if hit
+                else "merges the release unit %s onto the train %s" % (head, base))
+        raise Refuse("#%d %s and its head has no review proof (%s); once its review has settled, post it while the "
+                     "pull request is open: GH_REPO=%s python3 %s post %s --pr %d --base %s"
+                     % (number, what, why, shlex.quote("%s/%s" % (owner, name)), shlex.quote(REVIEWED), expected,
                         number, shlex.quote(base)))
 
 

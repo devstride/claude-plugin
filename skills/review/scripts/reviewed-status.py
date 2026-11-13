@@ -21,9 +21,8 @@ resolves `{owner}/{repo}`.
         release refusal (a refused unit goes back to the owner). After posting it verifies; a post
         that does not count (the poster is not a repository admin) says so.
         POSTED <sha> ... exit 0 | NOT POSTED <reason> exit 2 (the merge goes on; the release then
-        checks that unit file by file, as it does any unreviewed work; except into the train with a
-        `release.releaseBranchFixExclusions` path, where the merge gate refuses it without the proof,
-        so review stops there)
+        checks that unit file by file, as it does any unreviewed work; except a release unit into
+        the train, where the merge gate refuses it without the proof, so review stops there)
   verify <sha> [--pr <n> --base <branch>]
         REVIEWED <sha> by <login> exit 0 | UNREVIEWED <reason> exit 2 | ERROR <reason> exit 1
 
