@@ -80,4 +80,25 @@ if printf '%s' "$S8" | grep -q '^CHECKS STAMP' && [ "${A%%:*}" -eq 3 ] && printf
   ok "(8) a stamped production tip the head does not contain → BEHIND (exit 3); merged in and checked again → UNCHANGED"
 else bad "(8) s8=$S8 a=$A b=$B"; fi
 
+# (9) the queue story: release N+1 is cut while release N merges into production; `contains` says
+#     BEHIND until production (N's merge) is merged into N+1's branch, then CONTAINS; N+1 is checked
+#     and stamped on top of N's merge, and that stamp verifies UNCHANGED while N deploys. When N is
+#     reverted (production moves again) the stamp is CHANGED master: N+1 is rebuilt and checked again
+git checkout -q main; git checkout -q -b release/26-10-19 main; echo n > n; git add n; git commit -qm "release N"
+git checkout -q main; git checkout -q -b release/26-10-19-2 release/26-10-19; echo n1 > n1; git add n1; git commit -qm "release N+1 work"
+NEXT_CUT="$(git rev-parse HEAD)"
+git checkout -q main; git merge -q --no-ff --no-edit -m "Merge release N" release/26-10-19; git push -q origin main; git checkout -q release/26-10-19-2
+run contains --head "$NEXT_CUT"; A="$RC:$OUT"
+git merge -q --no-ff --no-edit origin/main; ON_TOP="$(git rev-parse HEAD)"; run contains --head "$ON_TOP"; B="$RC:$OUT"
+run tip; N_TIP="${OUT#PRODUCTION TIP }"; run stamp --head "$ON_TOP" --class LIGHT --master "$N_TIP"; S10="$OUT"
+run verify --stamp "$S10" --head "$ON_TOP"; C="$RC:$OUT"
+git checkout -q main; git revert --no-edit -m 1 HEAD >/dev/null; git push -q origin main; git checkout -q release/26-10-19-2
+run verify --stamp "$S10" --head "$ON_TOP"; D="$RC:$OUT"; run contains --head "$ON_TOP"; E="$RC:$OUT"
+run contains --head 0000000000000000000000000000000000000000; F="$RC:$OUT"; run contains; G="$RC:$OUT"
+if printf '%s' "$A" | grep -q "^3:BEHIND master $(printf '%s' "$N_TIP" | cut -c1-12) " && printf '%s' "$B" | grep -q "^0:CONTAINS master $N_TIP " \
+   && printf '%s' "$C" | grep -q '^0:UNCHANGED' && printf '%s' "$D" | grep -q '^3:CHANGED master' && printf '%s' "$E" | grep -q '^3:BEHIND master' \
+   && printf '%s' "$F" | grep -q '^1:ERROR' && printf '%s' "$G" | grep -q '^1:ERROR usage'; then
+  ok "(9) prepared on top of the release ahead: BEHIND until its merge is brought in, CONTAINS after, UNCHANGED while it deploys, CHANGED once it is reverted; a bad head → ERROR"
+else bad "(9) a=$A b=$B c=$C d=$D e=$E f=$F g=$G"; fi
+
 exit $FAIL

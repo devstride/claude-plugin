@@ -10,6 +10,9 @@ tree and the production tip are unchanged (the merge result is a function of the
 
   tip
       PRODUCTION TIP <m>                                                           exit 0
+  contains --head <sha>
+      CONTAINS master <m>  (the head already holds everything production holds)   exit 0
+      BEHIND master <m>  (bring production in before the checks)                  exit 3
   stamp --head <sha> --class <LIGHT|FULL> --master <m>
       CHECKS STAMP head <h> tree <t> master <m> class <c> at <iso>                 exit 0
       CHANGED master <m>..<now>  (production moved while the checks ran)          exit 3
@@ -27,6 +30,11 @@ UNCHANGED also needs the production tip to be contained in the head: an unchange
 merged tree is the tested tree only when merging adds nothing from production. A tip the head does
 not contain (a hotfix, or the release ahead's own fix commits, not yet in the release source) is
 BEHIND: merge production into the release branch (release-branch.md §4) and run the checks again.
+
+`contains` is the look right after the cut and after every rebuild, before any check runs: a release
+is prepared ON TOP of what is ahead of it (the release ahead's merge, a hotfix), so a head that does
+not hold production's tip gets production merged in first (release-branch.md §4), and only then do
+the checks run and stamp it (clearance.md, § Scope `merge-and-deploy`).
 
 `master` in the line is the production branch's tip (`release.productionBranch`, default master),
 read from origin after a fetch. Git only; no gh, no network beyond `git fetch origin`. Test seam:
@@ -100,6 +108,25 @@ def cmd_tip(_args):
     return 0
 
 
+def contained(tip, commit):
+    done = subprocess.run(["git", "merge-base", "--is-ancestor", tip, commit], capture_output=True, text=True)
+    if done.returncode not in (0, 1):
+        raise Error("git merge-base --is-ancestor failed: %s" % (done.stderr or "").strip()[:200])
+    return done.returncode == 0
+
+
+def cmd_contains(args):
+    head = option(args, "--head")
+    if not head:
+        raise Error("usage: release_checks.py contains --head <sha>")
+    commit, _, tip = facts(head)
+    if contained(tip, commit):
+        print("CONTAINS master %s (the head already holds everything production holds)" % tip)
+        return 0
+    print("BEHIND master %s (production holds commits %s does not: merge it in before the checks run)" % (tip[:12], commit[:12]))
+    return 3
+
+
 def cmd_stamp(args):
     head, klass, began = option(args, "--head"), (option(args, "--class") or "").upper(), option(args, "--master")
     if not head or klass not in ("LIGHT", "FULL") or not began or not re.match("^%s$" % SHA, began):
@@ -130,10 +157,7 @@ def cmd_verify(args):
     if changed:
         print("\n".join(changed))
         return 3
-    contained = subprocess.run(["git", "merge-base", "--is-ancestor", tip, commit], capture_output=True, text=True)
-    if contained.returncode not in (0, 1):
-        raise Error("git merge-base --is-ancestor failed: %s" % (contained.stderr or "").strip()[:200])
-    if contained.returncode == 1:
+    if not contained(tip, commit):
         print("BEHIND master %s (production holds commits %s does not: merge it in, then run the checks again)" % (tip[:12], commit[:12]))
         return 3
     print("UNCHANGED head %s tree %s master %s" % (commit, tree, tip))
@@ -141,9 +165,9 @@ def cmd_verify(args):
 
 
 def main(argv):
-    commands = {"tip": cmd_tip, "stamp": cmd_stamp, "verify": cmd_verify}
+    commands = {"tip": cmd_tip, "contains": cmd_contains, "stamp": cmd_stamp, "verify": cmd_verify}
     if not argv or argv[0] not in commands:
-        print("usage: release_checks.py tip | stamp --head <sha> --class <LIGHT|FULL> --master <sha> | verify --stamp '<line>' --head <sha>")
+        print("usage: release_checks.py tip | contains --head <sha> | stamp --head <sha> --class <LIGHT|FULL> --master <sha> | verify --stamp '<line>' --head <sha>")
         return 2
     try:
         return commands[argv[0]](argv[1:])

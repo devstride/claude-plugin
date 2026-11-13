@@ -34,15 +34,18 @@ Three rules, each opt-in. With no `claims` block, `release.autoStart`,
   the pull request).
 - **Release it NON-final**: `release` with outcome `handed-on`, never `done` and never final
   (`final: true`, `--final`), so the next cycle can claim it. It is handed on once 0c has cut the
-  release branch while this run holds the tower, so the next train phase runs during the deploy, but
-  ONLY with `release.clearance` and `release.releaseBranchPattern` both set (5b's train leveling
+  release branch while this run holds the tower (scope `merge-and-deploy`, which claims no tower
+  before step 4: once step 1 has opened the release pull request and the train is level, since that
+  open pull request is what queues every later release behind it), so the next train phase runs
+  during the deploy, but ONLY with `release.clearance` and `release.releaseBranchPattern` both set (5b's train leveling
   later re-claims it, `release-branch.md` §2 step 3); without either, the
   release pull request has no tower or its own branch to protect it, so the claim is held until the
   run ends. A train with nothing to ship changes neither point: the claim waits for the cut (or, held,
   for the run's end). Released early only when the whole run ends: nothing to ship at all, or stopped.
 - **Another release in flight.** A live session holding the tower owns its release pull request:
   this run never adopts it (step 0) and, under `cut-to-deploy`, runs 0b under the train claim, then waits at the tower claim
-  and, once cleared, re-reads step 0's shape before cutting (`clearance.md`).
+  and, once cleared, re-reads step 0's shape before cutting (`merge-and-deploy`: waits at the queue
+  instead, `clearance.md`).
 - **Lost to a live holder**: a hand-started run names who holds it and STOPs; an auto start carries
   on with its caller's loop, logging no failure.
 - **Won with an open train pull request present** (its previous holder lapsed): `release-branch.md`
@@ -65,13 +68,15 @@ Honoured only with a `claims` block (doctor: an ERROR; at run time it does nothi
 3. `release`, at the end of step 6, after its own close-out;
 4. `build-item`, at every clean story boundary (step 7's sync, after ANY story lands, epic stories
    included) and when its loop starts. A trigger lost to a live holder is never retried by itself,
-   and the release that holds the claim hands it on at its cut so the next train phase can run
-   during the deploy; this is the look that notices the hand-on;
+   and the release that holds the claim hands it on at its cut (`merge-and-deploy`: once its pull
+   request is open) so the next train phase can run during the deploy; this is the look that
+   notices the hand-on;
 5. `release`, at step 5b's train leveling after its deploy (`release-branch.md` §5 step 3), which
    holds the train claim at that moment: work that landed while this release ran lost its own
    trigger to this release's claim, so the leveling looks for it. `START` → this session keeps the
    claim and starts the next release once its tower is handed back and its post-deploy check has
-   run, instead of handing the claim on to a session that may never come (`release-branch.md`).
+   run (under `merge-and-deploy` both happened before the leveling), instead of handing the claim
+   on to a session that may never come (`release-branch.md`).
 
 A repository's own landing command may run `check` itself after a landing on the train and print
 the instruction to release now (trigger 1's look, made where the landing happens): the caller
@@ -98,8 +103,8 @@ A `started-by: auto` release that reaches step 4 without a MERGE from the standi
 `PushNotification` (where the tool exists): the release, READY or BLOCKED, why it is not eligible
 (the `ASK` reason, or "standing yes off"), and the pull request link. With `needsYou.label` set it
 also queues a NOTICE (build-item's `needs-you.md`): no reply to it can start the merge. Then it
-waits for the yes, holding the tower as any release does — under scope `merge-and-deploy`, after
-stepping aside (`clearance.md`).
+waits for the yes, holding the tower as any release does — under scope `merge-and-deploy`, holding
+nothing: it claims the tower only on the yes (`clearance.md`).
 
 ## The standing yes — `release.lightRelease.standingYes`, `release.fullRelease.standingYes`
 

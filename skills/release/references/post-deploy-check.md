@@ -32,8 +32,8 @@ and **before** the hand-back (5b; default scope only), the documentation update 
 health check before the deploy is confirmed measures the previous release; one after the docs are
 published cannot stop them. Under the default clearance scope the release still holds its
 clearance while `check` runs, so `check` does only what the next release depends on (health, and
-anything it must publish first). Under `release.clearance.scope` `"cut-to-deploy"` (or `"merge-and-deploy"`) it runs right
-AFTER the hand-back, as the first owed item; its result is the `release/post-deploy` commit status
+anything it must publish first). Under `release.clearance.scope` `"cut-to-deploy"` (or `"merge-and-deploy"`, where the hand-back
+comes at deploy-confirmed, before the sync) it runs right AFTER the hand-back, as the first owed item; its result is the `release/post-deploy` commit status
 on the merge commit, and the next release cannot merge to production until that status is success
 (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`, § Scope `cut-to-deploy`).
 

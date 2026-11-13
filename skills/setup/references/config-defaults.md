@@ -355,9 +355,11 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   `"cut-to-deploy"`: claimed at the cut, handed back once the deploy is confirmed; the post-deploy
   check then runs as owed work, posts the `release/post-deploy` commit status, and the next release
   refuses to merge until it is success (`clearance.md`). `"merge-and-deploy"` is `cut-to-deploy`
-  with the pre-ship, dev-deploy and pre-merge checks run BEFORE the claim at the commit to be cut,
-  a check stamp verified at every claim, the release stepping aside while it waits for anything
-  but its own merge and deploy, and no claim while another release pull request is open.
+  with the tower claimed only for the merge and the deploy: releases queue first cut, first
+  merged (no cut while another release pull request is open), each cut on top of the one ahead's
+  merge and checked and CI-tested outside the tower while that one deploys, a check stamp
+  verified at the claim and just before the merge (a moved production means a rebuild), and the
+  tower handed back at deploy-confirmed, the sync running after the post-deploy check.
   The built-in `github` provider keeps the clearance in the custom ref `refs/clearance/release`
   (every move a compare-and-swap through `git push --force-with-lease`; neither a branch nor a
   tag) and needs only git and `gh`; a claim starts a detached keeper that heartbeats while the

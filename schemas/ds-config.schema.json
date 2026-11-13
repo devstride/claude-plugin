@@ -972,7 +972,7 @@
                     "merge-and-deploy"
                   ],
                   "default": "release",
-                  "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check), cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge) or merge-and-deploy (cut-to-deploy, plus the pre-ship, dev-deploy and pre-merge checks run before the claim at the commit to be cut, a check stamp verified at every claim, stepping aside while waiting for anything but its own merge and deploy, and no claim while another release pull request is open into production; since 3.59.0)"
+                  "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check), cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge) or merge-and-deploy (cut-to-deploy, but the tower is claimed only for the merge and the deploy: no cut while another release pull request is open into production, the release cut on top of the one ahead's merge, its pre-ship, dev-deploy and pre-merge checks run outside the tower with a check stamp verified at the claim and just before the merge, and the tower handed back at deploy-confirmed; since 3.59.0)"
                 },
                 "credentialsFile": {
                   "type": "string",
@@ -1042,7 +1042,7 @@
                     "merge-and-deploy"
                   ],
                   "default": "release",
-                  "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check), cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge) or merge-and-deploy (cut-to-deploy, plus the pre-ship, dev-deploy and pre-merge checks run before the claim at the commit to be cut, a check stamp verified at every claim, stepping aside while waiting for anything but its own merge and deploy, and no claim while another release pull request is open into production; since 3.59.0)"
+                  "description": "how long a release holds clearance: release (claim before the train, hand back after the post-deploy check), cut-to-deploy (claim at the cut, hand back once the deploy is confirmed; the check then runs as owed work and gates the next release's merge) or merge-and-deploy (cut-to-deploy, but the tower is claimed only for the merge and the deploy: no cut while another release pull request is open into production, the release cut on top of the one ahead's merge, its pre-ship, dev-deploy and pre-merge checks run outside the tower with a check stamp verified at the claim and just before the merge, and the tower handed back at deploy-confirmed; since 3.59.0)"
                 }
               },
               "patternProperties": {

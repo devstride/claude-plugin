@@ -157,7 +157,7 @@ nothing on any failure. `gh` still serves pull-request facts.
 ## Where the release skill calls it
 
 Only when `release.clearance` is set; scope `cut-to-deploy` changes 0a, 4 and 5a–5b, and
-`merge-and-deploy` also 2 (below). **0a** `claim --wait --purpose release` before anything else (with a `claims` block, after the `release-train` claim only: `auto-start.md`'s lock order),
+`merge-and-deploy` claims only at step 4 and hands back at 5a (below). **0a** `claim --wait --purpose release` before anything else (with a `claims` block, after the `release-train` claim only: `auto-start.md`'s lock order),
 in the background with a long timeout: `0` continue (say who was waiting when stderr said so); `3`
 ask the owner once — adopt `<branch>` / `#<n>`, or keep waiting — and on adopt run `adopt --yes`
 and enter the adopted path (0b skips the train, 0c skips the cut, step 2 reviews the open pull
@@ -225,69 +225,94 @@ the release skill calls it does.
 
 ## Scope `merge-and-deploy`
 
-`"merge-and-deploy"` is `cut-to-deploy` — the whole section above applies: the train runs
-uncleared, the holder markers, the post-deploy check as the first owed item, the previous-release
-gate — with the tower held only to cut, open, merge and deploy. Every long check and every wait
-runs outside it.
+`"merge-and-deploy"` keeps everything `cut-to-deploy` keeps — the train runs uncleared, the holder
+markers, the post-deploy check as the first owed item, the previous-release gate — and holds the
+tower ONLY for the merge into production and the deploy. Where `cut-to-deploy` waits at the tower
+claim before it cuts (and re-reads step 0's shape and re-levels the train once cleared), this scope
+waits at the queue below and does both once the queue says `CLEAR`. Releases line up in a queue that is
+strictly first cut, first merged: while one release deploys, the next is already cut on top of its
+merge result, checked and CI-tested, so it can merge the moment the one ahead is confirmed healthy.
 
-- **0p. Pre-claim checks**, after step 0's delta and class and before any tower claim, on a
-  detached checkout at the head they test (`<sourceHead>`, exactly where 0c cuts, on the first
-  round; the release branch's head on a later one). FIRST `python3
-  ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/release_checks.py tip`: keep its `PRODUCTION TIP
-  <m>`. Then `classify-release` (`head: <that head>`); `pre-ship release run <class>` (with
-  `--ran-at-train` evidence as usual); the dev deploy wait (`release.devDeployVerification`,
-  every release, and **`RELEASE_COMMIT` is always the cut `<sourceHead>`**, the develop commit the
-  release branch was cut from, on every round: the release source's deploy never carries a release
-  branch's own commits until 5b's sync, so a later round passes the first round's exit through
-  rather than waiting on a commit that source will never deploy); and `pre-merge-check` at that
-  head. `PRE-SHIP: FAIL` or `HOLD` → STOP, holding nothing. Then `release_checks.py stamp --head
-  <that head> --class <class> --master <m>`: `CHECKS STAMP …` → keep it and 0p's verdict lines;
-  `CHANGED master` (production moved while the checks ran: the release ahead merged meanwhile) →
-  run 0p again, since those results describe a production that is gone.
-- **The queue, before every claim.** `python3
-  ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/tower-queue.py check` (`--own-pr <n>` once this
-  release's pull request exists; `--waited-minutes <m>`, the minutes this release has waited in the
-  queue so far). `WAIT` → do not claim: poll every 60 s, heartbeat the train claim while it is held
-  (`auto-start.md`), and after `waitMinutes` STOP naming the pull request ahead. `ASK` (exit 3, once
-  this release has waited `staleMinutes` behind another release pull request) → tell the owner ONCE
-  (a `PushNotification` where there is one) which pull request it waits behind and that, if that
-  release's session has stopped, they may say adopt; then keep polling as for `WAIT`, never asking
-  again. A release that stepped aside holds nothing that heartbeats, so this notice is how a release
-  orphaned while it waited is found in minutes rather than after `waitMinutes`. `CLEAR` → `claim
-  --wait`, its exits as in 0a. No release claims while another release pull request is open into
-  production, so releases still merge oldest first, one at a time.
-- **Every claim after the cut names the release.** `claim --wait --branch <release branch> --pr
-  <n>` (just `--branch` between the cut and step 1): the record is created naming its pull request
-  in the same write, so if the session dies under it the next claim is `STALE … still open` or `…
-  merged but the release was never closed out` (exit 3, adopt on the owner's yes), never a silent
-  takeover as "pull request never opened".
-- **Verify on every claim.** Right after `CLEARED`, re-read step 0's shape as above, then
-  `release_checks.py verify --stamp '<line>' --head <head>` (`<sourceHead>` before the cut, the
-  release pull request's head after). `UNCHANGED` → go on. `CHANGED` → `release --step-aside`, run
-  0p again at the new head (its stamp replaces the old one), then queue, claim and verify again;
-  after three rounds the checks run under the tower, said so. `BEHIND` (production holds commits the
-  head does not: a hotfix, or the fix commits of the release ahead, not yet in the release source)
-  → `release-branch.md` §4 merges production into the release branch (before the cut: cut first,
-  then §4), then as for `CHANGED`. `ERROR` → step aside, then STOP.
+- **The queue, before the cut.** `python3
+  ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/tower-queue.py check` (`--waited-minutes <m>`, the
+  minutes this release has waited in the queue so far). `WAIT` → do not cut: poll every 60 s,
+  heartbeat the train claim while it is held (`auto-start.md`), and after `waitMinutes` STOP naming
+  the pull request ahead. `ASK` (exit 3, once this release has waited `staleMinutes` behind another
+  release pull request) → tell the owner ONCE (a `PushNotification` where there is one) which pull
+  request it waits behind and that, if that release's session has stopped, they may say adopt; then
+  keep polling as for `WAIT`, never asking again. A release waiting outside the tower holds nothing
+  that heartbeats, so this notice is how a release orphaned while it waited is found in minutes
+  rather than after `waitMinutes`. `CLEAR` → cut. No release is cut while another release pull
+  request is open into production, so the release ahead has always MERGED (or closed) before the
+  next is cut, and releases merge in the order they were cut, one at a time. The cut itself runs
+  under the `release-train` claim, held until step 1 has opened the release pull request
+  (`auto-start.md`), so two releases never cut at once; without a `claims` block the queue's read is
+  the only order, and release-branch.md §2's rule (a second open release pull request STOPS) is the
+  backstop.
+- **Prepared on top of what is ahead.** Right after the cut, `release_checks.py contains --head
+  <release branch head>`: `BEHIND` (the release ahead merged, or a hotfix landed, and the release
+  source does not hold it yet) → `release-branch.md` §4 merges production into the release branch
+  now, before step 1 opens the pull request, so the review sees the combined change and needs no
+  follow-up; `CONTAINS` → nothing to bring in. Then step 1 opens the draft pull request (with the
+  holder marker below), the train is re-levelled by `release-branch.md` §1 step 7's rule (the
+  release ahead's own leveling is skipped while this run holds the train claim), and the train
+  claim is handed on.
+- **0p. The checks, after the pull request opens**, at the release branch head (on a detached
+  checkout at that head): FIRST `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/release_checks.py
+  tip`, kept as `PRODUCTION TIP <m>`; then `classify-release` (`head: <that head>`); `pre-ship
+  release run <class>` (with `--ran-at-train` evidence as usual); the dev deploy wait
+  (`release.devDeployVerification`, every release, and **`RELEASE_COMMIT` is always the cut
+  `<sourceHead>`**, the develop commit the release branch was cut from, on every round: the release
+  source's deploy never carries a release branch's own commits until the sync, so a later round
+  passes the first round's exit through rather than waiting on a commit that source will never
+  deploy); and `pre-merge-check` at that head. `PRE-SHIP: FAIL` or `HOLD` → STOP (the open pull
+  request keeps later releases queued behind it; the owner decides). Then `release_checks.py stamp
+  --head <that head> --class <class> --master <m>`: `CHECKS STAMP …` → keep it and 0p's verdict
+  lines; `CHANGED master` (production moved while the checks ran) → bring production in again
+  (`contains`, §4) and run 0p again, since those results describe a production that is gone.
 - **Step 2.** The pre-ship hold is declared exactly as under every other scope (`release-pr.md`).
   At 7.1b, when the settled head's tree equals the stamp's tree, 2b reports 0p's `PRE-SHIP` line
-  ("passed before the claim at <sha>") and 2c discharges the hold at once. When it differs (fix
-  commits, a hotfix merge by `release-branch.md` §4): `release --step-aside`, 0p at the settled
-  head, then queue, claim, verify, and only then 2c's `PRE-SHIP RESUME`, so the ready flip always
-  follows pre-ship on the final tree and CI runs once.
-- **Step 4 steps aside to wait.** `previous-release-gate.sh` runs WITHOUT `--wait` (one read).
-  Pending (`2`), a standing-yes `ASK`, or this pull request not `On final` → `heartbeat final`,
-  `release --step-aside`, the unattended-stop notice (`auto-start.md`), then wait outside the tower:
-  for the owner's words, and for the gate (one read every 60 s, at most its 45 minutes). Still `2`
-  after those 45 minutes → STOP, naming that release and `/devstride:release post-deploy only`; `1`
-  while waiting → the failure STOP of § Scope `cut-to-deploy`. On the yes, or with the standing yes
-  once the gate reads `0`: queue (`--own-pr`), claim (`--branch --pr`), `heartbeat final`, **the
-  previous-release gate once more** (one read: `0` → go on; `2` → step aside again and keep
-  waiting; `1` → the failure STOP, overridable only in the owner's words recorded on the pull
-  request; `3`/`4` → ask; an in-the-moment yes never lifts a pending gate), verify against the
-  stamp at `<reviewedHead>`, `pre-merge-check` again, `pre-ship release run <class> --only <names>`
-  for every `rerunAtMerge` entry, `standing-yes.py` again (or apply the in-the-moment yes), then
-  `heartbeat merging` and the merge. `CHANGED` or `BEHIND` → back to step 2; any yes is void.
+  ("passed at <sha>") and 2c discharges the hold at once. When it differs (fix commits, a §4 merge
+  of production because the release ahead was reverted or a hotfix landed): 0p at the settled head
+  first, then 2c's `PRE-SHIP RESUME`, so the ready flip always follows pre-ship on the final tree
+  and CI runs once. Nothing is held in steps 0 to 3, so nothing steps aside.
+- **Step 4 waits outside the tower.** It arrives holding nothing. `previous-release-gate.sh` runs
+  WITHOUT `--wait`, one read every 60 s, at most its 45 minutes, while it reads `2` (pending: the
+  release ahead is still deploying or checking its health, the normal case for a release prepared
+  on top of it, so this wait sends no notice). Still `2` after those 45 minutes → STOP, naming that
+  release and `/devstride:release post-deploy only`; `1` → the failure STOP of § Scope
+  `cut-to-deploy`; `3`/`4` → ask. Once it reads `0`: a standing-yes `ASK`, or this pull request not
+  `On final` → the unattended-stop notice (`auto-start.md`), then wait for the owner's words. An
+  in-the-moment yes given while the gate is pending is kept and acted on once it reads `0`; no yes
+  lifts a pending gate. With a yes (the owner's, or `MERGE` from the standing yes): the queue
+  (`--own-pr`), `claim --wait --branch <release branch> --pr <n>` (BUSY while the release ahead
+  is still merging or deploying: this one is next, so it waits there), `heartbeat final`, **the
+  previous-release gate once more** (one read: `0` → go on; `2` → `release --step-aside` and back
+  to waiting on the gate; `1` → the failure STOP, overridable only in the owner's words recorded on
+  the pull request; `3`/`4` → ask), `release_checks.py verify --stamp '<line>' --head
+  <reviewedHead>`, `pre-merge-check` again, `pre-ship release run <class> --only <names>` for every
+  `rerunAtMerge` entry, `standing-yes.py` again (or apply the in-the-moment yes), then `heartbeat
+  merging` and the merge.
+- **Rebuilt when what is ahead changes.** The stamp names production's tip, so `verify` at the
+  merge proves the tree CI tested is the tree that merges. `CHANGED` or `BEHIND` — the release
+  ahead was reverted or rolled back, a hotfix landed, or anything else moved production since the
+  checks — → `release --step-aside`, back to step 2: §4 brings production in, `review` follows up
+  over that merge, 0p runs again, and CI runs again on the new head before this release may merge;
+  any yes is void. `ERROR` → step aside, then STOP. A release ahead that is pulled from the queue
+  before it merges (its pull request closed) changes nothing behind it: nothing is cut on top of a
+  release until it has merged.
+- **Hand back at deploy-confirmed, then the owed work.** 5a confirms the merge and, at once, posts
+  `post-deploy-status.sh <merge sha> pending "<release> by <machine> / <session name>: deploying"`
+  (so the next release's gate reads pending, never no status, from the merge on); then it approves
+  and confirms the deploy and hands the tower back right there: `release --owed post-deploy-check
+  --owed sync` with the other `--owed` items. The post-deploy check runs FIRST (its result posted
+  as `release/post-deploy`, then `owed --done post-deploy-check`), so the release behind merges as
+  soon as this one is healthy and never waits on the sync's own pull request. `sync` is
+  `release-branch.md` §5 steps 1–3 (production synced into the source, the release branch deleted,
+  the train level), with `heartbeat` calls skipped (nothing is held) and `owed --done sync` at the
+  end; the release behind does not need it, since it brings production in itself. `FAIL` posts
+  `failure` and STOPs for the rollback decision as under `cut-to-deploy`; the sync and everything
+  after it wait for that decision.
 - **A stepped-aside release holds nothing.** `release --step-aside` releases with outcome
   `stepped-aside`, removes the local record and stops the keeper exactly like `release`, and owes
   nothing, so it vouches for nothing. Every step after a re-claim starts with its `heartbeat`:
@@ -295,13 +320,13 @@ runs outside it.
 - **Adoption.** The release pull request body carries `<!-- devstride:release-holder <digest> on
   <machine> -->` (the train marker's digest rule), written when step 1 opens it, never after the
   ready flip. An open release pull request whose marker names another holder is never adopted
-  silently, even with the tower clear (that release may only have stepped aside): this release
-  waits at the queue behind it (the queue's `ASK` tells the owner), and adopts it only on the
-  owner's yes and their word that its session stopped.
-- **An older holder.** A re-claim that is BUSY reads `status --json`: a `record.pluginVersion`
-  older than this plugin, with this release's pull request `On final`, sends ONE `PushNotification`
-  naming that session and the fix (`release` in it, or the owner's `release --force`). The STUCK
-  alarm on `final` is the floor.
+  silently, even with the tower clear (that release is preparing or waiting outside it): this
+  release waits at the queue behind it (the queue's `ASK` tells the owner), and adopts it only on
+  the owner's yes and their word that its session stopped.
+- **An older holder.** A claim at step 4 that is BUSY reads `status --json`: a
+  `record.pluginVersion` older than this plugin, with this release's pull request `On final`, sends
+  ONE `PushNotification` naming that session and the fix (`release` in it, or the owner's `release
+  --force`). The STUCK alarm on `final` is the floor.
 
 ## The floor: the `release-tower` check
 

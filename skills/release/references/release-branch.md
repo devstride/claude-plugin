@@ -178,7 +178,8 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    the hold, `review`'s step 5 follow-up with the cumulative ledger settles to 7.1b, every
    selected check runs on that final head, then PRE-SHIP RESUME flips it ready and settles CI),
    and rerun this step at that head; step 5's `<reviewedHead>` pin is that new head. Under scope `release` the clearance is
-   already held (step 0a); under `cut-to-deploy` and `merge-and-deploy` it is not claimed until the cut. With no train
+   already held (step 0a); under `cut-to-deploy` it is not claimed until the cut, and under
+   `merge-and-deploy` not until step 4. With no train
    pull request, no passing line or a different tree, step 2b runs these entries itself.
 5. **Merge** — first `git fetch origin <releaseSource>` and run the exclusion check with
    `--source-before <sourceBefore> --head <reviewedHead>` (source merges are not train work, and a
@@ -216,7 +217,9 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
   pattern is ADOPTED by step 0 instead of cutting; a second one open at once — or one still headed
   by `releaseSource` from before the pattern was set — is a STOP that names both. Under scope
   `merge-and-deploy`, one whose holder marker names another session is neither adopted nor a STOP:
-  this release WAITS at the queue (`tower-queue.py`, `clearance.md`) until it merges.
+  this release WAITS at the queue (`tower-queue.py`, `clearance.md`) until it merges, then cuts
+  outside the tower (under the train claim) and, when `release_checks.py contains` says `BEHIND`,
+  brings production in by §4 at once, so it is prepared on top of the release ahead's merge.
 - `git switch -c <name> <sourceHead> && git push -u origin <name>` — the SHA the delta was computed
   from, never a re-read `origin/<releaseSource>` that another session's fetch may have moved. It is
   recorded in the release pull request's marker `<!-- devstride:release-branch <name> cut <sha>
@@ -254,7 +257,9 @@ over the merge's range (its step 5 rule), carrying the ledger, counters and the 
 declaration; never a fresh cycle 1. A merge that leaves the tree unchanged (history only, e.g.
 production's own earlier release merge) needs no re-review: say so, set `<reviewedHead>` to the new
 same-tree head, and invoke `review` in PRE-SHIP RESUME mode so it flips the pull request ready and
-settles CI there without a review cycle. Any return to step 2 voids an owner yes already given; step
+settles CI there without a review cycle. Right after the cut, before step 1 has opened the pull
+request (scope `merge-and-deploy`, prepared on top of the release ahead), the merge is simply pushed
+with the branch: there is no review to re-enter, and the first review reads it with everything else. Any return to step 2 voids an owner yes already given; step
 4 asks again. Never rebase. `review` hands back here when its step 7.1 finds the production branch
 advanced under a release-branch head.
 
@@ -263,8 +268,10 @@ advanced under a release-branch head.
 Default scope: runs right after 5a's post-deploy check passes, BEFORE documentation (5c), the post-deploy
 check's own close-out (5d) and release notes (5e): these steps are what the next release depends
 on, so they finish while this release still holds clearance, and nothing else does. Under scope
-`cut-to-deploy` and `merge-and-deploy` it runs as soon as 5a confirms the deploy, and the post-deploy check follows the
-hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
+`cut-to-deploy` it runs as soon as 5a confirms the deploy, and the post-deploy check follows the
+hand-back as the first owed item, `post-deploy-check` (`clearance.md`). Under `merge-and-deploy` the
+next release brings production in itself, so the tower is handed back at 5a and steps 1–3 run after
+the post-deploy check as the owed item `sync`, with no heartbeat (nothing is held).
 
 1. **Sync production into the source.** Without it the release branch's fix commits never reach
    `releaseSource`. Already `git merge-base --is-ancestor origin/<productionBranch>
@@ -296,18 +303,21 @@ hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
    trigger 5): `START` → KEEP the claim and start the next release from here (below); anything
    else → release it `handed-on`. `takeover` (its holder lapsed) → ONE immediate takeover
    claim with that digest, decided the same way, never a third; held by a live session → SKIP the
-   leveling, said so (that holder re-levels once it holds the tower, `clearance.md`); a final
+   leveling, said so (that holder re-levels once it holds the tower, or under `merge-and-deploy`
+   before it hands the claim on, `clearance.md`); a final
    claim, `stop` or `degrade` → STOP. Never a push beside a live holder.
    **Starting the next release from the leveling** (a won claim and `START`): hand clearance back
-   (step 4), run the first owed item (`post-deploy-check` under scopes `cut-to-deploy` and
-   `merge-and-deploy`: the next release's merge waits on it anyway), heartbeating the train claim
+   (step 4), run the first owed item (`post-deploy-check` under scope `cut-to-deploy`: the next
+   release's merge waits on it anyway; under `merge-and-deploy` both are already done, and `sync`
+   is settled by `owed --done sync` before the next release starts), heartbeating the train claim
    through it, then invoke **`release`** in this session declaring `started-by: auto`; its step 0
    refreshes the train claim this session already holds. This release's other owed items (`docs`,
    `close-out`, `release-notes`) run when that release first waits for the owner (its step 4) or
    stops, whichever comes first, settled by `owed --done` as always; its own step 6 runs then too,
    without trigger 3 (the next release is already running). A failed post-deploy check STOPs as
    it always does, and the train claim is then released `handed-on`.
-4. **Hand clearance back** (`release.clearance` set): the provider's `release --owed <item>` for
+4. **Hand clearance back** (`release.clearance` set; under `merge-and-deploy` it was handed back at
+   5a, so this step does nothing): the provider's `release --owed <item>` for
    each later step still to run (`post-deploy-check` under scopes `cut-to-deploy` and `merge-and-deploy`, then `docs`,
    `close-out`, `release-notes` — only those that will run),
    only now — after 1–3, never before — so a session that waits on `claim --wait` starts from a

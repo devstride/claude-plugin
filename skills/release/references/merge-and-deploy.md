@@ -27,7 +27,8 @@ what "yes" versus "no" does. Then:
 - with `release.clearance` set, the provider's `status`
   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`, "Where the release skill calls
   it"); under scope `merge-and-deploy` also the check stamp (the tree, the production tip and when
-  0p's checks ran) and whether this release stepped aside to wait;
+  0p's checks ran), the release it was prepared on top of (the production tip in the stamp) and
+  whether it waits outside the tower;
 - with `release.devDeployVerification` set and a delta touching a fix-exclusion path, the dev
   deploy wait (run after the yes — a standing yes: before it — and before the checks below, per
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`).
@@ -38,11 +39,12 @@ In this order, after the yes and before the merge:
 
 1. **Scope `cut-to-deploy`**: the previous-release gate again
    (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`, § Scope `cut-to-deploy`).
-   **Scope `merge-and-deploy`** instead: re-claim if this release stepped aside (`--branch
-   --pr`), then `heartbeat final`, the previous-release gate once more (one read; pending steps
-   aside again, a failure STOPs, and no yes lifts either), the stamp verify, the pre-merge check,
-   every `rerunAtMerge` entry and the standing yes again, in that order (§ Scope
-   `merge-and-deploy`); 0p already ran the dev deploy wait.
+   **Scope `merge-and-deploy`** instead: the queue and the claim, this release's first
+   (`--branch --pr`; BUSY while the release ahead still merges or deploys), then `heartbeat
+   final`, the previous-release gate once more (one read; pending steps aside again, a failure
+   STOPs, and no yes lifts either), the stamp verify (`CHANGED` or `BEHIND`: rebuilt on what is
+   now ahead, back to step 2), the pre-merge check, every `rerunAtMerge` entry and the standing
+   yes again, in that order (§ Scope `merge-and-deploy`); 0p already ran the dev deploy wait.
 2. **The dev deploy wait**, when it applies (a standing yes ran it before the decision instead).
 
 Then confirm:
@@ -62,7 +64,9 @@ Then run the `MERGE` line of `merge-gate.py <n> <reviewedHead> --all-green` (ste
 ## Step 5a — the merge and the deploy
 
 - **Merge**: the PR reads `MERGED`; the merge commit and timestamp go into the payload; `live`
-  stays `false` until the deploy is confirmed, then `true`.
+  stays `false` until the deploy is confirmed, then `true`. Scope `merge-and-deploy`: post the
+  `pending` post-deploy status on the merge commit at once, and hand the tower back as soon as the
+  deploy is confirmed (`clearance.md`).
 - **Approve**: `release.deployApproval` set (an adopted merged release too) → the owner's yes
   approves the deploy: run it with `RELEASE_COMMIT=<merge sha>`; 0 = approved and read back, 2 =
   retry (bounded), else STOP; never send the owner to approve.

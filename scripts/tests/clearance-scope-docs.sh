@@ -1,6 +1,7 @@
 #!/bin/bash
 # The release.clearance.scope text stays whole: clearance.md documents EVERY scope and the scripts
-# each cites, every heartbeat phase its cut-to-deploy section names is one the default section lists,
+# each cites, merge-and-deploy's queue (cut behind the release ahead, prepared on top of it, rebuilt
+# when production moves, handed back at deploy-confirmed) is described where the skill reads it, every heartbeat phase its cut-to-deploy section names is one the default section lists,
 # and the release skill points at the section, names the `post-deploy only` argument, and every
 # script the section cites exists. Pure text checks; no git, no gh.
 set -u
@@ -41,6 +42,19 @@ for script in ("release_checks.py", "tower-queue.py", "previous-release-gate.sh"
     if not os.path.isfile(os.path.join(root, "skills/release/scripts", script)): problems.append("%s does not exist" % script)
 for needle in ("release --step-aside", "rerunAtMerge", "release-holder"):
     if needle not in mad: problems.append("the merge-and-deploy section does not mention %r" % needle)
+# the queue (the tower held only for the merge and the deploy): the cut waits at the queue, the
+# release is prepared on top of the one ahead (production brought in, then the checks), it is
+# rebuilt when production moves, the gate reads pending from the merge on, and the tower is handed
+# back at deploy-confirmed with the sync owed after the post-deploy check
+for needle in ("first cut, first merged", "release_checks.py contains", "Rebuilt when what is ahead changes",
+               "pending", "--owed post-deploy-check --owed sync", "owed --done sync", "train claim is handed on"):
+    if needle not in mad: problems.append("the merge-and-deploy section does not mention %r" % needle)
+for stale in ("Pre-claim checks", "The queue, before every claim"):
+    if stale in mad: problems.append("the merge-and-deploy section still says %r (the checks no longer run before every claim)" % stale)
+branch = re.sub(r"\s+", " ", open(os.path.join(root, "skills/release/references/release-branch.md")).read())
+if "owed item `sync`" not in branch: problems.append("release-branch.md §5 does not name the owed item `sync` under merge-and-deploy")
+auto = re.sub(r"\s+", " ", open(os.path.join(root, "skills/release/references/auto-start.md")).read())
+if "once step 1 has opened the release pull request" not in auto: problems.append("auto-start.md does not say where merge-and-deploy hands the train claim on")
 print("\n".join(problems) or "OK")
 PY
 OUT="$(python3 "$W/check.py" "$ROOT")"

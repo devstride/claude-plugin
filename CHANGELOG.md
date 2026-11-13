@@ -12,19 +12,25 @@ for what each version component means here and how a release is cut.
 
 ### Added
 
-- **A release can hold the production slot only while it merges and deploys.** A new value for
-  `release.clearance.scope`, `"merge-and-deploy"`, keeps everything `"cut-to-deploy"` does and
-  moves every long check and every wait out of the one-at-a-time slot (the release tower). The
-  release now runs its pre-ship checks, the dev-deploy wait and the pre-merge check before it
-  claims the tower, at the exact commit it will cut, and records a check stamp: the head's tree,
-  the production tip and when the checks ran. Every claim, and the moment before the merge, checks
-  that the stamp still matches; if the tree or production moved, the checks run again first. A
-  release that has to wait — for the owner's go-ahead or for the previous release's post-deploy
-  check — gives the tower back (`release --step-aside`, recorded as `stepped-aside`, nothing owed)
-  and claims it again when it can merge. A release never claims while another release pull request
-  is open into production, so releases still merge oldest first, one at a time. New helper scripts:
-  `release_checks.py` (the stamp) and `tower-queue.py` (the queue rule). Existing scopes behave
-  exactly as before.
+- **A release holds the production slot only while it merges and deploys, and releases queue.**
+  A new value for `release.clearance.scope`, `"merge-and-deploy"`, keeps everything
+  `"cut-to-deploy"` does and holds the one-at-a-time slot (the release tower) only for the merge
+  into production and the deploy. Releases line up first cut, first merged: no release is cut while
+  another release pull request is open into production, so the next one is cut the moment the one
+  ahead merges, built on top of that merge (production is merged into the new release branch at
+  once when the release source does not hold it yet), and its pre-ship checks, dev-deploy wait,
+  pre-merge check, review and CI all run outside the tower while the one ahead deploys. The checks
+  record a check stamp: the head's tree, the production tip and when they ran. The claim, made only
+  on the go-ahead, and the moment before the merge verify it: if the release ahead was reverted, a
+  hotfix landed or anything else moved production, the release is rebuilt on what is now ahead and
+  checked and tested again before it may merge. The release posts a pending post-deploy status on
+  its merge commit at once and hands the tower back as soon as the deploy is confirmed; its
+  post-deploy check runs first, so the release behind merges the moment this one is healthy, and
+  the sync of production into the release source runs after it as owed work. A release that has to
+  wait after it claimed (the previous release's check still pending) gives the tower back
+  (`release --step-aside`, recorded as `stepped-aside`, nothing owed). New helper scripts:
+  `release_checks.py` (the stamp, and `contains`, the look after the cut) and `tower-queue.py` (the
+  queue rule). Existing scopes behave exactly as before.
 - **`preShipChecks[].rerunAtMerge`.** A `releaseOnly` check that can lapse while a release waits
   (a sign-in, for example) runs again at every re-claim and just before the merge under
   `merge-and-deploy`. Doctor reports it on any other entry, or together with `runAt`.
@@ -63,6 +69,9 @@ for what each version component means here and how a release is cut.
 
 ### Changed
 
+- **Under `merge-and-deploy` the train claim is handed on once the release pull request is open**
+  (and the train re-levelled), not at the cut: the open pull request is what queues every later
+  release behind it.
 - **Under `merge-and-deploy` every claim after the cut names the release** (`clearance claim
   --branch <b> --pr <n>`, written on a new record and on a renewal), so a re-claim never reads as a
   release with no pull request.
@@ -75,7 +84,7 @@ for what each version component means here and how a release is cut.
   owner's words on the pull request), and still pending after 45 minutes stops naming the release
   and `release post-deploy only`.
 - **A pre-ship hold under `merge-and-deploy`** is discharged at the final check when the settled
-  tree is the stamped one, and otherwise steps aside, re-stamps, queues and claims before it resumes.
+  tree is the stamped one, and otherwise re-runs the checks and re-stamps before it resumes.
 - **The backstop under `cut-to-deploy` and `merge-and-deploy`** no longer counts an open release
   pull request or a held tower as a release in flight: the train claim alone decides.
 - Every later check round of a release reports against the cut head (`RELEASE_COMMIT` stays the

@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""May this release claim the tower now? The queue rule of scope `merge-and-deploy`.
+"""May this release be cut now, and later claim the tower? The queue rule of scope `merge-and-deploy`.
 
-Under `release.clearance.scope` `"merge-and-deploy"` a release claims the tower only while no OTHER
-release pull request is open into the production branch, so a release that stepped aside (its pull
-request still open, waiting for the owner or the previous release's post-deploy check) always finds
-the tower free when it claims again, and releases merge oldest first, one at a time
+Under `release.clearance.scope` `"merge-and-deploy"` a release is cut only while no OTHER release
+pull request is open into the production branch (run before the cut, without `--own-pr`), and
+claims the tower for its merge and deploy only while that still holds (run at step 4 with
+`--own-pr`). So the release ahead has always merged, or closed, before the next is cut: the next is
+cut on top of its merge and checked and tested while it deploys, a release waiting for the owner or
+the previous release's post-deploy check (its pull request still open, the tower not held) keeps
+every later release behind it, and releases merge in the order they were cut, one at a time
 (references/clearance.md, § Scope `merge-and-deploy`).
 
   check [--own-pr <n>] [--waited-minutes <m>]
