@@ -111,4 +111,31 @@ PR_HEAD="$SAME" t post "$SAME" --pr 7 --base "$BASE"
 [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED --base"*"never a remote ref or a SHA" ]] && ok "(10c) a SHA as --base is refused" || bad "(10c) $RC $OUT"
 t verify; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(13) usage" || bad "(13) $RC $OUT"
 t verify "$REVIEWED" --pr 7; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(13b) --pr without --base is a usage error" || bad "(13b) $RC $OUT"
+
+# The landing proof (post-landing / verify-landing): a LOCAL-FULL review of a train one-off, no pull request.
+GATE="$ROOT/skills/build-item/scripts/review-gate.py"
+mkdir -p .claude; echo '{"releaseTrain": {"branch": "train", "reviewEveryLanding": true}}' > .claude/ds-config.json
+git update-ref refs/remotes/origin/train "$BASE"; git checkout -q feat
+L() { t verify-landing "$1" --onto train; }
+L "$REVIEWED"
+[ "$RC" = 2 ] && [[ "$OUT" == UNREVIEWED*"no devstride/landing-reviewed status from a repository admin"*"for landing onto train" ]] && ok "(14) no landing proof: UNREVIEWED" || bad "(14) $RC $OUT"
+t post-landing "$REVIEWED" --onto train
+[ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED this checkout holds no settled LOCAL-FULL receipt for ${REVIEWED:0:12} onto origin/train"* ]] && ok "(15) post-landing refuses a head this checkout holds no settled receipt for" || bad "(15) $RC $OUT"
+L "$REVIEWED"; [ "$RC" = 2 ] && ok "(15b) ... and posted nothing" || bad "(15b) $RC $OUT"
+echo '{"base": "origin/train", "cycles": 1, "engines": [{"engine": "claude", "result": "no-findings"}], "findings": []}' \
+  | python3 "$GATE" record >/dev/null 2>&1 || bad "(16) setup: review-gate.py record failed"
+t post-landing "$REVIEWED" --onto train
+[ "$RC" = 0 ] && [ "$OUT" = "POSTED $REVIEWED devstride/landing-reviewed: Settled LOCAL-FULL review for landing onto train" ] && ok "(16) with a settled receipt here, post-landing posts the proof on the reviewed head" || bad "(16) $RC $OUT"
+L "$REVIEWED"; [ "$RC" = 0 ] && [ "$OUT" = "REVIEWED $REVIEWED by owner" ] && ok "(16b) ... and it verifies for landing onto that train" || bad "(16b) $RC $OUT"
+t verify-landing "$REVIEWED" --onto other; [ "$RC" = 2 ] && ok "(16c) ... never for another train" || bad "(16c) $RC $OUT"
+L "$SAME"; [ "$RC" = 2 ] && ok "(16d) a pull-request proof (devstride/reviewed) is never a landing proof" || bad "(16d) $RC $OUT"
+GH_LOGIN=partner t post-landing "$REVIEWED" --onto train
+L "$REVIEWED"; [ "$RC" = 0 ] && ok "(17) a non-admin's later landing status changes nothing" || bad "(17) $RC $OUT"
+GH_LOGIN=partner git checkout -q same; GH_LOGIN=partner t post-landing "$SAME" --onto train
+[ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED"* ]] && ok "(17b) a head with no receipt of its own gets no proof, even one with the same tree" || bad "(17b) $RC $OUT"
+CTX=devstride/landing-reviewed inject "$REVIEWED" 7000 owner failure "withdrawn"
+L "$REVIEWED"; [ "$RC" = 2 ] && [[ "$OUT" == *"an admin withdrew the devstride/landing-reviewed proof"* ]] && ok "(18) an admin withdraws a landing proof with a newer failure" || bad "(18) $RC $OUT"
+t post-landing "$REVIEWED" --onto origin/train; [ "$RC" = 2 ] && [[ "$OUT" == "NOT POSTED --onto 'origin/train'"* ]] && ok "(19) a remote ref as --onto is refused" || bad "(19) $RC $OUT"
+t post-landing "$REVIEWED"; [ "$RC" = 2 ] && [[ "$OUT" == usage:* ]] && ok "(19b) post-landing without --onto is a usage error" || bad "(19b) $RC $OUT"
+GH_FAIL=1 L "$REVIEWED"; [ "$RC" = 1 ] && [[ "$OUT" == ERROR* ]] && ok "(19c) GitHub unreadable: ERROR, never REVIEWED" || bad "(19c) $RC $OUT"
 exit $FAIL

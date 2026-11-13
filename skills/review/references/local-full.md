@@ -36,6 +36,13 @@ sizing narrows how wide the Claude pass looks, never who reviews or whether the 
    `failed` with a one-line `reason` (an `engine` answer of `returned` is read first, then mapped); `claude` and, with `review.localCommand` set, another engine
    must have returned one. Exit 2 → fix what it names. It writes a receipt for exactly this head, tree
    and merge base, kept under the repository's git directory on this machine.
+   **Then post its proof** (`releaseTrain.reviewEveryLanding` true): push the branch (`git push -u
+   origin HEAD`, never to the train) and run `python3
+   ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post-landing <head> --onto <train>`.
+   That repository admin's `devstride/landing-reviewed` status is what makes the receipt line in the
+   merge commit count (`train_receipts.py`); the line alone is text anyone with push access could
+   write. `NOT POSTED` → say it once and land anyway: the train's pull request then reviews this
+   one-off itself.
 4. **Return:** the triaged findings, the untracked-deferral list, the lessons tally, the cycle
    count, the reviewed head, and the gate's `mergeBody`.
 

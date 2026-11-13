@@ -85,7 +85,8 @@ request's base.
   skip above never applies: every train one-off runs 4a's `review` call in LOCAL-FULL mode, sized to
   the change (`local-full.md`: a small fix gets one cycle, anything else the full target), and the
   landing gate answers `reviewed` only with a receipt at exactly that head, whatever the size; its
-  refusal names the size. The receipt's first line rides in the landing's merge-commit body, and it
+  refusal names the size. The receipt's first line rides in the landing's merge-commit body, and,
+  with the repository admin's landing proof `local-full.md` step 3 posts on the reviewed head, it
   is the train pull request's review evidence: that pull request then reviews only what no receipt
   covers (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` §1 step 4r). Why:
   each landing session reviews its own one-off, so many reviews run at once, and the train's pull

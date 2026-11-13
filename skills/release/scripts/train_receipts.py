@@ -27,6 +27,10 @@ Each FIRST-PARENT commit in the range is one of:
     merge's second parent, or the head a clean refresh brought it to (each step a two-parent merge
     of train work the landing's first parent already holds, adding nothing of its own). Its engines
     must show a Claude result and, with `review.localCommand` set, a result from another engine.
+    And the line is only a label: the receipt counts only when the head it names carries a
+    repository admin's `devstride/landing-reviewed` proof for landing onto the train
+    (`reviewed-status.py verify-landing`, posted by `post-landing` after the review was recorded).
+    Anyone who can push to the train can write the line; only an admin's status proves it.
   - `covered`: a merge of the release source (its second parent is an ancestor of
     `origin/<releaseSource>`), or the merge of a reviewed release unit (an epic's or a plan's pull
     request with its settled-review proof, as `train_exclusions.py` decides it).
@@ -40,7 +44,7 @@ else covers the merge: its `from` is git's automatic merge result (a tree id).
 
 Output (stdout, one JSON object):
   {"verdict": "receipted" | "needs-review",
-   "receipted": [{"commit", "item", "head", "cycles", "engines"}],
+   "receipted": [{"commit", "item", "head", "cycles", "engines", "provedBy"}],
    "covered": [{"commit", "by"}],
    "unreviewed": [{"commit", "item", "why", "from", "to", "files"}],
    "body": the markdown list the train's pull request carries as its review evidence}
@@ -117,6 +121,15 @@ def landed_head(repo, receipt_head, landed, first):
     return landed == receipt_head
 
 
+def proof(repo, head, train):
+    """(True, admin login) or (False, why) for the landing proof on a receipt's head; GitHub that
+    cannot be read proves nothing."""
+    try:
+        return te.reviewed_status.verify_landing(head, repo, train)
+    except te.reviewed_status.Unreadable as err:
+        return False, "GitHub could not be read (%s)" % err
+
+
 def engines_ok(receipt, need_cli):
     ok = [e["engine"] for e in receipt["engines"] if e["result"] != "failed"]
     return "claude" in ok and (not need_cli or any(e != "claude" for e in ok))
@@ -171,9 +184,12 @@ def analyse(repo, config, source_before, head, train):
                 continue
             if te.is_ancestor(repo, c, origin_train):
                 receipt = gate.parse_receipt(message(repo, c))
-                if receipt and landed_head(repo, receipt["head"], ps[1], ps[0]) and engines_ok(receipt, need_cli):
+                matched = receipt is not None and landed_head(repo, receipt["head"], ps[1], ps[0])
+                proved = proof(repo, receipt["head"], train) if matched and engines_ok(receipt, need_cli) else None
+                if proved and proved[0]:
                     out["receipted"].append({"commit": c, "item": item_of(subject), "head": receipt["head"],
-                                             "cycles": receipt["cycles"], "engines": receipt["engines"]})
+                                             "cycles": receipt["cycles"], "engines": receipt["engines"],
+                                             "provedBy": proved[1]})
                     continue
                 number = unit(c, subject)
                 if number is not None:
@@ -181,8 +197,10 @@ def analyse(repo, config, source_before, head, train):
                     continue
                 why = ("landed without a review receipt" if receipt is None else
                        "its receipt names %s, not the commit that landed" % receipt["head"][:12]
-                       if not landed_head(repo, receipt["head"], ps[1], ps[0]) else
-                       "its receipt shows no result from %s" % ("Claude and the CLI engine" if need_cli else "Claude"))
+                       if not matched else
+                       "its receipt shows no result from %s" % ("Claude and the CLI engine" if need_cli else "Claude")
+                       if proved is None else
+                       "its receipt is not proven: %s" % proved[1])
                 unreviewed(c, subject, why, ps[0], c)
                 continue
             if te.is_ancestor(repo, ps[1], origin_train):
@@ -199,9 +217,10 @@ def analyse(repo, config, source_before, head, train):
 def body(out):
     lines = ["Review receipts (every one-off reviewed before it landed):"]
     for r in out["receipted"]:
-        lines.append("- %s, merge %s: LOCAL-FULL at %s, %d cycle(s), engines: %s" % (
+        lines.append("- %s, merge %s: LOCAL-FULL at %s, %d cycle(s), engines: %s; proof posted by %s" % (
             r["item"] or "no item", r["commit"][:10], r["head"][:12], r["cycles"],
-            ", ".join("%s (%s)" % (e["engine"], e["result"].replace("-", " ")) for e in r["engines"])))
+            ", ".join("%s (%s)" % (e["engine"], e["result"].replace("-", " ")) for e in r["engines"]),
+            r["provedBy"]))
     if not out["receipted"]:
         lines.append("- none")
     if out["covered"]:

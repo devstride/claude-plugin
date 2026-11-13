@@ -51,6 +51,12 @@ for what each version component means here and how a release is cut.
   setting, a conflict resolution, a direct or snapshot-fix commit) gets a short review of just that
   difference. The production pull request's one pass over the high-risk files stays. Without the
   setting nothing changes.
+- **A landing's review receipt is proven on GitHub, not by its commit message.** After LOCAL-FULL
+  records a receipt, `reviewed-status.py post-landing <head> --onto <train>` posts a repository
+  admin's `devstride/landing-reviewed` status on the reviewed head, and only when this checkout holds
+  a settled receipt for it. `train_receipts.py` counts a landing as receipted only when that status
+  verifies (`verify-landing`, the same trust rules as `devstride/reviewed`): a receipt line typed
+  into a hand-made merge is reviewed on the train's pull request like any other unreceipted change.
 - **`tower-queue.py --waited-minutes <m>`.** A release that stepped aside and has waited at the
   head of the queue past `release.clearance.staleMinutes` gets `ASK` (exit 3): tell the owner once
   and keep polling. It never adopts on its own.

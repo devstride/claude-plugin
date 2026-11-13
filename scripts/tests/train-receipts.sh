@@ -34,6 +34,18 @@ cat > "$CFG" <<'JSON'
 JSON
 # receipt HEAD [ENGINES]: the first mergeBody line review-gate.py writes for a review settled at HEAD
 receipt() { echo "Review: LOCAL-FULL at $1 over origin/train (merge base 000000000000), 2 cycle(s), engines: ${2:-claude (no findings), codex (findings)}"; }
+# prove SHA [LOGIN]: an admin's (default "owner") landing proof on SHA, as `reviewed-status.py post-landing` posts it
+prove() {
+  python3 - "$GH_STUB_DIR/status-$1.json" "${2:-owner}" <<'PY'
+import json, os, sys
+f, login = sys.argv[1:]
+s = json.load(open(f)) if os.path.exists(f) else []
+s.insert(0, {"id": 100 + len(s), "context": "devstride/landing-reviewed", "state": "success",
+             "description": "Settled LOCAL-FULL review for landing onto train", "created_at": "2026-12-01T1%d:00:00Z" % len(s),
+             "creator": {"login": login, "type": "User"}})
+json.dump(s, open(f, "w"))
+PY
+}
 # work BRANCH FILE: one commit changing FILE on a new branch off the train; prints nothing
 work() { git checkout -q -b "$1" train; mkdir -p "$(dirname "$2")"; echo "$1" >> "$2"; git add -A; git commit -qm "work on $1"; }
 # land BRANCH SUBJECT BODY: merge BRANCH onto the train --no-ff with that message
@@ -50,8 +62,13 @@ git init -q -b develop; echo base > a.txt; git add -A; git commit -qm base; SB="
 git checkout -q -b train
 work f1 src/one.txt; h1="$(git rev-parse HEAD)"; land f1 "merge: I1 one into train" "$(receipt "$h1")"
 sync; run
+expect "(1a) a receipt line without an admin's landing proof on GitHub is only text: reviewed on the pull request" 1 \
+  "d['receipted']==[] and [(u['item'],u['why'].split(':')[0]) for u in d['unreviewed']]==[('I1','its receipt is not proven')] and 'devstride/landing-reviewed' in d['unreviewed'][0]['why']"
+prove "$h1" partner; run
+expect "(1b) ... and a proof posted by someone without admin permission does not count" 1 "d['receipted']==[]"
+prove "$h1"; run
 expect "(1) a landing whose receipt names the commit that landed is receipted" 0 \
-  "d['verdict']=='receipted' and [r['item'] for r in d['receipted']]==['I1'] and d['receipted'][0]['head']=='$h1' and d['unreviewed']==[] and 'I1, merge' in d['body']"
+  "d['verdict']=='receipted' and [r['item'] for r in d['receipted']]==['I1'] and d['receipted'][0]['head']=='$h1' and d['unreviewed']==[] and 'I1, merge' in d['body'] and d['receipted'][0]['provedBy']=='owner' and 'proof posted by owner' in d['body']"
 
 work f2 src/two.txt; land f2 "merge: I2 two into train" "Review: small fix (1 file(s), 1 changed line(s)), covered by the train's release review"
 sync; run
@@ -61,21 +78,21 @@ expect "(2) a small fix landed without a receipt is reviewed on the pull request
 # (3) the ds work land shape: the receipt names the story head; the train moved, so the landing merges a
 # clean refresh (train merged into the branch) whose first parent is that head
 work f3 src/three.txt; h3="$(git rev-parse HEAD)"
-work f3b src/other.txt; land f3b "merge: I4 other into train" "$(receipt "$(git rev-parse f3b)")"
+work f3b src/other.txt; prove "$(git rev-parse f3b)"; prove "$h3"; land f3b "merge: I4 other into train" "$(receipt "$(git rev-parse f3b)")"
 git checkout -q f3; git merge -q --no-ff -m "merge: origin/train into f3" train; land f3 "merge: I3 three into train" "$(receipt "$h3")"
 sync; run
 expect "(3) a receipt for the head a clean refresh carried is receipted" 1 \
   "[r['item'] for r in d['receipted']]==['I1','I4','I3'] and [u['item'] for u in d['unreviewed']]==['I2']"
 
 work f5 src/five.txt; land f5 "merge: I5 five into train" "$(receipt "$h1")"
-work f6 src/six.txt; land f6 "merge: I6 six into train" "$(receipt "$(git rev-parse f6)" "claude (no findings), codex (failed: timed out)")"
+work f6 src/six.txt; prove "$(git rev-parse f6)"; land f6 "merge: I6 six into train" "$(receipt "$(git rev-parse f6)" "claude (no findings), codex (failed: timed out)")"
 git checkout -q train; echo direct > src/direct.txt; git add -A; git commit -qm "a direct commit"
 sync; run
 expect "(4) a receipt naming another commit, one with no CLI result, and a direct commit are each reviewed" 1 \
   "[(u['item'],u['why']) for u in d['unreviewed']]==[('I2','landed without a review receipt'),('I5','its receipt names '+'$h1'[:12]+', not the commit that landed'),('I6','its receipt shows no result from Claude and the CLI engine'),(None,'a direct commit')]"
 
 # (5) a conflict resolved in the landing merge: the landing is receipted AND what the merge itself changed is reviewed
-git checkout -q -b f7 train; echo story > src/clash.txt; git add -A; git commit -qm "story side"; h7="$(git rev-parse HEAD)"
+git checkout -q -b f7 train; echo story > src/clash.txt; git add -A; git commit -qm "story side"; h7="$(git rev-parse HEAD)"; prove "$h7"
 git checkout -q train; echo train > src/clash.txt; git add -A; git commit -qm "train side"
 git merge -q --no-ff -m "merge: I7 clash into train" -m "$(receipt "$h7")" f7 >/dev/null 2>&1; echo resolved > src/clash.txt; git add -A; git commit -q --no-edit
 sync; run
@@ -86,7 +103,7 @@ expect "(5) a landing that resolved a conflict is receipted and its resolution i
 # landing absorbed into the snapshot is read commit by commit
 git checkout -q develop; echo src > dev.txt; git add -A; git commit -qm "source moved"; git checkout -q -b snap train
 git merge -q --no-ff -m "Merge origin/develop into snap" develop; echo fix > src/fix.txt; git add -A; git commit -qm "snapshot fix"
-work f8 src/eight.txt; land f8 "merge: I8 eight into train" "$(receipt "$(git rev-parse f8)")"; sync
+work f8 src/eight.txt; prove "$(git rev-parse f8)"; land f8 "merge: I8 eight into train" "$(receipt "$(git rev-parse f8)")"; sync
 git checkout -q snap; git merge -q --no-ff -m "Merge branch 'train' into snap" train
 HEAD_REF=snap run
 expect "(6) source merge covered, fix commit reviewed, an absorbed landing receipted" 1 \

@@ -387,7 +387,9 @@ M15. A one-off merged onto the release train (`releaseTrain.branch`) is NOT Done
      merge only as small, or reviewed at exactly that head, tree and merge base. With
      `releaseTrain.reviewEveryLanding` true there is no small route: every train merge needs that
      receipt, its first line is in the merge commit, and the train's pull request reviews only what
-     `train_receipts.py` finds no receipt or reviewed pull request for.
+     `train_receipts.py` finds no PROVEN receipt or reviewed pull request for: a receipt counts only
+     with an admin's `devstride/landing-reviewed` status on its head (`reviewed-status.py`), never
+     from the commit message alone.
 M16. A story merged onto its release unit's integration branch is LANDED, not Done: it is Done only
      when the release unit's release pull request reaches the release target, marked by
      `build-item` step 8's close-out from the landed set captured BEFORE that merge (the git range
