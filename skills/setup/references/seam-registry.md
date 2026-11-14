@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.63.0.
+`.claude/ds-config.json` against. Schema version: 3.64.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and

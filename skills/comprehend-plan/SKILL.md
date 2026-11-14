@@ -70,7 +70,7 @@ Organize by the tree's own hierarchy (root → grouping items → leaves), not a
   "what runs next": the plan root's container
   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`, "Finding it"; its
   members never count as open plan work), any duplicates, and **Still open in Deferred** — number,
-  title, kind and the item each relates to. No container → say so.
+  title, kind and the item each relates to. No container → say so. Then its **Closing** decision, read only.
 - **Linked tickets** — each ticket, its status and the plan item it is linked to, read per
   `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/originating-ticket.md` ("Reading the links").
   None → say so.

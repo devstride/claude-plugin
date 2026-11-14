@@ -165,7 +165,7 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   (projection warning too). **Never auto-select from the deferred container.** Surface the
   whole ready-set.
 - **DRY-CHAIN / TERMINAL:** no selectable candidate → exit cleanly, never re-ask, saying which:
-  plan complete (with **Still open in Deferred**) / N landed, awaiting their release (gate on →
+  plan complete (then **Closing**, `deferred-container.md`) / N landed, awaiting their release (gate on →
   step 8 for it, then step 0) / N blocked by X, Y / N gated. Suggest `/devstride:plan <root>` only
   when the chain ran out; never invoke it.
 - **Every exit from step 0** (DRY-CHAIN/TERMINAL, ambiguous root, a given item merged or Done, any
@@ -275,7 +275,7 @@ merges, every profile, never a gate:
 ## 6. Completion ritual
 
 - `item-status.py decide`, `event: landed`, sets status and comment (never `mark_done`);
-  `startDate`/`dueDate` = branch creation → merge. Base → **Done**; an epic-branch merge is LANDED
+  `startDate`/`dueDate` = branch creation → merge. Base → **Done** (then its plan's **Closing**); an epic-branch merge is LANDED
   (`next-unblocked.md`), closed by step 8; a train merge too (`release-train.md`), closed by `release`.
   A train or base landing is then quoted (`item-status.md` step 4).
 - **The item points at its code**: 4b — confirm the PR auto-linked, else `link_pull_request`; 4a —
@@ -307,8 +307,7 @@ merges, every profile, never a gate:
 - **Counts**: `hierarchyRoles.leaf` descendants neither Done nor landed, of **the SAME
   release-unit ancestor step 0 resolved** — never the direct parent (why:
   `references/epic-release.md`) — plus the whole plan root. **The deferred container counts in
-  NEITHER** and is never a release unit; a plan root at zero adds its **Still open in Deferred**
-  list. Unnumbered plan
+  NEITHER** and is never a release unit; a plan root at zero runs its **Closing**. Unnumbered plan
   (`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/execution-order-numbering.md`) → bare numbers, noting
   `/devstride:plan <root>` would number it.
 - **Human recap.** After a direct pull-request merge (5b), lead with `Merged / Released`: item and

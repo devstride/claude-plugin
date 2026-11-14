@@ -89,6 +89,33 @@ beside the plan").
   related-to edge points at (`get_item` with `fields: ["number", "title", "workType", "status",
   "isBug", "completedAt", "endedOutcome", "relationships"]`).
 
+## Closing — the container and the plan close when the work under them is finished
+
+An open container whose work is all finished keeps its plan from ever showing Done, so both close
+themselves. **Unbuilt deferred work keeps both open** (owner decision): the loop never builds,
+moves or closes a deferred LEAF; a person builds it by number or closes it by hand.
+
+- **When.** `build-item` at step 0's terminal exits, at step 7 when the root reaches zero, and
+  when an item it lands Done sits under a plan root (a deferred item built by number included);
+  `release` after its train merge closes one-offs (`release-branch.md` §1 step 6); `create-story`
+  / `create-defect` after filing (a closed container or Done root reopens). `comprehend-plan` and
+  `doctor` only report the decision.
+- **The decision is code.** `search_items` with `hierarchy: [root]` (every page, no archived,
+  `fields: ["number", "parentNumber", "workType", "status", "completedAt", "endedOutcome"]`),
+  every container from `match` (`all`), then `{"root": {"number", "done"}, "containers": […], "nodes":
+  [{"number", "parentNumber", "leaf", "done"}…]}` into `deferred-container.py settle`. `leaf`: a
+  `hierarchyRoles.leaf` type; `done`: a done-type status, `completedAt` or `endedOutcome` (a
+  landed leaf not yet Done is open).
+- **Acting.** Each `close` number in order (container nodes, and outside them a grouping item
+  whose work is all Done), then the root on `close`: `update_item` to the
+  done-type status in its collection (as `item-status.py` resolves it; not exactly one → report,
+  never guess), `add_comment` "closed: everything under it is finished", `get_item` to read it
+  back. `reopen` goes to the first open status as "Closed or Done" says, commented "reopened:
+  <numbers> still open". A failed write is a report line, never a stop, and skips the closings
+  after it, the root included: the next run's decision repeats them.
+- **Report** what closed, and for an open plan its `openValue` numbers and **Still open in
+  Deferred**. A closed root leaves the Active Agents board by `active-agents.md` §2.
+
 ## Repair procedure — merging duplicates
 
 Run only by a story or a person that names it, never by a caller filing a finding: run `match`
