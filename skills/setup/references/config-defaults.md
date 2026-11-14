@@ -130,6 +130,11 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
   the release-train snapshot before the train merges (outside release clearance under
   `release.clearance.scope: "cut-to-deploy"`), and is not repeated at the release's step 2b when it passed there on the same snapshot
   (the only automatic 2b skip for it; otherwise 2b runs it). Absent, a `releaseOnly` check runs at 2b as before.
+- **`preShipChecks[].rerunAtMerge`**: `true` on a `when: "releaseOnly"` entry (anything else, or
+  together with `runAt`, is a config error). Under `release.clearance.scope: "merge-and-deploy"`
+  the entry, which passed before the tower claim, runs again (`pre-ship release run --only`) at
+  every re-claim and just before the merge: for a check whose result can lapse while a release
+  waits, such as a sign-in. Elsewhere it changes nothing.
 - **A story is Done when its release unit reaches `releaseTarget`**, not when it merges onto the
   integration branch. Until then it is *landed*
   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`): it satisfies blockers
@@ -280,6 +285,7 @@ work lands, which is the operator's decision. Absent, the loop behaves as before
 | `releaseTrain.fastMerges` | boolean | `false`: a one-off on the train takes the full per-story pull-request ritual, into the train |
 | `releaseTrain.smallFixes` | `{ "maxFiles": 5, "maxChangedLines": 500 }` | no fix counts as small: every fast one-off gets its own local review pass |
 | `releaseTrain.lateArrivals` | `"restart"` or `"offer"` | `"offer"`: a one-off landing during the train's review joins only on the owner's word, before the ready-flip |
+| `releaseTrain.reviewEveryLanding` | `true` | `false`: a small fix lands with no review of its own and the train's pull request reviews it; `true`: every one-off lands with a review receipt and the train's pull request needs only CI (`release-branch.md` §1 step 4) |
 | `protectedBranches` entries | exact names or patterns, e.g. `"release/*"` | exact names only |
 
 `releaseTrain` was called `supportTrain` before this release. The plugin reads `releaseTrain` first and,
@@ -348,7 +354,12 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   alarm, never a takeover. `scope` (either shape) `"release"` (default, the above) or
   `"cut-to-deploy"`: claimed at the cut, handed back once the deploy is confirmed; the post-deploy
   check then runs as owed work, posts the `release/post-deploy` commit status, and the next release
-  refuses to merge until it is success (`clearance.md`).
+  refuses to merge until it is success (`clearance.md`). `"merge-and-deploy"` is `cut-to-deploy`
+  with the tower claimed only for the merge and the deploy: releases queue first cut, first
+  merged (no cut while another release pull request is open), each cut on top of the one ahead's
+  merge and checked and CI-tested outside the tower while that one deploys, a check stamp
+  verified at the claim and just before the merge (a moved production means a rebuild), and the
+  tower handed back at deploy-confirmed, the sync running after the post-deploy check.
   The built-in `github` provider keeps the clearance in the custom ref `refs/clearance/release`
   (every move a compare-and-swap through `git push --force-with-lease`; neither a branch nor a
   tag) and needs only git and `gh`; a claim starts a detached keeper that heartbeats while the

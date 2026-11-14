@@ -415,7 +415,7 @@ class GitHubStore(Store):
 
     take_over = adopt = renew
 
-    def delete(self, expected, force=False):
+    def delete(self, expected, force=False, outcome=None):
         self.push_ref(None, expected["_version"])
 
 
@@ -666,8 +666,8 @@ class DevStrideStore(Store):
             "payload": self.payload(record), "holder": self.me, "machine": claim_record.machine_name(),
             **session_name()}))
 
-    def delete(self, expected, force=False):
-        arguments = {"kind": CLAIM_KIND, "key": repo(), "outcome": "released", "holder": self.me}
+    def delete(self, expected, force=False, outcome=None):
+        arguments = {"kind": CLAIM_KIND, "key": repo(), "outcome": outcome or "released", "holder": self.me}
         if force:
             arguments["force"] = True
         answer = self.call("release_claim", arguments)
@@ -1030,6 +1030,14 @@ def cmd_claim(args):
     wait = "--wait" in args
     stop_on_stuck = wait and "--ignore-stuck" not in args
     purpose = option(args, "--purpose") or "release"
+    # --branch/--pr: a claim made after the cut (a re-claim under scope merge-and-deploy) names the
+    # release branch and pull request in the SAME write that creates the record, so a session that
+    # dies under it is judged by its pull request (STALE, adopt only on the owner's yes), never
+    # taken over as "pull request never opened".
+    claim_branch = option(args, "--branch")
+    claim_pr = option(args, "--pr")
+    if claim_pr is not None and not str(claim_pr).lstrip("#").strip().isdigit():
+        fail("--pr needs a pull request number", 1)
     me, print_token = whoami()
     if print_token:
         progress("holder token %s — export it as CLEARANCE_HOLDER_TOKEN for heartbeat and release" % me)
@@ -1066,7 +1074,8 @@ def cmd_claim(args):
                     return 3
             record = {
                 "v": RECORD_VERSION, "repo": repo(), "holder": STORE.rid(me), "user": user, "machine": claim_record.machine_name(),
-                "purpose": purpose, "phase": "claimed", "branch": None, "pr": None,
+                "purpose": purpose, "phase": "claimed", "branch": claim_branch or None,
+                "pr": pr_number(claim_pr) if claim_pr else None,
                 "takenAt": iso(at), "heartbeatAt": iso(at), "phaseStartedAt": iso(at),
             }
             stamp_session(record)
@@ -1090,6 +1099,10 @@ def cmd_claim(args):
             return 0
         if STORE.holds(current, me):
             stamp_session(current)
+            if claim_branch:
+                current["branch"] = claim_branch
+            if claim_pr:
+                current["pr"] = pr_number(claim_pr)
             rejected = renew(current, me, at)
             if rejected is not None:
                 stuck = lost_race(rejected, current["_version"], stuck)
@@ -1285,6 +1298,12 @@ def record_owed(items, record, me, at):
 def cmd_release(args):
     force = "--force" in args
     owed_items = options(args, "--owed")
+    # --step-aside: the holder gives the clearance back while it waits for something other than
+    # its own merge and deploy (scope merge-and-deploy), and claims it again later. The store
+    # records outcome `stepped-aside`; nothing is owed, and it is never the owner's force.
+    step_aside = "--step-aside" in args
+    if step_aside and (force or owed_items):
+        fail("--step-aside cannot be combined with --force or --owed", 1)
     me, _ = whoami()
     at = now()
     record = STORE.read()
@@ -1302,7 +1321,7 @@ def cmd_release(args):
     stuck = 0
     while True:
         try:
-            STORE.delete(record, force)
+            STORE.delete(record, force, "stepped-aside" if step_aside else None)
             break
         except ToolError as error:
             if not error.rejected:
@@ -1318,7 +1337,7 @@ def cmd_release(args):
             stuck = lost_race(error, record["_version"], stuck)
             record["_version"] = current["_version"]
     remove_local(None if force else me)
-    print("RELEASED %s" % (record.get("branch") or record.get("purpose") or "release"))
+    print("RELEASED %s%s" % (record.get("branch") or record.get("purpose") or "release", " (stepped aside)" if step_aside else ""))
     record_owed(owed_items, record, me, at)
     return 0
 
@@ -1436,8 +1455,8 @@ def main(argv):
     provider, argv = argv[0], argv[1:]
     script = "clearance-%s.sh" % provider
     if not argv or argv[0] in ("-h", "--help"):
-        print("usage: %s <claim [--wait [--ignore-stuck]] [--purpose t] | status [--short] [--json] | "
-              "heartbeat <phase> [--branch b] [--pr n] | release [--force] [--owed item]... | "
+        print("usage: %s <claim [--wait [--ignore-stuck]] [--purpose t] [--branch b] [--pr n] | status [--short] [--json] | "
+              "heartbeat <phase> [--branch b] [--pr n] | release [--force] [--owed item]... [--step-aside] | "
               "adopt --yes [--original-stopped] | owed [--done item]... [--clear] [--release name] [--pr n] | identity>" % script)
         return 0 if argv else 1
     command = COMMANDS.get(argv[0])

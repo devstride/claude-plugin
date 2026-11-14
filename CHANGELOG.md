@@ -8,6 +8,138 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.61.0] — 2026-11-13
+
+### Added
+
+- **A release holds the production slot only while it merges and deploys, and releases queue.**
+  A new value for `release.clearance.scope`, `"merge-and-deploy"`, keeps everything
+  `"cut-to-deploy"` does and holds the one-at-a-time slot (the release tower) only for the merge
+  into production and the deploy. Releases line up first cut, first merged: no release is cut while
+  another release pull request is open into production, so the next one is cut the moment the one
+  ahead merges, built on top of that merge (production is merged into the new release branch at
+  once when the release source does not hold it yet), and its pre-ship checks, dev-deploy wait,
+  pre-merge check, review and CI all run outside the tower while the one ahead deploys. The checks
+  record a check stamp: the head's tree, the production tip and when they ran. The claim, made only
+  on the go-ahead, and the moment before the merge verify it: if the release ahead was reverted, a
+  hotfix landed or anything else moved production, the release is rebuilt on what is now ahead and
+  checked and tested again before it may merge. The release posts a pending post-deploy status on
+  its merge commit at once and hands the tower back as soon as the deploy is confirmed; its
+  post-deploy check runs first, so the release behind merges the moment this one is healthy, and
+  the sync of production into the release source runs after it as owed work. A release that has to
+  wait after it claimed (the previous release's check still pending) gives the tower back
+  (`release --step-aside`, recorded as `stepped-aside`, nothing owed). New helper scripts:
+  `release_checks.py` (the stamp, and `contains`, the look after the cut) and `tower-queue.py` (the
+  queue rule). Existing scopes behave exactly as before.
+- **`preShipChecks[].rerunAtMerge`.** A `releaseOnly` check that can lapse while a release waits
+  (a sign-in, for example) runs again at every re-claim and just before the merge under
+  `merge-and-deploy`. Doctor reports it on any other entry, or together with `runAt`.
+- **The build loop looks for a release to start at every story boundary.** When the release train
+  holds landed work, a story that landed while another release held the train claim used to wait
+  until that release finished its close-out, or until something else landed, because a lost start
+  was never retried. With `release.autoStart.enabled`, the build loop now runs the start check
+  after every story it lands and when its loop begins, so the next train starts soon after the
+  releasing session hands the train claim on at its cut.
+- **A release that levels the train after its deploy starts the next one itself.** With
+  `release.autoStart.enabled`, the release that wins the train claim to level the train after its
+  deploy runs the start check there (trigger 5 in `auto-start.md`); on `START` it keeps the claim,
+  hands the tower back, runs its own post-deploy check and then starts the next release, instead of
+  handing the claim on and waiting for another session to notice.
+- **Every one-off can be reviewed when it lands, so the train's pull request needs only CI.** With
+  the new `releaseTrain.reviewEveryLanding: true`, the landing gate (`review-gate.py check`) no
+  longer lets a small fix land unreviewed: every one-off lands with a settled LOCAL-FULL review
+  receipt at the exact commit that lands, sized to the change (a small fix gets one cycle with a
+  narrower Claude pass; the CLI engine runs on every one). The receipt's first line rides in the
+  landing's merge commit. The release reads those lines back with a new helper,
+  `train_receipts.py`, lists every item the train carries with its receipt in the train pull
+  request's body as its review evidence, and runs no review round when every commit is covered: the
+  pre-ship checks run and CI starts once. Anything without a receipt (a landing from before the
+  setting, a conflict resolution, a direct or snapshot-fix commit) gets a short review of just that
+  difference. The production pull request's one pass over the high-risk files stays. Without the
+  setting nothing changes.
+- **A landing's review receipt is proven on GitHub, not by its commit message.** After LOCAL-FULL
+  records a receipt, `reviewed-status.py post-landing <head> --onto <train>` posts a repository
+  admin's `devstride/landing-reviewed` status on the reviewed head, and only when this checkout holds
+  a settled receipt for it. `train_receipts.py` counts a landing as receipted only when that status
+  verifies (`verify-landing`, the same trust rules as `devstride/reviewed`): a receipt line typed
+  into a hand-made merge is reviewed on the train's pull request like any other unreceipted change.
+- **`tower-queue.py --waited-minutes <m>`.** A release that stepped aside and has waited at the
+  head of the queue past `release.clearance.staleMinutes` gets `ASK` (exit 3): tell the owner once
+  and keep polling. It never adopts on its own.
+
+### Changed
+
+- **Under `merge-and-deploy` the train claim is handed on once the release pull request is open**
+  (and the train re-levelled), not at the cut: the open pull request is what queues every later
+  release behind it.
+- **Under `merge-and-deploy` every claim after the cut names the release** (`clearance claim
+  --branch <b> --pr <n>`, written on a new record and on a renewal), so a re-claim never reads as a
+  release with no pull request.
+- **The check stamp reads production first.** `release_checks.py tip` prints the production tip
+  before the checks run and `stamp` now requires `--master <sha>`, printing `CHANGED master` (exit
+  3) when production moved while the checks ran. `verify` prints `BEHIND master <tip>` (exit 3)
+  when production is not contained in the release head.
+- **After a re-claim the previous-release gate is read once more** before the merge, after the
+  final heartbeat: a pending status steps aside again, a failure stops (an override only in the
+  owner's words on the pull request), and still pending after 45 minutes stops naming the release
+  and `release post-deploy only`.
+- **A pre-ship hold under `merge-and-deploy`** is discharged at the final check when the settled
+  tree is the stamped one, and otherwise re-runs the checks and re-stamps before it resumes.
+- **`merge-and-deploy` needs `release.releaseBranchPattern`.** Doctor and setup report the scope
+  without one as an ERROR, and the release stops before its cut: production is brought into the
+  release branch when the release ahead merged, and without a pattern there is no release branch.
+- **A repository with no post-deploy check never holds the next release.** Under `cut-to-deploy`
+  and `merge-and-deploy`, `NOT CONFIGURED` now posts a `success` `release/post-deploy` status
+  ("no post-deploy check configured") over the pending one, instead of leaving it pending.
+- **No tower heartbeat before the `merge-and-deploy` claim.** The phases before step 4 hold
+  nothing, so they are never heartbeated (one would answer not-holder and stop the release); the
+  first heartbeat is `final`.
+- **The backstop under `cut-to-deploy` and `merge-and-deploy`** no longer counts an open release
+  pull request or a held tower as a release in flight: the train claim alone decides.
+- Every later check round of a release reports against the cut head (`RELEASE_COMMIT` stays the
+  first round's `<sourceHead>`).
+
+- The post-deploy status, the previous-release gate and release holds treat `merge-and-deploy`
+  exactly like `cut-to-deploy`.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.60.0 @ 4226fa4, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.60.0 | tokens@devstride--v3.60.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,855 | 8,285 | 24,855 | 8,285 | +0 | 8,285 |
+| skills/doctor/SKILL.md | 23,998 | 8,000 | 23,998 | 8,000 | +0 | 8,000 |
+| skills/build-item/SKILL.md | 23,991 | 7,997 | 23,987 | 7,996 | -1 | 7,999 |
+| skills/review/SKILL.md | 23,971 | 7,991 | 23,970 | 7,990 | -1 | 7,999 |
+| skills/release/SKILL.md | 18,139 | 6,047 | 18,793 | 6,265 | +218 | 6,265 |
+| skills/rebalance/SKILL.md | 17,889 | 5,963 | 17,889 | 5,963 | +0 | 5,963 |
+| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,708 | 2,236 | 6,708 | 2,236 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-story/SKILL.md | 6,299 | 2,100 | 6,299 | 2,100 | +0 | 2,100 |
+| skills/comprehend-plan/SKILL.md | 5,580 | 1,860 | 5,580 | 1,860 | +0 | 1,860 |
+| skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,587 | 1,196 | +17 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 272,023 | 90,681 | 272,722 | 90,914 | +233 | |
+
 ## [3.60.0] — 2026-11-13
 
 ### Fixed
@@ -5219,7 +5351,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.60.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.61.0...HEAD
+[3.61.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.60.0...devstride--v3.61.0
 [3.60.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.59.0...devstride--v3.60.0
 [3.59.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.58.0...devstride--v3.59.0
 [3.58.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.57.0...devstride--v3.58.0

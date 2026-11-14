@@ -175,7 +175,7 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
   paths, symbols and assumptions against the code).
 - Resolve the profile; report item, title, ready-set, profile with source, buildable-now line.
 - **Claim it** (`claims` set) BEFORE step 1; heartbeat each step; held → next candidate, named →
-  STOP (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`).
+  STOP (`references/story-claims.md`).
 
 ## 1. Mark In Progress
 
@@ -207,7 +207,7 @@ per `releaseTrain.fastMerges`. Never mix: 4a toward develop reaches production n
 lenses included) or no valid verification receipt → **4b**, saying why.
 
 - **`review` in LOCAL-ONLY mode** with the base, profile and caller ledger: no second engine, but
-  it owns triage, fixes and lessons. On the train a small fix skips it and a larger one runs
+  it owns triage, fixes and lessons. On the train a small fix may skip it; any other runs
   LOCAL-FULL instead (`release-train.md`).
 - **Fix every fix-in-story finding it returns** (its `fixFloor` triage; a reasoned deferral is not
   re-imposed) per `commitConventions.reviewFixFormat` (fallback
@@ -233,7 +233,7 @@ is `review` step 7's; step 5 never reads `skipping` as green.
 
 **Release holds first**, before any merge onto the train or `baseBranch` (one-off or plan story): a
 hold on the item or an ancestor
-(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`) → no merge; the story
+(`references/release-holds.md`) → no merge; the story
 branch waits, said. **Consequence notices** just before 5a's or 5b's merge command, on the head that
 merges, every profile, never a gate:
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/consequence-notices.md`.
@@ -315,6 +315,7 @@ merges, every profile, never a gate:
 - **Human recap.** After a direct pull-request merge (5b), lead with `Merged / Released`: item and
   effect, destination and live state, checks/CI, risk, next action. Otherwise
   `Built / Checked / Next`: outcomes, checks run or skipped, link or SHA, CI, profile, remaining counts, next action.
+- `release.autoStart.enabled` → its trigger 4 (`auto-start.md`), lease kept.
 - Release unit at **zero** on its integration branch → **run step 8 now**; then step 0. Plan scope
   with the plan at zero → `plan-scope.md`'s plan release. DRY-CHAIN →
   exit and report.

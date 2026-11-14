@@ -124,7 +124,8 @@ def deferred_container_checks(v, config):
 
 
 def pre_ship_checks(v, config):
-    """What the schema cannot say: `runAt` belongs only to a `releaseOnly` entry, and never with `onlyWhenTouched`."""
+    """What the schema cannot say: `runAt` belongs only to a `releaseOnly` entry, and never with
+    `onlyWhenTouched`; `rerunAtMerge` only to a `releaseOnly` entry, and never with `runAt`."""
     entries = config.get("preShipChecks") if isinstance(config, dict) else None
     if not isinstance(entries, list):
         return
@@ -133,6 +134,10 @@ def pre_ship_checks(v, config):
             v.add("ERROR", "preShipChecks[%d].runAt" % i, "is only valid on an entry whose `when` is \"releaseOnly\"")
         elif isinstance(entry, dict) and "runAt" in entry and entry.get("onlyWhenTouched") is True:
             v.add("ERROR", "preShipChecks[%d].runAt" % i, "cannot be combined with `onlyWhenTouched: true`: a train check is skipped only by same-snapshot train evidence, never by path")
+        if isinstance(entry, dict) and entry.get("rerunAtMerge") is True and entry.get("when") != "releaseOnly":
+            v.add("ERROR", "preShipChecks[%d].rerunAtMerge" % i, "is only valid on an entry whose `when` is \"releaseOnly\"")
+        elif isinstance(entry, dict) and entry.get("rerunAtMerge") is True and "runAt" in entry:
+            v.add("ERROR", "preShipChecks[%d].rerunAtMerge" % i, "cannot be combined with `runAt`: a train check is never re-run at the merge")
 
 
 def real_date(value):
@@ -152,6 +157,9 @@ def auto_start_checks(v, config):
     auto = release.get("autoStart")
     if isinstance(auto, dict) and auto.get("enabled") is True and not isinstance(config.get("claims"), dict):
         v.add("ERROR", "release.autoStart.enabled", "needs a `claims` block: without a one-winner release-train claim two sessions could start the same release")
+    clearance = release.get("clearance")
+    if isinstance(clearance, dict) and clearance.get("scope") == "merge-and-deploy" and not release.get("releaseBranchPattern"):
+        v.add("ERROR", "release.clearance.scope", "merge-and-deploy needs `release.releaseBranchPattern`: production is brought into the release branch when the release ahead merged, and without a pattern there is no release branch")
     light = release.get("lightRelease")
     if isinstance(light, dict) and light.get("standingYes") is True and not release.get("classifySkill"):
         v.add("WARN", "release.lightRelease.standingYes", "has no effect without `release.classifySkill`: no release is ever classified LIGHT")

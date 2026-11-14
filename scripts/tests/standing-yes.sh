@@ -109,6 +109,11 @@ for bad_clearance in '{"provider": "bogus"}' '{"commands": {}}' "{\"commands\": 
 done
 cfg "{\"release\": {\"classifySkill\": \"classify\", \"clearance\": {\"commands\": {$V}}, \"lightRelease\": {\"standingYes\": true}}}"
 base; expect "(2f) a complete commands clearance → MERGE" 0 '^MERGE '
+# scope merge-and-deploy: the PRE-SHIP and dev-deploy lines come from the pre-claim checks (0p) and
+# the tower status is read after the re-claim — the same inputs, so the same verdicts
+cfg "{\"release\": {\"classifySkill\": \"classify\", \"clearance\": {\"scope\": \"merge-and-deploy\", \"commands\": {$V}}, \"devDeployVerification\": \"d\", \"lightRelease\": {\"standingYes\": true}}}"
+base; DEV=0; expect "(2f2) merge-and-deploy, with 0p's pre-ship and dev-deploy lines and a re-claimed tower → MERGE" 0 '^MERGE '
+base; DEV=0; PREV=2; expect "(2f3) merge-and-deploy, the previous release still pending → ASK" 0 '^ASK '
 for bad_classifier in '' ', "classifySkill": ""' ', "classifySkill": true'; do
   cfg "{\"release\": {\"clearance\": {\"provider\": \"github\"}, \"lightRelease\": {\"standingYes\": true}$bad_classifier}}"
   base; expect "(2g) no usable classifySkill ($bad_classifier) with a caller's LIGHT line → ASK" 0 '^ASK no release.classifySkill is configured'

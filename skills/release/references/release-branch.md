@@ -80,7 +80,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    pull request, apply step 6 to its marker's range. Step 6 skips any item already Done or already
    carrying that pull request's "reached …" comment, so a finished run is a no-op and a re-opened
    item is never closed again.
-2. **An open release-train pull request is ADOPTED** before anything is cut (scope `cut-to-deploy`:
+2. **An open release-train pull request is ADOPTED** before anything is cut (scope `cut-to-deploy` or `merge-and-deploy`:
    only when its holder marker is this session's or absent; another holder's → STOP and ask,
    `clearance.md`; with a `claims` block the won train claim decides which marker, `auto-start.md`): read `<sourceBefore>`
    and `<trainSnapshot>` from its marker (no marker → STOP and name it; never guess a range), skip
@@ -102,7 +102,8 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    one-off(s) for release <date>`, the body listing each one-off and carrying the range marker
    (scope `cut-to-deploy` or a `claims` block: and the holder marker) —
    flagged as a release-unit pull request exactly as `build-item` step 8 flags an epic release, so
-   `review` takes the FULL diff (a one-off merged fast onto the train had no full review yet — this
+   `review` takes the FULL diff (with `releaseTrain.reviewEveryLanding` true, step 4r decides
+   instead) (a one-off merged fast onto the train had no full review yet — this
    is its first and only full review before production; with `release.productionReview` set, a
    release unit that joined through its own reviewed pull request is excluded, `review-once.md`),
    and declaring `merge-only: true`,
@@ -113,6 +114,28 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    the source by its own pull request); once cut (and again on an adopted pull request) run the
    exclusion check with `--source-before <sourceBefore> --head <snapshot head>` and put each
    `allowedRenumbers` entry in the body.
+4r. **Review receipts** (`releaseTrain.reviewEveryLanding` true; else step 4 as written). Once the
+   snapshot is cut, run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/train_receipts.py
+   --config .claude/ds-config.json --source-before <sourceBefore> --head <snapshot head>` (its
+   header has the rules; exit 2 STOPS). Its `body` goes into the pull request's body under
+   `## Review evidence`: every item the train carries with its receipt (engines, cycles), every unit
+   its own pull request reviewed, and everything with neither. That list is the pull request's
+   review evidence.
+   - **`receipted`** (exit 0): no review round. `pr` runs as driven, step 4's declarations kept;
+     instead of a review cycle its pre-ship checks run at the snapshot head (as if `review` had
+     reached its 7.1b hold), then `review` in PRE-SHIP RESUME mode marks it ready and settles CI,
+     once. With no pre-ship hold, PRE-SHIP RESUME runs straight away.
+   - **`needs-review`** (exit 1): `review` runs as a short review of only the `unreviewed` entries,
+     its scope manifest naming each one's diff (`git diff <from> <to>`) — a landing with no receipt,
+     a conflict resolution, a direct or snapshot-fix commit — and listing the receipted items and
+     reviewed units as already reviewed, never re-read. Its cycle target, P1 continuation and the
+     ready-flip are as for any `review`.
+   - Every fix committed on the snapshot is itself a direct commit: rerun the script on the final
+     head before the ready-flip, and anything new it lists joins the review. The tree that settles
+     counts as the reviewed tree for `review-once.md`'s production comparison, so its one
+     `highRiskEngine` pass over the high-risk files on the production pull request stays.
+   - What it does not cover, said in the body: no reviewer reads how the one-offs interact with
+     each other; the one CI run over the combined train is the check for that.
 4a. **Late landings.** Each progress report runs `git fetch origin <releaseSource> <train>` and
    names any late one-offs in `git log --no-merges --oneline <trainSnapshot>..origin/<train>`. To
    ABSORB them: resolve `<absorbAt>` to a SHA (the commit named, else the fetched train tip, said
@@ -141,6 +164,8 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
      ready-flip; the absorbed range then gets one FULL-scope cycle of every configured engine
      with the ledger, outside the cycle budget (a required engine that cannot run STOPS). Later
      landings ship next time, said so; after the flip the offer closes (a push would restart CI).
+     With step 4r, rerun its script on the new head: the cycle covers only the new `unreviewed`
+     entries (none → no cycle), and the body's list is rewritten with the marker.
 4b. **Train-run pre-ship checks** (a new and an adopted train pull request both run this before
    step 5). Once `pr` has settled the pull request's review and its CI is running, run
    **`pre-ship train run`** at the snapshot head: every `preShipChecks` entry with `when:
@@ -153,7 +178,8 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    the hold, `review`'s step 5 follow-up with the cumulative ledger settles to 7.1b, every
    selected check runs on that final head, then PRE-SHIP RESUME flips it ready and settles CI),
    and rerun this step at that head; step 5's `<reviewedHead>` pin is that new head. Under scope `release` the clearance is
-   already held (step 0a); under `cut-to-deploy` it is not claimed until the cut. With no train
+   already held (step 0a); under `cut-to-deploy` it is not claimed until the cut, and under
+   `merge-and-deploy` not until step 4. With no train
    pull request, no passing line or a different tree, step 2b runs these entries itself.
 5. **Merge** — first `git fetch origin <releaseSource>` and run the exclusion check with
    `--source-before <sourceBefore> --head <reviewedHead>` (source merges are not train work, and a
@@ -189,7 +215,11 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
   against the pattern before pushing it.
 - **One release at a time.** An open pull request into `productionBranch` whose head matches the
   pattern is ADOPTED by step 0 instead of cutting; a second one open at once — or one still headed
-  by `releaseSource` from before the pattern was set — is a STOP that names both.
+  by `releaseSource` from before the pattern was set — is a STOP that names both. Under scope
+  `merge-and-deploy`, one whose holder marker names another session is neither adopted nor a STOP:
+  this release WAITS at the queue (`tower-queue.py`, `clearance.md`) until it merges, then cuts
+  outside the tower (under the train claim) and, when `release_checks.py contains` says `BEHIND`,
+  brings production in by §4 at once, so it is prepared on top of the release ahead's merge.
 - `git switch -c <name> <sourceHead> && git push -u origin <name>` — the SHA the delta was computed
   from, never a re-read `origin/<releaseSource>` that another session's fetch may have moved. It is
   recorded in the release pull request's marker `<!-- devstride:release-branch <name> cut <sha>
@@ -227,7 +257,9 @@ over the merge's range (its step 5 rule), carrying the ledger, counters and the 
 declaration; never a fresh cycle 1. A merge that leaves the tree unchanged (history only, e.g.
 production's own earlier release merge) needs no re-review: say so, set `<reviewedHead>` to the new
 same-tree head, and invoke `review` in PRE-SHIP RESUME mode so it flips the pull request ready and
-settles CI there without a review cycle. Any return to step 2 voids an owner yes already given; step
+settles CI there without a review cycle. Right after the cut, before step 1 has opened the pull
+request (scope `merge-and-deploy`, prepared on top of the release ahead), the merge is simply pushed
+with the branch: there is no review to re-enter, and the first review reads it with everything else. Any return to step 2 voids an owner yes already given; step
 4 asks again. Never rebase. `review` hands back here when its step 7.1 finds the production branch
 advanced under a release-branch head.
 
@@ -237,7 +269,9 @@ Default scope: runs right after 5a's post-deploy check passes, BEFORE documentat
 check's own close-out (5d) and release notes (5e): these steps are what the next release depends
 on, so they finish while this release still holds clearance, and nothing else does. Under scope
 `cut-to-deploy` it runs as soon as 5a confirms the deploy, and the post-deploy check follows the
-hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
+hand-back as the first owed item, `post-deploy-check` (`clearance.md`). Under `merge-and-deploy` the
+next release brings production in itself, so the tower is handed back at 5a and steps 1–3 run after
+the post-deploy check as the owed item `sync`, with no heartbeat (nothing is held).
 
 1. **Sync production into the source.** Without it the release branch's fix commits never reach
    `releaseSource`. Already `git merge-base --is-ancestor origin/<productionBranch>
@@ -265,12 +299,28 @@ hand-back as the first owed item, `post-deploy-check` (`clearance.md`).
    `claims` block and the train claim already handed on, it pushes the train only under that claim
    again: one claim, no wait, decided in mode `select` however the release started (the one
    exception to `auto-start.md`'s train-then-tower order, safe because it never waits); won →
-   level, then release it `handed-on`; `takeover` (its holder lapsed) → ONE immediate takeover
+   level, then, with `release.autoStart.enabled`, `auto-start.py check` (`auto-start.md`'s
+   trigger 5): `START` → KEEP the claim and start the next release from here (below); anything
+   else → release it `handed-on`. `takeover` (its holder lapsed) → ONE immediate takeover
    claim with that digest, decided the same way, never a third; held by a live session → SKIP the
-   leveling, said so (that holder re-levels once it holds the tower, `clearance.md`); a final
+   leveling, said so (that holder re-levels once it holds the tower, or under `merge-and-deploy`
+   before it hands the claim on, `clearance.md`); a final
    claim, `stop` or `degrade` → STOP. Never a push beside a live holder.
-4. **Hand clearance back** (`release.clearance` set): the provider's `release --owed <item>` for
-   each later step still to run (`post-deploy-check` under scope `cut-to-deploy`, then `docs`,
+   **Starting the next release from the leveling** (a won claim and `START`): hand clearance back
+   (step 4), run the first owed item (`post-deploy-check` under scope `cut-to-deploy`: the next
+   release's merge waits on it anyway; under `merge-and-deploy` both are already done, and `sync`
+   is settled by `owed --done sync` before the next release starts), heartbeating the train claim
+   through it, then invoke **`release`** in this session declaring `started-by: auto`; its step 0
+   refreshes the train claim this session already holds. This release's other owed items (`docs`,
+   `close-out`, `release-notes`) run when that release first waits for the owner (its step 4) or
+   stops, whichever comes first, settled by `owed --done` as always; its own step 6 runs then too,
+   without trigger 3 (the next release is already running). Under `merge-and-deploy` they run
+   first instead, heartbeating the train claim, before `release` is invoked: the next release
+   may spend hours in review and CI before it first waits. A failed post-deploy check STOPs as
+   it always does, and the train claim is then released `handed-on`.
+4. **Hand clearance back** (`release.clearance` set; under `merge-and-deploy` it was handed back at
+   5a, so this step does nothing): the provider's `release --owed <item>` for
+   each later step still to run (`post-deploy-check` under scopes `cut-to-deploy` and `merge-and-deploy`, then `docs`,
    `close-out`, `release-notes` — only those that will run),
    only now — after 1–3, never before — so a session that waits on `claim --wait` starts from a
    synced source and a level train (the next release's step 0 checks only that the source is

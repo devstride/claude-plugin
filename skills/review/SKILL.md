@@ -99,7 +99,7 @@ definition or a deferral route.**
   untracked-deferral list — run steps 3–5 for triage and fixes, then **step 6.5, which this path
   MUST write**; return the triaged findings, the untracked-deferral list **and the lessons tally**.
   The caller owns the merge. Never launch `review.localAssistCommand` here. Missing risk-screen evidence → the full PR path. Runs without a CLI engine. Skips 0–2 and 6–8.
-- **LOCAL-FULL** (`build-item` 4a for a train one-off that is not a small fix, or the argument
+- **LOCAL-FULL** (`build-item` 4a for a train one-off the landing gate holds, or the argument
   `local-full <base>`; no PR): the merge-boundary review with no PR, cloud reviewer or CI, recorded
   for the landing gate. **Read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/local-full.md`
   before running it.**

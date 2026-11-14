@@ -25,6 +25,19 @@ resolves `{owner}/{repo}`.
         the train, where the merge gate refuses it without the proof, so review stops there)
   verify <sha> [--pr <n> --base <branch>]
         REVIEWED <sha> by <login> exit 0 | UNREVIEWED <reason> exit 2 | ERROR <reason> exit 1
+  post-landing <sha> --onto <train>
+        The proof of a LOCAL-FULL review of a release-train one-off (`releaseTrain.reviewEveryLanding`),
+        which has no pull request: a `success` status with the context `devstride/landing-reviewed`
+        (`Settled LOCAL-FULL review for landing onto <train>`) on <sha>, the reviewed head. It posts
+        only when `review-gate.py check` in this checkout, for <sha> onto `origin/<train>`, answers
+        `reviewed` (a settled receipt for exactly that head is held here), and <sha> must already be
+        on GitHub (push the branch first). `local-full.md` step 3 runs it after `record`. Without it
+        the receipt line in the landing's merge commit is only text: `train_receipts.py` counts a
+        landing as receipted only when this proof verifies.
+        POSTED ... exit 0 | NOT POSTED <reason> exit 2 (the landing still goes ahead; the train's pull
+        request then reviews that one-off itself)
+  verify-landing <sha> --onto <train>
+        REVIEWED ... | UNREVIEWED ... | ERROR ..., as verify, for the landing proof.
 
 A proof names its base, so renaming the train voids the proofs of units still open against the old
 name: an admin re-posts them after the cutover. Withdrawing a proof does not follow a copy already
@@ -46,6 +59,9 @@ import sys
 import time
 
 CONTEXT = "devstride/reviewed"
+LANDING = "devstride/landing-reviewed"
+SKILLS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+GATE = os.path.join(SKILLS, "build-item/scripts/review-gate.py")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 TRUSTED = ("admin",)
 
@@ -73,7 +89,7 @@ def gh_json(cwd, *args):
         raise Unreadable("gh %s returned something that is not JSON" % " ".join(args[:2]))
 
 
-def statuses(sha, cwd):
+def statuses(sha, cwd, context=CONTEXT):
     """Every commit status on <sha> for the context, newest first (paged)."""
     found, page = [], 1
     while True:
@@ -81,14 +97,14 @@ def statuses(sha, cwd):
         if not isinstance(batch, list):
             raise Unreadable("the statuses on %s could not be read" % sha[:12])
         found += [s for s in batch if isinstance(s, dict) and isinstance(s.get("context"), str)
-                  and s["context"].lower() == CONTEXT]   # GitHub's contexts are case-insensitive
+                  and s["context"].lower() == context]   # GitHub's contexts are case-insensitive
         if len(batch) < 100:
             break
         page += 1   # GitHub's 1,000 limit is per context, so other contexts can make many pages
     for s in found:
         if not (isinstance(s.get("state"), str) and isinstance(s.get("created_at"), str)
                 and isinstance(s.get("id"), int)):
-            raise Unreadable("a %s status on %s could not be read" % (CONTEXT, sha[:12]))
+            raise Unreadable("a %s status on %s could not be read" % (context, sha[:12]))
     return sorted(found, key=lambda s: (s["created_at"], s["id"]), reverse=True)
 
 
@@ -124,16 +140,68 @@ def verify(sha, cwd, pr=None, base=None):
     """(True, login) when, read newest first, an admin's `success` status naming pull request <pr>
     into <base> comes before any admin status that is not `success`; else (False, reason). Raises
     Unreadable when GitHub cannot be read."""
+    what = (" for #%s into %s" % (pr, base)) if pr is not None else ""
+    return trusted_proof(sha, cwd, CONTEXT, lambda d: describes(d, pr, base), what)
+
+
+def trusted_proof(sha, cwd, context, matches, what):
+    """The shared trust rule of both proofs: read newest first, an admin's `success` status whose
+    description `matches` comes before any admin status that is not `success`."""
     if not SHA.match(sha or ""):
         return False, "%r is not a full commit SHA" % sha
-    cache, what = {}, (" for #%s into %s" % (pr, base)) if pr is not None else ""
-    trusted = [s for s in statuses(sha, cwd) if permission(s.get("creator"), cwd, cache) in TRUSTED]
+    cache = {}
+    trusted = [s for s in statuses(sha, cwd, context) if permission(s.get("creator"), cwd, cache) in TRUSTED]
     for s in trusted:
         if s["state"] != "success":
-            return False, "an admin withdrew the %s proof on %s (newest admin status: %s)" % (CONTEXT, sha[:12], s["state"])
-        if describes(s.get("description"), pr, base):
+            return False, "an admin withdrew the %s proof on %s (newest admin status: %s)" % (context, sha[:12], s["state"])
+        if matches(s.get("description")):
             return True, s["creator"]["login"]
-    return False, "no %s status from a repository admin on %s%s" % (CONTEXT, sha[:12], what)
+    return False, "no %s status from a repository admin on %s%s" % (context, sha[:12], what)
+
+
+def landing_description(train):
+    return "Settled LOCAL-FULL review for landing onto %s" % train
+
+
+def verify_landing(sha, cwd, train):
+    """(True, login) when an admin's `devstride/landing-reviewed` proof for landing <sha> onto
+    <train> stands; else (False, reason). Raises Unreadable when GitHub cannot be read."""
+    return trusted_proof(sha, cwd, LANDING, lambda d: d == landing_description(train), " for landing onto %s" % train)
+
+
+def bare_branch(name):
+    return bool(name) and not name.startswith(("origin/", "refs/")) and not re.match(r"^[0-9a-f]{40}$", name)
+
+
+def post_landing(sha, cwd, train):
+    if not SHA.match(sha or ""):
+        return False, "%r is not a full commit SHA" % sha
+    if not bare_branch(train):
+        return False, "--onto %r: pass the bare train branch name (e.g. train), never a remote ref or a SHA" % train
+    request = json.dumps({"base": "origin/" + train, "head": sha, "targetKind": "train"})
+    try:
+        p = subprocess.run([sys.executable, GATE, "check"], cwd=cwd, input=request, capture_output=True, text=True)
+    except OSError as err:
+        return False, "review-gate.py could not run: %s" % err
+    verdict = None
+    if p.returncode == 0:
+        try:
+            verdict = json.loads(p.stdout).get("verdict")
+        except (ValueError, AttributeError):
+            verdict = None
+    if verdict != "reviewed":
+        why = (p.stderr or "").strip().splitlines()
+        return False, "this checkout holds no settled LOCAL-FULL receipt for %s onto origin/%s (%s)" % (
+            sha[:12], train, why[-1] if why else "verdict %s" % verdict)
+    description = landing_description(train)
+    if len(description) > 140:
+        return False, "the train name %r is too long for a status description" % train
+    gh_json(cwd, "api", "-X", "POST", "repos/{owner}/{repo}/statuses/%s" % sha, "-f", "state=success",
+            "-f", "context=%s" % LANDING, "-f", "description=%s" % description)
+    ok, why = verify_landing(sha, cwd, train)
+    if not ok:
+        return False, "posted, but it does not count as proof (only a repository admin's status does): %s" % why
+    return True, description
 
 
 def tree(sha, cwd):
@@ -147,7 +215,7 @@ def post(sha, cwd, pr, base, source=None, wait=3):
         return False, "%r is not a full commit SHA" % sha
     if not re.match(r"^[1-9][0-9]*$", pr or ""):
         return False, "--pr %r is not a pull request number" % pr
-    if not base or base.startswith(("origin/", "refs/")) or re.match(r"^[0-9a-f]{40}$", base):
+    if not bare_branch(base):
         return False, "--base %r: pass the bare branch name the review ran against (e.g. train), never a remote ref or a SHA" % base
     for attempt in (0, 1):   # just after a push GitHub may still report the old head: read once more
         info = gh_json(cwd, "pr", "view", pr, "--json", "state,headRefOid,baseRefName")
@@ -193,12 +261,13 @@ def wait_seconds():
 def main(argv):
     args = argv[1:]
     usage = ("usage: reviewed-status.py post <sha> --pr <n> --base <branch> [--from <reviewed-sha>]"
-             " | verify <sha> [--pr <n> --base <branch>]\n")
-    if not args or args[0] not in ("post", "verify") or len(args) < 2:
+             " | verify <sha> [--pr <n> --base <branch>] | post-landing <sha> --onto <train>"
+             " | verify-landing <sha> --onto <train>\n")
+    if not args or args[0] not in ("post", "verify", "post-landing", "verify-landing") or len(args) < 2:
         sys.stderr.write(usage)
         return 2
     verb, sha, rest = args[0], args[1], args[2:]
-    allowed = ("--from", "--pr", "--base") if verb == "post" else ("--pr", "--base")
+    allowed = {"post": ("--from", "--pr", "--base"), "verify": ("--pr", "--base")}.get(verb, ("--onto",))
     opts = {}
     while rest:
         if rest[0] in allowed and len(rest) > 1 and rest[0] not in opts:
@@ -211,7 +280,18 @@ def main(argv):
             verb == "verify" and ("--pr" in opts) != ("--base" in opts)):
         sys.stderr.write(usage)
         return 2
+    if verb.endswith("-landing") and "--onto" not in opts:
+        sys.stderr.write(usage)
+        return 2
     try:
+        if verb == "verify-landing":
+            ok, why = verify_landing(sha, None, opts["--onto"])
+            print(("REVIEWED %s by %s" if ok else "UNREVIEWED %s") % ((sha, why) if ok else (why,)))
+            return 0 if ok else 2
+        if verb == "post-landing":
+            ok, why = post_landing(sha, None, opts["--onto"])
+            print(("POSTED %s %s: %s" % (sha, LANDING, why)) if ok else "NOT POSTED %s" % why)
+            return 0 if ok else 2
         if verb == "verify":
             ok, why = verify(sha, None, opts.get("--pr"), opts.get("--base"))
             print(("REVIEWED %s by %s" if ok else "UNREVIEWED %s") % ((sha, why) if ok else (why,)))
@@ -221,8 +301,9 @@ def main(argv):
         print(("POSTED %s %s: %s" % (sha, CONTEXT, why)) if ok else "NOT POSTED %s" % why)
         return 0 if ok else 2
     except Unreadable as err:
-        print(("ERROR %s" if verb == "verify" else "NOT POSTED %s") % err)
-        return 1 if verb == "verify" else 2
+        reading = verb in ("verify", "verify-landing")
+        print(("ERROR %s" if reading else "NOT POSTED %s") % err)
+        return 1 if reading else 2
 
 
 if __name__ == "__main__":

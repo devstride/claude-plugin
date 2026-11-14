@@ -8,3 +8,4 @@ statusLine.command    a Claude Code settings.json key, not a ds-config key
 ci.concurrency        a per-workflow fact setup's CI detection records in its report
 ci.productionTreeSkip a per-workflow fact setup's CI detection records in its report
 ci.policyCheck        a per-workflow fact setup's CI detection records in its report
+record.pluginVersion  a field of the clearance provider's `status --json` record, not a ds-config key

@@ -7,6 +7,12 @@ load: contract
 lands on the release train, with no pull request, no cloud reviewer and no CI run. The train's pull
 request into the base stays the batch's one CI run (why: `release-train.md`).
 
+**With `releaseTrain.reviewEveryLanding` true it reviews every train one-off**, sized to the change:
+the gate's refusal says whether it is a small fix. A small fix runs ONE cycle as its target, with
+Claude's fan-out narrowed to the change; anything else runs step 5's full target. Both run the CLI
+engine at its `initial` effort, keep P1 and serious-P2 continuation, and record the same receipt:
+sizing narrows how wide the Claude pass looks, never who reviews or whether the CLI engine runs.
+
 **Entry:** `build-item` 4a, when `review-gate.py check` refuses, or a person or another tool running
 `/devstride:review local-full <base>` in the story's checkout, where `<base>` is the ref it lands on
 (`origin/<train>`). With no caller ledger, seed one from the story's commits and the item.
@@ -30,6 +36,13 @@ request into the base stays the batch's one CI run (why: `release-train.md`).
    `failed` with a one-line `reason` (an `engine` answer of `returned` is read first, then mapped); `claude` and, with `review.localCommand` set, another engine
    must have returned one. Exit 2 → fix what it names. It writes a receipt for exactly this head, tree
    and merge base, kept under the repository's git directory on this machine.
+   **Then post its proof** (`releaseTrain.reviewEveryLanding` true): push the branch (`git push -u
+   origin HEAD`, never to the train) and run `python3
+   ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post-landing <head> --onto <train>`.
+   That repository admin's `devstride/landing-reviewed` status is what makes the receipt line in the
+   merge commit count (`train_receipts.py`); the line alone is text anyone with push access could
+   write. `NOT POSTED` → say it once and land anyway: the train's pull request then reviews this
+   one-off itself.
 4. **Return:** the triaged findings, the untracked-deferral list, the lessons tally, the cycle
    count, the reviewed head, and the gate's `mergeBody`.
 

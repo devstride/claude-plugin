@@ -81,6 +81,16 @@ request's base.
   non-zero exit. Why local: cloud
   runners are paid per run, so the train's pull request into `baseBranch` stays the batch's one CI
   run, while a late find on a large fix is caught here before it can hold up a release.
+- **Every one-off reviewed before it lands** (`releaseTrain.reviewEveryLanding` true). The small-fix
+  skip above never applies: every train one-off runs 4a's `review` call in LOCAL-FULL mode, sized to
+  the change (`local-full.md`: a small fix gets one cycle, anything else the full target), and the
+  landing gate answers `reviewed` only with a receipt at exactly that head, whatever the size; its
+  refusal names the size. The receipt's first line rides in the landing's merge-commit body, and,
+  with the repository admin's landing proof `local-full.md` step 3 posts on the reviewed head, it
+  is the train pull request's review evidence: that pull request then reviews only what no receipt
+  covers (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` §1 step 4r). Why:
+  each landing session reviews its own one-off, so many reviews run at once, and the train's pull
+  request into `baseBranch` waits only for its one CI run instead of a batch review.
 - **Otherwise → 4b with the train as the base.**
 
 ## Settings
@@ -88,6 +98,8 @@ request's base.
 - `releaseTrain.smallFixes` — `{maxFiles, maxChangedLines}`, both required, each at least 1; lines
   are added plus removed. Absent → no fix counts as small. The high-risk list is
   `release.productionReview.highRiskPaths` plus `release.releaseBranchFixExclusions`.
+- `releaseTrain.reviewEveryLanding` — boolean, absent `false`. `true`: every train one-off lands
+  with its own review receipt, and `smallFixes` only sizes that review.
 - `releaseTrain.lateArrivals` — `"restart"` or `"offer"` (absent: `"offer"`); what `release` does
   with a one-off that lands while the train's review is running
   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` step 4a).

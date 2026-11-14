@@ -47,7 +47,11 @@ concurrent checks dedupe; once that landing ships, the key moves to the next old
 START or SHADOW only when ALL hold: the mode is live or shadow, a `claims` block is configured, the
 train holds work beyond the source (auto-start.py's `train_state`, one rule, reused), the oldest
 landing waited MORE than `maxWaitMinutes` (default 120), no release is in progress, and no release
-hold holds the release delta. A release is in progress when `gh pr list --repo HOST/OWNER/REPO`
+hold holds the release delta. Under `release.clearance.scope` `cut-to-deploy` or `merge-and-deploy`
+nothing below is read: a release there holds the tower only from its cut (or only for its merge and
+deploy) and hands the train claim on at the cut (or once its pull request is open), so an open
+release pull request or a held tower is a release that has already left this waiting work behind, and the train claim the caller takes next alone decides. Otherwise a
+release is in progress when `gh pr list --repo HOST/OWNER/REPO`
 (all three read from the raw origin URL: an enterprise origin is listed on its own host, and an
 origin with no host to read is a SKIP) shows an open pull request
 into the production branch headed by the release source or a `release.releaseBranchPattern` branch
@@ -84,6 +88,7 @@ DEFAULT_WAIT, MIN_WAIT, MAX_WAIT = 120, 15, 1440   # a claim lives at most a day
 PR_LIMIT = 200   # a list this long is truncated, never trusted
 ITEM = re.compile(r"(?<![0-9A-Za-z])I\d{2,}(?![0-9A-Za-z])")
 UTC = datetime.timezone.utc
+GATED_SCOPES = ("cut-to-deploy", "merge-and-deploy")   # release.clearance.scope values that hand the train claim on before the merge
 EXIT = {"START": 0, "SHADOW": 10, "SKIP": 11, "OFF": 12, "HOLDS": 13, "ERROR": 1}
 
 
@@ -401,14 +406,25 @@ def due(now_text, holds_path):
     if waited <= wait:
         raise Answer("SKIP", "not waiting long enough: the oldest landing %s has waited %d of %d minutes"
                      % (oldest[:12], int(waited), wait), **record)
-    busy, why = open_release_prs(root, release, production, source, gh_repo)
-    record["releasePullRequests"] = why
-    if busy:
-        raise Answer("SKIP", why, **record)
-    busy, why = clearance(config, root)
-    record["clearance"] = why
-    if busy:
-        raise Answer("SKIP", why, **record)
+    block = release.get("clearance")
+    scope = block.get("scope") if isinstance(block, dict) else None
+    if scope in GATED_SCOPES:
+        # Under these scopes a release holds the tower only from its cut (merge-and-deploy: only for
+        # its merge and deploy), its train phase runs outside it, and it hands the train claim on at
+        # the cut (merge-and-deploy: once its pull request is open) so the next train phase can run
+        # while it deploys: an open release pull request or a held tower is not the release THIS
+        # waiting work needs. The train claim (claimed next, by the caller) alone decides.
+        why = "not read: under release.clearance.scope %s the train claim alone decides" % scope
+        record["releasePullRequests"] = record["clearance"] = why
+    else:
+        busy, why = open_release_prs(root, release, production, source, gh_repo)
+        record["releasePullRequests"] = why
+        if busy:
+            raise Answer("SKIP", why, **record)
+        busy, why = clearance(config, root)
+        record["clearance"] = why
+        if busy:
+            raise Answer("SKIP", why, **record)
     fetch_production(root, production)
     items = delta_items(root, train, source, production)
     record["items"] = items

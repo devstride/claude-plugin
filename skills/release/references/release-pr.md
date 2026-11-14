@@ -24,6 +24,8 @@ AI attribution only when `prBodyTemplate.noAiAttribution` is false (shipped defa
 End with `<!-- devstride:loop -->`, as `pr` does (the convention-only workflow's marker, never a
 bypass of the draft hold) and, on a release branch, a second marker line
 `<!-- devstride:release-branch <name> cut <sha> -->` (the cut point, read back on adoption).
+Under scope `merge-and-deploy` a third, `<!-- devstride:release-holder <digest> on <machine> -->`,
+written now so the body is never edited after the ready flip (`clearance.md`).
 
 ## Step 2 — invoking `review`
 
@@ -49,7 +51,9 @@ bypass of the draft hold) and, on a release branch, a second marker line
   list before step 4.
 - **The pre-ship hold.** Declared whenever any `preShipChecks` entry has `when` ∈
   {`releaseOnly`, `always`}: `pre-ship release select`, run here without `--ran-at-train`, prints
-  `PRE-SHIP SELECTED`. No such entry → no hold, skip 2c.
+  `PRE-SHIP SELECTED`. No such entry → no hold, skip 2c. Scope `merge-and-deploy` declares it
+  the same way; at 7.1b a head whose tree 0p's check stamp covers discharges it at once, and any
+  other head re-runs 0p before 2c (nothing is held then, `clearance.md`).
   The release head is protected so `review`'s 7.1 never rebases it — the hold still fires.
 - **Order**: merge-gate Claude + local CLI + cloud review concurrently (every finding
   verified/triaged/fixed/replied/resolved) → the pre-ship checks (2b) → the ready-flip releases CI,
