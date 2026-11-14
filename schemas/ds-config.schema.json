@@ -1401,6 +1401,26 @@
         "commands"
       ]
     },
+    "boardPlacement": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "description": "ordered rules, first match wins: { name?, match?: { workType?, team?, tag?, customField?, under? }, place: { board } | { cycleFolder } | { none: true } }; a contributor's personal rules file is read before them"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "where each kind of item goes when work on it starts; absent or null means nothing is placed, a one-off's board is asked, and personal rules are ignored (/devstride:setup boards writes it)",
+      "required": [
+        "rules"
+      ]
+    },
     "presence": {
       "type": [
         "object",

@@ -10,11 +10,13 @@ load: contract
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/agents-mode.md`. Each finding's severity is the
 `severity` `classify` gives it.
 
+- **Board placement, whatever the block says** — `boardPlacement` is checked on every run of
+  this section: `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/boards.md`.
 - **No block** (absent or null) → still look for the board: `list_boards` (every page) into
   `classify` with `configured: false` and `boards` (id, label, archived). `not-adopted` → INFO
   "Active Agents board found but not adopted; run `/devstride:setup agents`". `no-board` → INFO
   "no Active Agents board; `/devstride:setup agents` creates one". Neither is a FAIL, and nothing
-  else is checked.
+  else below is checked.
 - **The block is valid** — `validate`; each `ERROR` line is a FAIL.
 - **`boardId` null** → FAIL: the board is not adopted, so the build loop places no root.
 - **The snapshot** — build `classify`'s input: the board (`get_board`: exists, archived); its
@@ -50,4 +52,5 @@ load: contract
 ## Cited by
 
 - `skills/doctor/SKILL.md` §8
+- `skills/doctor/references/boards.md`
 - `skills/setup/references/agents-mode.md` (the scan)

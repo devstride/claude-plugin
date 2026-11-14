@@ -22,7 +22,7 @@ run "$FIX/commands-clearance.json"; expect "(3) the commands shapes of release.c
 run "$ROOT/.claude/ds-config.json"; expect "(4) this repository's own config is clean" 0 "$CLEAN"
 # (4b) keys added since the committed fixtures were last regenerated, in a scratch fixture that
 # must itself be clean; (5) counts it as a full-coverage fixture
-printf '%s\n' '{"activeAgents": {"boardId": "board-1", "rootLevel": "Capability", "commands": {"start": "./tools/presence start <root>", "end": "./tools/presence end <root>"}}}' > "$WORK/added.json"
+printf '%s\n' '{"activeAgents": {"boardId": "board-1", "rootLevel": "Capability", "commands": {"start": "./tools/presence start <root>", "end": "./tools/presence end <root>"}}, "boardPlacement": {"rules": [{"name": "Stories", "match": {"workType": ["Story"]}, "place": {"cycleFolder": "folder-1"}}]}}' > "$WORK/added.json"
 run "$WORK/added.json"; expect "(4b) the scratch fixture of newly added keys is clean" 0 "$CLEAN"
 
 # (5) the full-coverage fixtures name every registered key (deprecated ones aside)

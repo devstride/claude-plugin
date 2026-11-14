@@ -55,6 +55,6 @@ delivery profile. A finding that is not a bug is filed by `/devstride:create-sto
 ## Hard floors
 
 - DEFERRED placement never splices, never numbers, and never builds; ONE-OFF placement builds exactly once.
-- Ask for placement (parent + board) and confirm the assignee at the OUTSET of ONE-OFF — never guess a home for inbound work.
+- Ask for placement (parent + board, unless rules place it) and confirm the assignee at the OUTSET of ONE-OFF — never guess a home for inbound work.
 - One-off items get NO execution-order number and NO dependency edges, so `rationalize-gantt` is not run for them.
 - Never fabricate a fake historical repro — write the real, honest repro/root-cause as the description.

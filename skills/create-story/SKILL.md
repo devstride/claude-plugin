@@ -52,6 +52,6 @@ profile.
 ## Hard floors
 
 - DEFERRED placement never splices, never numbers, and never builds; ONE-OFF placement builds exactly once.
-- Ask for placement (parent + board) and confirm the assignee at the OUTSET of ONE-OFF — never guess a home for inbound work.
+- Ask for placement (parent + board, unless rules place it) and confirm the assignee at the OUTSET of ONE-OFF — never guess a home for inbound work.
 - Neither mode gives an item an execution-order number or a dependency edge; ONE-OFF items are therefore never dated by `rationalize-gantt`, and DEFERRED ones only by its deferred dating pass.
 - Never fabricate a fake historical spec — write the real, honest request as the description.

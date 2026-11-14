@@ -1011,6 +1011,22 @@ skills/plan/references/splice-mechanics.md|else an explicit `null`
 skills/plan/references/splice-mechanics.md|Step 3's board rule applies to each
 skills/rebalance/SKILL.md|by that step's board rule
 skills/create-story/references/one-off-handoff.md|leave it out of the list
+skills/build-item/SKILL.md|its step 0 places the item first
+skills/build-item/references/item-status.md|board-placement.md
+skills/build-item/references/board-placement.md|Only these two items are ever placed here
+skills/build-item/references/board-placement.md|never takes an item off a board
+skills/build-item/references/board-placement.md|a question, never a stop
+skills/setup/SKILL.md|boards-mode.md
+skills/setup/SKILL.md|that person's rules file
+skills/setup/references/boards-mode.md|never writes to it
+skills/setup/references/boards-mode.md|first match wins
+skills/setup/references/boards-mode.md|never write rules that fail
+skills/setup/references/boards-mode.md|naming this plan; anything else writes nothing
+skills/setup/references/boards-mode.md|then applies §3
+skills/doctor/SKILL.md|`boardPlacement` too
+skills/doctor/references/agents.md|`boardPlacement` is checked on every run of
+skills/doctor/references/boards.md|Doctor writes nothing here
+skills/create-story/references/one-off-handoff.md|the rules answer
 skills/build-item/references/deferred-container.md|It takes no board
 skills/build-item/references/deferred-container.md|is otherwise an explicit `null`
 PAIRS
