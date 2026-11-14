@@ -8,7 +8,7 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
-## [3.60.0] — 2026-11-13
+## [3.61.0] — 2026-11-13
 
 ### Added
 
@@ -139,6 +139,62 @@ for what each version component means here and how a release is cut.
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
 | **total (bodies)** | 271,721 | 90,581 | 272,420 | 90,814 | +233 | |
+
+## [3.60.0] — 2026-11-13
+
+### Fixed
+
+- **Stories and fixes created under a plan no longer land on the Active Agents board.** The board
+  is meant to show one row per plan being built. The build loop only ever moved the plan onto it,
+  but a session that planned work under a plan already on the board, or filed a one-off fix under
+  it, read the plan, saw its board and gave the new epics, stories and defects the same one, so
+  they appeared as rows of their own beside their parent. Nothing said which board a new item
+  takes. Now `plan`, `insert-story`, `insert-defect`, `rebalance`, `create-story` and
+  `create-defect` never copy a board from the parent: a planned, inserted or successor item gets
+  a board only when the person named one, a one-off is offered every board except the Active
+  Agents board, the plan's deferred container gets none, a follow-up parked in it gets none
+  unless a person present names one, and that board is filled only by the build loop. Where an organization has child items inherit their parent's board,
+  leaving the board out is not enough, so every item these skills create is given either the
+  board the person named or an explicit empty board. Items already on the board are not moved;
+  `doctor` still lists the stories and defects it finds there.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.59.0 @ 25465d3, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.59.0 | tokens@devstride--v3.59.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,592 | 8,198 | 24,855 | 8,285 | +87 | 8,285 |
+| skills/doctor/SKILL.md | 23,998 | 8,000 | 23,998 | 8,000 | +0 | 8,000 |
+| skills/build-item/SKILL.md | 23,991 | 7,997 | 23,991 | 7,997 | +0 | 7,999 |
+| skills/review/SKILL.md | 23,971 | 7,991 | 23,971 | 7,991 | +0 | 7,999 |
+| skills/release/SKILL.md | 18,139 | 6,047 | 18,139 | 6,047 | +0 | 6,049 |
+| skills/rebalance/SKILL.md | 17,850 | 5,950 | 17,889 | 5,963 | +13 | 5,963 |
+| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,708 | 2,236 | 6,708 | 2,236 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-story/SKILL.md | 6,299 | 2,100 | 6,299 | 2,100 | +0 | 2,100 |
+| skills/comprehend-plan/SKILL.md | 5,580 | 1,860 | 5,580 | 1,860 | +0 | 1,860 |
+| skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 271,721 | 90,581 | 272,023 | 90,681 | +100 | |
 
 ## [3.59.0] — 2026-11-13
 
@@ -5295,7 +5351,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.60.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.61.0...HEAD
+[3.61.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.60.0...devstride--v3.61.0
 [3.60.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.59.0...devstride--v3.60.0
 [3.59.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.58.0...devstride--v3.59.0
 [3.58.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.57.0...devstride--v3.58.0

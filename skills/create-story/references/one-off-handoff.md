@@ -26,7 +26,8 @@ any sequenced plan. Work that belongs in a plan's dependency chain goes through 
     parent/type pairings anyway.
   - **Which board?** A triage/kanban board or a current cycle/sprint: list with `list_boards`,
     then `get_board` for its id and default not-started status. A one-off must be VISIBLE on a
-    board — unlike sequenced-plan items, which live on the Gantt.
+    board — unlike sequenced-plan items, which live on the Gantt. Never
+    `activeAgents.boardId`: leave it out of the list (plan roots only; `build-item` places them).
   - **Assignee = the current user by default.** `whoami` (identity → username) →
     `assigneeUsername`; state who that resolved to and let the user name someone else before
     creating.
