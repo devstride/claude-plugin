@@ -8,8 +8,6 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
-## [3.59.0] — 2026-11-12
-
 ### Added
 
 - **A release holds the production slot only while it merges and deploys, and releases queue.**
@@ -102,17 +100,33 @@ for what each version component means here and how a release is cut.
 - The post-deploy status, the previous-release gate and release holds treat `merge-and-deploy`
   exactly like `cut-to-deploy`.
 
+## [3.59.0] — 2026-11-13
+
+### Changed
+
+- **An epic or plan reaches the release train only with its review proof.** The merge gate now
+  refuses every pull request onto the release train whose head is an epic or plan integration
+  branch until that branch carries the settled review's proof for this pull request (the
+  `devstride/reviewed` status an admin posts when the review settles), whatever files it changes.
+  Before, the gate asked for the proof only when the pull request touched a migration or deploy
+  configuration path, so an epic without one merged with no proof and the release later had to
+  check its whole diff file by file, as if it had never been reviewed. The refusal names the exact
+  `post` command to run while the pull request is still open. A one-off onto the train is unchanged:
+  it still never carries a migration or deploy path, and otherwise needs no proof. Since only an
+  admin's proof counts, an epic now reaches the train only once a repository admin's session has
+  settled its review.
+
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.58.0 @ 68e2283, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.58.0 @ 03739dd, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.58.0 | tokens@devstride--v3.58.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
 | skills/plan/SKILL.md | 24,592 | 8,198 | 24,592 | 8,198 | +0 | 8,198 |
 | skills/doctor/SKILL.md | 23,998 | 8,000 | 23,998 | 8,000 | +0 | 8,000 |
-| skills/build-item/SKILL.md | 23,991 | 7,997 | 23,990 | 7,997 | +0 | 7,999 |
+| skills/build-item/SKILL.md | 23,991 | 7,997 | 23,991 | 7,997 | +0 | 7,999 |
 | skills/review/SKILL.md | 23,971 | 7,991 | 23,971 | 7,991 | +0 | 7,999 |
-| skills/release/SKILL.md | 18,139 | 6,047 | 18,477 | 6,159 | +112 | 6,159 |
+| skills/release/SKILL.md | 18,139 | 6,047 | 18,139 | 6,047 | +0 | 6,049 |
 | skills/rebalance/SKILL.md | 17,850 | 5,950 | 17,850 | 5,950 | +0 | 5,950 |
 | skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
 | skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
@@ -124,7 +138,7 @@ for what each version component means here and how a release is cut.
 | skills/comprehend-plan/SKILL.md | 5,580 | 1,860 | 5,580 | 1,860 | +0 | 1,860 |
 | skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
 | skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
-| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,587 | 1,196 | +17 | 1,200 |
+| skills/pre-ship/SKILL.md | 3,537 | 1,179 | 3,537 | 1,179 | +0 | 1,200 |
 | skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
 | skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
 | skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
@@ -138,7 +152,7 @@ for what each version component means here and how a release is cut.
 | skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
-| **total (bodies)** | 271,721 | 90,581 | 272,108 | 90,710 | +129 | |
+| **total (bodies)** | 271,721 | 90,581 | 271,721 | 90,581 | +0 | |
 
 ## [3.58.0] — 2026-11-12
 
