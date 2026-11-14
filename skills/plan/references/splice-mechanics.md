@@ -137,3 +137,4 @@ Unnumbered plan → that file's handling: no prefix, and say so in the report.
 
 - `insert-story` SKILL.md steps 0–5
 - `insert-defect` SKILL.md steps 0–5
+- `plan` SKILL.md step 4, `rebalance` SKILL.md step 3a and `one-off-handoff.md` step 1 (step 3)
