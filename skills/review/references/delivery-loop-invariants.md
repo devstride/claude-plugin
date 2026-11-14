@@ -988,6 +988,9 @@ skills/setup/references/agents-mode.md|typed yes
 skills/setup/references/agents-mode.md|never moves, edits or removes an item
 skills/doctor/references/agents.md|never executed
 skills/build-item/references/active-agents.md|never a leaf
+skills/plan/SKILL.md|takes a board from its parent
+skills/plan/references/splice-mechanics.md|No board from the parent
+skills/create-story/references/one-off-handoff.md|leave it out of the list
 PAIRS
 
 # DEAD-REFERENCE check: every reference must be REACHABLE from a root an agent actually reads

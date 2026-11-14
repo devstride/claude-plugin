@@ -55,6 +55,9 @@ Numbering is NOT restated here — it lives in `execution-order-numbering.md`.
   `parentNumber` = the step-2 container; `title`/`description` = a real one-paragraph spec, not
   the raw argument text (this is what `ultracode-build` validates against). Title WITHOUT its
   execution-order prefix — that depends on the neighbours step 4 pins.
+- **No board from the parent.** Pass `boardId` only when the user named a board, never
+  `activeAgents.boardId`: that board holds plan roots only, and only `build-item` places them. A
+  container step 2 creates follows the same rule.
 - `startDate` = `dueDate` = today as a placeholder. One insert is not a cascade; to re-compress
   the plan's dates around it, run `/devstride:rationalize-gantt` on the root afterward.
 - **Priority at least `NEXT`'s.** `priorityId` is org-specific, not a comparable string — resolve

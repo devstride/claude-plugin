@@ -8,6 +8,19 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Stories and fixes created under a plan no longer land on the Active Agents board.** The board
+  is meant to show one row per plan being built. The build loop only ever moved the plan onto it,
+  but a session that planned work under a plan already on the board, or filed a one-off fix under
+  it, read the plan, saw its board and gave the new epics, stories and defects the same one, so
+  they appeared as rows of their own beside their parent. Nothing said which board a new item
+  takes. Now `plan`, `insert-story`, `insert-defect`, `create-story` and `create-defect` never
+  copy a board from the parent: a planned or inserted item gets a board only when the person
+  named one, a one-off is offered every board except the Active Agents board, and that board is
+  filled only by the build loop. Items already on the board are not moved; `doctor` still lists
+  the stories and defects it finds there.
+
 ## [3.59.0] — 2026-11-13
 
 ### Changed
