@@ -104,16 +104,16 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.59.0 @ 22858ad, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
-| File | bytes@devstride--v3.59.0 | tokens@devstride--v3.59.0 | bytes now | tokens now | Δ tokens | budget |
+<!-- scripts/measure-cost.sh --table --since devstride--v3.60.0 @ 4226fa4, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.60.0 | tokens@devstride--v3.60.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
-| skills/plan/SKILL.md | 24,592 | 8,198 | 24,592 | 8,198 | +0 | 8,198 |
+| skills/plan/SKILL.md | 24,855 | 8,285 | 24,855 | 8,285 | +0 | 8,285 |
 | skills/doctor/SKILL.md | 23,998 | 8,000 | 23,998 | 8,000 | +0 | 8,000 |
 | skills/build-item/SKILL.md | 23,991 | 7,997 | 23,987 | 7,996 | -1 | 7,999 |
 | skills/review/SKILL.md | 23,971 | 7,991 | 23,970 | 7,990 | -1 | 7,999 |
 | skills/release/SKILL.md | 18,139 | 6,047 | 18,793 | 6,265 | +218 | 6,265 |
-| skills/rebalance/SKILL.md | 17,850 | 5,950 | 17,850 | 5,950 | +0 | 5,950 |
+| skills/rebalance/SKILL.md | 17,889 | 5,963 | 17,889 | 5,963 | +0 | 5,963 |
 | skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
 | skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
 | skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
@@ -138,7 +138,7 @@ for what each version component means here and how a release is cut.
 | skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
-| **total (bodies)** | 271,721 | 90,581 | 272,420 | 90,814 | +233 | |
+| **total (bodies)** | 272,023 | 90,681 | 272,722 | 90,914 | +233 | |
 
 ## [3.60.0] — 2026-11-13
 
