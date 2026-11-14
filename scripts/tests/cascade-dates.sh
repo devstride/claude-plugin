@@ -14,7 +14,7 @@ DATES='[(a["number"],a["startDate"],a["dueDate"]) for a in d["assignments"]]'
 # A chain I1 -> I2 -> I3, with I4 and I5 both waiting only on I2, and I6 the last deliverable.
 PLAN='[{"number":"I1"},{"number":"I2","blockedBy":["I1"]},{"number":"I3","blockedBy":["I2"]},{"number":"I4","blockedBy":["I2"]},{"number":"I5","blockedBy":["I2"]},{"number":"I6","blockedBy":["I3","I4","I5"]}]'
 
-expect "a start date: the deepest leaf starts on it and every blocker is due the day before what it blocks" \
+expect "a start date: the deepest leaf starts on it and every blocker is due before what it blocks starts" \
   "{\"today\":\"2026-11-14\",\"start\":\"2026-12-01\",\"leaves\":$PLAN}" "[d['start'],d['end'],$DATES]" \
   '["2026-12-01", "2026-12-04", [["I1", "2026-12-01", "2026-12-01"], ["I2", "2026-12-02", "2026-12-02"], ["I3", "2026-12-03", "2026-12-03"], ["I4", "2026-12-03", "2026-12-03"], ["I5", "2026-12-03", "2026-12-03"], ["I6", "2026-12-04", "2026-12-04"]]]'
 expect "no start date: the plan starts the day after today, never today or earlier" \
@@ -47,13 +47,42 @@ expect "a fixed blocker due on or after the requested start holds the whole casc
 expect "a fixed leaf that blocks nothing open never holds the start" \
   '{"today":"2026-11-14","start":"2026-12-01","leaves":[{"number":"I1","fixed":true,"startDate":"2026-12-09","dueDate":"2026-12-09"},{"number":"I2"}]}' \
   "[d['start'],d['heldBy']]" '["2026-12-01", null]'
-expect "a fixed leaf's own blockers are ignored: a cycle through it is not a cycle among open leaves" \
-  '{"today":"2026-11-14","start":"2026-12-01","leaves":[{"number":"I1","fixed":true,"blockedBy":["I2"],"startDate":"2026-11-10","dueDate":"2026-11-10"},{"number":"I2","blockedBy":["I1"]}]}' \
-  "$DATES" '[["I2", "2026-12-01", "2026-12-01"]]'
+expect "a cycle that runs through a fixed leaf still stops the pass with no dates" \
+  '{"today":"2026-11-14","start":"2026-12-01","leaves":[{"number":"I1","fixed":true,"blockedBy":["I2"],"startDate":"2026-11-10","dueDate":"2026-11-10"},{"number":"I2","blockedBy":["I1"]},{"number":"I3","blockedBy":["I2"]}]}' \
+  "[sorted(d),d['cycles'][0]['members'],d['cycles'][0]['path']]" '[["cycles"], ["I1", "I2"], ["I1", "I2", "I1"]]' 1
+expect "a fixed leaf blocked by an open one, with no cycle, is history: it keeps its dates and holds nothing" \
+  '{"today":"2026-11-14","leaves":[{"number":"I1"},{"number":"I2","fixed":true,"blockedBy":["I1"],"startDate":"2026-11-10","dueDate":"2026-11-10"},{"number":"I3","blockedBy":["I2"]}]}' \
+  "[d['heldBy'],$DATES]" '[null, [["I1", "2026-11-15", "2026-11-15"], ["I3", "2026-11-15", "2026-11-15"]]]'
+expect "a fixed blocker inside the plan holds nothing when the leaf it blocks already starts after it" \
+  '{"today":"2026-11-14","start":"2026-12-01","leaves":[{"number":"I1","fixed":true,"startDate":"2026-12-03","dueDate":"2026-12-03"},{"number":"I2"},{"number":"I3","blockedBy":["I2"]},{"number":"I4","blockedBy":["I3"]},{"number":"I5","blockedBy":["I4","I1"]}]}' \
+  "[d['start'],d['heldBy'],d['end']]" '["2026-12-01", null, "2026-12-04"]'
+expect "a held cascade moves by the fewest days that clear every fixed blocker" \
+  '{"today":"2026-11-14","start":"2026-12-01","leaves":[{"number":"I1","fixed":true,"startDate":"2026-12-02","dueDate":"2026-12-02"},{"number":"I2"},{"number":"I3","blockedBy":["I2"]},{"number":"I4","blockedBy":["I3","I1"]}]}' \
+  "[d['start'],d['requestedStart'],d['heldBy'],$DATES]" \
+  '["2026-12-01", "2026-12-01", null, [["I2", "2026-12-01", "2026-12-01"], ["I3", "2026-12-02", "2026-12-02"], ["I4", "2026-12-03", "2026-12-03"]]]'
+expect "two fixed blockers that hold equally: the lower item number is named, whatever order the edges arrive in" \
+  '{"today":"2026-11-14","start":"2026-12-01","leaves":[{"number":"I2","fixed":true,"startDate":"2026-12-05","dueDate":"2026-12-05"},{"number":"I1","fixed":true,"startDate":"2026-12-05","dueDate":"2026-12-05"},{"number":"I3","blockedBy":["I2","I1"]}]}' \
+  "[d['start'],d['heldBy']]" '["2026-12-06", "I1"]'
+expect "a fixed blocker with only a start date holds by that date" \
+  '{"today":"2026-11-14","start":"2026-12-01","leaves":[{"number":"I1","fixed":true,"startDate":"2026-12-20"},{"number":"I2","blockedBy":["I1"]}]}' \
+  "[d['start'],d['heldBy']]" '["2026-12-21", "I1"]'
+expect "no itemDays: the length the dated open leaves already share is kept" \
+  '{"today":"2026-11-14","start":"2026-12-01","leaves":[{"number":"I1","startDate":"2026-11-01","dueDate":"2026-11-03"},{"number":"I2","blockedBy":["I1"],"startDate":"2026-11-04","dueDate":"2026-11-06"},{"number":"I3","blockedBy":["I2"]},{"number":"I4","fixed":true,"startDate":"2026-10-01","dueDate":"2026-10-09"}]}' \
+  "[d['itemDays'],d['itemDaysFrom'],$DATES]" \
+  '[3, "existing", [["I1", "2026-12-01", "2026-12-03"], ["I2", "2026-12-04", "2026-12-06"], ["I3", "2026-12-07", "2026-12-09"]]]'
+expect "no itemDays and open leaves of different lengths, or none dated: one day" \
+  '{"today":"2026-11-14","leaves":[{"number":"I1","startDate":"2026-11-01","dueDate":"2026-11-03"},{"number":"I2","startDate":"2026-11-04","dueDate":"2026-11-04"}]}' \
+  "[d['itemDays'],d['itemDaysFrom']]" '[1, "default"]'
+expect "a given itemDays wins over the length the leaves carry" \
+  '{"today":"2026-11-14","itemDays":2,"leaves":[{"number":"I1","startDate":"2026-11-01","dueDate":"2026-11-03"}]}' \
+  "[d['itemDays'],d['itemDaysFrom'],$DATES]" '[2, "given", [["I1", "2026-11-15", "2026-11-16"]]]'
 expect "group spans cover every dated leaf below the group, fixed ones included" \
   '{"today":"2026-11-14","start":"2026-12-01","itemDays":2,"leaves":[{"number":"I1","fixed":true,"startDate":"2026-11-10","dueDate":"2026-11-10","groups":["I70","I80"]},{"number":"I2","blockedBy":["I1"],"groups":["I70","I80"]},{"number":"I3","blockedBy":["I2"],"groups":["I71","I80"]},{"number":"I4","fixed":true,"groups":["I72"]}]}' \
   "d['groupSpans']" \
-  '{"I70": {"startDate": "2026-11-10", "dueDate": "2026-12-02"}, "I80": {"startDate": "2026-11-10", "dueDate": "2026-12-04"}, "I71": {"startDate": "2026-12-03", "dueDate": "2026-12-04"}}'
+  '{"I70": {"startDate": "2026-11-10", "dueDate": "2026-12-02"}, "I71": {"startDate": "2026-12-03", "dueDate": "2026-12-04"}, "I80": {"startDate": "2026-11-10", "dueDate": "2026-12-04"}}'
+expect "a fixed leaf with only one of its dates still widens its group\'s span" \
+  '{"today":"2026-11-14","start":"2026-12-01","leaves":[{"number":"I1","fixed":true,"startDate":"2026-11-10","groups":["I70"]},{"number":"I2","fixed":true,"dueDate":"2026-12-20","groups":["I70"]},{"number":"I3","groups":["I70"]}]}' \
+  "d['groupSpans']" '{"I70": {"startDate": "2026-11-10", "dueDate": "2026-12-20"}}'
 expect "nothing open: no dates and no end" \
   '{"today":"2026-11-14","leaves":[{"number":"I1","fixed":true}]}' "[d['assignments'],d['end'],d['distribution']]" '[[], null, []]'
 
@@ -98,6 +127,7 @@ for bad_input in 'not json' '[]' '{"leaves":[]}' '{"today":"2026-13-40","leaves"
   '{"today":"2026-11-14","leaves":"x"}' '{"today":"2026-11-14","leaves":[{"blockedBy":[]}]}' '{"today":"2026-11-14","leaves":[{"number":5}]}' \
   '{"today":"2026-11-14","leaves":[{"number":"I1"},{"number":"I1"}]}' '{"today":"2026-11-14","leaves":[{"number":"I1","blockedBy":"I2"}]}' \
   '{"today":"2026-11-14","leaves":[{"number":"I1","groups":[7]}]}' '{"today":"2026-11-14","leaves":[{"number":"I1","fixed":true,"dueDate":"then"}]}' \
+  '{"today":"2026-11-14","leaves":[{"number":"I1","fixed":"true"}]}' '{"today":"2026-11-14","itemDays":4000000,"leaves":[{"number":"I1"},{"number":"I2","blockedBy":["I1"]}]}' \
   '{"today":"2026-11-14","itemDays":0,"leaves":[]}' '{"today":"2026-11-14","itemDays":1.5,"leaves":[]}' '{"today":"2026-11-14","itemDays":"3","leaves":[]}' '{"today":"2026-11-14","itemDays":true,"leaves":[]}'; do
   out="$(run "$bad_input")"; rc=$?
   if [ "$rc" = 2 ] && printf '%s' "$out" | python3 -c 'import json,sys; assert "error" in json.load(sys.stdin)' 2>/dev/null; then ok "malformed input exits 2 with a JSON error ($bad_input)"; else bad "malformed $bad_input -> rc=$rc $out"; fi

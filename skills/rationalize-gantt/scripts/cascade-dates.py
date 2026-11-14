@@ -7,28 +7,31 @@ one JSON line on stdout:
   {"today": "YYYY-MM-DD", "start"?: "YYYY-MM-DD", "itemDays"?: <whole days, 1 or more>,
    "leaves": [{"number", "blockedBy"?: […], "groups"?: […],
                "fixed"?: true, "startDate"?, "dueDate"?}…]}
-  -> {"start", "requestedStart", "heldBy", "itemDays", "end",
+  -> {"start", "requestedStart", "heldBy", "itemDays", "itemDaysFrom", "end",
       "assignments": [{"number", "startDate", "dueDate", "depth"}…],
       "distribution": [{"startDate", "count"}…], "groupSpans": {"<number>": {"startDate", "dueDate"}},
       "outsideEdges": [{"number", "blockedBy"}…], "fixed": […]}
 
 `start` is the first day of the earliest leaf this pass dates; absent, it is the day after `today`.
-`itemDays` is how many calendar days one leaf is assumed to take (default 1). A leaf marked `fixed`
-(Done or landed, when only open items are re-dated) is never assigned and keeps the dates it
-carries. Every other leaf is OPEN.
+`itemDays` is how many calendar days one leaf is assumed to take. Absent, it is the length the
+dated open leaves already share (`itemDaysFrom` "existing"), or 1 when they differ or none is
+dated ("default"). A leaf marked `fixed` (Done or landed, when only open items are re-dated) is
+never assigned and keeps the dates it carries. Every other leaf is OPEN.
 
 Depth uses only edges between two open leaves: a leaf no open leaf is blocked by has depth 0, and
 any other has 1 + the deepest leaf blocked by it. The deepest leaves start on `start`; each depth
 nearer 0 starts `itemDays` later, and a leaf is due `itemDays - 1` days after it starts, so every
-blocker is due the day before the leaves it blocks start and no slot is empty. When a fixed leaf
-that blocks an open one is due on or after the requested start, the whole cascade starts the day
-after it instead: `start` is the day used, `requestedStart` the day asked for and `heldBy` that
-fixed leaf (null when the requested day was used). An edge to anything that is not a leaf in the
-input (a container, an item outside the plan) is listed in `outsideEdges` and dates nothing.
-`groups` names the containers above a leaf; `groupSpans` gives each its span over every dated leaf
-below it, fixed ones included. Weekends are not special-cased.
+blocker is due before the leaves it blocks start (the day before, along the longest chain) and no
+slot is empty. A fixed leaf that blocks an open one must be over before that leaf starts: when one
+is not, the whole cascade moves later by the fewest days that put every such leaf after its fixed
+blockers. `start` is then the day used, `requestedStart` the day asked for and `heldBy` the fixed
+leaf that moved it furthest (null when nothing moved). A fixed leaf with no due date counts by its
+start date. An edge to anything that is not a leaf in the input (a container, an item outside the
+plan) is listed in `outsideEdges` and dates nothing. `groups` names the containers above a leaf;
+`groupSpans` gives each its span over every date known below it, fixed leaves' included. Weekends
+are not special-cased. The dates do not depend on the order of the input.
 
-Exit 0 with dates; 1 when the open leaves hold a dependency cycle, with one
+Exit 0 with dates; 1 when the leaves hold a dependency cycle, fixed ones included, with one
 `{"cycles": [{"members": […], "path": […]}…]}` line and NO dates (`path` walks blocker to blocked
 and ends where it began); 2 on bad input with one `{"error": …}` line.
 """
@@ -76,8 +79,8 @@ def read():
         fail("stdin must be one JSON object")
     today = day(request.get("today"), "today")
     start = day(request.get("start"), "start", optional=True) or today + ONE_DAY
-    item_days = request.get("itemDays", 1)
-    if isinstance(item_days, bool) or not isinstance(item_days, int) or item_days < 1:
+    item_days = request.get("itemDays")
+    if item_days is not None and (isinstance(item_days, bool) or not isinstance(item_days, int) or item_days < 1):
         fail("itemDays must be a whole number of days, 1 or more")
     leaves = request.get("leaves")
     if not isinstance(leaves, list):
@@ -88,6 +91,8 @@ def read():
             fail("every leaf needs a number")
         if leaf["number"] in seen:
             fail("leaf %s is listed twice" % leaf["number"])
+        if not isinstance(leaf.get("fixed", False), bool):
+            fail("fixed must be true or false")
         seen[leaf["number"]] = {
             "blockedBy": names(leaf.get("blockedBy", []), "blockedBy"),
             "groups": names(leaf.get("groups", []), "groups"),
@@ -100,12 +105,13 @@ def read():
 
 def cycles(left, blockers):
     """Strongly connected components of size > 1 (plus self-edges) among the leaves that never
-    cleared, each with one path round it. Iterative Tarjan: a deep plan must not hit the stack."""
+    cleared, each with one path round it. `blockers` maps EVERY leaf to the leaves blocking it; an
+    edge leaving `left` leads to a leaf that cleared, so it is on no cycle and is skipped. Iterative Tarjan: a deep plan must not hit the stack."""
     index, low, on_stack, stack, found, counter = {}, {}, set(), [], [], [0]
     for root in sorted(left, key=number_key):
         if root in index:
             continue
-        work = [(root, iter(blockers[root]))]
+        work = [(root, iter([b for b in blockers[root] if b in left]))]
         index[root] = low[root] = counter[0]
         counter[0] += 1
         stack.append(root)
@@ -118,7 +124,7 @@ def cycles(left, blockers):
                     counter[0] += 1
                     stack.append(nxt)
                     on_stack.add(nxt)
-                    work.append((nxt, iter(blockers[nxt])))
+                    work.append((nxt, iter([b for b in blockers[nxt] if b in left])))
                     break
                 if nxt in on_stack:
                     low[node] = min(low[node], index[nxt])
@@ -161,25 +167,37 @@ def cycles(left, blockers):
 def main():
     requested, item_days, leaves = read()
     open_leaves = {n for n, leaf in leaves.items() if not leaf["fixed"]}
-    blockers = {n: [] for n in open_leaves}      # open leaf -> the open leaves it is blocked by
+
+    # A cycle anywhere among the leaves stops the pass, finished leaves included.
+    every = {n: [b for b in dict.fromkeys(leaf["blockedBy"]) if b in leaves] for n, leaf in leaves.items()}
+    waiting = {n: len(every[n]) for n in leaves}
+    unblocks = {n: [] for n in leaves}
+    for number, its_blockers in every.items():
+        for blocker in its_blockers:
+            unblocks[blocker].append(number)
+    ready, cleared = [n for n in leaves if not waiting[n]], set()
+    while ready:
+        node = ready.pop()
+        cleared.add(node)
+        for nxt in unblocks[node]:
+            waiting[nxt] -= 1
+            if not waiting[nxt]:
+                ready.append(nxt)
+    if len(cleared) < len(leaves):
+        print(json.dumps({"cycles": cycles(set(leaves) - cleared, every)}))
+        sys.exit(1)
+
+    blockers = {n: [b for b in every[n] if b in open_leaves] for n in open_leaves}
     blocked = {n: [] for n in open_leaves}       # open leaf -> the open leaves blocked by it
-    outside, floor, held_by = [], None, None
-    for number in sorted(open_leaves, key=number_key):
-        for blocker in dict.fromkeys(leaves[number]["blockedBy"]):
-            if blocker in open_leaves:
-                blockers[number].append(blocker)
-                blocked[blocker].append(number)
-            elif blocker in leaves:
-                due = leaves[blocker]["dueDate"]
-                if due and (floor is None or due > floor):
-                    floor, held_by = due, blocker
-            else:
-                outside.append({"number": number, "blockedBy": blocker})
+    for number, its_blockers in blockers.items():
+        for blocker in its_blockers:
+            blocked[blocker].append(number)
+    outside = [{"number": n, "blockedBy": b} for n in sorted(open_leaves, key=number_key)
+               for b in dict.fromkeys(leaves[n]["blockedBy"]) if b not in leaves]
 
     # Depth from the END of the plan: clear a leaf once every leaf it blocks has a depth.
     waiting = {n: len(blocked[n]) for n in open_leaves}
-    ready = sorted((n for n in open_leaves if not waiting[n]), key=number_key)
-    depth = {}
+    ready, depth = [n for n in open_leaves if not waiting[n]], {}
     while ready:
         node = ready.pop()
         depth[node] = 1 + max(depth[d] for d in blocked[node]) if blocked[node] else 0
@@ -187,43 +205,56 @@ def main():
             waiting[blocker] -= 1
             if not waiting[blocker]:
                 ready.append(blocker)
-    left = open_leaves - set(depth)
-    if left:
-        print(json.dumps({"cycles": cycles(left, blockers)}))
-        sys.exit(1)
 
-    start = requested
-    if floor is not None and floor >= requested:
-        start = floor + ONE_DAY
-    else:
-        held_by = None
+    item_days_from = "given"
+    if item_days is None:
+        spans = {(leaves[n]["dueDate"] - leaves[n]["startDate"]).days + 1 for n in open_leaves
+                 if leaves[n]["startDate"] and leaves[n]["dueDate"]}
+        item_days, item_days_from = (spans.pop(), "existing") if len(spans) == 1 and min(spans) >= 1 else (1, "default")
+
     deepest = max(depth.values()) if depth else 0
+    begins = {n: requested + datetime.timedelta(days=(deepest - depth[n]) * item_days) for n in open_leaves}
+    # Move the whole cascade later by the fewest days that put every open leaf after the fixed
+    # leaves blocking it.
+    late, held_by = 0, None
+    for number in sorted(open_leaves, key=number_key):
+        for blocker in sorted(every[number], key=number_key):
+            over = leaves[blocker]["dueDate"] or leaves[blocker]["startDate"] if leaves[blocker]["fixed"] else None
+            if over and (over - begins[number]).days + 1 > late:
+                late, held_by = (over - begins[number]).days + 1, blocker
+    start = requested + datetime.timedelta(days=late)
     assignments = []
     for number in open_leaves:
-        begins = start + datetime.timedelta(days=(deepest - depth[number]) * item_days)
-        assignments.append({"number": number, "startDate": begins.isoformat(),
-                            "dueDate": (begins + datetime.timedelta(days=item_days - 1)).isoformat(),
+        first = begins[number] + datetime.timedelta(days=late)
+        assignments.append({"number": number, "startDate": first.isoformat(),
+                            "dueDate": (first + datetime.timedelta(days=item_days - 1)).isoformat(),
                             "depth": depth[number]})
     assignments.sort(key=lambda a: (a["startDate"], number_key(a["number"])))
 
     counts, spans = {}, {}
     for a in assignments:
         counts[a["startDate"]] = counts.get(a["startDate"], 0) + 1
-    dated = [(a["number"], a["startDate"], a["dueDate"]) for a in assignments]
-    dated += [(n, leaf["startDate"].isoformat(), leaf["dueDate"].isoformat()) for n, leaf in leaves.items()
-              if leaf["fixed"] and leaf["startDate"] and leaf["dueDate"]]
-    for number, begins, due in dated:
-        for group in leaves[number]["groups"]:
-            span = spans.setdefault(group, {"startDate": begins, "dueDate": due})
-            span["startDate"], span["dueDate"] = min(span["startDate"], begins), max(span["dueDate"], due)
+    known = {a["number"]: (a["startDate"], a["dueDate"]) for a in assignments}
+    for number, leaf in leaves.items():
+        if leaf["fixed"]:
+            known[number] = tuple(d.isoformat() if d else None for d in (leaf["startDate"], leaf["dueDate"]))
+    for number in sorted(known, key=number_key):
+        for day_ in [d for d in known[number] if d]:
+            for group in leaves[number]["groups"]:
+                span = spans.setdefault(group, {"startDate": day_, "dueDate": day_})
+                span["startDate"], span["dueDate"] = min(span["startDate"], day_), max(span["dueDate"], day_)
     print(json.dumps({
         "start": start.isoformat(), "requestedStart": requested.isoformat(), "heldBy": held_by,
-        "itemDays": item_days, "end": max(a["dueDate"] for a in assignments) if assignments else None,
+        "itemDays": item_days, "itemDaysFrom": item_days_from,
+        "end": max(a["dueDate"] for a in assignments) if assignments else None,
         "assignments": assignments,
         "distribution": [{"startDate": d, "count": counts[d]} for d in sorted(counts)],
-        "groupSpans": spans, "outsideEdges": outside,
+        "groupSpans": {g: spans[g] for g in sorted(spans, key=number_key)}, "outsideEdges": outside,
         "fixed": sorted((n for n, leaf in leaves.items() if leaf["fixed"]), key=number_key)}))
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except OverflowError:
+        fail("these dates run past the end of the calendar")

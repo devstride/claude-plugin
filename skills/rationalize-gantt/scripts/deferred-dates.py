@@ -5,7 +5,7 @@ Implements the dating pass of `skills/rationalize-gantt/SKILL.md` for the items 
 deferred container (`skills/build-item/references/deferred-container.md`). Reads one JSON object
 on stdin, writes one JSON line on stdout:
 
-  {"today": "YYYY-MM-DD", "itemDays"?: <whole days, 1 or more>,
+  {"today": "YYYY-MM-DD", "start"?: "YYYY-MM-DD", "itemDays"?: <whole days, 1 or more>,
    "valueLeaves": [{"number", "dueDate"}…],
    "deferred": [{"number", "done", "startDate", "dueDate", "groups"?: […]}…]}
   -> {"boundary", "assignments": [{"number", "startDate", "dueDate", "reason": "scheduled"|"kept"}…],
@@ -13,8 +13,9 @@ on stdin, writes one JSON line on stdout:
       "groupSpans": {"<number>": {"startDate", "dueDate"}}}
 
 `valueLeaves` carry the dates the cascade just computed for every non-deferred leaf (plus the
-existing dates of Done leaves in not-done-only mode). The boundary is their latest `dueDate`, or
-the day before `today` when there is none. An open item whose start is after the boundary and
+existing dates of Done leaves in not-done-only mode). The boundary is their latest `dueDate`, but
+never earlier than the day before `start` (the plan's start date; absent, the day after `today`),
+so a deferred item is never dated before the plan starts, nor today or earlier by default. An open item whose start is after the boundary and
 whose due date is present and not before it keeps both dates ("kept") and uses up no day; every
 other open item gets the next free day after the boundary, in ascending item-number order
 ("scheduled"): with `itemDays` 1 (the default) start = due = boundary + 1, + 2, …; with more, each
@@ -57,6 +58,7 @@ def main():
     if not isinstance(request, dict):
         fail("stdin must be one JSON object")
     today = day(request.get("today"), "today")
+    start = day(request.get("start"), "start", optional=True) or today + datetime.timedelta(days=1)
     item_days = request.get("itemDays", 1)
     if isinstance(item_days, bool) or not isinstance(item_days, int) or item_days < 1:
         fail("itemDays must be a whole number of days, 1 or more")
@@ -65,7 +67,7 @@ def main():
         fail("valueLeaves and deferred must be arrays")
     dues = [day(leaf.get("dueDate"), "a value leaf's dueDate", optional=True) for leaf in leaves if isinstance(leaf, dict)]
     dues = [d for d in dues if d]
-    boundary = max(dues) if dues else today - datetime.timedelta(days=1)
+    boundary = max(dues + [start - datetime.timedelta(days=1)])
 
     for item in deferred:
         if not isinstance(item, dict) or not isinstance(item.get("number"), str) or not item["number"]:
@@ -105,4 +107,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except OverflowError:
+        fail("these dates run past the end of the calendar")

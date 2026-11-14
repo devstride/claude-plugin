@@ -180,7 +180,7 @@ tree in one message (no specs) and get an explicit **"yes, build this"**. Then, 
   asks (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md`).
 - **Settle the start date and the item length here**: the arguments' `start` and `item-days`,
   else ask for both, offering the defaults — the day after today, and one day per story. **A plan
-  never starts today or earlier unless the user names that day.** Step 6 passes both on.
+  never starts today or earlier unless the user names that day.** Step 6 passes on what was named.
 - **Batch the auto-scheduler heads-up here**, not at the end: step 6 needs the organization-wide
   dependency propagation OFF. Run the canonical Enable Link Mode check now
   (`${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/references/auto-scheduler-off.md`) — read the
@@ -271,12 +271,12 @@ miscalibration.
 
 ## 6. Rationalize dates
 
-After step 5 verifies zero orphans, invoke `rationalize-gantt` on the plan root with the sign-off's
-`start <date>` and `item-days <N>` — never hand-compute dates. It owns the auto-scheduler check, the cascade math and the red-line review; fix a graph issue
+After step 5 verifies zero orphans, invoke `rationalize-gantt` on the plan root with any
+`start <date>` and `item-days <N>` the sign-off named; never hand-compute dates. It owns the auto-scheduler check, the cascade math and the red-line review; fix a graph issue
 it traces to a step-5 wiring decision with `add_relationship`/`remove_relationship`, never by
 re-running the plan. **If it STOPS on a dependency cycle it wrote no dates at all**: fix the edges it
-names and re-invoke; never move on undated. On the EXTEND path, have it re-date **not-done items
-only** (it asks in its §0) so shipped items keep the completion dates `build-item`'s ritual stamped.
+names and re-invoke; never move on undated. On the EXTEND path it re-dates **not-done items
+only** (its default): shipped items keep the completion dates `build-item`'s ritual stamped.
 
 ## 6.5 Stamp execution-order numbers into leaf titles
 

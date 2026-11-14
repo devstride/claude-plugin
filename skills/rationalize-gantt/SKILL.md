@@ -44,13 +44,15 @@ Resolve the root (or ask). `search_items` (hierarchy=[root], itemType=workitem, 
 limit 200) gives the nodes with `number`/`title`/`parentNumber`/`status`/dates. Confirm, since each
 changes the output: (a) the root; (b) which leaves to re-date — default the not-done ones only, so
 a finished story keeps the completion date `build-item`'s ritual stamped; re-date completed items
-too only when the user asks for one clean cascade (a landed leaf — merged status or a "merged onto"
+too only when the user asks for one clean cascade — say it moves finished stories onto the new
+dates (a landed leaf — merged status or a "merged onto"
 comment, awaiting its epic's release
 (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`) — counts as done);
 (c) the start date and the item length — the arguments' `start` and `item-days`, else ASK for
-both here, offering the defaults: the day after today, and one day per story. **A plan never
-starts today or earlier unless the user names that day.** A driven or unattended run never asks:
-it uses what its caller passed, else the defaults; (d) the deferred items: resolve the plan root's deferred container and
+both here, offering the defaults: the day after today, and the length the open stories already
+share (one day when they share none). **A plan never starts today or earlier unless the user names
+that day.** A run another skill invoked, or one with nobody to ask, never asks: it uses what its
+caller passed, else the defaults; (d) the deferred items: resolve the plan root's deferred container and
 its `members` with `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`
 ("Finding it") and say "N deferred items will be dated after the plan". **Members — the container
 included — stay out of steps 2, 3, 5 and 6 entirely** (no depth, no violation, no edge
@@ -81,9 +83,10 @@ merged); read `args` defensively — `const items = Array.isArray(args) ? args :
   "leaves": [{"number", "blockedBy", "groups", "fixed", "startDate", "dueDate"}]}` to
   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/scripts/cascade-dates.py`: `leaves` is
   every leaf outside the deferred container, `blockedBy` its step-2 referenceIds, `groups` every
-  container above it up to and including the root; `start` and `itemDays` are step 0's (omit
-  `start` for the day after `today`); in not-done-only mode each Done or landed leaf carries
-  `"fixed": true` and its existing dates, and is never re-dated.
+  container above it up to and including the root, and EVERY leaf carries its existing dates.
+  `start` and `itemDays` are step 0's, each sent only when named: absent, the script uses the day
+  after `today` and the length the open leaves already share, else one day (`itemDaysFrom`). In
+  not-done-only mode each Done or landed leaf also carries `"fixed": true` and is never re-dated.
 - **Exit 1 is a DEPENDENCY CYCLE → STOP: write not a single date** (`plan` relies on this pass to
   catch cycles). `cycles` lists only the TRUE members — strongly connected components of size > 1,
   plus self-edges — each with the `path` round it; report exactly those and the path, never a leaf
@@ -95,10 +98,10 @@ merged); read `args` defensively — `const items = Array.isArray(args) ? args :
   inside this pass.
 - **Exit 0** returns `assignments` (each leaf's start and due), `groupSpans` (each container's
   span over its descendants; spans nest), `distribution`, `outsideEdges` (step 5 judges them) and
-  the `start` used: the deepest leaves begin on it, every dependency is due the day before its
-  dependents start, and no slot is empty. **`heldBy` set** → a finished blocker is due on or after
-  the start asked for, so the cascade begins the day after it: tell the user `requestedStart`,
-  `start` and which item held it.
+  the `start` and `itemDays` used: the deepest leaves begin on `start`, every dependency is due
+  before its dependents start, and no slot is empty. **`heldBy` set** → a finished blocker was not
+  over before a leaf it blocks would have started, so the whole cascade moved later by the fewest
+  days that clear it: tell the user `requestedStart`, `start` and which item held it.
 
 ## 4. Apply the dates
 
@@ -106,12 +109,12 @@ merged); read `args` defensively — `const items = Array.isArray(args) ? args :
 
 ## 4.5 Date the deferred items — after the plan
 
-Pipe `{"today", "itemDays", "valueLeaves": [{"number", "dueDate"}], "deferred": [{"number", "done",
-"startDate", "dueDate"}]}` to `python3 ${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/scripts/deferred-dates.py`
-— `valueLeaves` the dates step 3 just computed for every leaf outside the container (plus the
+Pipe `{"today", "start", "itemDays", "valueLeaves": [{"number", "dueDate"}], "deferred": [{"number",
+"done", "startDate", "dueDate"}]}` to `python3 ${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/scripts/deferred-dates.py`
+— `start` and `itemDays` as step 3 returned them, `valueLeaves` the dates step 3 just computed for every leaf outside the container (plus the
 existing dates of Done leaves in not-done-only mode), `deferred` every member leaf with its
 `groups` (the matched containers and intermediate nodes above it). It returns the
-`boundary` (the last value due date), `assignments` (`scheduled`: `itemDays` long each, the first starting
+`boundary` (the last value due date, never earlier than the day before `start`), `assignments` (`scheduled`: `itemDays` long each, the first starting
 the day after the boundary, then the next, in item-number order; `kept`: an item already starting after the boundary
 keeps its dates),
 `untouchedDone` and `groupSpans`. Write every `scheduled` entry and every group's span
@@ -121,9 +124,11 @@ entry writes nothing. Related-only items cannot trigger propagation. No member �
 
 ## 5. Find the violations (the red lines)
 
-For EVERY `blocked_by` edge X→D, a violation is `start(X) ≤ due(D)`. Two sources dominate: coarse
-links to a whole CONTAINER whose span reaches today (the bulk of the reds), and links to items
-outside the tree — fetch D's real date; it is often already Done and dated early.
+For EVERY `blocked_by` edge X→D whose dependent X this pass dated, a violation is
+`start(X) ≤ due(D)`. Two sources dominate: coarse links to a whole CONTAINER whose span reaches the
+plan's end (the bulk of the reds), and links to items outside the tree — fetch D's real date; it is
+often already Done and dated early. **An edge whose dependent kept its dates (a `fixed` leaf) is
+history**: count the red ones for the report; never rationalize one.
 
 ## 6. Rationalize each violated edge — judge necessity, never blindly offset
 
@@ -148,7 +153,8 @@ remove plus an add. Omit `staticMode` per
 ## 7. Verify + report
 
 Recompute violations over the UPDATED graph (your removes/repoints plus the known external dates)
-and assert ZERO remain. Report the start date and item length used (and a held start), the
+and assert ZERO remain among the edges whose dependent this pass dated. Report the start date and
+item length used (and a held start), how many red edges between finished stories were left alone, the
 distribution per start day (first → last), the edge changes
 (removed / repointed / kept-with-offset) and any offsets, and one deferred line: how many items
 were dated and from which day to which, how many kept their own date, how many Done were left
