@@ -115,8 +115,9 @@ At step 4, after the pre-merge check and the recap, run
 "<provider status output>" --reviewed-head <reviewedHead>`. `--head` is the release pull request's
 head; `--reviewed-head` is step 2's `<reviewedHead>`. With `release.devDeployVerification` set the
 dev-deploy wait runs BEFORE this check, whatever the delta, and passes its exit (scope
-`merge-and-deploy`: `--pre-ship` and `--dev-deploy` come from 0p, and `--tower` is read after the
-claim or re-claim); unset,
+`merge-and-deploy`: `--pre-ship` and `--dev-deploy` come from 0p, and `--tower` is a status read
+before the claim, since `On final` is the oldest open release pull request whoever holds the tower,
+and read again after it); unset,
 `not-applicable` (omitting it is an ERROR). The script reads the config from the head itself and
 prints `MERGE <sha>` and a `COMMENT <text>` line only when one route's conditions all hold (its
 header lists them); anything else prints `ASK <reason>`. Without `release.clearance` there is no

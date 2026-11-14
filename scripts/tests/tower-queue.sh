@@ -17,7 +17,7 @@ if [ "$RC" -eq 0 ] && printf '%s' "$OUT" | grep -q '^CLEAR (no other release pul
 
 st '{"state": "clear", "derived": true, "onFinal": {"number": 41, "head": "release/26-10-18", "draft": false}, "waiting": []}'
 run check --own-pr 41; A="$RC:$OUT"; run check; B="$RC:$OUT"
-if [ "${A%%:*}" -eq 0 ] && printf '%s' "$A" | grep -q "^0:CLEAR (only this release's pull request #41 is open)" \
+if [ "${A%%:*}" -eq 0 ] && printf '%s' "$A" | grep -q "^0:CLEAR (no release pull request older than #41 is open)" \
    && [ "${B%%:*}" -eq 2 ] && printf '%s' "$B" | grep -q '^2:WAIT #41 release/26-10-18 '; then
   ok "(2) only our own pull request on final with --own-pr → CLEAR; without it → WAIT #41"
 else bad "(2) a=$A b=$B"; fi
@@ -25,6 +25,11 @@ else bad "(2) a=$A b=$B"; fi
 st '{"state": "held", "derived": true, "onFinal": {"number": 41, "head": "release/26-10-18"}, "waiting": [{"number": 44, "head": "release/26-10-18-2"}]}'
 run check --own-pr 44
 if [ "$RC" -eq 2 ] && printf '%s' "$OUT" | grep -q '^WAIT #41 release/26-10-18 '; then ok "(3) another release pull request open ahead of ours → WAIT #41"; else bad "(3) rc=$RC: $OUT"; fi
+
+# (3b) a NEWER release pull request (cut by hand beside ours) does not hold ours: first cut, first merged
+st '{"state": "clear", "derived": true, "onFinal": {"number": 44, "head": "release/26-10-18-2"}, "waiting": [{"number": 41, "head": "release/26-10-18"}]}'
+run check --own-pr 41; A="$RC:$OUT"; run check --own-pr 44; B="$RC:$OUT"
+if printf '%s' "$A" | grep -q '^0:CLEAR' && printf '%s' "$B" | grep -q '^2:WAIT #41 '; then ok "(3b) only an OLDER release pull request is ahead: #41 CLEAR beside #44, #44 WAITs for #41"; else bad "(3b) a=$A b=$B"; fi
 
 st '{"state": "clear", "derived": true, "onFinal": null, "waiting": [], "hotfixesLanded": [{"number": 50, "head": "a/hotfix/26-10-18/x", "mergedAt": "2026-10-18T10:00:00Z"}]}'
 run check

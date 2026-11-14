@@ -12,7 +12,9 @@ every later release behind it, and releases merge in the order they were cut, on
 
   check [--own-pr <n>] [--waited-minutes <m>]
       CLEAR (<why>)                       no release pull request but <n> is open        exit 0
-      WAIT #<n> <head> (<why>)            another release pull request is open           exit 2
+                                          (with --own-pr, none OLDER than <n>)
+      WAIT #<n> <head> (<why>)            another release pull request is open (with     exit 2
+                                          --own-pr, an older one: first cut, first merged)
       ASK #<n> <head> (<why>)             the same, and this release has waited at least exit 3
                                           staleMinutes behind it (`--waited-minutes`)
       WAIT status unreadable (<why>)      unknown, not derived, or no provider           exit 2
@@ -118,7 +120,9 @@ def check(args):
     queue += [w for w in status.get("waiting") or [] if isinstance(w, dict)]
     for pr in queue:
         number = pr.get("number")
-        if number is None or (own is not None and int(number) == own):
+        # With --own-pr only an OLDER release pull request is ahead: releases merge first cut, first
+        # merged, so a newer one (cut by hand beside this one) waits behind this one, never the reverse.
+        if number is None or (own is not None and int(number) >= own):
             continue
         stale = block.get("staleMinutes")
         stale = stale if isinstance(stale, int) and not isinstance(stale, bool) and stale > 0 else 20
@@ -129,7 +133,7 @@ def check(args):
             return 3
         print("WAIT #%s %s (another release pull request is open into production; it merges first)" % (number, pr.get("head") or "?"))
         return 2
-    print("CLEAR (%s)" % ("only this release's pull request #%d is open" % own if own is not None and queue else "no other release pull request is open"))
+    print("CLEAR (%s)" % ("no release pull request older than #%d is open" % own if own is not None else "no other release pull request is open"))
     return 0
 
 

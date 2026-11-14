@@ -64,8 +64,10 @@ reads the exit code and quotes the line; it never parses further.
   with `· STALE` past the stale threshold and `· STUCK` past the phase budget — or, when clear,
   `close-out owed · <release> · <items>` while this machine owes close-out work, else nothing.
   `--json` prints `{ state: clear|held|unknown, stale, stuck, phaseMinutes, phaseBudgetMinutes,
-  record, onFinal, waiting, hotfixesLanded, closeOutOwed, warnings, staleMinutes }`; a provider may
-  add `record.pluginVersion`, the plugin version the holder claimed with.
+  record, onFinal, waiting, hotfixesLanded, closeOutOwed, warnings, staleMinutes, derived }`
+  (`derived` is true only when the open release pull requests were listed: the queue and the
+  backstop read anything else as unreadable, never clear); a provider may add
+  `record.pluginVersion`, the plugin version the holder claimed with.
 - **Stale** = heartbeat older than `staleMinutes`. A stale clearance with no pull request, or one
   CLOSED unmerged, is taken over by the next `claim` (one atomic change on the stale record, so two
   takers cannot both win). One whose pull request is OPEN, or MERGED but never closed out (its
@@ -292,14 +294,15 @@ without one there is none (doctor ERRORs; the release STOPs at step 0 naming the
   `On final` → the unattended-stop notice (`auto-start.md`), then wait for the owner's words. An
   in-the-moment yes given while the gate is pending is kept and acted on once it reads `0`; no yes
   lifts a pending gate. With a yes (the owner's, or `MERGE` from the standing yes): the queue
-  (`--own-pr`), `claim --wait --branch <release branch> --pr <n>` (BUSY while the release ahead
+  (`--own-pr`: only an older release pull request is ahead; `WAIT` → back to waiting, one read every
+  60 s, the yes kept; `ASK` → as before the cut, tell the owner once and keep waiting), `claim --wait --branch <release branch> --pr <n>` (BUSY while the release ahead
   is still merging or deploying: this one is next, so it waits there), `heartbeat final`, **the
   previous-release gate once more** (one read: `0` → go on; `2` → `release --step-aside` and back
   to waiting on the gate; `1` → the failure STOP, overridable only in the owner's words recorded on
   the pull request; `3`/`4` → ask), `release_checks.py verify --stamp '<line>' --head
   <reviewedHead>`, `pre-merge-check` again, `pre-ship release run <class> --only <names>` for every
-  `rerunAtMerge` entry, `standing-yes.py` again (or apply the in-the-moment yes), then `heartbeat
-  merging` and the merge.
+  `rerunAtMerge` entry, `standing-yes.py` again (or apply the in-the-moment yes), `verify` once
+  more (production may have moved while those ran), then `heartbeat merging` and the merge.
 - **Rebuilt when what is ahead changes.** The stamp names production's tip, so `verify` at the
   merge proves the tree CI tested is the tree that merges. `CHANGED` or `BEHIND` — the release
   ahead was reverted or rolled back, a hotfix landed, or anything else moved production since the
