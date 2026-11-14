@@ -8,6 +8,18 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A session interrupted while the model is still thinking reads as waiting on its person, not
+  stalled.** Pressing Esc before any reply text appears writes nothing to the session's transcript
+  and fires no hook, so the presence keeper kept reporting the session as working, and a repository's
+  health check later marked it stalled. The keeper now also reads Claude Code's own status file for
+  the session's process (`${CLAUDE_CONFIG_DIR:-~/.claude}/sessions/<pid>.json`). When that file names
+  this session and process and turned idle after the last prompt and the last activity, and the
+  session left no background work running and no turn failed, the keeper applies the interrupt
+  exactly as it does for an Esc mid-reply: the state becomes waiting, at the moment the file turned
+  idle. A missing, foreign or unreadable file changes nothing.
+
 ## [3.61.0] — 2026-11-13
 
 ### Added

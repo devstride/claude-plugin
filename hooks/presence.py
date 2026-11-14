@@ -100,6 +100,13 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            "working" at its next tool call, and the interrupt already applied does not undo that.
            Anything said after that entry, a transcript that is missing, unreadable, not the user's
            own file or cut mid-line, or an entry without a time changes nothing.
+           An Esc pressed while the model is still thinking, before any reply, writes no such entry
+           and fires no hook. For that one the keeper reads Claude Code's own status file for the
+           session's process (${CLAUDE_CONFIG_DIR:-~/.claude}/sessions/<pid>.json): when it names
+           this session and process, reads "idle", and turned idle later than the last start,
+           prompt, interrupt applied and activity, while the session left no background work running
+           and no turn failed, the interrupt is applied the same way at that time. A missing,
+           unreadable or foreign file, or any other status, changes nothing.
   send <event> <state> <session> <record> <sequence> <at>  (detached) runs the command once,
            holding the session's send lock so reports run one at a time, and only for the record
            that queued it (a record recreated since is another) and when its sequence number is
@@ -172,6 +179,7 @@ QUESTIONS = ("AskUserQuestion", "ExitPlanMode")  # the main conversation asking 
 OPEN_LIMIT = 64          # open calls kept per session; the oldest is dropped beyond it
 TRANSCRIPT_TAIL = 262144  # bytes at the end of the transcript the keeper reads to find an interrupt
 INTERRUPTED = "[Request interrupted by user"  # how Claude Code's transcript opens the entry for an Esc
+STATUS_LIMIT = 65536     # bytes of Claude Code's own session status file the keeper reads
 ISO_TIME = re.compile(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z$")
 TOOL_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 
@@ -543,6 +551,37 @@ def interrupted(path):
     return 0
 
 
+def config_dir():
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+
+
+def went_idle(sid, owner):
+    """When Claude Code marked this session idle, in epoch milliseconds; 0 when it is not idle, or on
+    any doubt. An Esc pressed while the model is still thinking writes nothing to the transcript and
+    fires no hook, but Claude Code's own status file for the session's process
+    (<config>/sessions/<pid>.json) turns from "busy" to "idle" at once. It counts only for this
+    session and this process, from a regular file the user (or root) owns."""
+    if isinstance(owner, bool) or not isinstance(owner, int) or owner <= 0:
+        return 0
+    try:
+        fd = os.open(os.path.join(config_dir(), "sessions", "%d.json" % owner), os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    except (OSError, ValueError):
+        return 0
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (os.getuid(), 0) or info.st_size > STATUS_LIMIT:
+            return 0
+        data = json.loads(os.pread(fd, STATUS_LIMIT, 0))
+    except Exception:
+        return 0
+    finally:
+        os.close(fd)
+    if not isinstance(data, dict) or data.get("sessionId") != sid or data.get("pid") != owner or data.get("status") != "idle":
+        return 0
+    at = data.get("statusUpdatedAt")
+    return at if isinstance(at, int) and not isinstance(at, bool) and at > 0 else 0
+
+
 def transition(event, payload, record, now_ms):
     """Apply one hook event to the record (the state lock is held): its open calls, background mark
     and failed-turn flag. Returns (the new state, or None to keep the state; whether it is a sign of
@@ -785,12 +824,18 @@ def replaced(record):
     return bool(now and abs(now - was) > STARTED_SLACK)
 
 
-def interrupt(record, peek, mark):
+def interrupt(record, peek, mark, idle=False):
     """Apply an interrupt the transcript showed at `mark` (the state lock is held): only to a session
     still working, on the transcript that was read, and only one later than the session's last
-    start or prompt and than the last interrupt applied. Returns whether the record changed."""
+    start or prompt and than the last interrupt applied. With `idle`, `mark` is when Claude Code's
+    status file turned idle: it counts only for the process that was read, a session with no
+    background work left running and no failed turn, and only when nothing happened since.
+    Returns whether the record changed."""
     if (not mark or record.get("state") != "working" or record.get("transcript") != peek.get("transcript")
             or mark <= max(stamp(record.get("prompted")), stamp(record.get("interrupt")))):
+        return False
+    if idle and (record.get("owner") != peek.get("owner") or stamp(record.get("background"))
+                 or record.get("failed") is True or mark <= stamp(record.get("activeAt"))):
         return False
     state, _ = transition("Interrupt", {}, record, mark)
     record.update({"state": state, "interrupt": mark, "activeAt": max(stamp(record.get("activeAt")), mark)})
@@ -814,6 +859,7 @@ def keeper(sid):
             due = bool(settings) and time.time() - (peek.get("sent") or 0) >= settings["intervalMinutes"] * MINUTE
             reused = due and replaced(peek)  # `ps` runs outside the state lock
             mark = interrupted(peek.get("transcript")) if peek.get("state") == "working" else 0  # so does this read
+            idle = went_idle(sid, peek.get("owner")) if peek.get("state") == "working" and not mark else 0  # and this
             job = None
             with state_lock(sid):
                 record = load(sid)
@@ -835,7 +881,7 @@ def keeper(sid):
                     os.close(fd)
                     fd = None
                 else:
-                    noted = interrupt(record, peek, mark)
+                    noted = interrupt(record, peek, mark) or interrupt(record, peek, idle, idle=True)
                     held = record.get("state") != record.get("reported") and now - (record.get("sent") or 0) >= CHANGE_AFTER
                     if due or held:
                         job = ("beat", record["state"]) + queue(record, now)
