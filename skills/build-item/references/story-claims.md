@@ -45,6 +45,9 @@ Never type a machine or session name, or add a payload key. Exit 1 degrades as `
 
 ## When
 
+**Beside each step below**, say what this session is about to ship: read
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md` once per run, at the first claim.
+
 1. **Selection (step 0).** After a candidate is chosen and BEFORE it moves to In Progress, claim it
    (`mode: select`). Held by a live holder → drop it, say who holds it, take the next candidate (the
    gating check's shape). Expired → take over. Already yours (a resumed story) → renewed, carry on.

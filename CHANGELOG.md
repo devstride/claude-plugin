@@ -8,6 +8,20 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Sessions say what they are about to ship.** With a `claims` block, a session that is building,
+  reviewing or landing work now declares it in the shared claims store (kind `ship-intent`): the
+  unit, the branch it will merge into, how far along it is and an estimate of when it will be
+  ready. `build-item` declares each story and each epic release and keeps the stage current,
+  `branch-hotfix` declares a hotfix, and `pr` declares a pull request opened outside the build
+  loop. A declaration is information only: nothing is refused, delayed or stopped because one is
+  missing, stale or another session's, and an unreachable store is said once and then ignored.
+  `skills/build-item/scripts/ship-intent.py` builds the declaration and reads every answer, so
+  other tooling gets the same result; `release.coordination.enabled` (default `true`) switches it
+  off, and the `ship-intent` entry of `claims.expiryMinutes` (default 20) sets how long a silent
+  session stays listed.
+
 ## [3.64.0] — 2026-11-14
 
 ### Fixed

@@ -88,6 +88,7 @@
     "syncWorkflow": "sync.yml",
     "mergeTrainBeforeCut": true,
     "autoStart": { "enabled": true },
+    "coordination": { "enabled": true },
     "backstop": { "mode": "shadow", "maxWaitMinutes": 120 },
     "estimates": { "deployMinutes": 15 },
     "lightRelease": { "standingYes": true },

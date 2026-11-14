@@ -88,6 +88,8 @@ nothing and note no cloud wave. A no-CI repo opens non-draft and reports `no pul
   `review`, which proves a NEW event while local streams run and records its server `created_at`
   before marking the reviewer REGISTERED. A hard request error is handed back, not retried here. An
   explicitly requested reviewer can review a draft.
+- **Standalone, `claims` set**: declare the pull request
+  (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md`).
 - **Body** — authored (never `--fill`), written to a scratch file, passed by `--body-file`, under a
   clear, conventional TITLE. Sections come from **`prBodyTemplate.sections`**, in order, each per its
   `guidance`; the list is CLOSED (no invented headings). Flavors (epic release, hotfix, release)

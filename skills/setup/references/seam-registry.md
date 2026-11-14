@@ -185,6 +185,8 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.mergeTrainBeforeCut` | boolean | — | `false` | merge the release train into the source before each cut | pre-registry |
 | `release.autoStart` | object | — | — | releases that start themselves under a one-winner release-train claim; contract: skills/release/references/auto-start.md | 3.29.0 |
 | `release.autoStart.enabled` | boolean | — | `false` | a train landing or a finished release starts the next release; needs a claims block | 3.29.0 |
+| `release.coordination` | object | — | — | sessions say what they are about to ship (claim kind ship-intent), so every other session and the owner can see it; contract: skills/build-item/references/ship-intent.md | unreleased |
+| `release.coordination.enabled` | boolean | — | `true` | declare what this session is building, reviewing or landing; needs a claims block, without one nothing is declared | unreleased |
 | `release.backstop` | object | — | — | start a release when work on the release train has waited too long and nothing is releasing it; contract: skills/release/references/backstop.md | 3.45.0 |
 | `release.backstop.mode` | string | off, shadow, live | off | off: no check; shadow: record what the backstop would start and change nothing; live: start the release (only after shadow results were checked); needs a claims block | 3.45.0 |
 | `release.backstop.maxWaitMinutes` | integer | >= 15, <= 1440 | `120` | how long the oldest landing on the train may wait, by its committer time, before the backstop starts a release; at most a day, the longest a claim can live | 3.45.0 |
@@ -216,7 +218,7 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.clearance.commands.adopt` | string | — | — | **Required.** the adopt command | pre-registry |
 | `release.clearance.commands.owed` | string | — | — | the optional owed command | pre-registry |
 | `claims.provider` | string | devstride | — | **Required.** the built-in provider: the agent's own DevStride MCP connection | 3.21.0 |
-| `claims.expiryMinutes` | object | each value integer, 1..1440, else warned and the default stands | — | kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here | 3.21.0 |
+| `claims.expiryMinutes` | object | each value integer, 1..1440, else warned and the default stands | — | kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, ship-intent 20, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here | 3.21.0 |
 | `claims.commands` | object | — | — | **Required.** a claims store the repository supplies | 3.21.0 |
 | `claims.commands.claim` | string | — | — | **Required.** the claim command | 3.21.0 |
 | `claims.commands.heartbeat` | string | — | — | **Required.** the heartbeat command | 3.21.0 |
