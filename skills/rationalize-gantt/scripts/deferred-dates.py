@@ -5,7 +5,7 @@ Implements the dating pass of `skills/rationalize-gantt/SKILL.md` for the items 
 deferred container (`skills/build-item/references/deferred-container.md`). Reads one JSON object
 on stdin, writes one JSON line on stdout:
 
-  {"today": "YYYY-MM-DD",
+  {"today": "YYYY-MM-DD", "start"?: "YYYY-MM-DD", "itemDays"?: <whole days, 1 or more>,
    "valueLeaves": [{"number", "dueDate"}…],
    "deferred": [{"number", "done", "startDate", "dueDate", "groups"?: […]}…]}
   -> {"boundary", "assignments": [{"number", "startDate", "dueDate", "reason": "scheduled"|"kept"}…],
@@ -13,11 +13,15 @@ on stdin, writes one JSON line on stdout:
       "groupSpans": {"<number>": {"startDate", "dueDate"}}}
 
 `valueLeaves` carry the dates the cascade just computed for every non-deferred leaf (plus the
-existing dates of Done leaves in not-done-only mode). The boundary is their latest `dueDate`, or
-the day before `today` when there is none. An open item whose start is after the boundary and
-whose due date is present and not before it keeps both dates ("kept") and uses up no day; every
-other open item gets start = due = boundary + 1, + 2, … in ascending item-number order
-("scheduled"). Done items are never assigned. `groups` names the container and intermediate nodes
+existing dates of Done leaves in not-done-only mode). The boundary is their latest `dueDate`, but
+never earlier than the day before `start` (the plan's start date; absent, the day after `today`),
+so a deferred item is never dated before the plan starts, nor today or earlier by default. Items
+are taken in ascending item-number order. An open item that starts after the boundary and after
+every item scheduled before it, and whose due date is present and not before its start, keeps both
+dates ("kept"); every other open item gets the next free day after the boundary, stepping past
+the days a kept item before it holds
+("scheduled"): with no kept item in the way and `itemDays` 1 (the default) start = due = boundary + 1, + 2, …; with more, each
+item spans `itemDays` calendar days and the next starts the day after it is due. Done items are never assigned. `groups` names the container and intermediate nodes
 above an item; `groupSpans` gives each its span over the assignments of its own items. Weekends
 are not special-cased. Re-running on its own output changes nothing. Exit 0 on a decision; 2 on bad
 input with one `{"error": …}` line.
@@ -56,12 +60,16 @@ def main():
     if not isinstance(request, dict):
         fail("stdin must be one JSON object")
     today = day(request.get("today"), "today")
+    start = day(request.get("start"), "start", optional=True) or today + datetime.timedelta(days=1)
+    item_days = request.get("itemDays", 1)
+    if isinstance(item_days, bool) or not isinstance(item_days, int) or item_days < 1:
+        fail("itemDays must be a whole number of days, 1 or more")
     leaves, deferred = request.get("valueLeaves", []), request.get("deferred")
     if not isinstance(leaves, list) or not isinstance(deferred, list):
         fail("valueLeaves and deferred must be arrays")
     dues = [day(leaf.get("dueDate"), "a value leaf's dueDate", optional=True) for leaf in leaves if isinstance(leaf, dict)]
     dues = [d for d in dues if d]
-    boundary = max(dues) if dues else today - datetime.timedelta(days=1)
+    boundary = max(dues + [start - datetime.timedelta(days=1)])
 
     for item in deferred:
         if not isinstance(item, dict) or not isinstance(item.get("number"), str) or not item["number"]:
@@ -69,19 +77,24 @@ def main():
         groups = item.get("groups", [])
         if not isinstance(groups, list) or not all(isinstance(g, str) and g for g in groups):
             fail("groups must be an array of item numbers")
-    assignments, done, cursor = [], [], boundary
+    assignments, done, cursor, held = [], [], boundary, []
     for item in sorted(deferred, key=lambda i: number_key(i["number"])):
         if item.get("done"):
             done.append(item["number"])
             continue
         start = day(item.get("startDate"), "a deferred startDate", optional=True)
         due = day(item.get("dueDate"), "a deferred dueDate", optional=True)
-        if start and due and start > boundary and due >= start:
+        if start and due and start > cursor and due >= start:
             assignments.append({"number": item["number"], "startDate": start.isoformat(),
                                 "dueDate": due.isoformat(), "reason": "kept"})
+            held.append((start, due))
             continue
-        cursor += datetime.timedelta(days=1)
-        assignments.append({"number": item["number"], "startDate": cursor.isoformat(),
+        begins = cursor + datetime.timedelta(days=1)
+        for first, last in sorted(held):
+            if begins <= last and begins + datetime.timedelta(days=item_days - 1) >= first:
+                begins = last + datetime.timedelta(days=1)
+        cursor = begins + datetime.timedelta(days=item_days - 1)
+        assignments.append({"number": item["number"], "startDate": begins.isoformat(),
                             "dueDate": cursor.isoformat(), "reason": "scheduled"})
 
     span = None
@@ -100,4 +113,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except OverflowError:
+        fail("these dates run past the end of the calendar")

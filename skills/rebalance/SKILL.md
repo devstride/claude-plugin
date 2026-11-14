@@ -211,7 +211,9 @@ restore); it is the only write before 3a, and an overwritten probe date stops th
   **Touch only the marker line** — the rest is the owner's. A descendant marker that now disagrees
   is rewritten only with the owner's yes. Leafless units get this marker's coverage alone; a later
   `/devstride:plan <unit>` slices them at the new grain.
-- **3f. Re-date** — invoke **rationalize-gantt** in its **not-done-only** mode (it asks in its §0),
+- **3f. Re-date** — invoke **rationalize-gantt** in its **not-done-only** mode (its default),
+  with `item-days <N>` and, when it is after today, `start <date>` — the length and the earliest
+  start the plan's open leaves had BEFORE 3a, whose placeholders would reset both —
   pointed at the ENCLOSING PLAN ROOT even on a scoped run (walk `hierarchy` up to the outermost item
   of the plan): the cascade cannot reach outside the tree it is given, so re-dating one unit leaves
   sibling units' leaves dated against a moved predecessor — red lines under a success report. In

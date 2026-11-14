@@ -18,8 +18,9 @@ Argument — a parent item number to plan under (e.g. `I20100`), optionally a sh
 what is being planned, and optionally one **delivery profile** — the bare word `prototype`,
 `standard` or `extended` anywhere in the arguments (`/devstride:plan I20100 prototype`;
 step 0 resolves it, and it shapes leaf grain and spec depth per
-`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`); empty → ask which parent item
-to plan under: $ARGUMENTS
+`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`), `start <YYYY-MM-DD>` (the day
+the first story begins) and `item-days <N>` (the days one story is assumed to take; step 2's
+sign-off settles both); empty → ask which parent item to plan under: $ARGUMENTS
 
 ## Hard floors
 
@@ -145,8 +146,8 @@ consequence per bullet. Ask as many rounds as the ambiguity needs. Cover at mini
   remembered size (above range: ask once about merging, never refuse);
   the row also settles where foundation work (scaffold, CI, schema, harness) sits. Flag foundation stories (under `prototype`: "goes first inside its slice")
   and mark gate stories (release-blocking checks, leak guards) for step 5. Grain changes; dating
-  does not — step 6 still dates every leaf one synthetic day apart, because dates show dependency
-  depth, not effort.
+  does not — step 6 still gives every leaf the same assumed length (one synthetic day unless
+  `item-days` says otherwise), because dates show dependency depth, not effort.
 - **Sequencing intent** — genuinely parallel vs hard serial gate; the narrow critical-path spine vs
   the wide parallel waves around it.
 - **Depth/risk areas** — data model, module ownership, permission model: the user's call now, not a
@@ -177,6 +178,10 @@ tree in one message (no specs) and get an explicit **"yes, build this"**. Then, 
   `rebalance`'s job (marker AND re-slice). "Use the argument's profile" → stop, run `rebalance`,
   re-invoke; "keep the marker" → plan under it. A `Release scope: plan` line: only when the owner
   asks (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md`).
+- **Settle the start date and the item length here**: the arguments' `start` and `item-days`,
+  else ask for both, offering the defaults — the day after today, and one day per story (on the
+  EXTEND path, the start, when still ahead, and the length the plan's open stories already have). **A plan never starts today or
+  earlier unless the user names that day.** Step 6 passes on the length, and the start when named.
 - **Batch the auto-scheduler heads-up here**, not at the end: step 6 needs the organization-wide
   dependency propagation OFF. Run the canonical Enable Link Mode check now
   (`${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/references/auto-scheduler-off.md`) — read the
@@ -267,12 +272,12 @@ miscalibration.
 
 ## 6. Rationalize dates
 
-After step 5 verifies zero orphans, invoke `rationalize-gantt` on the plan root — never hand-compute
-dates. It owns the auto-scheduler check, the cascade math and the red-line review; fix a graph issue
+After step 5 verifies zero orphans, invoke `rationalize-gantt` on the plan root with the sign-off's
+`item-days <N>` and, when one was named, `start <date>`; never hand-compute dates. It owns the auto-scheduler check, the cascade math and the red-line review; fix a graph issue
 it traces to a step-5 wiring decision with `add_relationship`/`remove_relationship`, never by
 re-running the plan. **If it STOPS on a dependency cycle it wrote no dates at all**: fix the edges it
-names and re-invoke; never move on undated. On the EXTEND path, have it re-date **not-done items
-only** (it asks in its §0) so shipped items keep the completion dates `build-item`'s ritual stamped.
+names and re-invoke; never move on undated. On the EXTEND path it re-dates **not-done items
+only** (its default): shipped items keep the completion dates `build-item`'s ritual stamped.
 
 ## 6.5 Stamp execution-order numbers into leaf titles
 

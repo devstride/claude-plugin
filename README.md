@@ -473,7 +473,10 @@ With the plugin installed, DevStride connected, and a config file in place:
 
 Pass the item you want to plan under — a Module, Capability, or Epic in your DevStride
 organization. This is an interactive discovery loop, not a document generator: it asks about scope,
-sequencing and trade-offs, and creates nothing until you have signed off on the shape.
+sequencing and trade-offs, and creates nothing until you have signed off on the shape. At that
+sign-off it also asks when the plan starts and how long one story is assumed to take (the day
+after today and one day, unless you say otherwise); `start 2026-12-01` and `item-days 2` after
+the item number answer both up front.
 
 Then execute what you planned, one item at a time:
 
@@ -572,7 +575,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.62.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.63.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

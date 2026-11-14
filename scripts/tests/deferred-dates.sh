@@ -26,9 +26,27 @@ expect "an item dated before the boundary (a creation placeholder) is reschedule
 expect "a Done item is untouched and listed" \
   "{\"today\":\"2026-10-01\",\"valueLeaves\":$LEAVES,\"deferred\":[{\"number\":\"I9\",\"done\":true,\"startDate\":\"2026-08-01\",\"dueDate\":\"2026-08-01\"},{\"number\":\"I10\"}]}" \
   "[d['untouchedDone'],$DATES]" '[["I9"], [["I10", "2026-11-02", "2026-11-02", "scheduled"]]]'
-expect "no value leaves: the block starts today" \
+expect "no value leaves: the block starts the day after today, never today" \
   '{"today":"2026-11-04","valueLeaves":[],"deferred":[{"number":"I9"}]}' \
-  "[d['boundary'],$DATES]" '["2026-11-03", [["I9", "2026-11-04", "2026-11-04", "scheduled"]]]'
+  "[d['boundary'],$DATES]" '["2026-11-04", [["I9", "2026-11-05", "2026-11-05", "scheduled"]]]'
+expect "value leaves that all ended in the past: deferred items still start the day after today" \
+  '{"today":"2026-11-14","valueLeaves":[{"number":"I1","dueDate":"2026-10-30"},{"number":"I2","dueDate":"2026-11-01"}],"deferred":[{"number":"I9"},{"number":"I10"}]}' \
+  "[d['boundary'],$DATES]" '["2026-11-14", [["I9", "2026-11-15", "2026-11-15", "scheduled"], ["I10", "2026-11-16", "2026-11-16", "scheduled"]]]'
+expect "run again a day later after the plan has ended: every deferred item moves on a day and no two share one" \
+  '{"today":"2026-11-15","valueLeaves":[{"number":"I1","dueDate":"2026-10-30"}],"deferred":[{"number":"I9","startDate":"2026-11-15","dueDate":"2026-11-15"},{"number":"I10","startDate":"2026-11-16","dueDate":"2026-11-16"},{"number":"I11","startDate":"2026-11-17","dueDate":"2026-11-17"}]}' \
+  "$DATES" '[["I9", "2026-11-16", "2026-11-16", "scheduled"], ["I10", "2026-11-17", "2026-11-17", "scheduled"], ["I11", "2026-11-18", "2026-11-18", "scheduled"]]'
+expect "a new item filed after the others were dated steps past the days they hold" \
+  '{"today":"2026-11-14","valueLeaves":[{"number":"I1","dueDate":"2026-12-20"}],"deferred":[{"number":"I9","startDate":"2026-12-21","dueDate":"2026-12-21"},{"number":"I10","startDate":"2026-12-22","dueDate":"2026-12-22"},{"number":"I30"}]}' \
+  "$DATES" '[["I9", "2026-12-21", "2026-12-21", "kept"], ["I10", "2026-12-22", "2026-12-22", "kept"], ["I30", "2026-12-23", "2026-12-23", "scheduled"]]'
+expect "itemDays: a scheduled item never overlaps a kept span before it" \
+  '{"today":"2026-11-14","itemDays":3,"valueLeaves":[{"number":"I1","dueDate":"2026-12-20"}],"deferred":[{"number":"I9"},{"number":"I10","startDate":"2026-12-27","dueDate":"2026-12-29"},{"number":"I12"}]}' \
+  "$DATES" '[["I9", "2026-12-21", "2026-12-23", "scheduled"], ["I10", "2026-12-27", "2026-12-29", "kept"], ["I12", "2026-12-24", "2026-12-26", "scheduled"]]'
+expect "a plan start date: deferred items never begin before it" \
+  '{"today":"2026-11-14","start":"2026-12-01","valueLeaves":[{"number":"I1","dueDate":"2026-10-30"}],"deferred":[{"number":"I9"}]}' \
+  "[d['boundary'],$DATES]" '["2026-11-30", [["I9", "2026-12-01", "2026-12-01", "scheduled"]]]'
+expect "a plan that ends after its start date: deferred items follow its last leaf" \
+  '{"today":"2026-11-14","start":"2026-12-01","valueLeaves":[{"number":"I1","dueDate":"2026-12-06"}],"deferred":[{"number":"I9"}]}' \
+  "[d['boundary'],$DATES]" '["2026-12-06", [["I9", "2026-12-07", "2026-12-07", "scheduled"]]]'
 expect "a future start with no due date is scheduled, not kept" \
   "{\"today\":\"2026-10-01\",\"valueLeaves\":$LEAVES,\"deferred\":[{\"number\":\"I9\",\"startDate\":\"2026-12-15\"}]}" \
   "$DATES" '[["I9", "2026-11-02", "2026-11-02", "scheduled"]]'
@@ -54,7 +72,15 @@ expect "a later boundary reschedules items the previous run placed" \
   '{"today":"2026-10-01","valueLeaves":[{"number":"I1","dueDate":"2026-11-05"}],"deferred":[{"number":"I9","startDate":"2026-11-02","dueDate":"2026-11-02"},{"number":"I10","startDate":"2026-11-03","dueDate":"2026-11-03"}]}' \
   "$DATES" '[["I9", "2026-11-06", "2026-11-06", "scheduled"], ["I10", "2026-11-07", "2026-11-07", "scheduled"]]'
 
-for bad_input in 'not json' '{"valueLeaves":[],"deferred":[]}' '{"today":"2026-13-40","deferred":[]}' '{"today":"2026-11-04","deferred":"x"}' '{"today":"2026-11-04","deferred":[{"startDate":"2026-11-01"}]}' '{"today":"2026-11-04","deferred":[{"number":5}]}' '{"today":"2026-11-04","deferred":[{"number":"I1","groups":"I0"}]}' '{"today":"2026-11-04","deferred":[{"number":"I1","groups":[[]]}]}'; do
+expect "itemDays 3: each scheduled item spans three days and the next starts the day after" \
+  "{\"today\":\"2026-10-01\",\"itemDays\":3,\"valueLeaves\":$LEAVES,\"deferred\":[{\"number\":\"I9\"},{\"number\":\"I10\"}]}" \
+  "[$DATES,d['containerSpan']]" \
+  '[[["I9", "2026-11-02", "2026-11-04", "scheduled"], ["I10", "2026-11-05", "2026-11-07", "scheduled"]], {"startDate": "2026-11-02", "dueDate": "2026-11-07"}]'
+expect "itemDays: a kept item keeps its own length and uses up no slot" \
+  "{\"today\":\"2026-10-01\",\"itemDays\":2,\"valueLeaves\":$LEAVES,\"deferred\":[{\"number\":\"I9\",\"startDate\":\"2026-12-15\",\"dueDate\":\"2026-12-15\"},{\"number\":\"I10\"}]}" \
+  "$DATES" '[["I9", "2026-12-15", "2026-12-15", "kept"], ["I10", "2026-11-02", "2026-11-03", "scheduled"]]'
+
+for bad_input in 'not json' '{"valueLeaves":[],"deferred":[]}' '{"today":"2026-13-40","deferred":[]}' '{"today":"2026-11-04","deferred":"x"}' '{"today":"2026-11-04","deferred":[{"startDate":"2026-11-01"}]}' '{"today":"2026-11-04","deferred":[{"number":5}]}' '{"today":"2026-11-04","deferred":[{"number":"I1","groups":"I0"}]}' '{"today":"2026-11-04","deferred":[{"number":"I1","groups":[[]]}]}' '{"today":"2026-11-04","start":"soon","deferred":[]}' '{"today":"2026-11-04","itemDays":4000000,"deferred":[{"number":"I1"},{"number":"I2"}]}' '{"today":"2026-11-04","itemDays":0,"deferred":[]}' '{"today":"2026-11-04","itemDays":"2","deferred":[]}' '{"today":"2026-11-04","itemDays":true,"deferred":[]}'; do
   out="$(run "$bad_input")"; rc=$?
   if [ "$rc" = 2 ] && printf '%s' "$out" | python3 -c 'import json,sys; assert "error" in json.load(sys.stdin)' 2>/dev/null; then ok "malformed input exits 2 with a JSON error ($bad_input)"; else bad "malformed $bad_input -> rc=$rc $out"; fi
 done

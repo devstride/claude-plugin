@@ -8,6 +8,82 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.63.0] — 2026-11-14
+
+### Added
+
+- **A plan starts on a date you choose, and each story has a length you choose.**
+  `/devstride:plan` and `/devstride:rationalize-gantt` take two new options: `start <YYYY-MM-DD>`,
+  the day the plan's first story begins, and `item-days <N>`, how many calendar days one story is
+  assumed to take. `plan` asks for both at its sign-off when the arguments do not give them, and
+  `rationalize-gantt` asks in its opening confirmation. The defaults are the day after today and
+  one day per story; a run with nobody to ask uses what its caller passed, else the defaults.
+  Run again later, the pass keeps the length most of the plan's open stories already have
+  and, when its open stories all still lie ahead, their start date, unless you name another; extending or
+  re-slicing a plan keeps both.
+
+### Changed
+
+- **A new plan is no longer dated into the past.** The dating pass used to put the plan's last
+  story on today and count every earlier story back one day, so a plan was overdue from the moment
+  it was created, and finishing its first story left that story dated after the ones waiting on
+  it. It now counts forward from the start date: the first stories begin there, every story
+  begins after the stories it waits on are due (the day after, along the longest chain), and no
+  day in between is empty. A plan never starts today or earlier unless you name that day.
+- **Finished stories keep their dates by default.** `rationalize-gantt` now re-dates only the
+  stories still open unless you ask for everything, so a story that was built keeps the day it was
+  finished. When a finished story is not over before an open story waiting on it would begin,
+  the open stories all move later by the fewest days that fix it, and the report says so. A
+  dependency line between two finished stories is left exactly as it is.
+- **The dates come from a tested script.** The cascade is computed by
+  `skills/rationalize-gantt/scripts/cascade-dates.py` instead of a calculation written fresh on
+  each run. It also finds dependency cycles, names only the stories really in one, and writes no
+  dates when it finds one. Items parked in the deferred container follow the plan at the same
+  length per item, are never dated before the plan's start, and a newly parked item no longer lands on a day
+  another already holds.
+- **The expected-model rule says in words what the defaults mean.** Planning expects `fable` and
+  building expects `opus`: family names, so `/model fable` or `/model opus` picks the newest model
+  of that family with no change to the plugin, and a repository that wants another model or a pinned version sets
+  `sessionModels.planning.model` or `sessionModels.runner.model`. The behaviour is unchanged.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.62.0 @ 94b2d5e, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.62.0 | tokens@devstride--v3.62.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,096 | 10,699 | 32,096 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,855 | 8,285 | 25,535 | 8,512 | +227 | 8,512 |
+| skills/doctor/SKILL.md | 23,994 | 7,998 | 23,994 | 7,998 | +0 | 8,000 |
+| skills/build-item/SKILL.md | 23,974 | 7,992 | 23,974 | 7,992 | +0 | 7,999 |
+| skills/review/SKILL.md | 23,970 | 7,990 | 23,970 | 7,990 | +0 | 7,999 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
+| skills/rebalance/SKILL.md | 17,889 | 5,963 | 18,067 | 6,023 | +60 | 6,023 |
+| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 11,963 | 3,988 | +796 | 3,988 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,731 | 2,244 | 6,731 | 2,244 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-story/SKILL.md | 6,322 | 2,108 | 6,322 | 2,108 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 5,580 | 1,860 | 5,580 | 1,860 | +0 | 1,860 |
+| skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 272,750 | 90,924 | 275,996 | 92,007 | +1083 | |
+
 ## [3.62.0] — 2026-11-13
 
 ### Added
@@ -5477,7 +5553,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.62.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.63.0...HEAD
+[3.63.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.62.0...devstride--v3.63.0
 [3.62.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.61.1...devstride--v3.62.0
 [3.61.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.61.0...devstride--v3.61.1
 [3.61.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.60.0...devstride--v3.61.0
