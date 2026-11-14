@@ -49,8 +49,8 @@ dates (a landed leaf — merged status or a "merged onto"
 comment, awaiting its epic's release
 (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`) — counts as done);
 (c) the start date and the item length — the arguments' `start` and `item-days`, else ASK for
-both here, offering the defaults: the day after today, and the length the open stories already
-share (one day when they share none). **A plan never starts today or earlier unless the user names
+both here, offering the defaults: the day after today (or the day the open stories already start
+on, when later), and the length most open stories already have (one day when none is dated). **A plan never starts today or earlier unless the user names
 that day.** A run another skill invoked, or one with nobody to ask, never asks: it uses what its
 caller passed, else the defaults; (d) the deferred items: resolve the plan root's deferred container and
 its `members` with `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`
@@ -84,8 +84,9 @@ merged); read `args` defensively — `const items = Array.isArray(args) ? args :
   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/scripts/cascade-dates.py`: `leaves` is
   every leaf outside the deferred container, `blockedBy` its step-2 referenceIds, `groups` every
   container above it up to and including the root, and EVERY leaf carries its existing dates.
-  `start` and `itemDays` are step 0's, each sent only when named: absent, the script uses the day
-  after `today` and the length the open leaves already share, else one day (`itemDaysFrom`). In
+  `start` and `itemDays` are step 0's — but a day-after-today start is left out, and a run that
+  never asked sends only what its caller passed: absent, the script uses the day after `today` and
+  the length most open leaves already have, else one day (`itemDaysFrom`). In
   not-done-only mode each Done or landed leaf also carries `"fixed": true` and is never re-dated.
 - **Exit 1 is a DEPENDENCY CYCLE → STOP: write not a single date** (`plan` relies on this pass to
   catch cycles). `cycles` lists only the TRUE members — strongly connected components of size > 1,
@@ -127,8 +128,8 @@ entry writes nothing. Related-only items cannot trigger propagation. No member �
 For EVERY `blocked_by` edge X→D whose dependent X this pass dated, a violation is
 `start(X) ≤ due(D)`. Two sources dominate: coarse links to a whole CONTAINER whose span reaches the
 plan's end (the bulk of the reds), and links to items outside the tree — fetch D's real date; it is
-often already Done and dated early. **An edge whose dependent kept its dates (a `fixed` leaf) is
-history**: count the red ones for the report; never rationalize one.
+often already Done and dated early. **An edge whose dependent kept its dates (a `fixed` leaf, or a container whose leaves
+are all fixed) is history**: count the red ones for the report; never rationalize one.
 
 ## 6. Rationalize each violated edge — judge necessity, never blindly offset
 
@@ -154,7 +155,8 @@ remove plus an add. Omit `staticMode` per
 
 Recompute violations over the UPDATED graph (your removes/repoints plus the known external dates)
 and assert ZERO remain among the edges whose dependent this pass dated. Report the start date and
-item length used (and a held start), how many red edges between finished stories were left alone, the
+item length used (and a held start), how many red edges whose dependent kept its dates were left alone (naming any whose blocker is
+still open), the
 distribution per start day (first → last), the edge changes
 (removed / repointed / kept-with-offset) and any offsets, and one deferred line: how many items
 were dated and from which day to which, how many kept their own date, how many Done were left

@@ -32,6 +32,9 @@ expect "no value leaves: the block starts the day after today, never today" \
 expect "value leaves that all ended in the past: deferred items still start the day after today" \
   '{"today":"2026-11-14","valueLeaves":[{"number":"I1","dueDate":"2026-10-30"},{"number":"I2","dueDate":"2026-11-01"}],"deferred":[{"number":"I9"},{"number":"I10"}]}' \
   "[d['boundary'],$DATES]" '["2026-11-14", [["I9", "2026-11-15", "2026-11-15", "scheduled"], ["I10", "2026-11-16", "2026-11-16", "scheduled"]]]'
+expect "run again a day later after the plan has ended: every deferred item moves on a day and no two share one" \
+  '{"today":"2026-11-15","valueLeaves":[{"number":"I1","dueDate":"2026-10-30"}],"deferred":[{"number":"I9","startDate":"2026-11-15","dueDate":"2026-11-15"},{"number":"I10","startDate":"2026-11-16","dueDate":"2026-11-16"},{"number":"I11","startDate":"2026-11-17","dueDate":"2026-11-17"}]}' \
+  "$DATES" '[["I9", "2026-11-16", "2026-11-16", "scheduled"], ["I10", "2026-11-17", "2026-11-17", "scheduled"], ["I11", "2026-11-18", "2026-11-18", "scheduled"]]'
 expect "a plan start date: deferred items never begin before it" \
   '{"today":"2026-11-14","start":"2026-12-01","valueLeaves":[{"number":"I1","dueDate":"2026-10-30"}],"deferred":[{"number":"I9"}]}' \
   "[d['boundary'],$DATES]" '["2026-11-30", [["I9", "2026-12-01", "2026-12-01", "scheduled"]]]'

@@ -13,9 +13,10 @@ one JSON line on stdout:
       "outsideEdges": [{"number", "blockedBy"}…], "fixed": […]}
 
 `start` is the first day of the earliest leaf this pass dates; absent, it is the day after `today`.
-`itemDays` is how many calendar days one leaf is assumed to take. Absent, it is the length the
-dated open leaves already share (`itemDaysFrom` "existing"), or 1 when they differ or none is
-dated ("default"). A leaf marked `fixed` (Done or landed, when only open items are re-dated) is
+`itemDays` is how many calendar days one leaf is assumed to take. Absent, it is the length most
+of the dated open leaves already have, the longer on a tie (`itemDaysFrom` "existing": a newly
+created leaf is a one-day placeholder, so the plan's own length outnumbers or outlasts it), or 1
+when none is dated ("default"). A leaf marked `fixed` (Done or landed, when only open items are re-dated) is
 never assigned and keeps the dates it carries. Every other leaf is OPEN.
 
 Depth uses only edges between two open leaves: a leaf no open leaf is blocked by has depth 0, and
@@ -208,9 +209,12 @@ def main():
 
     item_days_from = "given"
     if item_days is None:
-        spans = {(leaves[n]["dueDate"] - leaves[n]["startDate"]).days + 1 for n in open_leaves
-                 if leaves[n]["startDate"] and leaves[n]["dueDate"]}
-        item_days, item_days_from = (spans.pop(), "existing") if len(spans) == 1 and min(spans) >= 1 else (1, "default")
+        spans = [(leaves[n]["dueDate"] - leaves[n]["startDate"]).days + 1 for n in open_leaves
+                 if leaves[n]["startDate"] and leaves[n]["dueDate"]]
+        spans = [s for s in spans if s >= 1]
+        item_days, item_days_from = 1, "default"
+        if spans:
+            item_days, item_days_from = max(set(spans), key=lambda s: (spans.count(s), s)), "existing"
 
     deepest = max(depth.values()) if depth else 0
     begins = {n: requested + datetime.timedelta(days=(deepest - depth[n]) * item_days) for n in open_leaves}

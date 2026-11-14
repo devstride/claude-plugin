@@ -70,8 +70,15 @@ expect "no itemDays: the length the dated open leaves already share is kept" \
   '{"today":"2026-11-14","start":"2026-12-01","leaves":[{"number":"I1","startDate":"2026-11-01","dueDate":"2026-11-03"},{"number":"I2","blockedBy":["I1"],"startDate":"2026-11-04","dueDate":"2026-11-06"},{"number":"I3","blockedBy":["I2"]},{"number":"I4","fixed":true,"startDate":"2026-10-01","dueDate":"2026-10-09"}]}' \
   "[d['itemDays'],d['itemDaysFrom'],$DATES]" \
   '[3, "existing", [["I1", "2026-12-01", "2026-12-03"], ["I2", "2026-12-04", "2026-12-06"], ["I3", "2026-12-07", "2026-12-09"]]]'
-expect "no itemDays and open leaves of different lengths, or none dated: one day" \
-  '{"today":"2026-11-14","leaves":[{"number":"I1","startDate":"2026-11-01","dueDate":"2026-11-03"},{"number":"I2","startDate":"2026-11-04","dueDate":"2026-11-04"}]}' \
+expect "no itemDays, a three-day plan with a new one-day placeholder: the length most open leaves have is kept" \
+  '{"today":"2026-11-14","start":"2026-12-01","leaves":[{"number":"I9","fixed":true,"startDate":"2026-11-10","dueDate":"2026-11-12"},{"number":"I10","blockedBy":["I9"],"startDate":"2026-12-01","dueDate":"2026-12-03"},{"number":"I11","blockedBy":["I10"],"startDate":"2026-12-04","dueDate":"2026-12-06"},{"number":"I50","blockedBy":["I11"],"startDate":"2026-11-14","dueDate":"2026-11-14"}]}' \
+  "[d['itemDays'],d['itemDaysFrom'],$DATES]" \
+  '[3, "existing", [["I10", "2026-12-01", "2026-12-03"], ["I11", "2026-12-04", "2026-12-06"], ["I50", "2026-12-07", "2026-12-09"]]]'
+expect "no itemDays, as many placeholders as real stories: the longer length wins the tie" \
+  '{"today":"2026-11-14","leaves":[{"number":"I1","startDate":"2026-11-01","dueDate":"2026-11-03"},{"number":"I2","startDate":"2026-11-14","dueDate":"2026-11-14"}]}' \
+  "[d['itemDays'],d['itemDaysFrom']]" '[3, "existing"]'
+expect "no itemDays and no open leaf with both dates in order: one day" \
+  '{"today":"2026-11-14","leaves":[{"number":"I1","startDate":"2026-11-05","dueDate":"2026-11-03"},{"number":"I2","startDate":"2026-11-04"},{"number":"I3","fixed":true,"startDate":"2026-10-01","dueDate":"2026-10-09"}]}' \
   "[d['itemDays'],d['itemDaysFrom']]" '[1, "default"]'
 expect "a given itemDays wins over the length the leaves carry" \
   '{"today":"2026-11-14","itemDays":2,"leaves":[{"number":"I1","startDate":"2026-11-01","dueDate":"2026-11-03"}]}' \

@@ -16,8 +16,8 @@ for what each version component means here and how a release is cut.
   assumed to take. `plan` asks for both at its sign-off when the arguments do not give them, and
   `rationalize-gantt` asks in its opening confirmation. The defaults are the day after today and
   one day per story; a run with nobody to ask uses what its caller passed, else the defaults.
-  Run again on a plan whose open stories already share a length, the pass keeps that length
-  unless you name another.
+  Run again later, the pass keeps the length most of the plan's open stories already have
+  unless you name another, and re-slicing a plan keeps its start date and its story length.
 
 ### Changed
 

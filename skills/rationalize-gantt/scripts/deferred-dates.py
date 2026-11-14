@@ -15,9 +15,10 @@ on stdin, writes one JSON line on stdout:
 `valueLeaves` carry the dates the cascade just computed for every non-deferred leaf (plus the
 existing dates of Done leaves in not-done-only mode). The boundary is their latest `dueDate`, but
 never earlier than the day before `start` (the plan's start date; absent, the day after `today`),
-so a deferred item is never dated before the plan starts, nor today or earlier by default. An open item whose start is after the boundary and
-whose due date is present and not before it keeps both dates ("kept") and uses up no day; every
-other open item gets the next free day after the boundary, in ascending item-number order
+so a deferred item is never dated before the plan starts, nor today or earlier by default. Items
+are taken in ascending item-number order. An open item that starts after the boundary and after
+every item scheduled before it, and whose due date is present and not before its start, keeps both
+dates ("kept") and uses up no day; every other open item gets the next free day after the boundary
 ("scheduled"): with `itemDays` 1 (the default) start = due = boundary + 1, + 2, …; with more, each
 item spans `itemDays` calendar days and the next starts the day after it is due. Done items are never assigned. `groups` names the container and intermediate nodes
 above an item; `groupSpans` gives each its span over the assignments of its own items. Weekends
@@ -82,7 +83,7 @@ def main():
             continue
         start = day(item.get("startDate"), "a deferred startDate", optional=True)
         due = day(item.get("dueDate"), "a deferred dueDate", optional=True)
-        if start and due and start > boundary and due >= start:
+        if start and due and start > cursor and due >= start:
             assignments.append({"number": item["number"], "startDate": start.isoformat(),
                                 "dueDate": due.isoformat(), "reason": "kept"})
             continue
