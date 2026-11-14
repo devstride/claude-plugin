@@ -22,6 +22,11 @@ expect "no match: create" match '{"title":"Deferred","children":[]}' '[d["contai
 expect "an empty legacy entry is skipped, never a refusal" match '{"title":"Deferred","legacyTitles":["Deferred defects",""],"children":[{"number":"I38","title":"Deferred"}]}' 'd["container"]' '"I38"'
 expect "a configured list never removes the built-in legacy title" match '{"title":"Deferred","legacyTitles":["Something else"],"children":[{"number":"I37","title":"Deferred defects"}]}' 'd["container"]' '"I37"'
 
+expect "settle: an open epic whose stories are all Done closes, then the plan" settle '{"root":{"number":"I1","done":false},"containers":[],"nodes":[{"number":"I2","parentNumber":"I1","leaf":false,"done":false},{"number":"I3","parentNumber":"I2","leaf":true,"done":true}]}' '[d["close"],d["root"],d["openValue"]]' '[["I2"], "close", []]'
+expect "settle: an epic with an open story stays open and so does the plan" settle '{"root":{"number":"I1","done":false},"containers":[],"nodes":[{"number":"I2","parentNumber":"I1","leaf":false,"done":false},{"number":"I3","parentNumber":"I2","leaf":true,"done":false}]}' '[d["close"],d["root"],d["openValue"]]' '[[], "keep-open", ["I3"]]'
+expect "settle: an empty open epic outside the container holds the plan open" settle '{"root":{"number":"I1","done":false},"containers":[],"nodes":[{"number":"I2","parentNumber":"I1","leaf":false,"done":false}]}' '[d["close"],d["root"],d["openValue"]]' '[[], "keep-open", ["I2"]]'
+expect "settle: a duplicate container's finished contents close it and do not hold the plan open" settle '{"root":{"number":"I1","done":false},"containers":["I9","I20"],"nodes":[{"number":"I2","parentNumber":"I1","leaf":true,"done":true},{"number":"I9","parentNumber":"I1","leaf":false,"done":true},{"number":"I20","parentNumber":"I1","leaf":false,"done":false},{"number":"I21","parentNumber":"I20","leaf":true,"done":true}]}' '[d["close"],d["root"],d["openValue"]]' '[["I20"], "close", []]'
+expect "settle: open work under a duplicate container is deferred work" settle '{"root":{"number":"I1","done":false},"containers":["I9","I20"],"nodes":[{"number":"I9","parentNumber":"I1","leaf":false,"done":true},{"number":"I20","parentNumber":"I1","leaf":false,"done":false},{"number":"I21","parentNumber":"I20","leaf":true,"done":false}]}' '[d["openDeferred"],d["openValue"],d["root"]]' '[["I21"], [], "keep-open"]'
 for bad_input in 'not json' '{"children":[]}' '{"title":"Deferred","children":"x"}' '{"title":"Deferred","legacyTitles":"x","children":[]}' '{"title":"Deferred","legacyTitles":[5],"children":[]}' '{"title":"Deferred","children":[{"number":5,"title":"Deferred"}]}' '{"title":"Deferred","children":[{"number":"I5"}]}'; do
   out="$(run match "$bad_input")"; rc=$?
   if [ "$rc" = 2 ] && printf '%s' "$out" | python3 -c 'import json,sys; assert "error" in json.load(sys.stdin)' 2>/dev/null; then ok "malformed match input exits 2 with a JSON error ($bad_input)"; else bad "malformed $bad_input -> rc=$rc $out"; fi
@@ -34,5 +39,24 @@ expect "members: two containers are both honoured" members "{\"containers\":[\"I
 expect "members: a parent cycle terminates" members '{"containers":["I1"],"nodes":[{"number":"I8","parentNumber":"I9"},{"number":"I9","parentNumber":"I8"},{"number":"I2","parentNumber":"I1"}]}' 'd["members"]' '["I1", "I2"]'
 out="$(run members '{"containers":"I1","nodes":[]}')"; [ $? = 2 ] && ok "malformed members input exits 2" || bad "malformed members -> $out"
 out="$(run members '{"containers":["I1"],"nodes":[{"number":"I2"}]}')"; [ $? = 2 ] && ok "a node without parentNumber exits 2" || bad "missing parentNumber -> $out"
+
+# settle: what closes (deferred-container.md "Closing"). I1 root; I2 epic, I3/I4 its stories; I9 the container, I10 a story, I11 a defect.
+N() { printf '{"number":"%s","parentNumber":"%s","leaf":%s,"done":%s}' "$1" "$2" "$3" "$4"; }
+TREE() { printf '[%s,%s,%s,%s,%s,%s]' "$(N I2 I1 false "$1")" "$(N I3 I2 true "$2")" "$(N I4 I2 true "$3")" "$(N I9 I1 false "$4")" "$(N I10 I9 true "$5")" "$(N I11 I9 true "$6")"; }
+SET() { printf '{"root":{"number":"I1","done":%s},"containers":["I9"],"nodes":%s}' "$1" "$2"; }
+expect "settle: everything finished closes the container, then the plan" settle "$(SET false "$(TREE true true true false true true)")" '[d["close"],d["root"],d["openDeferred"],d["openValue"]]' '[["I9"], "close", [], []]'
+expect "settle: unbuilt deferred work keeps the container and the plan open (owner decision)" settle "$(SET false "$(TREE true true true false false true)")" '[d["close"],d["root"],d["openDeferred"]]' '[[], "keep-open", ["I10"]]'
+expect "settle: deferred work finished but the plan's own work open closes only the container" settle "$(SET false "$(TREE false true false false true true)")" '[d["close"],d["root"],d["openValue"]]' '[["I9"], "keep-open", ["I4"]]'
+expect "settle: an open epic whose stories are all Done closes with the plan (no release closes it)" settle "$(SET false "$(TREE false true true true true true)")" '[d["close"],d["root"],d["openValue"]]' '[["I2"], "close", []]'
+expect "settle: a new filing under a closed container reopens it and the plan" settle "$(SET true "$(TREE true true true true false true)")" '[d["reopen"],d["close"],d["root"]]' '[["I9"], [], "reopen"]'
+expect "settle: a finished, closed plan stays done" settle "$(SET true "$(TREE true true true true true true)")" '[d["close"],d["reopen"],d["root"]]' '[[], [], "done"]'
+expect "settle: an empty open container closes" settle "$(SET false "[$(N I2 I1 false true),$(N I9 I1 false false)]")" '[d["close"],d["root"]]' '[["I9"], "close"]'
+expect "settle: no container, plan finished" settle '{"root":{"number":"I1","done":false},"containers":[],"nodes":[{"number":"I3","parentNumber":"I1","leaf":true,"done":true}]}' '[d["close"],d["root"]]' '[[], "close"]'
+NEST="[$(N I9 I1 false false),$(N I12 I9 false false),$(N I13 I12 true true),$(N I14 I9 true true)]"
+expect "settle: a nested node inside the container closes before the container" settle "$(SET false "$NEST")" 'd["close"]' '["I12", "I9"]'
+for bad_input in '{"containers":[],"nodes":[]}' '{"root":{"number":"I1","done":"no"},"containers":[],"nodes":[]}' '{"root":{"number":"I1","done":false},"containers":["I9"],"nodes":[]}' '{"root":{"number":"I1","done":false},"containers":"I9","nodes":[]}' '{"root":{"number":"I1","done":false},"containers":[],"nodes":[{"number":"I2","parentNumber":"I1","leaf":true}]}' '{"root":{"number":"I1","done":false},"containers":[],"nodes":[{"number":"I1","parentNumber":null,"leaf":false,"done":false}]}'; do
+  out="$(run settle "$bad_input")"; rc=$?
+  if [ "$rc" = 2 ]; then ok "malformed settle input exits 2 ($bad_input)"; else bad "malformed settle $bad_input -> rc=$rc $out"; fi
+done
 
 [ "$FAIL" -eq 0 ]

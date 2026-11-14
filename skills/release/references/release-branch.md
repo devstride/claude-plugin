@@ -199,6 +199,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    marked Done: <subject>" — never guess. For each kept item: `update_item` → Done with `dueDate`
    today, then `add_comment` "reached <releaseSource> with release <name> (release train pull
    request #<n>)". Nothing was recorded on the items beforehand; the git history is the record.
+   Then run **Closing** (build-item's `deferred-container.md`) once per plan root above them.
 7. **Bring the live train up to date now**, not at close-out: `git fetch origin <releaseSource>
    <train>` first (the merge happened on GitHub, so local refs are stale), then
    `git merge-base --is-ancestor origin/<train> origin/<releaseSource>` → fast-forward it
