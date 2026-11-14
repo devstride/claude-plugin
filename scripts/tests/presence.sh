@@ -13,6 +13,7 @@ cleanup() { # stop the stand-in owners and every keeper the cases started (keepe
 }
 trap cleanup EXIT
 export XDG_CACHE_HOME="$WORK/cache"
+export CLAUDE_CONFIG_DIR="$WORK/claude"   # Claude Code's own session status files (case 38b) live here
 unset CLAUDE_PID CLAUDE_CODE_SESSION_ID   # the cases name their own stand-in process
 RECORDS="$XDG_CACHE_HOME/devstride-plugin/presence"
 LOG="$WORK/sent.log"
@@ -612,7 +613,7 @@ settle() { sleep 0.6; }   # three keeper checks at DEVSTRIDE_PRESENCE_MINUTE=1
 : > "$LOG"; O37="$(owner)"; T37="$WORK/t37.jsonl"
 entry "$T37" prompt,assistant >/dev/null
 DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O37" fire SessionStart s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 1
-age s37 61; CLAUDE_PID="$O37" fire UserPromptSubmit s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 2
+age s37 61; DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O37" fire UserPromptSubmit s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 2
 fire PreToolUse s37 "$K60" "" "$(tool Bash i1)" >/dev/null; settle
 BEFORE37="$(rec s37 'r["state"], len(r["tools"])')"; sleep 0.05
 M37="$(entry "$T37" esc-tool,bookkeeping,helper)"; settle
@@ -621,7 +622,7 @@ age s37 31; upto s37 3
 fire PreToolUse s37 "$K60" "" "$(tool Read h37 helper-37)" >/dev/null; settle   # a helper that outlived the Esc works on; no prompt
 HELPER37="$(rec s37 'r["state"], len(r["tools"]), r["interrupt"]')"            # the same interrupt is not applied a second time
 fire Stop s37 "$K60" >/dev/null                                               # the helper is done: waiting again, as reported
-age s37 31; CLAUDE_PID="$O37" fire UserPromptSubmit s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 4; settle
+age s37 31; DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O37" fire UserPromptSubmit s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 4; settle
 AGAIN37="$(rec s37 'r["state"]')"
 M37B="$(entry "$T37" esc)"; settle; age s37 31; upto s37 5   # interrupted again, while Claude was writing
 if [ "$BEFORE37" = "('working', 1)" ] && [ "$HELD37" = "('waiting', 0, $M37, $M37)" ] && [ "$N37" = 2 ] \
@@ -660,6 +661,50 @@ if [ "$D38" = "$WANT38" ] && [ "$N38" = 2 ] && [ "$(of s38 3 PRESENCE_STATE)" = 
   ok "(38) an interrupt that is stale, answered, a helper's, untimed, typed, cut mid-line, behind a symlink or missing, or a session not working → nothing; a real one after them → waiting"
 else bad "(38) got=$D38 n=$N38 $(grep '"s38"' "$LOG") $(cat "$RECORDS/s38.json")"; fi
 stop_keeper s38
+
+# (38b) an Esc while the model is still thinking writes no transcript entry and fires no hook, but
+#       Claude Code's own status file for the session's process turns "idle": a working session whose
+#       file says idle → waiting at that time, sent as a held change, and not applied again after the
+#       next prompt; a busy file, an idle time before the last prompt or activity, another session or
+#       process, a symlink, background work left running or a failed turn → nothing
+status() { # status OWNER SESSION STATUS [AGE-MS] [PID] — write Claude Code's status file; prints its time
+  python3 - "$CLAUDE_CONFIG_DIR/sessions" "$1" "$2" "$3" "${4:-0}" "${5:-$1}" <<'PY'
+import json, os, sys, time
+d, owner, sid, st, age, pid = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4], int(sys.argv[5]), int(sys.argv[6])
+os.makedirs(d, exist_ok=True); ms = int(time.time() * 1000) - age; p = os.path.join(d, "%d.json" % owner)
+json.dump({"pid": pid, "sessionId": sid, "status": st, "statusUpdatedAt": ms, "updatedAt": ms}, open(p + ".t", "w"))
+os.replace(p + ".t", p); print(ms)
+PY
+}
+: > "$LOG"; O38B="$(owner)"; T38B="$WORK/t38b.jsonl"; D38B=""
+entry "$T38B" prompt,assistant >/dev/null
+DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O38B" fire SessionStart s38b "$K60" "" "$(transcript "$T38B")" >/dev/null; upto s38b 1
+for _ in $(seq 50); do keeper_alive s38b && break; sleep 0.1; done   # its keeper (one check a second) holds the lock before any step
+age s38b 61; DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O38B" fire UserPromptSubmit s38b "$K60" "" "$(transcript "$T38B")" >/dev/null; upto s38b 2
+entry "$T38B" prompt >/dev/null   # the transcript ends on the prompt, as it does mid-thought
+doubt38b() { settle; D38B="$D38B $1:$(rec s38b 'r["state"], r.get("interrupt")')"; }
+status "$O38B" s38b busy >/dev/null; doubt38b busy
+status "$O38B" s38b idle 60000 >/dev/null; doubt38b before-prompt
+status "$O38B" other idle >/dev/null; doubt38b other-session
+status "$O38B" s38b idle 0 1 >/dev/null; doubt38b other-process
+edit s38b 'r["background"] = r["activeAt"]'; status "$O38B" s38b idle >/dev/null; doubt38b background
+edit s38b 'r["background"] = 0; r["failed"] = True'; status "$O38B" s38b idle >/dev/null; doubt38b failed
+edit s38b 'r["failed"] = False; r["activeAt"] = int(__import__("time").time() * 1000) + 60000'; status "$O38B" s38b idle >/dev/null; doubt38b before-activity
+edit s38b 'r["activeAt"] = r["prompted"]'
+status 1 s38b idle 0 "$O38B" >/dev/null; mv -f "$CLAUDE_CONFIG_DIR/sessions/1.json" "$WORK/real38b.json"
+rm -f "$CLAUDE_CONFIG_DIR/sessions/$O38B.json"; ln -s "$WORK/real38b.json" "$CLAUDE_CONFIG_DIR/sessions/$O38B.json"; doubt38b symlink
+rm -f "$CLAUDE_CONFIG_DIR/sessions/$O38B.json"; doubt38b missing
+N38B="$(of s38b 0)"; M38B="$(status "$O38B" s38b idle)"; settle
+HELD38B="$(rec s38b 'r["state"], len(r["tools"]), r["interrupt"], r["activeAt"]')"; age s38b 31; upto s38b 3
+age s38b 31; DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O38B" fire UserPromptSubmit s38b "$K60" "" "$(transcript "$T38B")" >/dev/null; upto s38b 4; settle
+AGAIN38B="$(rec s38b 'r["state"]')"   # the file still says idle, from before this prompt
+WANT38B=""; for d in busy before-prompt other-session other-process background failed before-activity symlink missing; do WANT38B="$WANT38B $d:('working', None)"; done
+if [ "$D38B" = "$WANT38B" ] && [ "$N38B" = 2 ] && [ "$HELD38B" = "('waiting', 0, $M38B, $M38B)" ] \
+   && [ "$(of s38b 3 PRESENCE_STATE)" = waiting ] && [ "$(of s38b 3 PRESENCE_ACTIVE_AT)" = "$M38B" ] \
+   && [ "$(of s38b 4 PRESENCE_STATE)" = working ] && [ "$AGAIN38B" = working ]; then
+  ok "(38b) Claude Code's status file turns idle (an Esc mid-thought) → waiting at that time, once; busy, stale, another session or process, a symlink, background work or a failed turn → nothing"
+else bad "(38b) got=$D38B n=$N38B held=$HELD38B m=$M38B again=$AGAIN38B $(grep '"s38b"' "$LOG") $(cat "$RECORDS/s38b.json")"; fi
+stop_keeper s38b
 
 # Helpers for (39)-(42): a copy of this plugin at another version (the same code, so its keeper
 # checks the version), and a stand-in for a keeper an earlier version started, which holds the
