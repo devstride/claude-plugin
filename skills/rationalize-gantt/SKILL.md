@@ -50,7 +50,8 @@ comment, awaiting its epic's release
 (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md`) — counts as done);
 (c) the start date and the item length — the arguments' `start` and `item-days`, else ASK for
 both here, offering the defaults: the day after today (or the day the open stories already start
-on, when later), and the length most open stories already have (one day when none is dated). **A plan never starts today or earlier unless the user names
+on, when later), and the length most open stories already have (one day when none is dated) —
+a one-day story dated today is a new story's placeholder and counts for neither. **A plan never starts today or earlier unless the user names
 that day.** A run another skill invoked, or one with nobody to ask, never asks: it uses what its
 caller passed, else the defaults; (d) the deferred items: resolve the plan root's deferred container and
 its `members` with `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`
@@ -85,8 +86,8 @@ merged); read `args` defensively — `const items = Array.isArray(args) ? args :
   every leaf outside the deferred container, `blockedBy` its step-2 referenceIds, `groups` every
   container above it up to and including the root, and EVERY leaf carries its existing dates.
   `start` and `itemDays` are step 0's — but a day-after-today start is left out, and a run that
-  never asked sends only what its caller passed: absent, the script uses the day after `today` and
-  the length most open leaves already have, else one day (`itemDaysFrom`). In
+  never asked sends only what its caller passed: absent, the script works out those same defaults
+  (`startFrom`, `itemDaysFrom`). In
   not-done-only mode each Done or landed leaf also carries `"fixed": true` and is never re-dated.
 - **Exit 1 is a DEPENDENCY CYCLE → STOP: write not a single date** (`plan` relies on this pass to
   catch cycles). `cycles` lists only the TRUE members — strongly connected components of size > 1,
@@ -117,7 +118,7 @@ existing dates of Done leaves in not-done-only mode), `deferred` every member le
 `groups` (the matched containers and intermediate nodes above it). It returns the
 `boundary` (the last value due date, never earlier than the day before `start`), `assignments` (`scheduled`: `itemDays` long each, the first starting
 the day after the boundary, then the next, in item-number order; `kept`: an item already starting after the boundary
-keeps its dates),
+and every item scheduled before it keeps its dates),
 `untouchedDone` and `groupSpans`. Write every `scheduled` entry and every group's span
 (and the root's due date, when a deferred item is now due after it)
 with step 4's chunked `bulk_update_items`, under step 1's check, `staticMode` omitted; a `kept`

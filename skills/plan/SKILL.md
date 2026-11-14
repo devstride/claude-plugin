@@ -180,7 +180,7 @@ tree in one message (no specs) and get an explicit **"yes, build this"**. Then, 
   asks (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md`).
 - **Settle the start date and the item length here**: the arguments' `start` and `item-days`,
   else ask for both, offering the defaults — the day after today, and one day per story (on the
-  EXTEND path, the length the plan's open stories already have). **A plan never starts today or
+  EXTEND path, the start, when still ahead, and the length the plan's open stories already have). **A plan never starts today or
   earlier unless the user names that day.** Step 6 passes on the length, and the start when named.
 - **Batch the auto-scheduler heads-up here**, not at the end: step 6 needs the organization-wide
   dependency propagation OFF. Run the canonical Enable Link Mode check now

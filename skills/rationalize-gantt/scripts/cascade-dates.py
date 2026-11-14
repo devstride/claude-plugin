@@ -7,17 +7,22 @@ one JSON line on stdout:
   {"today": "YYYY-MM-DD", "start"?: "YYYY-MM-DD", "itemDays"?: <whole days, 1 or more>,
    "leaves": [{"number", "blockedBy"?: […], "groups"?: […],
                "fixed"?: true, "startDate"?, "dueDate"?}…]}
-  -> {"start", "requestedStart", "heldBy", "itemDays", "itemDaysFrom", "end",
+  -> {"start", "requestedStart", "startFrom", "heldBy", "itemDays", "itemDaysFrom", "end",
       "assignments": [{"number", "startDate", "dueDate", "depth"}…],
       "distribution": [{"startDate", "count"}…], "groupSpans": {"<number>": {"startDate", "dueDate"}},
       "outsideEdges": [{"number", "blockedBy"}…], "fixed": […]}
 
-`start` is the first day of the earliest leaf this pass dates; absent, it is the day after `today`.
-`itemDays` is how many calendar days one leaf is assumed to take. Absent, it is the length most
-of the dated open leaves already have, the longer on a tie (`itemDaysFrom` "existing": a newly
-created leaf is a one-day placeholder, so the plan's own length outnumbers or outlasts it), or 1
-when none is dated ("default"). A leaf marked `fixed` (Done or landed, when only open items are re-dated) is
-never assigned and keeps the dates it carries. Every other leaf is OPEN.
+A leaf marked `fixed` (Done or landed, when only open items are re-dated) is never assigned and
+keeps the dates it carries. Every other leaf is OPEN. What the plan already has is read from its
+DATED open leaves: those with both dates in order, leaving out a one-day leaf dated `today`, which
+is the placeholder a newly created story arrives as.
+
+`start` is the first day of the earliest leaf this pass dates (`startFrom` "given"). Absent, it is
+the earliest start the dated open leaves already have when that is later than the day after
+`today` ("existing"), else the day after `today` ("default"): never today or earlier.
+`itemDays` is how many calendar days one leaf is assumed to take ("given"). Absent, it is the
+length most of the dated open leaves already have, the longer on a tie (`itemDaysFrom`
+"existing"), or 1 when there is none ("default").
 
 Depth uses only edges between two open leaves: a leaf no open leaf is blocked by has depth 0, and
 any other has 1 + the deepest leaf blocked by it. The deepest leaves start on `start`; each depth
@@ -79,7 +84,7 @@ def read():
     if not isinstance(request, dict):
         fail("stdin must be one JSON object")
     today = day(request.get("today"), "today")
-    start = day(request.get("start"), "start", optional=True) or today + ONE_DAY
+    start = day(request.get("start"), "start", optional=True)
     item_days = request.get("itemDays")
     if item_days is not None and (isinstance(item_days, bool) or not isinstance(item_days, int) or item_days < 1):
         fail("itemDays must be a whole number of days, 1 or more")
@@ -101,7 +106,7 @@ def read():
             "startDate": day(leaf.get("startDate"), "a leaf's startDate", optional=True),
             "dueDate": day(leaf.get("dueDate"), "a leaf's dueDate", optional=True),
         }
-    return start, item_days, seen
+    return today, start, item_days, seen
 
 
 def cycles(left, blockers):
@@ -166,7 +171,7 @@ def cycles(left, blockers):
 
 
 def main():
-    requested, item_days, leaves = read()
+    today, requested, item_days, leaves = read()
     open_leaves = {n for n, leaf in leaves.items() if not leaf["fixed"]}
 
     # A cycle anywhere among the leaves stops the pass, finished leaves included.
@@ -207,12 +212,18 @@ def main():
             if not waiting[blocker]:
                 ready.append(blocker)
 
-    item_days_from = "given"
+    # What the plan already has: its open leaves with both dates in order, placeholders left out.
+    dated = [(leaves[n]["startDate"], leaves[n]["dueDate"]) for n in open_leaves
+             if leaves[n]["startDate"] and leaves[n]["dueDate"]]
+    dated = [(first, due) for first, due in dated if first <= due and not first == due == today]
+    start_from, item_days_from = "given", "given"
+    if requested is None:
+        requested, start_from = today + ONE_DAY, "default"
+        if dated and min(first for first, _ in dated) > requested:
+            requested, start_from = min(first for first, _ in dated), "existing"
     if item_days is None:
-        spans = [(leaves[n]["dueDate"] - leaves[n]["startDate"]).days + 1 for n in open_leaves
-                 if leaves[n]["startDate"] and leaves[n]["dueDate"]]
-        spans = [s for s in spans if s >= 1]
         item_days, item_days_from = 1, "default"
+        spans = [(due - first).days + 1 for first, due in dated]
         if spans:
             item_days, item_days_from = max(set(spans), key=lambda s: (spans.count(s), s)), "existing"
 
@@ -248,7 +259,8 @@ def main():
                 span = spans.setdefault(group, {"startDate": day_, "dueDate": day_})
                 span["startDate"], span["dueDate"] = min(span["startDate"], day_), max(span["dueDate"], day_)
     print(json.dumps({
-        "start": start.isoformat(), "requestedStart": requested.isoformat(), "heldBy": held_by,
+        "start": start.isoformat(), "requestedStart": requested.isoformat(), "startFrom": start_from,
+        "heldBy": held_by,
         "itemDays": item_days, "itemDaysFrom": item_days_from,
         "end": max(a["dueDate"] for a in assignments) if assignments else None,
         "assignments": assignments,

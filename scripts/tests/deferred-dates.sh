@@ -35,6 +35,12 @@ expect "value leaves that all ended in the past: deferred items still start the 
 expect "run again a day later after the plan has ended: every deferred item moves on a day and no two share one" \
   '{"today":"2026-11-15","valueLeaves":[{"number":"I1","dueDate":"2026-10-30"}],"deferred":[{"number":"I9","startDate":"2026-11-15","dueDate":"2026-11-15"},{"number":"I10","startDate":"2026-11-16","dueDate":"2026-11-16"},{"number":"I11","startDate":"2026-11-17","dueDate":"2026-11-17"}]}' \
   "$DATES" '[["I9", "2026-11-16", "2026-11-16", "scheduled"], ["I10", "2026-11-17", "2026-11-17", "scheduled"], ["I11", "2026-11-18", "2026-11-18", "scheduled"]]'
+expect "a new item filed after the others were dated steps past the days they hold" \
+  '{"today":"2026-11-14","valueLeaves":[{"number":"I1","dueDate":"2026-12-20"}],"deferred":[{"number":"I9","startDate":"2026-12-21","dueDate":"2026-12-21"},{"number":"I10","startDate":"2026-12-22","dueDate":"2026-12-22"},{"number":"I30"}]}' \
+  "$DATES" '[["I9", "2026-12-21", "2026-12-21", "kept"], ["I10", "2026-12-22", "2026-12-22", "kept"], ["I30", "2026-12-23", "2026-12-23", "scheduled"]]'
+expect "itemDays: a scheduled item never overlaps a kept span before it" \
+  '{"today":"2026-11-14","itemDays":3,"valueLeaves":[{"number":"I1","dueDate":"2026-12-20"}],"deferred":[{"number":"I9"},{"number":"I10","startDate":"2026-12-27","dueDate":"2026-12-29"},{"number":"I12"}]}' \
+  "$DATES" '[["I9", "2026-12-21", "2026-12-23", "scheduled"], ["I10", "2026-12-27", "2026-12-29", "kept"], ["I12", "2026-12-24", "2026-12-26", "scheduled"]]'
 expect "a plan start date: deferred items never begin before it" \
   '{"today":"2026-11-14","start":"2026-12-01","valueLeaves":[{"number":"I1","dueDate":"2026-10-30"}],"deferred":[{"number":"I9"}]}' \
   "[d['boundary'],$DATES]" '["2026-11-30", [["I9", "2026-12-01", "2026-12-01", "scheduled"]]]'

@@ -18,7 +18,8 @@ never earlier than the day before `start` (the plan's start date; absent, the da
 so a deferred item is never dated before the plan starts, nor today or earlier by default. Items
 are taken in ascending item-number order. An open item that starts after the boundary and after
 every item scheduled before it, and whose due date is present and not before its start, keeps both
-dates ("kept") and uses up no day; every other open item gets the next free day after the boundary
+dates ("kept"); every other open item gets the next free day after the boundary, stepping past
+the days a kept item before it holds
 ("scheduled"): with `itemDays` 1 (the default) start = due = boundary + 1, + 2, …; with more, each
 item spans `itemDays` calendar days and the next starts the day after it is due. Done items are never assigned. `groups` names the container and intermediate nodes
 above an item; `groupSpans` gives each its span over the assignments of its own items. Weekends
@@ -76,7 +77,7 @@ def main():
         groups = item.get("groups", [])
         if not isinstance(groups, list) or not all(isinstance(g, str) and g for g in groups):
             fail("groups must be an array of item numbers")
-    assignments, done, cursor = [], [], boundary
+    assignments, done, cursor, held = [], [], boundary, []
     for item in sorted(deferred, key=lambda i: number_key(i["number"])):
         if item.get("done"):
             done.append(item["number"])
@@ -86,8 +87,12 @@ def main():
         if start and due and start > cursor and due >= start:
             assignments.append({"number": item["number"], "startDate": start.isoformat(),
                                 "dueDate": due.isoformat(), "reason": "kept"})
+            held.append((start, due))
             continue
         begins = cursor + datetime.timedelta(days=1)
+        for first, last in sorted(held):
+            if begins <= last and begins + datetime.timedelta(days=item_days - 1) >= first:
+                begins = last + datetime.timedelta(days=1)
         cursor = begins + datetime.timedelta(days=item_days - 1)
         assignments.append({"number": item["number"], "startDate": begins.isoformat(),
                             "dueDate": cursor.isoformat(), "reason": "scheduled"})

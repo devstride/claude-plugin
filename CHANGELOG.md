@@ -17,7 +17,8 @@ for what each version component means here and how a release is cut.
   `rationalize-gantt` asks in its opening confirmation. The defaults are the day after today and
   one day per story; a run with nobody to ask uses what its caller passed, else the defaults.
   Run again later, the pass keeps the length most of the plan's open stories already have
-  unless you name another, and re-slicing a plan keeps its start date and its story length.
+  and, when the plan has not started yet, its start date, unless you name another; extending or
+  re-slicing a plan keeps both.
 
 ### Changed
 
@@ -36,7 +37,8 @@ for what each version component means here and how a release is cut.
   `skills/rationalize-gantt/scripts/cascade-dates.py` instead of a calculation written fresh on
   each run. It also finds dependency cycles, names only the stories really in one, and writes no
   dates when it finds one. Items parked in the deferred container follow the plan at the same
-  length per item, and are never dated before the plan's start.
+  length per item, are never dated before the plan's start, and a newly parked item no longer lands on a day
+  another already holds.
 - **The expected-model rule says in words what the defaults mean.** Planning expects `fable` and
   building expects `opus`: family names, so `/model fable` or `/model opus` picks the newest model
   of that family with no change to the plugin, and a repository that wants another model or a pinned version sets
