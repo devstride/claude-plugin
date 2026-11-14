@@ -8,6 +8,37 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **A plan starts on a date you choose, and each story has a length you choose.**
+  `/devstride:plan` and `/devstride:rationalize-gantt` take two new options: `start <YYYY-MM-DD>`,
+  the day the plan's first story begins, and `item-days <N>`, how many calendar days one story is
+  assumed to take. `plan` asks for both at its sign-off when the arguments do not give them, and
+  `rationalize-gantt` asks in its opening confirmation. The defaults are the day after today and
+  one day per story; a run with nobody to ask uses what its caller passed, else the defaults.
+
+### Changed
+
+- **A new plan is no longer dated into the past.** The dating pass used to put the plan's last
+  story on today and count every earlier story back one day, so a plan was overdue from the moment
+  it was created, and finishing its first story left that story dated after the ones waiting on
+  it. It now counts forward from the start date: the first stories begin there, every story a
+  dependency holds up begins the day after that dependency is due, and no day in between is
+  empty. A plan never starts today or earlier unless you name that day.
+- **Finished stories keep their dates by default.** `rationalize-gantt` now re-dates only the
+  stories still open unless you ask for everything, so a story that was built keeps the day it was
+  finished. When a finished story that others wait on is due on or after the start you asked for,
+  the rest of the plan begins the day after it, and the report says so.
+- **The dates come from a tested script.** The cascade is computed by
+  `skills/rationalize-gantt/scripts/cascade-dates.py` instead of a calculation written fresh on
+  each run. It also finds dependency cycles, names only the stories really in one, and writes no
+  dates when it finds one. Items parked in the deferred container follow the plan at the same
+  length per item.
+- **The expected-model rule says in words what the defaults mean.** Planning expects `fable` and
+  building expects `opus`: family names, so each follows the newest model of its family with no
+  change to the plugin, and a repository that wants another model or a pinned version sets
+  `sessionModels.planning.model` or `sessionModels.runner.model`. The behaviour is unchanged.
+
 ## [3.62.0] — 2026-11-13
 
 ### Added

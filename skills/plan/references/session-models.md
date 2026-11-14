@@ -16,7 +16,9 @@ a session's model or effort.
 | `runner` | `build-item`, `ultracode-build` | `sessionModels.runner.model`, default `opus` | `sessionModels.runner.effort`, default `high` |
 
 The keys live in the consuming repository's `.claude/ds-config.json`; an absent key means its
-default. `sessionModels.check: false` switches the whole check off. A model is an alias (`default`,
+default. **The defaults name a family, never a version**: `fable` and `opus` mean the newest
+Fable and Opus the account offers, so they follow each new model; a repository that wants another
+model or a pinned version sets the key. `sessionModels.check: false` switches the whole check off. A model is an alias (`default`,
 `best`, `fable`, `opus`, `sonnet`, `haiku`, `opusplan`, optionally with a `[1m]` suffix) or a full
 `claude-…` id; an effort is `low`, `medium`, `high`, `xhigh` or `max`.
 

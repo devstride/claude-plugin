@@ -5,7 +5,7 @@ Implements the dating pass of `skills/rationalize-gantt/SKILL.md` for the items 
 deferred container (`skills/build-item/references/deferred-container.md`). Reads one JSON object
 on stdin, writes one JSON line on stdout:
 
-  {"today": "YYYY-MM-DD",
+  {"today": "YYYY-MM-DD", "itemDays"?: <whole days, 1 or more>,
    "valueLeaves": [{"number", "dueDate"}…],
    "deferred": [{"number", "done", "startDate", "dueDate", "groups"?: […]}…]}
   -> {"boundary", "assignments": [{"number", "startDate", "dueDate", "reason": "scheduled"|"kept"}…],
@@ -16,8 +16,9 @@ on stdin, writes one JSON line on stdout:
 existing dates of Done leaves in not-done-only mode). The boundary is their latest `dueDate`, or
 the day before `today` when there is none. An open item whose start is after the boundary and
 whose due date is present and not before it keeps both dates ("kept") and uses up no day; every
-other open item gets start = due = boundary + 1, + 2, … in ascending item-number order
-("scheduled"). Done items are never assigned. `groups` names the container and intermediate nodes
+other open item gets the next free day after the boundary, in ascending item-number order
+("scheduled"): with `itemDays` 1 (the default) start = due = boundary + 1, + 2, …; with more, each
+item spans `itemDays` calendar days and the next starts the day after it is due. Done items are never assigned. `groups` names the container and intermediate nodes
 above an item; `groupSpans` gives each its span over the assignments of its own items. Weekends
 are not special-cased. Re-running on its own output changes nothing. Exit 0 on a decision; 2 on bad
 input with one `{"error": …}` line.
@@ -56,6 +57,9 @@ def main():
     if not isinstance(request, dict):
         fail("stdin must be one JSON object")
     today = day(request.get("today"), "today")
+    item_days = request.get("itemDays", 1)
+    if isinstance(item_days, bool) or not isinstance(item_days, int) or item_days < 1:
+        fail("itemDays must be a whole number of days, 1 or more")
     leaves, deferred = request.get("valueLeaves", []), request.get("deferred")
     if not isinstance(leaves, list) or not isinstance(deferred, list):
         fail("valueLeaves and deferred must be arrays")
@@ -80,8 +84,9 @@ def main():
             assignments.append({"number": item["number"], "startDate": start.isoformat(),
                                 "dueDate": due.isoformat(), "reason": "kept"})
             continue
-        cursor += datetime.timedelta(days=1)
-        assignments.append({"number": item["number"], "startDate": cursor.isoformat(),
+        begins = cursor + datetime.timedelta(days=1)
+        cursor = begins + datetime.timedelta(days=item_days - 1)
+        assignments.append({"number": item["number"], "startDate": begins.isoformat(),
                             "dueDate": cursor.isoformat(), "reason": "scheduled"})
 
     span = None

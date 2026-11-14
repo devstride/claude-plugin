@@ -473,7 +473,10 @@ With the plugin installed, DevStride connected, and a config file in place:
 
 Pass the item you want to plan under — a Module, Capability, or Epic in your DevStride
 organization. This is an interactive discovery loop, not a document generator: it asks about scope,
-sequencing and trade-offs, and creates nothing until you have signed off on the shape.
+sequencing and trade-offs, and creates nothing until you have signed off on the shape. At that
+sign-off it also asks when the plan starts and how long one story is assumed to take (the day
+after today and one day, unless you say otherwise); `start 2026-12-01` and `item-days 2` after
+the item number answer both up front.
 
 Then execute what you planned, one item at a time:
 

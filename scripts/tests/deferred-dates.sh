@@ -54,7 +54,15 @@ expect "a later boundary reschedules items the previous run placed" \
   '{"today":"2026-10-01","valueLeaves":[{"number":"I1","dueDate":"2026-11-05"}],"deferred":[{"number":"I9","startDate":"2026-11-02","dueDate":"2026-11-02"},{"number":"I10","startDate":"2026-11-03","dueDate":"2026-11-03"}]}' \
   "$DATES" '[["I9", "2026-11-06", "2026-11-06", "scheduled"], ["I10", "2026-11-07", "2026-11-07", "scheduled"]]'
 
-for bad_input in 'not json' '{"valueLeaves":[],"deferred":[]}' '{"today":"2026-13-40","deferred":[]}' '{"today":"2026-11-04","deferred":"x"}' '{"today":"2026-11-04","deferred":[{"startDate":"2026-11-01"}]}' '{"today":"2026-11-04","deferred":[{"number":5}]}' '{"today":"2026-11-04","deferred":[{"number":"I1","groups":"I0"}]}' '{"today":"2026-11-04","deferred":[{"number":"I1","groups":[[]]}]}'; do
+expect "itemDays 3: each scheduled item spans three days and the next starts the day after" \
+  "{\"today\":\"2026-10-01\",\"itemDays\":3,\"valueLeaves\":$LEAVES,\"deferred\":[{\"number\":\"I9\"},{\"number\":\"I10\"}]}" \
+  "[$DATES,d['containerSpan']]" \
+  '[[["I9", "2026-11-02", "2026-11-04", "scheduled"], ["I10", "2026-11-05", "2026-11-07", "scheduled"]], {"startDate": "2026-11-02", "dueDate": "2026-11-07"}]'
+expect "itemDays: a kept item keeps its own length and uses up no slot" \
+  "{\"today\":\"2026-10-01\",\"itemDays\":2,\"valueLeaves\":$LEAVES,\"deferred\":[{\"number\":\"I9\",\"startDate\":\"2026-12-15\",\"dueDate\":\"2026-12-15\"},{\"number\":\"I10\"}]}" \
+  "$DATES" '[["I9", "2026-12-15", "2026-12-15", "kept"], ["I10", "2026-11-02", "2026-11-03", "scheduled"]]'
+
+for bad_input in 'not json' '{"valueLeaves":[],"deferred":[]}' '{"today":"2026-13-40","deferred":[]}' '{"today":"2026-11-04","deferred":"x"}' '{"today":"2026-11-04","deferred":[{"startDate":"2026-11-01"}]}' '{"today":"2026-11-04","deferred":[{"number":5}]}' '{"today":"2026-11-04","deferred":[{"number":"I1","groups":"I0"}]}' '{"today":"2026-11-04","deferred":[{"number":"I1","groups":[[]]}]}' '{"today":"2026-11-04","itemDays":0,"deferred":[]}' '{"today":"2026-11-04","itemDays":"2","deferred":[]}' '{"today":"2026-11-04","itemDays":true,"deferred":[]}'; do
   out="$(run "$bad_input")"; rc=$?
   if [ "$rc" = 2 ] && printf '%s' "$out" | python3 -c 'import json,sys; assert "error" in json.load(sys.stdin)' 2>/dev/null; then ok "malformed input exits 2 with a JSON error ($bad_input)"; else bad "malformed $bad_input -> rc=$rc $out"; fi
 done
