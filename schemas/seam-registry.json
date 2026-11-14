@@ -1908,6 +1908,22 @@
       "since": "3.25.0"
     },
     {
+      "key": "boardPlacement",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "where each kind of item goes when work on it starts; absent or null means nothing is placed, a one-off's board is asked, and personal rules are ignored (/devstride:setup boards writes it)",
+      "since": "3.62.0"
+    },
+    {
+      "key": "boardPlacement.rules",
+      "type": "array",
+      "required": true,
+      "description": "ordered rules, first match wins: { name?, match?: { workType?, team?, tag?, customField?, under? }, place: { board } | { cycleFolder } | { none: true } }; a contributor's personal rules file is read before them",
+      "since": "3.62.0"
+    },
+    {
       "key": "presence",
       "type": [
         "object",

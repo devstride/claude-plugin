@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.61.1/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.62.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -1399,6 +1399,26 @@
       "description": "the Active Agents board, tag and the repository's presence commands; absent or null means the plugin writes nothing to DevStride for this feature and runs no command (doctor and setup still look for the board, read-only)",
       "required": [
         "commands"
+      ]
+    },
+    "boardPlacement": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "description": "ordered rules, first match wins: { name?, match?: { workType?, team?, tag?, customField?, under? }, place: { board } | { cycleFolder } | { none: true } }; a contributor's personal rules file is read before them"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "where each kind of item goes when work on it starts; absent or null means nothing is placed, a one-off's board is asked, and personal rules are ignored (/devstride:setup boards writes it)",
+      "required": [
+        "rules"
       ]
     },
     "presence": {

@@ -8,6 +8,80 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.62.0] — 2026-11-13
+
+### Added
+
+- **Setup asks which board each kind of item goes on, and the build loop puts work there when it
+  starts.** Until now nothing said where a story, a defect or an epic belongs, so each session
+  guessed or asked, and planned work sat on no board at all. `/devstride:setup boards` (a full
+  `/devstride:setup` asks too) reads the organization's work types and boards and asks where
+  each leaf type and the release unit go. A team on a perpetual kanban answers with one board. A
+  team that works in cycles answers with a board folder, and the loop uses the board in it whose
+  dates cover the day the work starts, so epics can go on the increment's board and stories on
+  the sprint's. Work that belongs somewhere else, by team, tag, a custom field's value or the
+  part of the map it sits under, is one more rule ahead of the rest. The answer is saved as an
+  ordered list, first match wins, in the new `boardPlacement.rules` config key, and only after
+  the rules pass their checks and the engineer types yes to the plan shown.
+  `/devstride:setup boards personal` keeps one contributor's exceptions in a file of their own,
+  outside the repository, read before the team's.
+- **Work is placed when it starts, not when it is planned.** `build-item` puts each item it
+  picks up, and that item's release unit, on the board the rules name, before it moves the item's
+  status. `create-story` and `create-defect` take a one-off's board from the rules instead of
+  asking, and honour a rule that says no board (a one-off has no team or custom field when it is
+  created, so a rule on either does not apply to it). An item a person put on some other board stays
+  there, a cycle it was planned into that has not ended yet included; only an item left on a
+  cycle that has ended is carried over to today's. Nothing is ever taken off a board, a finished
+  item is never moved, and nothing but a plan goes on the Active Agents board. A board that
+  cannot be resolved is one line in the progress table: placement never stops or questions the
+  loop.
+- **`/devstride:doctor agents` checks the rules without writing anything**: a board or folder
+  that is gone, a cycle folder with no board for today or none for the day after today's cycle
+  ends, a team, tag, work type or custom field the organization does not have, a kind of item no
+  rule answers for, a rule placed after one that matches everything, and personal rules in
+  effect or ignored.
+
+With no `boardPlacement` block nothing changes: nothing is placed, a one-off's board is asked
+as before, and personal rules are ignored.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.61.1 @ dc5ae2a, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.61.1 | tokens@devstride--v3.61.1 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,097 | 10,699 | 32,096 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 24,855 | 8,285 | 24,855 | 8,285 | +0 | 8,285 |
+| skills/doctor/SKILL.md | 23,998 | 8,000 | 23,994 | 7,998 | -2 | 8,000 |
+| skills/build-item/SKILL.md | 23,987 | 7,996 | 23,974 | 7,992 | -4 | 7,999 |
+| skills/review/SKILL.md | 23,970 | 7,990 | 23,970 | 7,990 | +0 | 7,999 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
+| skills/rebalance/SKILL.md | 17,889 | 5,963 | 17,889 | 5,963 | +0 | 5,963 |
+| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 10,893 | 3,631 | +0 | 3,700 |
+| skills/rationalize-gantt/SKILL.md | 9,575 | 3,192 | 9,575 | 3,192 | +0 | 3,200 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,708 | 2,236 | 6,731 | 2,244 | +8 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,545 | 2,182 | +0 | 2,200 |
+| skills/create-story/SKILL.md | 6,299 | 2,100 | 6,322 | 2,108 | +8 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 5,580 | 1,860 | 5,580 | 1,860 | +0 | 1,860 |
+| skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 272,722 | 90,914 | 272,750 | 90,924 | +10 | |
+
 ## [3.61.1] — 2026-11-13
 
 ### Fixed
@@ -5403,7 +5477,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.61.1...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.62.0...HEAD
+[3.62.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.61.1...devstride--v3.62.0
 [3.61.1]: https://github.com/devstride/claude-plugin/compare/devstride--v3.61.0...devstride--v3.61.1
 [3.61.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.60.0...devstride--v3.61.0
 [3.60.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.59.0...devstride--v3.60.0

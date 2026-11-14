@@ -32,16 +32,19 @@ Optional argument: $ARGUMENTS
 - **`agents`** — the Active Agents mode, the only run that writes to DevStride: A1, then
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/agents-mode.md` end to end (inventory, plan, a
   typed yes, apply).
-- **Nothing** — the full run: inspect, ask, write, scaffold, validate, plus the `agents` mode's
-  read-only §0 scan.
+- **`boards`** (or `boards personal`) — where each kind of item goes: A1, then
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/boards-mode.md` end to end.
+- **Nothing** — the full run: inspect, ask, write, scaffold, validate, plus §0 of the `agents`
+  and `boards` modes.
 
 **Run each mode's prerequisites silently — A1 always, A2–A3 before A4.** A narrowed run reports
 fewer keys, never worse ones, and **stops after Phase B, writing nothing**; a full run writes. **`docs`,
-`ci` and `agents` are the exceptions by design** — each writes exactly what its own questions answer.
+`ci`, `agents` and `boards` are the exceptions by design** — each writes exactly what its own questions answer.
 
 **The write boundary — the whole of it**: `.claude/ds-config.json`; in E2 only, the scaffolded
 skills (never overwriting); in `ci` mode only, the pull-request workflows under
-`ci.workflowGlobs` and the release-tower pair (each change a diff, applied on an explicit yes).
+`ci.workflowGlobs` and the release-tower pair (each change a diff, applied on an explicit yes);
+in `boards personal` only, that person's rules file.
 Nothing else, ever — no git
 mutation, no installs, no DevStride **write** tool outside `agents` mode. **Phases A–D are strictly read-only**:
 `git status --porcelain` stays byte-identical until the write.
@@ -79,9 +82,7 @@ when it is anything else.
 
 **A config on a stale branch describes a repository that no longer exists.** When
 `.claude/ds-config.json` is already present and its `baseBranch` resolves on `origin` but HEAD is
-on a different branch, say so and offer to switch **before inspecting anything** — otherwise the
-run detects the stale branch's contents and writes a config describing them over the maintained
-one.
+on a different branch, say so and offer to switch **before inspecting anything**.
 
 ### A2. Ecosystem and package manager
 
@@ -243,9 +244,7 @@ One row per configuration key: `key` (dotted path), `value` (in the key's shape;
 nothing was detected), `evidence` (the file read or command run — never empty), `status`
 (`detected` / `ambiguous` / `unknown`), `candidates` (only when `ambiguous` — every plausible
 answer), `existing` (only when the config already sets the key). **This shape is the contract**:
-every `detected` row becomes a prefilled default, every `ambiguous`/`unknown` row a question —
-and a key that produced no row is a key nobody looked at, distinguishable from a key with no
-answer.
+every `detected` row becomes a prefilled default, every `ambiguous`/`unknown` row a question.
 
 ## Phase B — report what was found
 

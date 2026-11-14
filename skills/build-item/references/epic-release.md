@@ -141,7 +141,7 @@ take fast mode, exactly as an epic story does.
   unit at zero") and the one-off section's pointer ("Read … before changing the one-off
   classification or its step-0 delta").
 - `skills/build-item/SKILL.md` — the working-base note on why stories merge into the integration
-  branch, step 5a's story-branch deletion and step 6.5's deferred finding placement, each citing
+  branch and step 6.5's deferred finding placement, each citing
   this file with "(why: …)", as does step 7's release-unit count; step 8's auto-release gate
   is covered by the step-8 pointer above, and its `live: false` and no-release-notes rules by its
   pointer to `epic-release-steps.md`.

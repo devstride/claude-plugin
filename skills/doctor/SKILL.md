@@ -286,8 +286,8 @@ Two separate checks, and **the first is the one everyone misses**:
 ## 7. Hooks (`docs`, `release`)
 
 **Loop over every `shape: "skill"` hook in `${CLAUDE_PLUGIN_ROOT}/schemas/seam-registry.json`**
-(LOCAL skills: `docs.updateSkill`, `docs.releaseNotesSkill`, `release.postDeployCheckSkill`, the
-release safety hooks …), each against its registry `contract`:
+(LOCAL skills: `docs.updateSkill`, `docs.releaseNotesSkill`, `release.postDeployCheckSkill` …),
+each against its registry `contract`:
 
 - **Unset → N/A**, not a failure; quote its registry `unset` text.
 - **Set → `.claude/skills/<name>/SKILL.md` exists**; missing → FAIL (a dangling hook; the docs
@@ -315,7 +315,8 @@ release safety hooks …), each against its registry `contract`:
 
 ## 8. Active Agents (`agents`)
 
-Read-only: `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/agents.md`; no block → board scan, INFO.
+Read-only: `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/agents.md`, `boardPlacement` too; no
+block → board scan, INFO.
 
 ## Closing — the report, then the offer
 

@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.61.1.
+`.claude/ds-config.json` against. Schema version: 3.62.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -237,6 +237,8 @@ starting with `_` and `$schema` are never reported as unknown.
 | `activeAgents.staleMinutes` | integer | >= 1 | `20` | minutes without a heartbeat after which the repository's presence implementation treats a session as gone; exported to both commands | 3.25.0 |
 | `activeAgents.rootLevel` | string, null | — | `null` | the work type whose nearest item above a picked-up item is its plan on the board (matched case-insensitively); null means the level directly above the release unit | 3.56.0 |
 | `activeAgents.commands` | object | — | — | **Required.** the repository's own start and end commands | 3.25.0 |
+| `boardPlacement` | object, null | — | — | where each kind of item goes when work on it starts; absent or null means nothing is placed, a one-off's board is asked, and personal rules are ignored (/devstride:setup boards writes it) | 3.62.0 |
+| `boardPlacement.rules` | array | — | — | **Required.** ordered rules, first match wins: { name?, match?: { workType?, team?, tag?, customField?, under? }, place: { board } \| { cycleFolder } \| { none: true } }; a contributor's personal rules file is read before them | 3.62.0 |
 | `presence` | object, null | — | — | the repository's own presence command, run by the plugin's hooks for every session (session start, prompts, tool uses and finished turns, throttled; a keeper every intervalMinutes; session end); absent or null, or a blank command, runs nothing and writes nothing | 3.42.0 |
 | `presence.intervalMinutes` | integer | 1..60, else warned and the default stands | `5` | minutes between the keeper's beats while the session's process lives; a value outside 1 to 60 is ignored with a warning and reads as 5 | 3.42.0 |
 | `release.docsRepo` | any | — | — | **Deprecated (error):** retired pre-1.0 shape the release skill never acts on; run /devstride:setup docs to migrate it into the docs block | pre-registry |

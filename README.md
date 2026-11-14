@@ -430,6 +430,26 @@ stops, failing open. `/devstride:doctor` and a plain `/devstride:setup` look for
 without the block and tell you when it exists but is not adopted; doctor reports drift without
 writing anything. No block, no writes.
 
+## Which board work goes on
+
+Optional: tell the loop where each kind of item belongs, once. `/devstride:setup boards` (a full
+`/devstride:setup` asks too) reads your work types and boards and asks where a story, a defect
+and a release unit go when work on them starts. A team on a perpetual kanban answers with one
+board. A team that works in cycles answers with a board folder, and the loop uses the board in
+it whose dates cover that day: epics on the increment's board and stories on the sprint's, for
+example. A mix of both is fine. Work that lives somewhere else, by team, tag, a custom field's
+value or the part of the map it sits under, is one more rule ahead of the rest: the answer is an
+ordered list in `boardPlacement.rules`, first match wins. `/devstride:setup boards personal`
+keeps one contributor's exceptions in a file of their own, outside the repository, read before
+the team's.
+
+Work is placed when it starts, not when it is planned: `build-item` puts each item it picks up,
+and its release unit, on their board, and a one-off is created on its board. An item a person
+put on some other board stays there, nothing is ever taken off a board, and nothing but a plan
+goes on the Active Agents board. `/devstride:doctor agents` checks the rules without writing
+anything: a board or folder that is gone, a cycle with no board for today, a kind of item no
+rule answers for. No block, nothing placed.
+
 ## Needs-you list
 
 Optional: an agent running with nobody watching used to stop and wait whenever it reached a
@@ -552,7 +572,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **3.61.1** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **3.62.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

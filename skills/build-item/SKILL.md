@@ -7,7 +7,7 @@ description: "Orchestrate one DevStride work item end-to-end: select, branch, bu
 
 **Session model.** Read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/session-models.md` once per top-level run, role `runner`, first.
 
-**Goal:** ONE DevStride one-day leaf item (this org's Story or Defect types) delivered end-to-end —
+**Goal:** ONE DevStride one-day leaf item delivered end-to-end —
 select → In Progress → branch → build → review → merge → ritual → sync → next. This ORCHESTRATOR
 owns ONLY the DevStride glue (selection, status moves, the completion ritual); it composes the other
 delivery skills — **invoke them by name; never re-spell what they do.**
@@ -180,8 +180,8 @@ ask. **Steps 1–6 run VERBATIM.** Deltas:
 ## 1. Mark In Progress
 
 `item-status.py decide`, `event: start`
-(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/item-status.md`): `statusId` → `update_item`;
-confirm it moved before branching.
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/item-status.md`; with `boardPlacement` set
+its step 0 places the item first): `statusId` → `update_item`; confirm it moved before branching.
 
 ## 2. Branch
 
@@ -246,8 +246,7 @@ merges, every profile, never a gate:
   dismissed finding (steps 3 and 4a) with its rationale.
 - Base moved → merge the refreshed epic INTO the story, re-run the gate, merge back; unresolvable →
   fork.
-- Push. **Only once that push SUCCEEDS** delete the story branch locally AND remotely (why:
-  `references/epic-release.md`). Then step 6.
+- Push. **Only once that push SUCCEEDS** delete the story branch locally AND remotely. Then step 6.
 
 ### 5b. PR merge (from 4b)
 

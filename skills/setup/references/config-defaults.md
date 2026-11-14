@@ -554,6 +554,29 @@ Optional, and only `/devstride:setup agents` writes it, after a typed yes:
   nothing else) and runs them through the build loop:
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`.
 
+## Board placement
+
+Optional, and only `/devstride:setup boards` (or a full run's questions) writes it, after a typed
+yes: `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/boards-mode.md`. There is no shipped default:
+the boards are the organization's, so the rules are always an answer, never a template.
+
+| Key | Shape | Absent means |
+| --- | --- | --- |
+| `boardPlacement` | `null`, or `{ "rules": [ … ] }` | nothing is placed, a one-off's board is asked, and personal rules are ignored |
+| `boardPlacement.rules` | an ordered array of `{ "name"?: <text>, "match"?: { "workType"?: [<name>], "team"?: [<id>], "tag"?: [<name>], "customField"?: { "<field id>": [<value>] }, "under"?: [<item number>] }, "place": { "board": <board id> } \| { "cycleFolder": <board folder id> } \| { "none": true } }` | required when the block is set; an empty array places nothing |
+
+- **First match wins**, and a contributor's personal rules (the file
+  `board-placement.py personal-path` prints, written by `/devstride:setup boards personal`) are
+  read before the repository's.
+- **A perpetual board and a cycle are the same question with two answers**: `board` names one
+  long-lived board; `cycleFolder` names a board folder, and the dated board directly in it whose
+  dates cover the day the work starts is the one used. A team that mixes both writes both.
+- **Work is placed when it starts** — by the build loop for the picked-up item and its release
+  unit (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/board-placement.md`), and at
+  creation for a one-off. Planned and inserted items are still created with no board.
+- **Never `activeAgents.boardId`**: that board holds plan roots, and the Active Agents step
+  alone places them.
+
 ## Session presence
 
 Optional. Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/session-presence.md` before writing
@@ -918,6 +941,8 @@ says where the file goes.
 - `doctor` SKILL.md — §4's config audit (the profile contradictions, and the `localEnvironment`
   reasoning behind the `recreate`/`migrate` warning).
 - `plan/references/delivery-profiles.md` — the `profile` key setup writes.
+- `setup/references/boards-mode.md`, `build-item/references/board-placement.md` — the
+  `boardPlacement` block.
 - `release/references/post-deploy-check.md` — `release.postDeployCheckSkill`'s default.
 - `release/references/clearance.md` — `release.clearance` and `releaseTower`.
 - `release/references/release-safety-hooks.md`, `build-item/references/checkout-pool-commands.md`
