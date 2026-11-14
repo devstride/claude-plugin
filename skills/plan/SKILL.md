@@ -239,7 +239,7 @@ miscalibration.
   Then step 2's deferred container.
 - **No created item takes a board from its parent**, container or leaf: pass `boardId` only when
   the user named a board for it, and never `activeAgents.boardId` (plan roots only; `build-item`
-  places them).
+  places them). A parent on that board → pass `boardId: null`: an omitted one can inherit it.
 - Leaves (Story, or Defect for known-bug remediation) reuse the `create_item` CALL PATTERN of
   `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/splice-mechanics.md` step 3 (same field shape,
   today-dated placeholder) — NOT its step-4 UPSTREAM/NEXT splice topology; step 5 owns the graph. Invoke `insert-story` itself only to splice

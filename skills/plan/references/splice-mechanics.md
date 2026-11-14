@@ -48,6 +48,7 @@ Numbering is NOT restated here — it lives in `execution-order-numbering.md`.
   of the root, `startDate` = `dueDate` = today, titled for the surgical scope (e.g. "Webhook
   intake hardening"), never a placeholder. Create EVERY intermediate container level the org's
   `parentWorkTypeId` chain requires between anchor and leaf — the backend rejects skipped tiers.
+  Step 3's board rule applies to each.
 
 ## Step 3 — create the leaf
 
@@ -57,7 +58,7 @@ Numbering is NOT restated here — it lives in `execution-order-numbering.md`.
   execution-order prefix — that depends on the neighbours step 4 pins.
 - **No board from the parent.** Pass `boardId` only when the user named a board, never
   `activeAgents.boardId`: that board holds plan roots only, and only `build-item` places them. A
-  container step 2 creates follows the same rule.
+  parent on that board → pass `boardId: null`: an omitted one can inherit it.
 - `startDate` = `dueDate` = today as a placeholder. One insert is not a cascade; to re-compress
   the plan's dates around it, run `/devstride:rationalize-gantt` on the root afterward.
 - **Priority at least `NEXT`'s.** `priorityId` is org-specific, not a comparable string — resolve
