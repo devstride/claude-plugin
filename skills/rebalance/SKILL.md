@@ -160,7 +160,8 @@ restore); it is the only write before 3a, and an overwritten probe date stops th
 - **3a. Create each successor** — `create_item` with `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/splice-mechanics.md` step 3's call pattern:
   `workType` = the absorbed items' leaf type, `parentNumber` = their release unit, `startDate` =
   `dueDate` = today (placeholders), `priorityId` at or above the highest absorbed priority (an
-  org-specific id — resolve the collection via `get_workspace_context`), title WITHOUT a prefix. The
+  org-specific id — resolve the collection via `get_workspace_context`), title WITHOUT a prefix,
+  `boardId` by that step's board rule. The
   `description` is the drafted spec, then a trailing collapsed **"Absorbed specs"** section with the
   FULL original description of every absorbed item, verbatim, under a sub-heading of its number and
   title:

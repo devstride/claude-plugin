@@ -48,6 +48,7 @@ Numbering is NOT restated here — it lives in `execution-order-numbering.md`.
   of the root, `startDate` = `dueDate` = today, titled for the surgical scope (e.g. "Webhook
   intake hardening"), never a placeholder. Create EVERY intermediate container level the org's
   `parentWorkTypeId` chain requires between anchor and leaf — the backend rejects skipped tiers.
+  Step 3's board rule applies to each.
 
 ## Step 3 — create the leaf
 
@@ -55,6 +56,9 @@ Numbering is NOT restated here — it lives in `execution-order-numbering.md`.
   `parentNumber` = the step-2 container; `title`/`description` = a real one-paragraph spec, not
   the raw argument text (this is what `ultracode-build` validates against). Title WITHOUT its
   execution-order prefix — that depends on the neighbours step 4 pins.
+- **No board from the parent.** `boardId` = the board the user named, else an explicit `null` (an
+  omitted one can inherit the parent's); never `activeAgents.boardId`: that board holds plan
+  roots only, and only `build-item` places them.
 - `startDate` = `dueDate` = today as a placeholder. One insert is not a cascade; to re-compress
   the plan's dates around it, run `/devstride:rationalize-gantt` on the root afterward.
 - **Priority at least `NEXT`'s.** `priorityId` is org-specific, not a comparable string — resolve
@@ -133,3 +137,4 @@ Unnumbered plan → that file's handling: no prefix, and say so in the report.
 
 - `insert-story` SKILL.md steps 0–5
 - `insert-defect` SKILL.md steps 0–5
+- `plan` SKILL.md step 4, `rebalance` SKILL.md step 3a and `one-off-handoff.md` step 1 (step 3)

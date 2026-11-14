@@ -44,7 +44,8 @@ beside the plan").
   a one-paragraph description: a parking container whose items are never built from here
   automatically, carry no execution-order number and no blocking links, and link back to what
   produced them. `plan` step 2 provisions it up front this same way; otherwise the first filing
-  does.
+  does. It takes no board: an explicit `boardId: null` (an omitted one can inherit the root's)
+  on it and every level created with it.
 
 ## Filing into it
 
@@ -61,7 +62,8 @@ beside the plan").
   it (the story under build, or the release unit for an epic-release review) — the relationship
   type read from the `add_relationship` schema, never assumed. No board, status, priority or
   assignee interview: filing normally runs unattended inside a build loop, so set one only when a
-  user is present and asks. Filing writes no date; the item is never built and never given a
+  user is present and asks; `boardId` is otherwise an explicit `null`, as on the container and
+  on every node created here, and never `activeAgents.boardId`. Filing writes no date; the item is never built and never given a
   delivery phase. A person who names one by number can still build it as a one-off.
 - **What does not widen.** The bar is the CALLERS' (`review` step 4, `build-item` 6.5, `release`
   step 2): only a verified P1, a security finding, or a finding both likely and material is filed;
