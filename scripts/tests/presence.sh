@@ -613,7 +613,7 @@ settle() { sleep 0.6; }   # three keeper checks at DEVSTRIDE_PRESENCE_MINUTE=1
 : > "$LOG"; O37="$(owner)"; T37="$WORK/t37.jsonl"
 entry "$T37" prompt,assistant >/dev/null
 DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O37" fire SessionStart s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 1
-age s37 61; CLAUDE_PID="$O37" fire UserPromptSubmit s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 2
+age s37 61; DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O37" fire UserPromptSubmit s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 2
 fire PreToolUse s37 "$K60" "" "$(tool Bash i1)" >/dev/null; settle
 BEFORE37="$(rec s37 'r["state"], len(r["tools"])')"; sleep 0.05
 M37="$(entry "$T37" esc-tool,bookkeeping,helper)"; settle
@@ -622,7 +622,7 @@ age s37 31; upto s37 3
 fire PreToolUse s37 "$K60" "" "$(tool Read h37 helper-37)" >/dev/null; settle   # a helper that outlived the Esc works on; no prompt
 HELPER37="$(rec s37 'r["state"], len(r["tools"]), r["interrupt"]')"            # the same interrupt is not applied a second time
 fire Stop s37 "$K60" >/dev/null                                               # the helper is done: waiting again, as reported
-age s37 31; CLAUDE_PID="$O37" fire UserPromptSubmit s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 4; settle
+age s37 31; DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O37" fire UserPromptSubmit s37 "$K60" "" "$(transcript "$T37")" >/dev/null; upto s37 4; settle
 AGAIN37="$(rec s37 'r["state"]')"
 M37B="$(entry "$T37" esc)"; settle; age s37 31; upto s37 5   # interrupted again, while Claude was writing
 if [ "$BEFORE37" = "('working', 1)" ] && [ "$HELD37" = "('waiting', 0, $M37, $M37)" ] && [ "$N37" = 2 ] \
@@ -679,7 +679,8 @@ PY
 : > "$LOG"; O38B="$(owner)"; T38B="$WORK/t38b.jsonl"; D38B=""
 entry "$T38B" prompt,assistant >/dev/null
 DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O38B" fire SessionStart s38b "$K60" "" "$(transcript "$T38B")" >/dev/null; upto s38b 1
-age s38b 61; CLAUDE_PID="$O38B" fire UserPromptSubmit s38b "$K60" "" "$(transcript "$T38B")" >/dev/null; upto s38b 2
+for _ in $(seq 50); do keeper_alive s38b && break; sleep 0.1; done   # its keeper (one check a second) holds the lock before any step
+age s38b 61; DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O38B" fire UserPromptSubmit s38b "$K60" "" "$(transcript "$T38B")" >/dev/null; upto s38b 2
 entry "$T38B" prompt >/dev/null   # the transcript ends on the prompt, as it does mid-thought
 doubt38b() { settle; D38B="$D38B $1:$(rec s38b 'r["state"], r.get("interrupt")')"; }
 status "$O38B" s38b busy >/dev/null; doubt38b busy
@@ -695,7 +696,7 @@ rm -f "$CLAUDE_CONFIG_DIR/sessions/$O38B.json"; ln -s "$WORK/real38b.json" "$CLA
 rm -f "$CLAUDE_CONFIG_DIR/sessions/$O38B.json"; doubt38b missing
 N38B="$(of s38b 0)"; M38B="$(status "$O38B" s38b idle)"; settle
 HELD38B="$(rec s38b 'r["state"], len(r["tools"]), r["interrupt"], r["activeAt"]')"; age s38b 31; upto s38b 3
-age s38b 31; CLAUDE_PID="$O38B" fire UserPromptSubmit s38b "$K60" "" "$(transcript "$T38B")" >/dev/null; upto s38b 4; settle
+age s38b 31; DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O38B" fire UserPromptSubmit s38b "$K60" "" "$(transcript "$T38B")" >/dev/null; upto s38b 4; settle
 AGAIN38B="$(rec s38b 'r["state"]')"   # the file still says idle, from before this prompt
 WANT38B=""; for d in busy before-prompt other-session other-process background failed before-activity symlink missing; do WANT38B="$WANT38B $d:('working', None)"; done
 if [ "$D38B" = "$WANT38B" ] && [ "$N38B" = 2 ] && [ "$HELD38B" = "('waiting', 0, $M38B, $M38B)" ] \
