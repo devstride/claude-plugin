@@ -690,7 +690,7 @@ status "$O38B" s38b idle 0 1 >/dev/null; doubt38b other-process
 edit s38b 'r["background"] = r["activeAt"]'; status "$O38B" s38b idle >/dev/null; doubt38b background
 edit s38b 'r["background"] = 0; r["failed"] = True'; status "$O38B" s38b idle >/dev/null; doubt38b failed
 edit s38b 'r["failed"] = False; r["activeAt"] = int(__import__("time").time() * 1000) + 60000'; status "$O38B" s38b idle >/dev/null; doubt38b before-activity
-edit s38b 'r["activeAt"] = r["prompted"]'
+status "$O38B" s38b busy >/dev/null; edit s38b 'r["activeAt"] = r["prompted"]'   # busy first: the idle file left by the step above would now qualify
 status 1 s38b idle 0 "$O38B" >/dev/null; mv -f "$CLAUDE_CONFIG_DIR/sessions/1.json" "$WORK/real38b.json"
 rm -f "$CLAUDE_CONFIG_DIR/sessions/$O38B.json"; ln -s "$WORK/real38b.json" "$CLAUDE_CONFIG_DIR/sessions/$O38B.json"; doubt38b symlink
 rm -f "$CLAUDE_CONFIG_DIR/sessions/$O38B.json"; doubt38b missing
