@@ -315,8 +315,8 @@ the post-deploy check as the owed item `sync`, with no heartbeat (nothing is hel
    `close-out`, `release-notes`) run when that release first waits for the owner (its step 4) or
    stops, whichever comes first, settled by `owed --done` as always; its own step 6 runs then too,
    without trigger 3 (the next release is already running). Under `merge-and-deploy` they run
-   first instead, before `release` is invoked: the next release is cut at once and may spend hours
-   in review and CI before it first waits, and the owed items must not wait that long. A failed post-deploy check STOPs as
+   first instead, heartbeating the train claim, before `release` is invoked: the next release
+   may spend hours in review and CI before it first waits. A failed post-deploy check STOPs as
    it always does, and the train claim is then released `handed-on`.
 4. **Hand clearance back** (`release.clearance` set; under `merge-and-deploy` it was handed back at
    5a, so this step does nothing): the provider's `release --owed <item>` for
