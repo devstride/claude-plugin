@@ -17,7 +17,7 @@ for what each version component means here and how a release is cut.
   `rationalize-gantt` asks in its opening confirmation. The defaults are the day after today and
   one day per story; a run with nobody to ask uses what its caller passed, else the defaults.
   Run again later, the pass keeps the length most of the plan's open stories already have
-  and, when the plan has not started yet, its start date, unless you name another; extending or
+  and, when its open stories all still lie ahead, their start date, unless you name another; extending or
   re-slicing a plan keeps both.
 
 ### Changed

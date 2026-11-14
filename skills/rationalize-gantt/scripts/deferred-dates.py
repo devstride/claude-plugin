@@ -20,7 +20,7 @@ are taken in ascending item-number order. An open item that starts after the bou
 every item scheduled before it, and whose due date is present and not before its start, keeps both
 dates ("kept"); every other open item gets the next free day after the boundary, stepping past
 the days a kept item before it holds
-("scheduled"): with `itemDays` 1 (the default) start = due = boundary + 1, + 2, …; with more, each
+("scheduled"): with no kept item in the way and `itemDays` 1 (the default) start = due = boundary + 1, + 2, …; with more, each
 item spans `itemDays` calendar days and the next starts the day after it is due. Done items are never assigned. `groups` names the container and intermediate nodes
 above an item; `groupSpans` gives each its span over the assignments of its own items. Weekends
 are not special-cased. Re-running on its own output changes nothing. Exit 0 on a decision; 2 on bad

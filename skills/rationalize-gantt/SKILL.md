@@ -85,9 +85,8 @@ merged); read `args` defensively — `const items = Array.isArray(args) ? args :
   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/scripts/cascade-dates.py`: `leaves` is
   every leaf outside the deferred container, `blockedBy` its step-2 referenceIds, `groups` every
   container above it up to and including the root, and EVERY leaf carries its existing dates.
-  `start` and `itemDays` are step 0's — but a day-after-today start is left out, and a run that
-  never asked sends only what its caller passed: absent, the script works out those same defaults
-  (`startFrom`, `itemDaysFrom`). In
+  `start` and `itemDays` are step 0's, and a run that never asked sends only what its caller
+  passed: absent, the script works out those same defaults (`startFrom`, `itemDaysFrom`). In
   not-done-only mode each Done or landed leaf also carries `"fixed": true` and is never re-dated.
 - **Exit 1 is a DEPENDENCY CYCLE → STOP: write not a single date** (`plan` relies on this pass to
   catch cycles). `cycles` lists only the TRUE members — strongly connected components of size > 1,
@@ -116,8 +115,8 @@ Pipe `{"today", "start", "itemDays", "valueLeaves": [{"number", "dueDate"}], "de
 — `start` and `itemDays` as step 3 returned them, `valueLeaves` the dates step 3 just computed for every leaf outside the container (plus the
 existing dates of Done leaves in not-done-only mode), `deferred` every member leaf with its
 `groups` (the matched containers and intermediate nodes above it). It returns the
-`boundary` (the last value due date, never earlier than the day before `start`), `assignments` (`scheduled`: `itemDays` long each, the first starting
-the day after the boundary, then the next, in item-number order; `kept`: an item already starting after the boundary
+`boundary` (the last value due date, never earlier than the day before `start`), `assignments` (`scheduled`: `itemDays` long each, on the next free
+days after the boundary, in item-number order, stepping past a kept item's days; `kept`: an item already starting after the boundary
 and every item scheduled before it keeps its dates),
 `untouchedDone` and `groupSpans`. Write every `scheduled` entry and every group's span
 (and the root's due date, when a deferred item is now due after it)
