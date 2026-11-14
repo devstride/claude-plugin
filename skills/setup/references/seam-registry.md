@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 3.64.0.
+`.claude/ds-config.json` against. Schema version: 3.65.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -185,8 +185,8 @@ starting with `_` and `$schema` are never reported as unknown.
 | `release.mergeTrainBeforeCut` | boolean | — | `false` | merge the release train into the source before each cut | pre-registry |
 | `release.autoStart` | object | — | — | releases that start themselves under a one-winner release-train claim; contract: skills/release/references/auto-start.md | 3.29.0 |
 | `release.autoStart.enabled` | boolean | — | `false` | a train landing or a finished release starts the next release; needs a claims block | 3.29.0 |
-| `release.coordination` | object | — | — | sessions say what they are about to ship (claim kind ship-intent), so every other session and the owner can see it; contract: skills/build-item/references/ship-intent.md | unreleased |
-| `release.coordination.enabled` | boolean | — | `true` | declare what this session is building, reviewing or landing; needs a claims block, without one nothing is declared | unreleased |
+| `release.coordination` | object | — | — | sessions say what they are about to ship (claim kind ship-intent), so every other session and the owner can see it; contract: skills/build-item/references/ship-intent.md | 3.65.0 |
+| `release.coordination.enabled` | boolean | — | `true` | declare what this session is building, reviewing or landing; needs a claims block, without one nothing is declared | 3.65.0 |
 | `release.backstop` | object | — | — | start a release when work on the release train has waited too long and nothing is releasing it; contract: skills/release/references/backstop.md | 3.45.0 |
 | `release.backstop.mode` | string | off, shadow, live | off | off: no check; shadow: record what the backstop would start and change nothing; live: start the release (only after shadow results were checked); needs a claims block | 3.45.0 |
 | `release.backstop.maxWaitMinutes` | integer | >= 15, <= 1440 | `120` | how long the oldest landing on the train may wait, by its committer time, before the backstop starts a release; at most a day, the longest a claim can live | 3.45.0 |
