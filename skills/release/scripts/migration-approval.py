@@ -207,6 +207,9 @@ def check(base, head, already=(), rule_file=None):
     for status, path, mode, blob in changed:
         held = tree_entry(head_sha, path)
         plain = ("100644", "100755")
+        on_base = tree_entry(base_sha, path)
+        if mode in plain and on_base[0] in plain and on_base[1] == blob:
+            continue  # the bytes are the base's own: only the mode differs, and no content is joining
         # The same bytes under either plain-file mode are what the branch holds (the base may have
         # changed only the executable bit); anything else is content the merge made.
         if held != (mode, blob) and not (held[1] == blob and held[0] in plain and mode in plain):
