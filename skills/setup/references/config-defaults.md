@@ -394,7 +394,7 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
 - **`release.coordination.enabled`** — each session says what it is building, reviewing or landing
   (claim kind `ship-intent`: unit, target, stage and an estimate of when it is ready), so every other
   session and the owner can see it before it lands. Information only: it never blocks or delays
-  anything. Contract: `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md`.
+  anything, except the bounded wait `peerWaitMinutes` sets. Contract: `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md`.
 - **`release.autoStart.enabled`** — releases that start themselves: after a one-off lands on the
   train, an epic release merges onto it, or a release finishes, the session checks whether the
   train holds work beyond the source and, if it wins the `release-train` claim, runs `release`.
