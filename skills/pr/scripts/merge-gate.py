@@ -877,8 +877,8 @@ def migration_approval(pr, number, expected, owner, name, base, config_path):
               pr.get("headRefName") or "the head branch"))
     both = [str(u.get("path")) for u in unapproved if u.get("status") == "changed-on-both"]
     if both:
-        how += (" %s was also changed on %s since this branch was cut: merge %s into the branch first, so what is "
-                "approved is what will land." % (", ".join(both), base, base))
+        how += (" %s would land with content the branch itself does not hold (%s changed it too): merge %s into the "
+                "branch first, so what is approved is what will land." % (", ".join(both), base, base))
     if by_hand:
         how += (" %s cannot be approved by content (deleted, or not a plain file): the owner merges that pull request "
                 "themselves, on their own yes for it." % ", ".join(by_hand))

@@ -10,16 +10,18 @@ script asks the release's question about any head against any base, earlier.
       The RULE (whether the early question applies, and which files are migrations) is read from
       `.claude/ds-config.json` as committed at <base>, or from `--rule` when a caller has already
       read the base's policy (the merge gate, from GitHub); the APPROVALS from the one committed at
-      <head>. Nothing is read from the work tree. Considers only the files that differ between
-      <head> and its merge base with <base> and match `release.fullRelease.migrationGlobs`.
+      <head>. Nothing is read from the work tree. Considers what would LAND: the files that
+      differ between <base> and the tree the merge of <head> into it produces, and match
+      `release.fullRelease.migrationGlobs`. A head that does not merge cleanly is exit 1.
       A plain file whose content is already at an `--already` ref (the release train, the
       production branch) is not joining anything and is not asked about; a deletion only when
       that ref made it. The release's own check covers what was there before.
       stdout, one JSON object:
         {"applies": bool, "approved": bool, "reason": "<one plain line>",
          "unapproved": [{"path", "blob", "status": "new"|"changed"|"deleted"|"not-a-file"|"changed-on-both"}]}
-      `changed-on-both`: the base changed the same migration after the branch was cut, so the
-      merge would hold content neither side has; refresh the branch from the base first.
+      `changed-on-both`: the merge would hold migration content the branch itself does not (the
+      base changed the same file, or moved one the branch edits); refresh the branch from the
+      base first, then ask about the result.
       exit 0  approved, or not applicable (the base has no config, no written standing yes for
               full releases, no migrationGlobs, or `release.fullRelease.approveBeforeJoining` false)
       exit 2  one or more migrations have no approval for their content
@@ -181,20 +183,28 @@ def check(base, head, already=(), rule_file=None):
     globs, why_not = rule(given_rule(rule_file) if rule_file else committed_config(base_sha, base))
     if globs is None:
         return {"applies": False, "approved": True, "reason": why_not, "unapproved": []}
+    # What would LAND: the tree the merge of the head into the base produces, compared with the
+    # base. Asking about the head alone misses content only the merge creates (both sides editing
+    # one migration, a rename on one side meeting an edit on the other).
+    merged = subprocess.run(["git", "merge-tree", "--write-tree", base_sha, head_sha], capture_output=True, text=True)
+    landing = merged.stdout.split("\n", 1)[0].strip()
+    if merged.returncode == 1:
+        raise Unanswerable("%s does not merge cleanly into %s: merge the base into the branch first" % (head, base))
+    if merged.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}([0-9a-f]{24})?", landing):
+        raise Unanswerable("the merge of %s into %s could not be worked out (git 2.38 or newer is needed): %s"
+                           % (head, base, merged.stderr.strip()[:200] or "git merge-tree failed"))
     try:
         approved = sy.approvals(full_release(committed_config(head_sha, head)))
-        changed = list(sy.changed_migrations(base_sha, head_sha, sy.glob_matcher(globs), base))
+        changed = list(sy.changed_migrations(base_sha, landing, sy.glob_matcher(globs), base, since=base_sha))
     except sy.Ask as asked:
         raise Unanswerable(str(asked))
-    # Where the base and the head last met: a migration the base has changed since then too would
-    # merge into content neither side holds, so no approval of either side covers it.
-    met = subprocess.run(["git", "merge-base", base_sha, head_sha], capture_output=True, text=True).stdout.strip()
     unapproved = []
     for status, path, mode, blob in changed:
-        if met and tree_entry(base_sha, path) != tree_entry(met, path) and tree_entry(base_sha, path) != (mode, blob):
+        if tree_entry(head_sha, path) != (mode, blob):
+            # The merge makes content the branch itself does not hold, so nothing approved on the
+            # branch covers it: refresh the branch from the base, then ask about the result.
             unapproved.append({"path": path, "blob": blob, "status": "changed-on-both"})
-            continue
-        if status == "D":
+        elif status == "D":
             if not already_there(there, base_sha, status, path, blob):
                 unapproved.append({"path": path, "blob": "", "status": "deleted"})
         elif mode not in ("100644", "100755"):

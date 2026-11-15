@@ -48,8 +48,9 @@ production branch.
   `release.fullRelease.approvedMigrations` in a commit of its own ON THE BRANCH THAT CARRIES THE
   MIGRATION, with that subject and the trailers as the message's last paragraph, so the approval
   travels with the work. Run the check again, then carry on. An edit after approval is unapproved
-  again. `changed-on-both` means the base changed the same file since the branch was cut:
-  refresh the branch from the base first, then ask about the result. A `deleted` or `not-a-file`
+  again. `changed-on-both` means the merge would hold content the branch itself does not (the
+  check asks about what would LAND, not the head alone): refresh the branch from the base first,
+  then ask about the result. A `deleted` or `not-a-file`
   answer cannot be approved by content: the owner merges that
   pull request themselves, on their own yes for it; the loop never does.
 - **Nobody is answering** (an unattended run) → write ONE notice on the unit

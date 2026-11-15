@@ -283,14 +283,16 @@ def approvals(full):
     return found
 
 
-def changed_migrations(base, head, is_migration, base_name):
+def changed_migrations(base, head, is_migration, base_name, since=None):
     """Yields each migration file that differs between `head` and its merge base with `base`, in
     diff order and one at a time, so a caller that asks about the first problem asks about the same
     one as ever: (status letter, path, mode at head, blob at head). The one reader of a migration
     diff: the release's own check and migration-approval.py both use it."""
-    done = subprocess.run(["git", "merge-base", base, head], capture_output=True, text=True)
-    ask(done.returncode == 0, "no merge base between %s and the head" % base_name)
-    diff = subprocess.run(["git", "diff", "--name-status", "-z", "--no-renames", "--no-relative", "--no-ext-diff", "--ignore-submodules=none", done.stdout.strip(), head], capture_output=True)
+    if since is None:   # `since`: compare with that commit or tree itself (`head` may then be a tree)
+        done = subprocess.run(["git", "merge-base", base, head], capture_output=True, text=True)
+        ask(done.returncode == 0, "no merge base between %s and the head" % base_name)
+        since = done.stdout.strip()
+    diff = subprocess.run(["git", "diff", "--name-status", "-z", "--no-renames", "--no-relative", "--no-ext-diff", "--ignore-submodules=none", since, head], capture_output=True)
     ask(diff.returncode == 0, "the release diff cannot be read")
     fields = diff.stdout.decode("utf-8", "surrogateescape").split("\0")
     for status, path in zip(fields[0::2], fields[1::2]):
