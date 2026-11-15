@@ -18,8 +18,8 @@ declare nothing, say nothing. A session on an older plugin simply does not decla
 - **Kind `ship-intent`, key the unit**: the item number for a story or one-off, the release unit's
   number for its release; for a hotfix or a pull request with no item, its branch name.
 - **Build it, never type it**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/ship-intent.py
-  record` (stdin `{lane, unit, branch, target, stage, class?, expiryMinutes?}`) prints the `kind`,
-  `key`, `phase`, `expiryMinutes` and the seven-key `payload` (`lane`, `unit`, `branch`, `target`,
+  record` (stdin `{route, unit, branch, target, stage, class?, expiryMinutes?}`) prints the `kind`,
+  `key`, `phase`, `expiryMinutes` and the seven-key `payload` (`route`, `unit`, `branch`, `target`,
   `class`, `stage`, `readyBy`) to send; it refuses any other key. `expiryMinutes` is the
   `ship-intent` entry of `claims.expiryMinutes` when it is a whole number from 1 to 1440, else
   left out (20). `class` is `light` or `full` only when
@@ -40,7 +40,7 @@ declare nothing, say nothing. A session on an older plugin simply does not decla
 
 ## Who declares what
 
-| Where | Lane | Target | Stages |
+| Where | Route | Target | Stages |
 |---|---|---|---|
 | `build-item` step 3 | `train` on the release train, `develop-pr` on the base branch, `epic-release` on an integration branch | the working base | `building` at step 3, `reviewing` at step 4, `verifying` at the local gate, `landing` at step 5; released at step 6, outcome `landed` |
 | `build-item` step 8 | `epic-release`, unit the release unit | the release target | `reviewing` when the release pull request opens, `verifying`, `landing`; released when it merges |

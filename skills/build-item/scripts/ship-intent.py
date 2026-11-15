@@ -6,7 +6,7 @@ other agent or tool runs this file for the same answer. A declaration is informa
 permission and never a lock, so no answer here ever stops a build, a landing or a release.
 
   record   reads one JSON object on stdin, writes the claim to make on stdout:
-             {"lane": "train"|"epic-release"|"develop-pr"|"hotfix",
+             {"route": "train"|"epic-release"|"develop-pr"|"hotfix",
               "unit": "I20130",          (the item, the release unit, or a hotfix's branch name)
               "branch": "<head branch>", "target": "<branch it will merge into>",
               "stage": "building"|"reviewing"|"verifying"|"landing",
@@ -14,7 +14,7 @@ permission and never a lock, so no answer here ever stops a build, a landing or 
               "now": "<ISO time>",                    (optional; the clock when absent)
               "expiryMinutes": 20}                    (optional; claims.expiryMinutes ship-intent)
            -> {"kind": "ship-intent", "key": "<unit>", "phase": "<stage>", "expiryMinutes": n,
-               "payload": {"lane", "unit", "branch", "target", "class", "stage", "readyBy"}}
+               "payload": {"route", "unit", "branch", "target", "class", "stage", "readyBy"}}
            A key it does not know, or a value outside the lists above, is refused (exit 2).
   decide   reads one JSON object on stdin, writes one JSON object on stdout:
              {"mode": "declare"|"update"|"release", "unit": "I20130", "response": <see story-claim.py>,
@@ -34,12 +34,12 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
-LANES = ("train", "epic-release", "develop-pr", "hotfix")
+ROUTES = ("train", "epic-release", "develop-pr", "hotfix")
 CLASSES = ("light", "full", "unknown")
 # Minutes from a stage's record until the work is expected on its target. Estimates, shown as such;
 # record once per stage, since each record restarts the estimate.
 STAGE_MINUTES = {"building": 90, "reviewing": 40, "verifying": 15, "landing": 5}
-RECORD_KEYS = ("lane", "unit", "branch", "target", "stage", "class", "now", "expiryMinutes")
+RECORD_KEYS = ("route", "unit", "branch", "target", "stage", "class", "now", "expiryMinutes")
 DEFAULT_EXPIRY_MINUTES = 20
 DEGRADE = {
     "ABSENT": "Claims are not available on this DevStride server yet; not saying what this session is about to ship.",
@@ -74,9 +74,9 @@ def record(request):
     unknown = sorted(k for k in request if k not in RECORD_KEYS)
     if unknown:
         raise Refused("unknown key %s (a declaration carries no other key)" % ", ".join(unknown))
-    lane, stage = request.get("lane"), request.get("stage")
-    if not isinstance(lane, str) or lane not in LANES:
-        raise Refused("lane must be one of %s" % ", ".join(LANES))
+    route, stage = request.get("route"), request.get("stage")
+    if not isinstance(route, str) or route not in ROUTES:
+        raise Refused("route must be one of %s" % ", ".join(ROUTES))
     if not isinstance(stage, str) or stage not in STAGE_MINUTES:
         raise Refused("stage must be one of %s" % ", ".join(STAGE_MINUTES))
     klass = request.get("class", "unknown")
@@ -101,7 +101,7 @@ def record(request):
         "phase": stage,
         "expiryMinutes": expiry,
         "payload": {
-            "lane": lane,
+            "route": route,
             "unit": unit,
             "branch": text(request, "branch"),
             "target": text(request, "target"),

@@ -5,7 +5,7 @@
    "name": "a one-off heading for the release train, building",
    "run": "record",
    "request": {
-    "lane": "train",
+    "route": "train",
     "unit": "I20130",
     "branch": "jane/26-03-14/I20130-seat-count",
     "target": "train/release",
@@ -19,7 +19,7 @@
     "phase": "building",
     "expiryMinutes": 20,
     "payload": {
-     "lane": "train",
+     "route": "train",
      "unit": "I20130",
      "branch": "jane/26-03-14/I20130-seat-count",
      "target": "train/release",
@@ -33,7 +33,7 @@
    "name": "an epic release, reviewing, class not told",
    "run": "record",
    "request": {
-    "lane": "epic-release",
+    "route": "epic-release",
     "unit": "I20104",
     "branch": "jane/26-03-14/epic-I20104-attachment-storage",
     "target": "train/release",
@@ -46,7 +46,7 @@
     "phase": "reviewing",
     "expiryMinutes": 20,
     "payload": {
-     "lane": "epic-release",
+     "route": "epic-release",
      "unit": "I20104",
      "branch": "jane/26-03-14/epic-I20104-attachment-storage",
      "target": "train/release",
@@ -60,7 +60,7 @@
    "name": "a pull request into the base branch, verifying, with the repository's own expiry",
    "run": "record",
    "request": {
-    "lane": "develop-pr",
+    "route": "develop-pr",
     "unit": "I20131",
     "branch": "jane/26-03-14/I20131-stack-change",
     "target": "develop",
@@ -75,7 +75,7 @@
     "phase": "verifying",
     "expiryMinutes": 45,
     "payload": {
-     "lane": "develop-pr",
+     "route": "develop-pr",
      "unit": "I20131",
      "branch": "jane/26-03-14/I20131-stack-change",
      "target": "develop",
@@ -89,7 +89,7 @@
    "name": "a hotfix with no item is keyed by its branch, landing",
    "run": "record",
    "request": {
-    "lane": "hotfix",
+    "route": "hotfix",
     "unit": "jane/hotfix/26-03-14/login-loop",
     "branch": "jane/hotfix/26-03-14/login-loop",
     "target": "main",
@@ -102,7 +102,7 @@
     "phase": "landing",
     "expiryMinutes": 20,
     "payload": {
-     "lane": "hotfix",
+     "route": "hotfix",
      "unit": "jane/hotfix/26-03-14/login-loop",
      "branch": "jane/hotfix/26-03-14/login-loop",
      "target": "main",
@@ -462,7 +462,7 @@
    "name": "a pull request with no item is keyed by its branch",
    "run": "record",
    "request": {
-    "lane": "develop-pr",
+    "route": "develop-pr",
     "unit": "jane/26-03-14/tidy-readme",
     "branch": "jane/26-03-14/tidy-readme",
     "target": "develop",
@@ -475,7 +475,7 @@
     "phase": "reviewing",
     "expiryMinutes": 20,
     "payload": {
-     "lane": "develop-pr",
+     "route": "develop-pr",
      "unit": "jane/26-03-14/tidy-readme",
      "branch": "jane/26-03-14/tidy-readme",
      "target": "develop",
@@ -491,7 +491,7 @@
    "name": "a payload key the declaration does not carry",
    "run": "record",
    "request": {
-    "lane": "train",
+    "route": "train",
     "unit": "I20130",
     "branch": "b",
     "target": "train/release",
@@ -501,22 +501,22 @@
    "contains": "unknown key owner"
   },
   {
-   "name": "an unknown lane",
+   "name": "an unknown route",
    "run": "record",
    "request": {
-    "lane": "express",
+    "route": "express",
     "unit": "I20130",
     "branch": "b",
     "target": "t",
     "stage": "building"
    },
-   "contains": "lane must be one of"
+   "contains": "route must be one of"
   },
   {
    "name": "an unknown stage",
    "run": "record",
    "request": {
-    "lane": "train",
+    "route": "train",
     "unit": "I20130",
     "branch": "b",
     "target": "t",
@@ -528,7 +528,7 @@
    "name": "an unknown class",
    "run": "record",
    "request": {
-    "lane": "train",
+    "route": "train",
     "unit": "I20130",
     "branch": "b",
     "target": "t",
@@ -541,7 +541,7 @@
    "name": "no unit",
    "run": "record",
    "request": {
-    "lane": "train",
+    "route": "train",
     "branch": "b",
     "target": "t",
     "stage": "building"
@@ -552,7 +552,7 @@
    "name": "an expiry outside the store's range",
    "run": "record",
    "request": {
-    "lane": "train",
+    "route": "train",
     "unit": "I20130",
     "branch": "b",
     "target": "t",
@@ -565,7 +565,7 @@
    "name": "a time that is not one",
    "run": "record",
    "request": {
-    "lane": "train",
+    "route": "train",
     "unit": "I20130",
     "branch": "b",
     "target": "t",
@@ -590,7 +590,7 @@
    "name": "a stage that is a list",
    "run": "record",
    "request": {
-    "lane": "train",
+    "route": "train",
     "unit": "I20130",
     "branch": "b",
     "target": "t",
@@ -602,7 +602,7 @@
    "name": "a stage that is an object",
    "run": "record",
    "request": {
-    "lane": "train",
+    "route": "train",
     "unit": "I20130",
     "branch": "b",
     "target": "t",
@@ -611,10 +611,10 @@
    "contains": "stage must be one of"
   },
   {
-   "name": "a lane that is a list",
+   "name": "a route that is a list",
    "run": "record",
    "request": {
-    "lane": [
+    "route": [
      "train"
     ],
     "unit": "I20130",
@@ -622,13 +622,13 @@
     "target": "t",
     "stage": "building"
    },
-   "contains": "lane must be one of"
+   "contains": "route must be one of"
   },
   {
    "name": "a class that is an object",
    "run": "record",
    "request": {
-    "lane": "train",
+    "route": "train",
     "unit": "I20130",
     "branch": "b",
     "target": "t",
@@ -641,7 +641,7 @@
    "name": "a time too late to add minutes to",
    "run": "record",
    "request": {
-    "lane": "train",
+    "route": "train",
     "unit": "I20130",
     "branch": "b",
     "target": "t",

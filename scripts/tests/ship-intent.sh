@@ -37,9 +37,9 @@ for mode in ("record", "decide"):
 p = subprocess.run([sys.executable, helper, "claim"], input="{}", capture_output=True, text=True)
 say(p.returncode == 2 and p.stderr.startswith("usage: "), "refuses: an unknown subcommand", p.stderr)
 # with no clock given, the estimate is in the future and no holder ever appears in an answer
-p = run("record", json.dumps({"lane": "train", "unit": "I20130", "branch": "b", "target": "t", "stage": "landing"}))
+p = run("record", json.dumps({"route": "train", "unit": "I20130", "branch": "b", "target": "t", "stage": "landing"}))
 out = (answer(p) or {}) if p.returncode == 0 else {}
-say(sorted(out.get("payload", {})) == ["branch", "class", "lane", "readyBy", "stage", "target", "unit"], "record: the payload carries exactly the seven keys", p.stdout + p.stderr)
+say(sorted(out.get("payload", {})) == ["branch", "class", "readyBy", "route", "stage", "target", "unit"], "record: the payload carries exactly the seven keys", p.stdout + p.stderr)
 say("holder" not in p.stdout, "record: no holder in the answer", p.stdout)
 print("ran to the end")
 PY
