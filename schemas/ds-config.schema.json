@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.66.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.67.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -1146,6 +1146,13 @@
               "type": "boolean",
               "default": true,
               "description": "declare what this session is building, reviewing or landing; needs a claims block, without one nothing is declared"
+            },
+            "peerWaitMinutes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 120,
+              "default": 15,
+              "description": "the most a starting release waits for work a peer session says is nearly ready and heading for the release train, fixed when the release starts and never extended; 0: never wait; contract: skills/release/references/ship-plan.md"
             }
           },
           "patternProperties": {

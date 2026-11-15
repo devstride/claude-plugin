@@ -1527,6 +1527,15 @@
       "since": "3.65.0"
     },
     {
+      "key": "release.coordination.peerWaitMinutes",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 120,
+      "default": 15,
+      "description": "the most a starting release waits for work a peer session says is nearly ready and heading for the release train, fixed when the release starts and never extended; 0: never wait; contract: skills/release/references/ship-plan.md",
+      "since": "3.67.0"
+    },
+    {
       "key": "release.backstop",
       "type": "object",
       "description": "start a release when work on the release train has waited too long and nothing is releasing it; contract: skills/release/references/backstop.md",

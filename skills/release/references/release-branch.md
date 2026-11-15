@@ -89,7 +89,9 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    steps 2–2c on it, driven — pre-ship selection, hold, `review` with the step-4 declarations,
    discharge — then run step 4b (unless this session holds `PRE-SHIP TRAIN: PASS` for that exact
    head), then continue at step 5.
-3. `git fetch origin <releaseSource> <train>`. No one-off on the train beyond the source
+3. With `claims` set, first run the ship plan
+   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/ship-plan.md`); its marker line goes in step
+   4's body. Then `git fetch origin <releaseSource> <train>`. No one-off on the train beyond the source
    (`git log --no-merges --oneline origin/<releaseSource>..origin/<train>` is empty — merges of the
    source alone are not work) → report "release train: nothing to ship" and stop here. Otherwise
    record `<sourceBefore>` (the `origin/<releaseSource>` SHA) and `<trainSnapshot>` (the

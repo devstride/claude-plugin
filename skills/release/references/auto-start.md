@@ -90,8 +90,10 @@ finds and adopts any open train pull request itself. When that release stops —
 or merged — return to the caller's own loop (trigger 5: to the releasing session's owed items). The caller keeps its checkout lease until then and
 the release runs in that checkout; it is returned only after (a pool member handed back mid-release
 could be leased by another session while the release still uses it). Never resume, message or adopt another session's
-release; the fleet's hourly machine check never starts one. No batching wait: each release carries
-whatever landed during the previous cycle, and there is never a second concurrent release.
+release; the fleet's hourly machine check never starts one. No batching wait beyond the ship plan's
+(`${CLAUDE_PLUGIN_ROOT}/skills/release/references/ship-plan.md`: at most `peerWaitMinutes`, only
+for a peer that says it is nearly ready): each release carries whatever landed during the previous
+cycle, and there is never a second concurrent release.
 
 **The backstop** (`release.backstop.mode` shadow or live) enters this same path, on a schedule, only
 when landed work has waited too long. Read
