@@ -1607,6 +1607,13 @@
       "since": "3.37.0"
     },
     {
+      "key": "release.fullRelease.approveBeforeJoining",
+      "type": "boolean",
+      "default": true,
+      "description": "ask the owner about a new or changed migration before the work joins the release train or the base branch, never at release time; needs standingYes and migrationGlobs, without them nothing is asked early; contract: skills/release/references/migration-approval.md",
+      "since": "unreleased"
+    },
+    {
       "key": "release.fullRelease.approvedMigrations",
       "type": "array",
       "description": "the owner's migration approvals by content: {blob, path, item, approved}, each added on the owner's own yes",

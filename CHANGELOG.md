@@ -8,6 +8,22 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **A migration is approved before the work joins the release train or the base branch.** With a
+  written standing yes for full releases, a new or changed migration used to be asked about at
+  release time, so the release stopped and every release queued behind it stopped too. Now the
+  question is asked while the work is still on its own branch: `build-item` runs the check before
+  it cuts an epic's or a plan's release pull request, and the merge gate prints no `MERGE` line
+  for a pull request into the train or the base branch whose head carries a migration the owner
+  has not approved by content. The approval is committed on the branch that carries the
+  migration, with trailers recording which unit waited and for how long; an unattended run
+  writes one notice and moves on. `skills/release/scripts/migration-approval.py` is the check
+  (`check`) and builds the approval (`entry`), reusing the release's own reading of globs, diffs
+  and approvals. Content already on the train or in production is never asked about again, the
+  release's own check is unchanged, and hotfixes are never held.
+  `release.fullRelease.approveBeforeJoining: false` restores asking at release time only.
+
 ## [3.65.0] — 2026-11-14
 
 ### Added

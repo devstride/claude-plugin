@@ -122,6 +122,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILLS = os.path.dirname(os.path.dirname(HERE))
 ROUTING = os.path.join(SKILLS, "build-item/scripts/routing.py")
 REVIEWED = os.path.join(SKILLS, "review/scripts/reviewed-status.py")
+MIGRATION_APPROVAL = os.path.join(SKILLS, "release/scripts/migration-approval.py")
 FILES_LIMIT = 3000   # GitHub's pull-request files listing stops here
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -630,9 +631,9 @@ def load(module_name, path):
     return module
 
 
-def read_config(path, owner, name):
-    """(train, exclusions, unit patterns) from the consuming repository's config; (None, [], [])
-    only when a confirmed checkout of the inspected repository has no config."""
+def repo_config(path, owner, name):
+    """The consuming repository's config as a dict; None only when a confirmed checkout of the
+    inspected repository has no config."""
     if path is None:
         code, out, _ = git_out("rev-parse", "--show-toplevel")
         if code != 0 or not out.strip():
@@ -647,7 +648,7 @@ def read_config(path, owner, name):
                              "from a checkout of it or pass --config" % (owner, name, (here or err).strip()[:80] or "unknown"))
         path = os.path.join(top, ".claude", "ds-config.json")
         if not os.path.exists(path):
-            return None, [], []
+            return None
     try:
         with open(path) as f:
             config = json.load(f)
@@ -655,6 +656,16 @@ def read_config(path, owner, name):
         raise Unreadable("the config %s cannot be read: %s" % (path, err))
     if not isinstance(config, dict):
         raise Unreadable("the config %s is not a JSON object" % path)
+    return config
+
+
+def read_config(path, owner, name):
+    """(train, exclusions, unit patterns) from the consuming repository's config; (None, [], [])
+    only when a confirmed checkout of the inspected repository has no config."""
+    config = repo_config(path, owner, name)
+    if config is None:
+        return None, [], []
+    path = path or ".claude/ds-config.json"
     routing = load("merge_gate_routing", ROUTING)
     try:
         train = routing.train_section(config).get("branch")
@@ -753,6 +764,53 @@ def train_proof(pr, number, expected, owner, name, base, config_path):
                         number, shlex.quote(base)))
 
 
+def migration_approval(pr, number, expected, owner, name, base, config_path):
+    """REFUSE a head that would carry a migration the owner has not approved onto the release
+    train or the base branch (`skills/release/references/migration-approval.md`). The release's
+    own check still asks at release time; this asks before the work joins anything."""
+    config = repo_config(config_path, owner, name)
+    release = config.get("release") if isinstance(config, dict) and isinstance(config.get("release"), dict) else {}
+    full = release.get("fullRelease")
+    # The cheap test first, from this checkout: a repository without the written standing yes,
+    # without migration globs, or with the early question switched off is not asked anything.
+    if not (isinstance(full, dict) and full.get("standingYes") is True and full.get("migrationGlobs")
+            and full.get("approveBeforeJoining") is not False):
+        return
+    routing = load("merge_gate_routing", ROUTING)
+    try:
+        train = routing.train_section(config).get("branch")
+    except SystemExit:
+        raise Unreadable("the config names the train under both releaseTrain and supportTrain")
+    base_branch = config.get("baseBranch")
+    production = release.get("productionBranch") if isinstance(release.get("productionBranch"), str) else None
+    if base not in [b for b in (train, base_branch) if isinstance(b, str) and b]:
+        return
+    # What is already on the train or in production joined before, and was asked about then.
+    already = [b for b in ((train if base == base_branch else None), production) if isinstance(b, str) and b and b != base]
+    code, _, err = git_out("fetch", "-q", "--no-tags", "origin", expected,
+                           *["+refs/heads/%s:refs/remotes/origin/%s" % (b, b) for b in [base] + already])
+    if code != 0:
+        raise Unreadable("#%d's head and %s could not be fetched, so its migrations cannot be read: %s"
+                         % (number, ", ".join([base] + already), err.strip()[:200] or "git fetch failed"))
+    try:
+        done = subprocess.run([sys.executable, "-I", MIGRATION_APPROVAL, "check", "--base", "origin/%s" % base, "--head", expected]
+                              + [x for b in already for x in ("--already", "origin/%s" % b)],
+                              capture_output=True, text=True, timeout=120)
+        answer = json.loads(done.stdout)
+    except (OSError, ValueError, subprocess.TimeoutExpired) as err:
+        raise Unreadable("the migration approval check gave no answer for #%d: %s" % (number, err))
+    reason = answer.get("reason") if isinstance(answer, dict) else None
+    if done.returncode == 0 and isinstance(answer, dict) and answer.get("approved") is True:
+        return
+    if done.returncode == 2:
+        raise Refuse("#%d would carry onto %s %s. The owner approves a migration by content, in a session, before "
+                     "it joins: build each approval with python3 %s entry, add it to release.fullRelease.approvedMigrations "
+                     "in a commit of its own on %s, then run this gate again"
+                     % (number, base, reason or "a migration without the owner's approval",
+                        shlex.quote(MIGRATION_APPROVAL), pr.get("headRefName") or "the head branch"))
+    raise Unreadable("whether #%d carries an unapproved migration could not be told: %s" % (number, reason or "no reason given"))
+
+
 def decide(number, expected, owner, name, delete_branch, subject=None, all_green=False, config_path=None):
     # The static facts first: the pull request's state, threads, rules, protection, the base
     # compare and the classic rule. None of them is a check, so the reads that are (the run
@@ -766,6 +824,7 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     if not isinstance(base, str) or not base:
         raise Unreadable("#%d names no base branch" % number)
     train_proof(pr, number, expected, owner, name, base, config_path)
+    migration_approval(pr, number, expected, owner, name, base, config_path)
     ruled, ruled_strict, types, approvals = ruleset_checks(owner, name, base)
     protected, protected_strict = protection_checks(owner, name, base)
     if ruled_strict or protected_strict:

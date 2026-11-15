@@ -533,6 +533,64 @@ code, out, err = gate(onto_train(headRefName="kim/26-01-15/plan-billing", status
 say(code == 0 and out[0].startswith("MERGE"), "(33u) a plan integration head with a proof -> MERGE", "rc=%d %r" % (code, out))
 code, out, err = gate(onto_train(headRefName="kim/26-01-15/I1-fix", files=[{"filename": "src/app.ts"}]), TRAIN)
 say(code == 0 and out[0].startswith("MERGE"), "(33v) a one-off head with no excluded path -> MERGE (the rule does nothing)", "rc=%d %r" % (code, out))
+# Migration approval before joining (a head carrying a migration the owner has not approved does
+# not merge onto the train or into the base branch). Real repositories: the check reads git.
+def g(path, *args):
+    return subprocess.run(["git", "-C", path, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"] + list(args),
+                          check=True, capture_output=True, text=True).stdout.strip()
+def put(path, name, text):
+    os.makedirs(os.path.dirname(os.path.join(path, name)), exist_ok=True)
+    open(os.path.join(path, name), "w").write(text)
+FULL = {"standingYes": True, "migrationGlobs": ["db/migrations/*.sql"], "approvedMigrations": []}
+def joining(full=FULL, approved=False, on_train=False):
+    """origin with develop, master and train/release; a clone whose branch `work` adds a migration."""
+    n = len(os.listdir(work))
+    origin, clone = os.path.join(work, "origin%d.git" % n), os.path.join(work, "clone%d" % n)
+    config = {"baseBranch": "develop", "releaseTrain": {"branch": "train/release"}, "release": {"productionBranch": "master", "fullRelease": full}}
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "develop", origin], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "develop", clone], check=True)
+    put(clone, ".claude/ds-config.json", json.dumps(config)); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "base")
+    g(clone, "remote", "add", "origin", origin)
+    g(clone, "branch", "master"); g(clone, "branch", "train/release"); g(clone, "checkout", "-q", "-b", "work")
+    put(clone, "db/migrations/0042_add.sql", "create table x();"); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "work")
+    if approved:
+        entry = {"blob": g(clone, "rev-parse", "HEAD:db/migrations/0042_add.sql"), "path": "db/migrations/0042_add.sql", "item": "I20130", "approved": "2026-01-15"}
+        config["release"]["fullRelease"] = dict(full, approvedMigrations=[entry])
+        put(clone, ".claude/ds-config.json", json.dumps(config)); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "approve")
+    if on_train:
+        g(clone, "branch", "-f", "train/release", "work")
+    g(clone, "push", "-q", "origin", "develop", "master", "train/release", "work")
+    return clone, g(clone, "rev-parse", "HEAD"), config
+def join(base="develop", **kw):
+    clone, sha, config = joining(**kw)
+    g(clone, "update-ref", "-d", "refs/remotes/origin/develop")   # the gate fetches what it compares with
+    path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha, baseRefName=base), open(path, "w"))
+    cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
+    p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone,
+                       env=dict(os.environ, GH_SCENARIO=path))
+    return p.returncode, p.stdout.strip().split("\n"), p.stderr
+code, out, err = join()
+say(code == 2 and out[0].startswith("REFUSE #7 would carry onto develop 1 migration without the owner's approval") and "db/migrations/0042_add.sql (new)" in out[0]
+    and "migration-approval.py entry" in out[0] and len(out) == 1 and "Traceback" not in err,
+    "(34a) into the base branch with an unapproved migration -> REFUSE, naming the file and how approval is recorded", "rc=%d %r %r" % (code, out, err))
+code, out, err = join(approved=True)
+say(code == 0 and out[0].startswith("MERGE gh pr merge 7"), "(34b) the same migration approved by content on the branch -> MERGE", "rc=%d %r %r" % (code, out, err))
+code, out, err = join(base="train/release")
+say(code == 2 and out[0].startswith("REFUSE #7 would carry onto train/release"), "(34c) onto the release train -> REFUSE the same way", "rc=%d %r %r" % (code, out, err))
+code, out, err = join(on_train=True)
+say(code == 0 and out[0].startswith("MERGE"), "(34d) content already on the train merges into the base branch unasked (the train's own pull request)", "rc=%d %r %r" % (code, out, err))
+for label, full in (("no written standing yes", dict(FULL, standingYes=False)), ("approveBeforeJoining false", dict(FULL, approveBeforeJoining=False)),
+                    ("no migrationGlobs", {"standingYes": True})):
+    code, out, err = join(full=full)
+    say(code == 0 and out[0].startswith("MERGE"), "(34e) %s: the rule does nothing" % label, "rc=%d %r %r" % (code, out, err))
+code, out, err = join(base="master")
+say(code == 0 and out[0].startswith("MERGE"), "(34f) into the production branch (a hotfix, the release): never this rule's", "rc=%d %r %r" % (code, out, err))
+clone, sha, config = joining()
+path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid="b" * 40), open(path, "w"))
+cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
+p = subprocess.run([sys.executable, helper, "7", "b" * 40, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 1 and p.stdout.startswith("ERROR ") and "could not be fetched" in p.stdout and "MERGE" not in p.stdout,
+    "(34g) a head that cannot be fetched -> ERROR, never a MERGE line", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
 for label, args in (("no arguments", []), ("a short SHA", ["7", "abc123"]), ("a number that is not one", ["x", H]), ("a bad --repo", ["7", H, "--repo", "a b"])):
     p = subprocess.run([sys.executable, helper] + args, capture_output=True, text=True, env=dict(os.environ, GH_SCENARIO=os.path.join(work, "scenario.json")))
     say(p.returncode == 2 and p.stdout == "" and p.stderr.startswith("usage:"), "(28) usage: " + label, repr(p.stderr))
