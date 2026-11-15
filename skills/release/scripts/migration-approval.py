@@ -6,9 +6,10 @@ The rules are in `skills/release/references/migration-approval.md`. The reading 
 diff, the globs and the approvals is `standing-yes.py`'s own (beside this file), never a copy: this
 script asks the release's question about any head against any base, earlier.
 
-  check --base <ref> --head <ref> [--already <ref>]…
+  check --base <ref> --head <ref> [--already <ref>]… [--rule <policy.json>]
       The RULE (whether the early question applies, and which files are migrations) is read from
-      `.claude/ds-config.json` as committed at <base>; the APPROVALS from the one committed at
+      `.claude/ds-config.json` as committed at <base>, or from `--rule` when a caller has already
+      read the base's policy (the merge gate, from GitHub); the APPROVALS from the one committed at
       <head>. Nothing is read from the work tree. Considers only the files that differ between
       <head> and its merge base with <base> and match `release.fullRelease.migrationGlobs`.
       A plain file whose content is already at an `--already` ref (the release train, the
@@ -85,7 +86,11 @@ def tree_entry(ref, path):
     listed = done.stdout.decode("utf-8", "surrogateescape")
     if not listed:
         return "", ""
-    fields = listed.split("\t", 1)[0].split(" ")
+    # Exactly the entry named: a folder lists its children, and none of them is the file asked about.
+    records = [r for r in listed.split("\0") if r]
+    if len(records) != 1 or "\t" not in records[0] or records[0].split("\t", 1)[1] != path:
+        return "", ""
+    fields = records[0].split("\t", 1)[0].split(" ")
     return (fields[0], fields[2]) if len(fields) == 3 else ("", "")
 
 
@@ -144,7 +149,19 @@ def already_there(refs, base_sha, status, path, blob):
     return False
 
 
-def check(base, head, already=()):
+def given_rule(path):
+    """A policy handed in by the caller (the merge gate's reading of the base branch): a dict."""
+    try:
+        with open(path) as f:
+            loaded = json.load(f)
+    except (OSError, ValueError) as error:
+        raise Unanswerable("the policy %s cannot be read (%s)" % (path, error))
+    if not isinstance(loaded, dict):
+        raise Unanswerable("the policy %s is not a JSON object" % path)
+    return loaded
+
+
+def check(base, head, already=(), rule_file=None):
     sy = standing_yes()
     head_sha, base_sha = sy.full_sha(head), sy.full_sha(base)
     if not head_sha:
@@ -159,7 +176,7 @@ def check(base, head, already=()):
         there.append(sha)
     # The RULE is the base branch's, as committed there: a branch cut before the rule, or one that
     # edits it, is still asked. The APPROVALS are the head's, so an approval travels with the work.
-    globs, why_not = rule(committed_config(base_sha, base))
+    globs, why_not = rule(given_rule(rule_file) if rule_file else committed_config(base_sha, base))
     if globs is None:
         return {"applies": False, "approved": True, "reason": why_not, "unapproved": []}
     try:
@@ -200,7 +217,7 @@ def entry(a):
         raise ValueError("--asked and --approved must be ISO times with an offset")
     if asked > approved:
         raise ValueError("--asked is after --approved")
-    if approved > now + datetime.timedelta(minutes=1):
+    if approved > now:
         raise ValueError("--approved is in the future: an approval is given, never planned")
     if sy.CONTROL.search(a.path) or not a.path.strip():
         raise ValueError("--path is not a usable file name")
@@ -238,6 +255,7 @@ def main(argv):
     c.add_argument("--base", required=True)
     c.add_argument("--head", required=True)
     c.add_argument("--already", action="append", default=[])
+    c.add_argument("--rule")
     e = verbs.add_parser("entry")
     for name in ("--head", "--path", "--item", "--unit", "--asked"):
         e.add_argument(name, required=True)
@@ -245,7 +263,7 @@ def main(argv):
     a = parser.parse_args(argv[1:])
     if a.verb == "check":
         try:
-            answer = check(a.base, a.head, a.already)
+            answer = check(a.base, a.head, a.already, a.rule)
         except Unanswerable as why:
             print(json.dumps({"applies": True, "approved": False, "reason": str(why), "unapproved": []}))
             return 1

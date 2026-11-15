@@ -19,6 +19,13 @@ def kind(k):   # the order of reads, one word each, for the cases that check it
     open(os.environ["GH_LOG"] + ".order", "a").write(k + "\n")
 if a[:2] == ["repo", "view"]:
     print(os.environ.get("GH_REPO") or s.get("repo", "acme/widgets")); sys.exit(0)
+if a[0] == "api" and any("/contents/.claude/ds-config.json?ref=" in x for x in a):
+    kind("policy")
+    if s.get("policyFail"):
+        sys.stderr.write("gh: Server Error (HTTP 500)\n"); sys.exit(1)
+    if "baseConfig" not in s:
+        sys.stderr.write("gh: Not Found (HTTP 404)\n"); sys.exit(1)
+    print(s["baseConfig"] if isinstance(s["baseConfig"], str) else json.dumps(s["baseConfig"])); sys.exit(0)
 if a[:2] == ["api", "graphql"]:
     if s.get("graphqlFail"):
         sys.stderr.write("gh: Something went wrong (HTTP 502)\n"); sys.exit(1)
@@ -618,6 +625,39 @@ say(code == 2 and "Only the owner approves a migration, in their own words in a 
 code, out, err = join(head_full=dict(FULL, approvedMigrations=[{"blob": "abc"}]))
 say(code == 1 and out[0].startswith("ERROR ") and "approvedMigrations[0]" in out[0] and "MERGE" not in "".join(out),
     "(34m) approvals that cannot be read -> ERROR, never a MERGE line", "rc=%d %r %r" % (code, out, err))
+# With no --config the policy is the one on the base branch, read from GitHub: the checkout cannot stand in for it.
+def live(scenario_extra, mutate=None, base="develop", **kw):
+    clone, sha, config = joining(**kw)
+    if mutate:
+        mutate(clone, config)
+    path = os.path.join(work, "scenario.json")
+    json.dump(dict(sc(headRefOid=sha, baseRefName=base), **(scenario_extra(config) if callable(scenario_extra) else scenario_extra)), open(path, "w"))
+    p = subprocess.run([sys.executable, helper, "7", sha], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+    return p.returncode, p.stdout.strip().split("\n"), p.stderr
+def switched_off(clone, config):   # the work tree and every local ref say there is no rule
+    put(clone, ".claude/ds-config.json", json.dumps({"baseBranch": "develop"}))
+    g(clone, "update-ref", "-d", "refs/remotes/origin/develop")
+code, out, err = live(lambda config: {"baseConfig": config}, switched_off)
+say(code == 2 and out[0].startswith("REFUSE #7 would carry onto develop"), "(34n) the live base policy is on while the checkout says nothing: still refused", "rc=%d %r %r" % (code, out, err))
+code, out, err = live(lambda config: {"baseConfig": config}, approved=True)
+say(code == 0 and out[0].startswith("MERGE"), "(34o) the live policy on and the migration approved on the branch -> MERGE", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({})
+say(code == 0 and out[0].startswith("MERGE"), "(34p) the base branch has no config on GitHub: not asked, nothing fetched", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({"policyFail": True})
+say(code == 1 and out[0].startswith("ERROR ") and "could not be read from GitHub" in out[0], "(34q) the base policy cannot be read -> ERROR, never a MERGE line", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({"policyFail": True}, base="master")
+say(code == 0 and out[0].startswith("MERGE"), "(34q2) the base policy cannot be read, into production: a hotfix is never held by this rule", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({"baseConfig": "[1]"})
+say(code == 1 and out[0].startswith("ERROR ") and "not a JSON object" in out[0], "(34r) a base policy that is not an object -> ERROR", "rc=%d %r %r" % (code, out, err))
+# --config names the policy outright, and the check is handed the same one: a base commit with no config changes nothing
+clone, sha, config = joining()
+g(clone, "checkout", "-q", "--orphan", "empty"); g(clone, "rm", "-rqf", "."); put(clone, "readme", "x"); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "no config")
+g(clone, "checkout", "-q", "-b", "work3"); put(clone, "db/migrations/0042_add.sql", "create table x();"); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "work")
+g(clone, "push", "-q", "-f", "origin", "empty:develop", "work3"); sha3 = g(clone, "rev-parse", "HEAD")
+path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha3), open(path, "w"))
+cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
+p = subprocess.run([sys.executable, helper, "7", sha3, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 2 and p.stdout.startswith("REFUSE #7 would carry onto develop"), "(34s) --config is the policy for the check too, whatever the base commit holds", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
 clone, sha, config = joining()
 path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid="b" * 40), open(path, "w"))
 cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))

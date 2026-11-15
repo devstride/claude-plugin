@@ -41,11 +41,12 @@ The rule (an approver's admin merge exactly when every required check is green, 
   (never the production branch) and that base's committed config has the written standing yes for
   full releases with migration globs (`release.fullRelease`, `approveBeforeJoining` not false), the
   head's new or changed migrations must each be approved by content
-  (`release/scripts/migration-approval.py check`, the rule read from the base as fetched now, the
-  approvals from the head; content already on the train or in production is not asked about
-  again). Unapproved is a REFUSE naming the files; a head, base or answer that cannot be read is an
-  ERROR. A checkout that has never seen a `fullRelease` block does nothing and fetches nothing;
-  `--config` names the policy outright. The release's own check is unchanged.
+  (`release/scripts/migration-approval.py check`). The policy is the base branch's committed
+  config read from GitHub now (`--config` names it outright) and is handed to the check as it is;
+  the approvals are the head's own; content already on the train or in production is not asked
+  about again. Unapproved is a REFUSE naming the files; a policy, head, base or answer that cannot
+  be read is an ERROR. A base with no config, or without that written standing yes, is not asked
+  and nothing is fetched. The release's own check is unchanged.
 - Pinned to the head: the pull request's head must be the expected SHA, and the command carries
   `--match-head-commit <sha>`, so GitHub refuses it if the head moves in between.
 - Every required check green there: the required checks are the union of the base branch's
@@ -126,6 +127,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 from urllib.parse import quote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -774,26 +776,23 @@ def train_proof(pr, number, expected, owner, name, base, config_path):
                         number, shlex.quote(base)))
 
 
-def committed_policy(ref):
-    """`.claude/ds-config.json` as committed at `ref`: a dict; None when that commit has none."""
-    code, listed, _ = git_out("ls-tree", "--full-tree", ref, "--", ".claude/ds-config.json")
+def base_policy(owner, name, base):
+    """The config committed on the base branch as GitHub has it now: a dict; None when that branch
+    has none. Read from GitHub, like everything else this gate decides on: no local ref, work tree
+    or replaced object can stand in for it."""
+    code, out, err = gh("api", "-H", "Accept: application/vnd.github.raw+json",
+                        "repos/%s/%s/contents/.claude/ds-config.json?ref=%s" % (owner, name, quote(base, safe="")))
     if code != 0:
-        raise Unreadable("the config committed at %s could not be looked up" % ref)
-    if not listed.strip():
-        return None
-    code, shown, _ = git_out("show", "%s:.claude/ds-config.json" % ref)
+        if "HTTP 404" in (err or "") + (out or ""):
+            return None
+        raise Unreadable("the config on %s could not be read from GitHub: %s" % (base, (err or out).strip()[:200]))
     try:
-        config = json.loads(shown) if code == 0 else None
+        config = json.loads(out)
     except ValueError:
         config = None
     if not isinstance(config, dict):
-        raise Unreadable("the config committed at %s cannot be read as a JSON object" % ref)
+        raise Unreadable("the config on %s is not a JSON object" % base)
     return config
-
-
-def has_full_release(config):
-    release = config.get("release") if isinstance(config, dict) else None
-    return isinstance(release, dict) and "fullRelease" in release
 
 
 def migration_approval(pr, number, expected, owner, name, base, config_path):
@@ -801,24 +800,24 @@ def migration_approval(pr, number, expected, owner, name, base, config_path):
     train or the base branch (`skills/release/references/migration-approval.md`). The release's
     own check still asks at release time; this asks before the work joins anything.
 
-    The policy (whether the rule is on, which branches are the train, the base and production) is
-    the BASE BRANCH's committed config, fetched fresh: neither the checkout's work tree nor the
-    pull request's own branch can switch the question off. `--config` names the policy outright
-    (a caller that has no checkout of the repository's base)."""
+    The policy (whether the rule is on, which files are migrations, which branches are the train,
+    the base and production) is the BASE BRANCH's committed config, read from GitHub now: neither
+    this checkout's work tree or refs nor the pull request's own branch can switch the question
+    off. `--config` names the policy outright. The same policy is handed to the check, so the two
+    never disagree; the approvals are always the head's own."""
     if config_path is not None:
         policy = repo_config(config_path, owner, name)
     else:
-        working = repo_config(None, owner, name)   # also confirms this checkout is the repository
-        code, local, _ = git_out("show", "refs/remotes/origin/%s:.claude/ds-config.json" % base)
-        # Nothing this checkout has ever seen names a written standing yes: nothing to ask, and no
-        # fetch. Anything else is settled by the base as it is now.
-        if not has_full_release(working) and not (code == 0 and '"fullRelease"' in local):
-            return
-        code, _, err = git_out("fetch", "-q", "--no-tags", "origin", "+refs/heads/%s:refs/remotes/origin/%s" % (base, base))
-        if code != 0:
-            raise Unreadable("%s could not be fetched, so whether #%d needs a migration approval cannot be told: %s"
-                             % (base, number, err.strip()[:200] or "git fetch failed"))
-        policy = committed_policy("refs/remotes/origin/%s" % base)
+        try:
+            policy = base_policy(owner, name, base)
+        except Unreadable:
+            # A merge into production is never this rule's, so a policy that cannot be read must not
+            # hold a hotfix: this checkout's own name for production (else the default) settles that.
+            local = repo_config(None, owner, name) or {}
+            local_release = local.get("release") if isinstance(local.get("release"), dict) else {}
+            if base == (local_release.get("productionBranch") or "master"):
+                return
+            raise
     if policy is None:
         return
     release = policy.get("release") if isinstance(policy.get("release"), dict) else {}
@@ -844,13 +843,22 @@ def migration_approval(pr, number, expected, owner, name, base, config_path):
     if code != 0:
         raise Unreadable("#%d's head and %s could not be fetched, so its migrations cannot be read: %s"
                          % (number, ", ".join([base] + already), err.strip()[:200] or "git fetch failed"))
+    handle, rule_file = tempfile.mkstemp(prefix="merge-gate-policy-", suffix=".json")
     try:
-        done = subprocess.run([sys.executable, "-I", MIGRATION_APPROVAL, "check", "--base", "refs/remotes/origin/%s" % base, "--head", expected]
+        with os.fdopen(handle, "w") as f:
+            json.dump(policy, f)
+        done = subprocess.run([sys.executable, "-I", MIGRATION_APPROVAL, "check", "--rule", rule_file,
+                               "--base", "refs/remotes/origin/%s" % base, "--head", expected]
                               + [x for b in already for x in ("--already", "refs/remotes/origin/%s" % b)],
                               capture_output=True, text=True, timeout=120)
         answer = json.loads(done.stdout)
     except (OSError, ValueError, subprocess.TimeoutExpired) as err:
         raise Unreadable("the migration approval check gave no answer for #%d: %s" % (number, err))
+    finally:
+        try:
+            os.remove(rule_file)
+        except OSError:
+            pass
     answer = answer if isinstance(answer, dict) else {}
     reason = answer.get("reason") if isinstance(answer.get("reason"), str) else None
     if done.returncode == 0 and answer.get("approved") is True:
@@ -958,6 +966,7 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
 
 
 def main(argv):
+    os.environ["GIT_NO_REPLACE_OBJECTS"] = "1"  # every git read sees the real objects, never a local replacement
     args, delete_branch, repo, subject, all_green, config_path = [], False, None, None, False, None
     it = iter(argv[1:])
     for a in it:

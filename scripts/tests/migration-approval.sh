@@ -201,6 +201,15 @@ r = repo(ON); write(r, MIG, "create table x();"); commit(r, "work"); approve(r, 
 rc, out, p = check(r, cwd=os.path.join(r, "db"))
 say(rc == 0 and out["approved"] is True, "run from a sub-folder: an approved file is still a plain file", p.stdout + p.stderr)
 
+# a policy handed in by the caller decides instead of the base's commit
+r = repo({"standingYes": False}); write(r, MIG, "x"); commit(r, "work")
+rule_file = os.path.join(work, "rule.json"); json.dump({"release": {"fullRelease": ON}}, open(rule_file, "w"))
+p = subprocess.run([sys.executable, helper, "check", "--base", "develop", "--head", "work", "--rule", rule_file], capture_output=True, text=True, cwd=r)
+say(p.returncode == 2 and json.loads(p.stdout)["unapproved"][0]["path"] == MIG, "--rule: the caller's reading of the base policy is the rule", p.stdout + p.stderr)
+open(rule_file, "w").write("{bad")
+p = subprocess.run([sys.executable, helper, "check", "--base", "develop", "--head", "work", "--rule", rule_file], capture_output=True, text=True, cwd=r)
+say(p.returncode == 1 and json.loads(p.stdout)["approved"] is False, "--rule: a policy file that cannot be read is exit 1", p.stdout + p.stderr)
+
 # usage
 p = subprocess.run([sys.executable, helper, "check", "--base", "develop"], capture_output=True, text=True, cwd=r)
 say(p.returncode == 2 and p.stdout == "" and p.stderr.startswith("migration-approval: "), "a missing argument: exit 2, one line", p.stderr)
@@ -235,6 +244,9 @@ for label, change, needle in (("an item that is not one", ["--item", "20130"], "
                               ("a unit ending in a line break", ["--unit", "I20104\n"], "--unit"),
                               ("an item ending in a line break", ["--item", "I20130\n"], "--item"),
                               ("an approval in the future", ["--approved", "2099-01-01T00:00:00Z"], "in the future"),
+                              ("an approval half a minute ahead", ["--approved", (__import__("datetime").datetime.now(__import__("datetime").timezone.utc) + __import__("datetime").timedelta(seconds=30)).isoformat()], "in the future"),
+                              ("a folder in place of a file", ["--path", "db/migrations/sql/"], "not a plain file"),
+                              ("a folder with one file in it", ["--path", "db/migrations/sql"], "not a plain file"),
                               ("a file that is not there", ["--path", "db/migrations/sql/none.sql"], "not a plain file"),
                               ("a head that is not a commit", ["--head", "nowhere"], "not a commit")):
     args = list(BASE)

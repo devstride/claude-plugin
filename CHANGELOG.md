@@ -16,7 +16,8 @@ for what each version component means here and how a release is cut.
   written standing yes for full releases, a new or changed migration used to be asked about at
   release time, so the release stopped and every release queued behind it stopped too. Now the
   question is asked while the work is still on its own branch: `build-item` runs the check before
-  it cuts an epic's or a plan's release pull request, and the merge gate prints no `MERGE` line
+  it cuts an epic's or a plan's release pull request, `pr` before it opens any pull request into
+  the train or the base branch, and the merge gate prints no `MERGE` line
   for a pull request into the train or the base branch whose head carries a migration the owner
   has not approved by content. The approval is committed on the branch that carries the
   migration, with trailers recording which unit waited and for how long; an unattended run
@@ -28,13 +29,13 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.65.0 @ 87d7a50, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.65.0 @ 5244cbc, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.65.0 | tokens@devstride--v3.65.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,096 | 10,699 | 32,096 | 10,699 | +0 | 10,700 |
 | skills/plan/SKILL.md | 25,535 | 8,512 | 25,535 | 8,512 | +0 | 8,512 |
-| skills/doctor/SKILL.md | 23,994 | 7,998 | 23,994 | 7,998 | +0 | 8,000 |
 | skills/build-item/SKILL.md | 23,992 | 7,998 | 23,992 | 7,998 | +0 | 7,999 |
+| skills/doctor/SKILL.md | 23,994 | 7,998 | 23,994 | 7,998 | +0 | 8,000 |
 | skills/review/SKILL.md | 23,970 | 7,990 | 23,970 | 7,990 | +0 | 7,999 |
 | skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
 | skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |
