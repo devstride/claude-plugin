@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.64.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.65.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -8,7 +8,7 @@
       "type": "string"
     },
     "claims": {
-      "description": "provider-or-commands hook — <kind> <key>, then the verb's options (claim: --purpose, --phase, --expiry, --takeover; heartbeat: --phase; release: --outcome; list: --kind); the holder in CLAIM_HOLDER, never on argv",
+      "description": "provider-or-commands hook — <kind> <key>, then the verb's options (claim: --purpose, --phase, --expiry, --takeover, --payload; heartbeat: --phase, --payload; release: --outcome; list: --kind); the holder in CLAIM_HOLDER, never on argv",
       "oneOf": [
         {
           "type": "null"
@@ -34,7 +34,7 @@
                 "x-warnMinimum": 1,
                 "x-warnMaximum": 1440
               },
-              "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here"
+              "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, ship-intent 20, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here"
             }
           },
           "patternProperties": {
@@ -94,7 +94,7 @@
                 "x-warnMinimum": 1,
                 "x-warnMaximum": 1440
               },
-              "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here"
+              "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, ship-intent 20, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here"
             }
           },
           "patternProperties": {
@@ -1138,6 +1138,21 @@
           },
           "additionalProperties": false,
           "description": "releases that start themselves under a one-winner release-train claim; contract: skills/release/references/auto-start.md"
+        },
+        "coordination": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "declare what this session is building, reviewing or landing; needs a claims block, without one nothing is declared"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "description": "sessions say what they are about to ship (claim kind ship-intent), so every other session and the owner can see it; contract: skills/build-item/references/ship-intent.md"
         },
         "backstop": {
           "type": "object",

@@ -1,0 +1,703 @@
+{
+ "_about": "Shared fixtures for skills/build-item/scripts/ship-intent.py. Run the subcommand each case names (`run`: record or decide) on its request; `expect` is the whole answer. An `errors` case must exit 2 with one ship-intent: line containing `contains`. Tooling that re-implements the rule, or calls it, should run these against the installed script.",
+ "cases": [
+  {
+   "name": "a one-off heading for the release train, building",
+   "run": "record",
+   "request": {
+    "route": "train",
+    "unit": "I20130",
+    "branch": "jane/26-03-14/I20130-seat-count",
+    "target": "train/release",
+    "stage": "building",
+    "class": "light",
+    "now": "2026-03-14T15:00:00Z"
+   },
+   "expect": {
+    "kind": "ship-intent",
+    "key": "I20130",
+    "phase": "building",
+    "expiryMinutes": 20,
+    "payload": {
+     "route": "train",
+     "unit": "I20130",
+     "branch": "jane/26-03-14/I20130-seat-count",
+     "target": "train/release",
+     "class": "light",
+     "stage": "building",
+     "readyBy": "2026-03-14T16:30:00Z"
+    }
+   }
+  },
+  {
+   "name": "an epic release, reviewing, class not told",
+   "run": "record",
+   "request": {
+    "route": "epic-release",
+    "unit": "I20104",
+    "branch": "jane/26-03-14/epic-I20104-attachment-storage",
+    "target": "train/release",
+    "stage": "reviewing",
+    "now": "2026-03-14T15:00:00Z"
+   },
+   "expect": {
+    "kind": "ship-intent",
+    "key": "I20104",
+    "phase": "reviewing",
+    "expiryMinutes": 20,
+    "payload": {
+     "route": "epic-release",
+     "unit": "I20104",
+     "branch": "jane/26-03-14/epic-I20104-attachment-storage",
+     "target": "train/release",
+     "class": "unknown",
+     "stage": "reviewing",
+     "readyBy": "2026-03-14T15:40:00Z"
+    }
+   }
+  },
+  {
+   "name": "a pull request into the base branch, verifying, with the repository's own expiry",
+   "run": "record",
+   "request": {
+    "route": "develop-pr",
+    "unit": "I20131",
+    "branch": "jane/26-03-14/I20131-stack-change",
+    "target": "develop",
+    "stage": "verifying",
+    "class": "full",
+    "now": "2026-03-14T09:00:00-06:00",
+    "expiryMinutes": 45
+   },
+   "expect": {
+    "kind": "ship-intent",
+    "key": "I20131",
+    "phase": "verifying",
+    "expiryMinutes": 45,
+    "payload": {
+     "route": "develop-pr",
+     "unit": "I20131",
+     "branch": "jane/26-03-14/I20131-stack-change",
+     "target": "develop",
+     "class": "full",
+     "stage": "verifying",
+     "readyBy": "2026-03-14T15:15:00Z"
+    }
+   }
+  },
+  {
+   "name": "a hotfix with no item is keyed by its branch, landing",
+   "run": "record",
+   "request": {
+    "route": "hotfix",
+    "unit": "jane/hotfix/26-03-14/login-loop",
+    "branch": "jane/hotfix/26-03-14/login-loop",
+    "target": "main",
+    "stage": "landing",
+    "now": "2026-03-14T15:00:00Z"
+   },
+   "expect": {
+    "kind": "ship-intent",
+    "key": "jane/hotfix/26-03-14/login-loop",
+    "phase": "landing",
+    "expiryMinutes": 20,
+    "payload": {
+     "route": "hotfix",
+     "unit": "jane/hotfix/26-03-14/login-loop",
+     "branch": "jane/hotfix/26-03-14/login-loop",
+     "target": "main",
+     "class": "unknown",
+     "stage": "landing",
+     "readyBy": "2026-03-14T15:05:00Z"
+    }
+   }
+  },
+  {
+   "name": "declared: nothing to say",
+   "run": "decide",
+   "request": {
+    "mode": "declare",
+    "unit": "I20130",
+    "response": {
+     "won": true,
+     "claim": {
+      "holderDigest": "aa"
+     }
+    },
+    "now": "2026-03-14T15:00:00Z"
+   },
+   "expect": {
+    "action": "proceed",
+    "message": ""
+   }
+  },
+  {
+   "name": "a commands provider's WON is declared too",
+   "run": "decide",
+   "request": {
+    "mode": "declare",
+    "unit": "I20130",
+    "response": {
+     "verdict": "WON",
+     "exitCode": 0
+    },
+    "now": "2026-03-14T15:00:00Z"
+   },
+   "expect": {
+    "action": "proceed",
+    "message": ""
+   }
+  },
+  {
+   "name": "another session already declared the unit: say who, carry on without declaring",
+   "run": "decide",
+   "request": {
+    "mode": "declare",
+    "unit": "I20130",
+    "tz": "America/Chicago",
+    "now": "2026-03-14T15:00:00Z",
+    "response": {
+     "won": false,
+     "claim": {
+      "holderDigest": "bb",
+      "sessionName": "build-two",
+      "machine": "studio",
+      "claimedAt": "2026-03-14T14:50:00Z",
+      "expiresAt": "2026-03-14T15:10:00Z",
+      "releasedAt": null
+     }
+    }
+   },
+   "expect": {
+    "action": "carry-on",
+    "message": "I20130 is already declared as about to ship by session build-two on machine studio since 9:50 AM CDT on Mar 14; carrying on without declaring it."
+   }
+  },
+  {
+   "name": "the other session's declaration lapsed: take it over",
+   "run": "decide",
+   "request": {
+    "mode": "declare",
+    "unit": "I20130",
+    "now": "2026-03-14T15:00:00Z",
+    "response": {
+     "won": false,
+     "expired": true,
+     "claim": {
+      "holderDigest": "bb",
+      "expiresAt": "2026-03-14T14:40:00Z",
+      "releasedAt": null
+     }
+    }
+   },
+   "expect": {
+    "action": "takeover",
+    "takeoverDigest": "bb",
+    "message": ""
+   }
+  },
+  {
+   "name": "an update lands",
+   "run": "decide",
+   "request": {
+    "mode": "update",
+    "unit": "I20130",
+    "response": {
+     "holderDigest": "aa",
+     "expiresAt": "2026-03-14T15:20:00Z"
+    },
+    "now": "2026-03-14T15:00:00Z"
+   },
+   "expect": {
+    "action": "proceed",
+    "message": ""
+   }
+  },
+  {
+   "name": "an update finds the declaration gone: declare again",
+   "run": "decide",
+   "request": {
+    "mode": "update",
+    "unit": "I20130",
+    "response": {
+     "outcome": "NOT_HOLDER",
+     "current": null
+    },
+    "now": "2026-03-14T15:00:00Z"
+   },
+   "expect": {
+    "action": "declare",
+    "message": ""
+   }
+  },
+  {
+   "name": "an update finds another live holder: carry on without declaring",
+   "run": "decide",
+   "request": {
+    "mode": "update",
+    "unit": "I20130",
+    "tz": "UTC",
+    "now": "2026-03-14T15:00:00Z",
+    "response": {
+     "verdict": "NOT HOLDER",
+     "exitCode": 4,
+     "current": {
+      "holderDigest": "bb",
+      "machine": "studio",
+      "expiresAt": "2026-03-14T15:10:00Z",
+      "releasedAt": null
+     }
+    }
+   },
+   "expect": {
+    "action": "carry-on",
+    "message": "I20130 is already declared as about to ship by an unnamed session on machine studio; carrying on without declaring it."
+   }
+  },
+  {
+   "name": "a release that finds nothing of this session's is still done",
+   "run": "decide",
+   "request": {
+    "mode": "release",
+    "unit": "I20130",
+    "response": {
+     "outcome": "NOT_HOLDER",
+     "current": {
+      "holderDigest": "bb",
+      "expiresAt": "2026-03-14T15:10:00Z"
+     }
+    },
+    "now": "2026-03-14T15:00:00Z"
+   },
+   "expect": {
+    "action": "proceed",
+    "message": ""
+   }
+  },
+  {
+   "name": "no claim tool on the server: degrade",
+   "run": "decide",
+   "request": {
+    "mode": "declare",
+    "unit": "I20130",
+    "response": {
+     "error": "ABSENT"
+    }
+   },
+   "expect": {
+    "action": "degrade",
+    "message": "Claims are not available on this DevStride server yet; not saying what this session is about to ship."
+   }
+  },
+  {
+   "name": "unreachable: degrade",
+   "run": "decide",
+   "request": {
+    "mode": "update",
+    "unit": "I20130",
+    "response": {
+     "verdict": "UNREACHABLE",
+     "exitCode": 1
+    }
+   },
+   "expect": {
+    "action": "degrade",
+    "message": "DevStride claims could not be reached; not saying what this session is about to ship."
+   }
+  },
+  {
+   "name": "forbidden: degrade, naming the permission",
+   "run": "decide",
+   "request": {
+    "mode": "declare",
+    "unit": "I20130",
+    "response": {
+     "error": "FORBIDDEN"
+    }
+   },
+   "expect": {
+    "action": "degrade",
+    "message": "This DevStride key's user lacks the MANAGE_AGENT_CLAIMS permission; not saying what this session is about to ship."
+   }
+  },
+  {
+   "name": "an answer that cannot be read: degrade, never a stop",
+   "run": "decide",
+   "request": {
+    "mode": "release",
+    "unit": "I20130",
+    "response": "nonsense"
+   },
+   "expect": {
+    "action": "degrade",
+    "message": "DevStride claims returned an error; not saying what this session is about to ship."
+   }
+  },
+  {
+   "name": "declaring over a row another session already released: carry on",
+   "run": "decide",
+   "request": {
+    "mode": "declare",
+    "unit": "I20130",
+    "now": "2026-03-14T15:00:00Z",
+    "response": {
+     "won": false,
+     "claim": {
+      "holderDigest": "bb",
+      "expiresAt": "2026-03-14T15:10:00Z",
+      "releasedAt": "2026-03-14T14:55:00Z",
+      "outcome": "landed"
+     }
+    }
+   },
+   "expect": {
+    "action": "carry-on",
+    "message": "I20130 could not be declared; carrying on without saying so."
+   }
+  },
+  {
+   "name": "an update over a released row: declare again",
+   "run": "decide",
+   "request": {
+    "mode": "update",
+    "unit": "I20130",
+    "now": "2026-03-14T15:00:00Z",
+    "response": {
+     "outcome": "NOT_HOLDER",
+     "current": {
+      "holderDigest": "bb",
+      "expiresAt": "2026-03-14T15:10:00Z",
+      "releasedAt": "2026-03-14T14:55:00Z",
+      "outcome": "landed"
+     }
+    }
+   },
+   "expect": {
+    "action": "declare",
+    "message": ""
+   }
+  },
+  {
+   "name": "the release verb's own answer: done, and the session keeps declaring",
+   "run": "decide",
+   "request": {
+    "mode": "release",
+    "unit": "I20130",
+    "response": {
+     "released": true,
+     "claim": {
+      "holderDigest": "aa",
+      "releasedAt": "2026-03-14T15:00:00Z"
+     }
+    }
+   },
+   "expect": {
+    "action": "proceed",
+    "message": ""
+   }
+  },
+  {
+   "name": "a release with nothing to release is done too",
+   "run": "decide",
+   "request": {
+    "mode": "release",
+    "unit": "I20130",
+    "response": {
+     "released": false
+    }
+   },
+   "expect": {
+    "action": "proceed",
+    "message": ""
+   }
+  },
+  {
+   "name": "the store says not expired while this clock runs ahead: another session's, never a takeover",
+   "run": "decide",
+   "request": {
+    "mode": "declare",
+    "unit": "I20130",
+    "tz": "UTC",
+    "now": "2026-03-14T15:30:00Z",
+    "response": {
+     "won": false,
+     "expired": false,
+     "claim": {
+      "holderDigest": "bb",
+      "machine": "studio",
+      "expiresAt": "2026-03-14T15:20:00Z",
+      "releasedAt": null
+     }
+    }
+   },
+   "expect": {
+    "action": "carry-on",
+    "message": "I20130 is already declared as about to ship by an unnamed session on machine studio; carrying on without declaring it."
+   }
+  },
+  {
+   "name": "a commands provider's LOST with a lapsed row: take it over",
+   "run": "decide",
+   "request": {
+    "mode": "declare",
+    "unit": "I20130",
+    "now": "2026-03-14T15:30:00Z",
+    "response": {
+     "verdict": "LOST",
+     "exitCode": 2,
+     "claim": {
+      "holderDigest": "bb",
+      "expiresAt": "2026-03-14T15:20:00Z",
+      "releasedAt": null
+     }
+    }
+   },
+   "expect": {
+    "action": "takeover",
+    "takeoverDigest": "bb",
+    "message": ""
+   }
+  },
+  {
+   "name": "a commands LOST that says expired, while this clock runs behind: take it over",
+   "run": "decide",
+   "request": {
+    "mode": "declare",
+    "unit": "I20130",
+    "now": "2026-03-14T15:00:00Z",
+    "response": {
+     "verdict": "LOST",
+     "exitCode": 2,
+     "won": false,
+     "expired": true,
+     "claim": {
+      "holderDigest": "bb",
+      "expiresAt": "2026-03-14T15:20:00Z",
+      "releasedAt": null
+     }
+    }
+   },
+   "expect": {
+    "action": "takeover",
+    "takeoverDigest": "bb",
+    "message": ""
+   }
+  },
+  {
+   "name": "a NOT HOLDER update that says expired: take it over",
+   "run": "decide",
+   "request": {
+    "mode": "update",
+    "unit": "I20130",
+    "now": "2026-03-14T15:00:00Z",
+    "response": {
+     "verdict": "NOT HOLDER",
+     "exitCode": 4,
+     "expired": true,
+     "current": {
+      "holderDigest": "bb",
+      "expiresAt": "2026-03-14T15:20:00Z",
+      "releasedAt": null
+     }
+    }
+   },
+   "expect": {
+    "action": "takeover",
+    "takeoverDigest": "bb",
+    "message": ""
+   }
+  },
+  {
+   "name": "a pull request with no item is keyed by its branch",
+   "run": "record",
+   "request": {
+    "route": "develop-pr",
+    "unit": "jane/26-03-14/tidy-readme",
+    "branch": "jane/26-03-14/tidy-readme",
+    "target": "develop",
+    "stage": "reviewing",
+    "now": "2026-03-14T15:00:00Z"
+   },
+   "expect": {
+    "kind": "ship-intent",
+    "key": "jane/26-03-14/tidy-readme",
+    "phase": "reviewing",
+    "expiryMinutes": 20,
+    "payload": {
+     "route": "develop-pr",
+     "unit": "jane/26-03-14/tidy-readme",
+     "branch": "jane/26-03-14/tidy-readme",
+     "target": "develop",
+     "class": "unknown",
+     "stage": "reviewing",
+     "readyBy": "2026-03-14T15:40:00Z"
+    }
+   }
+  }
+ ],
+ "errors": [
+  {
+   "name": "a payload key the declaration does not carry",
+   "run": "record",
+   "request": {
+    "route": "train",
+    "unit": "I20130",
+    "branch": "b",
+    "target": "train/release",
+    "stage": "building",
+    "owner": "jane"
+   },
+   "contains": "unknown key owner"
+  },
+  {
+   "name": "an unknown route",
+   "run": "record",
+   "request": {
+    "route": "express",
+    "unit": "I20130",
+    "branch": "b",
+    "target": "t",
+    "stage": "building"
+   },
+   "contains": "route must be one of"
+  },
+  {
+   "name": "an unknown stage",
+   "run": "record",
+   "request": {
+    "route": "train",
+    "unit": "I20130",
+    "branch": "b",
+    "target": "t",
+    "stage": "done"
+   },
+   "contains": "stage must be one of"
+  },
+  {
+   "name": "an unknown class",
+   "run": "record",
+   "request": {
+    "route": "train",
+    "unit": "I20130",
+    "branch": "b",
+    "target": "t",
+    "stage": "building",
+    "class": "medium"
+   },
+   "contains": "class must be one of"
+  },
+  {
+   "name": "no unit",
+   "run": "record",
+   "request": {
+    "route": "train",
+    "branch": "b",
+    "target": "t",
+    "stage": "building"
+   },
+   "contains": "unit must be"
+  },
+  {
+   "name": "an expiry outside the store's range",
+   "run": "record",
+   "request": {
+    "route": "train",
+    "unit": "I20130",
+    "branch": "b",
+    "target": "t",
+    "stage": "building",
+    "expiryMinutes": 0
+   },
+   "contains": "expiryMinutes must be"
+  },
+  {
+   "name": "a time that is not one",
+   "run": "record",
+   "request": {
+    "route": "train",
+    "unit": "I20130",
+    "branch": "b",
+    "target": "t",
+    "stage": "building",
+    "now": "soon"
+   },
+   "contains": "now must be an ISO time"
+  },
+  {
+   "name": "an unknown mode",
+   "run": "decide",
+   "request": {
+    "mode": "guess",
+    "unit": "I20130",
+    "response": {
+     "won": true
+    }
+   },
+   "contains": "mode must be"
+  },
+  {
+   "name": "a stage that is a list",
+   "run": "record",
+   "request": {
+    "route": "train",
+    "unit": "I20130",
+    "branch": "b",
+    "target": "t",
+    "stage": []
+   },
+   "contains": "stage must be one of"
+  },
+  {
+   "name": "a stage that is an object",
+   "run": "record",
+   "request": {
+    "route": "train",
+    "unit": "I20130",
+    "branch": "b",
+    "target": "t",
+    "stage": {}
+   },
+   "contains": "stage must be one of"
+  },
+  {
+   "name": "a route that is a list",
+   "run": "record",
+   "request": {
+    "route": [
+     "train"
+    ],
+    "unit": "I20130",
+    "branch": "b",
+    "target": "t",
+    "stage": "building"
+   },
+   "contains": "route must be one of"
+  },
+  {
+   "name": "a class that is an object",
+   "run": "record",
+   "request": {
+    "route": "train",
+    "unit": "I20130",
+    "branch": "b",
+    "target": "t",
+    "stage": "building",
+    "class": {}
+   },
+   "contains": "class must be one of"
+  },
+  {
+   "name": "a time too late to add minutes to",
+   "run": "record",
+   "request": {
+    "route": "train",
+    "unit": "I20130",
+    "branch": "b",
+    "target": "t",
+    "stage": "building",
+    "now": "9999-12-31T23:30:00Z"
+   },
+   "contains": "now must be an ISO time"
+  }
+ ]
+}

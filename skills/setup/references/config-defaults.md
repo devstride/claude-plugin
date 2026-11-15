@@ -340,6 +340,7 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
 | `claims` | `null`, `{ "provider": "devstride" }`, or `{ "commands": { "claim", "heartbeat", "release", "get"?, "list"? } }`, each with optional `expiryMinutes` | no claims: `build-item` claims nothing and says nothing |
 | `releaseTower` | `{ "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" }` | those two defaults |
 | `release.autoStart.enabled` | boolean; needs `claims` | `false`: a release starts only when someone runs `release` |
+| `release.coordination.enabled` | boolean; needs `claims` | `true`: with a `claims` block, sessions say what they are about to ship |
 | `release.lightRelease.standingYes` | boolean; needs `release.classifySkill` | `false`: every production merge waits for the owner's in-the-moment yes |
 | `release.fullRelease` | `{ "standingYes", "ownerDecision": "YYYY-MM-DD", "migrationGlobs": [...], "approvedMigrations": [{ "blob", "path", "item", "approved" }] }`; needs `release.clearance` | no written standing yes: a release that is not light asks |
 
@@ -380,11 +381,15 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   is skipped, or STOPS a named one. `provider: devstride` uses the agent's own DevStride connection;
   `commands` supplies a store (verbs and verdicts in the registry); both is a config error.
   `expiryMinutes` maps a kind to the minutes a claim lives without a heartbeat: `story` 240,
-  `release-train` 30, other kinds the server's default (the release permit: `staleMinutes`); a value outside 1..1440 is warned about and
+  `release-train` 30, `ship-intent` 20, other kinds the server's default (the release permit: `staleMinutes`); a value outside 1..1440 is warned about and
   ignored. An unreachable, unsupported or forbidden store means no claims, said once. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`.
   With a `claims` block every release also claims the `release-train` claim (key `<owner>/<repo>`)
   before it opens or adopts the train's pull request, and hands it on at the cut.
+- **`release.coordination.enabled`** — each session says what it is building, reviewing or landing
+  (claim kind `ship-intent`: unit, target, stage and an estimate of when it is ready), so every other
+  session and the owner can see it before it lands. Information only: it never blocks or delays
+  anything. Contract: `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md`.
 - **`release.autoStart.enabled`** — releases that start themselves: after a one-off lands on the
   train, an epic release merges onto it, or a release finishes, the session checks whether the
   train holds work beyond the source and, if it wins the `release-train` claim, runs `release`.

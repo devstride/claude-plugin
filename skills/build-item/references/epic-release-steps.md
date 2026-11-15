@@ -15,6 +15,8 @@ instruction for a release that fires; a recovery close-out applies only the Merg
 
 In plan scope, the refresh source, the cut base and the close-out change as
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md` says; read it with this file.
+With `claims` set, the release is declared as
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md` says.
 
 - **Refresh**: pull the epic branch, fetch `baseBranch`, merge its captured tip `<baseOid>` — merge,
   NEVER rebase shared story SHAs; non-mechanical conflicts STOP. Push.

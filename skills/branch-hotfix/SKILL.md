@@ -42,7 +42,8 @@ development branch's unreleased work. Branch name argument: $ARGUMENTS (none →
 ## Steps
 
 1. `git checkout <hotfixBaseBranch>`, then `git pull`.
-2. `git checkout -b <hotfix-branch>`, then `git push -u origin <hotfix-branch>`.
+2. `git checkout -b <hotfix-branch>`, then `git push -u origin <hotfix-branch>`; with `claims`
+   set, declare it (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md`).
 3. Bring the local environment in step with production code (below).
 4. Confirm the current branch (`git rev-parse --abbrev-ref HEAD`) and the push; report the full
    branch name, what happened at each step, and which environment case was taken.

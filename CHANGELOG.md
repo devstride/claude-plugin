@@ -8,6 +8,60 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [3.65.0] — 2026-11-14
+
+### Added
+
+- **Sessions say what they are about to ship.** With a `claims` block, a session that is building,
+  reviewing or landing work now declares it in the shared claims store (kind `ship-intent`): the
+  unit, the branch it will merge into, how far along it is and an estimate of when it will be
+  ready. `build-item` declares each story and each epic release and keeps the stage current,
+  `branch-hotfix` declares a hotfix, and `pr` declares a pull request opened outside the build
+  loop. A declaration is information only: nothing is refused, delayed or stopped because one is
+  missing, stale or another session's, and an unreachable store is said once and then ignored.
+  `skills/build-item/scripts/ship-intent.py` builds the declaration and reads every answer, so
+  other tooling gets the same result; `release.coordination.enabled` (default `true`) switches it
+  off, and the `ship-intent` entry of `claims.expiryMinutes` (default 20) sets how long a silent
+  session stays listed.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.64.0 @ 108bedd, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.64.0 | tokens@devstride--v3.64.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,096 | 10,699 | 32,096 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 25,535 | 8,512 | 25,535 | 8,512 | +0 | 8,512 |
+| skills/build-item/SKILL.md | 23,992 | 7,998 | 23,992 | 7,998 | +0 | 7,999 |
+| skills/doctor/SKILL.md | 23,994 | 7,998 | 23,994 | 7,998 | +0 | 8,000 |
+| skills/review/SKILL.md | 23,970 | 7,990 | 23,970 | 7,990 | +0 | 7,999 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
+| skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |
+| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
+| skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 11,963 | 3,988 | +0 | 3,988 |
+| skills/pr/SKILL.md | 10,893 | 3,631 | 11,023 | 3,675 | +44 | 3,700 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,731 | 2,244 | 6,731 | 2,244 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,545 | 2,182 | 6,649 | 2,217 | +35 | 2,217 |
+| skills/create-story/SKILL.md | 6,322 | 2,108 | 6,322 | 2,108 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 5,622 | 1,874 | 5,622 | 1,874 | +0 | 1,874 |
+| skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 276,056 | 92,027 | 276,290 | 92,106 | +79 | |
+
 ## [3.64.0] — 2026-11-14
 
 ### Fixed
@@ -5610,7 +5664,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.64.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.65.0...HEAD
+[3.65.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.64.0...devstride--v3.65.0
 [3.64.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.63.0...devstride--v3.64.0
 [3.63.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.62.0...devstride--v3.63.0
 [3.62.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.61.1...devstride--v3.62.0

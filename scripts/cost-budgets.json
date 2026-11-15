@@ -6,7 +6,7 @@
   "alwaysOnContext": 1800,
   "bodies": {
     "branch-feature": 900,
-    "branch-hotfix": 2200,
+    "branch-hotfix": 2217,
     "build-item": 7999,
     "ci-audit": 2600,
     "comprehend-plan": 1874,
@@ -77,7 +77,7 @@
     "skills/review/references/roster-and-modes.md": 2120,
     "skills/review/references/slow-suite-gating.md": 1700,
     "skills/setup/references/ci-cost-patterns.md": 5000,
-    "skills/setup/references/config-defaults.md": 19589,
+    "skills/setup/references/config-defaults.md": 19770,
     "skills/setup/references/boards-mode.md": 2705,
     "skills/setup/references/detector-evidence.digest.md": 900,
     "skills/setup/references/detector-evidence.md": 4300,
@@ -85,7 +85,7 @@
     "skills/setup/references/docs-skill-templates/update-release-notes.md": 1200,
     "skills/setup/references/interview-rationale.md": 1900,
     "skills/setup/references/review-engines.md": 2700,
-    "skills/setup/references/seam-registry.md": 15951,
+    "skills/setup/references/seam-registry.md": 16099,
     "skills/setup/references/statusline-segments.md": 3416,
     "skills/setup/references/validation-checklist.md": 6000,
     "skills/ultracode-build/references/engineering-economy.md": 1400,
@@ -94,10 +94,10 @@
     "skills/release/references/step-skills.md": 1000,
     "skills/release/references/release-safety-hooks.md": 1200,
     "skills/build-item/references/checkout-pool-commands.md": 1400,
-    "skills/build-item/references/story-claims.md": 1557,
+    "skills/build-item/references/story-claims.md": 1699,
     "skills/build-item/references/needs-you.md": 3383,
     "skills/doctor/references/claims-checks.md": 450,
-    "skills/build-item/references/epic-release-steps.md": 1691,
+    "skills/build-item/references/epic-release-steps.md": 1731,
     "skills/review/references/cloud-reviewers.md": 700,
     "skills/build-item/references/deferred-container.md": 3166,
     "skills/setup/references/agents-mode.md": 2213,
@@ -116,11 +116,12 @@
     "skills/release/references/release-pr.md": 2107,
     "skills/release/references/merge-and-deploy.md": 1715,
     "skills/release/references/backstop.md": 2807,
-    "skills/release/references/estimates.md": 1892
+    "skills/release/references/estimates.md": 1892,
+    "skills/build-item/references/ship-intent.md": 1503
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 92326,
+      "budget": 94053,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -128,6 +129,7 @@
         "skills/build-item/references/deferred-container.md",
         "skills/build-item/references/active-agents.md",
         "skills/build-item/references/story-claims.md",
+        "skills/build-item/references/ship-intent.md",
         "skills/build-item/references/plain-language-output.md",
         "skills/build-item/references/verification-receipts.md",
         "skills/plan/references/delivery-profiles.md",
@@ -162,13 +164,14 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 76799,
+      "budget": 78486,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
         "skills/build-item/references/deferred-container.md",
         "skills/build-item/references/active-agents.md",
         "skills/build-item/references/story-claims.md",
+        "skills/build-item/references/ship-intent.md",
         "skills/build-item/references/plain-language-output.md",
         "skills/build-item/references/progress-table.md",
         "skills/build-item/references/verification-receipts.md",
@@ -207,7 +210,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 95149,
+      "budget": 96792,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
@@ -245,6 +248,7 @@
         "skills/review/references/cloud-reviewers.md",
         "skills/release/references/auto-start.md",
         "skills/build-item/references/story-claims.md",
+        "skills/build-item/references/ship-intent.md",
         "skills/build-item/references/consequence-notices.md"
       ]
     }
