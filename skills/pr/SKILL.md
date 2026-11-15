@@ -56,6 +56,8 @@ number): $ARGUMENTS
 - Otherwise the working base for a feature, `hotfixBaseBranch` (default `master`) for a hotfix —
   pre-answered in autonomous mode, asked standalone. Confirm the branch is pushed and ahead of the
   base; nothing to compare → STOP.
+- **Base the release train or the base branch**: first run the check in
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/migration-approval.md`; unapproved → ask before opening.
 - **Resolve the draft hold BEFORE creating anything.** Inspect `ci.workflowGlobs` for workflows
   subscribing to `pull_request`, excluding the convention-only policy shape in
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md`, and read

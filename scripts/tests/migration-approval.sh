@@ -120,11 +120,31 @@ for label, full in (("config with no migrationGlobs", {"standingYes": True}),
 r = repo(dict(ON, approveBeforeJoining=True)); write(r, MIG, "x"); commit(r, "work")
 say(check(r)[0] == 2, "the key set to true: asked")
 
-# the config is the HEAD's committed one, never the work tree's, and never the base's
-r = repo({"standingYes": False}); approve(r, [], None); write(r, MIG, "x"); commit(r, "work")
-write(r, ".claude/ds-config.json", json.dumps({"release": {}}))  # uncommitted: must not be read
+# the RULE is the base's committed one: a branch never switches the question off for itself
+for label, change in (("switches the standing yes off", {"standingYes": False, "migrationGlobs": GLOBS}),
+                      ("narrows the globs to nothing", {"standingYes": True, "migrationGlobs": ["nothing/*.none"]}),
+                      ("sets approveBeforeJoining false", dict(ON, approveBeforeJoining=False))):
+    r = repo(ON); write(r, MIG, "x"); write(r, ".claude/ds-config.json", json.dumps({"release": {"fullRelease": change}})); commit(r, "work")
+    rc, out, p = check(r)
+    say(rc == 2 and out["unapproved"][0]["path"] == MIG, "a branch that %s is still asked" % label, p.stdout + p.stderr)
+r = repo(ON); write(r, MIG, "x"); git(r, "rm", "-q", ".claude/ds-config.json"); commit(r, "work")
 rc, out, p = check(r)
-say(rc == 2, "the head's committed config decides, not the base's and not the work tree's", p.stdout + p.stderr)
+say(rc == 2, "a branch that deletes the config is still asked", p.stdout + p.stderr)
+r = repo({"standingYes": False}); approve(r, []); write(r, MIG, "x"); commit(r, "work")
+rc, out, p = check(r)
+say(rc == 0 and out["applies"] is False, "a rule only the branch itself turns on is not the base's: not applicable", p.stdout + p.stderr)
+r = repo(ON); write(r, MIG, "x"); commit(r, "work")
+write(r, ".claude/ds-config.json", json.dumps({"release": {}}))  # uncommitted: must not be read
+say(check(r)[0] == 2, "nothing is read from the work tree")
+r = repo(ON); write(r, MIG, "x"); write(r, ".claude/ds-config.json", "{not json"); commit(r, "work")
+rc, out, p = check(r)
+say(rc == 1 and "cannot be read as JSON" in out.get("reason", ""), "approvals that cannot be read at the head: exit 1, never approved", p.stdout + p.stderr)
+r = repo("[1, 2]"); write(r, MIG, "x"); commit(r, "work")
+rc, out, p = check(r)
+say(rc == 1 and "not a JSON object" in out.get("reason", ""), "a base config that is not an object: exit 1, never not-applicable", p.stdout + p.stderr)
+r = repo(ON); git(r, "checkout", "-q", "--orphan", "bare"); git(r, "rm", "-rqf", "."); write(r, "readme", "x"); commit(r, "no config"); git(r, "checkout", "-q", "-b", "work2"); write(r, MIG, "x"); commit(r, "work")
+rc, out, p = check(r, base="bare", head="work2")
+say(rc == 0 and out["applies"] is False, "a base with no config at all: not applicable", p.stdout + p.stderr)
 
 # unanswerable: exit 1
 r = repo("{not json"); write(r, MIG, "x"); commit(r, "work")
@@ -168,6 +188,19 @@ say(check(r, already=["train"])[0] == 0 and check(r)[0] == 2, "a deletion the tr
 rc, out, p = check(r, already=["nowhere"])
 say(rc == 1 and "fetch it first" in out.get("reason", ""), "an --already ref that is not a commit here: exit 1", p.stdout + p.stderr)
 
+# the shortcut for content already there is never a way round the checks
+r = repo(ON, {MIG: "target"}); git(r, "branch", "prod", "develop")
+os.remove(os.path.join(r, MIG)); os.symlink("target", os.path.join(r, MIG)); commit(r, "link with the same blob")
+rc, out, p = check(r, already=["prod"])
+say(rc == 2 and out["unapproved"][0]["status"] == "not-a-file", "a link whose text is the file production holds: never excused", p.stdout + p.stderr)
+r = repo(ON); git(r, "branch", "oldtrain", "develop"); git(r, "checkout", "-q", "develop"); write(r, MIG, "x"); commit(r, "base gains it")
+git(r, "branch", "prod", "develop"); git(r, "checkout", "-q", "-B", "work", "develop"); git(r, "rm", "-q", MIG); commit(r, "delete")
+rc, out, p = check(r, already=["oldtrain", "prod"])
+say(rc == 2 and out["unapproved"][0]["status"] == "deleted", "a deletion is not excused by a branch that never held the file", p.stdout + p.stderr)
+r = repo(ON); write(r, MIG, "create table x();"); commit(r, "work"); approve(r, [entry(blob(r, MIG))])
+rc, out, p = check(r, cwd=os.path.join(r, "db"))
+say(rc == 0 and out["approved"] is True, "run from a sub-folder: an approved file is still a plain file", p.stdout + p.stderr)
+
 # usage
 p = subprocess.run([sys.executable, helper, "check", "--base", "develop"], capture_output=True, text=True, cwd=r)
 say(p.returncode == 2 and p.stdout == "" and p.stderr.startswith("migration-approval: "), "a missing argument: exit 2, one line", p.stderr)
@@ -184,7 +217,8 @@ def entry_run(*args):
         return p.returncode, {}, p
 BASE = ["--head", "work", "--path", MIG, "--item", "I20130", "--unit", "I20104", "--asked", "2026-03-14T09:00:00-06:00", "--approved", "2026-03-14T15:20:00Z"]
 rc, out, p = entry_run(*BASE)
-say(rc == 0 and out == {"entry": {"blob": blob(r, MIG), "path": MIG, "item": "I20130", "approved": TODAY},
+DAY = __import__("datetime").datetime(2026, 3, 14, 15, 20, tzinfo=__import__("datetime").timezone.utc).astimezone().date().isoformat()
+say(rc == 0 and out == {"entry": {"blob": blob(r, MIG), "path": MIG, "item": "I20130", "approved": DAY},
                         "subject": "chore(release): approve migration %s [I20130]" % MIG,
                         "trailers": ["Migration-Approval-Unit: I20104", "Migration-Approval-Asked: 2026-03-14T15:00:00Z", "Migration-Approval-Approved: 2026-03-14T15:20:00Z"]},
     "entry: the approval, the commit subject and the hold record", p.stdout + p.stderr)
@@ -198,12 +232,17 @@ for label, change, needle in (("an item that is not one", ["--item", "20130"], "
                               ("a time with no offset", ["--asked", "2026-03-14T09:00:00"], "ISO times"),
                               ("asked after approved", ["--asked", "2026-03-15T09:00:00Z"], "after --approved"),
                               ("a unit with a space", ["--unit", "I20104 x"], "--unit"),
+                              ("a unit ending in a line break", ["--unit", "I20104\n"], "--unit"),
+                              ("an item ending in a line break", ["--item", "I20130\n"], "--item"),
+                              ("an approval in the future", ["--approved", "2099-01-01T00:00:00Z"], "in the future"),
                               ("a file that is not there", ["--path", "db/migrations/sql/none.sql"], "not a plain file"),
                               ("a head that is not a commit", ["--head", "nowhere"], "not a commit")):
     args = list(BASE)
     args[args.index(change[0]) + 1] = change[1]
     rc, out, p = entry_run(*args)
     say(rc == 2 and p.stdout == "" and p.stderr.startswith("migration-approval: ") and needle in p.stderr, "entry refuses: " + label, p.stderr)
+p = subprocess.run([sys.executable, helper, "entry"] + BASE, capture_output=True, text=True, cwd=os.path.join(r, "db"))
+say(p.returncode == 0 and json.loads(p.stdout)["entry"]["blob"] == blob(r, MIG, "work"), "entry: run from a sub-folder, the path is still from the repository root", p.stdout + p.stderr)
 print("ran to the end")
 PY
 RC=$?

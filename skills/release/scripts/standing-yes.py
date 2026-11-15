@@ -284,27 +284,27 @@ def approvals(full):
 
 
 def changed_migrations(base, head, is_migration, base_name):
-    """Each migration file that differs between `head` and its merge base with `base`:
-    (status letter, path, mode at head, blob at head). The one reader of a migration diff: the
-    release's own check and migration-approval.py both use it."""
+    """Yields each migration file that differs between `head` and its merge base with `base`, in
+    diff order and one at a time, so a caller that asks about the first problem asks about the same
+    one as ever: (status letter, path, mode at head, blob at head). The one reader of a migration
+    diff: the release's own check and migration-approval.py both use it."""
     done = subprocess.run(["git", "merge-base", base, head], capture_output=True, text=True)
     ask(done.returncode == 0, "no merge base between %s and the head" % base_name)
     diff = subprocess.run(["git", "diff", "--name-status", "-z", "--no-renames", "--no-relative", "--no-ext-diff", "--ignore-submodules=none", done.stdout.strip(), head], capture_output=True)
     ask(diff.returncode == 0, "the release diff cannot be read")
     fields = diff.stdout.decode("utf-8", "surrogateescape").split("\0")
-    found = []
     for status, path in zip(fields[0::2], fields[1::2]):
         ask(not CONTROL.search(path), "the release changes a file whose name holds a control character (%r): no glob can be trusted to classify it" % path)
         if not path or not is_migration(path):
             continue
         if status == "D":
-            found.append((status, path, "", ""))
+            yield status, path, "", ""
             continue
-        listed = subprocess.run(["git", "ls-tree", "-z", head, "--", path], capture_output=True).stdout.decode("utf-8", "surrogateescape")
+        # --full-tree: the path is from the repository root wherever this runs.
+        listed = subprocess.run(["git", "ls-tree", "-z", "--full-tree", head, "--", path], capture_output=True).stdout.decode("utf-8", "surrogateescape")
         mode = listed.split(" ", 1)[0] if listed else ""
         blob = subprocess.run(["git", "rev-parse", "%s:%s" % (head, path)], capture_output=True, text=True).stdout.strip()
-        found.append((status, path, mode, blob))
-    return found
+        yield status, path, mode, blob
 
 
 def migrations(head, production, full, live_base):

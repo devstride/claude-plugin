@@ -3,7 +3,8 @@
 
 Every place the plugin merges (`release`, `build-item`, a departure's merge) runs this file and
 then runs exactly the command it prints, never its own `gh pr merge`. It reads GitHub, and the
-consuming repository's `.claude/ds-config.json` for the one rule that needs it (the train proof below).
+consuming repository's `.claude/ds-config.json` for the two rules that need it (the train proof and
+the migration approval, below).
 
   merge-gate.py <pr-number> <expected-head-sha> [--all-green] [--delete-branch] [--subject <text>]
                 [--repo <owner>/<name>] [--config <ds-config.json>]
@@ -36,6 +37,15 @@ The rule (an approver's admin merge exactly when every required check is green, 
   GitHub's), matching `release.releaseBranchFixExclusions` (the one anchored matcher, `routing.py`'s
   `first_match`) is a REFUSE, since a proof would not save it. No train configured, another base,
   or a head that is not a release unit and changes no excluded path: the rule does nothing.
+- A migration is approved before it joins: when the base is the release train or the base branch
+  (never the production branch) and that base's committed config has the written standing yes for
+  full releases with migration globs (`release.fullRelease`, `approveBeforeJoining` not false), the
+  head's new or changed migrations must each be approved by content
+  (`release/scripts/migration-approval.py check`, the rule read from the base as fetched now, the
+  approvals from the head; content already on the train or in production is not asked about
+  again). Unapproved is a REFUSE naming the files; a head, base or answer that cannot be read is an
+  ERROR. A checkout that has never seen a `fullRelease` block does nothing and fetches nothing;
+  `--config` names the policy outright. The release's own check is unchanged.
 - Pinned to the head: the pull request's head must be the expected SHA, and the command carries
   `--match-head-commit <sha>`, so GitHub refuses it if the head moves in between.
 - Every required check green there: the required checks are the union of the base branch's
@@ -764,26 +774,68 @@ def train_proof(pr, number, expected, owner, name, base, config_path):
                         number, shlex.quote(base)))
 
 
+def committed_policy(ref):
+    """`.claude/ds-config.json` as committed at `ref`: a dict; None when that commit has none."""
+    code, listed, _ = git_out("ls-tree", "--full-tree", ref, "--", ".claude/ds-config.json")
+    if code != 0:
+        raise Unreadable("the config committed at %s could not be looked up" % ref)
+    if not listed.strip():
+        return None
+    code, shown, _ = git_out("show", "%s:.claude/ds-config.json" % ref)
+    try:
+        config = json.loads(shown) if code == 0 else None
+    except ValueError:
+        config = None
+    if not isinstance(config, dict):
+        raise Unreadable("the config committed at %s cannot be read as a JSON object" % ref)
+    return config
+
+
+def has_full_release(config):
+    release = config.get("release") if isinstance(config, dict) else None
+    return isinstance(release, dict) and "fullRelease" in release
+
+
 def migration_approval(pr, number, expected, owner, name, base, config_path):
     """REFUSE a head that would carry a migration the owner has not approved onto the release
     train or the base branch (`skills/release/references/migration-approval.md`). The release's
-    own check still asks at release time; this asks before the work joins anything."""
-    config = repo_config(config_path, owner, name)
-    release = config.get("release") if isinstance(config, dict) and isinstance(config.get("release"), dict) else {}
+    own check still asks at release time; this asks before the work joins anything.
+
+    The policy (whether the rule is on, which branches are the train, the base and production) is
+    the BASE BRANCH's committed config, fetched fresh: neither the checkout's work tree nor the
+    pull request's own branch can switch the question off. `--config` names the policy outright
+    (a caller that has no checkout of the repository's base)."""
+    if config_path is not None:
+        policy = repo_config(config_path, owner, name)
+    else:
+        working = repo_config(None, owner, name)   # also confirms this checkout is the repository
+        code, local, _ = git_out("show", "refs/remotes/origin/%s:.claude/ds-config.json" % base)
+        # Nothing this checkout has ever seen names a written standing yes: nothing to ask, and no
+        # fetch. Anything else is settled by the base as it is now.
+        if not has_full_release(working) and not (code == 0 and '"fullRelease"' in local):
+            return
+        code, _, err = git_out("fetch", "-q", "--no-tags", "origin", "+refs/heads/%s:refs/remotes/origin/%s" % (base, base))
+        if code != 0:
+            raise Unreadable("%s could not be fetched, so whether #%d needs a migration approval cannot be told: %s"
+                             % (base, number, err.strip()[:200] or "git fetch failed"))
+        policy = committed_policy("refs/remotes/origin/%s" % base)
+    if policy is None:
+        return
+    release = policy.get("release") if isinstance(policy.get("release"), dict) else {}
     full = release.get("fullRelease")
-    # The cheap test first, from this checkout: a repository without the written standing yes,
-    # without migration globs, or with the early question switched off is not asked anything.
     if not (isinstance(full, dict) and full.get("standingYes") is True and full.get("migrationGlobs")
             and full.get("approveBeforeJoining") is not False):
         return
     routing = load("merge_gate_routing", ROUTING)
     try:
-        train = routing.train_section(config).get("branch")
+        train = routing.train_section(policy).get("branch")
     except SystemExit:
         raise Unreadable("the config names the train under both releaseTrain and supportTrain")
-    base_branch = config.get("baseBranch")
-    production = release.get("productionBranch") if isinstance(release.get("productionBranch"), str) else None
-    if base not in [b for b in (train, base_branch) if isinstance(b, str) and b]:
+    # The registered defaults, as every other script reads them.
+    base_branch = policy.get("baseBranch") if isinstance(policy.get("baseBranch"), str) and policy.get("baseBranch") else "develop"
+    production = release.get("productionBranch") if isinstance(release.get("productionBranch"), str) and release.get("productionBranch") else "master"
+    # Production is never this rule's: a hotfix is never held, and the release has its own check.
+    if base == production or base not in [b for b in (train, base_branch) if isinstance(b, str) and b]:
         return
     # What is already on the train or in production joined before, and was asked about then.
     already = [b for b in ((train if base == base_branch else None), production) if isinstance(b, str) and b and b != base]
@@ -793,22 +845,29 @@ def migration_approval(pr, number, expected, owner, name, base, config_path):
         raise Unreadable("#%d's head and %s could not be fetched, so its migrations cannot be read: %s"
                          % (number, ", ".join([base] + already), err.strip()[:200] or "git fetch failed"))
     try:
-        done = subprocess.run([sys.executable, "-I", MIGRATION_APPROVAL, "check", "--base", "origin/%s" % base, "--head", expected]
-                              + [x for b in already for x in ("--already", "origin/%s" % b)],
+        done = subprocess.run([sys.executable, "-I", MIGRATION_APPROVAL, "check", "--base", "refs/remotes/origin/%s" % base, "--head", expected]
+                              + [x for b in already for x in ("--already", "refs/remotes/origin/%s" % b)],
                               capture_output=True, text=True, timeout=120)
         answer = json.loads(done.stdout)
     except (OSError, ValueError, subprocess.TimeoutExpired) as err:
         raise Unreadable("the migration approval check gave no answer for #%d: %s" % (number, err))
-    reason = answer.get("reason") if isinstance(answer, dict) else None
-    if done.returncode == 0 and isinstance(answer, dict) and answer.get("approved") is True:
+    answer = answer if isinstance(answer, dict) else {}
+    reason = answer.get("reason") if isinstance(answer.get("reason"), str) else None
+    if done.returncode == 0 and answer.get("approved") is True:
         return
-    if done.returncode == 2:
-        raise Refuse("#%d would carry onto %s %s. The owner approves a migration by content, in a session, before "
-                     "it joins: build each approval with python3 %s entry, add it to release.fullRelease.approvedMigrations "
-                     "in a commit of its own on %s, then run this gate again"
-                     % (number, base, reason or "a migration without the owner's approval",
-                        shlex.quote(MIGRATION_APPROVAL), pr.get("headRefName") or "the head branch"))
-    raise Unreadable("whether #%d carries an unapproved migration could not be told: %s" % (number, reason or "no reason given"))
+    if done.returncode != 2:
+        raise Unreadable("whether #%d carries an unapproved migration could not be told: %s" % (number, reason or "no reason given"))
+    unapproved = [u for u in answer.get("unapproved") or [] if isinstance(u, dict)]
+    by_hand = [str(u.get("path")) for u in unapproved if u.get("status") in ("deleted", "not-a-file")]
+    how = ("Only the owner approves a migration, in their own words in a session (never a relayed yes; an unattended run "
+           "writes one notice and moves on: %s). On that yes, build each approval with python3 %s entry and add it to "
+           "release.fullRelease.approvedMigrations in a commit of its own on %s, then run this gate again."
+           % (os.path.join(SKILLS, "release/references/migration-approval.md"), shlex.quote(MIGRATION_APPROVAL),
+              pr.get("headRefName") or "the head branch"))
+    if by_hand:
+        how += (" %s cannot be approved by content (deleted, or not a plain file): the owner merges that pull request "
+                "themselves, on their own yes for it." % ", ".join(by_hand))
+    raise Refuse("#%d would carry onto %s %s. %s" % (number, base, reason or "a migration without the owner's approval", how))
 
 
 def decide(number, expected, owner, name, delete_branch, subject=None, all_green=False, config_path=None):

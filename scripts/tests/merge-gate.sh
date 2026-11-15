@@ -542,17 +542,33 @@ def put(path, name, text):
     os.makedirs(os.path.dirname(os.path.join(path, name)), exist_ok=True)
     open(os.path.join(path, name), "w").write(text)
 FULL = {"standingYes": True, "migrationGlobs": ["db/migrations/*.sql"], "approvedMigrations": []}
-def joining(full=FULL, approved=False, on_train=False):
+def joining(full=FULL, approved=False, on_train=False, drop=(), head_full=None, hotfix=False, delete=False):
     """origin with develop, master and train/release; a clone whose branch `work` adds a migration."""
     n = len(os.listdir(work))
     origin, clone = os.path.join(work, "origin%d.git" % n), os.path.join(work, "clone%d" % n)
     config = {"baseBranch": "develop", "releaseTrain": {"branch": "train/release"}, "release": {"productionBranch": "master", "fullRelease": full}}
+    for key in drop:   # a registered default left out of the config
+        (config if key == "baseBranch" else config["release"]).pop(key)
     subprocess.run(["git", "init", "-q", "--bare", "-b", "develop", origin], check=True)
     subprocess.run(["git", "init", "-q", "-b", "develop", clone], check=True)
-    put(clone, ".claude/ds-config.json", json.dumps(config)); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "base")
+    put(clone, ".claude/ds-config.json", json.dumps(config))
+    if delete:
+        put(clone, "db/migrations/0001_old.sql", "create table old();")
+    g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "base")
     g(clone, "remote", "add", "origin", origin)
-    g(clone, "branch", "master"); g(clone, "branch", "train/release"); g(clone, "checkout", "-q", "-b", "work")
-    put(clone, "db/migrations/0042_add.sql", "create table x();"); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "work")
+    g(clone, "branch", "master"); g(clone, "branch", "train/release")
+    if hotfix:   # a migration that went to production by a hotfix, now coming back to the base
+        g(clone, "checkout", "-q", "master"); put(clone, "db/migrations/0042_add.sql", "create table x();")
+        g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "hotfix"); g(clone, "checkout", "-q", "-b", "work")
+    else:
+        g(clone, "checkout", "-q", "-b", "work")
+        if delete:
+            g(clone, "rm", "-q", "db/migrations/0001_old.sql")
+        else:
+            put(clone, "db/migrations/0042_add.sql", "create table x();")
+        if head_full is not None:   # the branch edits the rule for itself
+            put(clone, ".claude/ds-config.json", json.dumps(dict(config, release=dict(config["release"], fullRelease=head_full))))
+        g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "work")
     if approved:
         entry = {"blob": g(clone, "rev-parse", "HEAD:db/migrations/0042_add.sql"), "path": "db/migrations/0042_add.sql", "item": "I20130", "approved": "2026-01-15"}
         config["release"]["fullRelease"] = dict(full, approvedMigrations=[entry])
@@ -585,6 +601,23 @@ for label, full in (("no written standing yes", dict(FULL, standingYes=False)), 
     say(code == 0 and out[0].startswith("MERGE"), "(34e) %s: the rule does nothing" % label, "rc=%d %r %r" % (code, out, err))
 code, out, err = join(base="master")
 say(code == 0 and out[0].startswith("MERGE"), "(34f) into the production branch (a hotfix, the release): never this rule's", "rc=%d %r %r" % (code, out, err))
+for label, head_full in (("switches the standing yes off", dict(FULL, standingYes=False)), ("empties the globs", dict(FULL, migrationGlobs=["none/*.x"])),
+                         ("sets approveBeforeJoining false", dict(FULL, approveBeforeJoining=False))):
+    code, out, err = join(head_full=head_full)
+    say(code == 2 and out[0].startswith("REFUSE #7 would carry onto develop"), "(34h) a branch that %s for itself is still refused: the base's rule decides" % label, "rc=%d %r %r" % (code, out, err))
+code, out, err = join(drop=("baseBranch",))
+say(code == 2 and out[0].startswith("REFUSE #7 would carry onto develop"), "(34i) baseBranch left out: the registered default (develop) is the base branch", "rc=%d %r %r" % (code, out, err))
+code, out, err = join(drop=("productionBranch",), hotfix=True)
+say(code == 0 and out[0].startswith("MERGE"), "(34j) productionBranch left out: content a hotfix put on master comes back to the base unasked", "rc=%d %r %r" % (code, out, err))
+code, out, err = join(delete=True)
+say(code == 2 and "db/migrations/0001_old.sql (deleted)" in out[0] and "the owner merges that pull request themselves" in out[0],
+    "(34k) a deleted migration: refused, and told it merges only by the owner's own hand", "rc=%d %r %r" % (code, out, err))
+code, out, err = join()
+say(code == 2 and "Only the owner approves a migration, in their own words in a session" in out[0] and "references/migration-approval.md" in out[0],
+    "(34l) the refusal says who may approve and names the reference, never a recipe to self-approve", "rc=%d %r" % (code, out))
+code, out, err = join(head_full=dict(FULL, approvedMigrations=[{"blob": "abc"}]))
+say(code == 1 and out[0].startswith("ERROR ") and "approvedMigrations[0]" in out[0] and "MERGE" not in "".join(out),
+    "(34m) approvals that cannot be read -> ERROR, never a MERGE line", "rc=%d %r %r" % (code, out, err))
 clone, sha, config = joining()
 path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid="b" * 40), open(path, "w"))
 cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))

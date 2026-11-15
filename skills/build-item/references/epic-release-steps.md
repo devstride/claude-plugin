@@ -25,9 +25,9 @@ With `claims` set, the release is declared as
   exactly is not run locally; a required command CI lacks runs once as a pre-ship check on the final
   reviewed head; `preShipChecks` stay local; a firing `verify.skipDuringStoryBuilds` entry stays
   cloud-only. Record where each runs; never infer coverage from a job name.
-- **Migrations first**: read
-  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/migration-approval.md` when the unit's head adds
-  or changes a migration; an unapproved one is asked about before the cut, never after.
+- **Migrations first**: before the cut, always, run the check in
+  `${CLAUDE_PLUGIN_ROOT}/skills/release/references/migration-approval.md` on the unit's head; an
+  unapproved migration is asked about now, never after the cut.
 - **Cut via `/devstride:pr`** autonomously, declaring `merge-only: true`: head = epic branch, base =
   `routing.py release-target`'s branch (`epicIntegrationBranches.releaseTarget` without plan scope), flagged **EPIC RELEASE PR** (body leads with the epic and
   lists its stories), with the profile, the verification plan and the aggregate risk-check ledger.

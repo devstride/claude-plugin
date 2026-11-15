@@ -7,16 +7,18 @@ diff, the globs and the approvals is `standing-yes.py`'s own (beside this file),
 script asks the release's question about any head against any base, earlier.
 
   check --base <ref> --head <ref> [--already <ref>]…
-      Reads `.claude/ds-config.json` as committed at <head>. Considers only the files that differ
-      between <head> and its merge base with <base> and match `release.fullRelease.migrationGlobs`.
-      A migration whose content is already at an `--already` ref (the release train, the
-      production branch) is not joining anything and is not asked about: the release's own
-      check covers what was there before.
+      The RULE (whether the early question applies, and which files are migrations) is read from
+      `.claude/ds-config.json` as committed at <base>; the APPROVALS from the one committed at
+      <head>. Nothing is read from the work tree. Considers only the files that differ between
+      <head> and its merge base with <base> and match `release.fullRelease.migrationGlobs`.
+      A plain file whose content is already at an `--already` ref (the release train, the
+      production branch) is not joining anything and is not asked about; a deletion only when
+      that ref made it. The release's own check covers what was there before.
       stdout, one JSON object:
         {"applies": bool, "approved": bool, "reason": "<one plain line>",
          "unapproved": [{"path", "blob", "status": "new"|"changed"|"deleted"|"not-a-file"}]}
-      exit 0  approved, or not applicable (no written standing yes for full releases, no
-              migrationGlobs, or `release.fullRelease.approveBeforeJoining` false)
+      exit 0  approved, or not applicable (the base has no config, no written standing yes for
+              full releases, no migrationGlobs, or `release.fullRelease.approveBeforeJoining` false)
       exit 2  one or more migrations have no approval for their content
       exit 1  the question could not be answered (a ref that is not a commit here, unreadable
               config or approvals); wherever a merge would follow, treat it as unapproved
@@ -33,10 +35,8 @@ script asks the release's question about any head against any base, earlier.
       argument is malformed.
 """
 import argparse
-import contextlib
 import datetime
 import importlib.util
-import io
 import json
 import os
 import re
@@ -44,7 +44,7 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-UNIT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$")
+UNIT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,199}")
 STATUS = {"A": "new", "D": "deleted"}
 
 
@@ -62,44 +62,84 @@ class Unanswerable(Exception):
 
 
 def instant(value):
-    """An ISO time with an offset, as UTC; None when it is not one."""
+    """An ISO time with an offset, as an aware datetime; None when it is not one."""
     if not isinstance(value, str):
         return None
     try:
         parsed = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
-    if parsed.tzinfo is None:
+    return parsed if parsed.tzinfo else None
+
+
+def stamp(moment):
+    return moment.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def tree_entry(ref, path):
+    """(mode, blob) of `path` at `ref`, from the repository root; ("", "") when it is not there;
+    Unanswerable when git cannot say."""
+    done = subprocess.run(["git", "ls-tree", "-z", "--full-tree", ref, "--", path], capture_output=True)
+    if done.returncode != 0:
+        raise Unanswerable("%s could not be looked up at %s" % (path, ref[:12]))
+    listed = done.stdout.decode("utf-8", "surrogateescape")
+    if not listed:
+        return "", ""
+    fields = listed.split("\t", 1)[0].split(" ")
+    return (fields[0], fields[2]) if len(fields) == 3 else ("", "")
+
+
+def committed_config(ref, name):
+    """`.claude/ds-config.json` as committed at `ref`: a dict, or None when that commit has none.
+    A file that is there but cannot be read as a JSON object is never "no config"."""
+    mode, _ = tree_entry(ref, ".claude/ds-config.json")
+    if not mode:
         return None
-    return parsed.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def settings(sy, head):
-    """`release.fullRelease` at `head` when the early question applies, else (None, why not)."""
-    said = io.StringIO()
+    done = subprocess.run(["git", "show", "%s:.claude/ds-config.json" % ref], capture_output=True, text=True)
+    if done.returncode != 0:
+        raise Unanswerable(".claude/ds-config.json at %s cannot be read" % name)
     try:
-        with contextlib.redirect_stdout(said):  # its own ERROR line belongs in our one JSON answer
-            config = sy.load_config(head)
-    except SystemExit:
-        raise Unanswerable(said.getvalue().strip().replace("ERROR ", "", 1)
-                           or ".claude/ds-config.json at %s cannot be read as JSON" % head[:12])
-    release = config.get("release") if isinstance(config.get("release"), dict) else {}
-    full = release.get("fullRelease")
-    if not (isinstance(full, dict) and full.get("standingYes") is True):
-        return None, "no written standing yes for full releases: the release itself asks"
+        loaded = json.loads(done.stdout)
+    except ValueError as error:
+        raise Unanswerable(".claude/ds-config.json at %s cannot be read as JSON (%s)" % (name, error))
+    if not isinstance(loaded, dict):
+        raise Unanswerable(".claude/ds-config.json at %s is not a JSON object" % name)
+    return loaded
+
+
+def full_release(config):
+    release = config.get("release") if isinstance(config, dict) and isinstance(config.get("release"), dict) else {}
+    return release.get("fullRelease") if isinstance(release.get("fullRelease"), dict) else {}
+
+
+def rule(base_config):
+    """The base branch's own rule: (migration globs, "") when the early question applies there,
+    else (None, why not). The branch being asked about never decides this for itself."""
+    full = full_release(base_config)
+    if full.get("standingYes") is not True:
+        return None, "no written standing yes for full releases on the base: the release itself asks"
     globs = full.get("migrationGlobs")
     if not (isinstance(globs, list) and globs and all(isinstance(g, str) and g.strip() for g in globs)):
-        return None, "release.fullRelease.migrationGlobs names no migration files: the release itself asks"
+        return None, "release.fullRelease.migrationGlobs names no migration files on the base: the release itself asks"
     if full.get("approveBeforeJoining") is False:
-        return None, "release.fullRelease.approveBeforeJoining is false: the release itself asks"
-    return full, ""
+        return None, "release.fullRelease.approveBeforeJoining is false on the base: the release itself asks"
+    return globs, ""
 
 
-def already_there(sy, refs, status, path, blob):
-    """Whether one of `refs` already holds this migration as `head` has it (or, deleted, lacks it)."""
+def already_there(refs, base_sha, status, path, blob):
+    """Whether one of `refs` already holds this migration as `head` has it. A deletion counts only
+    with evidence that the ref itself made it: the file is gone there and was there where the ref
+    and the base last met."""
     for ref in refs:
-        there = subprocess.run(["git", "rev-parse", "--verify", "-q", "%s:%s" % (ref, path)], capture_output=True, text=True)
-        if (status == "D" and there.returncode != 0) or (status != "D" and there.returncode == 0 and there.stdout.strip() == blob):
+        mode, there = tree_entry(ref, path)
+        if status != "D":
+            if mode in ("100644", "100755") and there == blob:
+                return True
+            continue
+        if mode:
+            continue
+        met = subprocess.run(["git", "merge-base", ref, base_sha], capture_output=True, text=True)
+        if met.returncode == 0 and tree_entry(met.stdout.strip(), path)[0]:
             return True
     return False
 
@@ -117,30 +157,31 @@ def check(base, head, already=()):
         if not sha:
             raise Unanswerable("%s is not a commit in this checkout: fetch it first" % ref)
         there.append(sha)
-    full, why_not = settings(sy, head_sha)
-    if full is None:
+    # The RULE is the base branch's, as committed there: a branch cut before the rule, or one that
+    # edits it, is still asked. The APPROVALS are the head's, so an approval travels with the work.
+    globs, why_not = rule(committed_config(base_sha, base))
+    if globs is None:
         return {"applies": False, "approved": True, "reason": why_not, "unapproved": []}
     try:
-        approved = sy.approvals(full)
-        changed = sy.changed_migrations(base_sha, head_sha, sy.glob_matcher(full["migrationGlobs"]), base)
+        approved = sy.approvals(full_release(committed_config(head_sha, head)))
+        changed = list(sy.changed_migrations(base_sha, head_sha, sy.glob_matcher(globs), base))
     except sy.Ask as asked:
         raise Unanswerable(str(asked))
     unapproved = []
     for status, path, mode, blob in changed:
-        if already_there(sy, there, status, path, blob):
-            continue
         if status == "D":
-            unapproved.append({"path": path, "blob": "", "status": "deleted"})
+            if not already_there(there, base_sha, status, path, blob):
+                unapproved.append({"path": path, "blob": "", "status": "deleted"})
         elif mode not in ("100644", "100755"):
-            unapproved.append({"path": path, "blob": blob, "status": "not-a-file"})
-        elif blob not in approved:
+            unapproved.append({"path": path, "blob": blob, "status": "not-a-file"})  # never excused: no content is pinned
+        elif blob not in approved and not already_there(there, base_sha, status, path, blob):
             unapproved.append({"path": path, "blob": blob, "status": STATUS.get(status, "changed")})
     if unapproved:
         names = ", ".join("%s (%s)" % (u["path"], u["status"]) for u in unapproved)
         reason = "%d migration%s without the owner's approval for this content: %s" % (
             len(unapproved), "" if len(unapproved) == 1 else "s", names)
     elif changed:
-        reason = "every migration this branch adds or changes is approved by content (%d)" % len(changed)
+        reason = "every migration this branch adds or changes is approved by content or already there (%d)" % len(changed)
     else:
         reason = "this branch adds or changes no migration"
     return {"applies": True, "approved": not unapproved, "reason": reason, "unapproved": unapproved}
@@ -148,33 +189,38 @@ def check(base, head, already=()):
 
 def entry(a):
     sy = standing_yes()
-    if not sy.ITEM.match(a.item):
+    if not sy.ITEM.fullmatch(a.item):
         raise ValueError("--item must be an item number (I#####)")
-    if not UNIT.match(a.unit):
+    if not UNIT.fullmatch(a.unit):
         raise ValueError("--unit must be an item number or a branch name")
+    now = datetime.datetime.now(datetime.timezone.utc)
     asked = instant(a.asked)
-    approved = instant(a.approved) if a.approved else datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    approved = instant(a.approved) if a.approved else now
     if not asked or not approved:
         raise ValueError("--asked and --approved must be ISO times with an offset")
     if asked > approved:
         raise ValueError("--asked is after --approved")
+    if approved > now + datetime.timedelta(minutes=1):
+        raise ValueError("--approved is in the future: an approval is given, never planned")
     if sy.CONTROL.search(a.path) or not a.path.strip():
         raise ValueError("--path is not a usable file name")
     head = sy.full_sha(a.head)
     if not head:
         raise ValueError("%s is not a commit in this checkout" % a.head)
-    listed = subprocess.run(["git", "ls-tree", "-z", head, "--", a.path], capture_output=True).stdout.decode("utf-8", "surrogateescape")
-    mode = listed.split(" ", 1)[0] if listed else ""
+    try:
+        mode, blob = tree_entry(head, a.path)
+    except Unanswerable as why:
+        raise ValueError(str(why))
     if mode not in ("100644", "100755"):
         raise ValueError("%s is not a plain file at %s" % (a.path, head[:12]))
-    blob = subprocess.run(["git", "rev-parse", "%s:%s" % (head, a.path)], capture_output=True, text=True).stdout.strip()
     return {
-        # The date is the owner's day, as approvedMigrations has always carried it.
-        "entry": {"blob": blob, "path": a.path, "item": a.item, "approved": datetime.date.today().isoformat()},
+        # The day of the approval where this machine is, which is what the release's check compares
+        # with its own today.
+        "entry": {"blob": blob, "path": a.path, "item": a.item, "approved": approved.astimezone().date().isoformat()},
         "subject": "chore(release): approve migration %s [%s]" % (a.path, a.item),
         "trailers": ["Migration-Approval-Unit: %s" % a.unit,
-                     "Migration-Approval-Asked: %s" % asked,
-                     "Migration-Approval-Approved: %s" % approved],
+                     "Migration-Approval-Asked: %s" % stamp(asked),
+                     "Migration-Approval-Approved: %s" % stamp(approved)],
     }
 
 
