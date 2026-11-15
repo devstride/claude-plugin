@@ -6,9 +6,8 @@ load: contract
 **Goal:** every session, on every machine, and the owner can see what is being built, reviewed or
 landed, where it is heading and roughly when it will be ready — before it lands. A declaration is
 **information: never permission, never a lock.** Nothing refuses, delays or stops a build, a
-landing or a release because one is missing, stale or held by someone else. One reader acts on
-it: a starting release may wait a short, fixed time for a nearly-ready peer, and at step 5 that
-peer says so (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/ship-plan.md`).
+landing or a release because one is missing, stale or held by someone else — with one bounded
+exception: a starting release may wait a short, fixed time for a nearly-ready peer.
 
 ## When it applies
 
@@ -45,9 +44,12 @@ declare nothing, say nothing. A session on an older plugin simply does not decla
 | Where | Route | Target | Stages |
 |---|---|---|---|
 | `build-item` step 3 | `train` on the release train, `develop-pr` on the base branch, `epic-release` on an integration branch | the working base | `building` at step 3, `reviewing` at step 4, `verifying` at the local gate, `landing` at step 5; released at step 6, outcome `landed` |
-| `build-item` step 8 | `epic-release`, unit the release unit | the release target | `reviewing` when the release pull request opens, `verifying`, `landing`; released when it merges |
+| `build-item` step 8 | `epic-release`, unit the release unit | the release target | `reviewing` when the release pull request opens, `verifying`, `landing`; released when it merges, outcome `landed` |
 | `branch-hotfix` | `hotfix` | the production branch | `building` once the branch is pushed |
 | `pr`, run outside `build-item` | `hotfix` for a branch `branch-hotfix` cut, else `develop-pr` | the pull request's base | `reviewing` when it opens, `verifying` at the pre-ship checks |
+
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/ship-plan.md` (The peer) when a
+declaration turns `landing` with the release train as its target**: a release may be waiting for it.
 
 Only a declaration whose `target` is the release train, the base branch or the production branch
 is heading for a release; a story on an integration branch never is.

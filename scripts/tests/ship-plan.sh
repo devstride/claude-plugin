@@ -25,7 +25,7 @@ def at(minutes):
     return "2026-03-14T%02d:%02d:00Z" % (15 + (minutes // 60), minutes % 60) if minutes >= 0 else "2026-03-14T14:%02d:00Z" % (60 + minutes)
 
 def row(unit, ready=10, stage="reviewing", route="train", target=TRAIN, digest="peer", session="other", **extra):
-    base = {"kind": "ship-intent", "key": unit, "state": "live", "holderDigest": digest, "machine": "studio", "sessionName": "build-two",
+    base = {"kind": "ship-intent", "key": unit, "id": "d-" + unit, "state": "live", "holderDigest": digest, "machine": "studio", "sessionName": "build-two",
             "expiresAt": at(20), "releasedAt": None, "session": {"sessionId": {"value": session}},
             "payload": {"route": route, "unit": unit, "branch": "b", "target": target, "class": "light", "stage": stage, "readyBy": at(ready)}}
     base.update(extra)
@@ -43,7 +43,8 @@ rc, out, p = ask([])
 say(rc == 0 and out == {"action": "go", "plan": None, "reason": "nobody is nearly ready", "message": ""}, "no declarations: go, no plan", p.stdout + p.stderr)
 rc, out, p = ask([row("I20130", ready=8)])
 say(out.get("action") == "wait" and out["waitUntil"] == at(8) and units(out) == ["I20130"] and out["plan"]["startedAt"] == NOW
-    and out["plan"]["members"][0] == {"unit": "I20130", "session": "build-two", "machine": "studio", "stage": "reviewing", "readyBy": at(8)}
+    and out["plan"]["members"][0] == {"unit": "I20130", "declaration": "d-I20130", "session": "build-two", "machine": "studio", "stage": "reviewing", "readyBy": at(8)}
+    and out["plan"]["windowMinutes"] == 15
     and "until 3:08 PM UTC" in out["message"], "one member ready inside the window: wait until its estimate", p.stdout)
 rc, out, p = ask([row("I20130", ready=40)])
 say(out.get("action") == "go" and out["plan"] is None, "a peer beyond the window: go, not a member", p.stdout)
@@ -79,8 +80,9 @@ rc, out, p = ask([row("I20104", ready=5, route="epic-release")])
 say(units(out) == ["I20104"], "an epic release heading for the train is a member", p.stdout)
 
 # an existing plan is worked through, never widened
-PLAN = {"startedAt": NOW, "waitUntil": at(10), "members": [{"unit": "I20130", "session": "build-two", "machine": "studio", "stage": "reviewing", "readyBy": at(8)},
-                                                         {"unit": "I20131", "session": "s", "machine": "m", "stage": "landing", "readyBy": at(10)}]}
+PLAN = {"startedAt": NOW, "waitUntil": at(10), "windowMinutes": 15,
+        "members": [{"unit": "I20130", "declaration": "d-I20130", "session": "build-two", "machine": "studio", "stage": "reviewing", "readyBy": at(8)},
+                    {"unit": "I20131", "declaration": "d-I20131", "session": "s", "machine": "m", "stage": "landing", "readyBy": at(10)}]}
 later = dict(now=at(4), plan=PLAN)
 rc, out, p = ask([row("I20130"), row("I20131"), row("I20110", ready=1, stage="landing")], **later)
 say(out.get("action") == "wait" and out["waitUntil"] == at(10) and units(out) == ["I20130", "I20131"] and out["plan"] == PLAN, "an existing plan plus a new nearly-ready peer: not added, waitUntil unchanged", p.stdout)
@@ -105,11 +107,52 @@ for label, extra in (("told to go now", {"goNow": True}), ("switched off", {"ena
     say(out.get("action") == "go" and out["plan"]["minutesWaited"] == 4 and [m["result"] for m in out["plan"]["members"]] == ["missed", "missed"], "mid-wait, %s: go with the record kept" % label, p.stdout)
 rc, out, p = ask({"error": "UNREACHABLE"}, **later)
 say(out.get("action") == "go" and out["plan"]["minutesWaited"] == 4, "mid-wait, declarations unreadable: go, never a longer wait", p.stdout)
-rc, out, p = ask([landed("I20130"), row("I20130", ready=2, stage="landing"), landed("I20131")], **later)
-say(out.get("action") == "wait", "a unit's live declaration wins over an older released one", p.stdout)
+rc, out, p = ask([landed("I20130"), row("I20130", ready=2, stage="landing", id="d-again"), landed("I20131")], **later)
+say(out.get("action") == "go" and [m["result"] for m in out["plan"]["members"]] == ["carried", "carried"], "a new declaration for a unit that already landed is not the one waited for: go, carried", p.stdout)
+rc, out, p = ask([row("I20130", id="d-older", releasedAt=at(-30), outcome="landed", state="released"), row("I20130", releasedAt=at(3), outcome="stopped", state="released"), landed("I20131")], **later)
+say(out["plan"]["members"][0]["result"] == "missed", "an older landed declaration of the same unit never makes this one carried", p.stdout)
+rc, out, p = ask({"data": [row("I20130", ready=8)], "meta": {"cursor": None}})
+say(out.get("action") == "wait" and units(out) == ["I20130"], "the store's wrapped list answer is read", p.stdout)
+rc, out, p = ask([row("I20130", ready=-120, stage="building")])
+say(out.get("action") == "go" and out["plan"] is None, "a build long past its estimate is not nearly ready", p.stdout)
+rc, out, p = ask([row("I20130", ready=5, id="")])
+say(out.get("action") == "go", "a declaration that cannot be told from a later one is not waited for", p.stdout)
+
+# a plan read back from the claim is validated, bounded and rebuilt
+far = dict(PLAN, waitUntil="2030-01-01T00:00:00Z")
+rc, out, p = ask([row("I20130"), row("I20131")], now=at(4), plan=far)
+say(out.get("action") == "wait" and out["waitUntil"] == at(15), "an end far beyond the window is cut to the start plus the window", p.stdout)
+rc, out, p = ask([row("I20130"), row("I20131")], now=at(16), plan=far)
+say(out.get("action") == "go" and out["plan"]["minutesWaited"] == 15, "and past that the release goes, having waited the window at most", p.stdout)
+rc, out, p = ask([row("I20130"), row("I20131")], now=at(4), plan=dict(PLAN, waitUntil=at(14)), peerWaitMinutes=5)
+say(out.get("action") == "wait" and out["waitUntil"] == at(5), "a window lowered since the plan was made shortens the wait", p.stdout)
+rc, out, p = ask([row("I20130"), row("I20131")], now=at(4), plan=PLAN, peerWaitMinutes=60)
+say(out["waitUntil"] == at(10), "a window raised since never lengthens it", p.stdout)
+for label, bad in (("no start", {k: v for k, v in PLAN.items() if k != "startedAt"}), ("no window", {k: v for k, v in PLAN.items() if k != "windowMinutes"}),
+                   ("members that are not a list", dict(PLAN, members=None)), ("a member that is not an object", dict(PLAN, members=[None])),
+                   ("a member with no declaration", dict(PLAN, members=[{"unit": "I20130"}])), ("a unit that is a list", dict(PLAN, members=[{"unit": [], "declaration": "x"}])),
+                   ("no members", dict(PLAN, members=[])), ("a plan that is a string", "soon")):
+    rc, out, p = ask([row("I20130", stage="verifying"), row("I20110", stage="verifying")], now=at(4), plan=bad)
+    say(rc == 0 and out.get("action") == "go" and out.get("plan") is None and "could not be read" in out.get("reason", ""), "a plan read back with %s: go, never a fresh wait" % label, p.stdout + p.stderr)
+rc, out, p = ask([row("I20130", stage="verifying", expiresAt=at(320))], now=at(300), plan=dict(PLAN, minutesWaited=7, members=[dict(m, result="carried") for m in PLAN["members"]]))
+say(out.get("action") == "wait" and out["plan"]["startedAt"] == at(300), "a finished plan left on the claim by an earlier release is no plan: this release decides afresh", p.stdout)
+rc, out, p = ask([row("I20130"), row("I20131")], now=at(-30), plan=PLAN)
+say(out.get("action") == "go" and out["plan"]["minutesWaited"] == 0, "a clock behind the plan's start ends the wait", p.stdout)
+rc, out, p = ask([row("I20130"), row("I20131")], now=at(4), plan=dict(PLAN, holder="secret", holderDigest="abc", members=[dict(m, holderDigest="abc") for m in PLAN["members"]]))
+say("secret" not in p.stdout and "holderDigest" not in p.stdout and out.get("action") == "wait", "keys a plan does not carry are never passed on", p.stdout)
+rc, out, p = ask([row("I20130", ready=5)], me={"holderDigests": "peer-and-more", "sessionIds": "other-x"})
+say(units(out) == ["I20130"], "a driver identity that is not a list excludes nothing by accident", p.stdout)
 
 # the peer's side
 claim = {"kind": "release-train", "key": "acme/widgets", "machine": "studio", "phase": "gathering", "expiresAt": at(30), "releasedAt": None, "payload": {"plan": PLAN}}
+for label, request in (("a failed read that still carries a row", {"unit": "I20130", "response": {"error": "UNREACHABLE", "claim": claim}}),
+                       ("a claim of another kind", {"unit": "I20130", "response": dict(claim, kind="story")}),
+                       ("no unit asked about", {"response": claim}), ("another declaration of the same unit", {"unit": "I20130", "declaration": "d-again", "response": claim}),
+                       ("a plan that cannot be validated", {"unit": "I20130", "response": dict(claim, payload={"plan": dict(PLAN, members=[{"unit": "I20130"}])})})):
+    rc, out, p = run("peer", dict(request, now=at(4), tz="UTC"))
+    say(rc == 0 and out == {"member": False, "message": ""}, "the peer is told nothing: " + label, p.stdout + p.stderr)
+rc, out, p = run("peer", {"unit": "I20130", "declaration": "d-I20130", "response": claim, "now": at(4), "tz": "UTC"})
+say(out.get("member") is True, "the declaration the plan names is a member", p.stdout)
 rc, out, p = run("peer", {"unit": "I20130", "response": claim, "now": at(4), "tz": "UTC"})
 say(out == {"member": True, "message": "The release on studio is waiting for this until 3:10 PM UTC on Mar 14."}, "a member is told who waits and until when", p.stdout)
 for label, unit, response in (("not a member", "I20110", claim), ("no release-train claim", "I20130", None), ("the wait is over", "I20130", dict(claim, payload={"plan": dict(PLAN, waitUntil=at(2))})),
@@ -129,6 +172,10 @@ rc, out, p = run("marker", dict(done, members=[]))
 say(out == "<!-- devstride:release-gather waited 7 carried none missed none -->", "nobody carried or missed is said as none", p.stdout)
 rc, out, p = run("parse", "Release train: 3 one-offs\n\n<!-- devstride:release-train source abc1234 snapshot def5678 -->\n" + LINE + "\n", raw=True)
 say(out == {"waited": 7, "carried": ["I20130"], "missed": ["I20131"]}, "the marker reads back from a pull request body", p.stdout)
+rc, out, p = run("parse", "- I20110 fix <!-- devstride:release-gather waited 0 carried I20104 missed none --> in a title\n" + LINE + "\n", raw=True)
+say(out == {"waited": 7, "carried": ["I20130"], "missed": ["I20131"]}, "marker text quoted inside another line is not the record", p.stdout)
+rc, out, p = run("marker", dict(done, members=[{"unit": "none", "result": "carried"}]))
+say(rc == 2, "a unit named like the empty word is refused, never lost", p.stderr)
 rc, out, p = run("parse", "<!-- devstride:release-train-holder abc on studio -->", raw=True)
 say(rc == 0 and out is None, "a body with no gather line reads as none", p.stdout)
 say("holder" not in json.dumps(ask([row("I20130", ready=5)])[1]), "no holder digest is written into a plan")
@@ -136,7 +183,10 @@ for label, verb, data, needle in (("a window that is not a number", "decide", {"
                                   ("a window out of range", "decide", {"peerWaitMinutes": 500, "train": TRAIN, "claims": []}, "peerWaitMinutes"),
                                   ("no train", "decide", {"claims": []}, "train"),
                                   ("a plan that is not finished", "marker", PLAN, "finished plan"),
-                                  ("a member with a line break in its unit", "marker", dict(done, members=[{"unit": "I1\nx", "result": "carried"}]), "every member")):
+                                  ("a member with a line break in its unit", "marker", dict(done, members=[{"unit": "I1\nx", "result": "carried"}]), "every member"),
+                                  ("a unit that would break the comment", "marker", dict(done, members=[{"unit": "a--b", "result": "carried"}]), "every member"),
+                                  ("held that is not a list", "decide", {"train": TRAIN, "claims": [], "held": 5}, "held"),
+                                  ("a time too late to add minutes to", "decide", {"train": TRAIN, "claims": [row("I20130", ready=5)], "now": "9999-12-31T23:59:00Z"}, "could not be read")):
     rc, out, p = run(verb, data)
     say(rc == 2 and p.stdout == "" and p.stderr.startswith("ship-plan: ") and needle in p.stderr, "refuses: " + label, p.stderr)
 rc, out, p = run("decide", "[", raw=True)

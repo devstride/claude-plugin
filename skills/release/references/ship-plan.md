@@ -17,29 +17,45 @@ train snapshot (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.
 an adopted train pull request already fixed what it carries. A hotfix never waits and is never
 waited for. The person saying "go now" is `goNow: true` for that release.
 
+## Who is nearly ready
+
+Another live session's declaration (never the driver's own) on route `train` or `epic-release`
+whose `target` is the release train, not held, and either at stage `verifying` or `landing` or
+with a `readyBy` still ahead and inside the window. A build past its estimate is not nearly
+ready. The script decides this; the list is here so a person can predict it.
+
 ## The driver — before the fetch that fixes the snapshot
 
-1. List the declarations: `list_claims` (kind `ship-intent`, state `all`, limit 200; a `commands`
-   provider's `list`). A failure is `{"error": "<NAME>"}`, never an empty list.
-2. The held units, when any peer unit has a release hold
-   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`) or an open Needs-you
-   notice: their unit keys. Unknown → leave it out.
-3. **Never decide by eye**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/ship-plan.py
+1. **The plan already on the claim**: `get_claim` (kind `release-train`, key `<owner>/<repo>`) and
+   take its payload's `plan`, else null. Read it back every time, after a compaction too: passing null
+   while one exists would start a second wait.
+2. **The declarations**: `list_claims` (kind `ship-intent`, state `all`, limit 200; a `commands`
+   provider's `list`), the answer as it came. A failure is `{"error": "<NAME>"}`, never an empty
+   list.
+3. **The held units**, once, when the plan is first made: the unit keys of peers under a release
+   hold (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`) or with an open
+   Needs-you notice. Unknown → leave it out.
+4. **Never decide by eye**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/ship-plan.py
    decide`, stdin `{now, peerWaitMinutes, enabled, train, me, claims, plan, held, goNow, tz}`.
-   `me` is this session's holder digest(s) and session id; `plan` is the one already on the
-   `release-train` claim's payload, else null.
-4. `wait` → heartbeat the `release-train` claim with phase `gathering` and payload `{"plan":
-   <its plan>}` (the one payload key this adds to the record; sent whole, never edited by hand),
-   say its `message` once, wait about a minute (in the background, never a held foreground
-   sleep), and run 1–3 again with that plan. The plan is never widened and its `waitUntil` never
-   moves later.
-5. `go` → with a plan: heartbeat the claim with the finished plan and the next step's phase,
-   say its `message`, and keep `ship-plan.py marker`'s one line for the train pull request body.
-   Then carry on with §1 step 3's fetch: what is on the train now is the release. With no plan:
+   `me` is `{"holderDigests": [<story-claim.py digest of this session's holder>], "sessionIds":
+   [<claim_record.py's payload.sessionId>]}`.
+5. `wait` → heartbeat the `release-train` claim with phase `gathering` and the record's payload
+   plus ONE key more, `plan` (its plan, whole, never edited by hand: the exception
+   `story-claims.md`'s record rule allows here, as `backstop.md` has its own). Say its `message`
+   once. Then wait in the background — the shorter of a minute, the claim's heartbeat cadence
+   (`auto-start.md`) and the time left — and run 1–4 again. Stop waiting after
+   `peerWaitMinutes` of this session's own elapsed time whatever the script says.
+6. `go` → with a plan: heartbeat the claim with the finished plan and the next step's phase, say
+   its `message`, and keep `ship-plan.py marker`'s one line for the train pull request body. Then
+   carry on with §1 step 3's fetch: what is on the train now is the release. With no plan:
    nothing to record.
 
-A heartbeat that loses the claim STOPs as `auto-start.md` says. The late-arrivals rule, the
-backstop, the standing yes and the tower are unchanged.
+**When it cannot run, the release goes.** `decide` or `marker` exiting non-zero, or a provider
+that refuses the `plan` payload → no wait, no marker, said once; neither is a reason to STOP.
+Only a heartbeat answered NOT HOLDER or LOST stops, as `auto-start.md` says. The wait happens
+inside the train phase, so it holds the tower only under scope `release`, which holds it through
+that phase already. The late-arrivals rule, the backstop and the standing yes are unchanged; an
+absorbed late arrival does not rewrite the marker.
 
 ## The durable record
 
@@ -51,10 +67,12 @@ release that did not gather writes none.
 ## The peer — a session about to land on the train
 
 At `build-item` step 5, before the merge (and for an epic's release, before its merge): read the
-`release-train` claim (`get_claim`, key `<owner>/<repo>`, one row) and pipe it to `ship-plan.py
-peer` (stdin `{unit, response, now, tz}`). A `message` is said, once; nothing else changes. The
-session still lands, still tries to start its own release afterwards, and simply loses the claim.
-A read that fails says nothing.
+`release-train` claim (`get_claim`, key `<owner>/<repo>`, one row; a `commands` provider's `get`,
+when it has one) and pipe it to `ship-plan.py peer` (stdin `{unit, declaration?, response, now,
+tz}`). A `message` is said, once; nothing else changes. The session still lands, releases its
+declaration with outcome `landed` (that is what the driver counts as carried), still tries to
+start its own release afterwards, and simply loses the claim. A read that fails, or no `get`,
+says nothing.
 
 ## Cited by
 

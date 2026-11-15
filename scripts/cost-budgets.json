@@ -117,13 +117,13 @@
     "skills/release/references/merge-and-deploy.md": 1715,
     "skills/release/references/backstop.md": 2807,
     "skills/release/references/estimates.md": 1892,
-    "skills/build-item/references/ship-intent.md": 1566,
+    "skills/build-item/references/ship-intent.md": 1605,
     "skills/release/references/migration-approval.md": 1530,
-    "skills/release/references/ship-plan.md": 1245
+    "skills/release/references/ship-plan.md": 1706
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 94254,
+      "budget": 94293,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -166,7 +166,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 78611,
+      "budget": 78650,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -212,7 +212,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 96973,
+      "budget": 97012,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
