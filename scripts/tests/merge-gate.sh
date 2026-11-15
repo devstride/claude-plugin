@@ -28,6 +28,13 @@ if a[0] == "api" and any("/contents/.claude/ds-config.json?ref=" in x for x in a
     if "baseConfig" not in s:
         print("HTTP/2.0 404 Not Found\nContent-Type: application/json\n\n{\"message\": \"Not Found\"}"); sys.stderr.write("gh: Not Found (HTTP 404)\n"); sys.exit(1)
     print("HTTP/2.0 200 OK\r\nContent-Type: application/vnd.github.raw+json\r\n\r\n" + (s["baseConfig"] if isinstance(s["baseConfig"], str) else json.dumps(s["baseConfig"]))); sys.exit(0)
+if a[0] == "api" and any("/git/ref/heads/" in x for x in a):
+    kind("ref")
+    branch = next(x for x in a if "/git/ref/heads/" in x).split("/git/ref/heads/", 1)[1]
+    sha = (s.get("refs") or {}).get(branch)
+    if sha is None:
+        sys.stderr.write("gh: Not Found (HTTP 404)\n"); sys.exit(1)
+    print(json.dumps({"ref": "refs/heads/" + branch, "object": {"sha": sha, "type": "commit"}})); sys.exit(0)
 if a[:2] == ["api", "graphql"]:
     if s.get("graphqlFail"):
         sys.stderr.write("gh: Something went wrong (HTTP 502)\n"); sys.exit(1)
@@ -551,6 +558,7 @@ def put(path, name, text):
     os.makedirs(os.path.dirname(os.path.join(path, name)), exist_ok=True)
     open(os.path.join(path, name), "w").write(text)
 FULL = {"standingYes": True, "migrationGlobs": ["db/migrations/*.sql"], "approvedMigrations": []}
+REFS = {}   # what GitHub says each branch of the last repository built is at
 def joining(full=FULL, approved=False, on_train=False, drop=(), head_full=None, hotfix=False, delete=False):
     """origin with develop, master and train/release; a clone whose branch `work` adds a migration."""
     n = len(os.listdir(work))
@@ -585,11 +593,12 @@ def joining(full=FULL, approved=False, on_train=False, drop=(), head_full=None, 
     if on_train:
         g(clone, "branch", "-f", "train/release", "work")
     g(clone, "push", "-q", "origin", "develop", "master", "train/release", "work")
+    REFS.clear(); REFS.update({b: g(clone, "rev-parse", b) for b in ("develop", "master", "train/release")})
     return clone, g(clone, "rev-parse", "HEAD"), config
 def join(base="develop", **kw):
     clone, sha, config = joining(**kw)
     g(clone, "update-ref", "-d", "refs/remotes/origin/develop")   # the gate fetches what it compares with
-    path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha, baseRefName=base), open(path, "w"))
+    path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha, baseRefName=base, refs=dict(REFS)), open(path, "w"))
     cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
     p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone,
                        env=dict(os.environ, GH_SCENARIO=path))
@@ -633,7 +642,7 @@ def live(scenario_extra, mutate=None, base="develop", **kw):
     if mutate:
         mutate(clone, config)
     path = os.path.join(work, "scenario.json")
-    json.dump(dict(sc(headRefOid=sha, baseRefName=base), **(scenario_extra(config) if callable(scenario_extra) else scenario_extra)), open(path, "w"))
+    json.dump(dict(sc(headRefOid=sha, baseRefName=base, refs=dict(REFS)), **(scenario_extra(config) if callable(scenario_extra) else scenario_extra)), open(path, "w"))
     p = subprocess.run([sys.executable, helper, "7", sha], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
     return p.returncode, p.stdout.strip().split("\n"), p.stderr
 def switched_off(clone, config):   # the work tree and every local ref say there is no rule
@@ -660,12 +669,26 @@ clone, sha, config = joining()
 g(clone, "checkout", "-q", "--orphan", "empty"); g(clone, "rm", "-rqf", "."); put(clone, "readme", "x"); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "no config")
 g(clone, "checkout", "-q", "-b", "work3"); put(clone, "db/migrations/0042_add.sql", "create table x();"); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "work")
 g(clone, "push", "-q", "-f", "origin", "empty:develop", "work3"); sha3 = g(clone, "rev-parse", "HEAD")
-path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha3), open(path, "w"))
+path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha3, refs=dict(REFS, develop=g(clone, "rev-parse", "empty"))), open(path, "w"))
 cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
 p = subprocess.run([sys.executable, helper, "7", sha3, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
 say(p.returncode == 2 and p.stdout.startswith("REFUSE #7 would carry onto develop"), "(34s) --config is the policy for the check too, whatever the base commit holds", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
+# origin is a fork whose develop already sits at the head: compared by name there would be nothing to ask
 clone, sha, config = joining()
-path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid="b" * 40), open(path, "w"))
+real = dict(REFS)
+g(clone, "push", "-q", "-f", "origin", "work:develop")
+path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha, refs=real), open(path, "w"))
+cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
+p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 2 and p.stdout.startswith("REFUSE #7 would carry onto develop"), "(34t) a same-named branch on origin that is not where GitHub has the base: the commit GitHub names is compared", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
+json.dump(sc(headRefOid=sha, refs=dict(real, develop="c" * 40)), open(path, "w"))
+p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 1 and p.stdout.startswith("ERROR ") and "could not be fetched" in p.stdout, "(34u) the commit GitHub names for the base is not in origin -> ERROR, never a MERGE line", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
+json.dump(sc(headRefOid=sha), open(path, "w"))
+p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 1 and p.stdout.startswith("ERROR "), "(34v) GitHub names no commit for the base -> ERROR", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
+clone, sha, config = joining()
+path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid="b" * 40, refs=dict(REFS)), open(path, "w"))
 cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
 p = subprocess.run([sys.executable, helper, "7", "b" * 40, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
 say(p.returncode == 1 and p.stdout.startswith("ERROR ") and "could not be fetched" in p.stdout and "MERGE" not in p.stdout,

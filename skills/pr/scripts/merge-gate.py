@@ -43,7 +43,8 @@ The rule (an approver's admin merge exactly when every required check is green, 
   head's new or changed migrations must each be approved by content
   (`release/scripts/migration-approval.py check`). The policy is the base branch's committed
   config read from GitHub now (`--config` names it outright) and is handed to the check as it is;
-  the approvals are the head's own; content already on the train or in production is not asked
+  the base, the train and production are compared at the exact commits GitHub has for them in the
+  repository inspected, never by a local branch name; the approvals are the head's own; content already on the train or in production is not asked
   about again. Unapproved is a REFUSE naming the files; a policy, head, base or answer that cannot
   be read is an ERROR, whatever the base (the gate reads GitHub for everything else too). A base
   with no config (GitHub's own 404), or without that written standing yes, is not asked and
@@ -832,18 +833,26 @@ def migration_approval(pr, number, expected, owner, name, base, config_path):
         return
     # What is already on the train or in production joined before, and was asked about then.
     already = [b for b in ((train if base == base_branch else None), production) if isinstance(b, str) and b and b != base]
-    code, _, err = git_out("fetch", "-q", "--no-tags", "origin", expected,
-                           *["+refs/heads/%s:refs/remotes/origin/%s" % (b, b) for b in [base] + already])
-    if code != 0:
-        raise Unreadable("#%d's head and %s could not be fetched, so its migrations cannot be read: %s"
-                         % (number, ", ".join([base] + already), err.strip()[:200] or "git fetch failed"))
+    # The exact commits GitHub has for those branches, in the repository inspected: `origin` may be
+    # a fork whose same-named branch is somewhere else, so nothing is compared by branch name.
+    pinned = {}
+    for branch in [base] + already:
+        ref = gh_json("api", "repos/%s/%s/git/ref/heads/%s" % (owner, name, quote(branch, safe="/")))
+        sha = ref.get("object", {}).get("sha") if isinstance(ref, dict) and isinstance(ref.get("object"), dict) else None
+        if not isinstance(sha, str) or not SHA.match(sha):
+            raise Unreadable("GitHub gave no commit for %s, so #%d's migrations cannot be compared" % (branch, number))
+        pinned[branch] = sha
+    code, _, err = git_out("fetch", "-q", "--no-tags", "origin", expected, *sorted(set(pinned.values())))
+    if code != 0 or any(git_out("cat-file", "-e", "%s^{commit}" % sha)[0] != 0 for sha in [expected] + list(pinned.values())):
+        raise Unreadable("#%d's head and %s as GitHub has them could not be fetched into this checkout, so its "
+                         "migrations cannot be read: %s" % (number, ", ".join([base] + already), err.strip()[:200] or "git fetch failed"))
     handle, rule_file = tempfile.mkstemp(prefix="merge-gate-policy-", suffix=".json")
     try:
         with os.fdopen(handle, "w") as f:
             json.dump(policy, f)
         done = subprocess.run([sys.executable, "-I", MIGRATION_APPROVAL, "check", "--rule", rule_file,
-                               "--base", "refs/remotes/origin/%s" % base, "--head", expected]
-                              + [x for b in already for x in ("--already", "refs/remotes/origin/%s" % b)],
+                               "--base", pinned[base], "--head", expected]
+                              + [x for b in already for x in ("--already", pinned[b])],
                               capture_output=True, text=True, timeout=120)
         answer = json.loads(done.stdout)
     except (OSError, ValueError, subprocess.TimeoutExpired) as err:
