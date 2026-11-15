@@ -30,9 +30,10 @@ ready. The script decides this; the list is here so a person can predict it.
    take its payload's `plan`; null ONLY when the read succeeded and there is none. A read that
    failed is passed as `{"error": "<NAME>"}`, which ends the wait. Read it back every time, after
    a compaction too: passing null while one exists would start a second wait.
-2. **The declarations**: `list_claims` (kind `ship-intent`, state `all`, `since` an hour ago;
-   EVERY page, following `cursor`; a `commands` provider's `list`), the rows together. A member
-   missing from the list reads as dropped, so a short list would cut the wait. A failure is
+2. **The declarations**: `list_claims` (kind `ship-intent`, state `live`; EVERY page, following
+   `cursor`; a `commands` provider's `list`), plus, for each member of an existing plan not in
+   that list, its own row (`get_claim`, kind `ship-intent`, key the unit, `includeReleased`): the
+   rows together. No time cutoff: a member missing from the rows reads as dropped. A failure is
    `{"error": "<NAME>"}`, never an empty list.
 3. **The held units**, once, when the plan is first made: the unit keys of peers under a release
    hold (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`) or with an open
@@ -52,9 +53,10 @@ ready. The script decides this; the list is here so a person can predict it.
    carry on with §1 step 3's fetch: what is on the train now is the release. With no plan:
    nothing to record.
 
-**When it cannot run, the release goes.** `decide` or `marker` exiting non-zero, or a provider
-that refuses the `plan` payload → no wait, no marker, said once; neither is a reason to STOP.
-Only a heartbeat answered NOT HOLDER or LOST stops, as `auto-start.md` says. The wait happens
+**When it cannot run, the release goes.** `decide` or `marker` exiting non-zero → no wait, no
+marker, said once. A provider that refuses the `plan` payload → heartbeat again WITHOUT it and go
+without waiting. Neither loosens `auto-start.md`'s rule: the claim's ordinary heartbeat must
+still succeed before the snapshot is cut, and one that is lost or degrades STOPs as it says. The wait happens
 inside the train phase, so it holds the tower only under scope `release`, which holds it through
 that phase already. The late-arrivals rule, the backstop and the standing yes are unchanged; an
 absorbed late arrival does not rewrite the marker.
