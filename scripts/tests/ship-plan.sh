@@ -126,6 +126,12 @@ rc, out, p = ask([row("I20130"), row("I20131")], now=at(16), plan=far)
 say(out.get("action") == "go" and out["plan"]["minutesWaited"] == 15, "and past that the release goes, having waited the window at most", p.stdout)
 rc, out, p = ask([row("I20130"), row("I20131")], now=at(4), plan=dict(PLAN, waitUntil=at(14)), peerWaitMinutes=5)
 say(out.get("action") == "wait" and out["waitUntil"] == at(5), "a window lowered since the plan was made shortens the wait", p.stdout)
+say(out["plan"]["waitUntil"] == at(5) and out["plan"]["windowMinutes"] == 5, "and the shorter end is kept in the plan, so raising the window again cannot bring the old one back", p.stdout)
+rc, again, p = ask([row("I20130"), row("I20131")], now=at(4), plan=out["plan"], peerWaitMinutes=15)
+say(again["waitUntil"] == at(5), "the plan as stored stays at the shorter end", p.stdout)
+for label, bad in (("a read that failed", {"error": "UNREACHABLE"}), ("something half-finished", {"minutesWaited": None, "members": 7}), ("a result that is not one", dict(PLAN, members=[dict(PLAN["members"][0], result="maybe")]))):
+    rc, out2, p = ask([row("I20130", stage="verifying"), row("I20110", stage="verifying")], now=at(4), plan=bad)
+    say(out2.get("action") == "go" and out2.get("plan") is None and "could not be read" in out2.get("reason", ""), "a plan read back as %s: go, never a fresh wait" % label, p.stdout + p.stderr)
 rc, out, p = ask([row("I20130"), row("I20131")], now=at(4), plan=PLAN, peerWaitMinutes=60)
 say(out["waitUntil"] == at(10), "a window raised since never lengthens it", p.stdout)
 for label, bad in (("no start", {k: v for k, v in PLAN.items() if k != "startedAt"}), ("no window", {k: v for k, v in PLAN.items() if k != "windowMinutes"}),

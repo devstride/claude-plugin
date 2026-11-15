@@ -27,11 +27,13 @@ ready. The script decides this; the list is here so a person can predict it.
 ## The driver — before the fetch that fixes the snapshot
 
 1. **The plan already on the claim**: `get_claim` (kind `release-train`, key `<owner>/<repo>`) and
-   take its payload's `plan`, else null. Read it back every time, after a compaction too: passing null
-   while one exists would start a second wait.
-2. **The declarations**: `list_claims` (kind `ship-intent`, state `all`, limit 200; a `commands`
-   provider's `list`), the answer as it came. A failure is `{"error": "<NAME>"}`, never an empty
-   list.
+   take its payload's `plan`; null ONLY when the read succeeded and there is none. A read that
+   failed is passed as `{"error": "<NAME>"}`, which ends the wait. Read it back every time, after
+   a compaction too: passing null while one exists would start a second wait.
+2. **The declarations**: `list_claims` (kind `ship-intent`, state `all`, `since` an hour ago;
+   EVERY page, following `cursor`; a `commands` provider's `list`), the rows together. A member
+   missing from the list reads as dropped, so a short list would cut the wait. A failure is
+   `{"error": "<NAME>"}`, never an empty list.
 3. **The held units**, once, when the plan is first made: the unit keys of peers under a release
    hold (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`) or with an open
    Needs-you notice. Unknown → leave it out.

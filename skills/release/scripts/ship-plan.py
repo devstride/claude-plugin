@@ -126,8 +126,13 @@ def read_plan(plan, parse):
         return "none", None
     if not isinstance(plan, dict):
         return "invalid", None
-    if "minutesWaited" in plan or any(isinstance(m, dict) and "result" in m for m in plan.get("members") or [] if True):
-        return "finished", None
+    members = plan.get("members")
+    if "minutesWaited" in plan or (isinstance(members, list) and any(isinstance(m, dict) and "result" in m for m in members)):
+        # Finished only when it reads as one; anything else that looks half-finished is invalid.
+        waited = plan.get("minutesWaited")
+        whole = (isinstance(waited, int) and not isinstance(waited, bool) and isinstance(members, list)
+                 and all(isinstance(m, dict) and m.get("result") in ("carried", "missed") for m in members))
+        return ("finished" if whole else "invalid"), None
     started, until, window = parse(plan.get("startedAt")), parse(plan.get("waitUntil")), plan.get("windowMinutes")
     members = plan.get("members")
     if (not started or not until or isinstance(window, bool) or not isinstance(window, int) or not 1 <= window <= MAX_WINDOW
@@ -195,7 +200,9 @@ def decide(request):
             return done("coordination was switched off")
         if not readable:
             return done("the declarations could not be read")
-        until = min(until, started + timedelta(minutes=window))   # a lowered window shortens, never lengthens
+        if started + timedelta(minutes=window) < until:   # a lowered window shortens, never lengthens,
+            until = started + timedelta(minutes=window)   # and the shorter end is the plan's from now on
+            plan = dict(plan, waitUntil=stamp(until), windowMinutes=window)
         waiting = [m for m in plan["members"] if m["unit"] not in held
                    and live(by_declaration.get((m["unit"], m["declaration"])), now, claims.parse)]
         if not waiting:
