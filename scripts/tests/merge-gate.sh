@@ -21,11 +21,13 @@ if a[:2] == ["repo", "view"]:
     print(os.environ.get("GH_REPO") or s.get("repo", "acme/widgets")); sys.exit(0)
 if a[0] == "api" and any("/contents/.claude/ds-config.json?ref=" in x for x in a):
     kind("policy")
+    if s.get("policyRaw") is not None:   # exactly what gh printed, and how it exited
+        sys.stdout.write(s["policyRaw"]); sys.stderr.write(s.get("policyErr", "")); sys.exit(s.get("policyExit", 1))
     if s.get("policyFail"):
-        sys.stderr.write("gh: Server Error (HTTP 500)\n"); sys.exit(1)
+        print("HTTP/2.0 500 Internal Server Error\n\n{\"message\": \"HTTP 404\"}"); sys.stderr.write("gh: Server Error (HTTP 500)\n"); sys.exit(1)
     if "baseConfig" not in s:
-        sys.stderr.write("gh: Not Found (HTTP 404)\n"); sys.exit(1)
-    print(s["baseConfig"] if isinstance(s["baseConfig"], str) else json.dumps(s["baseConfig"])); sys.exit(0)
+        print("HTTP/2.0 404 Not Found\nContent-Type: application/json\n\n{\"message\": \"Not Found\"}"); sys.stderr.write("gh: Not Found (HTTP 404)\n"); sys.exit(1)
+    print("HTTP/2.0 200 OK\r\nContent-Type: application/vnd.github.raw+json\r\n\r\n" + (s["baseConfig"] if isinstance(s["baseConfig"], str) else json.dumps(s["baseConfig"]))); sys.exit(0)
 if a[:2] == ["api", "graphql"]:
     if s.get("graphqlFail"):
         sys.stderr.write("gh: Something went wrong (HTTP 502)\n"); sys.exit(1)
@@ -646,7 +648,11 @@ say(code == 0 and out[0].startswith("MERGE"), "(34p) the base branch has no conf
 code, out, err = live({"policyFail": True})
 say(code == 1 and out[0].startswith("ERROR ") and "could not be read from GitHub" in out[0], "(34q) the base policy cannot be read -> ERROR, never a MERGE line", "rc=%d %r %r" % (code, out, err))
 code, out, err = live({"policyFail": True}, base="master")
-say(code == 0 and out[0].startswith("MERGE"), "(34q2) the base policy cannot be read, into production: a hotfix is never held by this rule", "rc=%d %r %r" % (code, out, err))
+say(code == 1 and out[0].startswith("ERROR "), "(34q2) the same into any base, production included: an unreadable policy is never a pass", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({"policyRaw": "{\"note\":\"HTTP 404\",\"release\":", "policyErr": "unexpected EOF\n", "policyExit": 1})
+say(code == 1 and out[0].startswith("ERROR "), "(34q3) a cut-short answer that merely contains the text HTTP 404 is not a 404", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({"policyRaw": "HTTP/2.0 200 OK\n\n{\"release\":", "policyExit": 0})
+say(code == 1 and out[0].startswith("ERROR ") and "not a JSON object" in out[0], "(34q4) a 200 whose body is cut short -> ERROR", "rc=%d %r %r" % (code, out, err))
 code, out, err = live({"baseConfig": "[1]"})
 say(code == 1 and out[0].startswith("ERROR ") and "not a JSON object" in out[0], "(34r) a base policy that is not an object -> ERROR", "rc=%d %r %r" % (code, out, err))
 # --config names the policy outright, and the check is handed the same one: a base commit with no config changes nothing

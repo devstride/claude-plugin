@@ -45,8 +45,9 @@ The rule (an approver's admin merge exactly when every required check is green, 
   config read from GitHub now (`--config` names it outright) and is handed to the check as it is;
   the approvals are the head's own; content already on the train or in production is not asked
   about again. Unapproved is a REFUSE naming the files; a policy, head, base or answer that cannot
-  be read is an ERROR. A base with no config, or without that written standing yes, is not asked
-  and nothing is fetched. The release's own check is unchanged.
+  be read is an ERROR, whatever the base (the gate reads GitHub for everything else too). A base
+  with no config (GitHub's own 404), or without that written standing yes, is not asked and
+  nothing is fetched. The release's own check is unchanged.
 - Pinned to the head: the pull request's head must be the expected SHA, and the command carries
   `--match-head-commit <sha>`, so GitHub refuses it if the head moves in between.
 - Every required check green there: the required checks are the union of the base branch's
@@ -779,15 +780,20 @@ def train_proof(pr, number, expected, owner, name, base, config_path):
 def base_policy(owner, name, base):
     """The config committed on the base branch as GitHub has it now: a dict; None when that branch
     has none. Read from GitHub, like everything else this gate decides on: no local ref, work tree
-    or replaced object can stand in for it."""
-    code, out, err = gh("api", "-H", "Accept: application/vnd.github.raw+json",
+    or replaced object can stand in for it. "None" is GitHub's own 404 status and nothing else: a
+    failed or cut-short read is never "no config"."""
+    code, out, err = gh("api", "--include", "-H", "Accept: application/vnd.github.raw+json",
                         "repos/%s/%s/contents/.claude/ds-config.json?ref=%s" % (owner, name, quote(base, safe="")))
-    if code != 0:
-        if "HTTP 404" in (err or "") + (out or ""):
-            return None
-        raise Unreadable("the config on %s could not be read from GitHub: %s" % (base, (err or out).strip()[:200]))
+    head, _, body = out.replace("\r\n", "\n").partition("\n\n")
+    status = re.match(r"HTTP/[0-9.]+ ([0-9]{3})\b", head)
+    if not status:
+        raise Unreadable("the config on %s could not be read from GitHub: %s" % (base, (err or out).strip()[:200] or "no answer"))
+    if status.group(1) == "404":
+        return None
+    if status.group(1) != "200" or code != 0:
+        raise Unreadable("the config on %s could not be read from GitHub (HTTP %s): %s" % (base, status.group(1), err.strip()[:200]))
     try:
-        config = json.loads(out)
+        config = json.loads(body)
     except ValueError:
         config = None
     if not isinstance(config, dict):
@@ -805,19 +811,7 @@ def migration_approval(pr, number, expected, owner, name, base, config_path):
     this checkout's work tree or refs nor the pull request's own branch can switch the question
     off. `--config` names the policy outright. The same policy is handed to the check, so the two
     never disagree; the approvals are always the head's own."""
-    if config_path is not None:
-        policy = repo_config(config_path, owner, name)
-    else:
-        try:
-            policy = base_policy(owner, name, base)
-        except Unreadable:
-            # A merge into production is never this rule's, so a policy that cannot be read must not
-            # hold a hotfix: this checkout's own name for production (else the default) settles that.
-            local = repo_config(None, owner, name) or {}
-            local_release = local.get("release") if isinstance(local.get("release"), dict) else {}
-            if base == (local_release.get("productionBranch") or "master"):
-                return
-            raise
+    policy = repo_config(config_path, owner, name) if config_path is not None else base_policy(owner, name, base)
     if policy is None:
         return
     release = policy.get("release") if isinstance(policy.get("release"), dict) else {}
