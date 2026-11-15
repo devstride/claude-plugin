@@ -140,7 +140,7 @@ def decide(request):
         return {"action": "carry-on", "message": "%s could not be declared; carrying on without saying so." % unit}
     # The store's own word on expiry wins over this machine's clock, which may run ahead of it.
     told = isinstance(response, dict) and "expired" in response
-    if flags.get("expired") if told else claims.lapsed(claim, now):
+    if bool(response.get("expired")) if told else claims.lapsed(claim, now):
         return {"action": "takeover", "takeoverDigest": claim.get("holderDigest"), "message": ""}
     return {"action": "carry-on",
             "message": "%s is already declared as about to ship by %s; carrying on without declaring it." % (unit, claims.who(claim, tz))}

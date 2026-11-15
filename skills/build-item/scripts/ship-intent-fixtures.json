@@ -459,6 +459,55 @@
    }
   },
   {
+   "name": "a commands LOST that says expired, while this clock runs behind: take it over",
+   "run": "decide",
+   "request": {
+    "mode": "declare",
+    "unit": "I20130",
+    "now": "2026-03-14T15:00:00Z",
+    "response": {
+     "verdict": "LOST",
+     "exitCode": 2,
+     "won": false,
+     "expired": true,
+     "claim": {
+      "holderDigest": "bb",
+      "expiresAt": "2026-03-14T15:20:00Z",
+      "releasedAt": null
+     }
+    }
+   },
+   "expect": {
+    "action": "takeover",
+    "takeoverDigest": "bb",
+    "message": ""
+   }
+  },
+  {
+   "name": "a NOT HOLDER update that says expired: take it over",
+   "run": "decide",
+   "request": {
+    "mode": "update",
+    "unit": "I20130",
+    "now": "2026-03-14T15:00:00Z",
+    "response": {
+     "verdict": "NOT HOLDER",
+     "exitCode": 4,
+     "expired": true,
+     "current": {
+      "holderDigest": "bb",
+      "expiresAt": "2026-03-14T15:20:00Z",
+      "releasedAt": null
+     }
+    }
+   },
+   "expect": {
+    "action": "takeover",
+    "takeoverDigest": "bb",
+    "message": ""
+   }
+  },
+  {
    "name": "a pull request with no item is keyed by its branch",
    "run": "record",
    "request": {

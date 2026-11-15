@@ -46,7 +46,7 @@ Never type a machine or session name, or add a payload key. Exit 1 degrades as `
 ## When
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md` when the first story is
-claimed**, and again after a compaction: every story heartbeat below (3) also declares or moves what
+claimed**, and again after a compaction: every story heartbeat below (3) also declares, renews or moves what
 this session is about to ship — `building` at step 3, `reviewing` at step 4, `verifying` at the
 local gate, `landing` at step 5 — and completion (4) also releases that declaration, outcome
 `landed`.

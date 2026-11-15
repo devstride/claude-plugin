@@ -45,7 +45,7 @@ declare nothing, say nothing. A session on an older plugin simply does not decla
 | `build-item` step 3 | `train` on the release train, `develop-pr` on the base branch, `epic-release` on an integration branch | the working base | `building` at step 3, `reviewing` at step 4, `verifying` at the local gate, `landing` at step 5; released at step 6, outcome `landed` |
 | `build-item` step 8 | `epic-release`, unit the release unit | the release target | `reviewing` when the release pull request opens, `verifying`, `landing`; released when it merges |
 | `branch-hotfix` | `hotfix` | the production branch | `building` once the branch is pushed |
-| `pr`, run outside `build-item` | `hotfix` when the base is the production branch, else `develop-pr` | the pull request's base | `reviewing` when it opens, `verifying` at the pre-ship checks |
+| `pr`, run outside `build-item` | `hotfix` for a branch `branch-hotfix` cut, else `develop-pr` | the pull request's base | `reviewing` when it opens, `verifying` at the pre-ship checks |
 
 Only a declaration whose `target` is the release train, the base branch or the production branch
 is heading for a release; a story on an integration branch never is.
