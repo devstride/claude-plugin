@@ -229,7 +229,7 @@
       "shape": "provider-or-commands",
       "valueType": "object",
       "nullable": true,
-      "payload": "<kind> <key>, then the verb's options (claim: --purpose, --phase, --expiry, --takeover; heartbeat: --phase; release: --outcome; list: --kind); the holder in CLAIM_HOLDER, never on argv",
+      "payload": "<kind> <key>, then the verb's options (claim: --purpose, --phase, --expiry, --takeover, --payload; heartbeat: --phase, --payload; release: --outcome; list: --kind); the holder in CLAIM_HOLDER, never on argv",
       "modes": [
         "claim",
         "heartbeat",

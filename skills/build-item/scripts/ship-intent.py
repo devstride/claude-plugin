@@ -22,8 +22,9 @@ permission and never a lock, so no answer here ever stops a build, a landing or 
            -> {"action": "proceed"|"takeover"|"declare"|"carry-on"|"degrade",
                "message": "<one plain-English line, empty when there is nothing to say>",
                "takeoverDigest"?: "<hex>"}
-           proceed: done. takeover: declare again with `takeoverDigest` as the expected holder
-           digest. declare: an update found no live declaration of this session's; declare again.
+           proceed: done. takeover: declare again, ONCE, with `takeoverDigest` as the expected
+           holder digest. declare: an update found no live declaration of this session's; declare
+           again, ONCE. A second takeover or declare answer for the same step is a carry-on.
            carry-on: another session declared the unit; say the line, declare nothing.
            degrade: claims cannot be used; say the line ONCE per session, declare nothing more.
 """
@@ -35,7 +36,8 @@ from datetime import datetime, timedelta, timezone
 
 LANES = ("train", "epic-release", "develop-pr", "hotfix")
 CLASSES = ("light", "full", "unknown")
-# Minutes from entering a stage until the work is expected on its target. Estimates, shown as such.
+# Minutes from a stage's record until the work is expected on its target. Estimates, shown as such;
+# record once per stage, since each record restarts the estimate.
 STAGE_MINUTES = {"building": 90, "reviewing": 40, "verifying": 15, "landing": 5}
 RECORD_KEYS = ("lane", "unit", "branch", "target", "stage", "class", "now", "expiryMinutes")
 DEFAULT_EXPIRY_MINUTES = 20
@@ -73,12 +75,12 @@ def record(request):
     if unknown:
         raise Refused("unknown key %s (a declaration carries no other key)" % ", ".join(unknown))
     lane, stage = request.get("lane"), request.get("stage")
-    if lane not in LANES:
+    if not isinstance(lane, str) or lane not in LANES:
         raise Refused("lane must be one of %s" % ", ".join(LANES))
-    if stage not in STAGE_MINUTES:
+    if not isinstance(stage, str) or stage not in STAGE_MINUTES:
         raise Refused("stage must be one of %s" % ", ".join(STAGE_MINUTES))
     klass = request.get("class", "unknown")
-    if klass not in CLASSES:
+    if not isinstance(klass, str) or klass not in CLASSES:
         raise Refused("class must be one of %s" % ", ".join(CLASSES))
     expiry = request.get("expiryMinutes", DEFAULT_EXPIRY_MINUTES)
     if isinstance(expiry, bool) or not isinstance(expiry, int) or not 1 <= expiry <= 1440:
@@ -88,7 +90,10 @@ def record(request):
         now = story_claim().parse(request["now"])
         if now is None:
             raise Refused("now must be an ISO time")
-    ready = (now + timedelta(minutes=STAGE_MINUTES[stage])).astimezone(timezone.utc)
+    try:
+        ready = (now + timedelta(minutes=STAGE_MINUTES[stage])).astimezone(timezone.utc)
+    except (OverflowError, ValueError):
+        raise Refused("now must be an ISO time")
     unit = text(request, "unit")
     return {
         "kind": "ship-intent",
@@ -115,7 +120,12 @@ def decide(request):
     unit = request.get("unit") or "this work"
     now = claims.parse(request.get("now")) or datetime.now(timezone.utc)
     tz = request.get("tz")
-    kind, claim, flags = claims.normalise(request.get("response"))
+    response = request.get("response")
+    # The release verb's own answer ({"released": true|false, …}) is not a claim answer: either way
+    # nothing of this session's is left listed.
+    if mode == "release" and isinstance(response, dict) and "released" in response and not response.get("error"):
+        return {"action": "proceed", "message": ""}
+    kind, claim, flags = claims.normalise(response)
     claim = claim if isinstance(claim, dict) else {}
     if kind.startswith("error:"):
         return {"action": "degrade", "message": DEGRADE[kind.split(":", 1)[1]]}
@@ -128,7 +138,9 @@ def decide(request):
         if mode == "update":
             return {"action": "declare", "message": ""}
         return {"action": "carry-on", "message": "%s could not be declared; carrying on without saying so." % unit}
-    if flags.get("expired") or claims.lapsed(claim, now):
+    # The store's own word on expiry wins over this machine's clock, which may run ahead of it.
+    told = isinstance(response, dict) and "expired" in response
+    if flags.get("expired") if told else claims.lapsed(claim, now):
         return {"action": "takeover", "takeoverDigest": claim.get("holderDigest"), "message": ""}
     return {"action": "carry-on",
             "message": "%s is already declared as about to ship by %s; carrying on without declaring it." % (unit, claims.who(claim, tz))}

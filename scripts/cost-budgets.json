@@ -85,7 +85,7 @@
     "skills/setup/references/docs-skill-templates/update-release-notes.md": 1200,
     "skills/setup/references/interview-rationale.md": 1900,
     "skills/setup/references/review-engines.md": 2700,
-    "skills/setup/references/seam-registry.md": 16094,
+    "skills/setup/references/seam-registry.md": 16099,
     "skills/setup/references/statusline-segments.md": 3416,
     "skills/setup/references/validation-checklist.md": 6000,
     "skills/ultracode-build/references/engineering-economy.md": 1400,
@@ -94,7 +94,7 @@
     "skills/release/references/step-skills.md": 1000,
     "skills/release/references/release-safety-hooks.md": 1200,
     "skills/build-item/references/checkout-pool-commands.md": 1400,
-    "skills/build-item/references/story-claims.md": 1616,
+    "skills/build-item/references/story-claims.md": 1697,
     "skills/build-item/references/needs-you.md": 3383,
     "skills/doctor/references/claims-checks.md": 450,
     "skills/build-item/references/epic-release-steps.md": 1731,
@@ -117,11 +117,11 @@
     "skills/release/references/merge-and-deploy.md": 1715,
     "skills/release/references/backstop.md": 2807,
     "skills/release/references/estimates.md": 1892,
-    "skills/build-item/references/ship-intent.md": 1315
+    "skills/build-item/references/ship-intent.md": 1502
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 93784,
+      "budget": 94052,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -164,7 +164,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 78217,
+      "budget": 78485,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -210,7 +210,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 96523,
+      "budget": 96791,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

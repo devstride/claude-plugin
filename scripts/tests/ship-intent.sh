@@ -14,9 +14,15 @@ def run(mode, text):
 def say(good, label, extra=""):
     print(("ok   " if good else "FAIL ") + label + ("" if good else " -> " + extra))
 
+def answer(p):
+    try:
+        return json.loads(p.stdout)
+    except ValueError:
+        return None
+
 for c in fx["cases"]:
     p = run(c["run"], json.dumps(c["request"]))
-    good = p.returncode == 0 and json.loads(p.stdout) == c["expect"]
+    good = p.returncode == 0 and answer(p) == c["expect"]
     say(good, "%s: %s" % (c["run"], c["name"]), "rc=%d %s %s" % (p.returncode, p.stdout.strip(), p.stderr.strip()))
 for c in fx["errors"]:
     p = run(c["run"], json.dumps(c["request"]))
@@ -32,11 +38,13 @@ p = subprocess.run([sys.executable, helper, "claim"], input="{}", capture_output
 say(p.returncode == 2 and p.stderr.startswith("usage: "), "refuses: an unknown subcommand", p.stderr)
 # with no clock given, the estimate is in the future and no holder ever appears in an answer
 p = run("record", json.dumps({"lane": "train", "unit": "I20130", "branch": "b", "target": "t", "stage": "landing"}))
-out = json.loads(p.stdout) if p.returncode == 0 else {}
+out = (answer(p) or {}) if p.returncode == 0 else {}
 say(sorted(out.get("payload", {})) == ["branch", "class", "lane", "readyBy", "stage", "target", "unit"], "record: the payload carries exactly the seven keys", p.stdout + p.stderr)
 say("holder" not in p.stdout, "record: no holder in the answer", p.stdout)
+print("ran to the end")
 PY
-)"
+)"; RC=$?
 echo "$OUT"
+[ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q '^ran to the end$' || { echo "ship-intent: the runner itself failed (exit $RC)"; exit 1; }
 FAILS=$(printf '%s\n' "$OUT" | grep -c '^FAIL')
 [ "$FAILS" -eq 0 ] || { echo "ship-intent: $FAILS failed"; exit 1; }

@@ -10,7 +10,7 @@ lock: a person or an older plugin that never claims can still move the item.
 ## When it applies
 
 Only when the config has a `claims` block (registry contract for `claims`). No block → no claims, no
-heartbeats, no message; build exactly as before. Hotfixes never claim. `build-item` never calls
+heartbeats, no message; build exactly as before. Hotfixes never take a `story` claim. `build-item` never calls
 `adopt_claim`; adoption stays the owner's, in `release`.
 
 ## The claim
@@ -45,8 +45,11 @@ Never type a machine or session name, or add a payload key. Exit 1 degrades as `
 
 ## When
 
-**Beside each step below**, say what this session is about to ship: read
-`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md` once per run, at the first claim.
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md` when the first story is
+claimed**, and again after a compaction: every story heartbeat below (3) also declares or moves what
+this session is about to ship — `building` at step 3, `reviewing` at step 4, `verifying` at the
+local gate, `landing` at step 5 — and completion (4) also releases that declaration, outcome
+`landed`.
 
 1. **Selection (step 0).** After a candidate is chosen and BEFORE it moves to In Progress, claim it
    (`mode: select`). Held by a live holder → drop it, say who holds it, take the next candidate (the
