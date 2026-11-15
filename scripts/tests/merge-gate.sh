@@ -687,6 +687,16 @@ say(p.returncode == 1 and p.stdout.startswith("ERROR ") and "could not be fetche
 json.dump(sc(headRefOid=sha), open(path, "w"))
 p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
 say(p.returncode == 1 and p.stdout.startswith("ERROR "), "(34v) GitHub names no commit for the base -> ERROR", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
+# the base changed the same migration since the branch was cut
+clone, sha, config = joining(delete=True)
+g(clone, "checkout", "-q", "develop"); put(clone, "db/migrations/0001_old.sql", "create table old(); -- base"); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "base edits"); g(clone, "push", "-q", "origin", "develop")
+g(clone, "checkout", "-q", "work"); put(clone, "db/migrations/0001_old.sql", "create table old(id int);"); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "head edits"); g(clone, "push", "-q", "-f", "origin", "work")
+sha = g(clone, "rev-parse", "HEAD")
+path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha, refs=dict(REFS, develop=g(clone, "rev-parse", "develop"))), open(path, "w"))
+cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
+p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 2 and "(changed-on-both)" in p.stdout and "merge develop into the branch first" in p.stdout,
+    "(34w) the base changed the same migration since the branch was cut -> REFUSE, told to refresh first", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
 clone, sha, config = joining()
 path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid="b" * 40, refs=dict(REFS)), open(path, "w"))
 cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))

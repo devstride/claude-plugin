@@ -17,7 +17,9 @@ script asks the release's question about any head against any base, earlier.
       that ref made it. The release's own check covers what was there before.
       stdout, one JSON object:
         {"applies": bool, "approved": bool, "reason": "<one plain line>",
-         "unapproved": [{"path", "blob", "status": "new"|"changed"|"deleted"|"not-a-file"}]}
+         "unapproved": [{"path", "blob", "status": "new"|"changed"|"deleted"|"not-a-file"|"changed-on-both"}]}
+      `changed-on-both`: the base changed the same migration after the branch was cut, so the
+      merge would hold content neither side has; refresh the branch from the base first.
       exit 0  approved, or not applicable (the base has no config, no written standing yes for
               full releases, no migrationGlobs, or `release.fullRelease.approveBeforeJoining` false)
       exit 2  one or more migrations have no approval for their content
@@ -184,8 +186,14 @@ def check(base, head, already=(), rule_file=None):
         changed = list(sy.changed_migrations(base_sha, head_sha, sy.glob_matcher(globs), base))
     except sy.Ask as asked:
         raise Unanswerable(str(asked))
+    # Where the base and the head last met: a migration the base has changed since then too would
+    # merge into content neither side holds, so no approval of either side covers it.
+    met = subprocess.run(["git", "merge-base", base_sha, head_sha], capture_output=True, text=True).stdout.strip()
     unapproved = []
     for status, path, mode, blob in changed:
+        if met and tree_entry(base_sha, path) != tree_entry(met, path) and tree_entry(base_sha, path) != (mode, blob):
+            unapproved.append({"path": path, "blob": blob, "status": "changed-on-both"})
+            continue
         if status == "D":
             if not already_there(there, base_sha, status, path, blob):
                 unapproved.append({"path": path, "blob": "", "status": "deleted"})

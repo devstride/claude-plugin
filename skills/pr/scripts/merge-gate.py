@@ -875,6 +875,10 @@ def migration_approval(pr, number, expected, owner, name, base, config_path):
            "release.fullRelease.approvedMigrations in a commit of its own on %s, then run this gate again."
            % (os.path.join(SKILLS, "release/references/migration-approval.md"), shlex.quote(MIGRATION_APPROVAL),
               pr.get("headRefName") or "the head branch"))
+    both = [str(u.get("path")) for u in unapproved if u.get("status") == "changed-on-both"]
+    if both:
+        how += (" %s was also changed on %s since this branch was cut: merge %s into the branch first, so what is "
+                "approved is what will land." % (", ".join(both), base, base))
     if by_hand:
         how += (" %s cannot be approved by content (deleted, or not a plain file): the owner merges that pull request "
                 "themselves, on their own yes for it." % ", ".join(by_hand))

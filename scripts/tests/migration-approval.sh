@@ -210,6 +210,21 @@ open(rule_file, "w").write("{bad")
 p = subprocess.run([sys.executable, helper, "check", "--base", "develop", "--head", "work", "--rule", rule_file], capture_output=True, text=True, cwd=r)
 say(p.returncode == 1 and json.loads(p.stdout)["approved"] is False, "--rule: a policy file that cannot be read is exit 1", p.stdout + p.stderr)
 
+# both sides changed the same migration: the merge would be content neither approved
+r = repo(ON, {MIG: "one\ntwo\nthree\nfour\nfive\n"})
+write(r, MIG, "one\ntwo\nthree\nfour\nFIVE\n"); commit(r, "head edits the end"); approve(r, [entry(blob(r, MIG))])
+git(r, "checkout", "-q", "develop"); write(r, MIG, "ONE\ntwo\nthree\nfour\nfive\n"); commit(r, "base edits the start"); git(r, "checkout", "-q", "work")
+rc, out, p = check(r)
+say(rc == 2 and out["unapproved"] == [{"path": MIG, "blob": blob(r, MIG), "status": "changed-on-both"}], "the base changed the same migration since the branch was cut: refused until refreshed", p.stdout + p.stderr)
+git(r, "merge", "-q", "develop", "-m", "refresh")
+rc, out, p = check(r)
+say(rc == 2 and out["unapproved"][0]["status"] == "changed" and out["unapproved"][0]["blob"] == blob(r, MIG), "after the refresh the merged content is what is asked about", p.stdout + p.stderr)
+approve(r, [entry(blob(r, MIG))])
+say(check(r)[0] == 0, "and once that content is approved it joins")
+r = repo(ON, {MIG: "x\n"}); write(r, "src/a.ts", "x"); commit(r, "work")
+git(r, "checkout", "-q", "develop"); write(r, MIG, "y\n"); commit(r, "only the base changes it"); git(r, "checkout", "-q", "work")
+say(check(r)[0] == 0, "a migration only the base changed is not this branch's to answer for")
+
 # usage
 p = subprocess.run([sys.executable, helper, "check", "--base", "develop"], capture_output=True, text=True, cwd=r)
 say(p.returncode == 2 and p.stdout == "" and p.stderr.startswith("migration-approval: "), "a missing argument: exit 2, one line", p.stderr)
