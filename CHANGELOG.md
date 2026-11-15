@@ -8,6 +8,20 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **A starting release waits a short, fixed time for work a peer says is nearly ready.** When a
+  release starts and another session has declared work that is nearly ready and heading for the
+  release train, the release waits for it — at most `release.coordination.peerWaitMinutes` (15,
+  `0` never waits), fixed when the release starts and never extended — and carries it, where it
+  used to ride a second release with its own cloud tests and deploy. With nobody nearly ready
+  the release starts at once, as before. `skills/release/scripts/ship-plan.py` decides
+  (`decide`), so the wait is never judged by eye; the plan lives on the `release-train` claim
+  for every session to read, a session about to land is told when a release is waiting for it
+  (`peer`), and the train pull request's body records the minutes waited and the units carried
+  and missed (`marker`). Who drives a release is still the `release-train` claim's alone;
+  hotfixes never wait and are never waited for.
+
 ## [3.66.0] — 2026-11-14
 
 ### Added

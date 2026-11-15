@@ -63,7 +63,7 @@
     "skills/release/references/clearance.md": 10894,
     "skills/release/references/docs-hooks.md": 4420,
     "skills/release/references/post-deploy-check.md": 1656,
-    "skills/release/references/release-branch.md": 9491,
+    "skills/release/references/release-branch.md": 9544,
     "skills/release/references/release-gates.md": 1620,
     "skills/release/references/review-once.md": 1362,
     "skills/review/references/ci-settle.md": 1800,
@@ -77,7 +77,7 @@
     "skills/review/references/roster-and-modes.md": 2120,
     "skills/review/references/slow-suite-gating.md": 1700,
     "skills/setup/references/ci-cost-patterns.md": 5000,
-    "skills/setup/references/config-defaults.md": 19838,
+    "skills/setup/references/config-defaults.md": 20014,
     "skills/setup/references/boards-mode.md": 2705,
     "skills/setup/references/detector-evidence.digest.md": 900,
     "skills/setup/references/detector-evidence.md": 4300,
@@ -85,7 +85,7 @@
     "skills/setup/references/docs-skill-templates/update-release-notes.md": 1200,
     "skills/setup/references/interview-rationale.md": 1900,
     "skills/setup/references/review-engines.md": 2700,
-    "skills/setup/references/seam-registry.md": 16234,
+    "skills/setup/references/seam-registry.md": 16340,
     "skills/setup/references/statusline-segments.md": 3416,
     "skills/setup/references/validation-checklist.md": 6000,
     "skills/ultracode-build/references/engineering-economy.md": 1400,
@@ -104,7 +104,7 @@
     "skills/doctor/references/agents.md": 1414,
     "skills/doctor/references/boards.md": 897,
     "skills/build-item/references/active-agents.md": 1371,
-    "skills/release/references/auto-start.md": 4023,
+    "skills/release/references/auto-start.md": 4076,
     "skills/build-item/references/plan-scope.md": 2529,
     "skills/build-item/references/item-status.md": 744,
     "skills/build-item/references/board-placement.md": 1174,
@@ -117,12 +117,13 @@
     "skills/release/references/merge-and-deploy.md": 1715,
     "skills/release/references/backstop.md": 2807,
     "skills/release/references/estimates.md": 1892,
-    "skills/build-item/references/ship-intent.md": 1503,
-    "skills/release/references/migration-approval.md": 1530
+    "skills/build-item/references/ship-intent.md": 1566,
+    "skills/release/references/migration-approval.md": 1530,
+    "skills/release/references/ship-plan.md": 1245
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 94189,
+      "budget": 94254,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -165,7 +166,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 78546,
+      "budget": 78611,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -211,7 +212,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 96855,
+      "budget": 96973,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

@@ -6,7 +6,9 @@ load: contract
 **Goal:** every session, on every machine, and the owner can see what is being built, reviewed or
 landed, where it is heading and roughly when it will be ready — before it lands. A declaration is
 **information: never permission, never a lock.** Nothing refuses, delays or stops a build, a
-landing or a release because one is missing, stale or held by someone else.
+landing or a release because one is missing, stale or held by someone else. One reader acts on
+it: a starting release may wait a short, fixed time for a nearly-ready peer, and at step 5 that
+peer says so (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/ship-plan.md`).
 
 ## When it applies
 
