@@ -3,7 +3,8 @@
 
 Every place the plugin merges (`release`, `build-item`, a departure's merge) runs this file and
 then runs exactly the command it prints, never its own `gh pr merge`. It reads GitHub, and the
-consuming repository's `.claude/ds-config.json` for the one rule that needs it (the train proof below).
+consuming repository's `.claude/ds-config.json` for the two rules that need it (the train proof and
+the migration approval, below).
 
   merge-gate.py <pr-number> <expected-head-sha> [--all-green] [--delete-branch] [--subject <text>]
                 [--repo <owner>/<name>] [--config <ds-config.json>]
@@ -36,6 +37,18 @@ The rule (an approver's admin merge exactly when every required check is green, 
   GitHub's), matching `release.releaseBranchFixExclusions` (the one anchored matcher, `routing.py`'s
   `first_match`) is a REFUSE, since a proof would not save it. No train configured, another base,
   or a head that is not a release unit and changes no excluded path: the rule does nothing.
+- A migration is approved before it joins: when the base is the release train or the base branch
+  (never the production branch) and that base's committed config has the written standing yes for
+  full releases with migration globs (`release.fullRelease`, `approveBeforeJoining` not false), the
+  head's new or changed migrations must each be approved by content
+  (`release/scripts/migration-approval.py check`). The policy is the base branch's committed
+  config read from GitHub now (`--config` names it outright) and is handed to the check as it is;
+  the base, the train and production are compared at the exact commits GitHub has for them in the
+  repository inspected, never by a local branch name; the approvals are the head's own; content already on the train or in production is not asked
+  about again. Unapproved is a REFUSE naming the files; a policy, head, base or answer that cannot
+  be read is an ERROR, whatever the base (the gate reads GitHub for everything else too). A base
+  with no config (GitHub's own 404), or without that written standing yes, is not asked and
+  nothing is fetched. The release's own check is unchanged.
 - Pinned to the head: the pull request's head must be the expected SHA, and the command carries
   `--match-head-commit <sha>`, so GitHub refuses it if the head moves in between.
 - Every required check green there: the required checks are the union of the base branch's
@@ -116,12 +129,14 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 from urllib.parse import quote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILLS = os.path.dirname(os.path.dirname(HERE))
 ROUTING = os.path.join(SKILLS, "build-item/scripts/routing.py")
 REVIEWED = os.path.join(SKILLS, "review/scripts/reviewed-status.py")
+MIGRATION_APPROVAL = os.path.join(SKILLS, "release/scripts/migration-approval.py")
 FILES_LIMIT = 3000   # GitHub's pull-request files listing stops here
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -630,9 +645,9 @@ def load(module_name, path):
     return module
 
 
-def read_config(path, owner, name):
-    """(train, exclusions, unit patterns) from the consuming repository's config; (None, [], [])
-    only when a confirmed checkout of the inspected repository has no config."""
+def repo_config(path, owner, name):
+    """The consuming repository's config as a dict; None only when a confirmed checkout of the
+    inspected repository has no config."""
     if path is None:
         code, out, _ = git_out("rev-parse", "--show-toplevel")
         if code != 0 or not out.strip():
@@ -647,7 +662,7 @@ def read_config(path, owner, name):
                              "from a checkout of it or pass --config" % (owner, name, (here or err).strip()[:80] or "unknown"))
         path = os.path.join(top, ".claude", "ds-config.json")
         if not os.path.exists(path):
-            return None, [], []
+            return None
     try:
         with open(path) as f:
             config = json.load(f)
@@ -655,6 +670,16 @@ def read_config(path, owner, name):
         raise Unreadable("the config %s cannot be read: %s" % (path, err))
     if not isinstance(config, dict):
         raise Unreadable("the config %s is not a JSON object" % path)
+    return config
+
+
+def read_config(path, owner, name):
+    """(train, exclusions, unit patterns) from the consuming repository's config; (None, [], [])
+    only when a confirmed checkout of the inspected repository has no config."""
+    config = repo_config(path, owner, name)
+    if config is None:
+        return None, [], []
+    path = path or ".claude/ds-config.json"
     routing = load("merge_gate_routing", ROUTING)
     try:
         train = routing.train_section(config).get("branch")
@@ -753,6 +778,113 @@ def train_proof(pr, number, expected, owner, name, base, config_path):
                         number, shlex.quote(base)))
 
 
+def base_policy(owner, name, base):
+    """The config committed on the base branch as GitHub has it now: a dict; None when that branch
+    has none. Read from GitHub, like everything else this gate decides on: no local ref, work tree
+    or replaced object can stand in for it. "None" is GitHub's own 404 status and nothing else: a
+    failed or cut-short read is never "no config"."""
+    code, out, err = gh("api", "--include", "-H", "Accept: application/vnd.github.raw+json",
+                        "repos/%s/%s/contents/.claude/ds-config.json?ref=%s" % (owner, name, quote(base, safe="")))
+    head, _, body = out.replace("\r\n", "\n").partition("\n\n")
+    status = re.match(r"HTTP/[0-9.]+ ([0-9]{3})\b", head)
+    if not status:
+        raise Unreadable("the config on %s could not be read from GitHub: %s" % (base, (err or out).strip()[:200] or "no answer"))
+    if status.group(1) == "404":
+        return None
+    if status.group(1) != "200" or code != 0:
+        raise Unreadable("the config on %s could not be read from GitHub (HTTP %s): %s" % (base, status.group(1), err.strip()[:200]))
+    try:
+        config = json.loads(body)
+    except ValueError:
+        config = None
+    if not isinstance(config, dict):
+        raise Unreadable("the config on %s is not a JSON object" % base)
+    return config
+
+
+def migration_approval(pr, number, expected, owner, name, base, config_path):
+    """REFUSE a head that would carry a migration the owner has not approved onto the release
+    train or the base branch (`skills/release/references/migration-approval.md`). The release's
+    own check still asks at release time; this asks before the work joins anything.
+
+    The policy (whether the rule is on, which files are migrations, which branches are the train,
+    the base and production) is the BASE BRANCH's committed config, read from GitHub now: neither
+    this checkout's work tree or refs nor the pull request's own branch can switch the question
+    off. `--config` names the policy outright. The same policy is handed to the check, so the two
+    never disagree; the approvals are always the head's own."""
+    policy = repo_config(config_path, owner, name) if config_path is not None else base_policy(owner, name, base)
+    if policy is None:
+        return
+    release = policy.get("release") if isinstance(policy.get("release"), dict) else {}
+    full = release.get("fullRelease")
+    if not (isinstance(full, dict) and full.get("standingYes") is True and full.get("migrationGlobs")
+            and full.get("approveBeforeJoining") is not False):
+        return
+    routing = load("merge_gate_routing", ROUTING)
+    try:
+        train = routing.train_section(policy).get("branch")
+    except SystemExit:
+        raise Unreadable("the config names the train under both releaseTrain and supportTrain")
+    # The registered defaults, as every other script reads them.
+    base_branch = policy.get("baseBranch") if isinstance(policy.get("baseBranch"), str) and policy.get("baseBranch") else "develop"
+    production = release.get("productionBranch") if isinstance(release.get("productionBranch"), str) and release.get("productionBranch") else "master"
+    # Production is never this rule's: a hotfix is never held, and the release has its own check.
+    if base == production or base not in [b for b in (train, base_branch) if isinstance(b, str) and b]:
+        return
+    # What is already on the train or in production joined before, and was asked about then.
+    already = [b for b in ((train if base == base_branch else None), production) if isinstance(b, str) and b and b != base]
+    # The exact commits GitHub has for those branches, in the repository inspected: `origin` may be
+    # a fork whose same-named branch is somewhere else, so nothing is compared by branch name.
+    pinned = {}
+    for branch in [base] + already:
+        ref = gh_json("api", "repos/%s/%s/git/ref/heads/%s" % (owner, name, quote(branch, safe="/")))
+        sha = ref.get("object", {}).get("sha") if isinstance(ref, dict) and isinstance(ref.get("object"), dict) else None
+        if not isinstance(sha, str) or not SHA.match(sha):
+            raise Unreadable("GitHub gave no commit for %s, so #%d's migrations cannot be compared" % (branch, number))
+        pinned[branch] = sha
+    code, _, err = git_out("fetch", "-q", "--no-tags", "origin", expected, *sorted(set(pinned.values())))
+    if code != 0 or any(git_out("cat-file", "-e", "%s^{commit}" % sha)[0] != 0 for sha in [expected] + list(pinned.values())):
+        raise Unreadable("#%d's head and %s as GitHub has them could not be fetched into this checkout, so its "
+                         "migrations cannot be read: %s" % (number, ", ".join([base] + already), err.strip()[:200] or "git fetch failed"))
+    handle, rule_file = tempfile.mkstemp(prefix="merge-gate-policy-", suffix=".json")
+    try:
+        with os.fdopen(handle, "w") as f:
+            json.dump(policy, f)
+        done = subprocess.run([sys.executable, "-I", MIGRATION_APPROVAL, "check", "--rule", rule_file,
+                               "--base", pinned[base], "--head", expected]
+                              + [x for b in already for x in ("--already", pinned[b])],
+                              capture_output=True, text=True, timeout=120)
+        answer = json.loads(done.stdout)
+    except (OSError, ValueError, subprocess.TimeoutExpired) as err:
+        raise Unreadable("the migration approval check gave no answer for #%d: %s" % (number, err))
+    finally:
+        try:
+            os.remove(rule_file)
+        except OSError:
+            pass
+    answer = answer if isinstance(answer, dict) else {}
+    reason = answer.get("reason") if isinstance(answer.get("reason"), str) else None
+    if done.returncode == 0 and answer.get("approved") is True:
+        return
+    if done.returncode != 2:
+        raise Unreadable("whether #%d carries an unapproved migration could not be told: %s" % (number, reason or "no reason given"))
+    unapproved = [u for u in answer.get("unapproved") or [] if isinstance(u, dict)]
+    by_hand = [str(u.get("path")) for u in unapproved if u.get("status") in ("deleted", "not-a-file")]
+    how = ("Only the owner approves a migration, in their own words in a session (never a relayed yes; an unattended run "
+           "writes one notice and moves on: %s). On that yes, build each approval with python3 %s entry and add it to "
+           "release.fullRelease.approvedMigrations in a commit of its own on %s, then run this gate again."
+           % (os.path.join(SKILLS, "release/references/migration-approval.md"), shlex.quote(MIGRATION_APPROVAL),
+              pr.get("headRefName") or "the head branch"))
+    both = [str(u.get("path")) for u in unapproved if u.get("status") == "changed-on-both"]
+    if both:
+        how += (" %s would land with content the branch itself does not hold (%s changed it too): merge %s into the "
+                "branch first, so what is approved is what will land." % (", ".join(both), base, base))
+    if by_hand:
+        how += (" %s cannot be approved by content (deleted, or not a plain file): the owner merges that pull request "
+                "themselves, on their own yes for it." % ", ".join(by_hand))
+    raise Refuse("#%d would carry onto %s %s. %s" % (number, base, reason or "a migration without the owner's approval", how))
+
+
 def decide(number, expected, owner, name, delete_branch, subject=None, all_green=False, config_path=None):
     # The static facts first: the pull request's state, threads, rules, protection, the base
     # compare and the classic rule. None of them is a check, so the reads that are (the run
@@ -766,6 +898,7 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
     if not isinstance(base, str) or not base:
         raise Unreadable("#%d names no base branch" % number)
     train_proof(pr, number, expected, owner, name, base, config_path)
+    migration_approval(pr, number, expected, owner, name, base, config_path)
     ruled, ruled_strict, types, approvals = ruleset_checks(owner, name, base)
     protected, protected_strict = protection_checks(owner, name, base)
     if ruled_strict or protected_strict:
@@ -840,6 +973,7 @@ def decide(number, expected, owner, name, delete_branch, subject=None, all_green
 
 
 def main(argv):
+    os.environ["GIT_NO_REPLACE_OBJECTS"] = "1"  # every git read sees the real objects, never a local replacement
     args, delete_branch, repo, subject, all_green, config_path = [], False, None, None, False, None
     it = iter(argv[1:])
     for a in it:

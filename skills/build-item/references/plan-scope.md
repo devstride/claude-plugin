@@ -90,7 +90,8 @@ When the plan's remaining count reaches zero (step 7):
 
 - Gate: `epicIntegrationBranches.autoRelease`, read exactly as step 8 reads it (present wins;
   `"ask"` asks once).
-- Refresh the plan branch from `from`, then cut the **PLAN RELEASE PR** via `/devstride:pr`
+- Refresh the plan branch from `from`, run the migration check
+  (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/migration-approval.md`), then cut the **PLAN RELEASE PR** via `/devstride:pr`
   declaring `merge-only: true`: head = the plan branch, base = `from`, body leading with the plan
   root and listing every epic with its release PR.
 - **Review scope**: only what no pull request reviewed — the refresh merges' conflict resolutions

@@ -19,6 +19,22 @@ def kind(k):   # the order of reads, one word each, for the cases that check it
     open(os.environ["GH_LOG"] + ".order", "a").write(k + "\n")
 if a[:2] == ["repo", "view"]:
     print(os.environ.get("GH_REPO") or s.get("repo", "acme/widgets")); sys.exit(0)
+if a[0] == "api" and any("/contents/.claude/ds-config.json?ref=" in x for x in a):
+    kind("policy")
+    if s.get("policyRaw") is not None:   # exactly what gh printed, and how it exited
+        sys.stdout.write(s["policyRaw"]); sys.stderr.write(s.get("policyErr", "")); sys.exit(s.get("policyExit", 1))
+    if s.get("policyFail"):
+        print("HTTP/2.0 500 Internal Server Error\n\n{\"message\": \"HTTP 404\"}"); sys.stderr.write("gh: Server Error (HTTP 500)\n"); sys.exit(1)
+    if "baseConfig" not in s:
+        print("HTTP/2.0 404 Not Found\nContent-Type: application/json\n\n{\"message\": \"Not Found\"}"); sys.stderr.write("gh: Not Found (HTTP 404)\n"); sys.exit(1)
+    print("HTTP/2.0 200 OK\r\nContent-Type: application/vnd.github.raw+json\r\n\r\n" + (s["baseConfig"] if isinstance(s["baseConfig"], str) else json.dumps(s["baseConfig"]))); sys.exit(0)
+if a[0] == "api" and any("/git/ref/heads/" in x for x in a):
+    kind("ref")
+    branch = next(x for x in a if "/git/ref/heads/" in x).split("/git/ref/heads/", 1)[1]
+    sha = (s.get("refs") or {}).get(branch)
+    if sha is None:
+        sys.stderr.write("gh: Not Found (HTTP 404)\n"); sys.exit(1)
+    print(json.dumps({"ref": "refs/heads/" + branch, "object": {"sha": sha, "type": "commit"}})); sys.exit(0)
 if a[:2] == ["api", "graphql"]:
     if s.get("graphqlFail"):
         sys.stderr.write("gh: Something went wrong (HTTP 502)\n"); sys.exit(1)
@@ -533,6 +549,163 @@ code, out, err = gate(onto_train(headRefName="kim/26-01-15/plan-billing", status
 say(code == 0 and out[0].startswith("MERGE"), "(33u) a plan integration head with a proof -> MERGE", "rc=%d %r" % (code, out))
 code, out, err = gate(onto_train(headRefName="kim/26-01-15/I1-fix", files=[{"filename": "src/app.ts"}]), TRAIN)
 say(code == 0 and out[0].startswith("MERGE"), "(33v) a one-off head with no excluded path -> MERGE (the rule does nothing)", "rc=%d %r" % (code, out))
+# Migration approval before joining (a head carrying a migration the owner has not approved does
+# not merge onto the train or into the base branch). Real repositories: the check reads git.
+def g(path, *args):
+    return subprocess.run(["git", "-C", path, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"] + list(args),
+                          check=True, capture_output=True, text=True).stdout.strip()
+def put(path, name, text):
+    os.makedirs(os.path.dirname(os.path.join(path, name)), exist_ok=True)
+    open(os.path.join(path, name), "w").write(text)
+FULL = {"standingYes": True, "migrationGlobs": ["db/migrations/*.sql"], "approvedMigrations": []}
+REFS = {}   # what GitHub says each branch of the last repository built is at
+def joining(full=FULL, approved=False, on_train=False, drop=(), head_full=None, hotfix=False, delete=False):
+    """origin with develop, master and train/release; a clone whose branch `work` adds a migration."""
+    n = len(os.listdir(work))
+    origin, clone = os.path.join(work, "origin%d.git" % n), os.path.join(work, "clone%d" % n)
+    config = {"baseBranch": "develop", "releaseTrain": {"branch": "train/release"}, "release": {"productionBranch": "master", "fullRelease": full}}
+    for key in drop:   # a registered default left out of the config
+        (config if key == "baseBranch" else config["release"]).pop(key)
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "develop", origin], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "develop", clone], check=True)
+    put(clone, ".claude/ds-config.json", json.dumps(config))
+    if delete:
+        put(clone, "db/migrations/0001_old.sql", "create table old();")
+    g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "base")
+    g(clone, "remote", "add", "origin", origin)
+    g(clone, "branch", "master"); g(clone, "branch", "train/release")
+    if hotfix:   # a migration that went to production by a hotfix, now coming back to the base
+        g(clone, "checkout", "-q", "master"); put(clone, "db/migrations/0042_add.sql", "create table x();")
+        g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "hotfix"); g(clone, "checkout", "-q", "-b", "work")
+    else:
+        g(clone, "checkout", "-q", "-b", "work")
+        if delete:
+            g(clone, "rm", "-q", "db/migrations/0001_old.sql")
+        else:
+            put(clone, "db/migrations/0042_add.sql", "create table x();")
+        if head_full is not None:   # the branch edits the rule for itself
+            put(clone, ".claude/ds-config.json", json.dumps(dict(config, release=dict(config["release"], fullRelease=head_full))))
+        g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "work")
+    if approved:
+        entry = {"blob": g(clone, "rev-parse", "HEAD:db/migrations/0042_add.sql"), "path": "db/migrations/0042_add.sql", "item": "I20130", "approved": "2026-01-15"}
+        config["release"]["fullRelease"] = dict(full, approvedMigrations=[entry])
+        put(clone, ".claude/ds-config.json", json.dumps(config)); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "approve")
+    if on_train:
+        g(clone, "branch", "-f", "train/release", "work")
+    g(clone, "push", "-q", "origin", "develop", "master", "train/release", "work")
+    REFS.clear(); REFS.update({b: g(clone, "rev-parse", b) for b in ("develop", "master", "train/release")})
+    return clone, g(clone, "rev-parse", "HEAD"), config
+def join(base="develop", **kw):
+    clone, sha, config = joining(**kw)
+    g(clone, "update-ref", "-d", "refs/remotes/origin/develop")   # the gate fetches what it compares with
+    path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha, baseRefName=base, refs=dict(REFS)), open(path, "w"))
+    cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
+    p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone,
+                       env=dict(os.environ, GH_SCENARIO=path))
+    return p.returncode, p.stdout.strip().split("\n"), p.stderr
+code, out, err = join()
+say(code == 2 and out[0].startswith("REFUSE #7 would carry onto develop 1 migration without the owner's approval") and "db/migrations/0042_add.sql (new)" in out[0]
+    and "migration-approval.py entry" in out[0] and len(out) == 1 and "Traceback" not in err,
+    "(34a) into the base branch with an unapproved migration -> REFUSE, naming the file and how approval is recorded", "rc=%d %r %r" % (code, out, err))
+code, out, err = join(approved=True)
+say(code == 0 and out[0].startswith("MERGE gh pr merge 7"), "(34b) the same migration approved by content on the branch -> MERGE", "rc=%d %r %r" % (code, out, err))
+code, out, err = join(base="train/release")
+say(code == 2 and out[0].startswith("REFUSE #7 would carry onto train/release"), "(34c) onto the release train -> REFUSE the same way", "rc=%d %r %r" % (code, out, err))
+code, out, err = join(on_train=True)
+say(code == 0 and out[0].startswith("MERGE"), "(34d) content already on the train merges into the base branch unasked (the train's own pull request)", "rc=%d %r %r" % (code, out, err))
+for label, full in (("no written standing yes", dict(FULL, standingYes=False)), ("approveBeforeJoining false", dict(FULL, approveBeforeJoining=False)),
+                    ("no migrationGlobs", {"standingYes": True})):
+    code, out, err = join(full=full)
+    say(code == 0 and out[0].startswith("MERGE"), "(34e) %s: the rule does nothing" % label, "rc=%d %r %r" % (code, out, err))
+code, out, err = join(base="master")
+say(code == 0 and out[0].startswith("MERGE"), "(34f) into the production branch (a hotfix, the release): never this rule's", "rc=%d %r %r" % (code, out, err))
+for label, head_full in (("switches the standing yes off", dict(FULL, standingYes=False)), ("empties the globs", dict(FULL, migrationGlobs=["none/*.x"])),
+                         ("sets approveBeforeJoining false", dict(FULL, approveBeforeJoining=False))):
+    code, out, err = join(head_full=head_full)
+    say(code == 2 and out[0].startswith("REFUSE #7 would carry onto develop"), "(34h) a branch that %s for itself is still refused: the base's rule decides" % label, "rc=%d %r %r" % (code, out, err))
+code, out, err = join(drop=("baseBranch",))
+say(code == 2 and out[0].startswith("REFUSE #7 would carry onto develop"), "(34i) baseBranch left out: the registered default (develop) is the base branch", "rc=%d %r %r" % (code, out, err))
+code, out, err = join(drop=("productionBranch",), hotfix=True)
+say(code == 0 and out[0].startswith("MERGE"), "(34j) productionBranch left out: content a hotfix put on master comes back to the base unasked", "rc=%d %r %r" % (code, out, err))
+code, out, err = join(delete=True)
+say(code == 2 and "db/migrations/0001_old.sql (deleted)" in out[0] and "the owner merges that pull request themselves" in out[0],
+    "(34k) a deleted migration: refused, and told it merges only by the owner's own hand", "rc=%d %r %r" % (code, out, err))
+code, out, err = join()
+say(code == 2 and "Only the owner approves a migration, in their own words in a session" in out[0] and "references/migration-approval.md" in out[0],
+    "(34l) the refusal says who may approve and names the reference, never a recipe to self-approve", "rc=%d %r" % (code, out))
+code, out, err = join(head_full=dict(FULL, approvedMigrations=[{"blob": "abc"}]))
+say(code == 1 and out[0].startswith("ERROR ") and "approvedMigrations[0]" in out[0] and "MERGE" not in "".join(out),
+    "(34m) approvals that cannot be read -> ERROR, never a MERGE line", "rc=%d %r %r" % (code, out, err))
+# With no --config the policy is the one on the base branch, read from GitHub: the checkout cannot stand in for it.
+def live(scenario_extra, mutate=None, base="develop", **kw):
+    clone, sha, config = joining(**kw)
+    if mutate:
+        mutate(clone, config)
+    path = os.path.join(work, "scenario.json")
+    json.dump(dict(sc(headRefOid=sha, baseRefName=base, refs=dict(REFS)), **(scenario_extra(config) if callable(scenario_extra) else scenario_extra)), open(path, "w"))
+    p = subprocess.run([sys.executable, helper, "7", sha], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+    return p.returncode, p.stdout.strip().split("\n"), p.stderr
+def switched_off(clone, config):   # the work tree and every local ref say there is no rule
+    put(clone, ".claude/ds-config.json", json.dumps({"baseBranch": "develop"}))
+    g(clone, "update-ref", "-d", "refs/remotes/origin/develop")
+code, out, err = live(lambda config: {"baseConfig": config}, switched_off)
+say(code == 2 and out[0].startswith("REFUSE #7 would carry onto develop"), "(34n) the live base policy is on while the checkout says nothing: still refused", "rc=%d %r %r" % (code, out, err))
+code, out, err = live(lambda config: {"baseConfig": config}, approved=True)
+say(code == 0 and out[0].startswith("MERGE"), "(34o) the live policy on and the migration approved on the branch -> MERGE", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({})
+say(code == 0 and out[0].startswith("MERGE"), "(34p) the base branch has no config on GitHub: not asked, nothing fetched", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({"policyFail": True})
+say(code == 1 and out[0].startswith("ERROR ") and "could not be read from GitHub" in out[0], "(34q) the base policy cannot be read -> ERROR, never a MERGE line", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({"policyFail": True}, base="master")
+say(code == 1 and out[0].startswith("ERROR "), "(34q2) the same into any base, production included: an unreadable policy is never a pass", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({"policyRaw": "{\"note\":\"HTTP 404\",\"release\":", "policyErr": "unexpected EOF\n", "policyExit": 1})
+say(code == 1 and out[0].startswith("ERROR "), "(34q3) a cut-short answer that merely contains the text HTTP 404 is not a 404", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({"policyRaw": "HTTP/2.0 200 OK\n\n{\"release\":", "policyExit": 0})
+say(code == 1 and out[0].startswith("ERROR ") and "not a JSON object" in out[0], "(34q4) a 200 whose body is cut short -> ERROR", "rc=%d %r %r" % (code, out, err))
+code, out, err = live({"baseConfig": "[1]"})
+say(code == 1 and out[0].startswith("ERROR ") and "not a JSON object" in out[0], "(34r) a base policy that is not an object -> ERROR", "rc=%d %r %r" % (code, out, err))
+# --config names the policy outright, and the check is handed the same one: a base commit with no config changes nothing
+clone, sha, config = joining()
+g(clone, "checkout", "-q", "--orphan", "empty"); g(clone, "rm", "-rqf", "."); put(clone, "readme", "x"); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "no config")
+g(clone, "checkout", "-q", "-b", "work3"); put(clone, "db/migrations/0042_add.sql", "create table x();"); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "work")
+g(clone, "push", "-q", "-f", "origin", "empty:develop", "work3"); sha3 = g(clone, "rev-parse", "HEAD")
+path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha3, refs=dict(REFS, develop=g(clone, "rev-parse", "empty"))), open(path, "w"))
+cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
+p = subprocess.run([sys.executable, helper, "7", sha3, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 2 and p.stdout.startswith("REFUSE #7 would carry onto develop"), "(34s) --config is the policy for the check too, whatever the base commit holds", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
+# origin is a fork whose develop already sits at the head: compared by name there would be nothing to ask
+clone, sha, config = joining()
+real = dict(REFS)
+g(clone, "push", "-q", "-f", "origin", "work:develop")
+path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha, refs=real), open(path, "w"))
+cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
+p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 2 and p.stdout.startswith("REFUSE #7 would carry onto develop"), "(34t) a same-named branch on origin that is not where GitHub has the base: the commit GitHub names is compared", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
+json.dump(sc(headRefOid=sha, refs=dict(real, develop="c" * 40)), open(path, "w"))
+p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 1 and p.stdout.startswith("ERROR ") and "could not be fetched" in p.stdout, "(34u) the commit GitHub names for the base is not in origin -> ERROR, never a MERGE line", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
+json.dump(sc(headRefOid=sha), open(path, "w"))
+p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 1 and p.stdout.startswith("ERROR "), "(34v) GitHub names no commit for the base -> ERROR", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
+# both sides changed the same migration, and the two edits merge cleanly into content neither holds
+BODY = "".join("line %d\n" % n for n in range(1, 21))
+clone, sha, config = joining()
+g(clone, "checkout", "-q", "develop"); put(clone, "db/migrations/0001_old.sql", BODY); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "an old migration")
+g(clone, "branch", "-f", "work2", "develop")
+put(clone, "db/migrations/0001_old.sql", BODY.replace("line 1\n", "LINE 1\n")); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "base edits the start"); g(clone, "push", "-q", "origin", "develop")
+g(clone, "checkout", "-q", "work2"); put(clone, "db/migrations/0001_old.sql", BODY.replace("line 20\n", "LINE 20\n")); g(clone, "add", "-A"); g(clone, "commit", "-q", "-m", "head edits the end"); g(clone, "push", "-q", "origin", "work2")
+sha = g(clone, "rev-parse", "HEAD")
+path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid=sha, refs=dict(REFS, develop=g(clone, "rev-parse", "develop"))), open(path, "w"))
+cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
+p = subprocess.run([sys.executable, helper, "7", sha, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 2 and "(changed-on-both)" in p.stdout and "merge develop into the branch first" in p.stdout,
+    "(34w) both sides changed the same migration and the edits merge cleanly -> REFUSE, told to refresh first", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
+clone, sha, config = joining()
+path = os.path.join(work, "scenario.json"); json.dump(sc(headRefOid="b" * 40, refs=dict(REFS)), open(path, "w"))
+cfgfile = os.path.join(work, "join-config.json"); json.dump(config, open(cfgfile, "w"))
+p = subprocess.run([sys.executable, helper, "7", "b" * 40, "--config", cfgfile], capture_output=True, text=True, cwd=clone, env=dict(os.environ, GH_SCENARIO=path))
+say(p.returncode == 1 and p.stdout.startswith("ERROR ") and "could not be fetched" in p.stdout and "MERGE" not in p.stdout,
+    "(34g) a head that cannot be fetched -> ERROR, never a MERGE line", "rc=%d %r %r" % (p.returncode, p.stdout, p.stderr))
 for label, args in (("no arguments", []), ("a short SHA", ["7", "abc123"]), ("a number that is not one", ["x", H]), ("a bad --repo", ["7", H, "--repo", "a b"])):
     p = subprocess.run([sys.executable, helper] + args, capture_output=True, text=True, env=dict(os.environ, GH_SCENARIO=os.path.join(work, "scenario.json")))
     say(p.returncode == 2 and p.stdout == "" and p.stderr.startswith("usage:"), "(28) usage: " + label, repr(p.stderr))

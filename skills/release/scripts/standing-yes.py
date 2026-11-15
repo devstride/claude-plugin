@@ -283,6 +283,32 @@ def approvals(full):
     return found
 
 
+def changed_migrations(base, head, is_migration, base_name, since=None):
+    """Yields each migration file that differs between `head` and its merge base with `base`, in
+    diff order and one at a time, so a caller that asks about the first problem asks about the same
+    one as ever: (status letter, path, mode at head, blob at head). The one reader of a migration
+    diff: the release's own check and migration-approval.py both use it."""
+    if since is None:   # `since`: compare with that commit or tree itself (`head` may then be a tree)
+        done = subprocess.run(["git", "merge-base", base, head], capture_output=True, text=True)
+        ask(done.returncode == 0, "no merge base between %s and the head" % base_name)
+        since = done.stdout.strip()
+    diff = subprocess.run(["git", "diff", "--name-status", "-z", "--no-renames", "--no-relative", "--no-ext-diff", "--ignore-submodules=none", since, head], capture_output=True)
+    ask(diff.returncode == 0, "the release diff cannot be read")
+    fields = diff.stdout.decode("utf-8", "surrogateescape").split("\0")
+    for status, path in zip(fields[0::2], fields[1::2]):
+        ask(not CONTROL.search(path), "the release changes a file whose name holds a control character (%r): no glob can be trusted to classify it" % path)
+        if not path or not is_migration(path):
+            continue
+        if status == "D":
+            yield status, path, "", ""
+            continue
+        # --full-tree: the path is from the repository root wherever this runs.
+        listed = subprocess.run(["git", "ls-tree", "-z", "--full-tree", head, "--", path], capture_output=True).stdout.decode("utf-8", "surrogateescape")
+        mode = listed.split(" ", 1)[0] if listed else ""
+        blob = subprocess.run(["git", "rev-parse", "%s:%s" % (head, path)], capture_output=True, text=True).stdout.strip()
+        yield status, path, mode, blob
+
+
 def migrations(head, production, full, live_base):
     """The release's migration files, each approved by content; Ask names the first that is not."""
     is_migration = glob_matcher(full["migrationGlobs"])
@@ -291,21 +317,10 @@ def migrations(head, production, full, live_base):
     ask(base, "origin/%s cannot be read: fetch it first" % production)
     ask(base == live_base, "origin/%s is at %s but the pull request's base is at %s: fetch it first"
         % (production, base[:12], (live_base or "unreadable")[:12]))
-    done = subprocess.run(["git", "merge-base", base, head], capture_output=True, text=True)
-    ask(done.returncode == 0, "no merge base between origin/%s and the head" % production)
-    diff = subprocess.run(["git", "diff", "--name-status", "-z", "--no-renames", "--no-relative", "--no-ext-diff", "--ignore-submodules=none", done.stdout.strip(), head], capture_output=True)
-    ask(diff.returncode == 0, "the release diff cannot be read")
-    fields = diff.stdout.decode("utf-8", "surrogateescape").split("\0")
     shipped = []
-    for status, path in zip(fields[0::2], fields[1::2]):
-        ask(not CONTROL.search(path), "the release changes a file whose name holds a control character (%r): no glob can be trusted to classify it" % path)
-        if not path or not is_migration(path):
-            continue
+    for status, path, mode, blob in changed_migrations(base, head, is_migration, "origin/%s" % production):
         ask(status != "D", "the release deletes the migration %s" % path)
-        listed = subprocess.run(["git", "ls-tree", "-z", head, "--", path], capture_output=True).stdout.decode("utf-8", "surrogateescape")
-        mode = listed.split(" ", 1)[0] if listed else ""
         ask(mode in ("100644", "100755"), "the migration %s is not a plain file (mode %s): a link or submodule never pins its content" % (path, mode or "unreadable"))
-        blob = subprocess.run(["git", "rev-parse", "%s:%s" % (head, path)], capture_output=True, text=True).stdout.strip()
         entry = approved.get(blob)
         ask(entry, "the migration %s (blob %s) has no owner approval for this content" % (path, blob[:12] or "unreadable"))
         shipped.append("%s (%s, approved %s)" % (path, entry["item"], entry["approved"]))

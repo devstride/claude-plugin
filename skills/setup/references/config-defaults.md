@@ -415,7 +415,10 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
 - **`release.fullRelease`** — the owner's written, dated standing yes for any release with those
   same gates green, at exactly its reviewed head: it merges without asking when every migration
   file it adds or changes (`migrationGlobs`) is approved by content (`approvedMigrations`, the
-  file's blob id, added only on the owner's own yes). A new or edited migration still asks.
+  file's blob id, added only on the owner's own yes). A new or edited migration still asks — before
+  the work joins the release train or the base branch, unless
+  `release.fullRelease.approveBeforeJoining` is `false`
+  (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/migration-approval.md`).
   Contract for all three: `${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`.
 
 ## Lists a repository fills in for itself

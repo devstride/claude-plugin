@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.65.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v3.66.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -1231,6 +1231,11 @@
                 "type": "string"
               },
               "description": "the migration files (branch-patterns.md globs); each one a release adds or changes needs an approval; absent or empty: the route asks"
+            },
+            "approveBeforeJoining": {
+              "type": "boolean",
+              "default": true,
+              "description": "ask the owner about a new or changed migration before the work joins the release train or the base branch, read from the base branch's committed config; the release's own check still asks about anything unapproved it carries; needs standingYes and migrationGlobs; contract: skills/release/references/migration-approval.md"
             },
             "approvedMigrations": {
               "type": "array",
