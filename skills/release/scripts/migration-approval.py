@@ -186,7 +186,12 @@ def check(base, head, already=(), rule_file=None):
     # What would LAND: the tree the merge of the head into the base produces, compared with the
     # base. Asking about the head alone misses content only the merge creates (both sides editing
     # one migration, a rename on one side meeting an edit on the other).
-    merged = subprocess.run(["git", "merge-tree", "--write-tree", base_sha, head_sha], capture_output=True, text=True)
+    # Worked out as GitHub would: this machine's own git settings (a merge driver, rename or
+    # attribute overrides, in any config file) must not change the answer.
+    quiet = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull, GIT_CONFIG_NOSYSTEM="1", GIT_ATTR_NOSYSTEM="1")
+    merged = subprocess.run(["git", "-c", "merge.default=text", "-c", "merge.renames=true", "-c", "merge.directoryRenames=false",
+                             "-c", "merge.renormalize=false", "-c", "core.attributesFile=%s" % os.devnull,
+                             "merge-tree", "--write-tree", base_sha, head_sha], capture_output=True, text=True, env=quiet)
     landing = merged.stdout.split("\n", 1)[0].strip()
     if merged.returncode == 1:
         raise Unanswerable("%s does not merge cleanly into %s: merge the base into the branch first" % (head, base))
@@ -200,7 +205,11 @@ def check(base, head, already=(), rule_file=None):
         raise Unanswerable(str(asked))
     unapproved = []
     for status, path, mode, blob in changed:
-        if tree_entry(head_sha, path) != (mode, blob):
+        held = tree_entry(head_sha, path)
+        plain = ("100644", "100755")
+        # The same bytes under either plain-file mode are what the branch holds (the base may have
+        # changed only the executable bit); anything else is content the merge made.
+        if held != (mode, blob) and not (held[1] == blob and held[0] in plain and mode in plain):
             # The merge makes content the branch itself does not hold, so nothing approved on the
             # branch covers it: refresh the branch from the base, then ask about the result.
             unapproved.append({"path": path, "blob": blob, "status": "changed-on-both"})

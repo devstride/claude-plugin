@@ -240,6 +240,17 @@ git(r, "checkout", "-q", "develop"); write(r, "src/template.sql", BODY.replace("
 rc, out, p = check(r)
 say(rc == 2 and out["unapproved"][0]["path"] == MIG and out["unapproved"][0]["status"] == "changed-on-both",
     "the branch moved a file into the migrations and the base edits the original: asked about too", p.stdout + p.stderr)
+# this machine's own git settings never change what would land
+r = repo(ON, {MIG: BODY}); write(r, MIG, BODY.replace("line 20\n", "LINE 20\n")); commit(r, "head edits the end"); approve(r, [entry(blob(r, MIG))])
+git(r, "checkout", "-q", "develop"); write(r, MIG, BODY.replace("line 1\n", "LINE 1\n")); commit(r, "base edits the start"); git(r, "checkout", "-q", "work")
+git(r, "config", "merge.default", "keep-base"); git(r, "config", "merge.keep-base.driver", "true"); git(r, "config", "merge.renames", "false")
+rc, out, p = check(r)
+say(rc == 2 and out["unapproved"][0]["status"] == "changed-on-both", "a local merge driver that would keep the base's file is not believed", p.stdout + p.stderr)
+# the base changed only the executable bit: the bytes the branch approved are what lands
+r = repo(ON, {MIG: BODY}); write(r, MIG, BODY.replace("line 20\n", "LINE 20\n")); commit(r, "head edits"); approve(r, [entry(blob(r, MIG))])
+git(r, "checkout", "-q", "develop"); os.chmod(os.path.join(r, MIG), 0o755); commit(r, "base makes it executable"); git(r, "checkout", "-q", "work")
+rc, out, p = check(r)
+say(rc == 0 and out["approved"] is True, "the base changed only the executable bit: the approved bytes still land", p.stdout + p.stderr)
 r = repo(ON, {MIG: "x\n"}); write(r, MIG, "head\n"); commit(r, "head")
 git(r, "checkout", "-q", "develop"); write(r, MIG, "base\n"); commit(r, "base"); git(r, "checkout", "-q", "work")
 rc, out, p = check(r)
