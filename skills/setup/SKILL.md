@@ -34,13 +34,13 @@ Optional argument: $ARGUMENTS
   typed yes, apply).
 - **`boards`** (or `boards personal`) — where each kind of item goes: A1, then
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/boards-mode.md` end to end.
-- **`connect`** — this machine's key-based DevStride connection, anywhere (no A1; its
-  proof, on a typed yes, sends one report):
+- **`connect`** — this machine's key-based DevStride connection, anywhere (its
+  proof, on a typed yes, sends two reports):
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/session-presence.md`, Connecting this machine.
 - **Nothing** — the full run: inspect, ask, write, scaffold, validate, plus §0 of the `agents`
   and `boards` modes; after A1, `connect`'s check, and its step on `NOT READY`.
 
-**Run each mode's prerequisites silently — A1 always, A2–A3 before A4.** A narrowed run reports
+**Run each mode's prerequisites silently — A1 (not `connect`), A2–A3 before A4.** A narrowed run reports
 fewer keys, never worse ones, and **stops after Phase B, writing nothing**; a full run writes. **`docs`,
 `ci`, `agents`, `boards` and `connect` are exceptions by design** — each writes exactly what its own questions answer.
 
