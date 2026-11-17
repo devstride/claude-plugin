@@ -15,7 +15,8 @@ Decided per session by `skills/build-item/scripts/presence_settings.py`, in this
 
 1. **Off.** `DEVSTRIDE_PRESENCE` set to `0` (or `false`, `off`, `no`) switches a whole machine off,
    a repository's own command included. `"presence": null` in `.claude/ds-config.json` switches a
-   repository off. Nothing runs and nothing is written. **These are the only two switches.**
+   repository off. Nothing runs and nothing is written. **These are the only two switches.** (A
+   config file that is there but cannot be read switches nothing on: off until it is mended.)
 2. **The repository's own command**, when its block names one:
    `"presence": { "command": "<the repository's own command>", "intervalMinutes"?: 5 }`. It always
    wins over the built-in reporter, and what a report means, where it is stored and when it expires
@@ -23,8 +24,9 @@ Decided per session by `skills/build-item/scripts/presence_settings.py`, in this
 3. **Otherwise the built-in reporter**, `hooks/presence-report.py`: no block, an empty block, a
    block with only `intervalMinutes`, a repository with no config file, or a session outside any
    repository. It sends each report to DevStride (the tool `report_session_presence`) with the API
-   key the machine's DevStride connection carries. **With no key nothing runs and nothing is
-   written**, and the first session start on such a machine says so in one line, once per machine.
+   key the machine's DevStride connection carries. **With no key nothing runs and no record is
+   written**: the first session start on such a machine says so in one line, once per machine (an
+   empty marker file beside the records remembers it), and nothing else is ever printed.
 
 `intervalMinutes` (an integer, 1 to 60) is the keeper's beat: default 5 with a command, 1 for the
 built-in reporter; one out of range reads as that default, and doctor warns.
@@ -41,7 +43,8 @@ session's own project entry (the repository's main checkout, then the checkout, 
 directory), then the user-level entry. An entry counts only when its address is a DevStride API
 host followed by `/mcp` and it holds literal values for the key, the secret and the organization
 id; the three and the address are taken together from that one entry. The file is read only when
-it is a regular file the user owns with no group or other permission bits.
+it is a regular file the user (or root) owns, not a link, at most 16 MiB, with no group or other
+permission bits.
 
 The key goes only to an `https://api(-<stage>).devstride.(com|dev)` host, redirects are refused,
 every call is bounded, and no hook prints or logs a key, puts one on a command line or adds one to
@@ -56,7 +59,7 @@ read). A project `.mcp.json` is not read, nor a `devstride` server kept under an
 (the folder's base name, never a path; none outside a repository), `item`, `pluginVersion`,
 `intervalMinutes`, `reportedAt`, `activeAt`, `busySince` and, on an end, `endReason`: the values of
 the variables below, cleaned (control characters become spaces; cut to 500 characters for the
-branch and checkout, 200 for the machine and label, 64 for the rest). **Never session text, a
+branch and checkout, 200 for the machine and label, 64 for the item, version and end reason). **Never session text, a
 prompt, a file's content, a path or the machine's address.** Reports go to the organization the key
 belongs to. Any member's agent reports its own sessions; who may read the fleet view is the
 organization's to grant, so a member's sessions are visible to its administrators.
@@ -76,7 +79,9 @@ DevStride connection key-based. It serves the agent's DevStride tools and live s
 1. Run `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" check` and read its first line.
 2. `AGENT CONNECTION: READY (…)` → say where the key was found, in those fixed words only, and
    stop, offering the proof (step 4).
-3. `AGENT CONNECTION: NOT READY (…)` → say in plain words that this machine is connected by browser
+3. `AGENT CONNECTION: NOT READY (Claude Code's configuration file cannot be read safely: …)` →
+   the key may already be there: give that file's fix (`chmod 600` for `mode too open`; a link
+   replaced by the file itself), then run `check` again. Any other `NOT READY (…)` → say in plain words that this machine is connected by browser
    sign-in only (or not at all), and that such a connection is not ready for agents. Then give the
    one step, for the person to do **in their own terminal**: create a key in DevStride under
    Profile Settings, API Keys (a role that cannot is told to ask an administrator for the
@@ -93,8 +98,7 @@ DevStride connection key-based. It serves the agent's DevStride tools and live s
    then `claude mcp logout plugin:devstride:devstride`, and restart Claude Code. The command writes
    the key into Claude Code's own user configuration, the single place the agent's tools and the
    reporter both read it from. The sign-out matters: two live DevStride connections expose the
-   same tool names, and a call can reach the wrong organization. A configuration file the check
-   calls unsafe is fixed with `chmod 600` on that file.
+   same tool names, and a call can reach the wrong organization.
 4. When the person says it is done, run `check` again. **Only after a typed yes**, run
    `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" prove` (it sends a start and an end for
    a throwaway session) and report its one `PROOF:` line.
@@ -126,8 +130,9 @@ newer report is dropped, so a late `end` never follows a resumed session's `star
 one detached process per session, checks every 10 seconds, keeps a long turn visible and exits
 once the session ends, its record goes, reporting is switched off, the connection loses its key or
 the session loads another plugin version, whose next hook event starts its own. A session that
-moves to a place where reporting is off keeps reporting under the one it came from; one outside a
-repository that walks into one beats from it.
+moves to a place where reporting is off keeps reporting under the one it came from, and so does a
+session its repository's command reports when it moves to a place that names no command (the
+built-in reporter never takes it over); one outside a repository that walks into one beats from it.
 
 ## What a repository's command receives
 

@@ -7,11 +7,12 @@ whose repository names no presence command of its own (skills/setup/references/s
                  `report_session_presence`, one attempt, 15 seconds at most. Prints nothing.
                  Exit 0: sent (the answers recorded, ended, stale and not-owner are all ordinary),
                  or nothing to send (no session id, an unknown event). Exit 3: refused for now (the
-                 server has no such tool, HTTP 401 or 403, no usable key or address): the hook waits
-                 30 minutes. Exit 4: a failure that may pass (unreachable, a timeout, HTTP 429 or
-                 5xx, a redirect, any other error answer): the hook waits 2 minutes.
+                 server has no such tool, HTTP 401 or 403, an address that is not DevStride's): the
+                 hook waits 30 minutes. Exit 4: a failure that may pass (unreachable, a timeout,
+                 HTTP 429 or 5xx, a redirect, any other error answer, no key found just now, or
+                 anything unexpected): the hook waits 2 minutes.
   check          no network, never a value. Line 1: `AGENT CONNECTION: READY (key from …)` or
-                 `AGENT CONNECTION: NOT READY (…)`, the latter followed by `Fix: …`. Then
+                 `AGENT CONNECTION: NOT READY (…)`, the latter followed by a `Fix: …` line. Then
                  `PRESENCE: ON (built-in reporter | repository command)` or `PRESENCE: OFF (<reason>)`,
                  then `INTERVAL: <n> minute(s)` (`INTERVAL: none` when off). Always exit 0.
   prove          sends a start then an end for a throwaway session and prints one `PROOF: …` line.
@@ -98,8 +99,13 @@ def body_from(environ):
 
 def places(environ):
     """(the repository root or None, the project keys to look under) for this process."""
-    top = presence.repo_top(environ.get("PRESENCE_CHECKOUT") or os.getcwd())
-    return top, connection.project_places(top, os.getcwd())
+    try:
+        here = os.getcwd()
+    except OSError:
+        here = None  # the directory is gone
+    start = environ.get("PRESENCE_CHECKOUT") or here
+    top = presence.repo_top(start) if start else None
+    return top, connection.project_places(top, here)
 
 
 def credentials(environ):
@@ -124,8 +130,10 @@ def report(environ):
         return 0
     try:
         creds = credentials(environ)
+    except connection.BadAddress:
+        return EXIT_REFUSED  # an address that is not DevStride's: nothing to try again soon
     except connection.Problem:
-        return EXIT_REFUSED  # no usable key or address: nothing to try again soon
+        return EXIT_TRANSIENT  # no key just now (a file being rewritten): the keeper leaves if it stays so
     return deliver(body, creds)
 
 
@@ -135,6 +143,9 @@ def check(environ):
     word = connection.readiness(environ, path, where)
     if word in SOURCES:
         print("AGENT CONNECTION: READY (%s)" % SOURCES[word])
+    elif word == "bad-address":
+        print("AGENT CONNECTION: NOT READY (DEVSTRIDE_BASE_URL is not a DevStride API address)")
+        print("Fix: unset DEVSTRIDE_BASE_URL, or set it to https://api.devstride.com")
     else:
         unsafe = connection.unsafe_reason(environ, path, where) if word == "unsafe-config" else None
         if unsafe is not None:
@@ -161,7 +172,8 @@ def prove(environ):
     except connection.Problem as error:
         print("PROOF: FAILED (%s)" % connection.scrub(error.text))
         return 1
-    hidden = (creds["DEVSTRIDE_API_KEY"], creds["DEVSTRIDE_API_SECRET"], creds["DEVSTRIDE_ORG_ID"])
+    hidden = [creds[name] for name in connection.CREDENTIAL_NAMES[:4] if creds.get(name)]
+    hidden += [value.upper() for value in hidden] + [value.lower() for value in hidden]
     session = "setup-check-" + secrets.token_hex(4)
     base = {"sessionId": session, "machine": clean(claim_record.machine_name(environ), NAME) or "unknown"}
     try:
@@ -197,7 +209,7 @@ def main(argv):
         print("usage: presence-report.py [check|prove]", file=sys.stderr)
         return 2
     except Exception:
-        return 0 if not argv else 1  # a report never fails a session; check and prove say nothing false
+        return EXIT_TRANSIENT if not argv else 1  # nothing was sent: never recorded as a report that went
 
 
 if __name__ == "__main__":

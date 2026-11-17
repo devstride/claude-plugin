@@ -29,25 +29,26 @@ Optional argument: $ARGUMENTS
   With `release.clearance` set, offer the fifth mechanic too, **release ordering** (§E). **Draft-gate diffs accepted while the three
   `review.*` CI-ordering booleans are `false` → propose flipping them `true` in the same
   change.** Run Phase G's CI checks; offer `/devstride:ci-audit` first.
-- **`agents`** — Active Agents, the only run that writes to DevStride: A1, then
+- **`agents`** — Active Agents, which writes to DevStride: A1, then
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/agents-mode.md` end to end (inventory, plan, a
   typed yes, apply).
 - **`boards`** (or `boards personal`) — where each kind of item goes: A1, then
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/boards-mode.md` end to end.
-- **`connect`** — this machine's key-based DevStride connection:
+- **`connect`** — this machine's key-based DevStride connection (its proof, after a typed yes,
+  sends DevStride one throwaway report):
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/session-presence.md`, Connecting this machine.
 - **Nothing** — the full run: inspect, ask, write, scaffold, validate, plus §0 of the `agents`
   and `boards` modes; after A1, `connect`'s check, and its step on `NOT READY`.
 
 **Run each mode's prerequisites silently — A1 always, A2–A3 before A4.** A narrowed run reports
 fewer keys, never worse ones, and **stops after Phase B, writing nothing**; a full run writes. **`docs`,
-`ci`, `agents` and `boards` are the exceptions by design** — each writes exactly what its own questions answer.
+`ci`, `agents`, `boards` and `connect` are exceptions by design** — each writes exactly what its own questions answer.
 
-**The write boundary — the whole of it**: `.claude/ds-config.json`; in E2 only, the scaffolded
+**The whole write boundary**: `.claude/ds-config.json`; in E2 only, the scaffolded
 skills (never overwriting); in `ci` mode only, the pull-request workflows under
 `ci.workflowGlobs` and the release-tower pair (each change a diff, applied on an explicit yes);
 in `boards personal` only, that person's rules file.
-Nothing else, ever — no git
+Nothing else — no git
 mutation, no installs, no DevStride **write** tool outside `agents` mode. **Phases A–D are strictly read-only**:
 `git status --porcelain` stays byte-identical until the write.
 
@@ -77,9 +78,8 @@ Every row carries its evidence.
 
 ### A1. Repository and remote
 
-Confirm a git work tree (stop if not). `git remote get-url origin` — `origin` **by name** (the
-delivery skills hardcode it); other remotes only → say which, mark every branch key `ambiguous`.
-Record the forge host — **the delivery half assumes GitHub and GitHub Actions**; say plainly
+Confirm a git work tree (stop if not). `git remote get-url origin` — `origin` **by name**; other remotes only → say which, mark every branch key `ambiguous`.
+Record the forge host — **the delivery half assumes GitHub and GitHub Actions**; say
 when it is anything else.
 
 **A config on a stale branch describes a repository that no longer exists.** When

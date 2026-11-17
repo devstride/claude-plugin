@@ -234,20 +234,21 @@ own server if you want the smaller catalog.
 Once a machine is connected with a key, every Claude Code session on it shows on your
 organization's Agent Fleet as it happens, with nothing to configure: it appears when it starts,
 reads Working or Waiting on a person as it goes, and reads Stopped when it ends or its machine goes
-quiet. It works inside a git repository or not, and whether or not the session runs a DevStride
-skill.
+quiet. It works wherever the plugin is loaded, inside a git repository or not, and whether or not
+the session runs a DevStride skill.
 
 - **What is sent** is a short fixed list: the session's id and name, the machine's name, the
   branch, the checkout folder's base name, an item number the branch names, the plugin version,
-  the state, and timestamps. **Never** session text, a prompt, a file's content, a path or the
+  the event (start, beat or end) with its state, the report interval, timestamps, and why a
+  session ended. **Never** session text, a prompt, a file's content, a path or the
   machine's address.
 - **Who sees it.** Any member's sessions are reported; the Fleet is readable by the people your
   organization lets read it (its Owner and Admins by default), so a member's sessions are visible
   to their administrators.
 - **Turning it off.** `"presence": null` in a repository's `.claude/ds-config.json` switches that
   repository off; `DEVSTRIDE_PRESENCE=0` in the environment switches a whole machine off.
-- **It never gets in the way.** With no key, an older DevStride or no network it stays silent and
-  never slows a turn. A repository that names its own `presence.command` keeps using that instead.
+- **It never gets in the way.** With an older DevStride or no network it stays silent and never
+  slows a turn; with no key it reports nothing and says so once, at one session start. A repository that names its own `presence.command` keeps using that instead.
 
 The contract is `skills/setup/references/session-presence.md`.
 

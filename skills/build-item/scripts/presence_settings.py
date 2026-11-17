@@ -10,7 +10,9 @@ nothing written. The contract: skills/setup/references/session-presence.md.
 
   1. DEVSTRIDE_PRESENCE set to 0, false, off or no (any case)  -> off, `machine-off`: nothing runs,
      a repository's own command included.
-  2. `presence` present and null in <top>/.claude/ds-config.json -> off, `repo-null`.
+  2. `presence` present and null in <top>/.claude/ds-config.json -> off, `repo-null`; a config
+     file that is there but cannot be read as a JSON object   -> off, `config-unreadable` (a
+     broken file must never switch on what the repository switched off).
   3. a block with a `command` key: a non-blank string         -> the repository's command, `command`
      (interval default 5); anything else                      -> off, `command-blank`.
   4. otherwise (no repository, no file, no block, an empty block, a block with only
@@ -21,6 +23,8 @@ nothing written. The contract: skills/setup/references/session-presence.md.
 `intervalMinutes` applies to both modes when it is an integer from 1 to 60; anything else reads as
 the mode's default. `ready` is a function with no arguments, or None to skip that check.
 """
+import os
+
 OFF_WORDS = ("0", "false", "off", "no")
 COMMAND_INTERVAL = 5
 BUILTIN_INTERVAL = 1
@@ -36,7 +40,10 @@ def interval_of(value, default):
 def effective(top, read_json, environ, ready=None):
     if (environ.get(SWITCH) or "").strip().lower() in OFF_WORDS:
         return None, "machine-off"
-    config = read_json(top + "/.claude/ds-config.json") if isinstance(top, str) and top else None
+    path = os.path.join(top, ".claude", "ds-config.json") if isinstance(top, str) and top else None
+    config = read_json(path) if path else None
+    if path and not isinstance(config, dict) and os.path.lexists(path):
+        return None, "config-unreadable"
     block = None
     if isinstance(config, dict) and "presence" in config:
         block = config["presence"]

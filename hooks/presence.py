@@ -78,7 +78,8 @@ The contract: skills/setup/references/session-presence.md.
            carries it, and the keeper sends it once those 30 seconds pass (both compare against the
            last state REPORTED, so a held change is not lost).
            The record follows the session, not the checkout: a session that moves to a place where
-           reporting is off keeps reporting under the one it came from, and no event is ever
+           reporting is off, or from a repository whose own command reports it to a place that names
+           no command, keeps reporting under the one it came from, and no event is ever
            dropped for that reason for a session that has a record. The session's process
            (CLAUDE_PID, else the parent of the hook's shell) and its start time are re-read on every
            start and prompt.
@@ -171,7 +172,6 @@ SCRIPT = os.path.realpath(__file__)
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(SCRIPT))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills/build-item/scripts"))
 import claim_record  # noqa: E402  the one machine naming every claim uses
-import devstride_connection  # noqa: E402  the one place the machine's DevStride key is found
 import presence_settings  # noqa: E402  the one decision: off, the repository's command, or the built-in reporter
 
 REPORTER = os.path.join(os.path.dirname(SCRIPT), "presence-report.py")
@@ -324,11 +324,19 @@ def repo_top(start):
         here = parent
 
 
+_READINESS = []  # the last readiness word this process resolved, for the one-time line's marker
+
+
 def connection_ready(top, place):
-    """Whether the machine's DevStride connection carries a key, for a session in this place."""
+    """Whether the machine's DevStride connection carries a key, for a session in this place. The
+    resolver is imported only here: a repository that names a command, or a switched-off one,
+    never loads it."""
     try:
-        return devstride_connection.ready(os.environ, devstride_connection.config_file(os.environ),
-                                          devstride_connection.project_places(top, place))
+        import devstride_connection  # the one place the machine's DevStride key is found
+        word = devstride_connection.readiness(os.environ, devstride_connection.config_file(os.environ),
+                                              devstride_connection.project_places(top, place))
+        _READINESS[:] = [word]
+        return word in devstride_connection.READY_WORDS
     except Exception:
         return False
 
@@ -354,11 +362,13 @@ def marker_path():
 
 def no_key_notice(event, reason):
     """The only line this hook prints: at a SessionStart on a machine whose connection carries no
-    key, once (an owner-only marker records it). The marker goes the next time a key resolves, so a
-    machine that later loses its key is told once more."""
+    key, once (an owner-only marker records it). The marker goes the next time a key resolves for
+    the whole machine (the environment, or the user-level entry), so a machine that later loses its
+    key is told once more; a key that only one project's entry carries leaves the marker, so the
+    line is not repeated each time a session starts somewhere else."""
     try:
         if reason == "builtin":
-            if os.path.lexists(marker_path()):
+            if _READINESS[-1:] in (["environment"], ["connection-user"]) and os.path.lexists(marker_path()):
                 os.unlink(marker_path())
         elif reason == "no-key" and event == "SessionStart":
             private_dir(cache_dir())
@@ -748,8 +758,8 @@ def report_job(sid, record, event, state, at):
         env["CLAUDE_PID"] = str(record["owner"])
     if conf["mode"] == "command":
         return "command", conf["command"], top, env
-    cwd = top or place
-    return "builtin", [sys.executable, REPORTER], cwd if cwd and os.path.isdir(cwd) else None, env
+    cwd = next((d for d in (place, top) if d and os.path.isdir(d)), None)  # where the key was looked for
+    return "builtin", [sys.executable, REPORTER], cwd, env
 
 
 def quiet_until(record):
@@ -832,7 +842,7 @@ def hook():
         return  # the session carries on after a compaction
     cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else os.getcwd()
     top = repo_top(cwd)
-    place = top or os.path.realpath(cwd)  # outside a repository the session's directory is its place
+    place = os.path.realpath(cwd)  # the directory the session works in, inside a repository or not
     here, reason = decide(top, place)
     no_key_notice(event, reason)
     peek = load(sid)
@@ -853,10 +863,12 @@ def hook():
     with state_lock(sid):
         now = time.time()
         record = load(sid)
-        if not here:
-            if not (record and settings(record.get("top"), record.get("dir"))):
-                return
-            # moved to a place where reporting is off: keep reporting under the one it came from
+        was = settings(record.get("top"), record.get("dir")) if record else None
+        if not here and not was:
+            return
+        if not here or (here["mode"] == "builtin" and was and was["mode"] == "command"):
+            # moved to a place where reporting is off, or away from a repository whose own command
+            # reports this session to a place that names none: keep reporting under the one it came from
             top, place = record.get("top"), record.get("dir") or record.get("top")
         fresh = record is None
         previous = None if fresh else record.get("state")

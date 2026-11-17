@@ -8,22 +8,28 @@ All read-only. Never print a credential or a holder; say only whether it is pres
 ## Ready for agents (§3)
 
 Run `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" check` (no network, never a value)
-and report its first two lines.
+and report its `AGENT CONNECTION:` line and its `PRESENCE:` line (a `Fix:` line sits between them
+when the connection is not ready).
 
 - **`AGENT CONNECTION: READY (…)`** → PASS, naming where the key was found by those fixed words
   only (the environment; the devstride connection, this project; the devstride connection, user
   level).
 - **`AGENT CONNECTION: NOT READY (no API key: …)`** → FAIL: "not ready for agents: this machine's
   DevStride connection carries no API key (browser sign-in only)". The skills still run under a
-  browser sign-in, but no session shows on the fleet view and nothing a script does can reach
-  DevStride. Fix: `/devstride:setup connect`. A member whose role cannot create an API key asks an
+  browser sign-in, but the built-in reporter shows no session on the fleet view, and a script
+  reaches DevStride only where something else supplies a key (a repository's own presence
+  command, `release.clearance.credentialsFile`). Fix: `/devstride:setup connect`. A member whose role cannot create an API key asks an
   administrator for that permission; nothing else gives the machine a key.
 - **`AGENT CONNECTION: NOT READY (Claude Code's configuration file cannot be read safely: …)`** →
   FAIL. Fix: `chmod 600` on Claude Code's configuration file (`$CLAUDE_CONFIG_DIR/.claude.json`,
-  else `~/.claude.json`); a link is replaced by the file itself.
-- **Line 2** (`PRESENCE: ON (…)` or `PRESENCE: OFF (<reason>)`) is reported as it reads: `repo-null`
+  else `~/.claude.json`) for `mode too open`; a link is replaced by the file itself; `not yours`
+  and `too large` (over 16 MiB) are the person's to put right. Never the key-creation step: the
+  key may already be there.
+- **The `PRESENCE:` line** (`ON (…)` or `OFF (<reason>)`) is reported as it reads: `repo-null`
   and `machine-off` are someone's choice, never a gap; `command-blank` is a WARN (a `presence`
-  block whose `command` is blank runs nothing).
+  block whose `command` is blank runs nothing), and so is `config-unreadable` (the config file
+  cannot be read, so nothing is reported from this repository until it is mended).
+- **`AGENT CONNECTION: NOT READY (DEVSTRIDE_BASE_URL …)`** → FAIL, with the `Fix:` line it prints.
 - **Never print the stored entry**: `claude mcp get` shows a key-based entry's header values, so
   doctor never runs it and never advises it for one. A `devstride` server kept under another name,
   or only in a project `.mcp.json`, is not found: the fix is the same step.

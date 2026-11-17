@@ -21,15 +21,16 @@ call is bounded in time, and no secret is ever printed, logged, put in an error,
 command line or added to a child's environment. Nothing here writes a file.
 
 DEVSTRIDE_PLUGIN_TEST_URL (http://127.0.0.1:<port>) exists for the tests only: it replaces the
-base address, disables proxies, and makes an entry whose url is that address plus /mcp acceptable.
+base address whatever source the key came from (a real entry's key then goes to that loopback
+address), disables proxies, and makes an entry whose url is that address plus /mcp acceptable.
+
+The network modules are imported only by `call_tool`: the presence hook imports this file on
+every hook event to ask whether a key exists, and must not pay for them.
 """
-import http.client
 import json
 import os
 import re
 import stat
-import urllib.error
-import urllib.request
 
 BASE_URL_RULE = re.compile(r"^https://api(-[a-z0-9-]+)?\.devstride\.(com|dev)\Z")
 CREDENTIAL_NAMES = ("DEVSTRIDE_API_KEY", "DEVSTRIDE_API_SECRET", "DEVSTRIDE_ORG_ID", "DEVSTRIDE_ORG_SLUG", "DEVSTRIDE_BASE_URL")
@@ -98,11 +99,6 @@ class Unavailable(Problem):
         self.detail, self.code, self.unreachable = detail, code, unreachable
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args, **kwargs):
-        return None
-
-
 def scrub(text, secrets=()):
     """The first line of `text`, with every secret replaced, cut to 300 characters."""
     first = (text or "").strip().splitlines()[0] if (text or "").strip() else ""
@@ -126,18 +122,30 @@ def main_checkout(top):
         pointer = os.path.join(top, ".git")
         if os.path.isdir(pointer):
             return top
-        with open(pointer) as handle:
-            line = handle.read(4096).strip()
+        line = small_text(pointer)
         if not line.startswith("gitdir:"):
             return None
         gitdir = line[7:].strip()
         gitdir = gitdir if os.path.isabs(gitdir) else os.path.join(top, gitdir)
-        with open(os.path.join(gitdir, "commondir")) as handle:
-            common = handle.read(4096).strip()
+        common = small_text(os.path.join(gitdir, "commondir"))
+        if not common:
+            return None
         common = os.path.realpath(common if os.path.isabs(common) else os.path.join(gitdir, common))
         return os.path.dirname(common) if os.path.basename(common) == ".git" else None
     except (OSError, ValueError):
         return None
+
+
+def small_text(path, limit=4096):
+    """The first bytes of a regular file, stripped; "" for anything else. Opened without blocking,
+    so a pipe or a device in that place can never hang a hook."""
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            return ""
+        return os.read(fd, limit).decode("utf-8", "replace").strip()
+    finally:
+        os.close(fd)
 
 
 def project_places(top, directory):
@@ -249,7 +257,7 @@ def servers(config_path):
     found = ({}, None)
     try:
         data = json.loads(raw) if raw is not None else None
-    except ValueError:
+    except (ValueError, RecursionError):
         data = None
     if isinstance(data, dict):
         projects = data.get("projects") if isinstance(data.get("projects"), dict) else {}
@@ -260,7 +268,13 @@ def servers(config_path):
                 own[place] = listed[SERVER_NAME]
         listed = data.get("mcpServers")
         found = (own, listed.get(SERVER_NAME) if isinstance(listed, dict) else None)
-    _CONFIG[config_path] = (identity, found)
+    try:
+        after = os.lstat(config_path)
+        same = identity == (after.st_ino, after.st_size, after.st_mtime_ns, after.st_mode, after.st_uid)
+    except OSError:
+        same = False
+    if same:  # never remember what was read from a file that changed while it was read
+        _CONFIG[config_path] = (identity, found)
     return found
 
 
@@ -335,13 +349,14 @@ def credentials(environ, config_path, places, files=()):
 def readiness(environ, config_path, places, files=()):
     """One fixed word, never a value: `environment`, `file`, `connection-project` or
     `connection-user` (where a complete key was found), else `unsafe-config` (Claude Code's
-    configuration file cannot be read safely) or `no-key`."""
+    configuration file cannot be read safely), `bad-address` (a key, but an address that is not a
+    DevStride API host) or `no-key`."""
     try:
         return credentials(environ, config_path, places, files)["source"]
     except Missing as error:
         return "unsafe-config" if getattr(error, "unsafe", None) is not None else "no-key"
     except BadAddress:
-        return "environment" if all(environ.get(name) for name in REQUIRED) else "no-key"
+        return "bad-address"
     except Problem:
         return "no-key"
 
@@ -412,6 +427,14 @@ def call_tool(name, arguments, creds, timeout=30, attempts=2):
     if creds.get("DEVSTRIDE_ORG_SLUG"):
         headers["X-DevStride-Organization-Slug"] = creds["DEVSTRIDE_ORG_SLUG"]
     body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": name, "arguments": arguments}}).encode()
+    import http.client
+    import urllib.error
+    import urllib.request
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *args, **kwargs):
+            return None
+
     handlers = [NoRedirect()] + ([urllib.request.ProxyHandler({})] if creds.get("test") else [])
     opener = urllib.request.build_opener(*handlers)
     reply, answer_headers = None, None

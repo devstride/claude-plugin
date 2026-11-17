@@ -7,8 +7,8 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; RP="$ROOT/hooks/presence-report.py"; FX="$ROOT/scripts/tests/fixtures/clearance"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
-WORK="$(mktemp -d)"; PIDS=""
-trap 'for p in $PIDS; do kill "$p" 2>/dev/null; done; chmod -R u+w "$WORK" 2>/dev/null; rm -rf "$WORK"' EXIT
+WORK="$(mktemp -d)"   # every server's pid goes in a file: `server` runs in a subshell, which a variable would not leave
+trap 'for p in $(cat "$WORK/pids" 2>/dev/null); do kill "$p" 2>/dev/null; done; chmod -R u+w "$WORK" 2>/dev/null; rm -rf "$WORK"' EXIT
 export HOME="$WORK/home" XDG_CACHE_HOME="$WORK/cache" CLAUDE_CONFIG_DIR="$WORK/claude"; mkdir -p "$HOME" "$CLAUDE_CONFIG_DIR" "$WORK/dir"
 export PYTHONDONTWRITEBYTECODE=1   # a case imports the plugin's modules: never leave compiled files in the tree
 export GIT_CONFIG_GLOBAL="$WORK/gitconfig" GIT_CONFIG_NOSYSTEM=1; printf '[user]\n\tname = t\n\temail = t@t\n' > "$GIT_CONFIG_GLOBAL"
@@ -22,7 +22,7 @@ cd "$WORK/dir" || exit 1
 server() { # server NAME — start a fake server expecting the throwaway key; prints its state directory
   local d="$WORK/ds-$1" n=0; mkdir -p "$d"
   FAKE_DS_KEY="$KEY" FAKE_DS_SECRET="$SECRET" FAKE_DS_ORG="$ORG" python3 "$FX/fake-devstride.py" "$d" >/dev/null 2>&1 &
-  PIDS="$PIDS $!"; until [ -s "$d/port" ] || [ $n -gt 100 ]; do sleep 0.05; n=$((n + 1)); done; printf '%s' "$d"
+  echo "$!" >> "$WORK/pids"; until [ -s "$d/port" ] || [ $n -gt 100 ]; do sleep 0.05; n=$((n + 1)); done; printf '%s' "$d"
 }
 DS="$(server main)"; URL="http://127.0.0.1:$(cat "$DS/port")"
 key() { export DEVSTRIDE_API_KEY="$KEY" DEVSTRIDE_API_SECRET="$SECRET" DEVSTRIDE_ORG_ID="$ORG"; }
@@ -157,18 +157,29 @@ if [ "$A" = "AGENT CONNECTION: READY (key from the environment)|PRESENCE: ON (bu
 else bad "(5) a=$A b=$B c=$C c2=$C2 d=$D d2=$D2 e1=$E1 e2=$E2 e3=$E3"; fi
 noconfig
 
+# (5a) a key with an address that is not DevStride's is NOT READY, with its own fix; a report from a
+#      directory that is gone, or with no key, is recorded as not sent (exit 4), never as sent
+key; A="$(DEVSTRIDE_BASE_URL=https://evil.example chk | cut -d'|' -f1-2)"
+mkdir -p "$WORK/gone"; OUT="$(cd "$WORK/gone" && rmdir "$WORK/gone" && DEVSTRIDE_PLUGIN_TEST_URL="$URL" PRESENCE_EVENT=beat PRESENCE_SESSION_ID=r5 PRESENCE_STATE=working PRESENCE_MACHINE=m9 python3 "$RP" 2>&1)"; B="$?:$OUT"
+nokey; OUT="$(DEVSTRIDE_PLUGIN_TEST_URL="$URL" PRESENCE_EVENT=beat PRESENCE_SESSION_ID=r5 PRESENCE_MACHINE=m9 python3 "$RP" 2>&1)"; C="$?:$OUT"
+if [ "$A" = "AGENT CONNECTION: NOT READY (DEVSTRIDE_BASE_URL is not a DevStride API address)|Fix: unset DEVSTRIDE_BASE_URL, or set it to https://api.devstride.com" ] \
+   && { [ "$B" = "0:" ] || [ "$B" = "4:" ]; } && [ "$C" = "4:" ]; then
+  ok "(5a) a key with a foreign address → NOT READY naming the address; no key at report time → exit 4, silent; a deleted directory never crashes the reporter"
+else bad "(5a) a=$A b=$B c=$C"; fi
+
 # (5b) check's presence line: the repository command, the two switches, a blank command, the block's interval
 key
 printf '{"presence":{"command":"true","intervalMinutes":7}}' > "$REPO/.claude/ds-config.json"; A="$(chk "$REPO" | cut -d'|' -f2-3)"
 printf '{"presence":null}' > "$REPO/.claude/ds-config.json"; B="$(chk "$REPO" | cut -d'|' -f2-3)"
 printf '{"presence":{"command":""}}' > "$REPO/.claude/ds-config.json"; C="$(chk "$REPO" | cut -d'|' -f2-3)"
 printf '{"presence":{"intervalMinutes":4}}' > "$REPO/.claude/ds-config.json"; D="$(chk "$REPO" | cut -d'|' -f2-3)"
-E="$(DEVSTRIDE_PRESENCE=off chk "$REPO" | cut -d'|' -f2-3)"; rm -f "$REPO/.claude/ds-config.json"
+E="$(DEVSTRIDE_PRESENCE=off chk "$REPO" | cut -d'|' -f2-3)"
+printf '{"presence": null,}' > "$REPO/.claude/ds-config.json"; F="$(chk "$REPO" | cut -d'|' -f2-3)"; rm -f "$REPO/.claude/ds-config.json"
 if [ "$A" = "PRESENCE: ON (repository command)|INTERVAL: 7 minute(s)" ] && [ "$B" = "PRESENCE: OFF (repo-null)|INTERVAL: none" ] \
    && [ "$C" = "PRESENCE: OFF (command-blank)|INTERVAL: none" ] && [ "$D" = "PRESENCE: ON (built-in reporter)|INTERVAL: 4 minute(s)" ] \
-   && [ "$E" = "PRESENCE: OFF (machine-off)|INTERVAL: none" ]; then
-  ok "(5b) check: a repository command, presence null, a blank command, a block's own interval, DEVSTRIDE_PRESENCE off"
-else bad "(5b) a=$A b=$B c=$C d=$D e=$E"; fi
+   && [ "$E" = "PRESENCE: OFF (machine-off)|INTERVAL: none" ] && [ "$F" = "PRESENCE: OFF (config-unreadable)|INTERVAL: none" ]; then
+  ok "(5b) check: a repository command, presence null, a blank command, a block's own interval, DEVSTRIDE_PRESENCE off; a config file that cannot be read switches nothing on"
+else bad "(5b) a=$A b=$B c=$C d=$D e=$E f=$F"; fi
 
 # (5c) a configuration file another user owns is refused (needs root to create one)
 if [ "$(id -u)" = 0 ]; then

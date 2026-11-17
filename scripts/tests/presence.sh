@@ -36,7 +36,7 @@ REPORT='python3 -c "import json,os; print(json.dumps({k:v for k,v in os.environ.
 mkrepo() { # mkrepo NAME [CONFIG-JSON] [BRANCH]
   local d="$WORK/$1"; mkdir -p "$d/.claude"; git -C "$d" init -q -b "${3:-main}" 2>/dev/null
   git -C "$d" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
-  printf '%s' "${2:-{\}}" > "$d/.claude/ds-config.json"; printf '%s' "$d"
+  local empty='{}'; printf '%s' "${2:-$empty}" > "$d/.claude/ds-config.json"; printf '%s' "$d"
 }
 config() { python3 -c 'import json,sys; print(json.dumps({"presence":{"command":sys.argv[1],"intervalMinutes":int(sys.argv[2])}}))' "$REPORT" "${1:-5}"; }
 fire() { # fire EVENT SESSION CWD [REASON-OR-SOURCE] [EXTRA-JSON] — run the hook as Claude Code does; prints its
@@ -974,6 +974,12 @@ line_case() { # the cases below, in a cache of their own
   [ -z "$keyed" ] && [ ! -e "$mark" ] || { echo "with a key: $keyed"; return 1; }
   nokey; lost="$(fire SessionStart b5g "$BP" 2>&1)"; once="$(fire SessionStart b5h "$BP" 2>&1)"
   [ "$lost" = "$NO_KEY_LINE" ] && [ -z "$once" ] || { echo "lost=$lost once=$once"; return 1; }
+  # a key only one project's entry carries is not the machine's: starting there, then elsewhere, says nothing more
+  claudejson "{'projects': {'$(real "$BP")': {'mcpServers': {'devstride': E('k-proj')}}}}"
+  local inproj elsewhere
+  inproj="$(fire SessionStart b5i "$BP" 2>&1)"; pkill -f "presence.py keeper b5i\$" 2>/dev/null
+  elsewhere="$(fire SessionStart b5j "$WORK/out" 2>&1)"; noconfig
+  [ -z "$inproj" ] && [ -z "$elsewhere" ] && [ -e "$mark" ] || { echo "project key: in=$inproj elsewhere=$elsewhere"; return 1; }
 }
 if WHY="$(line_case)"; then ok "(B5) the no-key line: never with DEVSTRIDE_PRESENCE=0, presence null or a repository command; once per machine; the marker goes when a key resolves and the line is said once more after the key is gone"
 else bad "(B5) $WHY"; fi
@@ -1029,6 +1035,22 @@ if [ "$LAST7" = "end:gone" ] && [ "$GONE7" = 1 ] && [ "$UP7N" = 0 ] && [ "$LEFT7
   ok "(B7) built-in keeper: beats, then end (gone) for a killed session; leaves when presence becomes null and when the connection loses its key; an earlier version's keeper is replaced and the session reports at once"
 else bad "(B7) last=$LAST7 gone=$GONE7 null=$UP7N/$LEFT7N key=$UP7K/$LEFT7K legacy=$(got b7l 0) $(keeper_cmd b7l)"; fi
 stop_keeper b7l; kill "$O7N" "$O7K" "$O7L" 2>/dev/null
+
+# (B9) a session a repository's own command reports stays with that command when it moves to a place
+#      that names none (a key is there, so the built-in reporter could run): the command keeps getting
+#      its reports, the server gets none; moving to another repository's command still moves; and a
+#      repository whose config file cannot be read switches nothing on
+key; : > "$LOG"
+fire SessionStart b9 "$R" >/dev/null 2>&1; upto b9 1; stop_keeper b9; edit b9 'r["owner"] = 0'
+age b9 61; fire UserPromptSubmit b9 "$BP" >/dev/null 2>&1; upto b9 2
+age b9 61; fire UserPromptSubmit b9 "$WORK/out" >/dev/null 2>&1; upto b9 3
+fire SessionEnd b9 "$BP" logout >/dev/null 2>&1; upto b9 4
+BROKEN="$(mkrepo b-broken '{"presence": null,}')"; fire SessionStart b9x "$BROKEN" >/dev/null 2>&1; sleep 0.4
+if [ "$(of b9 0)" = 4 ] && [ "$(of b9 4 PRESENCE_EVENT)" = end ] && [ "$(of b9 3 PRESENCE_CHECKOUT)" = "$(real "$R")" ] \
+   && [ "$(got b9 0)" = 0 ] && [ "$(rec b9 'r["mode"]')" = command ] && [ ! -e "$RECORDS/b9x.json" ]; then
+  ok "(B9) a session its repository's command reports keeps that command in a place that names none (the built-in reporter never takes it over); an unreadable config file switches nothing on"
+else bad "(B9) command got $(of b9 0), server got $(got b9 0), mode=$(rec b9 'r.get("mode")') broken=$(ls "$RECORDS" | grep -c b9x)"; fi
+nokey
 
 # (B8) ordering, holds and ownership are the same for a built-in session as for a repository command:
 #      cases (3), (4), (16), (20) and (26) once more, against the server

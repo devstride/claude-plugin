@@ -18,10 +18,11 @@ for what each version component means here and how a release is cut.
   presence command, so everyone else's sessions were never seen. New: `hooks/presence-report.py`,
   the built-in reporter `hooks/presence.py` runs where no command is named. It sends a short fixed
   list (the session's id and name, the machine's name, the branch, the checkout folder's base
-  name, an item number the branch names, the plugin version, the state and timestamps) and never
+  name, an item number the branch names, the plugin version, the event with its state, the
+  report interval, timestamps and why a session ended) and never
   session text, a prompt, a file's content, a path or the machine's address. It fails open and
-  quietly: with no key, a server that does not have live status yet, or no network, it prints
-  nothing, never slows a turn, and tries again no sooner than 30 minutes after a refusal and 2
+  quietly: with a server that does not have live status yet, or no network, it prints nothing,
+  never slows a turn, and tries again no sooner than 30 minutes after a refusal and 2
   minutes after a failure that may pass. Contract: `skills/setup/references/session-presence.md`.
 - **One key per machine, found in one place.** The reporter uses the API key the machine's
   DevStride connection already carries: the environment (`DEVSTRIDE_API_KEY`,
@@ -40,16 +41,17 @@ for what each version component means here and how a release is cut.
 
 ### Changed
 
-- **Version class: MINOR.** No config key is added, removed or renamed, and a repository whose
-  `presence` block names a command behaves exactly as before: the command, its variables, its
-  20-second limit and its 5-minute default are unchanged, and it always wins over the built-in
-  reporter. What changes is the default where no command is named (no block, an empty block, or
-  one with only `intervalMinutes`, which the schema now accepts): the built-in reporter runs, at a
-  1-minute default, on a machine with a key. RELEASING.md's MINOR row covers it (existing
-  behavior that changes, additively); it was weighed against the MAJOR row and nothing a
-  repository had configured means something else now. To keep the old behavior, set
-  `"presence": null` in a repository, which switches off the built-in reporter and any command
-  alike, or `DEVSTRIDE_PRESENCE=0` for a machine.
+- **Breaking, and the reason this is a MAJOR version: a config with no `presence` block now means
+  "report every session", where it meant "report nothing".** RELEASING.md counts changing the
+  meaning of an existing config key as MAJOR, and the documented meaning of an absent block was
+  that no hook sends anything. Now, where no command is named (no block, an empty block, or one
+  with only `intervalMinutes`, which the schema now accepts), the built-in reporter runs, at a
+  1-minute default, on any machine whose DevStride connection carries a key. **To keep the old
+  behavior**, set `"presence": null` in the repository, which switches off the built-in reporter
+  and any command alike, or `DEVSTRIDE_PRESENCE=0` for a machine. Nothing else breaks: no key is
+  added, removed or renamed, no skill is renamed, and a repository whose block names a command
+  behaves exactly as before (the command, its variables, its 20-second limit and its 5-minute
+  default are unchanged, and it always wins over the built-in reporter).
 - **Connecting with an API key is now the documented way to connect** (README, "Connect to
   DevStride"): one step, once per machine, serving the skills' tools and live status alike.
   Browser sign-in still works for trying the skills by hand and is labelled not ready for agents.
