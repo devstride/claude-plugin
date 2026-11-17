@@ -225,13 +225,13 @@ path = os.path.join(work, "mix.json")
 def write(data, mode=0o600):
     if os.path.lexists(path): os.unlink(path)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT, mode); os.write(fd, json.dumps(data).encode()); os.close(fd); os.chmod(path, mode)
-entry = {"url": "https://api-stage.devstride.dev/mcp", "headers": {"X-DevStride-Api-Key": "ek", "X-DevStride-Api-Secret": "es",
+entry = {"url": "https://api.devstride.com/mcp", "headers": {"X-DevStride-Api-Key": "ek", "X-DevStride-Api-Secret": "es",
                                                                     "X-DevStride-Organization-Id": "eo", "X-DevStride-Organization-Slug": "slug"}}
 write({"mcpServers": {"devstride": entry}})
 # a partial environment is never completed from the entry: the entry's key, secret, organization and address travel together
 got = c.credentials({"DEVSTRIDE_API_KEY": "envkey"}, path, [])
 assert (got["DEVSTRIDE_API_KEY"], got["DEVSTRIDE_API_SECRET"], got["DEVSTRIDE_ORG_ID"], got["DEVSTRIDE_ORG_SLUG"]) == ("ek", "es", "eo", "slug"), got
-assert got["base"] == "https://api-stage.devstride.dev" and got["source"] == "connection-user"
+assert got["base"] == "https://api.devstride.com" and got["source"] == "connection-user"
 assert c.readiness({}, path, []) == "connection-user" and c.readiness({}, os.path.join(work, "absent.json"), []) == "no-key"
 write({"mcpServers": {"devstride": entry}}, 0o640)
 assert c.readiness({}, path, []) == "unsafe-config"
