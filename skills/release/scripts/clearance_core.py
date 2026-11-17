@@ -3,12 +3,13 @@ clearance-devstride.sh are thin wrappers: `python3 clearance_core.py <provider> 
 store (where the one record lives, and how it moves atomically) is the only thing that differs;
 every verdict line, exit code and local file is this file's, so the providers cannot drift. The
 contract is skills/release/references/clearance.md."""
-import hashlib, http.client, json, os, re, secrets, signal, subprocess, sys, time, urllib.error, urllib.request
+import hashlib, json, os, re, secrets, signal, subprocess, sys, time
 from datetime import datetime, timedelta, timezone
 
 sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "build-item/scripts"))
 import claim_record  # noqa: E402  the one machine and session naming every claim uses
+import devstride_connection  # noqa: E402  the one place the machine's DevStride key is found, and the one caller
 
 RECORD_VERSION = 1
 DEFAULT_REF = "refs/clearance/release"
@@ -421,15 +422,6 @@ class GitHubStore(Store):
 
 # ── the DevStride store: one claim, kind release-tower, keyed by the repository ──
 CLAIM_KIND = "release-tower"
-BASE_URL_RULE = re.compile(r"^https://api(-[a-z0-9-]+)?\.devstride\.(com|dev)\Z")
-CREDENTIAL_NAMES = ("DEVSTRIDE_API_KEY", "DEVSTRIDE_API_SECRET", "DEVSTRIDE_ORG_ID", "DEVSTRIDE_ORG_SLUG", "DEVSTRIDE_BASE_URL")
-
-
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args, **kwargs):
-        return None
-
-
 class DevStrideStore(Store):
     def __init__(self):
         self.me = None
@@ -454,64 +446,37 @@ class DevStrideStore(Store):
         self.me = me
         self.secrets.append(me)
 
-    # credentials: the environment first, then the file release.clearance.credentialsFile names
+    # credentials: the shared resolver (the environment, then the file release.clearance.credentialsFile
+    # names, then the key the machine's DevStride connection carries)
     def credentials(self):
         if self._creds is not None:
             return self._creds
-        values = {n: os.environ.get(n) or "" for n in CREDENTIAL_NAMES}
         path = CLEARANCE.get("credentialsFile")
-        if isinstance(path, str) and path and not all(values.values()):
+        files = []
+        if isinstance(path, str) and path:
             path = os.path.expanduser(path)
-            if not os.path.isabs(path):
-                path = os.path.join(CONFIG_DIR or os.getcwd(), path)
-            try:
-                info = os.lstat(path)
-            except OSError:
-                info = None
-            if info is not None:
-                if not os.path.isfile(path) or os.path.islink(path) or info.st_uid != os.getuid():
-                    raise ToolError("credentials file %s must be a regular file you own, not a link" % path)
-                if info.st_mode & 0o077:
-                    raise ToolError("credentials file %s is readable by others — chmod 600 it" % path)
-                try:
-                    with open(path) as handle:
-                        lines = handle.read().splitlines()
-                except OSError:
-                    raise ToolError("credentials file %s cannot be read" % path)
-                for line in lines:
-                    line = line.strip()
-                    if line.startswith("export "):
-                        line = line[7:].strip()
-                    if not line or line.startswith("#") or "=" not in line:
-                        continue
-                    name, _, value = line.partition("=")
-                    name, value = name.strip(), value.strip()
-                    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-                        value = value[1:-1]
-                    if name in values and not values[name]:
-                        values[name] = value
-        missing = [n for n in CREDENTIAL_NAMES[:3] if not values[n]]
-        if missing:
+            files.append(path if os.path.isabs(path) else os.path.join(CONFIG_DIR or os.getcwd(), path))
+        top = CONFIG_DIR or None
+        try:
+            creds = devstride_connection.credentials(os.environ, devstride_connection.config_file(os.environ),
+                                                     devstride_connection.project_places(top, os.getcwd()), files)
+        except devstride_connection.UnsafeFile as error:
+            if error.reason == "mode too open":
+                raise ToolError("credentials file %s is readable by others — chmod 600 it" % error.path)
+            if error.reason == "unreadable":
+                raise ToolError("credentials file %s cannot be read" % error.path)
+            raise ToolError("credentials file %s must be a regular file you own, not a link" % error.path)
+        except devstride_connection.Missing as error:
             raise ToolError("DevStride credentials missing (%s) — set them in the environment, or in the file "
-                            "release.clearance.credentialsFile names (mode 600)" % ", ".join(missing))
-        base = values["DEVSTRIDE_BASE_URL"] or "https://api.devstride.com"
-        test = os.environ.get("CLEARANCE_DEVSTRIDE_TEST_URL")
-        if test:
-            if not re.match(r"^http://(127\.0\.0\.1|localhost):[0-9]+$", test):
-                raise ToolError("CLEARANCE_DEVSTRIDE_TEST_URL must be http://127.0.0.1:<port>")
-            base = test
-        elif not BASE_URL_RULE.match(base):
-            raise ToolError("DEVSTRIDE_BASE_URL must be https://api.devstride.com (or an api-<stage>.devstride.com/.dev host)")
-        self.secrets += [values["DEVSTRIDE_API_KEY"], values["DEVSTRIDE_API_SECRET"]]
-        self._creds = dict(values, base=base, test=bool(test))
+                            "release.clearance.credentialsFile names (mode 600)" % ", ".join(error.names))
+        except devstride_connection.Problem as error:
+            raise ToolError(error.text)
+        self.secrets += [creds["DEVSTRIDE_API_KEY"], creds["DEVSTRIDE_API_SECRET"]]
+        self._creds = creds
         return self._creds
 
     def scrub(self, text):
-        first = (text or "").strip().splitlines()[0] if (text or "").strip() else ""
-        for secret in self.secrets:
-            if secret:
-                first = first.replace(secret, "***")
-        return first[:300]
+        return devstride_connection.scrub(text, self.secrets)
 
     def absent(self, headers):
         version = ""
@@ -532,65 +497,16 @@ class DevStrideStore(Store):
         return ToolError(self.scrub(text) or "DevStride returned an error")
 
     def call(self, tool, arguments):
-        cred = self.credentials()
-        headers = {"X-DevStride-Api-Key": cred["DEVSTRIDE_API_KEY"], "X-DevStride-Api-Secret": cred["DEVSTRIDE_API_SECRET"],
-                   "X-DevStride-Organization-Id": cred["DEVSTRIDE_ORG_ID"], "Content-Type": "application/json",
-                   "Accept": "application/json, text/event-stream"}
-        if cred["DEVSTRIDE_ORG_SLUG"]:
-            headers["X-DevStride-Organization-Slug"] = cred["DEVSTRIDE_ORG_SLUG"]
-        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": tool, "arguments": arguments}}).encode()
-        handlers = [NoRedirect()] + ([urllib.request.ProxyHandler({})] if cred["test"] else [])
-        opener = urllib.request.build_opener(*handlers)
-        reply, answer_headers = None, None
-        for attempt in (1, 2):
-            request = urllib.request.Request(cred["base"] + "/mcp", data=body, headers=headers, method="POST")
-            try:
-                with opener.open(request, timeout=30) as response:
-                    reply, answer_headers = response.read().decode("utf-8", "replace"), response.headers
-                break
-            except urllib.error.HTTPError as error:
-                if error.code in (401, 403):
-                    raise self.forbidden("HTTP %d" % error.code)
-                if error.code >= 500 and attempt == 1:
-                    continue
-                raise ToolError("DevStride answered HTTP %d" % error.code)
-            except (urllib.error.URLError, OSError, http.client.HTTPException):
-                if attempt == 1:
-                    continue
-                raise ToolError("DevStride could not be reached")
-            except ValueError:
-                raise ToolError("the DevStride address is not a valid URL")
-        return self.unwrap(reply, answer_headers)
-
-    def unwrap(self, reply, headers):
-        message = None
         try:
-            message = json.loads(reply)
-        except ValueError:
-            for line in reply.splitlines():
-                if line.startswith("data:"):
-                    try:
-                        candidate = json.loads(line[5:].strip())
-                    except ValueError:
-                        continue
-                    if isinstance(candidate, dict) and ("result" in candidate or "error" in candidate):
-                        message = candidate
-        if not isinstance(message, dict):
-            raise ToolError("DevStride returned something that is not a JSON-RPC answer")
-        if isinstance(message.get("error"), dict):
-            raise self.classify(str(message["error"].get("message") or ""), headers)
-        result = message.get("result")
-        content = result.get("content") if isinstance(result, dict) else None
-        text = content[0].get("text") if isinstance(content, list) and content and isinstance(content[0], dict) else None
-        if not isinstance(text, str):
-            raise ToolError("DevStride returned an answer with no content")
-        if result.get("isError"):
-            raise self.classify(text, headers)
-        try:
-            data = json.loads(text)
-        except ValueError:
-            raise ToolError("DevStride returned a claim answer that is not JSON")
-        return data["data"] if isinstance(data, dict) and "data" in data else data
+            return devstride_connection.call_tool(tool, arguments, self.credentials(), timeout=30, attempts=2)
+        except devstride_connection.Refused as error:
+            raise self.forbidden(error.text)
+        except devstride_connection.Absent as error:
+            raise self.absent(error.headers)
+        except devstride_connection.Unavailable as error:
+            if error.detail is not None:
+                raise self.classify(error.detail, error.headers)
+            raise ToolError(error.text)
 
     # records
     def version_of(self, row):

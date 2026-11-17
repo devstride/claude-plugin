@@ -1,16 +1,28 @@
 #!/usr/bin/env python3
-"""hooks/presence.py — every running session reports itself through the repository's own command.
+"""hooks/presence.py — every running session reports its live status, inside a repository or not.
 
 A fleet view built from work claims shows only the sessions holding a claim: a session that is
 reviewing, fixing, waiting on tests or waiting for its person has no row. This hook gives every
-session a presence report, whatever it is doing, through ONE command the consuming repository names
-in `.claude/ds-config.json`:
+session a presence report, whatever it is doing, through one of two reporters
+(skills/build-item/scripts/presence_settings.py decides, in this order):
 
-    "presence": { "command": "<the repository's own command>", "intervalMinutes": 5 }
+  - off: DEVSTRIDE_PRESENCE set to 0 (false, off, no) for the machine, or `"presence": null` in the
+    repository's `.claude/ds-config.json`. Nothing runs and nothing is written.
+  - the repository's own command, when its block names one:
 
-An absent or null block, or a session outside a repository, runs nothing and writes nothing. The
-plugin never talks to a tracker itself: what a report means, where it goes and when it expires are
-the repository's. The contract: skills/setup/references/session-presence.md.
+        "presence": { "command": "<the repository's own command>", "intervalMinutes": 5 }
+
+    What a report means, where it goes and when it expires are then the repository's. A block
+    whose `command` is blank runs nothing.
+  - otherwise the built-in reporter, hooks/presence-report.py, every minute (or the block's
+    `intervalMinutes`): it sends the report to DevStride with the API key the machine's DevStride
+    connection carries (skills/build-item/scripts/devstride_connection.py). A session outside any
+    repository, or in one with no block, is an ordinary session reported this way. With no key
+    nothing runs and nothing is written for the session; the first SessionStart on such a machine
+    prints one line saying so, once per machine (a marker file beside the records, removed the
+    next time a key resolves). That line is the only thing this hook ever prints.
+
+The contract: skills/setup/references/session-presence.md.
 
   hook     (the hook command; the event comes from the payload's hook_event_name)
            SessionStart     -> state "starting", sends `start`, starts this session's keeper when
@@ -65,8 +77,8 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            A state change within 30 seconds of the last send is held: the next hook or keeper send
            carries it, and the keeper sends it once those 30 seconds pass (both compare against the
            last state REPORTED, so a held change is not lost).
-           The record follows the session, not the checkout: a session that moves to a checkout
-           without the block keeps reporting under the one it came from, and no event is ever
+           The record follows the session, not the checkout: a session that moves to a place where
+           reporting is off keeps reporting under the one it came from, and no event is ever
            dropped for that reason for a session that has a record. The session's process
            (CLAUDE_PID, else the parent of the hook's shell) and its start time are re-read on every
            start and prompt.
@@ -83,7 +95,8 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            keeper may have dropped a queued report): a keeper from before this check never leaves.
   keeper <session>  (detached, one per session, holding the session's keeper lock, which is how a
            hook knows one runs) checks every 10 seconds: it exits once the session has ended, its
-           record is gone, the block is removed or the record names another plugin version than its
+           record is gone, reporting is switched off or the connection loses its key (re-read every
+           check; Claude Code's configuration file only when it changed) or the record names another plugin version than its
            own code's (an update the session has loaded), releasing its lock under the state lock so a
            resume never sees a keeper that is leaving; when the session's process is gone, or its
            process id now belongs to a process with another known start time, it sends `end`
@@ -107,15 +120,21 @@ the repository's. The contract: skills/setup/references/session-presence.md.
            prompt, interrupt applied and activity, while the session left no background work running
            and no turn failed, the interrupt is applied the same way at that time. A missing,
            unreadable or foreign file, or any other status, changes nothing.
-  send <event> <state> <session> <record> <sequence> <at>  (detached) runs the command once,
+  send <event> <state> <session> <record> <sequence> <at>  (detached) runs the reporter once,
            holding the session's send lock so reports run one at a time, and only for the record
            that queued it (a record recreated since is another) and when its sequence number is
            above the last one sent: a report overtaken by a newer one is dropped, so an old `end`
            never follows a resumed session's `start`. Any event but SessionStart and UserPromptSubmit from an
-           older process of the session, while a newer process holds it, does nothing. From the repository root, through the shell,
-           at most 20 seconds, its exit code kept in the record. It exports
+           older process of the session, while a newer process holds it, does nothing. A repository's command runs from the
+           repository root, through the shell; the built-in reporter runs with no arguments, from the
+           repository root or the session's directory. Either runs at most 20 seconds, its exit code kept in
+           the record with the mode that ran (`mode`: command | builtin). The built-in reporter's exit code 3
+           (the server has no such tool, or refused the key) sets the record's `quiet` 30 minutes ahead, and
+           its exit code 4, a timeout or an error (unreachable, busy) 2 minutes ahead; until then nothing is
+           sent for the session, and exit code 0 removes it. A repository command's exit code never does. It exports
            PRESENCE_EVENT (start|beat|end), PRESENCE_STATE, PRESENCE_SESSION_ID, PRESENCE_MACHINE,
-           PRESENCE_CHECKOUT, PRESENCE_BRANCH, PRESENCE_ITEM (an item number the branch name carries,
+           PRESENCE_CHECKOUT (the repository root; empty outside a repository, as PRESENCE_BRANCH and
+           PRESENCE_ITEM then are), PRESENCE_BRANCH, PRESENCE_ITEM (an item number the branch name carries,
            else empty), PRESENCE_PLUGIN_VERSION (the version of the code sending this report, hook
            or keeper, never one copied from the record), PRESENCE_INTERVAL_MINUTES, PRESENCE_END_REASON,
            PRESENCE_AT (when the hook or keeper queued the report, epoch milliseconds, always later
@@ -128,8 +147,10 @@ the repository's. The contract: skills/setup/references/session-presence.md.
 DEVSTRIDE_PRESENCE_MINUTE (seconds in a keeper minute, default 60) exists for the tests only.
 Records: ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/presence/<session>.json (and the session's
 three lock files), owner-only; another session's files untouched for 7 days are pruned at a new
-session's start, each under its own lock; nothing is created for a session whose
-checkout has no block. FAILS OPEN: every hook exits 0 and prints nothing (a prompt hook's stdout would become
+session's start, each under its own lock; nothing is created for a session whose reporting is off
+or whose machine has no key. A record holds `top` (the repository root, null outside one) and `dir`
+(the directory the session works in); no record, marker or log ever holds a key. FAILS OPEN: every
+hook exits 0 and prints nothing but the one-time no-key line (a prompt hook's stdout would become
 context), whatever goes wrong. python3 and the standard library only.
 """
 import calendar
@@ -150,11 +171,18 @@ SCRIPT = os.path.realpath(__file__)
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(SCRIPT))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills/build-item/scripts"))
 import claim_record  # noqa: E402  the one machine naming every claim uses
+import devstride_connection  # noqa: E402  the one place the machine's DevStride key is found
+import presence_settings  # noqa: E402  the one decision: off, the repository's command, or the built-in reporter
+
+REPORTER = os.path.join(os.path.dirname(SCRIPT), "presence-report.py")
+QUIET_REFUSED = 1800     # seconds the built-in reporter stays quiet after a definite refusal
+QUIET_TRANSIENT = 120    # and after a failure that may pass
+NO_KEY_LINE = ("devstride: this machine's DevStride connection carries no API key, so it is not ready for agents and "
+               "this session is not shown on the Agent Fleet. Fix, once per machine: /devstride:setup connect")
 
 SESSION_ID = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}$")
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 ITEM = re.compile(r"(?:^|[/_.-])(I[0-9]+)(?=$|[/_.-])")
-DEFAULT_INTERVAL = 5
 BEAT_AFTER = 60          # a prompt re-sends when the last send is this old
 CHANGE_AFTER = 30        # a state change within this of the last send waits for the next send
 COMMAND_TIMEOUT = 20
@@ -296,19 +324,49 @@ def repo_top(start):
         here = parent
 
 
-def block(top):
-    """The effective presence block, or None when absent, null or unusable."""
-    config = read_json(os.path.join(top, ".claude", "ds-config.json")) if top else None
-    value = config.get("presence") if isinstance(config, dict) else None
-    if not isinstance(value, dict):
-        return None
-    command = value.get("command")
-    if not isinstance(command, str) or not command.strip():
-        return None
-    interval = value.get("intervalMinutes", DEFAULT_INTERVAL)
-    if isinstance(interval, bool) or not isinstance(interval, int) or not 1 <= interval <= 60:
-        interval = DEFAULT_INTERVAL
-    return {"command": command, "intervalMinutes": interval}
+def connection_ready(top, place):
+    """Whether the machine's DevStride connection carries a key, for a session in this place."""
+    try:
+        return devstride_connection.ready(os.environ, devstride_connection.config_file(os.environ),
+                                          devstride_connection.project_places(top, place))
+    except Exception:
+        return False
+
+
+def decide(top, place, check_key=True):
+    """(the effective settings or None, the fixed reason word) for a session whose repository root
+    is `top` (None outside one) and whose directory is `place`."""
+    top = top if isinstance(top, str) and top else None
+    place = place if isinstance(place, str) and place else top
+    ready = (lambda: connection_ready(top, place)) if check_key else None
+    return presence_settings.effective(top, read_json, os.environ, ready)
+
+
+def settings(top, place, check_key=True):
+    """How this session reports: {"mode", "command", "intervalMinutes"}, or None when nothing runs."""
+    return decide(top, place, check_key)[0]
+
+
+def marker_path():
+    """Beside the records directory, so pruning never touches it: the one-time line was shown."""
+    return os.path.join(cache_dir(), "presence-no-key")
+
+
+def no_key_notice(event, reason):
+    """The only line this hook prints: at a SessionStart on a machine whose connection carries no
+    key, once (an owner-only marker records it). The marker goes the next time a key resolves, so a
+    machine that later loses its key is told once more."""
+    try:
+        if reason == "builtin":
+            if os.path.lexists(marker_path()):
+                os.unlink(marker_path())
+        elif reason == "no-key" and event == "SessionStart":
+            private_dir(cache_dir())
+            os.close(os.open(marker_path(), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
+            sys.stdout.write(NO_KEY_LINE + "\n")
+            sys.stdout.flush()
+    except OSError:
+        pass  # the marker is there already (said once), or cannot be written (never said)
 
 
 _VERSION = []
@@ -664,41 +722,66 @@ def item_of(branch):
     return match.group(1) if match else ""
 
 
-def run_command(sid, record, event, state, at):
-    top = record.get("top")
-    settings = block(top) if isinstance(top, str) else None
-    if not settings:
+def report_job(sid, record, event, state, at):
+    """What one report runs: (mode, the command or argument list, its working directory, its
+    environment), or None when reporting is off for the record's place. The built-in reporter gets
+    no arguments and nothing in its environment beyond what a repository's command gets: it finds
+    the key itself, so no key can ever show in a process list."""
+    top = record.get("top") if isinstance(record.get("top"), str) and record.get("top") else None
+    place = record.get("dir") if isinstance(record.get("dir"), str) and record.get("dir") else top
+    conf = settings(top, place)
+    if not conf:
         return None
-    branch = branch_of(top)
+    branch = branch_of(top) if top else ""
     env = dict(os.environ)
     env.update({
         "PRESENCE_EVENT": event, "PRESENCE_STATE": state,
         "PRESENCE_SESSION_ID": sid, "PRESENCE_MACHINE": claim_record.machine_name(),
-        "PRESENCE_CHECKOUT": top, "PRESENCE_BRANCH": branch, "PRESENCE_ITEM": item_of(branch),
+        "PRESENCE_CHECKOUT": top or "", "PRESENCE_BRANCH": branch, "PRESENCE_ITEM": item_of(branch),
         "PRESENCE_PLUGIN_VERSION": own_version(),  # the code sending this report, never the record's
-        "PRESENCE_INTERVAL_MINUTES": str(settings["intervalMinutes"]),
+        "PRESENCE_INTERVAL_MINUTES": str(conf["intervalMinutes"]),
         "PRESENCE_END_REASON": str(record.get("reason") or "") if event == "end" else "",
         "PRESENCE_AT": str(at), "PRESENCE_ACTIVE_AT": active_at(record),
         "PRESENCE_BUSY_SINCE": busy_since(record) if event != "end" else "", "CLAUDE_CODE_SESSION_ID": sid,
     })
     if record.get("owner"):
         env["CLAUDE_PID"] = str(record["owner"])
+    if conf["mode"] == "command":
+        return "command", conf["command"], top, env
+    cwd = top or place
+    return "builtin", [sys.executable, REPORTER], cwd if cwd and os.path.isdir(cwd) else None, env
+
+
+def quiet_until(record):
+    value = record.get("quiet")
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else 0
+
+
+def run_command(sid, record, event, state, at):
+    """Run one report. Returns (its exit code, "timeout" or "error", or None when nothing ran; the
+    mode that ran, or None when reporting is off)."""
+    job = report_job(sid, record, event, state, at)
+    if not job:
+        return None, None
+    mode, command, cwd, env = job
+    if mode == "builtin" and time.time() < quiet_until(record):
+        return None, mode  # the server refused or could not be reached a moment ago: not again yet
     try:
-        child = subprocess.Popen(settings["command"], shell=True, cwd=top, env=env, stdin=subprocess.DEVNULL,
+        child = subprocess.Popen(command, shell=mode == "command", cwd=cwd, env=env, stdin=subprocess.DEVNULL,
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         try:
-            return child.wait(timeout=COMMAND_TIMEOUT)
+            return child.wait(timeout=COMMAND_TIMEOUT), mode
         except subprocess.TimeoutExpired:
             os.killpg(child.pid, signal.SIGKILL)
             child.wait()
-            return "timeout"
+            return "timeout", mode
     except Exception:
-        return "error"
+        return "error", mode
 
 
 def send(event, state, sid, incarnation, sequence, at):
-    """Run the repository's command once for this session: one report at a time, only for the record
-    that queued it, and only when no newer report has already been sent."""
+    """Run the session's reporter once: one report at a time, only for the record that queued it,
+    and only when no newer report has already been sent."""
     if event not in EVENTS or state not in STATES:
         return
     fd = lock(sid, "send", True)
@@ -709,13 +792,20 @@ def send(event, state, sid, incarnation, sequence, at):
             record = load(sid)
             if not record or record.get("id") != incarnation or sequence <= int(record.get("done") or 0):
                 return  # the record was replaced, or a newer report for this session already ran
-        code = run_command(sid, record, event, state, at)
+        code, mode = run_command(sid, record, event, state, at)
         with state_lock(sid):
             latest = load(sid)
             if latest and latest.get("id") == incarnation:  # never recreate a record removed meanwhile
                 latest["done"] = max(sequence, int(latest.get("done") or 0))
+                if mode:
+                    latest["mode"] = mode
                 if code is not None:
                     latest["last"] = {"event": event, "exit": code, "at": round(time.time(), 3)}
+                    if mode == "builtin":  # a repository command's exit code never quiets anything
+                        if code == 0:
+                            latest.pop("quiet", None)
+                        else:
+                            latest["quiet"] = round(time.time() + (QUIET_REFUSED if code == 3 else QUIET_TRANSIENT), 3)
                 save(sid, latest)
     finally:
         os.close(fd)
@@ -742,9 +832,11 @@ def hook():
         return  # the session carries on after a compaction
     cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else os.getcwd()
     top = repo_top(cwd)
-    here = block(top)
+    place = top or os.path.realpath(cwd)  # outside a repository the session's directory is its place
+    here, reason = decide(top, place)
+    no_key_notice(event, reason)
     peek = load(sid)
-    if not here and not (peek and block(peek.get("top"))):
+    if not here and not (peek and settings(peek.get("top"), peek.get("dir"))):
         return  # nothing to report, and nothing written
     if event in LATER and (peek is None or peek.get("state") == "ended"):
         return  # never reported here, or already ended
@@ -762,9 +854,10 @@ def hook():
         now = time.time()
         record = load(sid)
         if not here:
-            if not (record and block(record.get("top"))):
+            if not (record and settings(record.get("top"), record.get("dir"))):
                 return
-            top = record["top"]  # moved to a checkout without the block: keep reporting under the old one
+            # moved to a place where reporting is off: keep reporting under the one it came from
+            top, place = record.get("top"), record.get("dir") or record.get("top")
         fresh = record is None
         previous = None if fresh else record.get("state")
         if event in LATER:
@@ -773,13 +866,13 @@ def hook():
             if mine and record.get("owner") not in (0, None, mine) and alive(record.get("owner")):
                 return  # from an older process of this session, which a newer one has since resumed
         if fresh:
-            record = {"schema": 1, "top": top, "state": None, "sent": 0, "owner": 0}
+            record = {"schema": 1, "top": top, "dir": place, "state": None, "sent": 0, "owner": 0}
         if not record.get("id"):
             record["id"] = secrets.token_hex(6)  # this record's incarnation: sends are bound to it
         moved = not fresh and record.get("top") != top
         state, active = transition(event, payload, record, int(now * 1000))
         sent, state = record.get("sent") or 0, state or previous
-        record.update({"top": top, "state": state, "version": version or record.get("version") or ""})
+        record.update({"top": top, "dir": place, "state": state, "version": version or record.get("version") or ""})
         if active:
             record["activeAt"] = int(now * 1000)  # the session's last sign of life: start, prompt, tool call, stop
         if owner and (event == "SessionStart" or owner_started or owner != record.get("owner")):
@@ -855,24 +948,24 @@ def keeper(sid):
             time.sleep(poll)
             os.utime(fd)
             peek = load(sid) or {}
-            settings = block(peek.get("top"))
-            due = bool(settings) and time.time() - (peek.get("sent") or 0) >= settings["intervalMinutes"] * MINUTE
+            conf = settings(peek.get("top"), peek.get("dir"))
+            due = bool(conf) and time.time() - (peek.get("sent") or 0) >= conf["intervalMinutes"] * MINUTE
             reused = due and replaced(peek)  # `ps` runs outside the state lock
             mark = interrupted(peek.get("transcript")) if peek.get("state") == "working" else 0  # so does this read
             idle = went_idle(sid, peek.get("owner")) if peek.get("state") == "working" and not mark else 0  # and this
             job = None
             with state_lock(sid):
                 record = load(sid)
-                settings = block(record.get("top")) if record else None
+                conf = settings(record.get("top"), record.get("dir")) if record else None
                 # the session's hooks now run another version: leave, and its next hook event
                 # starts a keeper of that version
                 moved_on = bool(record and version and record.get("version") not in (None, "", version))
-                if not settings or record.get("state") == "ended" or moved_on:
+                if not conf or record.get("state") == "ended" or moved_on:
                     os.close(fd)  # released under the state lock: a resume then starts a new keeper
                     fd = None
                     continue
                 owner, now = record.get("owner"), time.time()
-                due = now - (record.get("sent") or 0) >= settings["intervalMinutes"] * MINUTE
+                due = now - (record.get("sent") or 0) >= conf["intervalMinutes"] * MINUTE
                 same = owner == peek.get("owner") and record.get("ownerStarted") == peek.get("ownerStarted")
                 if not alive(owner) or (reused and same):
                     record.update({"state": "ended", "reason": "gone"})

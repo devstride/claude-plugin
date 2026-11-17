@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
-"""A fake DevStride MCP server for scripts/tests/clearance-devstride.sh: the six claim tools over
-HTTP on 127.0.0.1, with the claims kept in <state dir>/claims.json. Usage: fake-devstride.py
-<state dir>; it writes its port to <state dir>/port once it listens and serves until killed.
+"""A fake DevStride MCP server for scripts/tests/clearance-devstride.sh, presence.sh and
+presence-report.sh: the six claim tools and `report_session_presence` over HTTP on 127.0.0.1, with
+the claims kept in <state dir>/claims.json. Usage: fake-devstride.py <state dir>; it writes its
+port to <state dir>/port once it listens and serves until killed.
+
+`report_session_presence` refuses what the real operation refuses (an unknown key, a bad event,
+state or session id, a control character, an over-long text, an interval outside 1 to 60, a stamp
+that is not a whole number) and appends each accepted call's arguments to <state dir>/presence.jsonl
+with `_keyDigest`, the digest of the API key header it arrived with (never the key). It answers
+{outcome: recorded}, or `ended` for an end, or the word in the control file `presence-outcome`.
 
 Control files in the state dir (any may be absent):
   now        an ISO instant used as the server's clock (default: the real one)
-  mode       unknown-tool | http403 | forbidden | redirect (a 307 to /followed, which marks the file `followed`) — every call answers that way (consumed by nothing)
+  mode       unknown-tool | http403 | http401 | http500 | http429 | bad-json | forbidden |
+             redirect (a 307 to /followed, which marks the file `followed`) — every call answers that way (consumed by nothing)
+  delay      seconds every call waits before it is answered
+  any-key    its presence accepts any API key (the digest in presence.jsonl says which one arrived)
   fail-once  the file's presence makes the next call answer HTTP 500, then removes it
   sse        its presence answers as text/event-stream instead of JSON
   version    text sent as the X-DevStride-Version response header
@@ -13,7 +23,7 @@ Expected credentials: headers must equal FAKE_DS_KEY / FAKE_DS_SECRET / FAKE_DS_
 test-key / test-secret / org-1). calls.log gets one line per call: tool, kind, key, the holder as
 its digest, and any takeover digest — never a credential or a raw holder.
 """
-import hashlib, json, os, sys
+import hashlib, json, os, re, sys, time
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -87,6 +97,38 @@ def fresh(a):
            "payload": a.get("payload"), "claimedAt": at, "heartbeatAt": at, "phaseStartedAt": at,
            "expiresAt": iso(now() + timedelta(minutes=a.get("expiryMinutes") or 240)), "releasedAt": None, "outcome": None}
     return row
+
+
+PRESENCE_TEXT = {"machine": 200, "label": 200, "branch": 500, "checkout": 500, "item": 64, "pluginVersion": 64, "endReason": 64}
+PRESENCE_STAMPS = ("reportedAt", "activeAt", "busySince")
+PRESENCE_KEYS = set(PRESENCE_TEXT) | set(PRESENCE_STAMPS) | {"event", "sessionId", "state", "intervalMinutes"}
+
+
+def whole(value):
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def presence_problem(a):
+    """Why the real operation would refuse this report, or None."""
+    if set(a) - PRESENCE_KEYS:
+        return "unknown keys: %s" % ", ".join(sorted(set(a) - PRESENCE_KEYS))
+    if a.get("event") not in ("start", "beat", "end"):
+        return "event"
+    if not isinstance(a.get("sessionId"), str) or not re.match(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$", a["sessionId"]):
+        return "sessionId"
+    if "state" in a and a["state"] not in ("starting", "working", "waiting"):
+        return "state"
+    if not isinstance(a.get("machine"), str):
+        return "machine"
+    for name, limit in PRESENCE_TEXT.items():
+        if name in a and (not isinstance(a[name], str) or not a[name] or len(a[name]) > limit or re.search(r"[\x00-\x1f\x7f]", a[name])):
+            return name
+    if "intervalMinutes" in a and (not whole(a["intervalMinutes"]) or not 1 <= a["intervalMinutes"] <= 60):
+        return "intervalMinutes"
+    for name in PRESENCE_STAMPS:
+        if name in a and (not whole(a[name]) or not 0 < a[name] < 10 ** 16):
+            return name
+    return None
 
 
 def call(tool, a):
@@ -177,8 +219,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return None
-        if (self.headers.get("X-DevStride-Api-Key"), self.headers.get("X-DevStride-Api-Secret"),
-                self.headers.get("X-DevStride-Organization-Id")) != (KEY, SECRET, ORG):
+        if control("any-key") is None and (self.headers.get("X-DevStride-Api-Key"), self.headers.get("X-DevStride-Api-Secret"),
+                                           self.headers.get("X-DevStride-Organization-Id")) != (KEY, SECRET, ORG):
             return self.reply(401, '{"message":"bad credentials"}')
         if os.path.exists(os.path.join(STATE, "fail-once")):
             os.remove(os.path.join(STATE, "fail-once"))
@@ -186,6 +228,16 @@ class Handler(BaseHTTPRequestHandler):
         mode = control("mode")
         tool = body["params"]["name"]
         args = body["params"].get("arguments") or {}
+        if control("delay"):
+            time.sleep(float(control("delay")))
+        if mode in ("http401", "http500", "http429"):
+            with open(os.path.join(STATE, "calls.log"), "a") as handle:
+                handle.write(json.dumps({"tool": tool}) + "\n")
+            return self.reply(int(mode[4:]), "{}")
+        if mode == "bad-json":
+            with open(os.path.join(STATE, "calls.log"), "a") as handle:
+                handle.write(json.dumps({"tool": tool}) + "\n")
+            return self.reply(200, "this is not json")
         with open(os.path.join(STATE, "calls.log"), "a") as handle:
             handle.write(json.dumps({"tool": tool, "kind": args.get("kind"), "key": args.get("key"),
                                      "holder": digest(args["holder"]) if args.get("holder") else None,
@@ -200,6 +252,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.text("Forbidden: missing permission MANAGE_AGENT_CLAIMS", is_error=True)
         if isinstance(args.get("payload"), dict) and "session" in args["payload"]:  # the real server's refusal
             return self.text("The payload key `session` is reserved: report the session with `session`", is_error=True)
+        if tool == "report_session_presence":
+            problem = presence_problem(args)
+            if problem:
+                return self.text("Invalid arguments: %s" % problem, is_error=True)
+            with open(os.path.join(STATE, "presence.jsonl"), "a") as handle:
+                handle.write(json.dumps(dict(args, _keyDigest=digest(self.headers.get("X-DevStride-Api-Key") or ""))) + "\n")
+            outcome = control("presence-outcome") or ("ended" if args["event"] == "end" else "recorded")
+            return self.text(json.dumps({"data": {"outcome": outcome}}))
         try:
             data = call(tool, args)
         except KeyError:
