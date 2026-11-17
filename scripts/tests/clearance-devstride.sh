@@ -16,6 +16,9 @@ mkdir -p "$WORK/bin"; printf '#!/bin/bash\nexec python3 "%s/fake-gh.py" "$@"\n' 
 export PATH="$WORK/bin:$PATH" HOME="$WORK/home" GIT_CONFIG_GLOBAL="$WORK/gitconfig" GIT_CONFIG_NOSYSTEM=1; mkdir -p "$HOME"
 printf '[user]\n\tname = t\n\temail = t@t\n' > "$GIT_CONFIG_GLOBAL"
 export CLEARANCE_NO_KEEPER=1
+# The key resolver's last resort is Claude Code's configuration file: a scratch one, which only a
+# case writes, so a maintainer's real file and real key are never read (HOME is a throwaway too).
+export CLAUDE_CONFIG_DIR="$WORK/claude"; mkdir -p "$CLAUDE_CONFIG_DIR"
 
 # fresh NAME — a fake DevStride server with an empty claims file, a fake-gh state directory, a local
 # record path and a working directory; the provider then runs as session me-1.
@@ -30,7 +33,7 @@ fresh() {
          CLEARANCE_POLL_SECONDS=1 CLEARANCE_WAIT_MINUTES=1 CLEARANCE_STALE_MINUTES=20 \
          CLEARANCE_NOW=2026-10-18T10:05:00Z CLAUDE_CODE_SESSION_ID=me-1 \
          DEVSTRIDE_MACHINE_NAME=M9-Dan DEVSTRIDE_SESSION=rel-1 \
-         CLEARANCE_DEVSTRIDE_TEST_URL="http://127.0.0.1:$(cat "$DS/port")" \
+         DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:$(cat "$DS/port")" \
          DEVSTRIDE_API_KEY=test-key DEVSTRIDE_API_SECRET=test-secret DEVSTRIDE_ORG_ID=org-1
   unset CLEARANCE_HOLDER_TOKEN DEVSTRIDE_LEASE_TOKEN CODEX_THREAD_ID CLEARANCE_PHASE_BUDGETS
   rm -f "$CLEARANCE_RECORD" "$WORK/$1.record.owed.json"
@@ -305,7 +308,7 @@ echo wrong-secret-xyz >> "$WORK/secrets-to-find"
 # (7a) transport: one 500 is retried; SSE answers are read; a base URL off the allowed hosts is refused; no redirects
 fresh transport; : > "$DS/fail-once"; run claim; A="$RC:$OUT"
 fresh sse; : > "$DS/sse"; run claim; B="$RC:$OUT"; run status --json; J="$(printf '%s' "$OUT" | python3 -c 'import json,sys; print(json.load(sys.stdin)["state"])')"
-fresh badurl; unset CLEARANCE_DEVSTRIDE_TEST_URL; DEVSTRIDE_BASE_URL=http://evil.example run claim; C="$RC:$OUT"
+fresh badurl; unset DEVSTRIDE_PLUGIN_TEST_URL; DEVSTRIDE_BASE_URL=http://evil.example run claim; C="$RC:$OUT"
 DEVSTRIDE_BASE_URL=https://api.devstride.com.evil.example run claim; D="$RC:$OUT"
 if [ "${A%%:*}" -eq 0 ] && [ "${B%%:*}" -eq 0 ] && [ "$J" = held ] && [ "${C%%:*}" -eq 1 ] && printf '%s' "$C" | grep -q 'DEVSTRIDE_BASE_URL must be' && [ "${D%%:*}" -eq 1 ]; then
   ok "(7a) a 500 is retried once; a text/event-stream answer is read; a base URL off api(-x).devstride.com/.dev is refused"
@@ -314,11 +317,11 @@ else bad "(7a) a=$A b=$B j=$J c=$C d=$D"; fi
 # (7b) a redirect is never followed (credentials never travel to where it points); a trailing newline cannot pass the allow-list
 fresh redirect; printf 'redirect' > "$DS/mode"; run claim; A="$RC:$OUT"
 printf '' > "$DS/mode"
-B="$( ( unset CLEARANCE_DEVSTRIDE_TEST_URL; DEVSTRIDE_BASE_URL='https://api.devstride.com
+B="$( ( unset DEVSTRIDE_PLUGIN_TEST_URL; DEVSTRIDE_BASE_URL='https://api.devstride.com
 ' bash "$P" claim 2>&1 ); echo "rc=$?")"; printf '%s\n' "$B" >> "$LOG"
-if [ "${A%%:*}" -eq 1 ] && [ ! -e "$DS/followed" ] && printf '%s' "$A" | grep -q 'HTTP 307' \
+if [ "${A%%:*}" -eq 1 ] && [ ! -e "$DS/followed" ] && printf '%s' "$A" | grep -q 'HTTP 302' \
    && printf '%s' "$B" | grep -q 'DEVSTRIDE_BASE_URL must be' && printf '%s' "$B" | grep -q 'rc=1$' && ! printf '%s' "$B" | grep -q Traceback; then
-  ok "(7b) a 307 from the server is reported, never followed; a base URL with a trailing newline is refused"
+  ok "(7b) a 302 from the server is reported, never followed; a base URL with a trailing newline is refused"
 else bad "(7b) a=$A followed=$([ -e "$DS/followed" ] && echo yes || echo no) b=$B"; fi
 
 # (8) credentialsFile: used for what the environment leaves unset; a file open to group or other is refused
@@ -336,6 +339,40 @@ if [ "${A%%:*}" -eq 1 ] && printf '%s' "$A" | grep -q 'creds.env is readable by 
    && [ "${D%%:*}" -eq 1 ] && printf '%s' "$D" | grep -q 'DevStride credentials missing (DEVSTRIDE_API_KEY, DEVSTRIDE_API_SECRET, DEVSTRIDE_ORG_ID)'; then
   ok "(8) credentialsFile: mode 0644 refused (names the file, chmod 600); 0600 accepted (relative to the repository root, and with ~/); no file and no environment → missing, naming the variables"
 else bad "(8) a=$A b=$B c=$C d=$D"; fi
+
+# (8a) the key resolver is the shared one: the provider keeps no HTTP or credential code of its own
+if grep -q 'devstride_connection.credentials(' "$ROOT/skills/release/scripts/clearance_core.py" && grep -q 'devstride_connection.call_tool(' "$ROOT/skills/release/scripts/clearance_core.py" \
+   && ! grep -qE 'urllib|http\.client|BASE_URL_RULE' "$ROOT/skills/release/scripts/clearance_core.py"; then
+  ok "(8a) credentials and calls go through the shared resolver (the open-mode refusal in (8) is its text)"
+else bad "(8a) clearance_core.py still holds its own credential or HTTP code"; fi
+
+# (8b) no environment and no credentialsFile: the key the machine's DevStride connection carries
+#      (the user-level devstride entry in Claude Code's configuration file) supplies it; an entry
+#      open to others is not read; a configured credentialsFile still wins over an entry
+entry() { # entry KEY [MODE] — write the configuration file with a devstride entry carrying KEY
+  python3 - "$CLAUDE_CONFIG_DIR/.claude.json" "$1" "${2:-600}" <<'PY'
+import json, os, sys
+path, key, mode = sys.argv[1], sys.argv[2], int(sys.argv[3], 8)
+if os.path.lexists(path):
+    os.unlink(path)
+fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+os.write(fd, json.dumps({"mcpServers": {"devstride": {"type": "http", "url": os.environ.get("DEVSTRIDE_PLUGIN_TEST_URL", "https://api.devstride.com") + "/mcp", "headers": {
+    "X-DevStride-Api-Key": key, "X-DevStride-Api-Secret": "test-secret", "X-DevStride-Organization-Id": "org-1"}}}}).encode())
+os.close(fd); os.chmod(path, mode)
+PY
+}
+fresh entrykey; unset DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID
+mkdir -p .claude; printf '{"release":{"clearance":{"provider":"devstride"}}}' > .claude/ds-config.json
+entry test-key; run claim; A="$RC:$OUT"
+run release; entry test-key 644; run claim; B="$RC:$OUT"
+entry wrong-key-entry; printf 'DEVSTRIDE_API_KEY=test-key\nDEVSTRIDE_API_SECRET=test-secret\nDEVSTRIDE_ORG_ID=org-1\n' > creds.env; chmod 600 creds.env
+printf '{"release":{"clearance":{"provider":"devstride","credentialsFile":"creds.env"}}}' > .claude/ds-config.json; run claim; C="$RC:$OUT"
+rm -f "$CLAUDE_CONFIG_DIR/.claude.json" creds.env
+export DEVSTRIDE_API_KEY=test-key DEVSTRIDE_API_SECRET=test-secret DEVSTRIDE_ORG_ID=org-1
+if printf '%s' "$A" | grep -q '^0:CLEARED' && [ "${B%%:*}" -eq 1 ] && printf '%s' "$B" | grep -q 'DevStride credentials missing' \
+   && printf '%s' "$C" | grep -q '^0:CLEARED' && ! printf '%s%s%s' "$A" "$B" "$C" | grep -q 'wrong-key-entry'; then
+  ok "(8b) with no environment and no credentialsFile the connection's own key is used; an entry in a file open to others is not; a configured credentialsFile wins over an entry"
+else bad "(8b) a=$A b=$B c=$C"; fi
 
 # (9) identity: the holder rule is one rule — both providers print the same string; none → exit 1
 fresh ident; A="$(bash "$P" identity)"; B="$(bash "$G" identity)"

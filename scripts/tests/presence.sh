@@ -1,7 +1,8 @@
 #!/bin/bash
-# Deterministic tests for hooks/presence.py — every session reports itself through the repository's
-# own presence command. Each case runs against a private cache and throwaway repositories; the
-# "repository command" appends its environment to a log, so a case reads exactly what was sent.
+# Deterministic tests for hooks/presence.py — every session reports itself, through the repository's
+# own presence command or the built-in reporter. Each case runs against a private cache and throwaway
+# repositories; the "repository command" appends its environment to a log, and the built-in
+# reporter's cases (B1)-(B8) read a fake server's log, so a case reads exactly what was sent.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; HOOK="$ROOT/hooks/presence.py"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
@@ -15,6 +16,11 @@ trap cleanup EXIT
 export XDG_CACHE_HOME="$WORK/cache"
 export CLAUDE_CONFIG_DIR="$WORK/claude"   # Claude Code's own session status files (case 38b) live here
 unset CLAUDE_PID CLAUDE_CODE_SESSION_ID   # the cases name their own stand-in process
+# A maintainer's real configuration file and real key are never read: a throwaway HOME, a scratch
+# CLAUDE_CONFIG_DIR (above) whose .claude.json only a case writes, and none of the key variables.
+export HOME="$WORK/home"; mkdir -p "$HOME" "$CLAUDE_CONFIG_DIR"
+export GIT_CONFIG_GLOBAL="$WORK/gitconfig" GIT_CONFIG_NOSYSTEM=1; printf '[user]\n\tname = t\n\temail = t@t\n' > "$GIT_CONFIG_GLOBAL"
+unset DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL DEVSTRIDE_PRESENCE DEVSTRIDE_PLUGIN_TEST_URL DEVSTRIDE_SESSION
 RECORDS="$XDG_CACHE_HOME/devstride-plugin/presence"
 LOG="$WORK/sent.log"
 ITEM_NO="I$((20000 + 100))"   # an example item number, built at run time (public-repo hygiene)
@@ -30,7 +36,7 @@ REPORT='python3 -c "import json,os; print(json.dumps({k:v for k,v in os.environ.
 mkrepo() { # mkrepo NAME [CONFIG-JSON] [BRANCH]
   local d="$WORK/$1"; mkdir -p "$d/.claude"; git -C "$d" init -q -b "${3:-main}" 2>/dev/null
   git -C "$d" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
-  printf '%s' "${2:-{\}}" > "$d/.claude/ds-config.json"; printf '%s' "$d"
+  local empty='{}'; printf '%s' "${2:-$empty}" > "$d/.claude/ds-config.json"; printf '%s' "$d"
 }
 config() { python3 -c 'import json,sys; print(json.dumps({"presence":{"command":sys.argv[1],"intervalMinutes":int(sys.argv[2])}}))' "$REPORT" "${1:-5}"; }
 fire() { # fire EVENT SESSION CWD [REASON-OR-SOURCE] [EXTRA-JSON] — run the hook as Claude Code does; prints its
@@ -80,12 +86,19 @@ owner() { sleep 300 >/dev/null 2>&1 & echo "$!" >> "$WORK/owners"; echo "$!"; } 
 
 R="$(mkrepo repo "$(config)" "phil/26-01-01/$ITEM_NO-some-story")"
 
-# (1) no block, a null block, or a directory outside any repository: silent, nothing written
+# (1) no key on this machine: an absent block, a null block and a directory outside any repository
+#     send nothing and write no record. The first SessionStart says so once (the marker records it).
+NO_KEY_LINE="devstride: this machine's DevStride connection carries no API key, so it is not ready for agents and this session is not shown on the Agent Fleet. Fix, once per machine: /devstride:setup connect"
 N="$(mkrepo plain '{"presence":null}')"; mkdir -p "$WORK/loose"
-OUT="$(fire SessionStart s0 "$WORK/$(basename "$(mkrepo none)")")$(fire SessionStart s0 "$N")$(fire UserPromptSubmit s0 "$WORK/loose")"
+OUT0="$(fire SessionStart s0 "$N")$(fire UserPromptSubmit s0 "$WORK/loose")"      # a null block, and a prompt: never
+OUT1="$(fire SessionStart s0 "$(mkrepo none)" 2>&1)"                                # the first start with no key
+OUT2="$(fire SessionStart s0b "$WORK/none" 2>&1)$(fire UserPromptSubmit s0 "$WORK/loose" 2>&1)$(fire SessionStart s0c "$WORK/loose" 2>&1)$(fire Stop s0 "$WORK/none" 2>&1)"
 sleep 0.5
-if [ -z "$OUT" ] && [ ! -e "$XDG_CACHE_HOME/devstride-plugin" ] && [ "$(sent)" = 0 ]; then ok "(1) no presence block / null / no repository → silent, no directory or file created, nothing sent"
-else bad "(1) out=$OUT sent=$(sent)"; fi
+MARKER="$XDG_CACHE_HOME/devstride-plugin/presence-no-key"
+if [ -z "$OUT0" ] && [ "$OUT1" = "$NO_KEY_LINE" ] && [ -z "$OUT2" ] && [ ! -e "$RECORDS" ] && [ "$(sent)" = 0 ] \
+   && [ "$(python3 -c 'import os,stat,sys; i=os.stat(sys.argv[1]); print(oct(stat.S_IMODE(i.st_mode)), i.st_size)' "$MARKER")" = "0o600 0" ]; then
+  ok "(1) no key: no block / null / no repository → nothing sent, no record; the first SessionStart prints the one line, once (empty owner-only marker)"
+else bad "(1) out0=$OUT0 out1=$OUT1 out2=$OUT2 sent=$(sent) records=$(ls "$RECORDS" 2>&1)"; fi
 
 # (2) session start sends `start` with every documented variable; the record is owner-only
 O1="$(owner)"
@@ -711,7 +724,7 @@ stop_keeper s38b
 # session's keeper lock and never checks anything.
 OLDP="$WORK/oldplugin"; mkdir -p "$OLDP/.claude-plugin" "$OLDP/hooks" "$OLDP/skills/build-item/scripts"
 printf '{"name":"devstride","version":"1.0.0"}' > "$OLDP/.claude-plugin/plugin.json"
-cp "$HOOK" "$OLDP/hooks/presence.py"; cp "$ROOT/skills/build-item/scripts/claim_record.py" "$OLDP/skills/build-item/scripts/"
+cp "$HOOK" "$ROOT/hooks/presence-report.py" "$OLDP/hooks/"; cp "$ROOT"/skills/build-item/scripts/*.py "$OLDP/skills/build-item/scripts/"
 LEGACY="$WORK/legacyplugin"; mkdir -p "$LEGACY/hooks"
 cat > "$LEGACY/hooks/presence.py" <<'PY'
 import fcntl, os, sys, time
@@ -797,6 +810,291 @@ if ! kill -0 "$L40" 2>/dev/null && [ "$(of s50 0)" = 2 ] && [ "$(of s50 2 PRESEN
   ok "(42) ending an earlier version's keeper → a beat from this version at once (busy since the open call), its own keeper running"
 else bad "(42) legacy=$L40 $(grep '"s50"' "$LOG")"; fi
 kill "$L40" 2>/dev/null; stop_keeper s50
+
+# ── The built-in reporter (B1)-(B8): no repository command, the report goes to DevStride with the
+# key the machine's connection carries. A fake server stands in (it accepts any key and records the
+# digest of the one that arrived); every session's keeper is stopped once its case has its start.
+FX="$ROOT/scripts/tests/fixtures/clearance"
+server() { # server NAME — start a fake DevStride server; prints its state directory
+  local d="$WORK/ds-$1" n=0; mkdir -p "$d"; : > "$d/any-key"
+  python3 "$FX/fake-devstride.py" "$d" >/dev/null 2>&1 & echo "$!" >> "$WORK/owners"
+  until [ -s "$d/port" ] || [ $n -gt 100 ]; do sleep 0.05; n=$((n + 1)); done; printf '%s' "$d"
+}
+DS="$(server main)"; export DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:$(cat "$DS/port")"
+key() { export DEVSTRIDE_API_KEY="${1:-test-key}" DEVSTRIDE_API_SECRET=test-secret DEVSTRIDE_ORG_ID=org-1; }
+nokey() { unset DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID; }
+dig() { printf '%s' "$1" | python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.stdin.read().encode()).hexdigest())'; }
+got() { # got SESSION N FIELD [STATE-DIR] — FIELD of the session's Nth report at the server (N=0: how many);
+  #       FIELD `keys` is its sorted key list; a key the report does not carry prints "-"
+  python3 -c 'import json,os,sys
+p=os.path.join(sys.argv[4],"presence.jsonl")
+rows=[json.loads(l) for l in open(p) if l.strip()] if os.path.exists(p) else []
+rows=[r for r in rows if r.get("sessionId")==sys.argv[1]]; n=int(sys.argv[2])
+if n==0: print(len(rows))
+elif len(rows)<n: print("?")
+elif sys.argv[3]=="keys": print(",".join(sorted(k for k in rows[n-1] if not k.startswith("_"))))
+else: print(rows[n-1].get(sys.argv[3],"-"))' "$1" "$2" "${3:-}" "${4:-$DS}"
+}
+reach() { local i=0; while [ "$(got "$1" 0 "" "${3:-$DS}")" -lt "$2" ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done; [ "$(got "$1" 0 "" "${3:-$DS}")" -ge "$2" ]; }
+bbegin() { # bbegin SESSION DIR — a session the built-in reporter started, with no keeper and no known process
+  fire SessionStart "$1" "$2" >/dev/null 2>&1; reach "$1" 1; stop_keeper "$1"; edit "$1" 'r["owner"] = 0'
+}
+claudejson() { # claudejson PYTHON — write Claude Code's configuration file (mode 600) from a Python expression;
+  #              E(key, **changes) is a devstride server entry carrying KEY
+  python3 - "$CLAUDE_CONFIG_DIR/.claude.json" "$1" <<'PY'
+import json, os, sys
+def E(key, url=os.environ["DEVSTRIDE_PLUGIN_TEST_URL"] + "/mcp", **changes):  # under the tests-only address only an entry at it is usable
+    headers = {"X-DevStride-Api-Key": key, "X-DevStride-Api-Secret": "test-secret", "X-DevStride-Organization-Id": "org-1"}
+    headers.update(changes)
+    return {"type": "http", "url": url, "headers": {k: v for k, v in headers.items() if v is not None}}
+path = sys.argv[1]
+if os.path.lexists(path):
+    os.unlink(path)
+fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+os.write(fd, json.dumps(eval(sys.argv[2])).encode()); os.close(fd)
+PY
+}
+noconfig() { rm -f "$CLAUDE_CONFIG_DIR/.claude.json"; }
+real() { (cd "$1" && pwd -P); }
+BP="$(mkrepo b-plain)"   # a repository with no presence block
+
+# (B1) the decision: the machine switch, the repository switch, a blank command, a named command over
+#      a key, the built-in reporter with a key and nothing without one, and the interval defaults
+key; : > "$LOG"
+for w in 0 false OFF " no "; do DEVSTRIDE_PRESENCE="$w" fire SessionStart b1off "$R" >/dev/null 2>&1; DEVSTRIDE_PRESENCE="$w" fire SessionStart b1off "$BP" >/dev/null 2>&1; done
+fire SessionStart b1null "$N" >/dev/null 2>&1
+fire SessionStart b1blank "$(mkrepo b-blank '{"presence":{"command":"  ","intervalMinutes":2}}')" >/dev/null 2>&1
+fire SessionStart b1cmd "$R" >/dev/null 2>&1; upto b1cmd 1; stop_keeper b1cmd
+bbegin b1in "$BP"
+(nokey; fire SessionStart b1nk "$BP" >/dev/null 2>&1); sleep 0.5
+bbegin b1e "$(mkrepo b-empty '{"presence":{}}')"; bbegin b1i3 "$(mkrepo b-three '{"presence":{"intervalMinutes":3}}')"
+bbegin b1i99 "$(mkrepo b-far '{"presence":{"intervalMinutes":99}}')"; bbegin b1str "$(mkrepo b-str '{"presence":"yes"}')"
+if [ "$(of b1off 0)" = 0 ] && [ "$(got b1off 0)" = 0 ] && [ ! -e "$RECORDS/b1off.json" ] && [ ! -e "$RECORDS/b1null.json" ] \
+   && [ ! -e "$RECORDS/b1blank.json" ] && [ "$(of b1cmd 0)" = 1 ] && [ "$(got b1cmd 0)" = 0 ] && [ "$(rec b1cmd 'r["mode"]')" = command ] \
+   && [ "$(got b1in 1 event)" = start ] && [ "$(rec b1in 'r["mode"]')" = builtin ] && [ "$(of b1in 0)" = 0 ] \
+   && [ ! -e "$RECORDS/b1nk.json" ] && ! keeper_alive b1nk \
+   && [ "$(got b1in 1 intervalMinutes)" = 1 ] && [ "$(got b1e 1 intervalMinutes)" = 1 ] && [ "$(got b1i3 1 intervalMinutes)" = 3 ] \
+   && [ "$(got b1i99 1 intervalMinutes)" = 1 ] && [ "$(got b1str 1 intervalMinutes)" = 1 ]; then
+  ok "(B1) DEVSTRIDE_PRESENCE off (a repository command included), presence null, a blank command → nothing; a named command wins over a key; no block + a key → the built-in reporter (interval 1, a block's own 3, out of range 1); no key → no record, no keeper"
+else bad "(B1) off=$(of b1off 0)/$(got b1off 0) cmd=$(of b1cmd 0)/$(got b1cmd 0) in=$(got b1in 1 event)/$(of b1in 0) nk=$(ls "$RECORDS" | grep -c b1nk) iv=$(got b1in 1 intervalMinutes),$(got b1e 1 intervalMinutes),$(got b1i3 1 intervalMinutes),$(got b1i99 1 intervalMinutes),$(got b1str 1 intervalMinutes)"; fi
+
+# (B2) outside any repository: a start with no checkout, branch or item; the record has no root and
+#      keeps the directory; a prompt from a subdirectory is not a move; walking into a repository beats once
+mkdir -p "$WORK/out/sub"
+fire SessionStart b2 "$WORK/out" >/dev/null 2>&1; reach b2 1; stop_keeper b2
+K1="$(got b2 1 keys)"; TOP="$(rec b2 'r["top"]')"; DIR1="$(rec b2 'r["dir"]')"
+fire UserPromptSubmit b2 "$WORK/out/sub" >/dev/null 2>&1; sleep 0.6; A="$(got b2 0)"
+fire UserPromptSubmit b2 "$BP" >/dev/null 2>&1; reach b2 2; stop_keeper b2
+fire UserPromptSubmit b2 "$BP" >/dev/null 2>&1; sleep 0.6; stop_keeper b2
+if [ "$K1" = "activeAt,event,intervalMinutes,machine,pluginVersion,reportedAt,sessionId,state" ] && [ "$TOP" = None ] \
+   && [ "$DIR1" = "$(real "$WORK/out")" ] && [ "$A" = 1 ] && [ "$(got b2 0)" = 2 ] && [ "$(got b2 2 event)" = beat ] \
+   && [ "$(got b2 2 checkout)" = b-plain ] && [ "$(got b2 2 branch)" = main ]; then
+  ok "(B2) outside a repository → start with no checkout, branch or item (record: no root, the directory kept); a subdirectory is no move; into a repository → one beat from it"
+else bad "(B2) keys=$K1 top=$TOP dir=$DIR1 a=$A n=$(got b2 0) $(got b2 2 keys)"; fi
+
+# (B3) what is sent: exactly the documented fields for a start, a working beat (busy since its open
+#      call), a waiting beat and an end; the checkout is a base name; the label is the session's own name
+BB="$(mkrepo b-body '{}' "phil/26-01-01/$ITEM_NO-built-in")"; O3="$(owner)"; mkdir -p "$CLAUDE_CONFIG_DIR/sessions"
+printf '{"sessionId":"b3","pid":%s,"name":"Fleet walk"}' "$O3" > "$CLAUDE_CONFIG_DIR/sessions/$O3.json"
+CLAUDE_PID="$O3" fire SessionStart b3 "$BB" >/dev/null 2>&1; reach b3 1; stop_keeper b3; edit b3 'r["owner"] = 0'
+age b3 61; fire UserPromptSubmit b3 "$BB" >/dev/null 2>&1; reach b3 2
+fire PreToolUse b3 "$BB" "" "$(tool Bash t-b3)" >/dev/null 2>&1
+edit b3 'r["queued"] = int(r.get("queued") or 0) + 1'
+python3 "$HOOK" send beat working b3 "$(rec b3 'r["id"]')" "$(rec b3 'r["queued"]')" "$(now_ms)"; reach b3 3
+fire PostToolUse b3 "$BB" "" "$(tool Bash t-b3)" >/dev/null 2>&1
+age b3 31; fire Stop b3 "$BB" >/dev/null 2>&1; reach b3 4
+fire SessionEnd b3 "$BB" logout >/dev/null 2>&1; reach b3 5
+COMMON="activeAt,branch,checkout,event,intervalMinutes,item,label,machine,pluginVersion,reportedAt,sessionId"
+if [ "$(got b3 1 keys)" = "$COMMON,state" ] && [ "$(got b3 1 state)" = starting ] && [ "$(got b3 1 checkout)" = b-body ] \
+   && [ "$(got b3 1 item)" = "$ITEM_NO" ] && [ "$(got b3 1 pluginVersion)" = "$OWNV" ] && [ "$(got b3 1 reportedAt)" -gt 1000000000000 ] \
+   && [ "$(got b3 2 keys)" = "$COMMON,state" ] && [ "$(got b3 2 state)" = working ] \
+   && [ "$(got b3 3 keys)" = "activeAt,branch,busySince,checkout,event,intervalMinutes,item,label,machine,pluginVersion,reportedAt,sessionId,state" ] \
+   && [ "$(got b3 4 keys)" = "$COMMON,state" ] && [ "$(got b3 4 state)" = waiting ] \
+   && [ "$(got b3 5 keys)" = "activeAt,branch,checkout,endReason,event,intervalMinutes,item,label,machine,pluginVersion,reportedAt,sessionId" ] \
+   && [ "$(got b3 5 event)" = end ] && [ "$(got b3 5 endReason)" = logout ]; then
+  ok "(B3) start, working beat (busySince only while a call is open), waiting beat and end carry exactly the documented fields; checkout is a base name"
+else bad "(B3) 1=$(got b3 1 keys) 2=$(got b3 2 keys) 3=$(got b3 3 keys) 4=$(got b3 4 keys) 5=$(got b3 5 keys)"; fi
+if [ "$(got b3 1 label)" = "Fleet walk" ] && [ "$(got b2 1 label)" = "-" ]; then ok "(B3b) the label is the session's own name from Claude Code's session record; none → no label"
+else bad "(B3b) label=$(got b3 1 label) / $(got b2 1 label)"; fi
+
+# (B4) where the key comes from: the environment, the connection's user-level entry, the session's
+#      project entry (the repository root, the main checkout for a linked worktree, a plain directory);
+#      the environment wins over an entry and a project entry over the user-level one
+MAINR="$(mkrepo b-main)"; git -C "$MAINR" worktree add -q "$WORK/b-linked" -b linked 2>/dev/null; mkdir -p "$WORK/b-dir"
+src() { # src SESSION DIR EXPECTED-KEY — start SESSION in DIR; pass when the server got EXPECTED-KEY's digest
+  fire SessionStart "$1" "$2" >/dev/null 2>&1; reach "$1" 1; stop_keeper "$1"
+  [ "$(got "$1" 1 _keyDigest)" = "$(dig "$3")" ] || { SRC_BAD="$SRC_BAD $1=$(got "$1" 0)"; return 1; }
+}
+SRC_BAD=""
+key k-env; noconfig; src b4env "$BP" k-env
+nokey
+claudejson '{"mcpServers": {"devstride": E("k-user")}}'; src b4user "$BP" k-user
+claudejson "{'projects': {'$(real "$BP")': {'mcpServers': {'devstride': E('k-proj')}}}}"; src b4proj "$BP" k-proj
+claudejson "{'projects': {'$(real "$MAINR")': {'mcpServers': {'devstride': E('k-main')}}}}"; src b4tree "$WORK/b-linked" k-main
+claudejson "{'projects': {'$(real "$WORK/b-dir")': {'mcpServers': {'devstride': E('k-dir')}}}}"; src b4dir "$WORK/b-dir" k-dir
+claudejson "{'mcpServers': {'devstride': E('k-user')}, 'projects': {'$(real "$BP")': {'mcpServers': {'devstride': E('k-proj')}}}}"; src b4both "$BP" k-proj
+claudejson "{'mcpServers': {'devstride': {'type': 'http', 'url': '$DEVSTRIDE_PLUGIN_TEST_URL/mcp', 'headers': {'x-devstride-api-key': 'k-lower', 'x-devstride-api-secret': 'test-secret', 'x-devstride-organization-id': 'org-1'}}}}"; src b4low "$BP" k-lower
+key k-env2; claudejson '{"mcpServers": {"devstride": E("k-user")}}'; src b4wins "$BP" k-env2
+nokey
+if [ -z "$SRC_BAD" ]; then ok "(B4) the key is found in the environment, the user-level entry, the project entry (repository root, main checkout of a linked worktree, a plain directory); environment > project entry > user-level; header names in any case"
+else bad "(B4) wrong or no key for:$SRC_BAD"; fi
+
+# (B4b) never used, so the session is not reported: a header that references a variable, an entry
+#       missing its secret or organization, an address that is not a DevStride API host, another
+#       server name, a keyless entry (the browser sign-in shape), an unsafe configuration file
+unused() { fire SessionStart "$1" "$BP" >/dev/null 2>&1; sleep 0.3; [ ! -e "$RECORDS/$1.json" ] || { USED="$USED $1"; stop_keeper "$1"; }; }
+USED=""
+claudejson '{"mcpServers": {"devstride": E("${DEVSTRIDE_API_KEY}")}}'; unused b4ref
+claudejson '{"mcpServers": {"devstride": E("k", **{"X-DevStride-Api-Secret": None})}}'; unused b4nosecret
+claudejson '{"mcpServers": {"devstride": E("k", **{"X-DevStride-Organization-Id": ""})}}'; unused b4noorg
+claudejson '{"mcpServers": {"devstride": E("k", url="https://example.com/mcp")}}'; unused b4host
+claudejson '{"mcpServers": {"devstride": E("k", url="https://api.devstride.com.evil.example/mcp")}}'; unused b4evil
+claudejson '{"mcpServers": {"devstride": E("k", url="https://api.devstride.com/other")}}'; unused b4path
+claudejson '{"mcpServers": {"devstride": E("k", url="https://api.devstride.com/mcp")}}'; unused b4real
+claudejson '{"mcpServers": {"devstride-2": E("k")}}'; unused b4name
+claudejson '{"mcpServers": {"devstride": {"type": "http", "url": "https://api.devstride.com/mcp"}}}'; unused b4keyless
+claudejson '{"mcpServers": {"devstride": E("k")}}'; chmod 644 "$CLAUDE_CONFIG_DIR/.claude.json"; unused b4mode
+claudejson '{"mcpServers": {"devstride": E("k")}}'; mv "$CLAUDE_CONFIG_DIR/.claude.json" "$WORK/real.json"; ln -s "$WORK/real.json" "$CLAUDE_CONFIG_DIR/.claude.json"; unused b4link
+rm -f "$CLAUDE_CONFIG_DIR/.claude.json"
+claudejson '{"mcpServers": {"devstride": E("k")}}'; python3 -c 'import sys; f=open(sys.argv[1],"ab"); f.truncate(17*1048576)' "$CLAUDE_CONFIG_DIR/.claude.json"; unused b4big
+noconfig
+if [ -z "$USED" ]; then ok "(B4b) a \${VAR} header, a missing secret or organization, a foreign or look-alike host, another path, DevStride's real address while the tests-only one is set, another server name, a keyless entry, a file open to others, a link and an oversized file are never used: no record"
+else bad "(B4b) used:$USED"; fi
+
+# (B5) the one line: never with reporting switched off or a repository command; once with no key;
+#      the marker goes when a key appears, and the line is said once more after the key is taken away
+line_case() { # the cases below, in a cache of their own
+  local cache="$WORK/cache-line"; local mark="$cache/devstride-plugin/presence-no-key"
+  export XDG_CACHE_HOME="$cache"; nokey; noconfig
+  local quiet first again keyed lost once
+  quiet="$(DEVSTRIDE_PRESENCE=0 fire SessionStart b5a "$BP" 2>&1)$(fire SessionStart b5b "$N" 2>&1)$(fire SessionStart b5c "$R" 2>&1)"
+  [ -z "$quiet" ] && [ ! -e "$mark" ] || { echo "switched off or a command printed: $quiet"; return 1; }
+  first="$(fire SessionStart b5d "$BP" 2>&1)"; again="$(fire SessionStart b5e "$WORK/out" 2>&1)$(fire UserPromptSubmit b5d "$BP" 2>&1)"
+  [ "$first" = "$NO_KEY_LINE" ] && [ -z "$again" ] && [ -e "$mark" ] || { echo "first=$first again=$again"; return 1; }
+  key; keyed="$(fire SessionStart b5f "$BP" 2>&1)"; pkill -f "presence.py keeper b5f\$" 2>/dev/null
+  [ -z "$keyed" ] && [ ! -e "$mark" ] || { echo "with a key: $keyed"; return 1; }
+  nokey; lost="$(fire SessionStart b5g "$BP" 2>&1)"; once="$(fire SessionStart b5h "$BP" 2>&1)"
+  [ "$lost" = "$NO_KEY_LINE" ] && [ -z "$once" ] || { echo "lost=$lost once=$once"; return 1; }
+  # a key only one project's entry carries is not the machine's: starting there, then elsewhere, says nothing more
+  claudejson "{'projects': {'$(real "$BP")': {'mcpServers': {'devstride': E('k-proj')}}}}"
+  local inproj elsewhere
+  inproj="$(fire SessionStart b5i "$BP" 2>&1)"; pkill -f "presence.py keeper b5i\$" 2>/dev/null
+  elsewhere="$(fire SessionStart b5j "$WORK/out" 2>&1)"; noconfig
+  [ -z "$inproj" ] && [ -z "$elsewhere" ] && [ -e "$mark" ] || { echo "project key: in=$inproj elsewhere=$elsewhere"; return 1; }
+}
+if WHY="$(line_case)"; then ok "(B5) the no-key line: never with DEVSTRIDE_PRESENCE=0, presence null or a repository command; once per machine; the marker goes when a key resolves and the line is said once more after the key is gone"
+else bad "(B5) $WHY"; fi
+for s in a b c d e f g h i j; do pkill -f "$HOOK keeper b5$s\$" 2>/dev/null; done
+
+# (B6) quiet: a server with no such tool, or refusing the key → exit 3, nothing more for 30 minutes;
+#      a failing or unreachable one → exit 4, 2 minutes; a good answer removes the note; never a word
+QS="$(server quiet)"; QURL="http://127.0.0.1:$(cat "$QS/port")"; key
+calls() { [ -f "$QS/calls.log" ] && wc -l < "$QS/calls.log" | tr -d ' ' || echo 0; }
+lasted() { local i=0; while [ "$(rec "$1" 'r.get("last",{}).get("exit")' 2>/dev/null)" = None ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done; }
+quiet_case() { # quiet_case SESSION MODE — a start against the server in MODE; prints "<exit> <seconds of quiet, rounded to the minute>"
+  printf '%s' "$2" > "$QS/mode"
+  DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire SessionStart "$1" "$BP" >> "$WORK/qout" 2>&1 || echo "hook exit for $1" >> "$WORK/qout"; lasted "$1"; stop_keeper "$1"; edit "$1" 'r["owner"] = 0'
+  rec "$1" 'str(r["last"]["exit"]) + " " + str(round((r.get("quiet", 0) - r["last"]["at"]) / 60))'
+}
+: > "$WORK/qout"; A="$(quiet_case b6u unknown-tool)"; C0="$(calls)"
+age b6u 61; DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire UserPromptSubmit b6u "$BP" >> "$WORK/qout" 2>&1 || echo "hook exit" >> "$WORK/qout"; sleep 0.7; C1="$(calls)"; D1="$(rec b6u 'r["done"]')"
+edit b6u 'r["quiet"] = 1'; age b6u 61; DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire UserPromptSubmit b6u "$BP" >> "$WORK/qout" 2>&1 || echo "hook exit" >> "$WORK/qout"
+i=0; while [ "$(calls)" -lt 2 ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; C2="$(calls)"
+B="$(quiet_case b6a http401) $(quiet_case b6b http403)"; C="$(quiet_case b6c http500) $(quiet_case b6d http429) $(quiet_case b6e bad-json)"
+CE0="$(calls)"; DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire SessionEnd b6a "$BP" logout >> "$WORK/qout" 2>&1; sleep 0.7; CE1="$(calls)"   # an end inside the quiet time
+printf '' > "$QS/mode"; printf '2' > "$QS/delay"; S="$(DEVSTRIDE_PRESENCE_TIMEOUT=0.5 quiet_case b6s '')"; rm -f "$QS/delay"
+DEAD="$(server dead)"; DEADURL="http://127.0.0.1:$(cat "$DEAD/port")"; pkill -f "fake-devstride.py $DEAD\$" 2>/dev/null; sleep 0.2
+QURL_KEEP="$QURL"; QURL="$DEADURL"; X="$(quiet_case b6x '')"; QURL="$QURL_KEEP"
+printf 'http500' > "$QS/mode"; G0="$(quiet_case b6g http500)"; printf '' > "$QS/mode"
+edit b6g 'r["quiet"] = 1'; age b6g 61; DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire UserPromptSubmit b6g "$BP" >/dev/null 2>&1; reach b6g 1 "$QS"; sleep 0.3
+if [ "$A" = "3 30" ] && [ "$C0" = 1 ] && [ "$C1" = 1 ] && [ "$D1" = 2 ] && [ "$C2" = 2 ] && [ "$B" = "3 30 3 30" ] && [ "$C" = "4 2 4 2 4 2" ] \
+   && [ "$S" = "4 2" ] && [ "$X" = "4 2" ] && [ "$G0" = "4 2" ] && [ "$(rec b6g '"quiet" in r')" = False ] && [ "$(rec b6g 'r["last"]["exit"]')" = 0 ] && [ "$CE0" = "$CE1" ] && [ ! -s "$WORK/qout" ]; then
+  ok "(B6) no such tool, 401, 403 → exit 3 and 30 minutes of quiet (a beat or an end inside it runs nothing; one try after it); 500, 429, a bad answer, a timeout, a refused connection → exit 4 and 2 minutes; a good answer removes the note; the hook prints nothing and exits 0 throughout"
+else bad "(B6) a=$A calls=$C0/$C1/$C2 done=$D1 b=$B c=$C s=$S x=$X g=$G0 quiet=$(rec b6g '"quiet" in r') end=$CE0/$CE1 out=$(cat "$WORK/qout")"; fi
+
+# (B7) the keeper under the built-in reporter: it beats at the interval and ends a killed session
+#      (reason gone); it leaves when the repository switches reporting off, and when the connection
+#      loses its key; a keeper an earlier version started is replaced and the session keeps reporting
+key; O7="$(owner)"; K7="$(mkrepo b-keep)"
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O7" fire SessionStart b7 "$K7" >/dev/null 2>&1; reach b7 3; N7="$(got b7 0)"; E7="$(got b7 2 event):$(got b7 3 event)"
+kill "$O7" 2>/dev/null; wait "$O7" 2>/dev/null
+i=0; while [ "$(got b7 "$(got b7 0)" event)" != end ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; sleep 0.4
+LAST7="$(got b7 "$(got b7 0)" event):$(got b7 "$(got b7 0)" endReason)"; keeper_alive b7; GONE7=$?
+O7N="$(owner)"; K7N="$(mkrepo b-null)"
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O7N" fire SessionStart b7n "$K7N" >/dev/null 2>&1; reach b7n 1; wait_keeper b7n; UP7N=$?
+printf '{"presence":null}' > "$K7N/.claude/ds-config.json"
+i=0; while keeper_alive b7n && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; keeper_alive b7n; LEFT7N=$?
+nokey; claudejson '{"mcpServers": {"devstride": E("k-keep")}}'; O7K="$(owner)"
+DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O7K" fire SessionStart b7k "$BP" >/dev/null 2>&1; reach b7k 1; wait_keeper b7k; UP7K=$?
+claudejson '{"mcpServers": {"devstride": {"type": "http", "url": "https://api.devstride.com/mcp"}}}'
+i=0; while keeper_alive b7k && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; keeper_alive b7k; LEFT7K=$?
+noconfig; key; O7L="$(owner)"
+CLAUDE_PID="$O7L" fire SessionStart b7l "$BP" >/dev/null 2>&1; reach b7l 1; stop_keeper b7l; edit b7l 'r.pop("swept", None)'
+legacy b7l; CLAUDE_PID="$O7L" fire UserPromptSubmit b7l "$BP" >/dev/null 2>&1; reach b7l 2
+i=0; while ! keeper_cmd b7l | grep -qF "$HOOK keeper b7l" && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
+if [ "$N7" -ge 3 ] && [ "$E7" = "beat:beat" ] && [ "$LAST7" = "end:gone" ] && [ "$GONE7" = 1 ] && [ "$UP7N" = 0 ] && [ "$LEFT7N" = 1 ] && [ "$UP7K" = 0 ] && [ "$LEFT7K" = 1 ] \
+   && [ "$(got b7l 2 event)" = beat ] && keeper_cmd b7l | grep -qF "$HOOK keeper b7l"; then
+  ok "(B7) built-in keeper: beats, then end (gone) for a killed session; leaves when presence becomes null and when the connection loses its key; an earlier version's keeper is replaced and the session reports at once"
+else bad "(B7) beats=$N7/$E7 last=$LAST7 gone=$GONE7 null=$UP7N/$LEFT7N key=$UP7K/$LEFT7K legacy=$(got b7l 0) $(keeper_cmd b7l)"; fi
+stop_keeper b7l; kill "$O7N" "$O7K" "$O7L" 2>/dev/null
+
+# (B9) a session a repository's own command reports stays with that command when it moves to a place
+#      that names none (a key is there, so the built-in reporter could run): the command keeps getting
+#      its reports, the server gets none; and a
+#      repository whose config file cannot be read switches nothing on
+key; : > "$LOG"
+fire SessionStart b9 "$R" >/dev/null 2>&1; upto b9 1; stop_keeper b9; edit b9 'r["owner"] = 0'
+age b9 61; fire UserPromptSubmit b9 "$BP" >/dev/null 2>&1; upto b9 2
+age b9 61; fire UserPromptSubmit b9 "$WORK/out" >/dev/null 2>&1; upto b9 3
+fire SessionEnd b9 "$BP" logout >/dev/null 2>&1; upto b9 4
+BROKEN="$(mkrepo b-broken '{"presence": null,}')"; fire SessionStart b9x "$BROKEN" >/dev/null 2>&1; sleep 0.4
+if [ "$(of b9 0)" = 4 ] && [ "$(of b9 4 PRESENCE_EVENT)" = end ] && [ "$(of b9 3 PRESENCE_CHECKOUT)" = "$(real "$R")" ] \
+   && [ "$(got b9 0)" = 0 ] && [ "$(rec b9 'r["mode"]')" = command ] && [ ! -e "$RECORDS/b9x.json" ]; then
+  ok "(B9) a session its repository's command reports keeps that command in a place that names none (the built-in reporter never takes it over); an unreadable config file switches nothing on"
+else bad "(B9) command got $(of b9 0), server got $(got b9 0), mode=$(rec b9 'r.get("mode")') broken=$(ls "$RECORDS" | grep -c b9x)"; fi
+nokey
+
+# (B8) ordering, holds and ownership are the same for a built-in session as for a repository command:
+#      cases (3), (4), (16), (20) and (26) once more, against the server
+key; BO="$(mkrepo b-order)"
+bbegin b8 "$BO"
+fire UserPromptSubmit b8 "$BO" >/dev/null 2>&1; sleep 0.5; A="$(got b8 0)"
+age b8 61; fire UserPromptSubmit b8 "$BO" >/dev/null 2>&1; reach b8 2                        # (3)
+fire Stop b8 "$BO" >/dev/null 2>&1; sleep 0.5; B="$(got b8 0)"                                # (4) held
+age b8 31; fire Stop b8 "$BO" >/dev/null 2>&1; reach b8 3; age b8 31; fire Stop b8 "$BO" >/dev/null 2>&1; sleep 0.5
+if [ "$A" = 1 ] && [ "$(got b8 2 event):$(got b8 2 state)" = beat:working ] && [ "$B" = 2 ] && [ "$(got b8 0)" = 3 ] \
+   && [ "$(got b8 3 event):$(got b8 3 state)" = beat:waiting ] && [ "$(rec b8 'r["mode"]')" = builtin ] && [ "$(rec s1 'r["mode"]')" = command ]; then
+  ok "(B8) built-in: a prompt within a minute waits, a minute later beats; a finished turn is held 30 s, then sent once; the record's mode is builtin (command for a repository that names one)"
+else bad "(B8) a=$A b=$B n=$(got b8 0) 2=$(got b8 2 event):$(got b8 2 state) 3=$(got b8 3 event):$(got b8 3 state) mode=$(rec b8 'r.get("mode")')/$(rec s1 'r.get("mode")')"; fi
+printf '0.4' > "$DS/delay"                                                                    # (16) a slow report
+bbegin b816 "$BO"; age b816 31
+fire Stop b816 "$BO" >/dev/null 2>&1; fire SessionEnd b816 "$BO" logout >/dev/null 2>&1; sleep 2.5; rm -f "$DS/delay"
+ENDS="$(python3 -c 'import json,sys; print(sum(1 for l in open(sys.argv[1]) if json.loads(l).get("sessionId")=="b816" and json.loads(l)["event"]=="end"))' "$DS/presence.jsonl")"
+if [ "$(got b816 "$(got b816 0)" event)" = end ] && [ "$ENDS" = 1 ]; then ok "(B8b) built-in: a beat and an end queued together → end last, once"
+else bad "(B8b) n=$(got b816 0) ends=$ENDS"; fi
+bbegin b820 "$BO"; ID="$(rec b820 'r["id"]')"; NOW_MS="$(now_ms)"                               # (20)
+python3 "$HOOK" send start starting b820 "$ID" 3 "$NOW_MS"; python3 "$HOOK" send end ended b820 "$ID" 2 "$NOW_MS"
+python3 "$HOOK" send beat working b820 "$ID" 3 "$NOW_MS"; python3 "$HOOK" send beat working b820 0123456789ab 9 "$NOW_MS"; sleep 0.3
+if [ "$(got b820 0)" = 2 ] && [ "$(got b820 2 event)" = start ] && [ "$(rec b820 'r["done"]')" = 3 ]; then
+  ok "(B8c) built-in: a report overtaken by a newer one, or queued by a record since replaced, is dropped"
+else bad "(B8c) n=$(got b820 0) done=$(rec b820 'r["done"]')"; fi
+O826="$(owner)"; CLAUDE_PID="$O826" fire SessionStart b826 "$BO" >/dev/null 2>&1; reach b826 1; stop_keeper b826; age b826 61   # (26)
+python3 -c '
+import fcntl, os, sys, time
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT, 0o600); fcntl.flock(fd, fcntl.LOCK_EX)
+open(sys.argv[2], "w").close(); time.sleep(1.5)' "$RECORDS/b826.state.lock" "$WORK/heldb826" &
+HOLDER=$!
+i=0; while [ ! -e "$WORK/heldb826" ] && [ $i -lt 50 ]; do sleep 0.05; i=$((i + 1)); done
+(CLAUDE_PID="$O826" fire UserPromptSubmit b826 "$BO" >/dev/null 2>&1) &
+sleep 0.7; Q1="$(rec b826 'r["queued"]')"; wait "$HOLDER"; reach b826 2; Q2="$(rec b826 'r["queued"]')"
+if [ "$Q1" = 1 ] && [ "$Q2" = 2 ] && [ "$(got b826 2 event)" = beat ]; then ok "(B8d) built-in: a hook waits for the session's state lock, then its update lands (beat)"
+else bad "(B8d) q1=$Q1 q2=$Q2 n=$(got b826 0)"; fi
+stop_keeper b826; nokey
+
+# (B10) nothing the hook wrote (a session's record, a lock, the no-key marker) holds a key or a secret
+if [ -n "$(ls "$RECORDS")" ] && ! grep -rqF -e test-key -e test-secret -e k-env -e k-user -e k-proj -e k-main -e k-dir -e k-lower -e k-keep "$WORK/cache" "$WORK/cache-line" 2>/dev/null; then
+  ok "(B10) no record, lock or marker the hook wrote holds a key or a secret, wherever the key came from"
+else bad "(B10) a key or secret in: $(grep -rlF -e test-key -e test-secret -e k-env -e k-user -e k-proj -e k-main -e k-dir -e k-lower -e k-keep "$WORK/cache" "$WORK/cache-line" 2>/dev/null | head -3)"; fi
 
 # (12) hooks.json registers the hook on all ten events, bounded and failing open; Notification only for
 #      the six prompt types the hook reads, and PreToolUse after the model recorder

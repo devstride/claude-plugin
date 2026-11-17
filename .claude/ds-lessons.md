@@ -3,7 +3,7 @@
 <!-- Written ONLY by devstride:review at settle time. Read-only everywhere else.
      Format + curation rules: the devstride:review skill's references/lessons-format.md -->
 
-Next-ID: 6
+Next-ID: 7
 
 ## L-001 · Free-text git subjects classified by loose words
 
@@ -63,8 +63,8 @@ sources: review settle (status-line name refresh re-spawned on every stale redra
 
 ## L-005 · Grep consistency check passes on the wrong text or on nothing
 
-class: repeat · recurrences: 1 · first-seen: 2026-11-09 · last-seen: 2026-11-09
-sources: review settle (shipped-default test: shape-target rows and the no-override guard)
+class: repeat · recurrences: 2 · first-seen: 2026-11-09 · last-seen: 2026-11-17
+sources: review settle (shipped-default test: shape-target rows and the no-override guard; a no-secret grep over a directory the case never wrote to)
 
 - **Pattern:** a `scripts/tests/*.sh` check extracts a section with `awk` and greps it for words:
   the words also occur in nearby prose, not only in the rows it claims to guard; a negative check
@@ -75,3 +75,17 @@ sources: review settle (shipped-default test: shape-target rows and the no-overr
 - **Avoid:** match the structure itself (an anchored table row with its cells); fail when an
   extraction is empty; check the real vocabulary source (registry keys, the knob table); and prove
   each check with a mutation that must turn it red.
+
+## L-006 · Negative behaviour check the test's own setup can never trip
+
+class: common · recurrences: 1 · first-seen: 2026-11-17 · last-seen: 2026-11-17
+sources: review settle (a redirect the client never re-sends; a key already in the environment; output gathered inside a command substitution)
+
+- **Pattern:** a `scripts/tests/*.sh` case asserts something never happens (a redirect is not
+  followed, no variable is added, nothing is printed), but its setup rules the bad outcome out:
+  the fake answers 307 to a POST, the secret is already in the environment the "added" set is
+  compared with, or the output is appended to a variable inside `$(…)` and lost.
+- **Why:** the guard under test can be deleted and the case stays green; it reads as coverage of
+  a safety property.
+- **Avoid:** build the setup in which the unguarded code WOULD misbehave (a 302, the key only in
+  the file, output to a file), then delete the guard once and watch the case fail.

@@ -13,7 +13,8 @@
 # DEVSTRIDE_ORG_SLUG and DEVSTRIDE_BASE_URL (default https://api.devstride.com), from the
 # environment; any that are unset are read from the KEY=VALUE file release.clearance.credentialsFile
 # names in .claude/ds-config.json (a relative path is from the repository root, "~/" is expanded).
-# A file with any group or other permission is refused. The key, the secret and the holder are
+# A file with any group or other permission is refused. With neither, the key the machine's
+# DevStride connection itself carries is used (skills/build-item/scripts/devstride_connection.py). The key, the secret and the holder are
 # never printed. `gh` is still needed for pull-request facts and the user name (every verb but
 # `identity`). Everything else (configuration, environment overrides, liveness, the keeper) is
 # described in clearance-github.sh and clearance_core.py.

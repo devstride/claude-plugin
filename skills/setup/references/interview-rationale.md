@@ -16,7 +16,7 @@ string, misspellings included, is what the loop compares against. On a missing c
 guessed `hierarchyRoles` naming work types the organization does not have is worse than an absent
 one: absent is visible and reported as follow-up, wrong silently matches nothing and the loop
 treats every item as a one-off. The signed-out server contributes no tools at all — the failure
-mode to avoid is a wall of tool errors that reads like a bug when it is one browser sign-in.
+mode to avoid is a wall of tool errors that reads like a bug when it is one missing connection.
 
 ## Phase D — why the questions are shaped this way
 

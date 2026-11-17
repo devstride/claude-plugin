@@ -8,6 +8,97 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.0.0] — 2026-11-17
+
+### Added
+
+- **Every Claude Code session now shows its live status in DevStride by default.** On a machine
+  whose DevStride connection carries an API key, each session is reported as it happens, with
+  nothing to configure: when it starts, while it works, while it waits on its person, and when it
+  ends or its machine goes quiet. It works inside a git repository or not, and whether or not the
+  session runs a skill. Before, a session was reported only where the repository named its own
+  presence command, so everyone else's sessions were never seen. New: `hooks/presence-report.py`,
+  the built-in reporter `hooks/presence.py` runs where no command is named. It sends a short fixed
+  list (the session's id and name, the machine's name, the branch, the checkout folder's base
+  name, an item number the branch names, the plugin version, the event with its state, the
+  report interval, timestamps and why a session ended) and never
+  session text, a prompt, a file's content, a path or the machine's address. It fails open and
+  quietly: with a server that does not have live status yet, or no network, it prints nothing,
+  never slows a turn, and tries again no sooner than 30 minutes after a refusal and 2
+  minutes after a failure that may pass. Contract: `skills/setup/references/session-presence.md`.
+- **One key per machine, found in one place.** The reporter uses the API key the machine's
+  DevStride connection already carries: the environment (`DEVSTRIDE_API_KEY`,
+  `DEVSTRIDE_API_SECRET`, `DEVSTRIDE_ORG_ID`), else the `devstride` server entry in Claude Code's
+  own configuration. The plugin creates no key, stores none and never asks for one in the chat.
+  The DevStride release clearance provider now finds the key the same way (new shared module
+  `skills/build-item/scripts/devstride_connection.py`), so `release.clearance.credentialsFile` is
+  needed only where the connection is not key-based; a configured file still wins over the
+  connection's entry.
+- **`/devstride:setup connect`** checks whether this machine's connection carries a key, walks the
+  one step that makes it key-based (a key created in DevStride, one `claude mcp add` command in
+  your own terminal, the bundled browser connection signed out) and, on a typed yes, proves it
+  with a throwaway start and end. The full setup run does the same check. `/devstride:doctor` gains
+  "Ready for agents": a machine connected by browser sign-in only is a FAIL, "not ready for
+  agents", with that fix. A session start on such a machine says so in one line, once per machine.
+
+### Changed
+
+- **Breaking, and the reason this is a MAJOR version: a config with no `presence` block now means
+  "report every session", where it meant "report nothing".** RELEASING.md counts changing the
+  meaning of an existing config key as MAJOR, and the documented meaning of an absent block was
+  that no hook sends anything. Now, where no command is named (no block, an empty block, or one
+  with only `intervalMinutes`, which the schema now accepts), the built-in reporter runs, at a
+  1-minute default, on any machine whose DevStride connection carries a key. **To keep the old
+  behavior**, set `"presence": null` in the repository, which switches off the built-in reporter
+  and any command alike, or `DEVSTRIDE_PRESENCE=0` for a machine. Nothing else breaks: no key is
+  added, removed or renamed, no skill is renamed, and a repository whose block names a command
+  behaves exactly as before (the command, its variables, its 20-second limit and its 5-minute
+  default are unchanged, and it always wins over the built-in reporter).
+- **Connecting with an API key is now the documented way to connect** (README, "Connect to
+  DevStride"): one step, once per machine, serving the skills' tools and live status alike.
+  Browser sign-in still works for trying the skills by hand and is labelled not ready for agents.
+  Doctor no longer advises `claude mcp get` for a DevStride entry: it prints a key-based entry's
+  header values.
+- The tests-only variable `CLEARANCE_DEVSTRIDE_TEST_URL` is now `DEVSTRIDE_PLUGIN_TEST_URL`.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v3.67.0 @ 893bee6, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v3.67.0 | tokens@devstride--v3.67.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,096 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 25,535 | 8,512 | 25,535 | 8,512 | +0 | 8,512 |
+| skills/doctor/SKILL.md | 23,994 | 7,998 | 23,995 | 7,999 | +1 | 8,000 |
+| skills/build-item/SKILL.md | 23,992 | 7,998 | 23,992 | 7,998 | +0 | 7,999 |
+| skills/review/SKILL.md | 23,970 | 7,990 | 23,970 | 7,990 | +0 | 7,999 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
+| skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |
+| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
+| skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 11,963 | 3,988 | +0 | 3,988 |
+| skills/pr/SKILL.md | 11,205 | 3,735 | 11,205 | 3,735 | +0 | 3,735 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,731 | 2,244 | 6,731 | 2,244 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,649 | 2,217 | 6,649 | 2,217 | +0 | 2,217 |
+| skills/create-story/SKILL.md | 6,322 | 2,108 | 6,322 | 2,108 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 5,622 | 1,874 | 5,622 | 1,874 | +0 | 1,874 |
+| skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 276,472 | 92,166 | 276,472 | 92,167 | +1 | |
+
 ## [3.67.0] — 2026-11-15
 
 ### Added
@@ -5775,7 +5866,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v3.67.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.0.0...HEAD
+[4.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.67.0...devstride--v4.0.0
 [3.67.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.66.0...devstride--v3.67.0
 [3.66.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.65.0...devstride--v3.66.0
 [3.65.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.64.0...devstride--v3.65.0

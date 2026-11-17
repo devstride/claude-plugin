@@ -8,8 +8,8 @@ disable-model-invocation: true
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
 Set the delivery loop up for **this** repository and DevStride organization: inspect (A),
-report (B), map work types onto roles (C), ask what is left (D), write (E) — or merge into an
-existing config (F) — then prove it by running it (G).
+report (B), map work types onto roles (C), ask what is left (D), write (E) or merge into an
+existing config (F), then prove it by running it (G).
 
 Optional argument: $ARGUMENTS
 
@@ -17,11 +17,11 @@ Optional argument: $ARGUMENTS
   **Run A1 first even so** — Phase G assumes the repository root.
 - **A detector name** — `ecosystem` (A2–A3), `verify` (A4), `ci-inspect` (A5), `branches` (A6),
   `engines` (A7) — inspect and report that part (`ci-inspect`, not `ci`: the bare word writes).
-- **`docs`** — the documentation-hooks mode, a narrowed run that WRITES: A1 + A8, Phase
+- **`docs`** — documentation hooks, a narrowed run that WRITES: A1 + A8, Phase
   D's three documentation questions and `release.deployVerification`, then write **only** the
   `docs` block and that key (create-with-just-those-keys or Phase F merge, `release.docsRepo`
   migration included), scaffold E2, run Phase G check 7 alone.
-- **`ci`** — the CI-cost mode, the second narrowed run that WRITES, the only mode touching a
+- **`ci`** — CI cost, a narrowed run that WRITES, the only mode touching a
   workflow file: A1 + A5; detect which of the four mechanics in
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/ci-cost-patterns.md` each pull-request
   workflow carries; show the **exact diff** per mechanic missing OR present-but-inert; apply
@@ -29,23 +29,26 @@ Optional argument: $ARGUMENTS
   With `release.clearance` set, offer the fifth mechanic too, **release ordering** (§E). **Draft-gate diffs accepted while the three
   `review.*` CI-ordering booleans are `false` → propose flipping them `true` in the same
   change.** Run Phase G's CI checks; offer `/devstride:ci-audit` first.
-- **`agents`** — the Active Agents mode, the only run that writes to DevStride: A1, then
+- **`agents`** — Active Agents, which writes to DevStride: A1, then
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/agents-mode.md` end to end (inventory, plan, a
   typed yes, apply).
 - **`boards`** (or `boards personal`) — where each kind of item goes: A1, then
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/boards-mode.md` end to end.
+- **`connect`** — this machine's key-based DevStride connection, anywhere (its
+  proof, on a typed yes, sends two reports):
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/session-presence.md`, Connecting this machine.
 - **Nothing** — the full run: inspect, ask, write, scaffold, validate, plus §0 of the `agents`
-  and `boards` modes.
+  and `boards` modes; after A1, `connect`'s check, and its step on `NOT READY`.
 
-**Run each mode's prerequisites silently — A1 always, A2–A3 before A4.** A narrowed run reports
+**Run each mode's prerequisites silently — A1 (not `connect`), A2–A3 before A4.** A narrowed run reports
 fewer keys, never worse ones, and **stops after Phase B, writing nothing**; a full run writes. **`docs`,
-`ci`, `agents` and `boards` are the exceptions by design** — each writes exactly what its own questions answer.
+`ci`, `agents`, `boards` and `connect` are exceptions by design** — each writes exactly what its own questions answer.
 
-**The write boundary — the whole of it**: `.claude/ds-config.json`; in E2 only, the scaffolded
+**The whole write boundary**: `.claude/ds-config.json`; in E2 only, the scaffolded
 skills (never overwriting); in `ci` mode only, the pull-request workflows under
 `ci.workflowGlobs` and the release-tower pair (each change a diff, applied on an explicit yes);
 in `boards personal` only, that person's rules file.
-Nothing else, ever — no git
+Nothing else — no git
 mutation, no installs, no DevStride **write** tool outside `agents` mode. **Phases A–D are strictly read-only**:
 `git status --porcelain` stays byte-identical until the write.
 
@@ -59,7 +62,7 @@ mutation, no installs, no DevStride **write** tool outside `agents` mode. **Phas
 | `ambiguous` | Several plausible answers, or one needing confirmation | A question offering the candidates |
 | `unknown` | The repository does not answer this | A question with no prefill |
 
-Every row carries the evidence that produced it.
+Every row carries its evidence.
 
 ## Ground rules for every detector
 
@@ -75,9 +78,8 @@ Every row carries the evidence that produced it.
 
 ### A1. Repository and remote
 
-Confirm a git work tree (stop if not). `git remote get-url origin` — `origin` **by name** (the
-delivery skills hardcode it); other remotes only → say which, mark every branch key `ambiguous`.
-Record the forge host — **the delivery half assumes GitHub and GitHub Actions**; say plainly
+Confirm a git work tree (stop if not). `git remote get-url origin` — `origin` **by name**; other remotes only → say which, mark every branch key `ambiguous`.
+Record the forge host — **the delivery half assumes GitHub and GitHub Actions**; say
 when it is anything else.
 
 **A config on a stale branch describes a repository that no longer exists.** When
@@ -234,8 +236,7 @@ valid. Never confuse this read-only cloud stage with the mutable LOCAL `localEnv
 existing config per A8.
 
 **When a detector's result is `ambiguous`, read
-`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.digest.md`** — why that detector
-declines to decide, and what evidence would settle it. **Read the full
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.digest.md`**. **Read the full
 `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/detector-evidence.md` before changing a detector**.
 
 ## The prefill summary — the contract
@@ -267,9 +268,9 @@ shorthand — say **parent item**, **grouping item**, or the actual work type na
 release boundary (two roles, not a level count); a single work type doing everything → map it to
 both roles, every item its own release unit, no batching.
 
-**DevStride connection unavailable**: the bundled server contributes no tools until signed in —
-a symptom, not an error; `/mcp` is where sign-in happens. Two paths: continue without it (write
-with `hierarchyRoles` omitted, reported as required follow-up) or stop and resume. **Never guess the roles.**
+**DevStride connection unavailable** (a symptom, not an error; fix: `connect`):
+continue without it (write with `hierarchyRoles` omitted, reported as required follow-up) or stop
+and resume. **Never guess the roles.**
 
 ## Phase D — ask only what is left
 

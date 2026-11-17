@@ -327,4 +327,11 @@ expect "(65) sessionModels with both roles and the switch is clean" 0 "$CLEAN"
 cfg '{"sessionModels": {"runner": {"effort": "huge"}, "planning": {"model": 7}, "check": "no"}}'
 expect "(66) an effort outside the five levels, a model that is not a string and a non-boolean switch are three ERRORs" 1 "^CONFIG: 3 error(s)" "^ERROR sessionModels.runner.effort"
 
+# (67) presence: an object (empty, an interval alone, or a command) or null; never a string
+for c in '{"presence": null}' '{"presence": {}}' '{"presence": {"intervalMinutes": 3}}' '{"presence": {"command": "./tools/report", "intervalMinutes": 5}}'; do
+  cfg "$c"; expect "(67) $c is clean" 0 "$CLEAN"
+done
+cfg '{"presence": "yes"}'; expect "(67b) a string for presence is an ERROR" 1 "^CONFIG: 1 error(s)" "^ERROR presence: expected object or null"
+cfg '{"presence": {"intervalMinutes": 99}}'; expect "(67c) an interval outside 1 to 60 is a WARN: the default stands" 0 "^CONFIG: 0 error(s), 1 warning(s)" "^WARN presence.intervalMinutes"
+
 exit "$FAIL"

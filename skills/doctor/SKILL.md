@@ -76,15 +76,14 @@ next action. For each failure symptom, read
 
 ## 3. DevStride connection (`devstride`)
 
-- **A server exists and is CONNECTED** — `claude mcp list`. The bundled one appears as
-  `plugin:devstride:devstride`; a plain `devstride` entry is one you or your project configured.
-- **Not connected.** Say: until sign-in, skills have no DevStride tools and nothing prompts; the
-  symptom is missing tools, not an auth error. Fix: `/mcp`, then browser sign-in.
-- **More than one connected** — FAIL: the two tool namespaces leave calls able to reach either
-  organization. Inspect with
-  `claude mcp get <name>`; OAuth uses `claude mcp logout <name>`, API-key headers require
-  `claude mcp remove <name>`.
-- **Do not call a DevStride tool to test this**; presence and connection state are enough.
+- **A server exists and is CONNECTED** — `claude mcp list`. The bundled one is
+  `plugin:devstride:devstride`; a plain `devstride` is yours or your project's.
+- **Ready for agents** — report the connection and `PRESENCE` lines of
+  `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" check`; `NOT READY` → FAIL (`claims-checks.md`).
+- **Not connected** (missing tools, not an auth error) or `NOT READY` → Fix: `/devstride:setup connect`.
+- **More than one connected** — FAIL: calls can reach either organization. OAuth:
+  `claude mcp logout <name>`; API-key headers: `claude mcp remove <name>`; never `claude mcp get` (it prints the key).
+- **Never call a DevStride tool to test this.**
 
 ## 4. Config file (`config`)
 
