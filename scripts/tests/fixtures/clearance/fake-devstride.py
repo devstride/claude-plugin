@@ -13,7 +13,9 @@ with `_keyDigest`, the digest of the API key header it arrived with (never the k
 Control files in the state dir (any may be absent):
   now        an ISO instant used as the server's clock (default: the real one)
   mode       unknown-tool | http403 | http401 | http500 | http429 | bad-json | forbidden |
-             redirect (a 307 to /followed, which marks the file `followed`) — every call answers that way (consumed by nothing)
+             redirect (a 302 to /followed, which marks the file `followed` when anything asks for it) |
+             echo-key (a tool error whose text repeats the key and secret that arrived) — every call
+             answers that way (consumed by nothing)
   delay      seconds every call waits before it is answered
   any-key    its presence accepts any API key (the digest in presence.jsonl says which one arrived)
   fail-once  the file's presence makes the next call answer HTTP 500, then removes it
@@ -205,6 +207,11 @@ class Handler(BaseHTTPRequestHandler):
     def text(self, text, is_error=False):
         return self.rpc({"content": [{"type": "text", "text": text}], "isError": is_error})
 
+    def do_GET(self):  # only a client that follows the redirect ever asks
+        if self.path == "/followed":
+            open(os.path.join(STATE, "followed"), "w").close()
+        return self.reply(200 if self.path == "/followed" else 404, "{}")
+
     def do_POST(self):
         length = int(self.headers.get("Content-Length") or 0)
         body = json.loads(self.rfile.read(length) or b"{}")
@@ -214,7 +221,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/mcp":
             return self.reply(404, "{}")
         if control("mode") == "redirect":
-            self.send_response(307)
+            self.send_response(302)
             self.send_header("Location", "/followed")
             self.send_header("Content-Length", "0")
             self.end_headers()
@@ -246,6 +253,8 @@ class Handler(BaseHTTPRequestHandler):
                                      "machine": args.get("machine"), "sessionName": args.get("sessionName")}) + "\n")
         if mode == "http403":
             return self.reply(403, '{"message":"forbidden"}')
+        if mode == "echo-key":
+            return self.text("Rejected: %s / %s" % (self.headers.get("X-DevStride-Api-Key"), self.headers.get("X-DevStride-Api-Secret")), is_error=True)
         if mode == "unknown-tool":
             return self.text("Unknown tool: %s" % tool, is_error=True)
         if mode == "forbidden":

@@ -76,9 +76,17 @@ good answer clears it. An end that falls inside a quiet window is not sent: the 
 The body of `/devstride:setup connect`: the one step, done once per machine, that makes the
 DevStride connection key-based. It serves the agent's DevStride tools and live status alike.
 
-1. Run `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" check` and read its first line.
+It needs no repository: run it from any directory, with none of setup's repository checks.
+
+1. Run `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" check` and read its first line
+   (and the `Fix:` line under a `NOT READY`).
 2. `AGENT CONNECTION: READY (…)` → say where the key was found, in those fixed words only, and
-   stop, offering the proof (step 4).
+   stop, offering the proof (step 4). One exception: `READY (key from the environment)` while
+   `claude mcp list` shows no connected `devstride` server means live status works but the skills
+   have no DevStride tools: give step 3's command, which builds the connection from those same
+   variables.
+   `AGENT CONNECTION: NOT READY (DEVSTRIDE_BASE_URL …)` → the key is there and its address is
+   wrong: give the `Fix:` line it printed, then run `check` again. Never the key-creation step.
 3. `AGENT CONNECTION: NOT READY (Claude Code's configuration file cannot be read safely: …)` →
    the key may already be there: give that file's fix (`chmod 600` for `mode too open`; a link
    replaced by the file itself), then run `check` again. Any other `NOT READY (…)` → say in plain words that this machine is connected by browser

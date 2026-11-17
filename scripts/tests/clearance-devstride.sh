@@ -319,9 +319,9 @@ fresh redirect; printf 'redirect' > "$DS/mode"; run claim; A="$RC:$OUT"
 printf '' > "$DS/mode"
 B="$( ( unset DEVSTRIDE_PLUGIN_TEST_URL; DEVSTRIDE_BASE_URL='https://api.devstride.com
 ' bash "$P" claim 2>&1 ); echo "rc=$?")"; printf '%s\n' "$B" >> "$LOG"
-if [ "${A%%:*}" -eq 1 ] && [ ! -e "$DS/followed" ] && printf '%s' "$A" | grep -q 'HTTP 307' \
+if [ "${A%%:*}" -eq 1 ] && [ ! -e "$DS/followed" ] && printf '%s' "$A" | grep -q 'HTTP 302' \
    && printf '%s' "$B" | grep -q 'DEVSTRIDE_BASE_URL must be' && printf '%s' "$B" | grep -q 'rc=1$' && ! printf '%s' "$B" | grep -q Traceback; then
-  ok "(7b) a 307 from the server is reported, never followed; a base URL with a trailing newline is refused"
+  ok "(7b) a 302 from the server is reported, never followed; a base URL with a trailing newline is refused"
 else bad "(7b) a=$A followed=$([ -e "$DS/followed" ] && echo yes || echo no) b=$B"; fi
 
 # (8) credentialsFile: used for what the environment leaves unset; a file open to group or other is refused
@@ -356,7 +356,7 @@ path, key, mode = sys.argv[1], sys.argv[2], int(sys.argv[3], 8)
 if os.path.lexists(path):
     os.unlink(path)
 fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-os.write(fd, json.dumps({"mcpServers": {"devstride": {"type": "http", "url": "https://api.devstride.com/mcp", "headers": {
+os.write(fd, json.dumps({"mcpServers": {"devstride": {"type": "http", "url": os.environ.get("DEVSTRIDE_PLUGIN_TEST_URL", "https://api.devstride.com") + "/mcp", "headers": {
     "X-DevStride-Api-Key": key, "X-DevStride-Api-Secret": "test-secret", "X-DevStride-Organization-Id": "org-1"}}}}).encode())
 os.close(fd); os.chmod(path, mode)
 PY

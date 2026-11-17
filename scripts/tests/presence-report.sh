@@ -118,8 +118,8 @@ OUT="$(DEVSTRIDE_PRESENCE_TIMEOUT=0.5 DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.
 OUT="$(DEVSTRIDE_API_SECRET=wrong DEVSTRIDE_PLUGIN_TEST_URL="$URL" PRESENCE_EVENT=beat PRESENCE_SESSION_ID=r3 PRESENCE_MACHINE=m9 python3 "$RP" 2>&1)"; D="$?:$OUT"
 OUT="$(DEVSTRIDE_PLUGIN_TEST_URL="$URL" PRESENCE_EVENT=beat PRESENCE_SESSION_ID=r3 PRESENCE_STATE=working PRESENCE_MACHINE=m9 PRESENCE_BRANCH="$(printf 'a\001b')" python3 "$RP" 2>&1)"; G="$?:$OUT:$(last branch)"
 if [ "$A" = "unknown-tool=3: http403=3: http401=3: http500=4: http429=4: bad-json=4: redirect=4: " ] && [ "$B" = "4:" ] && [ "$C" = "4:" ] \
-   && [ "$D" = "3:" ] && [ "$G" = "0::a b" ]; then
-  ok "(3) no such tool, 403, 401 (a wrong secret too) → exit 3; 500, 429, an answer that is not JSON, a redirect (never followed), a refused connection, a timeout → exit 4; a control character is cleaned before it is sent; never any output"
+   && [ "$D" = "3:" ] && [ "$G" = "0::a b" ] && [ "$(wc -l < "$WORK/ds-m-http500/calls.log" | tr -d ' ')" = 1 ]; then
+  ok "(3) no such tool, 403, 401 (a wrong secret too) → exit 3; 500, 429, an answer that is not JSON, a redirect (never followed), a refused connection, a timeout → exit 4, after one attempt; a control character is cleaned before it is sent; never any output"
 else bad "(3) a=$A b=$B c=$C d=$D g=$G"; fi
 
 # (4) the address: anything but a DevStride API host is refused before any request
@@ -144,27 +144,29 @@ claudejson '{"mcpServers": {"devstride": E()}}'; chmod 644 "$CLAUDE_CONFIG_DIR/.
 mv "$CLAUDE_CONFIG_DIR/.claude.json" "$WORK/real.json"; chmod 600 "$WORK/real.json"; ln -s "$WORK/real.json" "$CLAUDE_CONFIG_DIR/.claude.json"; E2="$(chk)"
 rm -f "$CLAUDE_CONFIG_DIR/.claude.json"; claudejson '{"mcpServers": {"devstride": E()}}'
 python3 -c 'import sys; open(sys.argv[1],"ab").truncate(17*1048576)' "$CLAUDE_CONFIG_DIR/.claude.json"; E3="$(chk)"
+for u in https://example.com/mcp https://api.devstride.com.evil.example/mcp https://api.devstride.com/other; do
+  rm -f "$CLAUDE_CONFIG_DIR/.claude.json"; claudejson "{'mcpServers': {'devstride': E(url='$u')}}"; F5="${F5:-}$(chk)#"; done
 NR="AGENT CONNECTION: NOT READY"; FIXL="Fix: /devstride:setup connect"
 if [ "$A" = "AGENT CONNECTION: READY (key from the environment)|PRESENCE: ON (built-in reporter)|INTERVAL: 1 minute(s)" ] \
    && [ "$B" = "AGENT CONNECTION: READY (key from the devstride connection, user level)|PRESENCE: ON (built-in reporter)|INTERVAL: 1 minute(s)" ] \
    && [ "$C" = "AGENT CONNECTION: READY (key from the devstride connection, this project)|PRESENCE: ON (built-in reporter)|INTERVAL: 1 minute(s)" ] \
    && [ "$C2" = "$NR (no API key: browser sign-in only, or no devstride connection)|$FIXL|PRESENCE: OFF (no-key)|INTERVAL: none" ] \
-   && [ "$D" = "$C2" ] && [ "$D2" = "$C2" ] \
+   && [ "$D" = "$C2" ] && [ "$D2" = "$C2" ] && [ "$F5" = "$C2#$C2#$C2#" ] \
    && [ "$E1" = "$NR (Claude Code's configuration file cannot be read safely: mode too open)|$FIXL|PRESENCE: OFF (no-key)|INTERVAL: none" ] \
    && [ "$E2" = "$NR (Claude Code's configuration file cannot be read safely: a link)|$FIXL|PRESENCE: OFF (no-key)|INTERVAL: none" ] \
    && [ "$E3" = "$NR (Claude Code's configuration file cannot be read safely: too large)|$FIXL|PRESENCE: OFF (no-key)|INTERVAL: none" ]; then
-  ok "(5) check: READY from the environment, the user-level entry, this project's entry; NOT READY (no key, a keyless entry, a file open to others, a link, too large), each with the Fix line"
+  ok "(5) check: READY from the environment, the user-level entry, this project's entry; NOT READY (no key, a keyless entry, an entry at a foreign or look-alike host or another path, a file open to others, a link, too large), each with the Fix line"
 else bad "(5) a=$A b=$B c=$C c2=$C2 d=$D d2=$D2 e1=$E1 e2=$E2 e3=$E3"; fi
 noconfig
 
 # (5a) a key with an address that is not DevStride's is NOT READY, with its own fix; a report from a
-#      directory that is gone, or with no key, is recorded as not sent (exit 4), never as sent
+#      directory that is gone is still sent; one with no key is recorded as not sent (exit 4)
 key; A="$(DEVSTRIDE_BASE_URL=https://evil.example chk | cut -d'|' -f1-2)"
 mkdir -p "$WORK/gone"; OUT="$(cd "$WORK/gone" && rmdir "$WORK/gone" && DEVSTRIDE_PLUGIN_TEST_URL="$URL" PRESENCE_EVENT=beat PRESENCE_SESSION_ID=r5 PRESENCE_STATE=working PRESENCE_MACHINE=m9 python3 "$RP" 2>&1)"; B="$?:$OUT"
 nokey; OUT="$(DEVSTRIDE_PLUGIN_TEST_URL="$URL" PRESENCE_EVENT=beat PRESENCE_SESSION_ID=r5 PRESENCE_MACHINE=m9 python3 "$RP" 2>&1)"; C="$?:$OUT"
 if [ "$A" = "AGENT CONNECTION: NOT READY (DEVSTRIDE_BASE_URL is not a DevStride API address)|Fix: unset DEVSTRIDE_BASE_URL, or set it to https://api.devstride.com" ] \
-   && { [ "$B" = "0:" ] || [ "$B" = "4:" ]; } && [ "$C" = "4:" ]; then
-  ok "(5a) a key with a foreign address → NOT READY naming the address; no key at report time → exit 4, silent; a deleted directory never crashes the reporter"
+   && [ "$B" = "0:" ] && [ "$C" = "4:" ]; then
+  ok "(5a) a key with a foreign address → NOT READY naming the address; no key at report time → exit 4, silent; from a deleted directory the report is still sent"
 else bad "(5a) a=$A b=$B c=$C"; fi
 
 # (5b) check's presence line: the repository command, the two switches, a blank command, the block's interval
@@ -194,20 +196,22 @@ OUT="$(DEVSTRIDE_PLUGIN_TEST_URL="$URL" python3 "$RP" prove 2>&1)"; A="$?:$OUT";
 SID="$(last sessionId)"; EV="$(sed -n "$((N0 + 1))p" "$DS/presence.jsonl" | python3 -c 'import json,sys; print(json.load(sys.stdin)["event"])'):$(last event)"
 prove_in() { local d; d="$(server "p-$1")"; : > "$d/any-key"; printf '%s' "$1" > "$d/mode"
   OUT="$(DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:$(cat "$d/port")" python3 "$RP" prove 2>&1)"; printf '%s:%s' "$?" "$OUT"; printf '%s\n' "$OUT" >> "$ALL"; }
-B="$(prove_in unknown-tool)"; C="$(prove_in http403)"; D="$(prove_in http500)"
+B="$(prove_in unknown-tool)"; C="$(prove_in http403)"; D="$(prove_in http500)"; G="$(prove_in echo-key)"
 OUT="$(DEVSTRIDE_PLUGIN_TEST_URL="$DEADURL" python3 "$RP" prove 2>&1)"; E="$?:$OUT"
 nokey; OUT="$(DEVSTRIDE_PLUGIN_TEST_URL="$URL" python3 "$RP" prove 2>&1)"; F="$?:$OUT"; printf '%s\n' "$OUT" >> "$ALL"
 if [ "$A" = "0:PROOF: ok" ] && [ "$(lines)" = "$((N0 + 2))" ] && [ "$EV" = "start:end" ] && printf '%s' "$SID" | grep -Eq '^setup-check-[0-9a-f]{8}$' \
    && [ "$B" = "1:PROOF: NOT AVAILABLE (the server has no live status yet)" ] \
    && [ "$C" = "1:PROOF: REFUSED (HTTP 403: the key, secret and organization id must belong together)" ] \
    && [ "$D" = "1:PROOF: FAILED (DevStride answered HTTP 500)" ] && [ "$E" = "1:PROOF: UNREACHABLE" ] \
-   && [ "$F" = "1:PROOF: NOT READY (the DevStride connection carries no API key)" ]; then
-  ok "(6) prove: a start then an end for setup-check-<8 hex> → PROOF: ok; NOT AVAILABLE, REFUSED, FAILED, UNREACHABLE and NOT READY each say so"
-else bad "(6) a=$A ev=$EV sid=$SID b=$B c=$C d=$D e=$E f=$F"; fi
+   && [ "$F" = "1:PROOF: NOT READY (the DevStride connection carries no API key)" ] \
+   && printf '%s' "$G" | grep -q '^1:PROOF: FAILED (Rejected: ' && ! printf '%s' "$G" | grep -qF -e "$KEY" -e "$SECRET"; then
+  ok "(6) prove: a start then an end for setup-check-<8 hex> → PROOF: ok; NOT AVAILABLE, REFUSED, FAILED, UNREACHABLE and NOT READY each say so; a server error that repeats the key and secret is shown without them"
+else bad "(6) a=$A ev=$EV sid=$SID b=$B c=$C d=$D e=$E f=$F g=$(printf '%s' "$G" | cut -c1-24)"; fi
 
 # (7) the hook starts the reporter with no arguments and adds nothing to its environment but the
 #     PRESENCE_* variables and the session's id and process: a key can never show in a process list
-if key && python3 - "$ROOT" "$WORK/dir" <<'PY'
+nokey; claudejson '{"mcpServers": {"devstride": E()}}'
+if python3 - "$ROOT" "$WORK/dir" "$KEY" "$SECRET" "$ORG" <<'PY'
 import os, sys
 sys.path.insert(0, os.path.join(sys.argv[1], "hooks"))
 before = dict(os.environ)
@@ -219,11 +223,14 @@ added = {k for k in env if k not in before}
 assert added <= {"CLAUDE_CODE_SESSION_ID", "CLAUDE_PID"} | {k for k in env if k.startswith("PRESENCE_")}, added
 assert all(before[k] == env[k] for k in before if not k.startswith("PRESENCE_") and k not in ("CLAUDE_CODE_SESSION_ID", "CLAUDE_PID"))
 assert env["PRESENCE_CHECKOUT"] == "" and env["PRESENCE_BRANCH"] == "" and env["PRESENCE_ITEM"] == ""
-for secret in (before["DEVSTRIDE_API_KEY"], before["DEVSTRIDE_API_SECRET"]):
-    assert all(secret not in part for part in command)
+assert presence.connection_ready(None, sys.argv[2]), "the entry's key is what makes this session report"
+assert not any(k.startswith("DEVSTRIDE_API") or k.startswith("DEVSTRIDE_ORG") for k in env), "the key never becomes a variable"
+for secret in sys.argv[3:6]:
+    assert all(secret not in part for part in command) and all(secret not in value for value in env.values())
 PY
-then ok "(7) the reporter is started with no arguments and no added variables beyond PRESENCE_* (and the session's id and process)"
+then ok "(7) with the key in the connection's entry, the reporter is started with no arguments and no added variables beyond PRESENCE_* (and the session's id and process): no key, secret or organization id in either"
 else bad "(7) the job the hook builds"; fi
+noconfig
 
 # (8) the resolver refuses to mix sources, and a maintainer's real file is never read
 nokey
@@ -253,7 +260,7 @@ assert c.readiness({}, path, []) == "no-key"
 assert c.config_file({"CLAUDE_CONFIG_DIR": "/x"}) == "/x/.claude.json"
 assert c.config_file({}) == os.path.join(os.path.expanduser("~"), ".claude.json")
 assert os.path.expanduser("~") == os.path.join(work, "home"), "the tests never run against a real home"
-# places: the main checkout first for a linked worktree, real paths, no duplicates
+# places outside a repository: the real path, then the path as given when it differs
 assert c.project_places(None, work) == [os.path.realpath(work)] + ([work] if work != os.path.realpath(work) else [])
 PY
 then ok "(8) the entry's key, secret, organization and address are taken together, never mixed with the environment; an unsafe file is unsafe-config unless the environment has a key; the home directory is a throwaway"

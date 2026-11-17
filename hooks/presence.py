@@ -809,9 +809,8 @@ def send(event, state, sid, incarnation, sequence, at):
             latest = load(sid)
             if latest and latest.get("id") == incarnation:  # never recreate a record removed meanwhile
                 latest["done"] = max(sequence, int(latest.get("done") or 0))
-                if mode:
-                    latest["mode"] = mode
                 if code is not None:
+                    latest["mode"] = mode  # the reporter that ran; a skipped report says nothing
                     latest["last"] = {"event": event, "exit": code, "at": round(time.time(), 3)}
                     if mode == "builtin":  # a repository command's exit code never quiets anything
                         if code == 0:

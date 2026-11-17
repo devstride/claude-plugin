@@ -63,10 +63,10 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v3.67.0 @ 8f37204, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v3.67.0 @ 68842ad, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v3.67.0 | tokens@devstride--v3.67.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
-| skills/setup/SKILL.md | 32,096 | 10,699 | 32,098 | 10,700 | +1 | 10,700 |
+| skills/setup/SKILL.md | 32,096 | 10,699 | 32,092 | 10,698 | -1 | 10,700 |
 | skills/plan/SKILL.md | 25,535 | 8,512 | 25,535 | 8,512 | +0 | 8,512 |
 | skills/doctor/SKILL.md | 23,994 | 7,998 | 23,995 | 7,999 | +1 | 8,000 |
 | skills/build-item/SKILL.md | 23,992 | 7,998 | 23,992 | 7,998 | +0 | 7,999 |
@@ -97,7 +97,7 @@ for what each version component means here and how a release is cut.
 | skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
-| **total (bodies)** | 276,472 | 92,166 | 276,475 | 92,168 | +2 | |
+| **total (bodies)** | 276,472 | 92,166 | 276,469 | 92,166 | +0 | |
 
 ## [3.67.0] — 2026-11-15
 

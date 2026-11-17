@@ -21,8 +21,9 @@ call is bounded in time, and no secret is ever printed, logged, put in an error,
 command line or added to a child's environment. Nothing here writes a file.
 
 DEVSTRIDE_PLUGIN_TEST_URL (http://127.0.0.1:<port>) exists for the tests only: it replaces the
-base address whatever source the key came from (a real entry's key then goes to that loopback
-address), disables proxies, and makes an entry whose url is that address plus /mcp acceptable.
+base address for a key from the environment or a credentials file, disables proxies, and makes
+the ONLY usable connection entry one whose url is that address plus /mcp. A real connection
+entry is never used while it is set, so the key such an entry carries can never be sent to it.
 
 The network modules are imported only by `call_tool`: the presence hook imports this file on
 every hook event to ask whether a key exists, and must not pay for them.
@@ -212,13 +213,14 @@ def entry_values(entry, test):
     """The key a `devstride` server entry carries, as {name: value, "base": address}; None unless its
     url is a DevStride API address followed by /mcp and it holds literal, non-empty values for the
     key, the secret and the organization id (header names compared without regard to case). A value
-    containing `${` references an environment variable, which step 1 already covered: not a key."""
+    containing `${` references an environment variable, which step 1 already covered: not a key.
+    With the tests-only address set, only an entry at that address counts."""
     if not isinstance(entry, dict) or not isinstance(entry.get("url"), str) or not isinstance(entry.get("headers"), dict):
         return None
     url = entry["url"]
     base = url[:-4] if url.endswith("/mcp") else None
-    if not base or not (BASE_URL_RULE.match(base) or (test and base == test)):
-        return None
+    if not base or not (base == test if test else BASE_URL_RULE.match(base)):
+        return None  # under the tests-only address a real entry is never used: its key stays home
     headers = {name.lower(): value for name, value in entry["headers"].items() if isinstance(name, str)}
     values = {}
     for name, header in HEADERS.items():

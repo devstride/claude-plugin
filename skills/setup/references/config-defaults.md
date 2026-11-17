@@ -367,8 +367,10 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   tag) and needs only git and `gh`; a claim starts a detached keeper that heartbeats while the
   claiming agent lives. The `devstride`
   provider keeps it as a DevStride claim (kind `release-tower`) and needs the DevStride API
-  credentials in the environment or in `credentialsFile`, a KEY=VALUE file that must not be
-  readable by group or others (mode 0600). A repository may supply its own five commands instead
+  credentials: in the environment, in `credentialsFile` (a KEY=VALUE file that must not be
+  readable by group or others, mode 0600), or, with neither, the key the machine's DevStride
+  connection itself carries, so `credentialsFile` is needed only where that connection is not
+  key-based. A repository may supply its own five commands instead
   (a sixth, `owed`, is optional). **A block with both `provider` and `commands`, or a `provider`
   other than `github` or `devstride`, is a config error.** Nothing ever blocks a hotfix. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`.

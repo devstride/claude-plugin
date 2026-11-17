@@ -976,7 +976,7 @@
                 },
                 "credentialsFile": {
                   "type": "string",
-                  "description": "a KEY=VALUE file holding the DevStride API credentials for the devstride provider; must not be readable by group or others"
+                  "description": "a KEY=VALUE file holding the DevStride API credentials for the devstride provider; must not be readable by group or others; needed only where neither the environment nor the machine's DevStride connection carries the key"
                 }
               },
               "patternProperties": {
