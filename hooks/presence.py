@@ -370,7 +370,9 @@ def no_key_notice(event, reason):
         if reason == "builtin":
             if _READINESS[-1:] in (["environment"], ["connection-user"]) and os.path.lexists(marker_path()):
                 os.unlink(marker_path())
-        elif reason == "no-key" and event == "SessionStart":
+        elif reason == "no-key" and event == "SessionStart" and _READINESS[-1:] == ["no-key"]:
+            # only when there is truly no key: an address that is not DevStride's, or a configuration
+            # file that cannot be read safely, is doctor's to explain, not this line's
             private_dir(cache_dir())
             os.close(os.open(marker_path(), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
             sys.stdout.write(NO_KEY_LINE + "\n")
@@ -863,8 +865,13 @@ def hook():
     with state_lock(sid):
         now = time.time()
         record = load(sid)
-        was = settings(record.get("top"), record.get("dir")) if record else None
+        was, why = decide(record.get("top"), record.get("dir")) if record else (None, None)
+        # a repository whose command reported this session, and whose config cannot be read just now
+        # (a merge in progress), still holds it: nothing is sent, and the built-in reporter does not take over
+        held = bool(record) and record.get("mode") == "command" and why == "config-unreadable"
         if not here and not was:
+            return
+        if held and here:
             return
         if not here or (here["mode"] == "builtin" and was and was["mode"] == "command"):
             # moved to a place where reporting is off, or away from a repository whose own command
