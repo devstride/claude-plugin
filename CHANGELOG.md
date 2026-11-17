@@ -8,6 +8,55 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Every Claude Code session now shows its live status in DevStride by default.** On a machine
+  whose DevStride connection carries an API key, each session is reported as it happens, with
+  nothing to configure: when it starts, while it works, while it waits on its person, and when it
+  ends or its machine goes quiet. It works inside a git repository or not, and whether or not the
+  session runs a skill. Before, a session was reported only where the repository named its own
+  presence command, so everyone else's sessions were never seen. New: `hooks/presence-report.py`,
+  the built-in reporter `hooks/presence.py` runs where no command is named. It sends a short fixed
+  list (the session's id and name, the machine's name, the branch, the checkout folder's base
+  name, an item number the branch names, the plugin version, the state and timestamps) and never
+  session text, a prompt, a file's content, a path or the machine's address. It fails open and
+  quietly: with no key, a server that does not have live status yet, or no network, it prints
+  nothing, never slows a turn, and tries again no sooner than 30 minutes after a refusal and 2
+  minutes after a failure that may pass. Contract: `skills/setup/references/session-presence.md`.
+- **One key per machine, found in one place.** The reporter uses the API key the machine's
+  DevStride connection already carries: the environment (`DEVSTRIDE_API_KEY`,
+  `DEVSTRIDE_API_SECRET`, `DEVSTRIDE_ORG_ID`), else the `devstride` server entry in Claude Code's
+  own configuration. The plugin creates no key, stores none and never asks for one in the chat.
+  The DevStride release clearance provider now finds the key the same way (new shared module
+  `skills/build-item/scripts/devstride_connection.py`), so `release.clearance.credentialsFile` is
+  needed only where the connection is not key-based; a configured file still wins over the
+  connection's entry.
+- **`/devstride:setup connect`** checks whether this machine's connection carries a key, walks the
+  one step that makes it key-based (a key created in DevStride, one `claude mcp add` command in
+  your own terminal, the bundled browser connection signed out) and, on a typed yes, proves it
+  with one throwaway report. The full setup run does the same check. `/devstride:doctor` gains
+  "Ready for agents": a machine connected by browser sign-in only is a FAIL, "not ready for
+  agents", with that fix. A session start on such a machine says so in one line, once per machine.
+
+### Changed
+
+- **Version class: MINOR.** No config key is added, removed or renamed, and a repository whose
+  `presence` block names a command behaves exactly as before: the command, its variables, its
+  20-second limit and its 5-minute default are unchanged, and it always wins over the built-in
+  reporter. What changes is the default where no command is named (no block, an empty block, or
+  one with only `intervalMinutes`, which the schema now accepts): the built-in reporter runs, at a
+  1-minute default, on a machine with a key. RELEASING.md's MINOR row covers it (existing
+  behavior that changes, additively); it was weighed against the MAJOR row and nothing a
+  repository had configured means something else now. To keep the old behavior, set
+  `"presence": null` in a repository, which switches off the built-in reporter and any command
+  alike, or `DEVSTRIDE_PRESENCE=0` for a machine.
+- **Connecting with an API key is now the documented way to connect** (README, "Connect to
+  DevStride"): one step, once per machine, serving the skills' tools and live status alike.
+  Browser sign-in still works for trying the skills by hand and is labelled not ready for agents.
+  Doctor no longer advises `claude mcp get` for a DevStride entry: it prints a key-based entry's
+  header values.
+- The tests-only variable `CLEARANCE_DEVSTRIDE_TEST_URL` is now `DEVSTRIDE_PLUGIN_TEST_URL`.
+
 ## [3.67.0] — 2026-11-15
 
 ### Added

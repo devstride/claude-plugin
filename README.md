@@ -6,7 +6,7 @@ merge, and release — against your own repository and your own DevStride organi
 
 > **Status: early.** The thirty delivery-loop skills and the DevStride MCP connection are both
 > bundled — installing the plugin is all the *configuration* the connection needs, though you still
-> sign in once. `/devstride:setup` then configures the plugin for your repository and proves the
+> connect it once per machine with an API key. `/devstride:setup` then configures the plugin for your repository and proves the
 > config by running it.
 
 ## How it works, and why
@@ -134,67 +134,84 @@ different times can be running different versions — see
 
 ## Connect to DevStride
 
-The plugin bundles the DevStride MCP server, so there is nothing to configure — but there **is** one
-step: you have to sign in once.
+The plugin bundles the DevStride MCP server's address, so there is nothing to configure — but there
+**is** one step, done once per machine: connect it with an API key. That one connection serves the
+skills' DevStride tools and [live status on the Fleet](#live-status-on-the-fleet) alike, and it is
+what makes a machine **ready for agents**.
+
+1. In DevStride, create a key under **Profile Settings → API Keys** (the standard roles can; with a
+   custom role that cannot, ask an administrator for the permission to create API keys).
+2. In your own terminal, with the key, the secret and the organization id in the three variables:
+
+   ```bash
+   claude mcp add --transport http --scope user devstride https://api.devstride.com/mcp \
+     --header "X-DevStride-Api-Key: $DEVSTRIDE_API_KEY" \
+     --header "X-DevStride-Api-Secret: $DEVSTRIDE_API_SECRET" \
+     --header "X-DevStride-Organization-Id: $DEVSTRIDE_ORG_ID"
+   claude mcp logout plugin:devstride:devstride
+   ```
+
+3. Restart Claude Code. `/devstride:setup connect` checks the result and, on your yes, proves it
+   with one throwaway report; `/devstride:doctor` reports a machine without a key as not ready for
+   agents.
+
+Only those three headers are required. `X-DevStride-Organization-Slug` is optional — supplying it
+just saves the server one round trip resolving the slug on startup. The command stores the key in
+Claude Code's own user configuration, the single place the skills' tools and the plugin's session
+reporter both read it from. Installing the plugin never asks for a credential and never stores
+one: the plugin writes no key anywhere, and nothing it runs prints one.
+
+**Do this before running any skill.** Until a connection is live the server contributes *no tools
+at all* — DevStride rejects unauthenticated requests, including the tool listing — and nothing
+prompts you. A skill will simply report that it cannot find DevStride tools. That is the
+not-connected symptom; it is not a misconfiguration. (An *authorization* error is different, and
+means a key is wrong or a sign-in expired.)
+
+> **Connecting grants read _and write_ access** to the key's organization, at the same level you
+> have in the DevStride app — creating, updating and deleting items included. There is no sandbox
+> or dry-run mode, and no narrower scope to grant: the skills write to live data by design.
+
+**Keep exactly one DevStride connection live.** Your server is `devstride`; the bundled one is
+`plugin:devstride:devstride`, and it always carries the `plugin:` prefix. They coexist safely
+**only while the bundled one is signed out**, which is what the `logout` line above does: two
+authenticated DevStride servers expose identically-named tools, the skills call tools by bare
+name, and that is how work intended for one organization lands in another.
+
+Prefer the command over hand-writing a project `.mcp.json`: project-scoped servers need interactive
+approval before they connect, which an unattended environment cannot give, and the session reporter
+does not read one. Keep the credentials in environment variables as shown and never paste the key
+or secret into a file you commit.
+
+**Switching organization.** A key belongs to one organization; there is no in-session switch. To
+move to another, `claude mcp remove devstride` and add it again with that organization's key.
+
+<details>
+<summary>Trying the skills with a browser sign-in (not ready for agents)</summary>
+
+To try the skills by hand before creating a key, sign in to the bundled server instead:
 
 ```
 /mcp
 ```
 
 Connect the server listed as **`plugin:devstride:devstride`**. That opens your browser, you sign in
-to DevStride and pick an organization, and you are done. Installing the plugin never asks for a
-credential and never stores one.
+to DevStride and pick an organization, and the skills have their tools. Read the consent screen
+before accepting: it grants the same read and write access.
 
-**Do this before running any skill.** Until you sign in the server contributes *no tools at all* —
-DevStride rejects unauthenticated requests, including the tool listing — and nothing prompts you.
-A skill will simply report that it cannot find DevStride tools. That is the signed-out symptom;
-it is not a misconfiguration. (An *authorization* error is different, and means your session
-expired or a key is wrong.)
+A connection that only signs in through the browser carries no API key, so that machine is **not
+ready for agents**: its sessions are not shown on the Fleet, and nothing a script runs outside the
+model can reach DevStride. The plugin says so once, at a session start, and never works around it.
+To switch organization on this path, run `claude mcp logout plugin:devstride:devstride` and
+connect again.
 
-> **Signing in grants read _and write_ access** to the organization you choose, at the same level
-> you have in the DevStride app — creating, updating and deleting items included. There is no
-> sandbox or dry-run mode, and no narrower scope to grant: the skills write to live data by design.
-> Read the consent screen before accepting.
-
-A plain `devstride` entry in `/mcp` is **not** this server — that is one you or your project
-configured separately. The bundled one always carries the `plugin:` prefix.
-
-**Switching organization.** Your sign-in is bound to the single organization you picked; there is no
-in-session switch. To move to another, run `claude mcp logout plugin:devstride:devstride` and connect
-again.
+</details>
 
 <details>
-<summary>Connecting without a browser (CI, containers, headless agents)</summary>
+<summary>Pointing at a non-production DevStride</summary>
 
-Browser sign-in needs a browser. Where there isn't one, add your own server with an API key.
-Generate one under **Profile Settings → API Keys**, then:
-
-```bash
-claude mcp add --transport http --scope user devstride https://api.devstride.com/mcp \
-  --header "X-DevStride-Api-Key: $DEVSTRIDE_API_KEY" \
-  --header "X-DevStride-Api-Secret: $DEVSTRIDE_API_SECRET" \
-  --header "X-DevStride-Organization-Id: $DEVSTRIDE_ORG_ID"
-```
-
-Only those three are required. `X-DevStride-Organization-Slug` is optional — supplying it just saves
-the server one round trip resolving the slug on startup.
-
-Prefer this command over hand-writing a project `.mcp.json`: project-scoped servers need interactive
-approval before they connect, which is precisely what an unattended environment cannot give. Keep the
-credentials in environment variables as shown and never paste the key or secret in literally — MCP
-config files are routinely committed.
-
-Your server and the bundled one **coexist**; the plugin's is `plugin:devstride:devstride`, yours is
-`devstride`. That is safe **only while the bundled one is signed out**, because a server you never
-sign in to contributes nothing. If you sign in to both, they expose identically-named tools and the
-skills — which call tools by bare name — cannot tell them apart. Two authenticated DevStride servers
-is how work intended for one organization lands in another. Keep exactly one signed in, using
-`claude mcp logout plugin:devstride:devstride` to clear the bundled one if you have already
-connected it.
-
-The same applies to pointing at a non-production DevStride: define your own server and sign out of
-the bundled one, which is production-only by design. The bundled server cannot be removed on its
-own — disabling it means disabling the plugin, and that takes the skills with it.
+Define your own server at that address with the command above and keep the bundled one signed out;
+the bundled server is production-only by design. It cannot be removed on its own — disabling it
+means disabling the plugin, and that takes the skills with it.
 
 </details>
 
@@ -211,6 +228,28 @@ skills are expected to keep working — but that is a trade to make knowingly. A
 own server if you want the smaller catalog.
 
 </details>
+
+## Live status on the Fleet
+
+Once a machine is connected with a key, every Claude Code session on it shows on your
+organization's Agent Fleet as it happens, with nothing to configure: it appears when it starts,
+reads Working or Waiting on a person as it goes, and reads Stopped when it ends or its machine goes
+quiet. It works inside a git repository or not, and whether or not the session runs a DevStride
+skill.
+
+- **What is sent** is a short fixed list: the session's id and name, the machine's name, the
+  branch, the checkout folder's base name, an item number the branch names, the plugin version,
+  the state, and timestamps. **Never** session text, a prompt, a file's content, a path or the
+  machine's address.
+- **Who sees it.** Any member's sessions are reported; the Fleet is readable by the people your
+  organization lets read it (its Owner and Admins by default), so a member's sessions are visible
+  to their administrators.
+- **Turning it off.** `"presence": null` in a repository's `.claude/ds-config.json` switches that
+  repository off; `DEVSTRIDE_PRESENCE=0` in the environment switches a whole machine off.
+- **It never gets in the way.** With no key, an older DevStride or no network it stays silent and
+  never slows a turn. A repository that names its own `presence.command` keeps using that instead.
+
+The contract is `skills/setup/references/session-presence.md`.
 
 ## Configure it for your repo
 

@@ -132,7 +132,7 @@ timeline. A `PASS` here means *nothing is obviously in the way*.
 |---|---|---|
 | A name in `hierarchyRoles` no longer resolves | The work type was renamed or archived in the organization | Re-run the role-mapping phase and confirm against the current hierarchy |
 | It resolves but the loop treats everything as a one-off | `releaseUnit` names a type that exists but is not the container above the leaves | Re-map. The release unit is the level whose completion cuts a release |
-| The check is `UNVERIFIABLE` | The DevStride server is not connected — the signed-out symptom is *absent tools*, not an error | Run `/mcp` and connect the bundled server, then re-run validation |
+| The check is `UNVERIFIABLE` | The DevStride server is not connected — the signed-out symptom is *absent tools*, not an error | Run `/devstride:setup connect`, then re-run validation |
 
 ### Lessons store
 

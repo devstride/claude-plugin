@@ -592,17 +592,21 @@ the boards are the organization's, so the rules are always an answer, never a te
 
 ## Session presence
 
-Optional. Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/session-presence.md` before writing
-or changing the block.
+On by default. Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/session-presence.md` before
+writing or changing the block.
 
 | Key | Shape | Absent means |
 | --- | --- | --- |
-| `presence` | `null`, or `{ "command": "…", "intervalMinutes"?: 5 }` | no session reports itself: no hook sends anything and no keeper starts |
+| `presence` | `null`, or `{ "command"?: "…", "intervalMinutes"?: 5 }` | the built-in reporter: every session reports its live status to DevStride with the API key the machine's DevStride connection carries (nothing runs on a machine whose connection has no key) |
 
-- **The command is the repository's**: the plugin's hooks run it for every session, at start, on
-  prompts, at each finished turn, from a per-session keeper every `presence.intervalMinutes`, and
-  at session end, with the event and the session's details in the environment. It is separate
-  from `activeAgents`, which marks plan roots during build-item runs only.
+- **`null` switches the repository off**, the built-in reporter and any command alike;
+  `DEVSTRIDE_PRESENCE=0` in the environment switches a whole machine off. Nothing else does.
+- **A command is the repository's own reporter and always wins**: the plugin's hooks run it for
+  every session, at start, on prompts, at each finished turn, from a per-session keeper every
+  `presence.intervalMinutes`, and at session end, with the event and the session's details in the
+  environment. A blank `presence.command` runs nothing.
+- **`presence.intervalMinutes`** defaults to 5 with a command and to 1 for the built-in reporter.
+- It is separate from `activeAgents`, which marks plan roots during build-item runs only.
 
 ## Local environment
 

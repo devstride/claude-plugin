@@ -1,23 +1,109 @@
 ---
 load: contract
 ---
-# Session presence — every running session reports itself
+# Session presence — every running session reports its live status
 
 A fleet view built from work claims shows only sessions that hold a claim. A session reviewing,
 fixing, waiting on tests or waiting for its person has no row, so the view undercounts exactly
 when someone is watching it. Presence closes that gap: the plugin's hooks report every session,
-whatever it is doing, through ONE command the repository names. The hook is
-`hooks/presence.py`; its docstring is the contract in full.
+whatever it is doing, inside a repository or not. The hook is `hooks/presence.py`; its docstring
+is the contract in full.
 
-## The block (`.claude/ds-config.json`)
+## Two reporters, and which one runs
 
-`presence`: `{ "command": "<the repository's own command>", "intervalMinutes"?: 5 }`.
-**An absent or null block, or a blank `command`, runs nothing and writes nothing.** The plugin
-never contacts a tracker for presence: what a report means, where it is stored and when it
-expires are the repository's, behind its command. `intervalMinutes` (an integer, 1 to 60; one out
-of range reads as 5, and doctor warns) is the keeper's beat.
+Decided per session by `skills/build-item/scripts/presence_settings.py`, in this order:
 
-## When the command runs
+1. **Off.** `DEVSTRIDE_PRESENCE` set to `0` (or `false`, `off`, `no`) switches a whole machine off,
+   a repository's own command included. `"presence": null` in `.claude/ds-config.json` switches a
+   repository off. Nothing runs and nothing is written. **These are the only two switches.**
+2. **The repository's own command**, when its block names one:
+   `"presence": { "command": "<the repository's own command>", "intervalMinutes"?: 5 }`. It always
+   wins over the built-in reporter, and what a report means, where it is stored and when it expires
+   are then the repository's, behind its command. A blank `command` runs nothing.
+3. **Otherwise the built-in reporter**, `hooks/presence-report.py`: no block, an empty block, a
+   block with only `intervalMinutes`, a repository with no config file, or a session outside any
+   repository. It sends each report to DevStride (the tool `report_session_presence`) with the API
+   key the machine's DevStride connection carries. **With no key nothing runs and nothing is
+   written**, and the first session start on such a machine says so in one line, once per machine.
+
+`intervalMinutes` (an integer, 1 to 60) is the keeper's beat: default 5 with a command, 1 for the
+built-in reporter; one out of range reads as that default, and doctor warns.
+
+## The one key
+
+There is one DevStride credential per agentic machine: the API key its DevStride connection
+carries. The built-in reporter and the DevStride release clearance provider find it in one place,
+`skills/build-item/scripts/devstride_connection.py`, in one order: the environment
+(`DEVSTRIDE_API_KEY`, `DEVSTRIDE_API_SECRET`, `DEVSTRIDE_ORG_ID`); for the clearance provider only,
+the file `release.clearance.credentialsFile` names; then the server named `devstride` in Claude
+Code's configuration file (`$CLAUDE_CONFIG_DIR/.claude.json`, else `~/.claude.json`), first the
+session's own project entry (the repository's main checkout, then the checkout, then the session's
+directory), then the user-level entry. An entry counts only when its address is a DevStride API
+host followed by `/mcp` and it holds literal values for the key, the secret and the organization
+id; the three and the address are taken together from that one entry. The file is read only when
+it is a regular file the user owns with no group or other permission bits.
+
+The key goes only to an `https://api(-<stage>).devstride.(com|dev)` host, redirects are refused,
+every call is bounded, and no hook prints or logs a key, puts one on a command line or adds one to
+a child's environment. **The plugin creates no key, writes no key anywhere and never asks for one
+in the chat.** A connection that only signs in through the browser carries no key: that machine is
+**not ready for agents**, and nothing works around it (Claude Code's own sign-in token is never
+read). A project `.mcp.json` is not read, nor a `devstride` server kept under another name.
+
+## What the built-in reporter sends
+
+`event`, `sessionId`, `state`, `machine`, `label` (the session's own name), `branch`, `checkout`
+(the folder's base name, never a path; none outside a repository), `item`, `pluginVersion`,
+`intervalMinutes`, `reportedAt`, `activeAt`, `busySince` and, on an end, `endReason`: the values of
+the variables below, cleaned (control characters become spaces; cut to 500 characters for the
+branch and checkout, 200 for the machine and label, 64 for the rest). **Never session text, a
+prompt, a file's content, a path or the machine's address.** Reports go to the organization the key
+belongs to. Any member's agent reports its own sessions; who may read the fleet view is the
+organization's to grant, so a member's sessions are visible to its administrators.
+
+The server answers `recorded`, `ended`, `stale` (an older report than the one stored) or
+`not-owner` (the session's row belongs to another user); all four are ordinary. **It fails open,
+quietly:** one attempt, 15 seconds at most, never on a turn's clock, never a word printed. A server
+with no such tool, or one that refuses the key (HTTP 401 or 403), quiets the session's reports for
+30 minutes; an unreachable or failing server (a timeout, HTTP 429 or 5xx) for 2 minutes; the next
+good answer clears it. An end that falls inside a quiet window is not sent: the row lapses by silence.
+
+## Connecting this machine
+
+The body of `/devstride:setup connect`: the one step, done once per machine, that makes the
+DevStride connection key-based. It serves the agent's DevStride tools and live status alike.
+
+1. Run `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" check` and read its first line.
+2. `AGENT CONNECTION: READY (…)` → say where the key was found, in those fixed words only, and
+   stop, offering the proof (step 4).
+3. `AGENT CONNECTION: NOT READY (…)` → say in plain words that this machine is connected by browser
+   sign-in only (or not at all), and that such a connection is not ready for agents. Then give the
+   one step, for the person to do **in their own terminal**: create a key in DevStride under
+   Profile Settings, API Keys (a role that cannot is told to ask an administrator for the
+   permission to create API keys); with the key, the secret and the organization id held in the
+   three variables, run
+
+   ```bash
+   claude mcp add --transport http --scope user devstride https://api.devstride.com/mcp \
+     --header "X-DevStride-Api-Key: $DEVSTRIDE_API_KEY" \
+     --header "X-DevStride-Api-Secret: $DEVSTRIDE_API_SECRET" \
+     --header "X-DevStride-Organization-Id: $DEVSTRIDE_ORG_ID"
+   ```
+
+   then `claude mcp logout plugin:devstride:devstride`, and restart Claude Code. The command writes
+   the key into Claude Code's own user configuration, the single place the agent's tools and the
+   reporter both read it from. The sign-out matters: two live DevStride connections expose the
+   same tool names, and a call can reach the wrong organization. A configuration file the check
+   calls unsafe is fixed with `chmod 600` on that file.
+4. When the person says it is done, run `check` again. **Only after a typed yes**, run
+   `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" prove` (it sends a start and an end for
+   a throwaway session) and report its one `PROOF:` line.
+
+**Setup never asks for a key, a secret or an organization id in the chat, never runs that command
+itself or through the `!` prefix (its output would join the conversation), never prints the stored
+entry, and writes no file of its own.**
+
+## When a report is sent
 
 | When | `PRESENCE_EVENT` | `PRESENCE_STATE` |
 | --- | --- | --- |
@@ -38,16 +124,18 @@ A state change within 30 seconds of the last report is held and carried by the n
 Reports for one session run one at a time; each is numbered when queued, and one overtaken by a
 newer report is dropped, so a late `end` never follows a resumed session's `start`. The keeper,
 one detached process per session, checks every 10 seconds, keeps a long turn visible and exits
-once the session ends, its record goes, the block is removed or the session loads another plugin
-version, whose next hook event starts its own. A session that moves to a
-checkout without the block keeps reporting under the one it came from.
+once the session ends, its record goes, reporting is switched off, the connection loses its key or
+the session loads another plugin version, whose next hook event starts its own. A session that
+moves to a place where reporting is off keeps reporting under the one it came from; one outside a
+repository that walks into one beats from it.
 
-## What the command receives
+## What a repository's command receives
 
 Run from the repository root through the shell, at most 20 seconds, never on the hook's own
-clock (the hook spawns it and returns). Exported: `PRESENCE_EVENT`, `PRESENCE_STATE`,
+clock (the hook spawns it and returns). The built-in reporter is given the same variables (and no
+arguments), from the repository root or the session's directory. Exported: `PRESENCE_EVENT`, `PRESENCE_STATE`,
 `PRESENCE_SESSION_ID`, `PRESENCE_MACHINE` (the claim machine name),
-`PRESENCE_CHECKOUT` (the checkout's root), `PRESENCE_BRANCH`, `PRESENCE_ITEM` (an item number the branch name carries as its own
+`PRESENCE_CHECKOUT` (the checkout's root; empty outside a repository, as the branch and item then are), `PRESENCE_BRANCH`, `PRESENCE_ITEM` (an item number the branch name carries as its own
 segment, such as `I20100` in `jane/03-14-26/I20100-attachment-storage`; else empty),
 `PRESENCE_PLUGIN_VERSION` (the sender's), `PRESENCE_INTERVAL_MINUTES`, `PRESENCE_END_REASON` (on `end` only),
 `PRESENCE_AT` (when queued, in epoch milliseconds, rising with each report, so an
@@ -82,4 +170,7 @@ name. Its exit code is kept in the session's local record; nothing reads it as a
 
 - `skills/setup/references/config-defaults.md` — the Session presence section.
 - `schemas/seam-registry.json` — `presence.command`'s contract.
-- `hooks/presence.py` — its docstring.
+- `hooks/presence.py` and `hooks/presence-report.py` — their docstrings.
+- `skills/setup/SKILL.md` — the `connect` mode; `skills/doctor/SKILL.md` §3 and
+  `skills/doctor/references/claims-checks.md` — "Ready for agents".
+- `README.md` — "Connect to DevStride" and "Live status on the Fleet".

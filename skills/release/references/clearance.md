@@ -152,7 +152,8 @@ first 12 characters), never the holder. Credentials `DEVSTRIDE_API_KEY`, `DEVSTR
 `DEVSTRIDE_ORG_ID`, optionally `DEVSTRIDE_ORG_SLUG` and `DEVSTRIDE_BASE_URL` (an
 `api[-x].devstride.com|dev` host): the environment first, then the `KEY=VALUE` file
 `credentialsFile` names (from the repository root, `~/` expanded; **a file open to group or other
-is refused: `chmod 600`**). Nothing prints the key, the secret or the holder. A server without the
+is refused: `chmod 600`**), then the key the machine's DevStride connection itself carries, so
+`credentialsFile` is needed only where that connection is not key-based. Nothing prints the key, the secret or the holder. A server without the
 claim tools, or a key lacking `MANAGE_AGENT_CLAIMS`, is exit `1` saying so; `status --short` prints
 nothing on any failure. `gh` still serves pull-request facts.
 
