@@ -599,12 +599,14 @@ a restart or a cleared conversation, because the run's position lives in a small
 under your cache folder, not in the conversation.
 
 It decides and records; it never acts. It refuses a step list that drops, weakens or reorders a
-required step (a merge needs a review, green local checks and a risk check before it, and no second
-build may come after them), and it will not say "go on to the merge" while the local checks or the
-review are stale: the checks are bound to the exact tree they ran on and the review to the exact
-patch it read, byte for byte, white space included. It checks again whenever it is asked, also
-while the merge is already handed out, and a merge reported as landed must name the very commit
-those checks and that review were proven on. The catalog holds twelve contracts: the eleven Build
+required step (a merge needs a review, green local checks and a risk check before it, and no step
+may repeat what a required step provides after a step that requires it, since nothing would check
+that second one), and it will not say "go on to the merge" while the local checks or the review are
+stale: the checks are bound to the exact tree they ran on and the review to the exact patch it
+read, byte for byte, white space included. Before it hands out the merge it reads the branch's
+commit once, checks both against that commit and hands the merge exactly that commit; a merge
+reported as landed must name it. A step already handed out is handed back unchanged if asked
+again, because it may already have acted. The catalog holds twelve contracts: the eleven Build
 steps and one for a repository's own step.
 
 **Nothing calls it yet.** `build-item` runs exactly as before. `/devstride:run-workflow build` is

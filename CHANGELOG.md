@@ -29,24 +29,32 @@ for what each version component means here and how a release is cut.
     your cache folder. It decides and records and never acts: it runs no skill, calls no tracker
     and only reads git.
   - It refuses a step list that drops, weakens, switches off or moves a required step: a merge
-    cannot lack a review, green local checks or a risk check before it, and no second build may
-    come after the steps that check the first, whatever the steps are called and whichever skill
-    runs them. It also refuses a step list that does not meet its schema in full, and one that
-    holds anything that looks like a credential (`credential-in-definition`), because the step list
+    cannot lack a review, green local checks or a risk check before it, and no step may repeat
+    what a required step provides after a step that requires it (a second build after the review,
+    say, whose changes nothing would check), whatever the steps are called and whichever skill runs
+    them. It also refuses a step list that does not meet its schema in full, and one that
+    holds anything shaped like a credential (`credential-in-definition`), because the step list
     is reported as written. Each refusal has a fixed code.
   - It will not say "go on to the merge" on stale checks. The local checks are bound to the exact
     tree they ran on and the review to the exact patch it read, every byte of it, white space
-    included (`git patch-id --verbatim`, from a diff whose flags no git setting can change; a git
+    included (`git patch-id --verbatim`, from a diff whose flags fix colour, prefixes, context,
+    renames, the diff algorithm and submodules, so those git settings cannot change it; a git
     without `--verbatim` stops the run rather than guess). A refreshed base under a byte-identical
-    patch keeps the review. When either goes stale it issues that step again first, also when it is
-    asked again while the merge is already handed out. A merge reported as landed must name the
-    commit it merged, and that must be the commit the checks and the review were proven on
-    (`merge-lands-what-was-checked`); anything else stops the run. A missing or malformed verdict
+    patch keeps the review. When either goes stale it issues that step again first. Before it hands
+    out the merge it reads the branch's commit once, checks both proofs against that one commit and
+    hands the merge that commit to merge exactly; a merge reported as landed must name it
+    (`merge-lands-what-was-checked`), and anything else stops the run. A step already handed out is
+    handed back unchanged when asked again, because it may already have acted (a merge that landed
+    just before a restart is reported with `done`, never run twice). A missing or malformed verdict
     stops the run and is never read as a pass, and so does a proof that disagrees with its verdict:
-    "nothing configured" is believed only from the `NOT CONFIGURED` verdict.
+    "nothing configured" is believed only from the `NOT CONFIGURED` verdict, and a pass only when
+    it names a command it ran and carries their receipt.
   - What it reports about a step is small: the verdict line, a few lines of evidence and https
-    links, with anything that looks like a credential (headers, tokens, keys, passwords, URLs with
-    a password, in any case) dropped or withheld, and no refusal line echoes one. The result and
+    links, with anything shaped like a credential (an Authorization, Bearer or Basic value, a known
+    token prefix, a URL with a password, or a secret, token, password or key name assigned a value
+    of 7 characters or more, not all digits, in any case) dropped or withheld, and no refusal line
+    echoes one. Ordinary lines that only mention such a word (`token_count=12`,
+    `password_reset.py: 12 passed`) are kept. The result and
     the proof a step hands back are kept as given in the owner-only state file and passed to later
     steps; they are never reported. It hands back ready-made step reports for DevStride and never
     sends them itself.
@@ -74,7 +82,7 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.1.0 @ fdc50cb, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v4.1.0 @ e2b8774, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.1.0 | tokens@devstride--v4.1.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
@@ -96,7 +104,7 @@ for what each version component means here and how a release is cut.
 | skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
 | skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
 | skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
-| skills/run-workflow/SKILL.md (added) | — | — | 2,904 | 968 | +968 | 1,000 |
+| skills/run-workflow/SKILL.md (added) | — | — | 2,956 | 986 | +986 | 1,000 |
 | skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
 | skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
 | skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
@@ -109,7 +117,7 @@ for what each version component means here and how a release is cut.
 | skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,472 | 1,824 | +32 | 1,900 |
-| **total (bodies)** | 276,460 | 92,163 | 279,364 | 93,131 | +968 | |
+| **total (bodies)** | 276,460 | 92,163 | 279,416 | 93,149 | +986 | |
 
 ## [4.1.0] — 2026-11-17
 
