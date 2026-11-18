@@ -8,6 +8,83 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.1.0] — 2026-11-17
+
+### Added
+
+- **The Build workflow ships as a written step list.** `workflows/build.json` describes the loop
+  `build-item` already runs as four phases and thirteen named steps (pick up, build, review, land),
+  each with the skill that runs it today. It is a description, not a new engine: the loop chooses,
+  orders, gates and skips exactly as before, and nothing evaluates the file yet. The step ids are
+  stable from this release on. New: `schemas/workflow.schema.json` (the shape, for editors and
+  later tools) and `scripts/check-workflows.py`, which `validate.sh` runs so a release cannot ship
+  a definition that breaks its own rules.
+- **The loop reports each step and what it produced to DevStride, on by default.** In a session
+  connected to DevStride, `build-item` now says at each of its own transitions which step it is on
+  and how the last one ended: a one-line verdict, a few lines of evidence (counts, commands, a
+  short commit id) and the links the loop already holds. Never session text, a prompt or a file's
+  contents. It only observes, and it fails open and silently: where DevStride cannot take a report
+  (an older server, no permission, no network, no connection) nothing is sent after the first
+  attempt of that run, nothing is said to the person, and the work never waits, retries or stops
+  because of it. Set `"workflows": null` in `.claude/ds-config.json` to switch reporting off for a
+  repository, or `DEVSTRIDE_WORKFLOWS=0` for one machine. A repository with its own store names
+  `workflows.commands.report` and the reports go to that command instead. New config key
+  `workflows` (and `workflows.provider`, `workflows.commands`, `workflows.commands.report`); new
+  helper `skills/build-item/scripts/workflow_report.py` (standard library only, no network), which
+  shapes each report, caps it, removes any user or password from a repository address or link, and
+  keeps a small per-run state file in the temporary directory. Contract:
+  `skills/build-item/references/workflow-reports.md`.
+
+### Changed
+
+- **`build-item`'s instructions are slightly shorter.** The new reporting pointer and its
+  fail-open sentence were paid for by removing explanation the references already carry (an
+  example of the profile announcement, the reason behind the one-off bypass, a summary of the step
+  order that `workflows/build.json` now states, two short notes for editors of these files, and
+  one reason that now sits in `as-built.md`).
+  No rule left the body. The `fastStoryLoop` load path rises by the new reference and the
+  progress table's new row, because every story now reads them unless reporting is switched off.
+  The first report of a run also carries the workflow definition, about 4 KB the agent passes on
+  once.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v4.0.0 @ a93d635, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v4.0.0 | tokens@devstride--v4.0.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 25,535 | 8,512 | 25,535 | 8,512 | +0 | 8,512 |
+| skills/doctor/SKILL.md | 23,995 | 7,999 | 23,995 | 7,999 | +0 | 8,000 |
+| skills/build-item/SKILL.md | 23,992 | 7,998 | 23,980 | 7,994 | -4 | 7,994 |
+| skills/review/SKILL.md | 23,970 | 7,990 | 23,970 | 7,990 | +0 | 7,999 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
+| skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |
+| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
+| skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 11,963 | 3,988 | +0 | 3,988 |
+| skills/pr/SKILL.md | 11,205 | 3,735 | 11,205 | 3,735 | +0 | 3,735 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,731 | 2,244 | 6,731 | 2,244 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,649 | 2,217 | 6,649 | 2,217 | +0 | 2,217 |
+| skills/create-story/SKILL.md | 6,322 | 2,108 | 6,322 | 2,108 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 5,622 | 1,874 | 5,622 | 1,874 | +0 | 1,874 |
+| skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,374 | 1,792 | +0 | 1,800 |
+| **total (bodies)** | 276,472 | 92,167 | 276,460 | 92,163 | -4 | |
+
 ## [4.0.0] — 2026-11-17
 
 ### Added
@@ -5866,7 +5943,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.0.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.1.0...HEAD
+[4.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.0.0...devstride--v4.1.0
 [4.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.67.0...devstride--v4.0.0
 [3.67.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.66.0...devstride--v3.67.0
 [3.66.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.65.0...devstride--v3.66.0
