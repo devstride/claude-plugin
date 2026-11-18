@@ -556,7 +556,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | Skill | What it does |
 |---|---|
 | `build-item` | The orchestrator: select → branch → build → review → merge → completion ritual → repeat |
-| `run-workflow` | Runs a workflow one step at a time with the step runner. Nothing calls it yet, and it refuses the Build workflow until the release that ships the step skills: see [The step runner](#the-step-runner) |
+| `run-workflow` | Runs a workflow one step at a time with the step runner. Nothing calls it yet, and it refuses the shipped Build workflow: see [The step runner](#the-step-runner) |
 | `ultracode-build` | The build engine for one scoped item: fast feedback, exact-tree verification receipt, bounded risk screen, and focused critical-boundary verification when needed |
 | `review` | Runs every configured reviewer, settles findings, then releases CI — re-reviewing from the latest common cycle anchor and continuing P1/serious-P2 fixes until clear |
 | `pr` | Opens a pull request and runs the review-and-settle loop |
@@ -599,15 +599,19 @@ a restart or a cleared conversation, because the run's position lives in a small
 under your cache folder, not in the conversation.
 
 It decides and records; it never acts. It refuses a step list that drops, weakens or reorders a
-required step (a merge needs a review, green local checks and a risk check before it), and it will
-not say "go on to the merge" while the local checks or the review are stale: the checks are bound
-to the exact tree they ran on and the review to the exact patch it read. The catalog holds twelve
-contracts: the eleven Build steps and one for a repository's own step.
+required step (a merge needs a review, green local checks and a risk check before it, and no second
+build may come after them), and it will not say "go on to the merge" while the local checks or the
+review are stale: the checks are bound to the exact tree they ran on and the review to the exact
+patch it read, byte for byte, white space included. It checks again whenever it is asked, also
+while the merge is already handed out, and a merge reported as landed must name the very commit
+those checks and that review were proven on. The catalog holds twelve contracts: the eleven Build
+steps and one for a repository's own step.
 
 **Nothing calls it yet.** `build-item` runs exactly as before. `/devstride:run-workflow build` is
 refused before anything is written: the shipped `workflows/build.json` still uses its draft
-contract names (`unknown-contract`), and the step skills the catalog names arrive in a later
-release (`skill-missing`). Until then the runner is there to read and to try. Its rules are in
+contract names (`unknown-contract`). Its step skills arrive in a later release, and a workflow
+that names a step skill this plugin does not have is refused too (`skill-missing`). Until then the
+runner is there to read and to try. Its rules are in
 `skills/run-workflow/references/workflow-runner.md`, and `workflow-fixtures.json` beside the script
 holds its canonical cases.
 
