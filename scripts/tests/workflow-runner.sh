@@ -864,10 +864,18 @@ def section_proofs():
     repo = new_repo()
     git(repo, "checkout", "-q", "main")
     commit(repo, "notes.txt", "".join("note %d\n" % n for n in range(12)), "notes")
+    os.makedirs(os.path.join(repo, "vendor"))  # a submodule that is not checked out: a pointer only, no network
+    git(repo, "update-index", "--add", "--cacheinfo", "160000,%s,vendor" % ("1" * 40))
+    git(repo, "commit", "-q", "-m", "a submodule")
     git(repo, "checkout", "-q", "feature")
     git(repo, "rebase", "-q", "main")
     git(repo, "mv", "notes.txt", "moved.txt")
     commit(repo, "readme.txt", "one\ntwo\nthree\nfour\n", "a rename and a change with context")
+    git(repo, "update-index", "--cacheinfo", "160000,%s,vendor" % ("2" * 40))
+    git(repo, "commit", "-q", "-m", "the submodule moves")
+    check("(the fixture changes a submodule, which diff.ignoreSubmodules=all would hide)",
+          b"Subproject commit" in git(repo, *(DIFF + ["main...HEAD", "--"]))
+          and b"Subproject commit" not in git(repo, "-c", "diff.ignoreSubmodules=all", "diff", "main...HEAD"))
     run = Driver(repo=repo)
     run.until("review")
     hook = os.path.join(WORK, "ext-diff-ran")
@@ -908,7 +916,9 @@ def section_proofs():
         run.until("local-checks")
         answer = run.done(canned("local-checks@1", run.repo, **{"proof.kind": kind}).replace("LOCAL CHECKS: PASS (2 ran)", verdict))
         check("local checks: %s is refused, never passed" % label, is_stopped(answer, "proof", "local-checks") and answer["recorded"]["status"] == "failed", answer)
-    for label, change in (("ran no command", {"commands": [], "results": []}), ("carries no receipt", {"receipt": None, "proof.receipt": None})):
+    for label, change in (("ran no command", {"commands": [], "results": []}), ("carries no receipt", {"receipt": None, "proof.receipt": None}),
+                          ("carries a blank receipt", {"receipt": "  ", "proof.receipt": "  "}), ("names a blank command", {"commands": ["unit", " "]}),
+                          ("names a command that is not text", {"commands": [7]})):
         run = Driver()
         run.until("local-checks")
         answer = run.done(**change)
@@ -1013,13 +1023,21 @@ def section_evidence():
               "a token eyJabcdefg.eyJhijklmn.sig9 in the log", "Bearer abcd1234efgh5678", "passwd=x1y2z3w4", "https://user:pw@example.com/x",
               "secretKey=abcd1234efgh", "password: hunter2hunter", "bearer \t ABCDEFGHIJKLMNOPQRST", "ASIAABCDEFGHIJKLMNOP",
               "npm_abcdefghijklmnopqrstuvwxyz0123456789", "AIzaSyA1234567890abcdefghijklmnopqrstu", "whsec_abcdefgh",
-              "SG.abcdefghijklmn.opqrstuvwxyz", "X-Api-Key: abc", "--password hunter2", "--token abcdef123", "client_secret hunter2"]
+              "SG.abcdefghijklmn.opqrstuvwxyz", "X-Api-Key: abc", "--password hunter2", "--token abcdef123", "client_secret hunter2",
+              "Authorization: ApiKey abcdefghijklmnopqrstuvwxyz012345", "Authorization: Token " + "0123456789abcdef" * 2 + "01234567",
+              "Authorization: Bot abcdefghijklmnopqrstu", "Authorization: SSWS 00abcdefghijklmnopqrstuvwx", "Authorization: abcdefghijklmnopqrstu",
+              "db.password=huntertwo", "spring.datasource.password: huntertwo"]
     ordinary = ["3 files changed", "unit: 12 passed", "lint: clean", "tokens: 911 used", "the token rotation is documented",
                 "secretary: Jane", "clone ssh://git@github.com/example/widgets", "git@github.com:example/widgets.git", "the Authorization header is checked",
                 "a bearer of good news", "task-runner: done", "the password reset flow works", "https://example.com/commit/1", "main...HEAD"] + LOOKALIKES
     run, answer, text, report = claim("CLAIM: WON\n%s\n%s" % ("\n".join(shapes + ordinary), result))
     check("credentials of every common shape are dropped, case and spacing aside", not any(line in text for line in shapes), [l for l in shapes if l in text])
     check("... and ordinary evidence lines survive", report["evidence"] == ordinary, report.get("evidence"))
+    for line in ("token" * 20000, "a." * 50000, "password=" * 11112, "eyJ" * 33334, "bearer " * 14286, "a://" * 25000,
+                 "x." * 49999 + "password", "authorization: " * 6667, "a" * 100000 + ".password=x"):
+        began = time.time()
+        module.has_secret(line)
+        check("a 100 KB line built to be slow is scanned in well under a second (%s...)" % line[:12], time.time() - began < 0.25, time.time() - began)
     for line in LOOKALIKES:
         run = Driver()
         run.until("build")
@@ -1275,9 +1293,9 @@ section validation 125
 section verdicts 76
 section proof-fixtures 25
 section lifecycle 59
-section proofs 66
+section proofs 70
 section stand-in 3
-section evidence 37
+section evidence 46
 section state 29
 section reporting 4
 section repository 7

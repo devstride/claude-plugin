@@ -6,8 +6,8 @@ load: contract
 `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py` walks a workflow definition
 (`${CLAUDE_PLUGIN_ROOT}/schemas/workflow.schema.json`) against the step contract catalog
 (`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`). **It decides and records; it never acts**: no
-network, no tracker call, no skill run, and git only to read (HEAD and its tree, a patch id, the
-remote's name). Whoever drives it (a person, another agent, a loop) runs the steps.
+network, no tracker call, no skill run, and git only to read. Whoever drives it (a person, another
+agent, a loop) runs the steps.
 
 ## Commands
 
@@ -99,7 +99,7 @@ the contract does not list are dropped. A `count` is a whole number of at least 
 links (`pullRequest`, `commit`, `comment`) and the branch name from `links`, the skill that ran,
 and the definition. What is shaped like a credential (an Authorization, Bearer or Basic value of 16
 characters or more, an `x-api-key` header, a web token, a URL with a password, a known token prefix,
-a private key, a claim holder, or one word naming a secret, token, password or API, access or
+a private key, a claim holder, or a key naming a secret, token, password or API, access or
 private key, assigned, or a `--password`/`--token`/`client_secret` flag, followed by 7 or more
 characters, not all digits) is never reported: the evidence
 line or link is dropped, the verdict detail becomes `[withheld]`, the definition is refused (also for such a key holding such a
@@ -129,15 +129,17 @@ Each command reads HEAD once, as a full commit id, and checks every proof agains
 - **patch**: the proof's `patchId` must be the verbatim patch id of everything on that commit since
   the proof's `base`, every byte counted, white space too:
   `git diff --no-color --no-ext-diff --no-textconv --no-relative --src-prefix=a/ --dst-prefix=b/ --ignore-submodules=none --unified=3 --no-renames --diff-algorithm=myers <base>...<commit> -- | git patch-id --verbatim`.
-  A git without `--verbatim` stops the run (kind `proof`). A base that moved under a byte-identical
-  patch keeps the proof.
+  The flags override git's settings for colour, prefixes, paths, submodules, context, renames and
+  the algorithm; its suppressBlankEmpty and quotePath settings are not covered, and fail closed
+  (the proof reads as stale). A git without `--verbatim` stops the run (kind `proof`). A base
+  that moved under a byte-identical patch keeps the proof.
 - **none**: nothing in the repository binds it.
 
 Whatever the binding, a proof is void once a step it requires is completed again after it
 (supersession): a second build voids the risk check, the local checks and the review that came from
 the first. One exception keeps the patch binding meaningful: a step issued again only to refresh
-its own stale proof does not void the steps that rely on it. In this catalog those are the review,
-bound to its own patch and re-checked against it, and the merge, which has not run yet.
+its own stale proof does not void the steps that rely on it (here the review, which holds its own
+patch proof, and the merge).
 
 A finished step is re-examined only while a later step that requires it has not finished, so
 nothing before a finished merge is re-opened. `next` issues the first step, in order, that is not
@@ -168,9 +170,8 @@ itself. Wherever a `requires` list names contract X, the nearest earlier step ca
 contract in X's list** meets it. It is honoured in three places: start validation (a stand-in that
 is absent, later, conditional, non-stopping or switched off is refused exactly as the original
 would be), payload paths (a result path naming X reads the stand-in's result, so a stand-in must
-always give every key a dependent reads without a `?`), and supersession. A server that checks
-workflows reads the same field. Only a release that adds a contract meant to stand in appends to a
-list; nothing redefines the rule. No shipped contract carries the field yet.
+always give every key a dependent reads without a `?`), and supersession. Only a release adding a
+stand-in contract appends to a list. No shipped contract carries the field yet.
 
 ## Stops
 

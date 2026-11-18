@@ -117,23 +117,26 @@ RUN_OUTCOME = {
 # a verdict detail or a refusal message is replaced, and a definition that holds one is refused.
 # A value is one unbroken run of at least 7 characters that is not all digits, so `token: 911`,
 # `has_token=true` and `Rotate the token: weekly` are ordinary text and `password: hunter2` is not.
-CREDENTIAL_NAME = r"[A-Za-z0-9_-]*(?:secret|token|passw(?:or)?d|api[_-]?key|access_?key|private_?key)[A-Za-z0-9_-]*"
-CREDENTIAL_VALUE = r"(?=[^\s\"']*[^\s\"'0-9])[^\s\"']{7,}"
+# Every repeat is bounded and a match needs only its first few characters, so the work stays
+# linear in the text's length whatever it holds.
+CREDENTIAL_NAME = (r"(?:[A-Za-z0-9_-]{1,64}\.){0,8}"   # a dotted key's earlier segments: db.password
+                   r"[A-Za-z0-9_-]{0,64}(?:secret|token|passw(?:or)?d|api[_-]?key|access_?key|private_?key)[A-Za-z0-9_-]{0,64}")
+CREDENTIAL_VALUE = r"(?=[^\s\"']{7})(?![0-9]+(?:[\s\"']|$))"
 SECRET = re.compile(
     r"CLAIM_HOLDER|-----BEGIN"
-    r"|\bauthorization[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9._~+/=-]{16,}"    # an Authorization header's raw value
-    r"|\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{16,}"                     # a bearer or basic credential
+    r"|\bauthorization[\"']?\s*[:=]\s*[\"']?(?:[A-Za-z]{1,32}\s+)?[A-Za-z0-9._~+/=-]{16}"  # an Authorization header, any scheme
+    r"|\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{16}"                     # a bearer or basic credential
     r"|\bx-api-key[\"']?\s*:\s*[\"']?[^\s\"']"                           # an API key header
-    r"|\b[a-z][a-z0-9+.-]*://[^\s/@:]+:[^\s/@]+@"                         # a URL with a user and password
-    r"|\b(?:sk_live_|sk_test_|rk_live_|sk-ant-|ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abpors]-|whsec_)[A-Za-z0-9_-]{4,}"
-    r"|\bnpm_[A-Za-z0-9]{16,}|\bAIza[A-Za-z0-9_-]{16,}|\bSG\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"
-    r"|\bsk-[A-Za-z0-9_-]{16,}|(?-i:\b(?:AKIA|ASIA)[0-9A-Z]{12,})"
-    r"|\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*"          # a JSON web token
+    r"|\b[a-z][a-z0-9+.-]{0,31}://[^\s/@:]+:[^\s/@]+@"                   # a URL with a user and password
+    r"|\b(?:sk_live_|sk_test_|rk_live_|sk-ant-|ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abpors]-|whsec_)[A-Za-z0-9_-]{4}"
+    r"|\bnpm_[A-Za-z0-9]{16}|\bAIza[A-Za-z0-9_-]{16}|\bSG\.[A-Za-z0-9_-]{8,64}\.[A-Za-z0-9_-]{8}"
+    r"|\bsk-[A-Za-z0-9_-]{16}|(?-i:\b(?:AKIA|ASIA)[0-9A-Z]{12})"
+    r"|\beyJ[A-Za-z0-9_-]{4,64}\.[A-Za-z0-9_-]{4}"                         # a JSON web token
     r"|(?:--(?:password|token)|\bclient_secret)(?:\s+|=)[\"']?" + CREDENTIAL_VALUE +   # a flag and its value
     r"|(?<![A-Za-z0-9_./\\-])" + CREDENTIAL_NAME + r"[\"']?\s*[:=]\s*[\"']?" + CREDENTIAL_VALUE,  # a key that names one, assigned
     re.I)
 CREDENTIAL_KEY = re.compile("^%s$" % CREDENTIAL_NAME, re.I)
-CREDENTIAL_STRING = re.compile(r"^\s*%s\s*$" % CREDENTIAL_VALUE)
+CREDENTIAL_STRING = re.compile(r"^\s*(?![0-9]+\s*$)\S{7,}\s*$")
 WITHHELD = "[withheld]"
 NOT_SHOWN = "the message names a value that looks like a credential, so it is not shown"
 
@@ -209,8 +212,10 @@ class World:
 
     def patch_id(self, cwd, base, commit):
         """The verbatim patch id of everything on `commit` since it left `base`, or None for no
-        patch. Every byte counts, white space too, and the diff's flags are fixed so that no
-        setting of git's diff changes it and no diff driver or text converter runs."""
+        patch. Every byte counts, white space too. The fixed flags override the settings for colour,
+        prefixes, relative paths, submodules, context, renames and the diff algorithm, and no diff
+        driver or text converter runs; `diff.suppressBlankEmpty` and `core.quotePath` are not
+        covered, and fail closed: an id they change reads as stale and the step runs again."""
         if not isinstance(base, str) or not GIT_REF.match(base):
             raise GitFailed("the proof's base is not a usable git name")
         diff = self.git(cwd, "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative",
@@ -722,8 +727,11 @@ def proof_fault(contract, entry, proof, value=None, result=None):
             return "the verdict %s needs a proof whose %s is %s" % (value["value"], key, wanted)
     if contract == "risk-check@1" and proof["triggers"] and proof["verifiers"] < 1:
         return "risk-triggers-need-verifiers: the risk check names triggers and ran no verifier"
-    if contract == "local-checks@1" and proof["kind"] == "receipt" and (proof["receipt"] is None or (result is not None and not result.get("commands"))):
-        return "a pass names the commands it ran and carries their receipt"
+    if contract == "local-checks@1" and proof["kind"] == "receipt":
+        named = lambda text: isinstance(text, str) and bool(text.strip())
+        commands = (result or {}).get("commands")
+        if not named(proof["receipt"]) or (result is not None and not (commands and all(named(c) for c in commands))):
+            return "a pass names the commands it ran and carries their receipt"
     return None
 
 
