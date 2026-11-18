@@ -1,0 +1,2444 @@
+{
+ "_readme": "Canonical cases for skills/run-workflow/scripts/workflow.py, run by scripts/tests/workflow-runner.sh. definitions: the Build definition the tests drive, and a one-step variant. context and outputs: the start context and one passing answer per contract ({head}, {tree} and {patchId} are filled from the test's repository). catalogs: standIn is added to a copy of the real catalog (contracts are added, satisfiedBy is set); faults and sound are edited copies and the fault code each must, or must not, raise. validation: each case edits a definition (set a step's or a top-level field, remove, move or add a step, or replace it whole) and names the refusal code start must give, or ok; root says which plugin copy runs it (fixture: every step skill present; real: the plugin as released; standIn: the fixture copy with the standIn catalog); git says whether the working directory is a repository. verdicts: an answer, its contract and what its first line parses to (class null: no verdict). proofs: a proof, the git answers given and whether it holds, is stale, is refused or cannot be read. repository: a remote address and the name reports carry for it.",
+ "definitions": {
+  "build": {
+   "schema": 1,
+   "id": "build",
+   "version": 2,
+   "name": "Build",
+   "startsWhen": "item-picked-up",
+   "endsBy": null,
+   "appliesTo": {
+    "workTypes": [],
+    "tags": [],
+    "repositories": []
+   },
+   "minPluginVersion": "4.2.0",
+   "phases": [
+    {
+     "id": "pick-up",
+     "name": "Pick up",
+     "steps": [
+      {
+       "id": "claim",
+       "name": "Claim it",
+       "summary": "",
+       "contract": "claim@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "claim-story",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "start",
+       "name": "Mark In Progress",
+       "summary": "",
+       "contract": "start@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "story-lifecycle",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      }
+     ]
+    },
+    {
+     "id": "build",
+     "name": "Build",
+     "steps": [
+      {
+       "id": "branch",
+       "name": "Branch",
+       "summary": "",
+       "contract": "branch@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "branch-feature",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "build",
+       "name": "Build",
+       "summary": "",
+       "contract": "build@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "ultracode-build",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "risk-check",
+       "name": "Risk check",
+       "summary": "",
+       "contract": "risk-check@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "risk-check",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      }
+     ]
+    },
+    {
+     "id": "review",
+     "name": "Review",
+     "steps": [
+      {
+       "id": "local-checks",
+       "name": "Local checks",
+       "summary": "",
+       "contract": "local-checks@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "local-checks",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "review",
+       "name": "Review",
+       "summary": "",
+       "contract": "review@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "review-story",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      }
+     ]
+    },
+    {
+     "id": "land",
+     "name": "Land",
+     "steps": [
+      {
+       "id": "merge",
+       "name": "Merge",
+       "summary": "",
+       "contract": "merge@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "merge-story",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "complete",
+       "name": "Complete",
+       "summary": "",
+       "contract": "complete@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "story-lifecycle",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "capture",
+       "name": "File the findings",
+       "summary": "",
+       "contract": "capture@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "capture-findings",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "sync",
+       "name": "Sync the base",
+       "summary": "",
+       "contract": "sync@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "sync-base",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      }
+     ]
+    }
+   ]
+  },
+  "claim-only": {
+   "schema": 1,
+   "id": "claim-only",
+   "version": 1,
+   "name": "Claim only",
+   "startsWhen": "item-picked-up",
+   "endsBy": null,
+   "appliesTo": {
+    "workTypes": [],
+    "tags": [],
+    "repositories": []
+   },
+   "minPluginVersion": "4.2.0",
+   "phases": [
+    {
+     "id": "pick-up",
+     "name": "Pick up",
+     "steps": [
+      {
+       "id": "claim",
+       "name": "Claim it",
+       "summary": "",
+       "contract": "claim@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "claim-story",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      }
+     ]
+    }
+   ]
+  },
+  "mostly-off": {
+   "schema": 1,
+   "id": "mostly-off",
+   "version": 1,
+   "name": "Mostly off",
+   "startsWhen": "item-picked-up",
+   "endsBy": null,
+   "appliesTo": {
+    "workTypes": [],
+    "tags": [],
+    "repositories": []
+   },
+   "minPluginVersion": "4.2.0",
+   "phases": [
+    {
+     "id": "pick-up",
+     "name": "Pick up",
+     "steps": [
+      {
+       "id": "skip-1",
+       "name": "Skipped 1",
+       "summary": "",
+       "contract": "claim@1",
+       "kind": "step",
+       "run": {
+        "source": "off",
+        "ref": null,
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "skip-2",
+       "name": "Skipped 2",
+       "summary": "",
+       "contract": "claim@1",
+       "kind": "step",
+       "run": {
+        "source": "off",
+        "ref": null,
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "skip-3",
+       "name": "Skipped 3",
+       "summary": "",
+       "contract": "claim@1",
+       "kind": "step",
+       "run": {
+        "source": "off",
+        "ref": null,
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "skip-4",
+       "name": "Skipped 4",
+       "summary": "",
+       "contract": "claim@1",
+       "kind": "step",
+       "run": {
+        "source": "off",
+        "ref": null,
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "skip-5",
+       "name": "Skipped 5",
+       "summary": "",
+       "contract": "claim@1",
+       "kind": "step",
+       "run": {
+        "source": "off",
+        "ref": null,
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      },
+      {
+       "id": "claim",
+       "name": "Claim it",
+       "summary": "",
+       "contract": "claim@1",
+       "kind": "step",
+       "run": {
+        "source": "builtin",
+        "ref": "claim-story",
+        "version": null
+       },
+       "when": {
+        "mode": "always",
+        "condition": null
+       },
+       "onFail": "stop"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "context": {
+  "item": "I123",
+  "goal": "Add the export button",
+  "profile": {
+   "name": "standard",
+   "source": "default"
+  },
+  "workingBase": "main",
+  "oneOff": false,
+  "route": "epic-release",
+  "releaseUnit": "I120",
+  "reviewMoment": "release-deferred",
+  "branchSlug": "export-button",
+  "mode": "named"
+ },
+ "outputs": {
+  "claim@1": "CLAIM: WON\nclaimed for this session\n```json\n{\n \"state\": \"won\"\n}\n```\n",
+  "start@1": "START: MOVED In Progress\n```json\n{\n \"statusBefore\": \"To Do\",\n \"statusAfter\": \"In Progress\",\n \"boardPlaced\": true\n}\n```\n",
+  "branch@1": "BRANCH: CREATED feature\n```json\n{\n \"branch\": \"feature\",\n \"base\": \"main\",\n \"created\": true\n}\n```\n",
+  "build@1": "BUILD: READY\n3 files changed\n12 tests pass\n```json\n{\n \"deferrals\": [],\n \"deviations\": [],\n \"untrackedDeferrals\": [\n  \"tidy the export menu\"\n ],\n \"dismissed\": [],\n \"scopeLine\": \"3 files\",\n \"head\": \"{head}\"\n}\n```\n",
+  "risk-check@1": "RISK CHECK: CLEAR\n```json\n{\n \"ledger\": \"ledger text\",\n \"report\": \"risk check: clear\",\n \"counts\": {\n  \"raised\": 0,\n  \"fixed\": 0,\n  \"deferred\": 0,\n  \"dismissed\": 0\n },\n \"untrackedDeferrals\": [],\n \"dismissed\": [],\n \"proof\": {\n  \"base\": \"main\",\n  \"head\": \"{head}\",\n  \"triggers\": [],\n  \"verifiers\": 0,\n  \"lenses\": []\n }\n}\n```\n",
+  "local-checks@1": "LOCAL CHECKS: PASS (2 ran)\nunit: 12 passed\nlint: clean\n```json\n{\n \"commands\": [\n  \"unit\",\n  \"lint\"\n ],\n \"results\": [\n  {\n   \"command\": \"unit\",\n   \"status\": \"pass\",\n   \"count\": 12\n  }\n ],\n \"receipt\": null,\n \"tree\": \"{tree}\",\n \"head\": \"{head}\",\n \"skippedSuites\": [],\n \"proof\": {\n  \"kind\": \"receipt\",\n  \"tree\": \"{tree}\",\n  \"head\": \"{head}\",\n  \"receipt\": null\n }\n}\n```\n",
+  "review@1": "REVIEW: SETTLED\n1 cycle, nothing open\n```json\n{\n \"path\": \"fast-local\",\n \"cycles\": 1,\n \"untrackedDeferrals\": [],\n \"dismissed\": [],\n \"pullRequest\": null,\n \"mergeBody\": null,\n \"proof\": {\n  \"path\": \"fast-local\",\n  \"head\": \"{head}\",\n  \"base\": \"main\",\n  \"patchId\": \"{patchId}\"\n }\n}\n```\n",
+  "merge@1": "MERGE: LANDED main\n```json\n{\n \"target\": \"main\",\n \"sha\": \"{head}\",\n \"pullRequest\": null,\n \"deletedBranch\": true,\n \"links\": {\n  \"commit\": \"https://example.com/commit/1\"\n }\n}\n```\n",
+  "complete@1": "COMPLETE: DONE\n```json\n{\n \"status\": \"done\",\n \"statusName\": \"Done\",\n \"startDate\": null,\n \"dueDate\": null,\n \"pullRequest\": null,\n \"asBuilt\": \"none\",\n \"claimReleased\": true,\n \"shipIntentReleased\": true\n}\n```\n",
+  "capture@1": "FINDINGS: NONE\n```json\n{\n \"filed\": [],\n \"inserted\": []\n}\n```\n",
+  "sync@1": "SYNC: CLEAN\n```json\n{\n \"branch\": \"main\",\n \"clean\": true\n}\n```\n",
+  "stand-in@1": "STAND IN: READY\n```json\n{\n \"deferrals\": [],\n \"deviations\": [],\n \"untrackedDeferrals\": [],\n \"dismissed\": [],\n \"scopeLine\": \"stood in\",\n \"head\": \"{head}\"\n}\n```\n"
+ },
+ "catalogs": {
+  "standIn": {
+   "contracts": {
+    "stand-in@1": {
+     "summary": "A test-only stand-in for the build step.",
+     "builtinSkill": "stand-in",
+     "payload": {
+      "item": "context.item"
+     },
+     "argument": null,
+     "verdict": {
+      "label": "STAND IN",
+      "values": [
+       {
+        "value": "READY",
+        "detail": "none",
+        "class": "continue"
+       },
+       {
+        "value": "BLOCKED",
+        "detail": "optional",
+        "class": "stop"
+       }
+      ]
+     },
+     "result": {
+      "required": [
+       "deferrals",
+       "deviations",
+       "untrackedDeferrals",
+       "dismissed",
+       "scopeLine",
+       "head"
+      ],
+      "types": {
+       "deferrals": "array",
+       "deviations": "array",
+       "untrackedDeferrals": "array",
+       "dismissed": "array",
+       "scopeLine": "string",
+       "head": "string"
+      }
+     },
+     "proof": {
+      "binding": "none"
+     },
+     "requires": [],
+     "claimPhase": null,
+     "shipIntentStage": null
+    }
+   },
+   "satisfiedBy": {
+    "build@1": [
+     "stand-in@1"
+    ]
+   }
+  },
+  "faults": [
+   {
+    "name": "a contract name that is not <name>@<major>",
+    "base": "real",
+    "edits": [
+     {
+      "copy": [
+       "contracts",
+       "sync@1"
+      ],
+      "to": [
+       "contracts",
+       "Sync"
+      ]
+     }
+    ],
+    "expect": "name"
+   },
+   {
+    "name": "an unknown entry field",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "neverOptional"
+      ],
+      "value": true
+     }
+    ],
+    "expect": "shape"
+   },
+   {
+    "name": "a requirement the catalog does not hold",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "requires"
+      ],
+      "value": [
+       "deploy@1"
+      ]
+     }
+    ],
+    "expect": "requires-unknown"
+   },
+   {
+    "name": "a cycle",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "branch@1",
+       "requires"
+      ],
+      "value": [
+       "merge@1"
+      ]
+     }
+    ],
+    "expect": "cycle"
+   },
+   {
+    "name": "a verdict class outside the closed list",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "verdict",
+       "values",
+       0,
+       "class"
+      ],
+      "value": "retry"
+     }
+    ],
+    "expect": "class"
+   },
+   {
+    "name": "a required contract with a verdict that skips it",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "build@1",
+       "verdict",
+       "values",
+       0,
+       "class"
+      ],
+      "value": "skipped"
+     }
+    ],
+    "expect": "required-skippable"
+   },
+   {
+    "name": "a stand-in with a verdict that skips it",
+    "base": "standIn",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "stand-in@1",
+       "verdict",
+       "values",
+       0,
+       "class"
+      ],
+      "value": "skipped"
+     }
+    ],
+    "expect": "required-skippable"
+   },
+   {
+    "name": "a claim phase over 64 characters",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "claimPhase"
+      ],
+      "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+     }
+    ],
+    "expect": "claim-phase"
+   },
+   {
+    "name": "a claim phase with a control character",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "claimPhase"
+      ],
+      "value": "Sync\u0007"
+     }
+    ],
+    "expect": "claim-phase"
+   },
+   {
+    "name": "a malformed payload path",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "payload",
+       "workingBase"
+      ],
+      "value": "workingBase"
+     }
+    ],
+    "expect": "payload-path"
+   },
+   {
+    "name": "a required step path",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "build@1",
+       "payload",
+       "answer"
+      ],
+      "value": "step.answer"
+     }
+    ],
+    "expect": "payload-path"
+   },
+   {
+    "name": "a result path to a contract that is not required",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "start@1",
+       "payload",
+       "claim"
+      ],
+      "value": "result:claim@1"
+     }
+    ],
+    "expect": "payload-order"
+   },
+   {
+    "name": "an optional result path to a later contract",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "start@1",
+       "payload",
+       "sync"
+      ],
+      "value": "result:sync@1?"
+     }
+    ],
+    "expect": "payload-order"
+   },
+   {
+    "name": "an argument field that is not a payload key",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "branch@1",
+       "argument"
+      ],
+      "value": "{branchSlug} for {owner}"
+     }
+    ],
+    "expect": "argument-field"
+   },
+   {
+    "name": "the reserved payload key step",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "payload",
+       "step"
+      ],
+      "value": "context.item"
+     }
+    ],
+    "expect": "reserved-key"
+   },
+   {
+    "name": "the reserved payload key contract",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "payload",
+       "contract"
+      ],
+      "value": "context.item"
+     }
+    ],
+    "expect": "reserved-key"
+   },
+   {
+    "name": "a satisfier listed twice",
+    "base": "standIn",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "build@1",
+       "satisfiedBy"
+      ],
+      "value": [
+       "stand-in@1",
+       "stand-in@1"
+      ]
+     }
+    ],
+    "expect": "satisfied-duplicate"
+   },
+   {
+    "name": "a contract that satisfies itself",
+    "base": "standIn",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "build@1",
+       "satisfiedBy"
+      ],
+      "value": [
+       "build@1"
+      ]
+     }
+    ],
+    "expect": "satisfied-self"
+   },
+   {
+    "name": "a satisfier the catalog does not hold",
+    "base": "standIn",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "build@1",
+       "satisfiedBy"
+      ],
+      "value": [
+       "deploy@1"
+      ]
+     }
+    ],
+    "expect": "satisfied-unknown"
+   },
+   {
+    "name": "a satisfier that lacks a key a dependent reads",
+    "base": "standIn",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "risk-check@1",
+       "payload",
+       "head"
+      ],
+      "value": "result:build@1.head"
+     },
+     {
+      "set": [
+       "contracts",
+       "stand-in@1",
+       "result",
+       "required"
+      ],
+      "value": [
+       "scopeLine"
+      ]
+     }
+    ],
+    "expect": "satisfied-keys"
+   }
+  ],
+  "sound": [
+   {
+    "name": "an optional result path to an earlier contract that is not required",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "start@1",
+       "payload",
+       "claim"
+      ],
+      "value": "result:claim@1?"
+     }
+    ]
+   },
+   {
+    "name": "a satisfier that lacks a key a dependent reads only optionally",
+    "base": "standIn",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "risk-check@1",
+       "payload",
+       "head"
+      ],
+      "value": "result:build@1.head?"
+     },
+     {
+      "set": [
+       "contracts",
+       "stand-in@1",
+       "result",
+       "required"
+      ],
+      "value": [
+       "scopeLine"
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "validation": [
+  {
+   "name": "the eleven-step Build definition is accepted where its step skills exist",
+   "definition": "build",
+   "edits": [],
+   "root": "fixture",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "the same definition is refused by the released plugin, which lacks the step skills",
+   "definition": "build",
+   "edits": [],
+   "root": "real",
+   "git": true,
+   "expect": "skill-missing"
+  },
+  {
+   "name": "a definition that is not an object",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "replace",
+     "value": [
+      "not",
+      "an",
+      "object"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "schema 2",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "schema"
+     ],
+     "value": 2
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a phase with no steps",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "phases",
+      0,
+      "steps"
+     ],
+     "value": []
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a step with no contract",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "claim",
+     "path": [
+      "contract"
+     ],
+     "value": null
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "two steps with one id",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "start",
+     "path": [
+      "id"
+     ],
+     "value": "claim"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "duplicate-step-id"
+  },
+  {
+   "name": "a contract nobody knows",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "contract"
+     ],
+     "value": "deploy@1"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unknown-contract"
+  },
+  {
+   "name": "a known contract at an unknown major",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "contract"
+     ],
+     "value": "sync@2"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unknown-contract-major"
+  },
+  {
+   "name": "a risk check with no build before it",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "build"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "requires-missing"
+  },
+  {
+   "name": "the review moved after the merge",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "move",
+     "step": "review",
+     "after": "merge"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "requires-not-earlier"
+  },
+  {
+   "name": "a required step made conditional",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "local-checks",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "review-path:fast"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-not-always"
+  },
+  {
+   "name": "a required step that carries on after a failure",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "review",
+     "path": [
+      "onFail"
+     ],
+     "value": "continue"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-not-stop"
+  },
+  {
+   "name": "the local checks switched off",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "local-checks",
+     "path": [
+      "run"
+     ],
+     "value": {
+      "source": "off",
+      "ref": null,
+      "version": null
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-off"
+  },
+  {
+   "name": "a step skill this plugin lacks",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "run",
+      "ref"
+     ],
+     "value": "no-such-skill"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "skill-missing"
+  },
+  {
+   "name": "a definition for a newer plugin",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "minPluginVersion"
+     ],
+     "value": "99.0.0"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "plugin-too-old"
+  },
+  {
+   "name": "a tree-bound contract outside a repository",
+   "definition": "build",
+   "edits": [],
+   "root": "fixture",
+   "git": false,
+   "expect": "repository-required"
+  },
+  {
+   "name": "a gate",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "kind"
+     ],
+     "value": "gate"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-gate"
+  },
+  {
+   "name": "a manual step nothing requires",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "manual",
+      "condition": null
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-when"
+  },
+  {
+   "name": "a library skill",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "run",
+      "source"
+     ],
+     "value": "library"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-source"
+  },
+  {
+   "name": "a repository skill file",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "run",
+      "source"
+     ],
+     "value": "repo"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-source"
+  },
+  {
+   "name": "the custom contract, which no built-in skill carries",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "contract"
+     ],
+     "value": "custom@1"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-source"
+  },
+  {
+   "name": "a step nothing requires that carries on after a failure",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "onFail"
+     ],
+     "value": "continue"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-on-fail"
+  },
+  {
+   "name": "a step nothing requires may be switched off",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "run"
+     ],
+     "value": {
+      "source": "off",
+      "ref": null,
+      "version": null
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "the review renamed, its contract kept",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "review",
+     "path": [
+      "id"
+     ],
+     "value": "second-opinion"
+    },
+    {
+     "op": "set",
+     "step": "second-opinion",
+     "path": [
+      "name"
+     ],
+     "value": "Second opinion"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "the renamed review still may not be weakened",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "review",
+     "path": [
+      "id"
+     ],
+     "value": "second-opinion"
+    },
+    {
+     "op": "set",
+     "step": "second-opinion",
+     "path": [
+      "onFail"
+     ],
+     "value": "continue"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-not-stop"
+  },
+  {
+   "name": "a claim-only workflow needs no repository",
+   "definition": "claim-only",
+   "edits": [],
+   "root": "fixture",
+   "git": false,
+   "expect": "ok"
+  },
+  {
+   "name": "stand-in: neither the build nor its stand-in",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "build"
+    }
+   ],
+   "root": "standIn",
+   "git": true,
+   "expect": "requires-missing"
+  },
+  {
+   "name": "stand-in: in place of the build",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "build"
+    },
+    {
+     "op": "add",
+     "after": "branch",
+     "value": {
+      "id": "stand-in",
+      "name": "Stand in",
+      "summary": "",
+      "contract": "stand-in@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "stand-in",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "standIn",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "stand-in: after the risk check",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "build"
+    },
+    {
+     "op": "add",
+     "after": "risk-check",
+     "value": {
+      "id": "stand-in",
+      "name": "Stand in",
+      "summary": "",
+      "contract": "stand-in@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "stand-in",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "standIn",
+   "git": true,
+   "expect": "requires-not-earlier"
+  },
+  {
+   "name": "stand-in: switched off",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "build"
+    },
+    {
+     "op": "add",
+     "after": "branch",
+     "value": {
+      "id": "stand-in",
+      "name": "Stand in",
+      "summary": "",
+      "contract": "stand-in@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "stand-in",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    },
+    {
+     "op": "set",
+     "step": "stand-in",
+     "path": [
+      "run"
+     ],
+     "value": {
+      "source": "off",
+      "ref": null,
+      "version": null
+     }
+    }
+   ],
+   "root": "standIn",
+   "git": true,
+   "expect": "required-off",
+   "sameAsOriginal": [
+    {
+     "op": "set",
+     "step": "build",
+     "path": [
+      "run"
+     ],
+     "value": {
+      "source": "off",
+      "ref": null,
+      "version": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "stand-in: conditional",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "build"
+    },
+    {
+     "op": "add",
+     "after": "branch",
+     "value": {
+      "id": "stand-in",
+      "name": "Stand in",
+      "summary": "",
+      "contract": "stand-in@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "stand-in",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    },
+    {
+     "op": "set",
+     "step": "stand-in",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "manual",
+      "condition": null
+     }
+    }
+   ],
+   "root": "standIn",
+   "git": true,
+   "expect": "required-not-always",
+   "sameAsOriginal": [
+    {
+     "op": "set",
+     "step": "build",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "manual",
+      "condition": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "stand-in: carries on after a failure",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "build"
+    },
+    {
+     "op": "add",
+     "after": "branch",
+     "value": {
+      "id": "stand-in",
+      "name": "Stand in",
+      "summary": "",
+      "contract": "stand-in@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "stand-in",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    },
+    {
+     "op": "set",
+     "step": "stand-in",
+     "path": [
+      "onFail"
+     ],
+     "value": "continue"
+    }
+   ],
+   "root": "standIn",
+   "git": true,
+   "expect": "required-not-stop",
+   "sameAsOriginal": [
+    {
+     "op": "set",
+     "step": "build",
+     "path": [
+      "onFail"
+     ],
+     "value": "continue"
+    }
+   ]
+  },
+  {
+   "name": "stand-in: both present, the nearer one provides",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "build",
+     "value": {
+      "id": "stand-in",
+      "name": "Stand in",
+      "summary": "",
+      "contract": "stand-in@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "stand-in",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "standIn",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "stand-in: both present, the nearer one may not be weakened",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "build",
+     "value": {
+      "id": "stand-in",
+      "name": "Stand in",
+      "summary": "",
+      "contract": "stand-in@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "stand-in",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    },
+    {
+     "op": "set",
+     "step": "stand-in",
+     "path": [
+      "run"
+     ],
+     "value": {
+      "source": "off",
+      "ref": null,
+      "version": null
+     }
+    }
+   ],
+   "root": "standIn",
+   "git": true,
+   "expect": "required-off"
+  },
+  {
+   "name": "stand-in: both present, the farther one is not the provider and may be switched off",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "build",
+     "value": {
+      "id": "stand-in",
+      "name": "Stand in",
+      "summary": "",
+      "contract": "stand-in@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "stand-in",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    },
+    {
+     "op": "set",
+     "step": "build",
+     "path": [
+      "run"
+     ],
+     "value": {
+      "source": "off",
+      "ref": null,
+      "version": null
+     }
+    }
+   ],
+   "root": "standIn",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "stand-in: unknown to the released catalog",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "build"
+    },
+    {
+     "op": "add",
+     "after": "branch",
+     "value": {
+      "id": "stand-in",
+      "name": "Stand in",
+      "summary": "",
+      "contract": "stand-in@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "stand-in",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unknown-contract"
+  }
+ ],
+ "verdicts": [
+  {
+   "contract": "claim@1",
+   "output": "CLAIM: WON\n",
+   "class": "continue",
+   "value": "WON",
+   "detail": ""
+  },
+  {
+   "contract": "claim@1",
+   "output": "CLAIM: RENEWED\n",
+   "class": "continue",
+   "value": "RENEWED",
+   "detail": ""
+  },
+  {
+   "contract": "claim@1",
+   "output": "CLAIM: TOOK OVER\n",
+   "class": "continue",
+   "value": "TOOK OVER",
+   "detail": ""
+  },
+  {
+   "contract": "claim@1",
+   "output": "\n\nCLAIM: HELD the reason given\nmore\n",
+   "class": "end:held",
+   "value": "HELD",
+   "detail": "the reason given"
+  },
+  {
+   "contract": "claim@1",
+   "output": "CLAIM: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "claim@1",
+   "output": "CLAIM: DEGRADED\n",
+   "class": "skipped",
+   "value": "DEGRADED",
+   "detail": ""
+  },
+  {
+   "contract": "claim@1",
+   "output": "\n\nCLAIM: DEGRADED some detail\nmore\n",
+   "class": "skipped",
+   "value": "DEGRADED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "start@1",
+   "output": "START: MOVED\n",
+   "class": "continue",
+   "value": "MOVED",
+   "detail": ""
+  },
+  {
+   "contract": "start@1",
+   "output": "\n\nSTART: MOVED some detail\nmore\n",
+   "class": "continue",
+   "value": "MOVED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "start@1",
+   "output": "START: UNCHANGED\n",
+   "class": "continue",
+   "value": "UNCHANGED",
+   "detail": ""
+  },
+  {
+   "contract": "start@1",
+   "output": "START: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "start@1",
+   "output": "\n\nSTART: FAILED some detail\nmore\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "branch@1",
+   "output": "BRANCH: CREATED\n",
+   "class": "continue",
+   "value": "CREATED",
+   "detail": ""
+  },
+  {
+   "contract": "branch@1",
+   "output": "\n\nBRANCH: CREATED some detail\nmore\n",
+   "class": "continue",
+   "value": "CREATED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "branch@1",
+   "output": "BRANCH: EXISTS\n",
+   "class": "continue",
+   "value": "EXISTS",
+   "detail": ""
+  },
+  {
+   "contract": "branch@1",
+   "output": "\n\nBRANCH: EXISTS some detail\nmore\n",
+   "class": "continue",
+   "value": "EXISTS",
+   "detail": "some detail"
+  },
+  {
+   "contract": "branch@1",
+   "output": "BRANCH: REFUSED\n",
+   "class": "stop",
+   "value": "REFUSED",
+   "detail": ""
+  },
+  {
+   "contract": "branch@1",
+   "output": "\n\nBRANCH: REFUSED some detail\nmore\n",
+   "class": "stop",
+   "value": "REFUSED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "build@1",
+   "output": "BUILD: READY\n",
+   "class": "continue",
+   "value": "READY",
+   "detail": ""
+  },
+  {
+   "contract": "build@1",
+   "output": "\n\nBUILD: NEEDS DECISION the reason given\nmore\n",
+   "class": "ask",
+   "value": "NEEDS DECISION",
+   "detail": "the reason given"
+  },
+  {
+   "contract": "build@1",
+   "output": "BUILD: BLOCKED\n",
+   "class": "stop",
+   "value": "BLOCKED",
+   "detail": ""
+  },
+  {
+   "contract": "build@1",
+   "output": "\n\nBUILD: BLOCKED some detail\nmore\n",
+   "class": "stop",
+   "value": "BLOCKED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "risk-check@1",
+   "output": "RISK CHECK: CLEAR\n",
+   "class": "continue",
+   "value": "CLEAR",
+   "detail": ""
+  },
+  {
+   "contract": "risk-check@1",
+   "output": "RISK CHECK: FIXED\n",
+   "class": "continue",
+   "value": "FIXED",
+   "detail": ""
+  },
+  {
+   "contract": "risk-check@1",
+   "output": "\n\nRISK CHECK: FIXED some detail\nmore\n",
+   "class": "continue",
+   "value": "FIXED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "risk-check@1",
+   "output": "\n\nRISK CHECK: NEEDS DECISION the reason given\nmore\n",
+   "class": "ask",
+   "value": "NEEDS DECISION",
+   "detail": "the reason given"
+  },
+  {
+   "contract": "risk-check@1",
+   "output": "RISK CHECK: BLOCKED\n",
+   "class": "stop",
+   "value": "BLOCKED",
+   "detail": ""
+  },
+  {
+   "contract": "risk-check@1",
+   "output": "\n\nRISK CHECK: BLOCKED some detail\nmore\n",
+   "class": "stop",
+   "value": "BLOCKED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "local-checks@1",
+   "output": "LOCAL CHECKS: PASS\n",
+   "class": "continue",
+   "value": "PASS",
+   "detail": ""
+  },
+  {
+   "contract": "local-checks@1",
+   "output": "\n\nLOCAL CHECKS: PASS some detail\nmore\n",
+   "class": "continue",
+   "value": "PASS",
+   "detail": "some detail"
+  },
+  {
+   "contract": "local-checks@1",
+   "output": "LOCAL CHECKS: NOT CONFIGURED\n",
+   "class": "continue",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "local-checks@1",
+   "output": "LOCAL CHECKS: FAIL\n",
+   "class": "stop",
+   "value": "FAIL",
+   "detail": ""
+  },
+  {
+   "contract": "local-checks@1",
+   "output": "\n\nLOCAL CHECKS: FAIL some detail\nmore\n",
+   "class": "stop",
+   "value": "FAIL",
+   "detail": "some detail"
+  },
+  {
+   "contract": "review@1",
+   "output": "REVIEW: SETTLED\n",
+   "class": "continue",
+   "value": "SETTLED",
+   "detail": ""
+  },
+  {
+   "contract": "review@1",
+   "output": "REVIEW: COVERED\n",
+   "class": "continue",
+   "value": "COVERED",
+   "detail": ""
+  },
+  {
+   "contract": "review@1",
+   "output": "\n\nREVIEW: COVERED some detail\nmore\n",
+   "class": "continue",
+   "value": "COVERED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "review@1",
+   "output": "REVIEW: BLOCKED\n",
+   "class": "stop",
+   "value": "BLOCKED",
+   "detail": ""
+  },
+  {
+   "contract": "review@1",
+   "output": "\n\nREVIEW: BLOCKED some detail\nmore\n",
+   "class": "stop",
+   "value": "BLOCKED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "merge@1",
+   "output": "MERGE: LANDED\n",
+   "class": "continue",
+   "value": "LANDED",
+   "detail": ""
+  },
+  {
+   "contract": "merge@1",
+   "output": "\n\nMERGE: LANDED some detail\nmore\n",
+   "class": "continue",
+   "value": "LANDED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "merge@1",
+   "output": "MERGE: REFRESHED\n",
+   "class": "redo:self",
+   "value": "REFRESHED",
+   "detail": ""
+  },
+  {
+   "contract": "merge@1",
+   "output": "MERGE: HELD\n",
+   "class": "end:held",
+   "value": "HELD",
+   "detail": ""
+  },
+  {
+   "contract": "merge@1",
+   "output": "\n\nMERGE: HELD some detail\nmore\n",
+   "class": "end:held",
+   "value": "HELD",
+   "detail": "some detail"
+  },
+  {
+   "contract": "merge@1",
+   "output": "MERGE: BLOCKED\n",
+   "class": "stop",
+   "value": "BLOCKED",
+   "detail": ""
+  },
+  {
+   "contract": "merge@1",
+   "output": "\n\nMERGE: BLOCKED some detail\nmore\n",
+   "class": "stop",
+   "value": "BLOCKED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "complete@1",
+   "output": "COMPLETE: DONE\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": ""
+  },
+  {
+   "contract": "complete@1",
+   "output": "COMPLETE: LANDED\n",
+   "class": "continue",
+   "value": "LANDED",
+   "detail": ""
+  },
+  {
+   "contract": "complete@1",
+   "output": "COMPLETE: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "complete@1",
+   "output": "\n\nCOMPLETE: FAILED some detail\nmore\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "capture@1",
+   "output": "FINDINGS: FILED\n",
+   "class": "continue",
+   "value": "FILED",
+   "detail": ""
+  },
+  {
+   "contract": "capture@1",
+   "output": "\n\nFINDINGS: FILED some detail\nmore\n",
+   "class": "continue",
+   "value": "FILED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "capture@1",
+   "output": "FINDINGS: NONE\n",
+   "class": "continue",
+   "value": "NONE",
+   "detail": ""
+  },
+  {
+   "contract": "sync@1",
+   "output": "SYNC: CLEAN\n",
+   "class": "continue",
+   "value": "CLEAN",
+   "detail": ""
+  },
+  {
+   "contract": "sync@1",
+   "output": "SYNC: DIRTY\n",
+   "class": "stop",
+   "value": "DIRTY",
+   "detail": ""
+  },
+  {
+   "contract": "sync@1",
+   "output": "\n\nSYNC: DIRTY some detail\nmore\n",
+   "class": "stop",
+   "value": "DIRTY",
+   "detail": "some detail"
+  },
+  {
+   "contract": "custom@1",
+   "output": "STEP: PASS\n",
+   "class": "continue",
+   "value": "PASS",
+   "detail": ""
+  },
+  {
+   "contract": "custom@1",
+   "output": "STEP: FAIL\n",
+   "class": "stop",
+   "value": "FAIL",
+   "detail": ""
+  },
+  {
+   "contract": "custom@1",
+   "output": "STEP: HOLD\n",
+   "class": "end:held",
+   "value": "HOLD",
+   "detail": ""
+  },
+  {
+   "contract": "claim@1",
+   "output": "",
+   "class": null,
+   "why": "an empty answer"
+  },
+  {
+   "contract": "claim@1",
+   "output": "   \n\n",
+   "class": null,
+   "why": "only blank lines"
+  },
+  {
+   "contract": "claim@1",
+   "output": "I claimed it.\nCLAIM: WON\n",
+   "class": null,
+   "why": "the verdict is not on the first non-blank line"
+  },
+  {
+   "contract": "claim@1",
+   "output": "BUILD: READY\n",
+   "class": null,
+   "why": "the wrong label"
+  },
+  {
+   "contract": "claim@1",
+   "output": "CLAIM: MAYBE\n",
+   "class": null,
+   "why": "an unlisted value"
+  },
+  {
+   "contract": "claim@1",
+   "output": "CLAIM: WONDERFUL\n",
+   "class": null,
+   "why": "a listed value must end at a word boundary"
+  },
+  {
+   "contract": "claim@1",
+   "output": "CLAIM: WON and then some\n",
+   "class": null,
+   "why": "a value that takes no detail, given one"
+  },
+  {
+   "contract": "claim@1",
+   "output": "CLAIM: HELD\n",
+   "class": null,
+   "why": "a required detail left out"
+  },
+  {
+   "contract": "claim@1",
+   "output": "CLAIM:WON\n",
+   "class": null,
+   "why": "no space after the colon"
+  },
+  {
+   "contract": "claim@1",
+   "output": "**CLAIM: WON**\n",
+   "class": null,
+   "why": "decorated"
+  },
+  {
+   "contract": "build@1",
+   "output": "BUILD: NEEDS DECISION\n",
+   "class": null,
+   "why": "a question left out"
+  },
+  {
+   "contract": "claim@1",
+   "output": "CLAIM: TOOK OVER\n",
+   "class": "continue",
+   "value": "TOOK OVER",
+   "detail": "",
+   "why": "a two-word value"
+  },
+  {
+   "contract": "claim@1",
+   "output": "CLAIM: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": "",
+   "why": "a two-word value"
+  },
+  {
+   "contract": "local-checks@1",
+   "output": "LOCAL CHECKS: PASS (3 ran)\n",
+   "class": "continue",
+   "value": "PASS",
+   "detail": "(3 ran)"
+  },
+  {
+   "contract": "risk-check@1",
+   "output": "RISK CHECK: NEEDS DECISION keep the old column?\n",
+   "class": "ask",
+   "value": "NEEDS DECISION",
+   "detail": "keep the old column?"
+  }
+ ],
+ "proofs": [
+  {
+   "name": "a tree proof that names the real tree",
+   "contract": "local-checks@1",
+   "proof": {
+    "kind": "receipt",
+    "tree": "t1",
+    "head": "h",
+    "receipt": null
+   },
+   "git": {
+    "tree": "t1"
+   },
+   "expect": "holds"
+  },
+  {
+   "name": "a tree proof that names another tree",
+   "contract": "local-checks@1",
+   "proof": {
+    "kind": "receipt",
+    "tree": "t0",
+    "head": "h",
+    "receipt": null
+   },
+   "git": {
+    "tree": "t1"
+   },
+   "expect": "stale"
+  },
+  {
+   "name": "a tree proof with no tree",
+   "contract": "local-checks@1",
+   "proof": {
+    "kind": "receipt",
+    "head": "h",
+    "receipt": null
+   },
+   "git": {
+    "tree": "t1"
+   },
+   "expect": "refused"
+  },
+  {
+   "name": "no proof at all where one is required",
+   "contract": "local-checks@1",
+   "proof": null,
+   "git": {
+    "tree": "t1"
+   },
+   "expect": "refused"
+  },
+  {
+   "name": "a tree proof when git cannot answer",
+   "contract": "local-checks@1",
+   "proof": {
+    "kind": "receipt",
+    "tree": "t1",
+    "head": "h",
+    "receipt": null
+   },
+   "git": {},
+   "expect": "unreadable"
+  },
+  {
+   "name": "a patch proof that names the real patch",
+   "contract": "review@1",
+   "proof": {
+    "path": "fast-local",
+    "head": "h",
+    "base": "main",
+    "patchId": "p1"
+   },
+   "git": {
+    "patchIds": {
+     "main": "p1"
+    }
+   },
+   "expect": "holds"
+  },
+  {
+   "name": "a patch proof whose patch changed",
+   "contract": "review@1",
+   "proof": {
+    "path": "fast-local",
+    "head": "h",
+    "base": "main",
+    "patchId": "p1"
+   },
+   "git": {
+    "patchIds": {
+     "main": "p2"
+    }
+   },
+   "expect": "stale"
+  },
+  {
+   "name": "a patch proof over an empty patch",
+   "contract": "review@1",
+   "proof": {
+    "path": "fast-local",
+    "head": "h",
+    "base": "main",
+    "patchId": ""
+   },
+   "git": {
+    "patchIds": {
+     "main": ""
+    }
+   },
+   "expect": "stale"
+  },
+  {
+   "name": "a patch proof whose base is an option, not a name",
+   "contract": "review@1",
+   "proof": {
+    "path": "fast-local",
+    "head": "h",
+    "base": "--output=x",
+    "patchId": "p1"
+   },
+   "git": {
+    "patchIds": {
+     "--output=x": "p1"
+    }
+   },
+   "expect": "unreadable"
+  },
+  {
+   "name": "a risk check with no triggers and no verifiers",
+   "contract": "risk-check@1",
+   "proof": {
+    "base": "main",
+    "head": "abc",
+    "lenses": [],
+    "triggers": [],
+    "verifiers": 0
+   },
+   "git": {},
+   "expect": "holds"
+  },
+  {
+   "name": "a risk check with triggers and a verifier",
+   "contract": "risk-check@1",
+   "proof": {
+    "base": "main",
+    "head": "abc",
+    "lenses": [],
+    "triggers": [
+     "auth"
+    ],
+    "verifiers": 1
+   },
+   "git": {},
+   "expect": "holds"
+  },
+  {
+   "name": "a risk check with triggers and no verifier",
+   "contract": "risk-check@1",
+   "proof": {
+    "base": "main",
+    "head": "abc",
+    "lenses": [],
+    "triggers": [
+     "auth"
+    ],
+    "verifiers": 0
+   },
+   "git": {},
+   "expect": "refused",
+   "rule": "risk-triggers-need-verifiers"
+  },
+  {
+   "name": "a risk check whose verifier count is text",
+   "contract": "risk-check@1",
+   "proof": {
+    "base": "main",
+    "head": "abc",
+    "lenses": [],
+    "triggers": [
+     "auth"
+    ],
+    "verifiers": "0"
+   },
+   "git": {},
+   "expect": "refused"
+  },
+  {
+   "name": "a contract with no proof rules accepts none",
+   "contract": "build@1",
+   "proof": null,
+   "git": {},
+   "expect": "holds"
+  }
+ ],
+ "repository": [
+  {
+   "remote": "https://github.com/Example/Widgets.git",
+   "expect": "github.com/example/widgets"
+  },
+  {
+   "remote": "https://someone:secret-value@github.com/example/widgets",
+   "expect": "github.com/example/widgets"
+  },
+  {
+   "remote": "git@github.com:example/widgets.git",
+   "expect": "github.com/example/widgets"
+  },
+  {
+   "remote": "ssh://git@GitHub.com/Example/Widgets.git/",
+   "expect": "github.com/example/widgets"
+  },
+  {
+   "remote": "../a-local-folder",
+   "expect": null
+  },
+  {
+   "remote": null,
+   "expect": null
+  }
+ ],
+ "definitionHash": {
+  "definition": "claim-only",
+  "sha256": "52cd714a579502ce0bb0a3608b0f5cc40fdcc747281a08ae287313a3f2bcaff4"
+ }
+}
