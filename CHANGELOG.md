@@ -38,8 +38,8 @@ for what each version component means here and how a release is cut.
   - It will not say "go on to the merge" on stale checks. The local checks are bound to the exact
     tree they ran on and the review to the exact patch it read, every byte of it, white space
     included (`git patch-id --verbatim`, from a diff whose flags fix colour, prefixes, context,
-    renames, the diff algorithm and submodules, so those git settings cannot change it; a git
-    without `--verbatim` stops the run rather than guess). A refreshed base under a byte-identical
+    hunk joining, renames, the diff algorithm and submodules, so those git settings cannot change
+    it; a git without `--verbatim` stops the run rather than guess). A refreshed base under a byte-identical
     patch keeps the review. When either goes stale it issues that step again first. Before it hands
     out the merge it reads the branch's commit once, checks both proofs against that one commit and
     hands the merge that commit to merge exactly; a merge reported as landed must name it

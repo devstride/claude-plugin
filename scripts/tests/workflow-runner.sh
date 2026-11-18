@@ -13,7 +13,7 @@ export PYTHONDONTWRITEBYTECODE=1
 unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID XDG_CACHE_HOME GIT_DIR GIT_WORK_TREE
 
 cat > "$WORK/cases.py" <<'PY'
-import ast, copy, hashlib, importlib.util, json, os, re, shutil, stat, subprocess, sys, time
+import ast, base64, copy, hashlib, importlib.util, json, os, re, shutil, stat, subprocess, sys, time
 
 ROOT, WORK, SECTION = sys.argv[1], sys.argv[2], sys.argv[3]
 RUNNER = "skills/run-workflow/scripts/workflow.py"
@@ -190,7 +190,7 @@ def new_repo(remote=None):
 LOOKALIKES = ["password_reset.py: 12 passed", "auth/token.py:40: unused import", "Token: 911", "token_count=12", "has_token=true",
               "secret-scanner: clean", "api_key_rotation: 0 failures", "Rotate the token: weekly", "Authorization: header is now checked"]
 DIFF = ["diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative", "--src-prefix=a/", "--dst-prefix=b/",
-        "--ignore-submodules=none", "--unified=3", "--no-renames", "--diff-algorithm=myers"]
+        "--ignore-submodules=none", "--unified=3", "--no-renames", "--diff-algorithm=myers", "--inter-hunk-context=0"]
 
 
 def facts(repo, base="main"):
@@ -864,6 +864,7 @@ def section_proofs():
     repo = new_repo()
     git(repo, "checkout", "-q", "main")
     commit(repo, "notes.txt", "".join("note %d\n" % n for n in range(12)), "notes")
+    commit(repo, "spread.txt", "".join("line %d\n" % n for n in range(20)), "two changes, close together")
     os.makedirs(os.path.join(repo, "vendor"))  # a submodule that is not checked out: a pointer only, no network
     git(repo, "update-index", "--add", "--cacheinfo", "160000,%s,vendor" % ("1" * 40))
     git(repo, "commit", "-q", "-m", "a submodule")
@@ -871,8 +872,11 @@ def section_proofs():
     git(repo, "rebase", "-q", "main")
     git(repo, "mv", "notes.txt", "moved.txt")
     commit(repo, "readme.txt", "one\ntwo\nthree\nfour\n", "a rename and a change with context")
+    commit(repo, "spread.txt", "".join("line %d%s\n" % (n, " changed" if n in (2, 11) else "") for n in range(20)), "two hunks close together")
     git(repo, "update-index", "--cacheinfo", "160000,%s,vendor" % ("2" * 40))
     git(repo, "commit", "-q", "-m", "the submodule moves")
+    check("(the fixture's two close hunks are joined by diff.interHunkContext=10)",
+          git(repo, *(DIFF + ["main...HEAD", "--"])).count(b"\n@@ ") > git(repo, "-c", "diff.interHunkContext=10", *(DIFF[:-1] + ["main...HEAD", "--"])).count(b"\n@@ "))
     check("(the fixture changes a submodule, which diff.ignoreSubmodules=all would hide)",
           b"Subproject commit" in git(repo, *(DIFF + ["main...HEAD", "--"]))
           and b"Subproject commit" not in git(repo, "-c", "diff.ignoreSubmodules=all", "diff", "main...HEAD"))
@@ -881,7 +885,7 @@ def section_proofs():
     hook = os.path.join(WORK, "ext-diff-ran")
     settings = {"color.diff": "always", "color.ui": "always", "diff.noprefix": "true", "diff.mnemonicPrefix": "true", "diff.relative": "true",
                 "diff.external": "touch %s; false" % hook, "diff.wsErrorHighlight": "all", "core.pager": "cat", "diff.ignoreSubmodules": "all",
-                "diff.context": "0", "diff.renames": "copies", "diff.algorithm": "patience"}
+                "diff.context": "0", "diff.renames": "copies", "diff.algorithm": "patience", "diff.interHunkContext": "10"}
     env = dict(os.environ, GIT_CONFIG_COUNT=str(len(settings)))
     for n, (key, value) in enumerate(settings.items()):
         env["GIT_CONFIG_KEY_%d" % n], env["GIT_CONFIG_VALUE_%d" % n] = key, value
@@ -1016,6 +1020,10 @@ def section_evidence():
     check("a link over 500 characters is dropped", "links" not in report, report.get("links"))
     run, answer, text, report = claim('CLAIM: WON\n```json\n%s\n```\n' % json.dumps({"state": "won", "links": {"branch": "feature/ghp_example", "commit": "https://example.com/c?token=abc123def"}}))
     check("a link or branch name that holds a secret marker is dropped", "links" not in report and "ghp_example" not in text and "token=abc123def" not in text, report.get("links"))
+    # a web token signed RS256 with a key id: its header is 94 characters
+    header = base64.urlsafe_b64encode(b'{"alg":"RS256","kid":"0123456789abcdef0123456789abcdef01","typ":"JWT"}').decode().rstrip("=")
+    RS256 = header + ".eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+    check("(the web token's header is 94 characters)", len(header) == 94, len(header))
     shapes = ["GOLDEN_DB_CONNECTION_STRING=postgresql://owner:pw-123@db.example.com/db", "aws_secret_access_key = wJalrXUtnFEMIEXAMPLEKEY",
               "authorization: bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig", "AUTHORIZATION:   Basic dXNlcjpodW50ZXIy",
               "STRIPE_SECRET_KEY sk_live_51Habcdefghijklmnop", "api_key=sk-ant-api03-abcdefghijklmnop", "apikey: abcdefgh", "private_key=abcdefgh",
@@ -1026,15 +1034,20 @@ def section_evidence():
               "SG.abcdefghijklmn.opqrstuvwxyz", "X-Api-Key: abc", "--password hunter2", "--token abcdef123", "client_secret hunter2",
               "Authorization: ApiKey abcdefghijklmnopqrstuvwxyz012345", "Authorization: Token " + "0123456789abcdef" * 2 + "01234567",
               "Authorization: Bot abcdefghijklmnopqrstu", "Authorization: SSWS 00abcdefghijklmnopqrstuvwx", "Authorization: abcdefghijklmnopqrstu",
-              "db.password=huntertwo", "spring.datasource.password: huntertwo"]
+              "db.password=huntertwo", "spring.datasource.password: huntertwo",
+              "credential_for_production_region_production_region_production_region_password=huntertwo",
+              "Authorization: Api-Key abcdefghijklmnopqrstuvwx", "redis://:pw@cache.example.com",
+              RS256, "jwt=" + RS256, "the cookie was " + RS256 + " ok"]
     ordinary = ["3 files changed", "unit: 12 passed", "lint: clean", "tokens: 911 used", "the token rotation is documented",
                 "secretary: Jane", "clone ssh://git@github.com/example/widgets", "git@github.com:example/widgets.git", "the Authorization header is checked",
-                "a bearer of good news", "task-runner: done", "the password reset flow works", "https://example.com/commit/1", "main...HEAD"] + LOOKALIKES
+                "a bearer of good news", "task-runner: done", "the password reset flow works", "https://example.com/commit/1", "main...HEAD",
+                "eyJmb28iOiJiYXIifQ.json", "Authorization: see docs/permissions/architecture.md"] + LOOKALIKES
     run, answer, text, report = claim("CLAIM: WON\n%s\n%s" % ("\n".join(shapes + ordinary), result))
     check("credentials of every common shape are dropped, case and spacing aside", not any(line in text for line in shapes), [l for l in shapes if l in text])
     check("... and ordinary evidence lines survive", report["evidence"] == ordinary, report.get("evidence"))
     for line in ("token" * 20000, "a." * 50000, "password=" * 11112, "eyJ" * 33334, "bearer " * 14286, "a://" * 25000,
-                 "x." * 49999 + "password", "authorization: " * 6667, "a" * 100000 + ".password=x"):
+                 "x." * 49999 + "password", "authorization: " * 6667, "a" * 100000 + ".password=x", "eyJ-" * 25000,
+                 "eyJa" * 25000 + ".", "eyJa." * 20000, ("k" * 70 + "_password=") * 1250, "authorization: see " + "a/" * 50000):
         began = time.time()
         module.has_secret(line)
         check("a 100 KB line built to be slow is scanned in well under a second (%s...)" % line[:12], time.time() - began < 0.25, time.time() - began)
@@ -1293,9 +1306,9 @@ section validation 125
 section verdicts 76
 section proof-fixtures 25
 section lifecycle 59
-section proofs 70
+section proofs 71
 section stand-in 3
-section evidence 46
+section evidence 52
 section state 29
 section reporting 4
 section repository 7

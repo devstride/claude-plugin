@@ -6,8 +6,7 @@ load: contract
 `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py` walks a workflow definition
 (`${CLAUDE_PLUGIN_ROOT}/schemas/workflow.schema.json`) against the step contract catalog
 (`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`). **It decides and records; it never acts**: no
-network, no tracker call, no skill run, and git only to read. Whoever drives it (a person, another
-agent, a loop) runs the steps.
+network, no tracker call, no skill run, and git only to read. Whoever drives it runs the steps.
 
 ## Commands
 
@@ -128,9 +127,9 @@ Each command reads HEAD once, as a full commit id, and checks every proof agains
   only while it is.
 - **patch**: the proof's `patchId` must be the verbatim patch id of everything on that commit since
   the proof's `base`, every byte counted, white space too:
-  `git diff --no-color --no-ext-diff --no-textconv --no-relative --src-prefix=a/ --dst-prefix=b/ --ignore-submodules=none --unified=3 --no-renames --diff-algorithm=myers <base>...<commit> -- | git patch-id --verbatim`.
-  The flags override git's settings for colour, prefixes, paths, submodules, context, renames and
-  the algorithm; its suppressBlankEmpty and quotePath settings are not covered, and fail closed
+  `git diff --no-color --no-ext-diff --no-textconv --no-relative --src-prefix=a/ --dst-prefix=b/ --ignore-submodules=none --unified=3 --no-renames --diff-algorithm=myers --inter-hunk-context=0 <base>...<commit> -- | git patch-id --verbatim`.
+  The flags override git's settings for colour, prefixes, paths, submodules, context, hunk joining,
+  renames and the algorithm; its suppressBlankEmpty and quotePath settings are not covered, and fail closed
   (the proof reads as stale). A git without `--verbatim` stops the run (kind `proof`). A base
   that moved under a byte-identical patch keeps the proof.
 - **none**: nothing in the repository binds it.
