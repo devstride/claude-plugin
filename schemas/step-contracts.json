@@ -293,7 +293,8 @@
         "branch": "result:branch@1.branch",
         "review": "result:review@1",
         "build": "result:build@1",
-        "riskCheck": "result:risk-check@1"
+        "riskCheck": "result:risk-check@1",
+        "commit": "step.head?"
       },
       "argument": null,
       "verdict": {

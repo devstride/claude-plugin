@@ -63,6 +63,7 @@ RUN_ID = re.compile(r"^[0-9a-f]{32}$")
 SLUG = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 CONTRACT = re.compile(r"^([a-z][a-z0-9-]*)@([0-9]+)$")
+COMMIT_ID = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 GIT_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/@^~-]{0,199}$")
 CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 FENCE_OPEN = re.compile(r"^\s*```json\s*$")
@@ -70,7 +71,7 @@ TEMPLATE_FIELD = re.compile(r"\{([A-Za-z][A-Za-z0-9]*)\}")
 PAYLOAD_PATH = re.compile(
     r"^(?:context(?:\.[A-Za-z][A-Za-z0-9]*)+"
     r"|result:[a-z][a-z0-9-]*@[0-9]+(?:\.[A-Za-z][A-Za-z0-9]*)*"
-    r"|step\.(?:answer|proof))\??$")
+    r"|step\.(?:answer|proof|head))\??$")
 
 # The catalog's vocabulary (schemas/step-contracts.json).
 ENTRY_FIELDS = ("summary", "builtinSkill", "payload", "argument", "verdict", "result", "proof",
@@ -112,19 +113,27 @@ RUN_OUTCOME = {
     "attempts-exhausted": "failed",
 }
 
-# What looks like a credential. An evidence line that matches is dropped whole, a verdict detail
-# or a refusal message is replaced, and a definition that holds one is refused; case is ignored.
+# What looks like a credential: shapes, not words. An evidence line that matches is dropped whole,
+# a verdict detail or a refusal message is replaced, and a definition that holds one is refused.
+# A value is one unbroken run of at least 7 characters that is not all digits, so `token: 911`,
+# `has_token=true` and `Rotate the token: weekly` are ordinary text and `password: hunter2` is not.
+CREDENTIAL_NAME = r"[A-Za-z0-9_-]*(?:secret|token|passw(?:or)?d|api[_-]?key|access_?key|private_?key)[A-Za-z0-9_-]*"
+CREDENTIAL_VALUE = r"(?=[^\s\"']*[^\s\"'0-9])[^\s\"']{7,}"
 SECRET = re.compile(
     r"CLAIM_HOLDER|-----BEGIN"
-    r"|\bauthorization\b[\"']?\s*[:=]\s*[\"']?\S"                       # an Authorization header, any scheme
-    r"|\bbearer\s+(?=\S*[0-9._~+/=-])[A-Za-z0-9._~+/=-]{8,}"              # a bearer token
+    r"|\bauthorization[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9._~+/=-]{16,}"    # an Authorization header's raw value
+    r"|\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{16,}"                     # a bearer or basic credential
+    r"|\bx-api-key[\"']?\s*:\s*[\"']?[^\s\"']"                           # an API key header
     r"|\b[a-z][a-z0-9+.-]*://[^\s/@:]+:[^\s/@]+@"                         # a URL with a user and password
-    r"|\b(?:sk_live_|sk_test_|rk_live_|sk-ant-|ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abpors]-)[A-Za-z0-9_-]{4,}"
-    r"|\bsk-[A-Za-z0-9_-]{16,}|\bAKIA[0-9A-Z]{4,}"
+    r"|\b(?:sk_live_|sk_test_|rk_live_|sk-ant-|ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abpors]-|whsec_)[A-Za-z0-9_-]{4,}"
+    r"|\bnpm_[A-Za-z0-9]{16,}|\bAIza[A-Za-z0-9_-]{16,}|\bSG\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"
+    r"|\bsk-[A-Za-z0-9_-]{16,}|(?-i:\b(?:AKIA|ASIA)[0-9A-Z]{12,})"
     r"|\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*"          # a JSON web token
-    r"|(?<![A-Za-z0-9])[A-Za-z0-9_.-]*(?:secret|token|password|passwd|api_?key|apikey|access_?key|private_?key)"
-    r"(?:[_.-][A-Za-z0-9_.-]*)?[\"']?\s*[:=]\s*[\"']?[^\s\"']",            # a key that names one, assigned
+    r"|(?:--(?:password|token)|\bclient_secret)(?:\s+|=)[\"']?" + CREDENTIAL_VALUE +   # a flag and its value
+    r"|(?<![A-Za-z0-9_./\\-])" + CREDENTIAL_NAME + r"[\"']?\s*[:=]\s*[\"']?" + CREDENTIAL_VALUE,  # a key that names one, assigned
     re.I)
+CREDENTIAL_KEY = re.compile("^%s$" % CREDENTIAL_NAME, re.I)
+CREDENTIAL_STRING = re.compile(r"^\s*%s\s*$" % CREDENTIAL_VALUE)
 WITHHELD = "[withheld]"
 NOT_SHOWN = "the message names a value that looks like a credential, so it is not shown"
 
@@ -188,20 +197,25 @@ class World:
         moment = datetime.now(timezone.utc)
         return moment.strftime("%Y-%m-%dT%H:%M:%S.") + "%03dZ" % (moment.microsecond // 1000)
 
-    def tree(self, cwd):
-        return self.git(cwd, "rev-parse", "HEAD^{tree}").decode("utf-8", "replace").strip()
-
     def head(self, cwd):
-        return self.git(cwd, "rev-parse", "HEAD").decode("utf-8", "replace").strip()
+        """The full commit id HEAD is on: read once, then every proof is checked against it."""
+        head = self.git(cwd, "rev-parse", "--verify", "HEAD^{commit}").decode("utf-8", "replace").strip()
+        if not COMMIT_ID.match(head):
+            raise GitFailed("HEAD does not name a commit id")
+        return head
 
-    def patch_id(self, cwd, base):
-        """The verbatim patch id of everything on HEAD since it left `base`, or None for no patch.
-        Every byte counts, white space too, and the diff's flags are fixed so that no git setting
-        changes it and no diff driver or text converter runs."""
+    def tree(self, cwd, commit):
+        return self.git(cwd, "rev-parse", commit + "^{tree}").decode("utf-8", "replace").strip()
+
+    def patch_id(self, cwd, base, commit):
+        """The verbatim patch id of everything on `commit` since it left `base`, or None for no
+        patch. Every byte counts, white space too, and the diff's flags are fixed so that no
+        setting of git's diff changes it and no diff driver or text converter runs."""
         if not isinstance(base, str) or not GIT_REF.match(base):
             raise GitFailed("the proof's base is not a usable git name")
         diff = self.git(cwd, "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative",
-                        "--src-prefix=a/", "--dst-prefix=b/", base + "...HEAD", "--", timeout=GIT_DIFF_TIMEOUT)
+                        "--src-prefix=a/", "--dst-prefix=b/", "--ignore-submodules=none", "--unified=3",
+                        "--no-renames", "--diff-algorithm=myers", base + "..." + commit, "--", timeout=GIT_DIFF_TIMEOUT)
         try:
             out = self.git(cwd, "patch-id", "--verbatim", stdin=diff).decode("utf-8", "replace").split()
         except GitFailed:
@@ -537,7 +551,8 @@ def _credential_at(value, path="$"):
                 return found
     elif isinstance(value, dict):
         for key, item in value.items():
-            if has_secret(key):
+            # a key that names a credential, holding a value shaped like one: {"password": "huntertwo"}
+            if has_secret(key) or (CREDENTIAL_KEY.match(key) and isinstance(item, str) and CREDENTIAL_STRING.match(item)):
                 return path
             found = _credential_at(item, "%s.%s" % (path, key))
             if found:
@@ -688,7 +703,7 @@ def read_result(entry, text):
     return result, proof, REPORT.clean_links(links), problem
 
 
-def proof_fault(contract, entry, proof, value=None):
+def proof_fault(contract, entry, proof, value=None, result=None):
     """Why a proof is refused outright (its shape, a value the catalog does not list or that
     disagrees with the verdict `value`, or a named acceptance rule), or None."""
     rules = entry["proof"]
@@ -707,17 +722,19 @@ def proof_fault(contract, entry, proof, value=None):
             return "the verdict %s needs a proof whose %s is %s" % (value["value"], key, wanted)
     if contract == "risk-check@1" and proof["triggers"] and proof["verifiers"] < 1:
         return "risk-triggers-need-verifiers: the risk check names triggers and ran no verifier"
+    if contract == "local-checks@1" and proof["kind"] == "receipt" and (proof["receipt"] is None or (result is not None and not result.get("commands"))):
+        return "a pass names the commands it ran and carries their receipt"
     return None
 
 
-def binding_holds(binding, proof, world, cwd):
-    """True when a proof still matches the repository it is bound to. `tree`: the proof's tree is
-    the tree of HEAD. `patch`: its patch id is the id of everything on HEAD since its base, so a
-    base that moved under an unchanged patch keeps the proof. `none`: nothing binds it."""
+def binding_holds(binding, proof, world, cwd, commit):
+    """True when a proof still matches `commit`, the commit HEAD was found on. `tree`: the proof's
+    tree is that commit's tree. `patch`: its patch id is the id of everything on that commit since
+    its base, so a base that moved under an unchanged patch keeps the proof. `none`: nothing binds it."""
     if binding == "tree":
-        return isinstance(proof, dict) and proof.get("tree") == world.tree(cwd)
+        return isinstance(proof, dict) and proof.get("tree") == world.tree(cwd, commit)
     if binding == "patch":
-        real = isinstance(proof, dict) and world.patch_id(cwd, proof.get("base"))
+        real = isinstance(proof, dict) and world.patch_id(cwd, proof.get("base"), commit)
         return bool(real) and proof.get("patchId") == real
     return True
 
@@ -868,6 +885,7 @@ class Run:
         self.events = []        # step reports, in the order they happened
         self.closing = None     # the run's end as the tracker is told it
         self.resend_definition = False
+        self.commit = None      # the commit HEAD is on, read once per command
 
     def record(self, index):
         return self.state["steps"][self.steps[index]["id"]]
@@ -895,8 +913,18 @@ class Run:
                 return True
         return False
 
+    def head(self):
+        """HEAD as a full commit id, read once: every proof this command checks, and the commit a
+        merge it issues is handed, are that one commit, whatever lands on the branch meanwhile."""
+        if self.commit is None:
+            self.commit = self.world.head(self.state["context"]["cwd"])
+        return self.commit
+
     def binding_holds(self, index, proof):
-        return binding_holds(self.entry(index)["proof"]["binding"], proof, self.world, self.state["context"]["cwd"])
+        binding = self.entry(index)["proof"]["binding"]
+        if binding == "none":
+            return True
+        return binding_holds(binding, proof, self.world, self.state["context"]["cwd"], self.head())
 
     def proof_gone(self, index):
         """Why a finished step's proof no longer holds (`superseded` or `stale`), or None."""
@@ -924,13 +952,13 @@ class Run:
 
     def landed_fault(self, index, proof):
         """merge-lands-what-was-checked: a merge that landed names the commit it merged, and it is
-        the commit HEAD was on when the merge was issued, the moment the runner had just found the
-        local checks' tree and the review's patch to hold for it."""
+        the commit it was handed (`issuedHead`), the one the local checks' tree and the review's
+        patch were found to hold for when the merge was issued."""
         record = self.record(index)
         if self.steps[index]["contract"] != "merge@1" or proof.get("head") == record.get("issuedHead"):
             return None
         return ("merge-lands-what-was-checked: the merge names another commit than %s, the one the local checks "
-                "and the review were proven on; resume to check what changed" % (record.get("issuedHead") or "none")[:12])
+                "and the review were proven on; resume to check what changed" % (record.get("issuedHead") or "none"))
 
     # -- what a step is handed --
 
@@ -945,7 +973,7 @@ class Run:
                 given = self.provider(index, contract)
                 value = dig(self.record(given)["result"], keys) if given is not None and ended_well(self.record(given)) else MISSING
             else:
-                value = record["answer"] if keys == ["answer"] else record["proof"]
+                value = {"answer": record["answer"], "proof": record["proof"], "head": record.get("issuedHead")}[keys[0]]
                 value = MISSING if value is None else value
             if value is MISSING and not optional:
                 raise KeyError(key)
@@ -1014,10 +1042,9 @@ class Run:
         refused = self.merge_refused(index)
         if refused:
             return self.stop("proof", refused, index)
-        head = None
         if step["contract"] == "merge@1":
             try:
-                head = self.world.head(self.state["context"]["cwd"])
+                self.head()
             except GitFailed as error:
                 return self.stop("proof", "the commit step %s would merge cannot be read: %s" % (step["id"], error), index)
         if cause and cause != "redo":  # a step's own verdict asking for another go is not the runner's re-issue
@@ -1041,7 +1068,7 @@ class Run:
         # on it: they hold their own proofs (a rebase that leaves the patch alone keeps the review).
         refresh = cause == "stale" or (cause == "mismatch" and record.get("refresh", False))
         record.update(attempt=record["attempt"] + 1, status="issued", verdict=None, evidence=[], links={},
-                      startedAt=self.world.now(), endedAt=None, refresh=refresh, redo=None, issuedHead=head,
+                      startedAt=self.world.now(), endedAt=None, refresh=refresh, redo=None, issuedHead=self.commit,
                       ran={"source": "builtin", "ref": ref, "version": self.state["pluginVersion"], "hash": digest})
         record["class"] = None
         self.state["current"] = {"stepId": step["id"], "attempt": record["attempt"]}
@@ -1055,14 +1082,14 @@ class Run:
             return self.finished_answer()
         if state["stopped"]:
             return self.stopped_answer()
-        current = (state["current"] or {}).get("stepId")
+        if state["current"]:
+            # An issued step is handed back as it was: it may already have acted (a merge that
+            # landed), so only its answer moves the run on, and its proofs are checked then.
+            index = self.index_of(state["current"]["stepId"])
+            self.report(index)  # the same running report again: harmless, and a lost one is not lost
+            return self.run_answer(index)
         for index, step in enumerate(self.steps):
             record = self.record(index)
-            if step["id"] == current:
-                # Every proof it relies on still holds: the same step and attempt again, with the
-                # same running report (harmless, and a lost one is not lost).
-                self.report(index)
-                return self.run_answer(index)
             if step["run"]["source"] == "off":
                 if record["status"] != "skipped":
                     record.update(status="skipped", verdict="Off", startedAt=self.world.now(), endedAt=self.world.now(),
@@ -1077,27 +1104,13 @@ class Run:
                 try:
                     cause = self.proof_gone(index)
                 except GitFailed as error:
-                    self.withdraw(current)
                     return self.stop("proof", "the proof of step %s cannot be checked: %s" % (step["id"], error), index)
                 if cause is None:
                     continue
             elif record["status"] == "done":
                 cause = "redo"  # its own verdict asked for another go
-            self.withdraw(current)
             return self.issue(index, cause)
         return self.finish("completed")
-
-    def withdraw(self, step_id):
-        """An issued step goes back unanswered because a proof it relies on no longer holds: that
-        attempt is over (reported failed), and the step is issued again once the earlier one holds."""
-        if not step_id:
-            return
-        index = self.index_of(step_id)
-        record = self.record(index)
-        record.update(status="failed", verdict="Withdrawn: an earlier step must run again first", endedAt=self.world.now())
-        record["class"] = None
-        self.state["current"] = None
-        self.report(index)
 
     def complete(self, index, output):
         """Record a step's answer: its verdict, evidence, result and proof, and what that means
@@ -1125,7 +1138,7 @@ class Run:
         after = None  # (stop kind, reason) once the report is queued
         if kind == "continue":
             # The merge rule is asked again here: a step repaired by hand was never issued past it.
-            fault = (problem or proof_fault(step["contract"], entry, proof, value) or self.merge_refused(index)
+            fault = (problem or proof_fault(step["contract"], entry, proof, value, result) or self.merge_refused(index)
                      or self.landed_fault(index, proof or {}))
             try:
                 holds = fault is not None or self.binding_holds(index, proof)
