@@ -43,4 +43,4 @@ means the runner itself failed: say its line and stop, without retrying.
    stop, then stop. `resume` continues the run once the cause is fixed.
 6. **On `finished`**: say the outcome in plain words.
 
-After a restart or a compaction: `status` (where the run is), then `resume` (the same step again, unless a proof it relies on went stale).
+After a restart or a compaction: `status` (where the run is), then `resume` (the issued step again). A step that already acted (a merge that landed) is reported with `done`, never run again.

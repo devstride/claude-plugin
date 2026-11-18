@@ -20,10 +20,10 @@ session id) and names its run by `item`, by `runId`, or by being the session's o
 | Command | Request | What it does |
 |---|---|---|
 | `start` | `definition` or `definitionFile` (a file of at most 256 KB), `context`, `replace`? | Validates everything before writing anything, then issues the first step. An open run for the same session and item is refused (`run-open`) unless `replace` is true, which ends the old run as interrupted |
-| `next` | | The next action. Asked again before `done`, it re-checks the proofs the issued step relies on: the same step and attempt while they hold, else that attempt is withdrawn (reported failed) and the stale step issued first |
+| `next` | | The next action. Asked again before `done`, it hands back the issued step and attempt as they were: the step may already have acted, so only its `done` moves the run on |
 | `done` | `stepId`, `attempt`, `output` (the step's whole final answer, as text) | Records the issued step's answer and returns the next action plus `recorded`. Any other step or attempt is refused (`not-current-step`), except the step a stopped run stopped on, repaired by hand |
 | `status` | `includeDefinition`? | Read-only: `state` (running, stopped or finished), `position`, one row per step and a ready Markdown `table`. With `includeDefinition`, one report object carrying the definition |
-| `resume` | `answer`? | Continues after a restart or a stop, checking proofs as `next` does. `answer`, a person's reply to a question, reaches that step's payload for that attempt only |
+| `resume` | `answer`? | Continues after a restart or a stop: an issued step comes back as it was, otherwise as `next`. `answer`, a person's reply to a question, reaches that step's payload for that attempt only |
 
 The context: `item` (an item number or null), `goal`, `profile` (`name` and `source`),
 `workingBase`, `oneOff`, `route` (`train`, `develop-pr` or `epic-release`), `releaseUnit`,
@@ -74,8 +74,8 @@ result keys. Nothing after it is kept. A passing local check, for example:
 LOCAL CHECKS: PASS (2 ran)
 unit: 12 passed
 ```json
-{"commands": ["unit", "lint"], "results": [], "receipt": null, "tree": "<tree>", "head": "<commit>",
- "skippedSuites": [], "proof": {"kind": "receipt", "tree": "<tree>", "head": "<commit>", "receipt": null}}
+{"commands": ["unit", "lint"], "results": [], "receipt": "<receipt>", "tree": "<tree>", "head": "<commit>",
+ "skippedSuites": [], "proof": {"kind": "receipt", "tree": "<tree>", "head": "<commit>", "receipt": "<receipt>"}}
 ```
 ````
 
@@ -97,20 +97,23 @@ the contract does not list are dropped. A `count` is a whole number of at least 
 
 **Reported:** the verdict line (200 characters), the evidence (the reporting helper's caps), https
 links (`pullRequest`, `commit`, `comment`) and the branch name from `links`, the skill that ran,
-and the definition. What looks like a credential (an Authorization header, a bearer or web token, a
-URL with a password, a known token prefix, a private key, a claim holder, or a secret, token,
-password or API, access or private key assigned a value, any case) is never reported: the evidence
-line or link is dropped, the verdict detail becomes `[withheld]`, the definition is refused, and a
-refusal line says it is not shown. **Not scrubbed:** the result and the proof, kept as given in the
+and the definition. What is shaped like a credential (an Authorization, Bearer or Basic value of 16
+characters or more, an `x-api-key` header, a web token, a URL with a password, a known token prefix,
+a private key, a claim holder, or one word naming a secret, token, password or API, access or
+private key, assigned, or a `--password`/`--token`/`client_secret` flag, followed by 7 or more
+characters, not all digits) is never reported: the evidence
+line or link is dropped, the verdict detail becomes `[withheld]`, the definition is refused (also for such a key holding such a
+string), and a refusal line says it is not shown. **Not scrubbed:** the result and the proof, kept as given in the
 owner-only state file and handed to later payloads and to `finished`, never reported.
 
 ## Payloads
 
 Each contract maps payload keys to paths: a context path (`context.` and a key), an earlier step's
-result (`result:`, a contract, optionally a key), or one of two step paths: the step's own answer
-from a person, and the proof of its previous attempt. A trailing `?` makes a path optional (null
-when missing). The runner then adds two reserved keys, `step` (the issued step's id) and
-`contract` (its contract), so one skill that serves several steps can tell them apart.
+result (`result:`, a contract, optionally a key), or a step path: the step's own answer from a
+person, the proof of its previous attempt, or the commit it was issued on (`head`). A trailing `?`
+makes a path optional (null when missing). The runner then adds two reserved keys, `step` (the
+issued step's id) and `contract` (its contract), so one skill that serves several steps can tell
+them apart.
 
 ## Proofs
 
@@ -119,11 +122,13 @@ takes only those, and a verdict value that pins one (its `proof`) needs exactly 
 `LOCAL CHECKS: NOT CONFIGURED` carries kind `none-configured`, a pass `receipt`. Its contract binds
 it:
 
-- **tree**: the proof's `tree` must be the tree of HEAD when the step answers, and stays valid
+Each command reads HEAD once, as a full commit id, and checks every proof against that commit.
+
+- **tree**: the proof's `tree` must be that commit's tree when the step answers, and stays valid
   only while it is.
-- **patch**: the proof's `patchId` must be the verbatim patch id of everything on HEAD since the
-  proof's `base`, every byte counted, white space too:
-  `git diff --no-color --no-ext-diff --no-textconv --no-relative --src-prefix=a/ --dst-prefix=b/ <base>...HEAD -- | git patch-id --verbatim`.
+- **patch**: the proof's `patchId` must be the verbatim patch id of everything on that commit since
+  the proof's `base`, every byte counted, white space too:
+  `git diff --no-color --no-ext-diff --no-textconv --no-relative --src-prefix=a/ --dst-prefix=b/ --ignore-submodules=none --unified=3 --no-renames --diff-algorithm=myers <base>...<commit> -- | git patch-id --verbatim`.
   A git without `--verbatim` stops the run (kind `proof`). A base that moved under a byte-identical
   patch keeps the proof.
 - **none**: nothing in the repository binds it.
@@ -137,11 +142,11 @@ bound to its own patch and re-checked against it, and the merge, which has not r
 A finished step is re-examined only while a later step that requires it has not finished, so
 nothing before a finished merge is re-opened. `next` issues the first step, in order, that is not
 finished with a valid proof: a stale proof re-issues the step that produced it before anything that
-relies on it, also when that is the step already issued. A proof that does not match the
+relies on it. A proof that does not match the
 repository when the step answers counts as a failed attempt and the step is issued again. The
 runner counts its own re-issues per step (not a step's own `redo:self`), starts again from 0 when
 the step finishes with a proof that holds, and stops at the fifth in a row (kind
-`attempts-exhausted`).
+`attempts-exhausted`). A local-checks pass names at least one command and carries a receipt.
 
 Three named rules, a closed list:
 
@@ -150,11 +155,11 @@ Three named rules, a closed list:
 - `none-configured-needs-pull-request-route`: local checks that found nothing configured are
   accepted by a merge only when the review ran on a pull request (path `pull-request`), where CI is
   the gate.
-- `merge-lands-what-was-checked`: a merge reported landed (also by hand, after a stop) names the
-  full id of the commit it merged as its proof's `head`: the commit HEAD was on when the runner
-  issued the merge, having just found the local checks' tree and the review's patch to hold for it.
-  Another commit, or none, stops the run (kind `proof`), and `resume` checks the new commit first.
-  A merge that had to change the branch answers `MERGE: REFRESHED`.
+- `merge-lands-what-was-checked`: the merge is handed `commit`, the full id the local checks' tree
+  and the review's patch were just found to hold for. A merge skill merges exactly that commit
+  (for a pull request, `--match-head-commit <commit>`) and answers `MERGE: REFRESHED` when HEAD is
+  no longer it. Reported landed (also by hand, after a stop), its proof's `head` names that id;
+  another commit, or none, stops the run (kind `proof`), and `resume` checks the new commit first.
 
 ## satisfiedBy — one step standing in for another's proof
 
@@ -175,7 +180,7 @@ list; nothing redefines the rule. No shipped contract carries the field yet.
 | `needs-person` | The step asked a question | `resume` with the `answer` |
 | `no-verdict` | The answer did not open with a verdict the contract lists | Run the step again (`resume`), or report its real verdict with `done` |
 | `proof` | A proof was refused by a value or a named rule, or could not be checked | Fix what the reason names, then `resume` |
-| `attempts-exhausted` | The same step was re-issued until the limit | Find why its proof never holds, then `resume` (which resets the count) |
+| `attempts-exhausted` | The same step was re-issued until the limit, or has run 50 times | Find why its proof never holds, then `resume`, which resets the re-issue count but never the 50 |
 
 ## Reporting
 
