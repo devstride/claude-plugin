@@ -79,16 +79,26 @@ CLASSES = ("continue", "skipped", "redo:self", "stop", "ask")
 END_CLASS = re.compile(r"^end:([a-z][a-z-]*)$")
 DETAILS = ("none", "optional", "required")
 BINDINGS = ("none", "tree", "patch")
-TYPE_NAMES = ("string", "number", "boolean", "array", "object", "null")
+BINDING_FIELDS = {"none": (), "tree": ("tree",), "patch": ("base", "patchId")}
+TYPE_NAMES = ("string", "number", "count", "boolean", "array", "object", "null")
 STAGES = ("building", "reviewing", "verifying", "landing")
 RESERVED_PAYLOAD_KEYS = ("step", "contract")
 CLAIM_PHASE_MAX = 64
 
-# The definition's vocabulary (schemas/workflow.schema.json).
+DETAIL_NAME = re.compile(r"^[a-z][a-z-]{0,31}$")
+
+# The definition's vocabulary and limits (schemas/workflow.schema.json).
+WORKFLOW_ID = re.compile(r"^[a-z][a-z0-9-]{0,99}$")
+STARTS_WHEN = ("item-picked-up", "children-complete", "on-demand")
+ENDS_BY = ("ship", "hand-up", None)
+APPLIES_TO = ("workTypes", "tags", "repositories")
 KINDS = ("step", "gate")
 RUN_SOURCES = ("builtin", "library", "repo", "off")
 WHEN_MODES = ("always", "condition", "manual")
+CONDITIONS = ("review-path:fast", "review-path:pull-request", None)
 ON_FAIL = ("stop", "continue")
+NAME_MAX, SUMMARY_MAX = 200, 500
+MAX_PHASES, MAX_PHASE_STEPS, MAX_STEPS = 12, 40, 100
 
 # How a run's end, or the kind of stop it is waiting at, is named to the tracker. The one table.
 RUN_OUTCOME = {
@@ -102,10 +112,21 @@ RUN_OUTCOME = {
     "attempts-exhausted": "failed",
 }
 
-# An evidence line holding any of these is dropped whole before anything is stored or reported.
-SECRET_MARKERS = ("CLAIM_HOLDER", "Bearer ", "ghp_", "gho_", "github_pat_", "AKIA", "xoxb-", "xoxp-", "-----BEGIN")
-SECRET_ASSIGNMENT = re.compile(r"(?i)(password|token|secret)[\"']?\s*[=:]\s*\S")
+# What looks like a credential. An evidence line that matches is dropped whole, a verdict detail
+# or a refusal message is replaced, and a definition that holds one is refused; case is ignored.
+SECRET = re.compile(
+    r"CLAIM_HOLDER|-----BEGIN"
+    r"|\bauthorization\b[\"']?\s*[:=]\s*[\"']?\S"                       # an Authorization header, any scheme
+    r"|\bbearer\s+(?=\S*[0-9._~+/=-])[A-Za-z0-9._~+/=-]{8,}"              # a bearer token
+    r"|\b[a-z][a-z0-9+.-]*://[^\s/@:]+:[^\s/@]+@"                         # a URL with a user and password
+    r"|\b(?:sk_live_|sk_test_|rk_live_|sk-ant-|ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abpors]-)[A-Za-z0-9_-]{4,}"
+    r"|\bsk-[A-Za-z0-9_-]{16,}|\bAKIA[0-9A-Z]{4,}"
+    r"|\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*"          # a JSON web token
+    r"|(?<![A-Za-z0-9])[A-Za-z0-9_.-]*(?:secret|token|password|passwd|api_?key|apikey|access_?key|private_?key)"
+    r"(?:[_.-][A-Za-z0-9_.-]*)?[\"']?\s*[:=]\s*[\"']?[^\s\"']",            # a key that names one, assigned
+    re.I)
 WITHHELD = "[withheld]"
+NOT_SHOWN = "the message names a value that looks like a credential, so it is not shown"
 
 MISSING = object()
 REPORT = None   # skills/build-item/scripts/workflow_report.py: hashing, normalizing, capping, report shape
@@ -170,12 +191,21 @@ class World:
     def tree(self, cwd):
         return self.git(cwd, "rev-parse", "HEAD^{tree}").decode("utf-8", "replace").strip()
 
+    def head(self, cwd):
+        return self.git(cwd, "rev-parse", "HEAD").decode("utf-8", "replace").strip()
+
     def patch_id(self, cwd, base):
-        """The stable patch id of everything on HEAD since it left `base`, or None for no patch."""
+        """The verbatim patch id of everything on HEAD since it left `base`, or None for no patch.
+        Every byte counts, white space too, and the diff's flags are fixed so that no git setting
+        changes it and no diff driver or text converter runs."""
         if not isinstance(base, str) or not GIT_REF.match(base):
             raise GitFailed("the proof's base is not a usable git name")
-        diff = self.git(cwd, "diff", base + "...HEAD", "--", timeout=GIT_DIFF_TIMEOUT)
-        out = self.git(cwd, "patch-id", "--stable", stdin=diff).decode("utf-8", "replace").split()
+        diff = self.git(cwd, "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative",
+                        "--src-prefix=a/", "--dst-prefix=b/", base + "...HEAD", "--", timeout=GIT_DIFF_TIMEOUT)
+        try:
+            out = self.git(cwd, "patch-id", "--verbatim", stdin=diff).decode("utf-8", "replace").split()
+        except GitFailed:
+            raise GitFailed("git patch-id --verbatim failed; a git too old to support --verbatim cannot check a review")
         return out[0] if out else None
 
     def in_work_tree(self, cwd):
@@ -194,6 +224,7 @@ def is_type(value, spec):
                 or (name == "string" and isinstance(value, str))
                 or (name == "boolean" and isinstance(value, bool))
                 or (name == "number" and isinstance(value, (int, float)) and not isinstance(value, bool))
+                or (name == "count" and isinstance(value, int) and not isinstance(value, bool) and value >= 0)
                 or (name == "array" and isinstance(value, list))
                 or (name == "object" and isinstance(value, dict))):
             return True
@@ -243,6 +274,12 @@ def _entry_shape(entry):
         if (not isinstance(value, dict) or not isinstance(value.get("value"), str) or not value["value"].strip()
                 or value.get("detail") not in DETAILS or not isinstance(value.get("class"), str)):
             return "a verdict value needs value, detail and class"
+        if (value["detail"] == "none") != ("detailName" not in value) or (
+                "detailName" in value and not (isinstance(value["detailName"], str) and DETAIL_NAME.match(value["detailName"]))):
+            return "a verdict value that takes a detail names it (detailName, a lower-case word), and only such a value"
+        if "proof" in value and not (isinstance(value["proof"], dict) and value["proof"]
+                                     and all(isinstance(v, str) for v in value["proof"].values())):
+            return "a verdict value's proof maps proof keys to the text each must be"
     if len(set(v["value"] for v in verdict["values"])) != len(verdict["values"]):
         return "a verdict value is listed twice"
     if not isinstance(entry["result"], dict) or not _keys_and_types(entry["result"]):
@@ -252,6 +289,11 @@ def _entry_shape(entry):
         return "proof.binding is none, tree or patch"
     if ("required" in proof or "types" in proof) and not _keys_and_types(proof):
         return "proof needs required keys, each with a type"
+    values = proof.get("values", {})
+    if not isinstance(values, dict) or not all(
+            key in proof.get("required", []) and proof["types"][key] == "string" and isinstance(allowed, list)
+            and allowed and all(isinstance(v, str) for v in allowed) for key, allowed in values.items()):
+        return "proof.values maps required text keys to the values each may take"
     if not isinstance(entry["requires"], list) or not all(isinstance(r, str) for r in entry["requires"]):
         return "requires is a list of contract names"
     if entry["claimPhase"] is not None and not isinstance(entry["claimPhase"], str):
@@ -308,6 +350,17 @@ def check_catalog(catalog):
         closure = requires_closure(contracts, name)
         if name in closure:
             fault("cycle", name, "requires itself through its requirements")
+        proof = entry["proof"]
+        for key in BINDING_FIELDS[proof["binding"]]:
+            if key not in proof.get("required", []) or proof["types"][key] != "string":
+                fault("proof-fields", name, "a %s binding needs the text proof key %s" % (proof["binding"], key))
+        pinned = set(key for value in entry["verdict"]["values"] for key in value.get("proof", {}))
+        for value in entry["verdict"]["values"]:
+            for key, wanted in value.get("proof", {}).items():
+                if wanted not in proof.get("values", {}).get(key, []):
+                    fault("proof-values", name, "%s pins %s to a value proof.values does not list" % (value["value"], key))
+            if value["class"] == "continue" and pinned - set(value.get("proof", {})):
+                fault("proof-values", name, "%s does not pin %s, which another verdict pins" % (value["value"], ", ".join(sorted(pinned))))
         for value in entry["verdict"]["values"]:
             if value["class"] not in CLASSES and not END_CLASS.match(value["class"]):
                 fault("class", name, "%s has the unknown class %s" % (value["value"], value["class"]))
@@ -391,36 +444,65 @@ def _version(text):
     return tuple(int(part) for part in text.split("."))
 
 
+def _text(value, limit, empty=False):
+    return isinstance(value, str) and len(value) <= limit and (empty or bool(value))
+
+
+def _whole(value):
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
 def _shape_fault(definition):
-    """Why a definition is not shaped as one (the bad-schema refusal), or None."""
+    """Why a definition does not meet schemas/workflow.schema.json (the bad-schema refusal), or
+    None. Every field the schema requires is checked, with its type and its limits."""
     if not isinstance(definition, dict):
         return "a definition is one JSON object"
     if definition.get("schema") != 1 or isinstance(definition.get("schema"), bool):
         return "schema must be 1"
-    if not isinstance(definition.get("id"), str) or not definition["id"]:
-        return "id must be text"
-    if isinstance(definition.get("version"), bool) or not isinstance(definition.get("version"), int):
-        return "version must be a whole number"
+    if not isinstance(definition.get("id"), str) or not WORKFLOW_ID.match(definition["id"]):
+        return "id must be a lower-case slug of at most 100 characters"
+    if not _whole(definition.get("version")) or definition["version"] < 1:
+        return "version must be a whole number of at least 1"
+    if not _text(definition.get("name"), NAME_MAX):
+        return "name must be text of 1 to %d characters" % NAME_MAX
+    if definition.get("startsWhen") not in STARTS_WHEN:
+        return "startsWhen must be one of %s" % ", ".join(STARTS_WHEN)
+    if "endsBy" not in definition or definition["endsBy"] not in ENDS_BY:
+        return "endsBy must be ship, hand-up or null"
+    applies = definition.get("appliesTo")
+    if not isinstance(applies, dict) or any(not isinstance(applies.get(key), list) or not all(isinstance(v, str) for v in applies[key])
+                                            for key in APPLIES_TO):
+        return "appliesTo must hold workTypes, tags and repositories, each a list of text"
     if not isinstance(definition.get("minPluginVersion"), str) or not SEMVER.match(definition["minPluginVersion"]):
         return "minPluginVersion must be x.y.z"
     phases = definition.get("phases")
-    if not isinstance(phases, list) or not phases:
-        return "phases must be a list of at least one phase"
+    if not isinstance(phases, list) or not 1 <= len(phases) <= MAX_PHASES:
+        return "phases must be a list of 1 to %d phases" % MAX_PHASES
+    total = 0
     for p, phase in enumerate(phases):
         where = "phases[%d]" % p
-        if not isinstance(phase, dict) or not isinstance(phase.get("name"), str) or not phase["name"]:
-            return "%s must be an object with a name" % where
+        if not isinstance(phase, dict):
+            return "%s must be an object" % where
+        if not isinstance(phase.get("id"), str) or not SLUG.match(phase["id"]):
+            return "%s.id must be a lower-case slug" % where
+        if not _text(phase.get("name"), NAME_MAX):
+            return "%s.name must be text of 1 to %d characters" % (where, NAME_MAX)
         steps = phase.get("steps")
-        if not isinstance(steps, list) or not steps:
-            return "%s.steps must be a list of at least one step" % where
+        if not isinstance(steps, list) or not 1 <= len(steps) <= MAX_PHASE_STEPS:
+            return "%s.steps must be a list of 1 to %d steps" % (where, MAX_PHASE_STEPS)
+        total += len(steps)
+        if total > MAX_STEPS:
+            return "a definition has at most %d steps across its phases" % MAX_STEPS
         for s, step in enumerate(steps):
             at = "%s.steps[%d]" % (where, s)
             if not isinstance(step, dict):
                 return "%s must be an object" % at
             if not isinstance(step.get("id"), str) or not SLUG.match(step["id"]):
                 return "%s.id must be a lower-case slug" % at
-            if not isinstance(step.get("name"), str) or not step["name"]:
-                return "%s.name must be text" % at
+            if not _text(step.get("name"), NAME_MAX):
+                return "%s.name must be text of 1 to %d characters" % (at, NAME_MAX)
+            if not _text(step.get("summary"), SUMMARY_MAX, empty=True):
+                return "%s.summary must be text of at most %d characters" % (at, SUMMARY_MAX)
             if not isinstance(step.get("contract"), str) or not CONTRACT.match(step["contract"]):
                 return "%s.contract must be <name>@<major>" % at
             if step.get("kind") not in KINDS:
@@ -428,12 +510,38 @@ def _shape_fault(definition):
             run = step.get("run")
             if not isinstance(run, dict) or run.get("source") not in RUN_SOURCES:
                 return "%s.run.source must be one of %s" % (at, ", ".join(RUN_SOURCES))
-            if run["source"] != "off" and not (isinstance(run.get("ref"), str) and run["ref"]):
+            if "ref" not in run or not (run["ref"] is None or isinstance(run["ref"], str)):
+                return "%s.run.ref must be text or null" % at
+            if run["source"] != "off" and not run["ref"]:
                 return "%s.run.ref must name what runs the step" % at
-            if not isinstance(step.get("when"), dict) or step["when"].get("mode") not in WHEN_MODES:
+            if "version" not in run or not (run["version"] is None or isinstance(run["version"], str) or _whole(run["version"])):
+                return "%s.run.version must be a whole number, text or null" % at
+            when = step.get("when")
+            if not isinstance(when, dict) or when.get("mode") not in WHEN_MODES:
                 return "%s.when.mode must be one of %s" % (at, ", ".join(WHEN_MODES))
+            if "condition" not in when or when["condition"] not in CONDITIONS:
+                return "%s.when.condition must be review-path:fast, review-path:pull-request or null" % at
             if step.get("onFail") not in ON_FAIL:
                 return "%s.onFail must be one of %s" % (at, ", ".join(ON_FAIL))
+    return None
+
+
+def _credential_at(value, path="$"):
+    """Where a definition holds a string that looks like a credential, or None."""
+    if isinstance(value, str):
+        return path if has_secret(value) else None
+    if isinstance(value, list):
+        for at, item in enumerate(value):
+            found = _credential_at(item, "%s[%d]" % (path, at))
+            if found:
+                return found
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            if has_secret(key):
+                return path
+            found = _credential_at(item, "%s.%s" % (path, key))
+            if found:
+                return found
     return None
 
 
@@ -444,8 +552,12 @@ def validate_definition(definition, contracts, plugin_version, in_work_tree, roo
         raise Refuse("bad-schema", problem)
     try:
         REPORT.canonical_json(definition)
+        where = _credential_at(definition)
     except (ValueError, RecursionError) as error:
         raise Refuse("bad-schema", str(error))
+    if where:
+        # The definition is reported to the tracker as it is, so one that holds a credential is never run.
+        raise Refuse("credential-in-definition", "%s holds what looks like a credential" % where)
     steps = flat_steps(definition)
     seen = set()
     for step in steps:
@@ -478,6 +590,10 @@ def validate_definition(definition, contracts, plugin_version, in_work_tree, roo
                 raise Refuse("required-not-always", "step %s is required by %s and must always run" % (given["id"], step["id"]))
             if given["onFail"] != "stop":
                 raise Refuse("required-not-stop", "step %s is required by %s and must stop the run when it fails" % (given["id"], step["id"]))
+            again = [other for other in steps[index + 1:] if other["run"]["source"] != "off" and other["contract"] in providers_of(contracts, need)]
+            if again:
+                # Its changes would come after the step that checks them, so nothing would.
+                raise Refuse("requires-not-earlier", "step %s provides %s after step %s, which requires it" % (again[0]["id"], need, step["id"]))
     for step in steps:
         if step["kind"] == "gate":
             raise Refuse("unsupported-gate", "step %s is a gate, which this plugin does not run" % step["id"])
@@ -503,8 +619,8 @@ def validate_definition(definition, contracts, plugin_version, in_work_tree, roo
 
 # --- a step's answer ---------------------------------------------------------------------------
 
-def has_secret(line):
-    return any(marker in line for marker in SECRET_MARKERS) or bool(SECRET_ASSIGNMENT.search(line))
+def has_secret(text):
+    return bool(SECRET.search(text))
 
 
 def parse_verdict(entry, output):
@@ -572,8 +688,9 @@ def read_result(entry, text):
     return result, proof, REPORT.clean_links(links), problem
 
 
-def proof_fault(contract, entry, proof):
-    """Why a proof is refused outright (its shape, or a named acceptance rule), or None."""
+def proof_fault(contract, entry, proof, value=None):
+    """Why a proof is refused outright (its shape, a value the catalog does not list or that
+    disagrees with the verdict `value`, or a named acceptance rule), or None."""
     rules = entry["proof"]
     if "required" not in rules:
         return None
@@ -582,7 +699,13 @@ def proof_fault(contract, entry, proof):
     lacking = [key for key in rules["required"] if key not in proof or not is_type(proof[key], rules["types"][key])]
     if lacking:
         return "the proof lacks %s" % ", ".join(lacking)
-    if contract == "risk-check@1" and proof["triggers"] and proof["verifiers"] == 0:
+    for key, allowed in rules.get("values", {}).items():
+        if proof[key] not in allowed:
+            return "the proof's %s is not one of %s" % (key, ", ".join(allowed))
+    for key, wanted in ((value or {}).get("proof") or {}).items():
+        if proof[key] != wanted:
+            return "the verdict %s needs a proof whose %s is %s" % (value["value"], key, wanted)
+    if contract == "risk-check@1" and proof["triggers"] and proof["verifiers"] < 1:
         return "risk-triggers-need-verifiers: the risk check names triggers and ran no verifier"
     return None
 
@@ -799,6 +922,16 @@ class Run:
                     "so the merge needs a review that ran on a pull request")
         return None
 
+    def landed_fault(self, index, proof):
+        """merge-lands-what-was-checked: a merge that landed names the commit it merged, and it is
+        the commit HEAD was on when the merge was issued, the moment the runner had just found the
+        local checks' tree and the review's patch to hold for it."""
+        record = self.record(index)
+        if self.steps[index]["contract"] != "merge@1" or proof.get("head") == record.get("issuedHead"):
+            return None
+        return ("merge-lands-what-was-checked: the merge names another commit than %s, the one the local checks "
+                "and the review were proven on; resume to check what changed" % (record.get("issuedHead") or "none")[:12])
+
     # -- what a step is handed --
 
     def payload(self, index):
@@ -881,7 +1014,13 @@ class Run:
         refused = self.merge_refused(index)
         if refused:
             return self.stop("proof", refused, index)
-        if cause:
+        head = None
+        if step["contract"] == "merge@1":
+            try:
+                head = self.world.head(self.state["context"]["cwd"])
+            except GitFailed as error:
+                return self.stop("proof", "the commit step %s would merge cannot be read: %s" % (step["id"], error), index)
+        if cause and cause != "redo":  # a step's own verdict asking for another go is not the runner's re-issue
             record["autoRedo"] += 1
             if record["autoRedo"] >= AUTO_REDO_LIMIT:
                 return self.stop("attempts-exhausted", "step %s was re-issued %d times without its proof holding" % (
@@ -902,7 +1041,7 @@ class Run:
         # on it: they hold their own proofs (a rebase that leaves the patch alone keeps the review).
         refresh = cause == "stale" or (cause == "mismatch" and record.get("refresh", False))
         record.update(attempt=record["attempt"] + 1, status="issued", verdict=None, evidence=[], links={},
-                      startedAt=self.world.now(), endedAt=None, refresh=refresh, redo=None,
+                      startedAt=self.world.now(), endedAt=None, refresh=refresh, redo=None, issuedHead=head,
                       ran={"source": "builtin", "ref": ref, "version": self.state["pluginVersion"], "hash": digest})
         record["class"] = None
         self.state["current"] = {"stepId": step["id"], "attempt": record["attempt"]}
@@ -916,12 +1055,14 @@ class Run:
             return self.finished_answer()
         if state["stopped"]:
             return self.stopped_answer()
-        if state["current"]:
-            index = self.index_of(state["current"]["stepId"])
-            self.report(index)  # the same running report again: harmless, and a lost one is not lost
-            return self.run_answer(index)
+        current = (state["current"] or {}).get("stepId")
         for index, step in enumerate(self.steps):
             record = self.record(index)
+            if step["id"] == current:
+                # Every proof it relies on still holds: the same step and attempt again, with the
+                # same running report (harmless, and a lost one is not lost).
+                self.report(index)
+                return self.run_answer(index)
             if step["run"]["source"] == "off":
                 if record["status"] != "skipped":
                     record.update(status="skipped", verdict="Off", startedAt=self.world.now(), endedAt=self.world.now(),
@@ -936,13 +1077,27 @@ class Run:
                 try:
                     cause = self.proof_gone(index)
                 except GitFailed as error:
+                    self.withdraw(current)
                     return self.stop("proof", "the proof of step %s cannot be checked: %s" % (step["id"], error), index)
                 if cause is None:
                     continue
             elif record["status"] == "done":
                 cause = "redo"  # its own verdict asked for another go
+            self.withdraw(current)
             return self.issue(index, cause)
         return self.finish("completed")
+
+    def withdraw(self, step_id):
+        """An issued step goes back unanswered because a proof it relies on no longer holds: that
+        attempt is over (reported failed), and the step is issued again once the earlier one holds."""
+        if not step_id:
+            return
+        index = self.index_of(step_id)
+        record = self.record(index)
+        record.update(status="failed", verdict="Withdrawn: an earlier step must run again first", endedAt=self.world.now())
+        record["class"] = None
+        self.state["current"] = None
+        self.report(index)
 
     def complete(self, index, output):
         """Record a step's answer: its verdict, evidence, result and proof, and what that means
@@ -970,7 +1125,8 @@ class Run:
         after = None  # (stop kind, reason) once the report is queued
         if kind == "continue":
             # The merge rule is asked again here: a step repaired by hand was never issued past it.
-            fault = problem or proof_fault(step["contract"], entry, proof) or self.merge_refused(index)
+            fault = (problem or proof_fault(step["contract"], entry, proof, value) or self.merge_refused(index)
+                     or self.landed_fault(index, proof or {}))
             try:
                 holds = fault is not None or self.binding_holds(index, proof)
             except GitFailed as error:
@@ -985,7 +1141,7 @@ class Run:
                 record["status"] = "done"
                 if not (record.get("refresh") and record["doneSeq"]):
                     record["doneSeq"] = state["seq"] + 1
-                record["refresh"] = False
+                record.update(refresh=False, autoRedo=0)  # its proof holds: the runner's re-issues start again from 0
         elif kind == "skipped":
             record["status"] = "skipped"
         elif kind == "stop":
@@ -1051,7 +1207,7 @@ def read_definition_file(path):
 def new_record():
     return {"attempt": 0, "autoRedo": 0, "status": "pending", "verdict": None, "class": None, "evidence": [],
             "result": {}, "proof": None, "links": {}, "startedAt": None, "endedAt": None, "doneSeq": None,
-            "ran": None, "answer": None, "refresh": False, "redo": None}
+            "ran": None, "answer": None, "refresh": False, "redo": None, "issuedHead": None}
 
 
 def close_replaced(old, world):
@@ -1186,6 +1342,10 @@ def adopt(world, request, session):
     if not found:
         raise Refuse("no-run", "there is no unfinished run to resume")
     _, old_path, state = max(found, key=lambda entry: entry[0])
+    mine = os.path.join(folder, state_name(session, state["item"]))
+    if os.path.lexists(mine) and not read_state(mine, world)["outcome"]:
+        # As start: an open run of this session's own is never overwritten.
+        raise Refuse("run-open", "this session already has an open run for %s; finish it, or start with replace" % (state["item"] or "no item"))
     state["sessionId"] = session
     state["definitionReported"] = False  # the first report after an adoption carries the definition again
     write_state(folder, state)
@@ -1241,6 +1401,12 @@ def run_command(command, request, world=None):
     return HANDLERS[command](world, request, load_catalog())
 
 
+def shown(message):
+    """A message as it may leave the runner: one line, and never an echoed credential."""
+    message = CONTROL.sub(" ", message)
+    return NOT_SHOWN if has_secret(message) else message
+
+
 def main(argv):
     try:
         if len(argv) != 2:
@@ -1251,7 +1417,7 @@ def main(argv):
             raise Refuse("bad-request", "the request on stdin is not JSON")
         answer = run_command(argv[1], request)
     except Refuse as refusal:
-        sys.stderr.write("workflow: %s: %s\n" % (refusal.code, CONTROL.sub(" ", str(refusal))))
+        sys.stderr.write("workflow: %s: %s\n" % (refusal.code, shown(str(refusal))))
         return 2
     sys.stdout.write(json.dumps(answer, ensure_ascii=False) + "\n")
     return 0
@@ -1261,5 +1427,5 @@ if __name__ == "__main__":
     try:
         sys.exit(main(sys.argv))
     except Exception as error:  # never a traceback on the caller's screen
-        sys.stderr.write("workflow: internal-error: %s\n" % CONTROL.sub(" ", str(error) or error.__class__.__name__))
+        sys.stderr.write("workflow: internal-error: %s\n" % shown(str(error) or error.__class__.__name__))
         sys.exit(1)

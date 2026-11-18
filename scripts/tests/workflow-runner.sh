@@ -24,7 +24,7 @@ PENDING = ["claim-story", "story-lifecycle", "risk-check", "local-checks", "revi
 CODES = ["bad-schema", "duplicate-step-id", "unknown-contract", "unknown-contract-major", "requires-missing",
          "requires-not-earlier", "required-not-always", "required-not-stop", "required-off", "skill-missing",
          "plugin-too-old", "repository-required", "unsupported-gate", "unsupported-when", "unsupported-source",
-         "unsupported-on-fail"]
+         "unsupported-on-fail", "credential-in-definition"]
 OFF = {"source": "off", "ref": None, "version": None}
 counter, made = [0], [0]
 
@@ -128,6 +128,17 @@ def edit(definition, edits):
             return copy.deepcopy(change["value"])
         if op == "top":
             put(definition, change["path"], copy.deepcopy(change["value"]))
+        elif op == "drop":
+            target = definition
+            for key in change["path"][:-1]:
+                target = target[key]
+            del target[change["path"][-1]]
+        elif op == "repeat":
+            target = definition
+            for key in change["path"]:
+                target = target[key]
+            first = target[0]
+            target[:] = [first] + [dict(copy.deepcopy(first), id="%s-%d" % (first["id"], n)) for n in range(2, change["count"] + 1)]
         elif op == "set":
             steps, at = find(change["step"])
             put(steps[at], change["path"], copy.deepcopy(change["value"]))
@@ -174,9 +185,13 @@ def new_repo(remote=None):
     return repo
 
 
+DIFF = ["diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative", "--src-prefix=a/", "--dst-prefix=b/"]
+
+
 def facts(repo, base="main"):
-    diff = git(repo, "diff", base + "...HEAD", "--")
-    patch = git(repo, "patch-id", "--stable", stdin=diff).decode().split()
+    """What a step skill reports about the repository, computed the way the runner checks it."""
+    diff = git(repo, *(DIFF + [base + "...HEAD", "--"]))
+    patch = git(repo, "patch-id", "--verbatim", stdin=diff).decode().split()
     return {"head": git(repo, "rev-parse", "HEAD").decode().strip(),
             "tree": git(repo, "rev-parse", "HEAD^{tree}").decode().strip(),
             "patchId": patch[0] if patch else ""}
@@ -366,7 +381,16 @@ def section_validation():
     check("refused: a context that lacks what a step is handed", refused(result, "context-missing"), result[3])
     # the inert guarantee: the plugin as released refuses its own shipped Build definition too
     result = cli(ROOT, "start", {"definitionFile": os.path.join(ROOT, "workflows", "build.json"), "context": dict(FIX["context"], cwd=repo)}, fresh("cache"), cwd=repo)
-    check("the released plugin runs nothing: workflows/build.json is refused", result[0] == 2 and result[2] == "", result[3])
+    check("the released plugin runs nothing: workflows/build.json is refused (its draft contract names are unknown)", refused(result, "unknown-contract"), result[3])
+    # a refusal never echoes what looks like a credential
+    edits = [{"op": "set", "step": "sync", "path": ["run", "ref"], "value": "ghp_abcdefghijklmnop"}]
+    result = cli(roots("fixture"), "start", {"definition": edit(FIX["definitions"]["build"], edits), "context": dict(FIX["context"], cwd=repo)}, fresh("cache"), cwd=repo)
+    check("a step skill named like a token is refused by where it is, never echoed",
+          refused(result, "credential-in-definition") and "ghp_abcdef" not in result[3] and "phases[3].steps[3].run.ref" in result[3], result[3])
+    run = Driver(definition="claim-only", plain=True)
+    result = run.call("done", {"item": "I123", "stepId": "token=abc123", "attempt": 1, "output": "CLAIM: WON"})
+    check("a refusal that would echo a credential from the request says so instead",
+          refused(result, "not-current-step") and "abc123" not in result[3] and result[3].endswith("so it is not shown\n"), result[3])
 
 
 def section_verdicts():
@@ -400,8 +424,8 @@ def section_proof_fixtures():
         def fake(cwd, *args, **options):
             if args[:2] == ("rev-parse", "HEAD^{tree}") and "tree" in answers:
                 return answers["tree"].encode()
-            if args[0] == "diff" and args[1].endswith("...HEAD"):
-                return ("diff " + args[1][:-len("...HEAD")]).encode()
+            if args[0] == "diff" and args[-2].endswith("...HEAD"):
+                return ("diff " + args[-2][:-len("...HEAD")]).encode()
             if args[0] == "patch-id" and options.get("stdin", b"").decode()[5:] in answers.get("patchIds", {}):
                 patch = answers["patchIds"][options["stdin"].decode()[5:]]
                 return (patch + " 0000\n").encode() if patch else b""
@@ -409,7 +433,8 @@ def section_proof_fixtures():
 
         world = module.World(env={}, git=fake, uid=os.getuid())
         entry = contracts[case["contract"]]
-        fault = module.proof_fault(case["contract"], entry, case["proof"])
+        value = [v for v in entry["verdict"]["values"] if v["value"] == case["verdict"]][0] if "verdict" in case else None
+        fault = module.proof_fault(case["contract"], entry, case["proof"], value)
         if fault:
             got = "refused"
         else:
@@ -742,6 +767,110 @@ def section_proofs():
     answer = run.done(**{"proof.base": "--output=leak"})
     check("a review proof whose base is not a git name cannot be checked, and stops the run", is_stopped(answer, "proof", "review") and not os.path.exists(os.path.join(run.repo, "leak")), answer)
 
+    # asked again for an issued merge, the runner re-checks what the merge relies on first
+    run = Driver()
+    run.until("merge")
+    commit(run.repo, "export.txt", "export\nchanged after the merge was issued\n", "a late change")
+    answer = run.next()
+    check("next re-checks the proofs an issued merge relies on, and re-issues the stale local checks first",
+          is_run(answer, "local-checks", 2) and [(r["stepId"], r["status"]) for r in run.step_reports([answer])] == [("merge", "failed"), ("local-checks", "running")], answer)
+    check("... the merge's withdrawn attempt takes no answer", refused(run.call("done", {"item": "I123", "stepId": "merge", "attempt": 1, "output": canned("merge@1", run.repo)}), "not-current-step"))
+    answer = run.done()
+    check("... then the review of the changed patch", is_run(answer, "review", 2), answer)
+    check("... and only then the merge again", is_run(run.done(), "merge", 2), run.answer)
+    rc, answer, _, _ = run.call("resume", {"item": "I123"})
+    check("resume of an issued merge whose proofs hold hands back the same attempt", is_run(answer, "merge", 2), answer)
+
+    # a merge reported landed names the commit the checks and the review were proven on
+    run = Driver()
+    run.until("merge")
+    commit(run.repo, "unreviewed.txt", "unreviewed\n", "an unreviewed change")
+    answer = run.done()
+    check("a merge that landed a commit added after it was issued stops the run",
+          is_stopped(answer, "proof", "merge") and "merge-lands-what-was-checked" in answer["reason"] and answer["recorded"]["status"] == "failed", answer)
+    rc, answer, _, _ = run.call("resume", {"item": "I123"})
+    check("... and resume checks the new commit first", is_run(answer, "local-checks", 2), answer)
+    run = Driver()
+    run.until("merge")
+    answer = run.done(output="MERGE: BLOCKED conflicts\n")
+    commit(run.repo, "fixed.txt", "conflict fixed by hand\n", "a hand fix")
+    answer = run.call("done", {"item": "I123", "stepId": "merge", "attempt": 1, "output": canned("merge@1", run.repo)})[1]
+    check("a merge repaired by hand after a block, over a new commit, stops the run", is_stopped(answer, "proof", "merge") and "merge-lands-what-was-checked" in answer["reason"], answer)
+    run = Driver()
+    run.until("merge")
+    block = json.loads(canned("merge@1", run.repo).split("```json\n")[1].split("```")[0])
+    del block["proof"]
+    answer = run.done("MERGE: LANDED main\n```json\n%s\n```\n" % json.dumps(block))
+    check("a merge that does not name what it merged stops the run", is_stopped(answer, "proof", "merge") and "proof" in answer["reason"], answer)
+
+    # every byte of the patch counts, white space too
+    run = Driver()
+    commit(run.repo, "auth.py", "def allowed(user):\n    if user.admin:\n        audit(user)\n        return True\n    return False\n", "auth")
+    run.until("merge")
+    stable = lambda: git(run.repo, "patch-id", "--stable", stdin=git(run.repo, *(DIFF + ["main...HEAD", "--"]))).split()[0]
+    before = (facts(run.repo)["patchId"], stable())
+    commit(run.repo, "auth.py", "def allowed(user):\n    if user.admin:\n        audit(user)\n    return True\n    return False\n", "an indentation change")
+    check("(an indentation change keeps the stable patch id and changes the verbatim one)",
+          facts(run.repo)["patchId"] != before[0] and stable() == before[1], before)
+    answer = run.done("MERGE: REFRESHED\n")
+    check("a change of indentation alone: the local checks again", is_run(answer, "local-checks", 2), answer)
+    check("... and the review again, never straight to the merge", is_run(run.done(), "review", 2), run.answer)
+
+    # git settings neither break the patch id nor run anything
+    run = Driver()
+    run.until("review")
+    hook = os.path.join(WORK, "ext-diff-ran")
+    settings = {"color.diff": "always", "color.ui": "always", "diff.noprefix": "true", "diff.mnemonicPrefix": "true", "diff.relative": "true",
+                "diff.external": "touch %s; false" % hook, "diff.wsErrorHighlight": "all", "core.pager": "cat"}
+    env = dict(os.environ, GIT_CONFIG_COUNT=str(len(settings)))
+    for n, (key, value) in enumerate(settings.items()):
+        env["GIT_CONFIG_KEY_%d" % n], env["GIT_CONFIG_VALUE_%d" % n] = key, value
+    output = canned("review@1", run.repo)
+    done = subprocess.run([sys.executable, "-B", os.path.join(run.root, RUNNER), "done"], capture_output=True, text=True, cwd=run.cwd,
+                          input=json.dumps({"session": "s1", "item": "I123", "stepId": "review", "attempt": 1, "output": output}),
+                          env=dict(env, XDG_CACHE_HOME=run.cache))
+    answer = json.loads(done.stdout) if done.returncode == 0 else done.stderr
+    check("colour, prefix and external-diff settings leave the patch id as it is", is_run(answer, "merge", 1), answer)
+    check("... and no external diff program runs", not os.path.exists(hook))
+
+    # a count is a whole number of at least 0
+    run = Driver()
+    run.until("risk-check")
+    block = json.loads(canned("risk-check@1", run.repo).split("```json\n")[1].split("```")[0])
+    text = json.dumps(block).replace('"verifiers": 0', '"verifiers": NaN').replace('"triggers": []', '"triggers": ["auth"]')
+    answer = run.done("RISK CHECK: CLEAR\n```json\n%s\n```\n" % text)
+    check("a risk check whose verifier count is not a number (NaN) is refused", is_stopped(answer, "proof", "risk-check"), answer)
+    run = Driver()
+    run.until("risk-check")
+    answer = run.done(**{"proof.triggers": ["auth"], "proof.verifiers": -2})
+    check("... and a negative one", is_stopped(answer, "proof", "risk-check"), answer)
+
+    # the verdict, not a free-text field, says whether anything is configured
+    for label, verdict, kind in (("NOT CONFIGURED with a receipt", "LOCAL CHECKS: NOT CONFIGURED", "receipt"),
+                                 ("a pass that says nothing is configured", "LOCAL CHECKS: PASS (2 ran)", "none-configured"),
+                                 ("a kind the catalog does not list", "LOCAL CHECKS: NOT CONFIGURED", "not-configured")):
+        run = Driver()
+        run.until("local-checks")
+        answer = run.done(canned("local-checks@1", run.repo, **{"proof.kind": kind}).replace("LOCAL CHECKS: PASS (2 ran)", verdict))
+        check("local checks: %s is refused, never passed" % label, is_stopped(answer, "proof", "local-checks") and answer["recorded"]["status"] == "failed", answer)
+    run = Driver()
+    run.until("review")
+    answer = run.done(**{"proof.path": "pull-request-ish"})
+    check("a review proof whose path the catalog does not list is refused", is_stopped(answer, "proof", "review"), answer)
+
+    # healthy refreshes never use up the runner's own re-issues
+    run = Driver()
+    run.until("merge")
+    for n in range(1, 8):
+        git(run.repo, "checkout", "-q", "main")
+        commit(run.repo, "base-%d.txt" % n, "x\n", "the base moves %d" % n)
+        git(run.repo, "checkout", "-q", "feature")
+        git(run.repo, "rebase", "-q", "main")
+        if not is_run(run.done("MERGE: REFRESHED\n"), "local-checks") or not is_run(run.done(), "merge"):
+            break
+    check("seven base refreshes in a row each re-check the local checks and come back to the merge", n == 7 and is_run(run.answer, "merge", 8)
+          and run.state()["steps"]["local-checks"]["autoRedo"] == 0 and run.state()["steps"]["review"]["attempt"] == 1, (n, run.answer))
+
     # a repository that disappears under a run
     run = Driver()
     run.until("review")
@@ -817,6 +946,21 @@ def section_evidence():
     check("a link over 500 characters is dropped", "links" not in report, report.get("links"))
     run, answer, text, report = claim('CLAIM: WON\n```json\n%s\n```\n' % json.dumps({"state": "won", "links": {"branch": "feature/ghp_example", "commit": "https://example.com/c?token=abc"}}))
     check("a link or branch name that holds a secret marker is dropped", "links" not in report and "ghp_example" not in text and "token=abc" not in text, report.get("links"))
+    shapes = ["GOLDEN_DB_CONNECTION_STRING=postgresql://owner:pw-123@db.example.com/db", "aws_secret_access_key = wJalrXUtnFEMIEXAMPLEKEY",
+              "authorization: bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig", "AUTHORIZATION:   Basic dXNlcjpodW50ZXIy",
+              "STRIPE_SECRET_KEY sk_live_51Habcdefghijklmnop", "api_key=sk-ant-api03-abcdefghijklmnop", "apikey: abc", "private_key=abc",
+              "glpat-abcdefghijklmnop0123", "the key sk-proj-abcdefghijklmnopqrstu", "AWS_ACCESS_KEY_ID=AKIAEXAMPLEONLY",
+              "a token eyJabcdefg.eyJhijklmn.sig9 in the log", "Bearer abcd1234efgh", "passwd=x", "https://user:pw@example.com/x"]
+    ordinary = ["3 files changed", "unit: 12 passed", "lint: clean", "tokens: 911 used", "the token rotation is documented",
+                "secretary: Jane", "clone ssh://git@github.com/example/widgets", "git@github.com:example/widgets.git", "the Authorization header is checked",
+                "a bearer of good news", "task-runner: done", "the password reset flow works", "https://example.com/commit/1", "main...HEAD"]
+    run, answer, text, report = claim("CLAIM: WON\n%s\n%s" % ("\n".join(shapes + ordinary), result))
+    check("credentials of every common shape are dropped, case and spacing aside", not any(line in text for line in shapes), [l for l in shapes if l in text])
+    check("... and ordinary evidence lines survive", report["evidence"] == ordinary, report.get("evidence"))
+    run = Driver()
+    run.until("build")
+    answer = run.done("BUILD: NEEDS DECISION use Authorization: Bearer abc123def?\n")
+    check("a question with an Authorization header is withheld", answer["reason"] == "[withheld]" and "abc123def" not in json.dumps(answer) + open(run.state_path()).read(), answer)
 
 
 def section_state():
@@ -917,6 +1061,17 @@ def section_state():
     rc, answer, _, _ = cli(run.root, "resume", {"item": "I123"}, cache, cwd=cwd, session="s11")
     check("a link or a stray file in the folder is never adopted", rc == 0 and answer["runId"] == newer and older != newer and os.path.exists(run.state_path("old")), answer["runId"])
 
+    # adopting another session's run never overwrites this session's own open one
+    run = Driver(definition="claim-only", plain=True, session="mine")
+    mine = run.state("mine")["runId"]
+    theirs = cli(run.root, "start", {"definition": FIX["definitions"]["claim-only"], "context": dict(FIX["context"], cwd=run.cwd)}, run.cache, cwd=run.cwd, session="theirs")[1]["runId"]
+    result = run.call("resume", {"runId": theirs})
+    check("resume by run id is refused while this session has its own open run for that item",
+          refused(result, "run-open") and run.state("mine")["runId"] == mine and run.state("theirs")["runId"] == theirs, result[3])
+    run.done()
+    rc, answer, _, _ = run.call("resume", {"runId": theirs})
+    check("... and adopts it once this session's own run has finished", rc == 0 and answer["runId"] == theirs and run.state("mine")["runId"] == theirs, answer)
+
     # where state may live
     repo = new_repo()
     request = {"definition": FIX["definitions"]["claim-only"], "context": dict(FIX["context"], cwd=repo)}
@@ -1009,6 +1164,24 @@ def section_static():
             stopped = True
         check("git %s is not run" % (command[0] if command else "(nothing)"), stopped)
     check("the runner never writes to a repository, a network or a skill", not re.search(r"\b(push|fetch|pull|commit|checkout|reset|merge)\b\"", source))
+    diff = [n for n in calls if len(n.args) > 1 and isinstance(n.args[1], ast.Constant) and n.args[1].value == "diff"]
+    flags = [a.value for a in diff[0].args[2:] if isinstance(a, ast.Constant)] if len(diff) == 1 else []
+    check("the patch id's diff has fixed flags: no colour, no external diff, no text converter, no relative paths, fixed prefixes",
+          flags[:6] == ["--no-color", "--no-ext-diff", "--no-textconv", "--no-relative", "--src-prefix=a/", "--dst-prefix=b/"], flags)
+    patch = [n for n in calls if len(n.args) > 2 and isinstance(n.args[1], ast.Constant) and n.args[1].value == "patch-id"]
+    check("... and the patch id counts every byte (--verbatim)", len(patch) == 1 and isinstance(patch[0].args[2], ast.Constant) and patch[0].args[2].value == "--verbatim")
+
+    def fake(cwd, *args, **options):
+        if args[0] == "patch-id":
+            raise module.GitFailed("git patch-id failed")
+        return b"diff"
+
+    try:
+        module.World(env={}, git=fake).patch_id(WORK, "main")
+        said = ""
+    except module.GitFailed as error:
+        said = str(error)
+    check("a git that cannot do --verbatim stops the check with a reason that says so", "--verbatim" in said, said)
 
 
 SECTIONS = {"catalog": section_catalog, "validation": section_validation, "verdicts": section_verdicts,
@@ -1029,16 +1202,16 @@ section() {
   elif [ "$n" -lt "$2" ]; then bad "$1: only $n cases ran, expected at least $2"
   else ok "($1: all $n cases passed)"; fi
 }
-section catalog 29
-section validation 56
+section catalog 37
+section validation 112
 section verdicts 76
-section proof-fixtures 14
+section proof-fixtures 24
 section lifecycle 59
-section proofs 36
+section proofs 57
 section stand-in 3
-section evidence 25
-section state 27
+section evidence 28
+section state 29
 section reporting 4
 section repository 7
-section static 15
+section static 18
 exit $FAIL

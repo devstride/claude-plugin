@@ -33,10 +33,11 @@ def frontmatter(text):
 
 
 def verdict_line(entry):
-    """A contract's verdict as one line: the label, then each value with <detail> where it must
-    carry one and [<detail>] where it may."""
-    marks = {"none": "", "required": " <detail>", "optional": " [<detail>]"}
-    return "%s: %s" % (entry["verdict"]["label"], " | ".join(v["value"] + marks[v["detail"]] for v in entry["verdict"]["values"]))
+    """A contract's verdict as one line: the label, then each value with <name> where it must
+    carry its detail and [<name>] where it may, the name being the value's detailName."""
+    marks = {"none": "%s", "required": "%s <%s>", "optional": "%s [<%s>]"}
+    return "%s: %s" % (entry["verdict"]["label"], " | ".join(
+        marks[v["detail"]] % ((v["value"],) if v["detail"] == "none" else (v["value"], v["detailName"])) for v in entry["verdict"]["values"]))
 
 
 def skill_faults(root, name, contracts, words, body_tokens):
@@ -99,12 +100,61 @@ for name, entry in contracts.items():
 needs = dict((name, [v["value"] for v in entry["verdict"]["values"] if v["detail"] == "required"]) for name, entry in contracts.items())
 check("the values that must carry a detail: a held claim's holder and the two questions",
       dict((k, v) for k, v in needs.items() if v) == {"claim@1": ["HELD"], "build@1": ["NEEDS DECISION"], "risk-check@1": ["NEEDS DECISION"]}, needs)
+# Every value's detail, as the step skills a later release writes must repeat it: <name> must, [<name>] may.
+LINES = {
+    "claim@1": "CLAIM: WON | RENEWED | TOOK OVER | HELD <holder> | NOT CONFIGURED | DEGRADED [<reason>]",
+    "start@1": "START: MOVED [<status>] | UNCHANGED | FAILED [<reason>]",
+    "branch@1": "BRANCH: CREATED [<branch>] | EXISTS [<branch>] | REFUSED [<reason>]",
+    "build@1": "BUILD: READY | NEEDS DECISION <question> | BLOCKED [<reason>]",
+    "risk-check@1": "RISK CHECK: CLEAR | FIXED [<count>] | NEEDS DECISION <question> | BLOCKED [<reason>]",
+    "local-checks@1": "LOCAL CHECKS: PASS [<count>] | NOT CONFIGURED | FAIL [<checks>]",
+    "review@1": "REVIEW: SETTLED | COVERED [<reason>] | BLOCKED [<reason>]",
+    "merge@1": "MERGE: LANDED [<target>] | REFRESHED | HELD [<reason>] | BLOCKED [<reason>]",
+    "complete@1": "COMPLETE: DONE | LANDED | FAILED [<reason>]",
+    "capture@1": "FINDINGS: FILED [<items>] | NONE",
+    "sync@1": "SYNC: CLEAN | DIRTY [<paths>]",
+    "custom@1": "STEP: PASS | FAIL | HOLD",
+}
+for name, entry in contracts.items():
+    check("%s: every value's detail mode and name are as published" % name, verdict_line(entry) == LINES.get(name), verdict_line(entry))
+# Every contract's result keys, which are required and each one's type.
+RESULTS = {
+    "claim@1": (["state"], {"state": "string", "heldBy": "string", "since": "string"}),
+    "start@1": (["statusBefore", "statusAfter", "boardPlaced"], {"statusBefore": "string", "statusAfter": "string", "boardPlaced": "boolean"}),
+    "branch@1": (["branch", "base", "created"], {"branch": "string", "base": "string", "created": "boolean"}),
+    "build@1": (["deferrals", "deviations", "untrackedDeferrals", "dismissed", "scopeLine", "head"],
+                {"deferrals": "array", "deviations": "array", "untrackedDeferrals": "array", "dismissed": "array", "scopeLine": "string", "head": "string"}),
+    "risk-check@1": (["ledger", "report", "counts", "untrackedDeferrals", "dismissed"],
+                     {"ledger": "string", "report": "string", "counts": "object", "untrackedDeferrals": "array", "dismissed": "array"}),
+    "local-checks@1": (["commands", "results", "receipt", "tree", "head", "skippedSuites"],
+                       {"commands": "array", "results": "array", "receipt": "string|null", "tree": "string", "head": "string", "skippedSuites": "array"}),
+    "review@1": (["path", "cycles", "untrackedDeferrals", "dismissed", "pullRequest", "mergeBody"],
+                 {"path": "string", "cycles": "count", "untrackedDeferrals": "array", "dismissed": "array", "pullRequest": "number|null", "mergeBody": "string|null"}),
+    "merge@1": (["target", "sha", "pullRequest", "deletedBranch"], {"target": "string", "sha": "string", "pullRequest": "number|null", "deletedBranch": "boolean"}),
+    "complete@1": (["status", "statusName", "startDate", "dueDate", "pullRequest", "asBuilt", "claimReleased", "shipIntentReleased"],
+                   {"status": "string", "statusName": "string|null", "startDate": "string|null", "dueDate": "string|null", "pullRequest": "number|null",
+                    "asBuilt": "string", "claimReleased": "boolean", "shipIntentReleased": "boolean"}),
+    "capture@1": (["filed", "inserted"], {"filed": "array", "inserted": "array"}),
+    "sync@1": (["branch", "clean"], {"branch": "string", "clean": "boolean"}),
+    "custom@1": ([], {}),
+}
+for name, entry in contracts.items():
+    check("%s: its result keys and their types are as published" % name, (entry["result"]["required"], entry["result"]["types"]) == RESULTS.get(name), entry["result"])
 check("the two skills that take text keep their argument templates",
       dict((n, e["argument"]) for n, e in contracts.items() if e["argument"]) ==
       {"branch@1": "{branchSlug} base: {workingBase}", "build@1": "{item} {goal} profile: {profile} review-moment: {reviewMoment}"})
-check("the three proofs name their fields",
+check("the four proofs name their fields",
       dict((n, e["proof"].get("required")) for n, e in contracts.items() if "required" in e["proof"]) ==
-      {"risk-check@1": ["base", "head", "triggers", "verifiers", "lenses"], "local-checks@1": ["kind", "tree", "head", "receipt"], "review@1": ["path", "head", "base", "patchId"]})
+      {"risk-check@1": ["base", "head", "triggers", "verifiers", "lenses"], "local-checks@1": ["kind", "tree", "head", "receipt"],
+       "review@1": ["path", "head", "base", "patchId"], "merge@1": ["head"]})
+check("the proof values each kind of local check and review may give, and the verdict each local check pins",
+      dict((n, e["proof"]["values"]) for n, e in contracts.items() if "values" in e["proof"]) ==
+      {"local-checks@1": {"kind": ["receipt", "none-configured"]}, "review@1": {"path": ["fast-local", "pull-request"]}}
+      and dict((v["value"], v.get("proof")) for v in contracts["local-checks@1"]["verdict"]["values"]) ==
+      {"PASS": {"kind": "receipt"}, "NOT CONFIGURED": {"kind": "none-configured"}, "FAIL": None}
+      and not any("proof" in v for n, e in contracts.items() if n != "local-checks@1" for v in e["verdict"]["values"]))
+check("a count is a count: the risk check's verifiers and the review's cycles",
+      contracts["risk-check@1"]["proof"]["types"]["verifiers"] == "count" and contracts["review@1"]["result"]["types"]["cycles"] == "count")
 check("no shipped contract carries satisfiedBy", not any("satisfiedBy" in e for e in contracts.values()))
 
 # run-workflow: the entry skill and its reference
@@ -123,13 +173,14 @@ check("the skill names the five commands' loop and the reference names all five"
       all("`%s`" % c in text for c in runner.COMMANDS) and all("`%s`" % c in skill for c in ("start", "done", "status", "resume")))
 codes = ["bad-schema", "duplicate-step-id", "unknown-contract", "unknown-contract-major", "requires-missing", "requires-not-earlier",
          "required-not-always", "required-not-stop", "required-off", "skill-missing", "plugin-too-old", "repository-required",
-         "unsupported-gate", "unsupported-when", "unsupported-source", "unsupported-on-fail"]
+         "unsupported-gate", "unsupported-when", "unsupported-source", "unsupported-on-fail", "credential-in-definition"]
 source = open(os.path.join(root, "skills/run-workflow/scripts/workflow.py"), encoding="utf-8").read()
 check("every validation code is in the runner and in the reference", all('"%s"' % c in source and "`%s`" % c in text for c in codes),
       [c for c in codes if '"%s"' % c not in source or "`%s`" % c not in text])
 kinds = ["failed", "needs-person", "attempts-exhausted", "no-verdict", "proof"]
 check("every stop kind is in the reference's table", all("| `%s` |" % k in text for k in kinds))
-check("both named proof rules are in the runner and the reference", all(r in source and "`%s`" % r in text for r in ("risk-triggers-need-verifiers", "none-configured-needs-pull-request-route")))
+check("the three named proof rules are in the runner and the reference", all(r in source and "`%s`" % r in text for r in (
+    "risk-triggers-need-verifiers", "none-configured-needs-pull-request-route", "merge-lands-what-was-checked")))
 
 # the skills the catalog names
 present = sorted(n for n in os.listdir(os.path.join(root, "skills")) if os.path.isfile(os.path.join(root, "skills", n, "SKILL.md")))
@@ -152,7 +203,7 @@ def write(name, body, described="Step: do the thing and print one verdict."):
         out.write('---\nname: %s\ndescription: "%s"\n---\n\n%s\n\n%s' % (name, described, POINTER, body))
 
 grouped = [contracts["start@1"], contracts["complete@1"]]
-lines = "`START: MOVED [<detail>] | UNCHANGED | FAILED [<detail>]` and `COMPLETE: DONE | LANDED | FAILED [<detail>]`"
+lines = "`START: MOVED [<status>] | UNCHANGED | FAILED [<reason>]` and `COMPLETE: DONE | LANDED | FAILED [<reason>]`"
 write("good", "## Verdict\n\n%s\n\n## Steps\n\nDo it.\n" % lines)
 write("stale", "## Verdict\n\n`START: MOVED | STAYED`\n")
 write("silent", "Do it.\n")
@@ -167,7 +218,7 @@ OUT="$(python3 -B "$WORK/cases.py" "$ROOT" "$WORK/plugin" $PENDING_SKILLS 2>&1)"
 printf '%s\n' "$OUT" | sed 's/^/  /'
 N="$(printf '%s\n' "$OUT" | grep -c '^ok')"
 if [ $RC -ne 0 ] || printf '%s\n' "$OUT" | grep -q '^FAIL'; then bad "a case failed or the script did not finish (exit $RC)"
-elif [ "$N" -lt 35 ]; then bad "only $N cases ran, expected at least 35"
+elif [ "$N" -lt 61 ]; then bad "only $N cases ran, expected at least 61"
 else ok "(all $N cases passed)"; fi
 
 # the ten seam steps of scripts/tests/step-skills.sh are a separate list: no Build step has a seam

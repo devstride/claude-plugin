@@ -15,9 +15,9 @@
           { "value": "WON", "detail": "none", "class": "continue" },
           { "value": "RENEWED", "detail": "none", "class": "continue" },
           { "value": "TOOK OVER", "detail": "none", "class": "continue" },
-          { "value": "HELD", "detail": "required", "class": "end:held" },
+          { "value": "HELD", "detail": "required", "class": "end:held", "detailName": "holder" },
           { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
-          { "value": "DEGRADED", "detail": "optional", "class": "skipped" }
+          { "value": "DEGRADED", "detail": "optional", "class": "skipped", "detailName": "reason" }
         ]
       },
       "result": {
@@ -47,9 +47,9 @@
       "verdict": {
         "label": "START",
         "values": [
-          { "value": "MOVED", "detail": "optional", "class": "continue" },
+          { "value": "MOVED", "detail": "optional", "class": "continue", "detailName": "status" },
           { "value": "UNCHANGED", "detail": "none", "class": "continue" },
-          { "value": "FAILED", "detail": "optional", "class": "stop" }
+          { "value": "FAILED", "detail": "optional", "class": "stop", "detailName": "reason" }
         ]
       },
       "result": {
@@ -78,9 +78,9 @@
       "verdict": {
         "label": "BRANCH",
         "values": [
-          { "value": "CREATED", "detail": "optional", "class": "continue" },
-          { "value": "EXISTS", "detail": "optional", "class": "continue" },
-          { "value": "REFUSED", "detail": "optional", "class": "stop" }
+          { "value": "CREATED", "detail": "optional", "class": "continue", "detailName": "branch" },
+          { "value": "EXISTS", "detail": "optional", "class": "continue", "detailName": "branch" },
+          { "value": "REFUSED", "detail": "optional", "class": "stop", "detailName": "reason" }
         ]
       },
       "result": {
@@ -114,8 +114,8 @@
         "label": "BUILD",
         "values": [
           { "value": "READY", "detail": "none", "class": "continue" },
-          { "value": "NEEDS DECISION", "detail": "required", "class": "ask" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop" }
+          { "value": "NEEDS DECISION", "detail": "required", "class": "ask", "detailName": "question" },
+          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
         ]
       },
       "result": {
@@ -152,9 +152,9 @@
         "label": "RISK CHECK",
         "values": [
           { "value": "CLEAR", "detail": "none", "class": "continue" },
-          { "value": "FIXED", "detail": "optional", "class": "continue" },
-          { "value": "NEEDS DECISION", "detail": "required", "class": "ask" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop" }
+          { "value": "FIXED", "detail": "optional", "class": "continue", "detailName": "count" },
+          { "value": "NEEDS DECISION", "detail": "required", "class": "ask", "detailName": "question" },
+          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
         ]
       },
       "result": {
@@ -174,7 +174,7 @@
           "base": "string",
           "head": "string",
           "triggers": "array",
-          "verifiers": "number",
+          "verifiers": "count",
           "lenses": "array"
         }
       },
@@ -198,9 +198,9 @@
       "verdict": {
         "label": "LOCAL CHECKS",
         "values": [
-          { "value": "PASS", "detail": "optional", "class": "continue" },
-          { "value": "NOT CONFIGURED", "detail": "none", "class": "continue" },
-          { "value": "FAIL", "detail": "optional", "class": "stop" }
+          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "count", "proof": { "kind": "receipt" } },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "continue", "proof": { "kind": "none-configured" } },
+          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "checks" }
         ]
       },
       "result": {
@@ -222,6 +222,9 @@
           "tree": "string",
           "head": "string",
           "receipt": "string|null"
+        },
+        "values": {
+          "kind": ["receipt", "none-configured"]
         }
       },
       "requires": ["risk-check@1"],
@@ -246,15 +249,15 @@
         "label": "REVIEW",
         "values": [
           { "value": "SETTLED", "detail": "none", "class": "continue" },
-          { "value": "COVERED", "detail": "optional", "class": "continue" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop" }
+          { "value": "COVERED", "detail": "optional", "class": "continue", "detailName": "reason" },
+          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
         ]
       },
       "result": {
         "required": ["path", "cycles", "untrackedDeferrals", "dismissed", "pullRequest", "mergeBody"],
         "types": {
           "path": "string",
-          "cycles": "number",
+          "cycles": "count",
           "untrackedDeferrals": "array",
           "dismissed": "array",
           "pullRequest": "number|null",
@@ -269,7 +272,10 @@
           "head": "string",
           "base": "string",
           "patchId": "string",
-          "pullRequest": "number|null"
+          "pullRequest": "count|null"
+        },
+        "values": {
+          "path": ["fast-local", "pull-request"]
         }
       },
       "requires": ["risk-check@1", "local-checks@1"],
@@ -293,10 +299,10 @@
       "verdict": {
         "label": "MERGE",
         "values": [
-          { "value": "LANDED", "detail": "optional", "class": "continue" },
+          { "value": "LANDED", "detail": "optional", "class": "continue", "detailName": "target" },
           { "value": "REFRESHED", "detail": "none", "class": "redo:self" },
-          { "value": "HELD", "detail": "optional", "class": "end:held" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop" }
+          { "value": "HELD", "detail": "optional", "class": "end:held", "detailName": "reason" },
+          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
         ]
       },
       "result": {
@@ -309,7 +315,11 @@
         }
       },
       "proof": {
-        "binding": "none"
+        "binding": "none",
+        "required": ["head"],
+        "types": {
+          "head": "string"
+        }
       },
       "requires": ["review@1", "local-checks@1", "risk-check@1"],
       "claimPhase": "Merge",
@@ -336,7 +346,7 @@
         "values": [
           { "value": "DONE", "detail": "none", "class": "continue" },
           { "value": "LANDED", "detail": "none", "class": "continue" },
-          { "value": "FAILED", "detail": "optional", "class": "stop" }
+          { "value": "FAILED", "detail": "optional", "class": "stop", "detailName": "reason" }
         ]
       },
       "result": {
@@ -373,7 +383,7 @@
       "verdict": {
         "label": "FINDINGS",
         "values": [
-          { "value": "FILED", "detail": "optional", "class": "continue" },
+          { "value": "FILED", "detail": "optional", "class": "continue", "detailName": "items" },
           { "value": "NONE", "detail": "none", "class": "continue" }
         ]
       },
@@ -402,7 +412,7 @@
         "label": "SYNC",
         "values": [
           { "value": "CLEAN", "detail": "none", "class": "continue" },
-          { "value": "DIRTY", "detail": "optional", "class": "stop" }
+          { "value": "DIRTY", "detail": "optional", "class": "stop", "detailName": "paths" }
         ]
       },
       "result": {

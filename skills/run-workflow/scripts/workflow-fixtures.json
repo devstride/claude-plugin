@@ -1,5 +1,5 @@
 {
- "_readme": "Canonical cases for skills/run-workflow/scripts/workflow.py, run by scripts/tests/workflow-runner.sh. definitions: the Build definition the tests drive, and a one-step variant. context and outputs: the start context and one passing answer per contract ({head}, {tree} and {patchId} are filled from the test's repository). catalogs: standIn is added to a copy of the real catalog (contracts are added, satisfiedBy is set); faults and sound are edited copies and the fault code each must, or must not, raise. validation: each case edits a definition (set a step's or a top-level field, remove, move or add a step, or replace it whole) and names the refusal code start must give, or ok; root says which plugin copy runs it (fixture: every step skill present; real: the plugin as released; standIn: the fixture copy with the standIn catalog); git says whether the working directory is a repository. verdicts: an answer, its contract and what its first line parses to (class null: no verdict). proofs: a proof, the git answers given and whether it holds, is stale, is refused or cannot be read. repository: a remote address and the name reports carry for it.",
+ "_readme": "Canonical cases for skills/run-workflow/scripts/workflow.py, run by scripts/tests/workflow-runner.sh. definitions: the Build definition the tests drive, and a one-step variant. context and outputs: the start context and one passing answer per contract ({head}, {tree} and {patchId} are filled from the test's repository). catalogs: standIn is added to a copy of the real catalog (contracts are added, satisfiedBy is set); faults and sound are edited copies and the fault code each must, or must not, raise. validation: each case edits a definition (set a step's or a top-level field, drop a field, remove, move or add a step, repeat a list's first item until the list holds count items, each copy's id suffixed -2, -3 and so on, or replace it whole) and names the refusal code start must give, or ok; root says which plugin copy runs it (fixture: every step skill present; real: the plugin as released; standIn: the fixture copy with the standIn catalog); git says whether the working directory is a repository. verdicts: an answer, its contract and what its first line parses to (class null: no verdict). proofs: a proof (with the verdict value it came with, where that matters), the git answers given and whether it holds, is stale, is refused or cannot be read. repository: a remote address and the name reports carry for it.",
  "definitions": {
   "build": {
    "schema": 1,
@@ -415,7 +415,7 @@
   "risk-check@1": "RISK CHECK: CLEAR\n```json\n{\n \"ledger\": \"ledger text\",\n \"report\": \"risk check: clear\",\n \"counts\": {\n  \"raised\": 0,\n  \"fixed\": 0,\n  \"deferred\": 0,\n  \"dismissed\": 0\n },\n \"untrackedDeferrals\": [],\n \"dismissed\": [],\n \"proof\": {\n  \"base\": \"main\",\n  \"head\": \"{head}\",\n  \"triggers\": [],\n  \"verifiers\": 0,\n  \"lenses\": []\n }\n}\n```\n",
   "local-checks@1": "LOCAL CHECKS: PASS (2 ran)\nunit: 12 passed\nlint: clean\n```json\n{\n \"commands\": [\n  \"unit\",\n  \"lint\"\n ],\n \"results\": [\n  {\n   \"command\": \"unit\",\n   \"status\": \"pass\",\n   \"count\": 12\n  }\n ],\n \"receipt\": null,\n \"tree\": \"{tree}\",\n \"head\": \"{head}\",\n \"skippedSuites\": [],\n \"proof\": {\n  \"kind\": \"receipt\",\n  \"tree\": \"{tree}\",\n  \"head\": \"{head}\",\n  \"receipt\": null\n }\n}\n```\n",
   "review@1": "REVIEW: SETTLED\n1 cycle, nothing open\n```json\n{\n \"path\": \"fast-local\",\n \"cycles\": 1,\n \"untrackedDeferrals\": [],\n \"dismissed\": [],\n \"pullRequest\": null,\n \"mergeBody\": null,\n \"proof\": {\n  \"path\": \"fast-local\",\n  \"head\": \"{head}\",\n  \"base\": \"main\",\n  \"patchId\": \"{patchId}\"\n }\n}\n```\n",
-  "merge@1": "MERGE: LANDED main\n```json\n{\n \"target\": \"main\",\n \"sha\": \"{head}\",\n \"pullRequest\": null,\n \"deletedBranch\": true,\n \"links\": {\n  \"commit\": \"https://example.com/commit/1\"\n }\n}\n```\n",
+  "merge@1": "MERGE: LANDED main\n```json\n{\n \"target\": \"main\",\n \"sha\": \"{head}\",\n \"pullRequest\": null,\n \"deletedBranch\": true,\n \"links\": {\n  \"commit\": \"https://example.com/commit/1\"\n },\n \"proof\": {\n  \"head\": \"{head}\"\n }\n}\n```\n",
   "complete@1": "COMPLETE: DONE\n```json\n{\n \"status\": \"done\",\n \"statusName\": \"Done\",\n \"startDate\": null,\n \"dueDate\": null,\n \"pullRequest\": null,\n \"asBuilt\": \"none\",\n \"claimReleased\": true,\n \"shipIntentReleased\": true\n}\n```\n",
   "capture@1": "FINDINGS: NONE\n```json\n{\n \"filed\": [],\n \"inserted\": []\n}\n```\n",
   "sync@1": "SYNC: CLEAN\n```json\n{\n \"branch\": \"main\",\n \"clean\": true\n}\n```\n",
@@ -442,7 +442,8 @@
        {
         "value": "BLOCKED",
         "detail": "optional",
-        "class": "stop"
+        "class": "stop",
+        "detailName": "reason"
        }
       ]
      },
@@ -818,6 +819,162 @@
      }
     ],
     "expect": "satisfied-keys"
+   },
+   {
+    "name": "a tree binding whose proof has no tree",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "local-checks@1",
+       "proof",
+       "required"
+      ],
+      "value": [
+       "kind",
+       "head",
+       "receipt"
+      ]
+     }
+    ],
+    "expect": "proof-fields"
+   },
+   {
+    "name": "a patch binding whose proof has no patch id",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "review@1",
+       "proof",
+       "required"
+      ],
+      "value": [
+       "path",
+       "head",
+       "base"
+      ]
+     }
+    ],
+    "expect": "proof-fields"
+   },
+   {
+    "name": "a tree binding with no proof keys at all",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "proof",
+       "binding"
+      ],
+      "value": "tree"
+     }
+    ],
+    "expect": "proof-fields"
+   },
+   {
+    "name": "a verdict that pins a proof value the catalog does not list",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "local-checks@1",
+       "verdict",
+       "values",
+       1,
+       "proof"
+      ],
+      "value": {
+       "kind": "not-configured"
+      }
+     }
+    ],
+    "expect": "proof-values"
+   },
+   {
+    "name": "a continue verdict that does not pin what another pins",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "local-checks@1",
+       "verdict",
+       "values",
+       0
+      ],
+      "value": {
+       "value": "PASS",
+       "detail": "optional",
+       "class": "continue",
+       "detailName": "count"
+      }
+     }
+    ],
+    "expect": "proof-values"
+   },
+   {
+    "name": "a value that takes a detail without naming it",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "claim@1",
+       "verdict",
+       "values",
+       3
+      ],
+      "value": {
+       "value": "HELD",
+       "detail": "required",
+       "class": "end:held"
+      }
+     }
+    ],
+    "expect": "shape"
+   },
+   {
+    "name": "a detail name on a value that takes none",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "claim@1",
+       "verdict",
+       "values",
+       0,
+       "detailName"
+      ],
+      "value": "holder"
+     }
+    ],
+    "expect": "shape"
+   },
+   {
+    "name": "proof values for a key the proof does not require",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "review@1",
+       "proof",
+       "values",
+       "pullRequest"
+      ],
+      "value": [
+       "1"
+      ]
+     }
+    ],
+    "expect": "shape"
    }
   ],
   "sound": [
@@ -950,6 +1107,647 @@
    "expect": "bad-schema"
   },
   {
+   "name": "no name",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "name"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "an empty name",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "name"
+     ],
+     "value": ""
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a name over 200 characters",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "name"
+     ],
+     "value": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "an id that is not a slug",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "id"
+     ],
+     "value": "Build"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "an id over 100 characters",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "id"
+     ],
+     "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "version 0",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "version"
+     ],
+     "value": 0
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a version written as text",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "version"
+     ],
+     "value": "2"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "no startsWhen",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "startsWhen"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a startsWhen not listed",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "startsWhen"
+     ],
+     "value": "nightly"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "no endsBy (null is a value, absence is not)",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "endsBy"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "an endsBy not listed",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "endsBy"
+     ],
+     "value": "deploy"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "no appliesTo",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "appliesTo"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "appliesTo without tags",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "appliesTo",
+      "tags"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "appliesTo.workTypes holding a number",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "appliesTo",
+      "workTypes"
+     ],
+     "value": [
+      7
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "appliesTo.repositories that is not a list",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "appliesTo",
+      "repositories"
+     ],
+     "value": "any"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "no minPluginVersion",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "minPluginVersion"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "thirteen phases",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "repeat",
+     "path": [
+      "phases"
+     ],
+     "count": 13
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a phase with no id",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "phases",
+      0,
+      "id"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a phase id that is not a slug",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "phases",
+      0,
+      "id"
+     ],
+     "value": "Pick up"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a phase with no name",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "phases",
+      0,
+      "name"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a phase of 41 steps",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "repeat",
+     "path": [
+      "phases",
+      0,
+      "steps"
+     ],
+     "count": 41
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "101 steps across the phases",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "repeat",
+     "path": [
+      "phases",
+      0,
+      "steps"
+     ],
+     "count": 34
+    },
+    {
+     "op": "repeat",
+     "path": [
+      "phases"
+     ],
+     "count": 3
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a step id that is not a slug",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "id"
+     ],
+     "value": "Sync"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a step with no name",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "phases",
+      0,
+      "steps",
+      0,
+      "name"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a step name over 200 characters",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "name"
+     ],
+     "value": "sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a step with no summary",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "phases",
+      0,
+      "steps",
+      0,
+      "summary"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a step summary over 500 characters",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "summary"
+     ],
+     "value": "sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a step kind not listed",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "kind"
+     ],
+     "value": "job"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a run.source not listed",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "run",
+      "source"
+     ],
+     "value": "remote"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a run with no ref",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "phases",
+      3,
+      "steps",
+      3,
+      "run",
+      "ref"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a run.ref that is a number",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "run",
+      "ref"
+     ],
+     "value": 7
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a run with no version",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "phases",
+      3,
+      "steps",
+      3,
+      "run",
+      "version"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a run.version that is true",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "run",
+      "version"
+     ],
+     "value": true
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a when with no condition",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "drop",
+     "path": [
+      "phases",
+      3,
+      "steps",
+      3,
+      "when",
+      "condition"
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a when.condition not listed",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "branch:main"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a when.mode not listed",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "when",
+      "mode"
+     ],
+     "value": "sometimes"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "an onFail not listed",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "onFail"
+     ],
+     "value": "retry"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
    "name": "two steps with one id",
    "definition": "build",
    "edits": [
@@ -1014,6 +1812,58 @@
    "expect": "requires-missing"
   },
   {
+   "name": "a merge with no review before it",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "review"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "requires-missing"
+  },
+  {
+   "name": "a review with no local checks before it",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "local-checks"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "requires-missing"
+  },
+  {
+   "name": "local checks with no risk check before them",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "risk-check"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "requires-missing"
+  },
+  {
+   "name": "a build with no branch before it",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "branch"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "requires-missing"
+  },
+  {
    "name": "the review moved after the merge",
    "definition": "build",
    "edits": [
@@ -1028,12 +1878,152 @@
    "expect": "requires-not-earlier"
   },
   {
+   "name": "a second build after the steps that check the first",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "review",
+     "value": {
+      "id": "build-again",
+      "name": "Build again",
+      "summary": "",
+      "contract": "build@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "ultracode-build",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "requires-not-earlier"
+  },
+  {
+   "name": "a second build after the risk check that requires one",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "risk-check",
+     "value": {
+      "id": "build-again",
+      "name": "Build again",
+      "summary": "",
+      "contract": "build@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "ultracode-build",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "requires-not-earlier"
+  },
+  {
    "name": "a required step made conditional",
    "definition": "build",
    "edits": [
     {
      "op": "set",
      "step": "local-checks",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "review-path:fast"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-not-always"
+  },
+  {
+   "name": "the review made conditional",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "review",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "review-path:fast"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-not-always"
+  },
+  {
+   "name": "the risk-check made conditional",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "risk-check",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "review-path:fast"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-not-always"
+  },
+  {
+   "name": "the build made conditional",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "build",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "review-path:fast"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-not-always"
+  },
+  {
+   "name": "the branch made conditional",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "branch",
      "path": [
       "when"
      ],
@@ -1086,6 +2076,90 @@
    "expect": "required-off"
   },
   {
+   "name": "the review switched off",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "review",
+     "path": [
+      "run"
+     ],
+     "value": {
+      "source": "off",
+      "ref": null,
+      "version": null
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-off"
+  },
+  {
+   "name": "the risk-check switched off",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "risk-check",
+     "path": [
+      "run"
+     ],
+     "value": {
+      "source": "off",
+      "ref": null,
+      "version": null
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-off"
+  },
+  {
+   "name": "the build switched off",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "build",
+     "path": [
+      "run"
+     ],
+     "value": {
+      "source": "off",
+      "ref": null,
+      "version": null
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-off"
+  },
+  {
+   "name": "the branch switched off",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "branch",
+     "path": [
+      "run"
+     ],
+     "value": {
+      "source": "off",
+      "ref": null,
+      "version": null
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-off"
+  },
+  {
    "name": "a step skill this plugin lacks",
    "definition": "build",
    "edits": [
@@ -1118,6 +2192,39 @@
    "root": "fixture",
    "git": true,
    "expect": "plugin-too-old"
+  },
+  {
+   "name": "a step summary that holds a credential",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "summary"
+     ],
+     "value": "Sync with api_key=abc123"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "credential-in-definition"
+  },
+  {
+   "name": "an unknown key that holds a credential",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "top",
+     "path": [
+      "notes"
+     ],
+     "value": "deploy with https://ci:hunter2@example.com"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "credential-in-definition"
   },
   {
    "name": "a tree-bound contract outside a repository",
@@ -1274,6 +2381,24 @@
       "name"
      ],
      "value": "Second opinion"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "the review re-sourced to another skill",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "review",
+     "path": [
+      "run",
+      "ref"
+     ],
+     "value": "ultracode-build"
     }
    ],
    "root": "fixture",
@@ -2409,6 +3534,150 @@
    "proof": null,
    "git": {},
    "expect": "holds"
+  },
+  {
+   "name": "local checks whose kind the catalog does not list",
+   "contract": "local-checks@1",
+   "proof": {
+    "kind": "not-configured",
+    "tree": "t1",
+    "head": "h",
+    "receipt": null
+   },
+   "git": {
+    "tree": "t1"
+   },
+   "expect": "refused"
+  },
+  {
+   "name": "local checks that pass with the nothing-configured kind",
+   "contract": "local-checks@1",
+   "verdict": "PASS",
+   "proof": {
+    "kind": "none-configured",
+    "tree": "t1",
+    "head": "h",
+    "receipt": null
+   },
+   "git": {
+    "tree": "t1"
+   },
+   "expect": "refused"
+  },
+  {
+   "name": "nothing configured, with a receipt kind",
+   "contract": "local-checks@1",
+   "verdict": "NOT CONFIGURED",
+   "proof": {
+    "kind": "receipt",
+    "tree": "t1",
+    "head": "h",
+    "receipt": null
+   },
+   "git": {
+    "tree": "t1"
+   },
+   "expect": "refused"
+  },
+  {
+   "name": "nothing configured, with its own kind",
+   "contract": "local-checks@1",
+   "verdict": "NOT CONFIGURED",
+   "proof": {
+    "kind": "none-configured",
+    "tree": "t1",
+    "head": "h",
+    "receipt": null
+   },
+   "git": {
+    "tree": "t1"
+   },
+   "expect": "holds"
+  },
+  {
+   "name": "a review whose path the catalog does not list",
+   "contract": "review@1",
+   "proof": {
+    "path": "pull-request-ish",
+    "head": "h",
+    "base": "main",
+    "patchId": "p1"
+   },
+   "git": {
+    "patchIds": {
+     "main": "p1"
+    }
+   },
+   "expect": "refused"
+  },
+  {
+   "name": "a review on a pull request",
+   "contract": "review@1",
+   "proof": {
+    "path": "pull-request",
+    "head": "h",
+    "base": "main",
+    "patchId": "p1",
+    "pullRequest": 42
+   },
+   "git": {
+    "patchIds": {
+     "main": "p1"
+    }
+   },
+   "expect": "holds"
+  },
+  {
+   "name": "a risk check with a negative verifier count",
+   "contract": "risk-check@1",
+   "proof": {
+    "base": "main",
+    "head": "abc",
+    "lenses": [],
+    "triggers": [
+     "auth"
+    ],
+    "verifiers": -1
+   },
+   "git": {},
+   "expect": "refused"
+  },
+  {
+   "name": "a risk check with a fractional verifier count",
+   "contract": "risk-check@1",
+   "proof": {
+    "base": "main",
+    "head": "abc",
+    "lenses": [],
+    "triggers": [
+     "auth"
+    ],
+    "verifiers": 1.5
+   },
+   "git": {},
+   "expect": "refused"
+  },
+  {
+   "name": "a risk check whose verifier count is true",
+   "contract": "risk-check@1",
+   "proof": {
+    "base": "main",
+    "head": "abc",
+    "lenses": [],
+    "triggers": [
+     "auth"
+    ],
+    "verifiers": true
+   },
+   "git": {},
+   "expect": "refused"
+  },
+  {
+   "name": "a merge that does not name the commit it merged",
+   "contract": "merge@1",
+   "proof": null,
+   "git": {},
+   "expect": "refused"
   }
  ],
  "repository": [
