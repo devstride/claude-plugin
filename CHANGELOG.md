@@ -8,6 +8,53 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **A step runner and a catalog of step contracts. Nothing calls them yet.** Until now the order
+  of the Build loop, which of its steps are required, and where a run had got to lived only in the
+  agent's head and in the prose of `build-item`. This release adds the two pieces a later release
+  will move that onto, and changes no existing flow: `build-item` and every other skill run
+  exactly as before.
+  - `schemas/step-contracts.json` lists twelve step contracts (the eleven Build steps and one for a
+    repository's own step). Each says how a step must answer (one verdict line, written exactly as
+    listed), what result it must hand on, what proof it must leave, and which other steps it
+    requires. Hand-edited, and additive within a major version.
+  - `skills/run-workflow/scripts/workflow.py` is the runner: one plain Python 3 file, standard
+    library only, no network. A person, Codex or the plugin's own loop asks it `next`, runs the
+    step it names, hands the step's answer back with `done`, and asks `status` to see where the run
+    is; `start` and `resume` begin and continue a run. It gives the same answers after a restart or
+    a cleared conversation, because the run's position is kept in a small owner-only file under
+    your cache folder. It decides and records and never acts: it runs no skill, calls no tracker
+    and only reads git.
+  - It refuses a step list that drops, weakens, switches off or moves a required step: a merge
+    cannot lack a review, green local checks or a risk check before it, whatever the steps are
+    called and whichever skill runs them. Each refusal has a fixed code.
+  - It will not say "go on to the merge" on stale checks. The local checks are bound to the exact
+    tree they ran on and the review to the exact patch it read (so a refreshed base that leaves the
+    patch alone keeps the review); when either goes stale it issues that step again first. A
+    missing or malformed verdict stops the run and is never read as a pass.
+  - What it keeps about a step is small and holds no secrets: the verdict line, a few lines of
+    evidence with any line that looks like a credential dropped, the result, and https links. It
+    hands back ready-made step reports for DevStride and never sends them itself.
+- **`/devstride:run-workflow <workflow id> [<item>]`**, the skill that drives the runner. It is
+  inert in this release: `/devstride:run-workflow build` is refused before anything is written,
+  because the shipped `workflows/build.json` still uses its draft contract names
+  (`unknown-contract`) and the step skills the catalog names arrive in a later release
+  (`skill-missing`). Use `/devstride:build-item` to build. Contract:
+  `skills/run-workflow/references/workflow-runner.md`; canonical cases:
+  `skills/run-workflow/scripts/workflow-fixtures.json`.
+
+### Changed
+
+- **The always-loaded skill listing grows by one line**, the new skill's description, and its
+  budget rises from 1,800 to 1,900 tokens (it measures 1,824). No other budget moves: no loop
+  loads the new skill or its reference yet.
+- **`run-workflow` counts as an execution job** for the one-job-per-session gate, beside
+  `build-item`.
+- **The plugin's descriptions no longer count its skills.** `plugin.json`, `marketplace.json` and
+  the README's status line said "thirty"; they now say "the delivery-loop skills", so the number is
+  never wrong by one.
+
 ## [4.1.0] — 2026-11-17
 
 ### Added

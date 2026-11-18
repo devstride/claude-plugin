@@ -78,4 +78,12 @@ OUT="$(run "$WORK/a-wt" s2 '/devstride:plan I1')"; RC=$?
 # (12) stale markers are pruned on write
 touch -t 202001010000 "$R/.git/devstride/session/s1.json"; run "$R" s5 '/devstride:push' >/dev/null
 [ ! -f "$R/.git/devstride/session/s1.json" ] && [ -f "$R/.git/devstride/session/s5.json" ] && ok "(12) markers older than 7 days pruned" || bad "(12) $(ls "$R/.git/devstride/session")"
+# (13) run-workflow drives work: an execution job, blocked after an authoring job and blocking one
+OUT="$(run "$R" s7 '/devstride:run-workflow build I123')"; RC=$?
+OUT2="$(run "$R" s7 '/devstride:plan I1')"; RC2=$?
+run "$R" s8 '/devstride:setup' >/dev/null; OUT3="$(run "$R" s8 '/ds:run-workflow build')"; RC3=$?
+if [ $RC -eq 0 ] && [ -z "$OUT" ] && marker "$R" s7 | grep -q '"skill": "run-workflow", "class": "execution"' \
+   && [ $RC2 -eq 2 ] && printf '%s' "$OUT2" | grep -q 'already ran /devstride:run-workflow, an execution job' \
+   && [ $RC3 -eq 2 ] && printf '%s' "$OUT3" | grep -q '/devstride:run-workflow is an execution job'; then
+  ok "(13) run-workflow is an execution job, both ways round"; else bad "(13) rc=$RC/$RC2/$RC3 $OUT|$OUT2|$OUT3"; fi
 exit $FAIL

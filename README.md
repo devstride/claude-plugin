@@ -4,7 +4,7 @@ DevStride's agentic delivery loop, packaged as a Claude Code plugin. Plan a road
 existence, then let the loop walk it one story at a time — branch, build, adversarially review,
 merge, and release — against your own repository and your own DevStride organization.
 
-> **Status: early.** The thirty delivery-loop skills and the DevStride MCP connection are both
+> **Status: early.** The delivery-loop skills and the DevStride MCP connection are both
 > bundled — installing the plugin is all the *configuration* the connection needs, though you still
 > connect it once per machine with an API key. `/devstride:setup` then configures the plugin for your repository and proves the
 > config by running it.
@@ -438,7 +438,7 @@ Picked too heavy a profile and watching the loop take far too long? `/devstride:
 
 Every turn re-sends the whole conversation, so a session's cost is its turns times its context.
 An **authoring** job (`setup`, `plan`, `ci-audit`, `rebalance`, `rationalize-gantt`,
-`comprehend-plan`) and an **execution** job (`build-item`, `pr`, `review`, `release`, `push`,
+`comprehend-plan`) and an **execution** job (`build-item`, `run-workflow`, `pr`, `review`, `release`, `push`,
 `create-story`, `create-defect`, `insert-story`, `insert-defect`) each carry their own context; run
 both in one session and everything after the switch pays for both. The plugin's prompt-time hook
 blocks the second kind with a one-line reason; the cure is a new session (`/clear`, then the same command — `/clear` ends the session, giving up anything it holds, such as a checkout lease). `doctor` and `update` are neutral and never block either kind. It
@@ -556,6 +556,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | Skill | What it does |
 |---|---|
 | `build-item` | The orchestrator: select → branch → build → review → merge → completion ritual → repeat |
+| `run-workflow` | Runs a workflow one step at a time with the step runner. Nothing calls it yet, and it refuses the Build workflow until the release that ships the step skills: see [The step runner](#the-step-runner) |
 | `ultracode-build` | The build engine for one scoped item: fast feedback, exact-tree verification receipt, bounded risk screen, and focused critical-boundary verification when needed |
 | `review` | Runs every configured reviewer, settles findings, then releases CI — re-reviewing from the latest common cycle anchor and continuing P1/serious-P2 fixes until clear |
 | `pr` | Opens a pull request and runs the review-and-settle loop |
@@ -586,6 +587,29 @@ take the stricter path when their hook is missing or cannot answer. Shared rule:
 | `lease-checkout` / `return-checkout` | Lease and return a pool checkout through `pool.checkout` / `pool.checkin`; busy means ask, never make a copy |
 | `classify-release` | Asks `release.classifySkill` whether a release is light or full; anything but a clear answer is FULL |
 | `pre-merge-check` | Asks `release.preMergeSkill` whether production needs anything before the merge: clear, hold, not run or not configured |
+
+### The step runner
+
+`skills/run-workflow/scripts/workflow.py` walks a workflow definition one step at a time, and
+`schemas/step-contracts.json` is the catalog of what each kind of step must answer with and what
+proof it must leave. The runner is one plain Python 3 file (standard library only, no network): a
+person, Codex or the plugin's own loop asks it `next`, runs the step it names, hands the step's
+answer back with `done`, and asks `status` to see where the run is. It gives the same answers after
+a restart or a cleared conversation, because the run's position lives in a small owner-only file
+under your cache folder, not in the conversation.
+
+It decides and records; it never acts. It refuses a step list that drops, weakens or reorders a
+required step (a merge needs a review, green local checks and a risk check before it), and it will
+not say "go on to the merge" while the local checks or the review are stale: the checks are bound
+to the exact tree they ran on and the review to the exact patch it read. The catalog holds twelve
+contracts: the eleven Build steps and one for a repository's own step.
+
+**Nothing calls it yet.** `build-item` runs exactly as before. `/devstride:run-workflow build` is
+refused before anything is written: the shipped `workflows/build.json` still uses its draft
+contract names (`unknown-contract`), and the step skills the catalog names arrive in a later
+release (`skill-missing`). Until then the runner is there to read and to try. Its rules are in
+`skills/run-workflow/references/workflow-runner.md`, and `workflow-fixtures.json` beside the script
+holds its canonical cases.
 
 ### Agents that do not run these skills
 
