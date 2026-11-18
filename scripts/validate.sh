@@ -36,6 +36,9 @@ done
 step "5b the old config name supportTrain stays out of skill text (scripts/check-train-name.sh)"
 bash scripts/check-train-name.sh || fail 5b
 
+step "5c workflow definitions (scripts/check-workflows.py)"
+python3 scripts/check-workflows.py || fail 5c
+
 step "6/7 script tests (scripts/tests/run.sh)"
 bash scripts/tests/run.sh || fail 6
 

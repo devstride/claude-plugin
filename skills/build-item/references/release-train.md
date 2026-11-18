@@ -3,7 +3,7 @@ load: contract
 ---
 # The release train — where one-offs go when one is configured
 
-**Goal:** one-off items (no release-unit ancestor) batch on one long-lived branch that ships with
+**Goal:** one-off items (outside a sequenced plan, even under an Epic) batch on one long-lived branch that ships with
 every release, instead of each merging straight into `baseBranch` and paying its own CI and
 deploy.
 

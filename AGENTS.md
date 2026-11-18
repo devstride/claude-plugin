@@ -110,6 +110,8 @@ paths individually) rather than trusting a single root-level run.
   and `ds-config.schema.json`, generated from it by `scripts/build-config-schema.py --write`
   together with `skills/setup/references/seam-registry.md`; never edit either output by hand. It
   ships: doctor's validator reads the schema from `${CLAUDE_PLUGIN_ROOT}/schemas/`.
+- `workflows/` holds the built-in workflow definitions (`build.json`: the build loop as a list of
+  phases and steps). Data, not instructions; it ships, and `scripts/check-workflows.py` validates it.
 - `scripts/` holds repo-level maintenance scripts (`validate.sh`, `measure-cost.sh`, their tests).
   Nothing at runtime reads them and the plugin loader ignores the directory — it is not a
   component directory, and it must not move under `.claude-plugin/`.

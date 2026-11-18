@@ -4,7 +4,9 @@ load: contract
 # As-built reconciliation — when a story ships differently from its description
 
 **Goal:** the item's description says what was really built, the plan as written stays readable,
-and any spec linked to the item is told, so no record falls behind quietly.
+and any spec linked to the item is told, so no record falls behind quietly. The item, not the
+pull request, is the durable source of truth, which is why the body's "plan is a hypothesis" floor
+has the description corrected as the work firms up.
 
 1. **Compose the as-built description** from the item's `view: 'full'` description: an italic
    as-built note, a **Deviations** list with one-line rationales, an **As shipped** summary.

@@ -7,7 +7,7 @@
   "bodies": {
     "branch-feature": 900,
     "branch-hotfix": 2217,
-    "build-item": 7999,
+    "build-item": 7994,
     "ci-audit": 2600,
     "comprehend-plan": 1874,
     "create-defect": 2500,
@@ -41,8 +41,8 @@
     "skills/build-item/references/ground-truth-at-start.md": 1900,
     "skills/build-item/references/next-unblocked.md": 3410,
     "skills/build-item/references/plain-language-output.md": 2402,
-    "skills/build-item/references/progress-table.md": 1330,
-    "skills/build-item/references/release-train.md": 3319,
+    "skills/build-item/references/progress-table.md": 1504,
+    "skills/build-item/references/release-train.md": 3326,
     "skills/build-item/references/verification-receipts.md": 800,
     "skills/create-story/references/one-off-handoff.md": 1990,
     "skills/doctor/references/repairs.md": 2904,
@@ -67,7 +67,7 @@
     "skills/release/references/release-gates.md": 1620,
     "skills/release/references/review-once.md": 1362,
     "skills/review/references/ci-settle.md": 1800,
-    "skills/review/references/delivery-loop-invariants.md": 27450,
+    "skills/review/references/delivery-loop-invariants.md": 27906,
     "skills/review/references/delta-re-review.md": 2310,
     "skills/review/references/final-head-request.md": 910,
     "skills/review/references/github-review-api.md": 4700,
@@ -77,7 +77,7 @@
     "skills/review/references/roster-and-modes.md": 2120,
     "skills/review/references/slow-suite-gating.md": 1700,
     "skills/setup/references/ci-cost-patterns.md": 5000,
-    "skills/setup/references/config-defaults.md": 20240,
+    "skills/setup/references/config-defaults.md": 20588,
     "skills/setup/references/boards-mode.md": 2705,
     "skills/setup/references/detector-evidence.digest.md": 900,
     "skills/setup/references/detector-evidence.md": 4300,
@@ -85,7 +85,7 @@
     "skills/setup/references/docs-skill-templates/update-release-notes.md": 1200,
     "skills/setup/references/interview-rationale.md": 1900,
     "skills/setup/references/review-engines.md": 2700,
-    "skills/setup/references/seam-registry.md": 16611,
+    "skills/setup/references/seam-registry.md": 17005,
     "skills/setup/references/statusline-segments.md": 3416,
     "skills/setup/references/validation-checklist.md": 6000,
     "skills/ultracode-build/references/engineering-economy.md": 1400,
@@ -110,7 +110,7 @@
     "skills/build-item/references/board-placement.md": 1174,
     "skills/review/references/local-full.md": 1289,
     "skills/build-item/references/release-holds.md": 781,
-    "skills/build-item/references/as-built.md": 700,
+    "skills/build-item/references/as-built.md": 730,
     "skills/build-item/references/consequence-notices.md": 2803,
     "skills/setup/references/session-presence.md": 4684,
     "skills/release/references/release-pr.md": 2107,
@@ -119,11 +119,12 @@
     "skills/release/references/estimates.md": 1892,
     "skills/build-item/references/ship-intent.md": 1605,
     "skills/release/references/migration-approval.md": 1530,
-    "skills/release/references/ship-plan.md": 1861
+    "skills/release/references/ship-plan.md": 1861,
+    "skills/build-item/references/workflow-reports.md": 1938
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 94293,
+      "budget": 94289,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -166,7 +167,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 78650,
+      "budget": 80760,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -176,6 +177,7 @@
         "skills/build-item/references/ship-intent.md",
         "skills/build-item/references/plain-language-output.md",
         "skills/build-item/references/progress-table.md",
+        "skills/build-item/references/workflow-reports.md",
         "skills/build-item/references/verification-receipts.md",
         "skills/plan/references/delivery-profiles.md",
         "skills/branch-feature/SKILL.md",
