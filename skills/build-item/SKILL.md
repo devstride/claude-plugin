@@ -7,8 +7,7 @@ description: "Orchestrate one DevStride work item end-to-end: select, branch, bu
 
 **Session model.** Read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/session-models.md` once per top-level run, role `runner`, first.
 
-**Goal:** ONE DevStride one-day leaf item delivered end-to-end —
-select → In Progress → branch → build → review → merge → ritual → sync → next. This ORCHESTRATOR
+**Goal:** ONE DevStride one-day leaf item delivered end-to-end, then the next. This ORCHESTRATOR
 owns ONLY the DevStride glue (selection, status moves, the completion ritual); it composes the other
 delivery skills — **invoke them by name; never re-spell what they do.**
 
@@ -54,26 +53,26 @@ An item outside a sequenced plan is auto-detected as a one-off: $ARGUMENTS
   worktree or instance unless the owner asks in this conversation; never delete another session's
   lease.
 - **Serial by design.** "Parallel waves" are SHAPE (`references/next-unblocked.md`):
-  `localEnvironment` never makes the loop concurrent; a human fans out the ready-set.
+  `localEnvironment` never makes the loop concurrent.
 - **Full-auto through merge.** PAUSE only at a genuine fork: a user's human/infra decision, an
   ambiguous or unverifiable finding, a destructive or outward-facing action. Record every deferral;
   never skip silently.
 - **The plan is a HYPOTHESIS.** Validate the spec against the ACTUAL code and correct the item's
-  description as the work firms up — the item, not the PR, is the durable source of truth.
+  description as the work firms up.
 - **Develop only receives a COMPLETE release unit** (refreshed, fully reviewed, every applicable
   gate green) or a one-off that settled the same gates. Out-of-scope findings: 6.5.
 
 ## Delivery profile — resolve once per story, announce with its source
 
 Knobs, floors, resolution order and root marker live ONLY in
-`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md` — never restate its table. This
+`${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`. This
 skill honours `perStoryPullRequest` (4), `storyVerify` (4a), `autoRelease` and `releaseCiOrdering` (8).
 
 - **Resolve once the story is SELECTED**, in the contract's order (explicit word → root marker →
   config `profile` → `extended`; an unknown word → `standard`, said so). The marker walks the
   story's ancestors (`get_item` with `view: 'full'` each) and takes the NEAREST. A one-off skips
   only the marker step. Never carried over from the last story.
-- **Announce it WITH ITS SOURCE** — `profile: extended — from the plan root I20100` — in the
+- **Announce it WITH ITS SOURCE** in the
   `Profile` row and handoff memory; pass it **by name**, `profile: <name>`, to `ultracode-build` (3),
   `review` (4a, 4b) and `pr` (4b, 8), which never re-resolve it.
 - **Branch on EFFECTIVE knobs, never the name**: profile default → `profileOverrides` → a PRESENT
@@ -88,7 +87,11 @@ One row per NUMBERED step in this skill's names (CI release/settle belong to `re
 on a one-off. **EVIDENCE, not intent**: "request registered in timeline", never "requested";
 "non-applicable" with its reason, never a bare "skipped"; a missing CI check says `skipping` or
 never ran, and why. The fast path shows 4a/5a with the deferred cloud rows visible. A render, not a gate. **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/progress-table.md` at the first
-render in a session or after a compaction.**
+render in a session or after a compaction.** **Read
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` in full at the first
+transition or after a compaction and report each step as it describes, unless `workflows` is
+`null`: then report nothing. A report never gates, delays or stops a step; a failed one is
+dropped, silently.**
 
 ## Working base — epic integration branches
 
@@ -130,8 +133,7 @@ one-off**; both → plan mode; exactly one → plan mode if a root resolves, els
 ask. **Steps 1–6 run VERBATIM.** Deltas:
 
 - **Step 0** — no root, ready-set or selection. **SKIP THE EPIC-BRANCH DERIVATION TOO — the working
-  base is the release train when configured (precedence 3), else `baseBranch`** — never reason "a
-  one-off has no release-unit ancestor". The merged-or-Done guard, gating, scope and spec checks
+  base is the release train when configured (precedence 3), else `baseBranch`**. The merged-or-Done guard, gating, scope and spec checks
   still run; the profile skips only the marker. **4b under every profile** — except 4a on a train
   with `releaseTrain.fastMerges` true. **Read
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` before changing the one-off

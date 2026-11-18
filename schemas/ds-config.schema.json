@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v4.0.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v4.1.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -95,6 +95,62 @@
                 "x-warnMaximum": 1440
               },
               "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, ship-intent 20, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "required": [
+            "commands"
+          ]
+        }
+      ]
+    },
+    "workflows": {
+      "description": "provider-or-commands hook — the `record_workflow_step` arguments as one JSON object (the provider sends them to the DevStride tool; a commands report receives them on stdin)",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": [
+                "devstride"
+              ],
+              "description": "the built-in provider: the agent's own DevStride connection; reporting uses it whenever the block is absent"
+            }
+          },
+          "patternProperties": {
+            "^_": {}
+          },
+          "additionalProperties": false,
+          "required": [
+            "provider"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "commands": {
+              "type": "object",
+              "properties": {
+                "report": {
+                  "type": "string",
+                  "description": "the report command; the arguments arrive as JSON on stdin"
+                }
+              },
+              "patternProperties": {
+                "^_": {}
+              },
+              "additionalProperties": false,
+              "description": "a report command the repository supplies; a block that names it reports through that command instead",
+              "required": [
+                "report"
+              ]
             }
           },
           "patternProperties": {

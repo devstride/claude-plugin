@@ -332,12 +332,14 @@ a trailing `[-n]`): `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patt
 ## Release clearance, the release tower and claims
 
 Optional, and `setup` writes none of them: each changes how work is sequenced across machines, the
-operator's decision. Absent, nothing is claimed and nothing is shown.
+operator's decision. Absent, nothing is claimed and nothing is shown — except `workflows`, which
+reports with no other key set (its paragraph below).
 
 | Key | Shape | Absent means |
 | --- | --- | --- |
 | `release.clearance` | `null`, `{ "provider": "github" }` (optional `ref`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), `{ "provider": "devstride" }` (optional `credentialsFile`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), or `{ "commands": { "claim", "status", "heartbeat", "release", "adopt", "owed"? } }` | no clearance: `release` runs as before, the `release` status-line segment never renders |
 | `claims` | `null`, `{ "provider": "devstride" }`, or `{ "commands": { "claim", "heartbeat", "release", "get"?, "list"? } }`, each with optional `expiryMinutes` | no claims: `build-item` claims nothing and says nothing |
+| `workflows` | absent, `{ "provider": "devstride" }`, `{ "commands": { "report" } }`, or `null` | reporting is on: `build-item` reports each step of its workflow through the agent's own DevStride connection, and says nothing when it cannot |
 | `releaseTower` | `{ "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" }` | those two defaults |
 | `release.autoStart.enabled` | boolean; needs `claims` | `false`: a release starts only when someone runs `release` |
 | `release.coordination.enabled` | boolean; needs `claims` | `true`: with a `claims` block, sessions say what they are about to ship |
@@ -389,6 +391,14 @@ operator's decision. Absent, nothing is claimed and nothing is shown.
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`.
   With a `claims` block every release also claims the `release-train` claim (key `<owner>/<repo>`)
   before it opens or adopts the train's pull request, and hands it on at the cut.
+- **`workflows`** — as it runs, `build-item` reports which step of its workflow it is on and what
+  each step produced. On by default: an absent key, or `provider: devstride`, sends the reports
+  through the agent's own DevStride connection; a `commands` block sends them through
+  `workflows.commands.report` instead (the arguments arrive as JSON on stdin). `null` switches
+  reporting off for the repository, and the machine variable `DEVSTRIDE_WORKFLOWS=0` for one
+  machine. Reports only observe: a session with no connection, a server that cannot take them or
+  any failure sends nothing, says nothing and never stops the loop. Contract:
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md`.
 - **`release.coordination.peerWaitMinutes`** — when a release starts and a peer session says its
   work is nearly ready and heading for the release train, the release waits at most this long
   (fixed at the start, never extended) and carries it; nobody nearly ready means no wait. Contract:

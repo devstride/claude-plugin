@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A workflow definition",
+  "description": "A workflow as a written list of phases and steps. Unknown keys are allowed everywhere and are kept. Every number is a whole number. scripts/check-workflows.py checks the rules a schema cannot say, and that the lists below equal its own.",
+  "type": "object",
+  "required": ["schema", "id", "version", "name", "startsWhen", "endsBy", "appliesTo", "minPluginVersion", "phases"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,99}$", "description": "Also the file's name, without .json." },
+    "version": { "type": "integer", "minimum": 1, "description": "Raised by any edit to the file." },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "startsWhen": { "enum": ["item-picked-up", "children-complete", "on-demand"] },
+    "endsBy": { "enum": ["ship", "hand-up", null] },
+    "appliesTo": {
+      "type": "object",
+      "required": ["workTypes", "tags", "repositories"],
+      "additionalProperties": true,
+      "properties": {
+        "workTypes": { "type": "array", "items": { "type": "string" } },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "repositories": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "minPluginVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "phases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "description": "At most 100 steps across all phases.",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "steps"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 40,
+            "items": {
+              "type": "object",
+              "required": ["id", "name", "summary", "contract", "kind", "run", "when", "onFail"],
+              "additionalProperties": true,
+              "properties": {
+                "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$", "description": "Unique across every phase." },
+                "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "summary": { "type": "string", "maxLength": 500 },
+                "contract": { "type": "string", "pattern": "^[a-z][a-z0-9-]*@[0-9]+$" },
+                "kind": { "enum": ["step", "gate"] },
+                "run": {
+                  "type": "object",
+                  "required": ["source", "ref", "version"],
+                  "additionalProperties": true,
+                  "properties": {
+                    "source": { "enum": ["builtin", "library", "repo", "off"] },
+                    "ref": { "type": ["string", "null"] },
+                    "version": { "type": ["integer", "string", "null"] }
+                  }
+                },
+                "when": {
+                  "type": "object",
+                  "required": ["mode", "condition"],
+                  "additionalProperties": true,
+                  "properties": {
+                    "mode": { "enum": ["always", "condition", "manual"] },
+                    "condition": { "enum": ["review-path:fast", "review-path:pull-request", null] }
+                  }
+                },
+                "onFail": { "enum": ["stop", "continue"] }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

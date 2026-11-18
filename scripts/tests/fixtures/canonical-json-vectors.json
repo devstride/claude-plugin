@@ -1,0 +1,66 @@
+{
+  "_about": "Shared canonical-JSON vectors: the DevStride API (canonical-json.ts) and the devstride plugin's helper must produce the same sha256 for each input. The canonical text is Python's json.dumps(obj, sort_keys=True, separators=(\",\", \":\"), ensure_ascii=False), hashed as UTF-8. Do not change a vector: both sides were written against these exact values.",
+  "vectors": [
+    {
+      "name": "the empty object",
+      "input": {},
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "canonical": "{}"
+    },
+    {
+      "name": "nested keys out of order",
+      "input": {
+        "b": 1,
+        "a": {
+          "d": 2,
+          "c": [3, 2, 1]
+        }
+      },
+      "sha256": "49eaef5002f9752ec6c880c0aa9af03132dd2217ab365978334592600c999d92",
+      "canonical": "{\"a\":{\"c\":[3,2,1],\"d\":2},\"b\":1}"
+    },
+    {
+      "name": "non-ASCII left unescaped",
+      "input": {
+        "name": "Caf\u00e9 \u2014 \u65e5\u672c"
+      },
+      "sha256": "adfccf44948a24c6814610ef8e26713e0a4fc10a3fdadcddfd0e5b54684ebfe1",
+      "canonical": "{\"name\":\"Caf\u00e9 \u2014 \u65e5\u672c\"}"
+    },
+    {
+      "name": "quote, backslash, newline and tab",
+      "input": {
+        "t": "a\"b\\c\nd\te"
+      },
+      "sha256": "eb500a4543290220b167a7b8df1fe111bbe28acfb698d9dd2904cb486bf0f7c0"
+    },
+    {
+      "name": "null, booleans and a negative integer",
+      "input": {
+        "x": null,
+        "y": true,
+        "z": false,
+        "n": -7
+      },
+      "sha256": "90bb93fb12938503fb8b41196f0359c938923868d51f24015ff2c4f564594048",
+      "canonical": "{\"n\":-7,\"x\":null,\"y\":true,\"z\":false}"
+    },
+    {
+      "name": "keys ordered by code point, not UTF-16 unit",
+      "input": {
+        "\ud83d\ude00": 1,
+        "\uffee": 2,
+        "a": 3
+      },
+      "sha256": "b6348bfd7a385552ebb887798bba67c54243e4e939821a72416f1a3b9f25e86e",
+      "canonical": "{\"a\":3,\"\uffee\":2,\"\ud83d\ude00\":1}"
+    },
+    {
+      "name": "control characters",
+      "input": {
+        "c": "\u0001\u001f\u007f"
+      },
+      "sha256": "2a001225d7eed8f79b66837460e43bbe206fa43cb9f7124bb601ac4dd4e4c3b9"
+    }
+  ]
+}

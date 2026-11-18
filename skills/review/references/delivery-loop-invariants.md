@@ -654,6 +654,17 @@ U5. **Cut the WHY before the WHAT.** Keeping a rationale while dropping its impe
 U6. **A config claim lives in more than one file** (L8) — grep them all when changing how a flag is
     honoured.
 
+## V. Workflow reports (config: `workflows`; contract: `skills/build-item/references/workflow-reports.md`)
+
+V1. Workflow reports only observe. They are on unless `workflows` is `null` or the machine sets
+    `DEVSTRIDE_WORKFLOWS` to `0`, and they fail open, silently: any non-zero exit, unparsable
+    output, skip or tool failure means send nothing and carry on; the first report of a run is its
+    availability check, and once any answer is an error nothing more is sent for that run; a
+    report is never retried in a loop, never waited on, never a reason to stop, and nothing about
+    reporting is said to the person beyond the progress table's own row. A report never chooses,
+    reorders, gates or skips a step. The body carries the gate and the fail-open sentence itself,
+    not only the pointer.
+
 ## How to actually run this checklist
 
 An earlier header claimed these were "verified mechanically" without saying how, which is its own
@@ -742,6 +753,12 @@ while IFS='|' read -r file needle; do
   grep -qiF "$needle" "$file" 2>/dev/null || echo "MISSING in $file: $needle"
 done <<'PAIRS'
 skills/build-item/SKILL.md|autoRelease
+skills/build-item/SKILL.md|workflow-reports.md
+skills/build-item/SKILL.md|never gates, delays or stops a step
+skills/build-item/SKILL.md|then report nothing
+skills/build-item/references/workflow-reports.md|never say or explain anything about reporting
+skills/build-item/references/workflow-reports.md|send nothing and carry on
+skills/build-item/references/workflow-reports.md|never choose, reorder, gate or skip a step
 skills/build-item/references/epic-release-steps.md|deleteBranchAfterRelease
 skills/build-item/references/epic-release-steps.md|NEVER rebase shared story SHAs
 skills/build-item/SKILL.md|epic-release-steps.md
@@ -811,6 +828,7 @@ skills/review/SKILL.md|CHANGED the patch
 skills/review/references/ci-settle.md|skipping
 skills/build-item/SKILL.md|EXPIRED
 skills/build-item/SKILL.md|registered in timeline
+skills/build-item/SKILL.md|"non-applicable" with its reason
 skills/build-item/references/epic-release-steps.md|FULL diff
 skills/build-item/references/epic-release-steps.md|live: false
 skills/build-item/references/progress-table.md|not configured
@@ -1105,8 +1123,8 @@ step. That is the moment a rule goes missing, and it is the only moment this fil
 
 ---
 
-**Total: 151 rule entries (A–T) + 6 editing disciplines (U) = 157.** (N11, shape targets, added
-with a recount; before it 156, when M21, honest estimates, was added with a recount; before that
+**Total: 152 rule entries (A–T, V) + 6 editing disciplines (U) = 158.** (V1, workflow reports
+fail open, added with a recount; before it 157, when N11, shape targets, was added with a recount; before it 156, when M21, honest estimates, was added with a recount; before that
 155, when M20, the release backstop, was added with a recount. The total before it claimed 144
 while 146 were enumerated — M17 and M18 were added without a recount: the seventh miscount,
 corrected then. Before it, 142 claimed while 143 were enumerated, when M16 was added.)

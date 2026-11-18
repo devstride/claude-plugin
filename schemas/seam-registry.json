@@ -251,6 +251,23 @@
       ]
     },
     {
+      "key": "workflows",
+      "shape": "provider-or-commands",
+      "valueType": "object",
+      "nullable": true,
+      "payload": "the `record_workflow_step` arguments as one JSON object (the provider sends them to the DevStride tool; a commands report receives them on stdin)",
+      "modes": [
+        "report"
+      ],
+      "verdict": "stdout's first line (OK, ABSENT, FORBIDDEN, UNREACHABLE, ERROR), then the stored run as JSON; exit 0 ok, 1 anything else",
+      "calledBy": [
+        "build-item progress table"
+      ],
+      "unset": "reports go to DevStride through the agent's own connection when the session has one, and nothing is sent or said when it does not or the server cannot take them; set the key to null to switch reporting off (the machine variable DEVSTRIDE_WORKFLOWS=0 does the same)",
+      "contract": "skills/build-item/references/workflow-reports.md",
+      "since": "4.1.0"
+    },
+    {
       "key": "activeAgents.commands.start",
       "shape": "command",
       "valueType": "string",
@@ -1816,6 +1833,30 @@
       "type": "string",
       "description": "the optional list command",
       "since": "3.21.0"
+    },
+    {
+      "key": "workflows.provider",
+      "type": "string",
+      "enum": [
+        "devstride"
+      ],
+      "required": true,
+      "description": "the built-in provider: the agent's own DevStride connection; reporting uses it whenever the block is absent",
+      "since": "4.1.0"
+    },
+    {
+      "key": "workflows.commands",
+      "type": "object",
+      "required": true,
+      "description": "a report command the repository supplies; a block that names it reports through that command instead",
+      "since": "4.1.0"
+    },
+    {
+      "key": "workflows.commands.report",
+      "type": "string",
+      "required": true,
+      "description": "the report command; the arguments arrive as JSON on stdin",
+      "since": "4.1.0"
     },
     {
       "key": "consequenceNotices",

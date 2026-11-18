@@ -34,6 +34,7 @@ engine actually registered would have surfaced that in one glance.
 | 6.5 · Findings filed | I20111, I20112 |
 | 7 · Sync + close-out | — |
 | 8 · Epic release | n/a — one-off |
+| Workflow report | on (run 3f9c1a) |
 ```
 
 ## The fast-path shape (4a/5a) — deferred cloud rows stay visible
@@ -47,6 +48,7 @@ engine actually registered would have surfaced that in one glance.
 | — Required local checks | ✅ passed — file/test counts recorded in the commit body |
 | — Copilot + CI | ⏸ deferred to the epic release PR (step 8) |
 | 5a · Fast merge | ✅ merged --no-ff → jane/03-14-26/I20104-attachment-storage |
+| Workflow report | on (run 3f9c1a) |
 ```
 
 Without the deferred rows, "no Copilot row" is indistinguishable from "Copilot was forgotten".
@@ -68,6 +70,11 @@ Without the deferred rows, "no Copilot row" is indistinguishable from "Copilot w
   told apart from "not reached". The `Profile` row exists because a resumed session re-derives
   the review path and verify width from it.
 - It is a status render, not a gate — it must never delay the step it describes.
+- **The `Workflow report` row** is shown only while reporting is on and the run's last answer was
+  not an error, so a resumed session knows reporting is live; its id is the first six characters
+  of the `runId` the helper printed. Off or unavailable, the row is left out, and a resumed
+  session that finds no row simply reports its next step as usual: the helper decides
+  (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md`).
 
 ## Cited by
 

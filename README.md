@@ -252,6 +252,15 @@ the session runs a DevStride skill.
 
 The contract is `skills/setup/references/session-presence.md`.
 
+**Step reports.** While `build-item` builds a story in a session connected to DevStride, it also
+reports which step of its workflow it is on and what each step produced: a one-line verdict, a
+few lines of evidence (counts, commands, a short commit id) and the links it already holds, with
+the repository's name as `host/owner/name`. **Never** session text, a prompt or a file's content.
+`"workflows": null` in a repository's `.claude/ds-config.json` switches it off for that
+repository; `DEVSTRIDE_WORKFLOWS=0` switches a whole machine off. Where DevStride cannot take a
+report nothing is sent, said or delayed. The contract is
+`skills/build-item/references/workflow-reports.md`.
+
 ## Configure it for your repo
 
 The skills read one file in **your** repository — `.claude/ds-config.json` — for everything
@@ -615,7 +624,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **4.0.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **4.1.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added
