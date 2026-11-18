@@ -524,8 +524,8 @@ headless runs. The recipe and the record it writes are in
   one session, with a plain-language message saying what the session is already doing and how to
   proceed.
 - **The two classes.** AUTHORING — `setup`, `plan`, `doctor`, `ci-audit`, `rebalance`,
-  `rationalize-gantt`, `comprehend-plan`. EXECUTION — `build-item`, `pr`, `review`, `release`,
-  `push`, `create-story`, `create-defect`, `insert-story`, `insert-defect`.
+  `rationalize-gantt`, `comprehend-plan`. EXECUTION — `build-item`, `run-workflow`, `pr`, `review`,
+  `release`, `push`, `create-story`, `create-defect`, `insert-story`, `insert-defect`.
 - **Why mixing costs.** Every turn re-sends the whole conversation, so the authoring half's
   context is paid for again on every execution turn after the switch, a multiplier that grows with
   the session.

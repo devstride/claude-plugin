@@ -22,23 +22,25 @@ what a person does about each, and the reporting rule are there.
 
 Every command is `python3 -B "${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py" <command>`
 with one JSON object on stdin (a file or a here-document, never inside quotes) and one JSON answer on
-stdout. Exit 2 is a refusal: say its one line in plain words and stop; nothing has changed.
+stdout. Exit 2 is a refusal: say its one line in plain words and stop; nothing has changed. Exit 1
+means the runner itself failed: say its line and stop, without retrying.
 
 1. **Resolve the definition**: `${CLAUDE_PLUGIN_ROOT}/workflows/<workflow id>.json`. No such file:
    say so and stop.
-2. **`start`** with that path as `definitionFile` and a `context` holding the item (or null) and
-   `"mode": "on-demand"`. A workflow whose step skills this plugin lacks is refused here
-   (`skill-missing`), before anything is written.
+2. **`start`** with that path as `definitionFile` and a `context` holding every key the
+   reference's Commands section lists (`mode` is a story-claim mode, `named` for a named item).
+   Nothing in this release resolves them: the person starting the run supplies them, and a missing one is
+   refused (`context-missing`). The shipped Build definition is refused too (`unknown-contract`),
+   before anything is written.
 3. **For each `run` answer**: send its heartbeat (the phase to the story claim, the ship-intent
    request to the ship-intent helper; skip whichever is null), invoke the named skill through the
-   Skill tool with `argument` unchanged, then pass that skill's WHOLE final answer as `output` to
-   `done`, with the step's `id` and `attempt`. The answer to `done` is the next action.
-4. **Forward every object in `reports`**, in order, through the `workflows` seam
-   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md`, The gate), failing
-   open: the first time the tool is absent, refused or unreachable, say one plain line, send
-   nothing more for this run, and carry on. A report never stops, slows or retries a step.
+   Skill tool with `argument` unchanged, then call `done` with `stepId` (the step's `id`),
+   `attempt` and `output` (that skill's WHOLE final answer). Its answer is the next action.
+4. **Send `reports`** in order exactly as
+   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` says: its gate decides
+   whether and how, and it fails open silently, never a word to the person about reporting.
 5. **On `stopped`**: say the reason in plain words and what the person can do about that kind of
    stop, then stop. `resume` continues the run once the cause is fixed.
 6. **On `finished`**: say the outcome in plain words.
 
-After a restart or a compaction: `status` (where the run is), then `resume` (the same step again).
+After a restart or a compaction: `status` (where the run is), then `resume` (the same step again, unless a proof it relies on went stale).

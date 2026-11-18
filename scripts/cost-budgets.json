@@ -41,7 +41,7 @@
     "skills/build-item/references/epic-release.md": 3200,
     "skills/build-item/references/ground-truth-at-start.md": 1900,
     "skills/build-item/references/next-unblocked.md": 3410,
-    "skills/build-item/references/plain-language-output.md": 2402,
+    "skills/build-item/references/plain-language-output.md": 2413,
     "skills/build-item/references/progress-table.md": 1504,
     "skills/build-item/references/release-train.md": 3326,
     "skills/build-item/references/verification-receipts.md": 800,
@@ -68,7 +68,7 @@
     "skills/release/references/release-gates.md": 1620,
     "skills/release/references/review-once.md": 1362,
     "skills/review/references/ci-settle.md": 1800,
-    "skills/review/references/delivery-loop-invariants.md": 27906,
+    "skills/review/references/delivery-loop-invariants.md": 27911,
     "skills/review/references/delta-re-review.md": 2310,
     "skills/review/references/final-head-request.md": 910,
     "skills/review/references/github-review-api.md": 4700,
@@ -78,7 +78,7 @@
     "skills/review/references/roster-and-modes.md": 2120,
     "skills/review/references/slow-suite-gating.md": 1700,
     "skills/setup/references/ci-cost-patterns.md": 5000,
-    "skills/setup/references/config-defaults.md": 20588,
+    "skills/setup/references/config-defaults.md": 20594,
     "skills/setup/references/boards-mode.md": 2705,
     "skills/setup/references/detector-evidence.digest.md": 900,
     "skills/setup/references/detector-evidence.md": 4300,
@@ -122,11 +122,11 @@
     "skills/release/references/migration-approval.md": 1530,
     "skills/release/references/ship-plan.md": 1861,
     "skills/build-item/references/workflow-reports.md": 1938,
-    "skills/run-workflow/references/workflow-runner.md": 3900
+    "skills/run-workflow/references/workflow-runner.md": 4900
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 94289,
+      "budget": 94300,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -169,7 +169,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 80760,
+      "budget": 80771,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -208,7 +208,7 @@
       ]
     },
     "manualPluginUpdate": {
-      "budget": 5524,
+      "budget": 5535,
       "files": [
         "skills/update/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
@@ -216,7 +216,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 97058,
+      "budget": 97069,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

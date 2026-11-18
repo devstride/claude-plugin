@@ -147,6 +147,7 @@ into one dense sentence. The goal is minimum reading for maximum correct underst
 - `skills/rebalance/SKILL.md`
 - `skills/release/SKILL.md`
 - `skills/review/SKILL.md`
+- `skills/run-workflow/SKILL.md`
 - `skills/setup/SKILL.md`
 - `skills/ultracode-build/SKILL.md`
 - `skills/update/SKILL.md`
