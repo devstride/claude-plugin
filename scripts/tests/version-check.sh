@@ -200,7 +200,8 @@ if result_is lookup-failed && printf '%s' "$OUT" | grep -q 'active install is am
 else bad "(4c) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
 
 # A workspace with no DevStride setup can never tie an install to itself, so the same failed lookup
-# sends the person to /reload-plugins (with update as the fallback), never to doctor; still no mutation.
+# sends the person to /reload-plugins (with update as the fallback), not to doctor, when the copy is
+# recorded for another folder; still no mutation.
 setup_case no-setup 2.9.0 '{}' project 2.9.0 0
 rm "$REPO/.claude/ds-config.json"
 OUT="$(run_hook)"
@@ -212,6 +213,22 @@ if result_is lookup-failed && printf '%s' "$OUT" | grep -q 'This workspace has n
    && [ "$(grep -c 'claude:plugin list --json' "$VC_LOG")" -eq 1 ]; then
   ok "(4d) no DevStride setup → reload instruction instead of doctor, no mutation"
 else bad "(4d) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
+
+# Without setup, two installs at once are still an ambiguity for doctor, never reload advice.
+setup_case no-setup-two 2.9.0 '{}' user 2.9.0 0
+rm "$REPO/.claude/ds-config.json"
+python3 - "$VC_STATE/list-before.json" <<'PY'
+import json, sys
+rows = json.load(open(sys.argv[1])); rows.append(dict(rows[0], scope="managed"))
+json.dump(rows, open(sys.argv[1], "w"))
+PY
+OUT="$(run_hook)"
+if result_is lookup-failed && printf '%s' "$OUT" | grep -q 'active install is ambiguous or unsafe' \
+   && printf '%s' "$OUT" | grep -qF '/devstride:doctor' \
+   && ! printf '%s' "$OUT" | grep -qF '/reload-plugins' \
+   && not_called 'plugin marketplace' && not_called 'plugin update'; then
+  ok "(4e) no DevStride setup but two installs → still doctor, never reload advice"
+else bad "(4e) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
 
 # (5) An explicit pin suppresses all install/update commands; a disabled check suppresses network too.
 setup_case pinned 2.9.0 '{"plugin":{"pin":"2.8.0","autoUpdate":true}}' project 2.9.0

@@ -11,13 +11,15 @@ for what each version component means here and how a release is cut.
 ### Changed
 
 - **A workspace with no DevStride setup is told to reload, not to run doctor.** When a session
-  falls behind the newest release in a folder that has no `.claude/ds-config.json`, the
-  session-start check could never tell which installed copy belonged to that folder, so it always
-  said "Run /devstride:doctor", which has no setup there to diagnose. The usual cause is a session
-  still serving an older copy than the one installed, so it now says to type `/reload-plugins` and
-  confirm no load error (restart if reload fails), and to run `/devstride:update` if the session
-  still runs the old version afterwards. A set-up repository whose install cannot be resolved is
-  still sent to doctor, and nothing is updated in either case.
+  falls behind the newest release in a folder that has no `.claude/ds-config.json`, and the only
+  installed copy the session-start check can find is recorded for another project or folder, the
+  check used to say "Run /devstride:doctor", which has no setup there to diagnose. The usual cause
+  is a session still serving an older copy than the one installed, so it now says to type
+  `/reload-plugins` and confirm no load error (restart if reload fails), and to run
+  `/devstride:update` if the session still runs the old version afterwards. Every other reason the
+  install cannot be resolved (two installs at once, a copy that does not match its record, a
+  disabled install), and any set-up repository, still goes to doctor. Nothing is updated in either
+  case.
 
 ## [4.2.0] — 2026-11-18
 
