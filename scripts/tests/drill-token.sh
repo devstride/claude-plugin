@@ -21,7 +21,12 @@ case "$1" in
     if [ "${CLAUDE_CODE_OAUTH_TOKEN:-}" = "$FAKE_GOOD" ]; then echo '{"is_error": false, "result": "ok"}'
     elif [ "${CLAUDE_CODE_OAUTH_TOKEN:-}" = "sk-ant-oat01-busy" ]; then echo '{"is_error": true, "terminal_reason": "api_error", "api_error_status": 429}'; exit 1
     else echo '{"is_error": true, "terminal_reason": "sk-leak-me", "api_error_status": 401}'; exit 1; fi ;;
-  setup-token) echo "Your token: (fake, printed here only)" ;;
+  setup-token)
+    [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ -d "$CLAUDE_CONFIG_DIR" ] && [ -z "$(ls -A "$CLAUDE_CONFIG_DIR")" ] \
+      && [ "$(pwd -P)" = "$(cd "$CLAUDE_CONFIG_DIR" && pwd -P)" ] && echo "setup-token config-dir: fresh, and the working directory" >> "$FAKE_LOG"
+    [ -n "${CLAUDE_CONFIG_DIR:-}" ] && echo "setup-token folder: $CLAUDE_CONFIG_DIR" >> "$FAKE_LOG"
+    env | grep -q '^CLAUDE_CODE_ENTRYPOINT=\|^ANTHROPIC_' && echo "setup-token inherited: yes" >> "$FAKE_LOG"
+    echo "Your token: (fake, printed here only)" ;;
 esac
 FAKE
 chmod +x "$TMP/bin/claude"
@@ -170,12 +175,16 @@ _, status = os.waitpid(pid, 0)
 sys.stdout.write(buf.decode(errors="replace"))
 print("\nEXIT=%d" % os.waitstatus_to_exitcode(status))
 PY
-OUT="$(python3 "$TMP/drive.py" "$SC" "$NEW" "$SECRET")"
+OUT="$(CLAUDE_CODE_ENTRYPOINT=cli ANTHROPIC_BASE_URL=https://example.invalid python3 "$TMP/drive.py" "$SC" "$NEW" "$SECRET")"
 MODE="$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode)), oct(stat.S_IMODE(os.stat(os.path.dirname(sys.argv[1])).st_mode)))' "$NEW" 2>/dev/null)"
 if printf '%s' "$OUT" | grep -q 'EXIT=0' && printf '%s' "$OUT" | grep -q '^DRILL TOKEN: READY' \
    && [ "$MODE" = "0o600 0o700" ] && [ "$(cat "$NEW")" = "$SECRET" ] && grep -qx 'setup-token' "$FAKE_LOG"; then
   ok "(9) make in a terminal → saved 0600 in a 0700 folder, then READY"; else bad "(9) mode=$MODE $OUT"; fi
 if ! printf '%s' "$OUT" | grep -q "$SECRET"; then ok "(9b) the pasted token is never echoed"; else bad "(9b) token echoed"; fi
+MADE="$(sed -n 's/^setup-token folder: //p' "$FAKE_LOG" | tail -1)"
+if grep -qx 'setup-token config-dir: fresh, and the working directory' "$FAKE_LOG" && ! grep -qx 'setup-token inherited: yes' "$FAKE_LOG" \
+   && [ -n "$MADE" ] && [ ! -e "$MADE" ]; then
+  ok "(9c) setup-token runs in a fresh folder of its own, with no inherited Claude settings, removed afterwards"; else bad "(9c) $(cat "$FAKE_LOG")"; fi
 
 # (10) a mistyped paste during renewal is refused before anything is saved; the old token stays
 OUT="$(python3 "$TMP/drive.py" "$SC" "$NEW" "sk-ant-oat01-typo")"

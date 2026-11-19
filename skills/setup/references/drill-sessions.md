@@ -67,8 +67,9 @@ python3 '<plugin root>/skills/setup/scripts/drill-token.py' make --file '<token 
 
 and says why not in the agent's prompt: a command typed there (`! …`) prints its output into the
 conversation, so the token would land in the transcript. `make` refuses without a terminal on both
-ends for the same reason. It runs `claude setup-token` (a browser page opens), asks for the token
-it printed with a hidden prompt, proves it before saving (a mistyped paste is refused and any
+ends for the same reason. It runs `claude setup-token` (a browser page opens) in a fresh Claude
+Code folder of its own, removed afterwards, so making the token never signs the person out of their
+own Claude Code, asks for the token it printed with a hidden prompt, proves it before saving (a mistyped paste is refused and any
 token already saved is kept), saves it owner-only (a new 0600 file beside it, then moved into
 place; a missing folder is created 0700) and runs the check. The agent waits for the person's
 "done", runs the check once more and reports its line; a second `NOT READY` is reported with its

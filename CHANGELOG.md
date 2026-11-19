@@ -8,6 +8,16 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Making the drill token no longer signs you out of your own Claude Code.** The setup step that
+  makes the long-lived token for the agent health drills (`drill-token.py make`) now runs
+  `claude setup-token` in a fresh, empty Claude Code folder of its own, with no inherited Claude
+  or Anthropic settings, and removes that folder afterwards. Before, it ran in your everyday
+  Claude Code folder, the only drill step that did, and right after making a token you could
+  have to sign in again for every normal session. The browser page and the printed token still
+  reach only you.
+
 ## [4.6.0] — 2026-11-19
 
 ### Changed
