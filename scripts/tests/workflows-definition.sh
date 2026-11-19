@@ -42,7 +42,7 @@ check("(6) every step always runs, stops on failure and is a built-in step skill
       [("step", {"mode": "always", "condition": None}, "stop", "builtin", None)] * 11)
 check("(7a) each step runs its step skill", [s["run"]["ref"] for s in steps], SKILLS)
 check("(7b) each step's skill exists", [r for r in SKILLS if not os.path.isfile(os.path.join(root, "skills", r, "SKILL.md"))], [])
-check("(7c) version 2, minPluginVersion this plugin's version", (build["version"], build["minPluginVersion"]), (2, plugin))
+check("(7c) version 2, minPluginVersion the release that introduced it", (build["version"], build["minPluginVersion"]), (2, "4.3.0"))
 check("(7d) step 8, the epic release, is not a step of this workflow", [s for s in ids if "release" in s], [])
 
 # (8) each rule fails a scratch copy with the right reason
