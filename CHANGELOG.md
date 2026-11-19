@@ -132,18 +132,18 @@ for what each version component means here and how a release is cut.
 
 The bodies below shrink where rules moved out, but a fast story now loads the eight step skills
 and their references as well: the fast story loop path grows from 80,771 tokens at 4.2.0 to
-103,194 tokens (`scripts/cost-budgets.json`, `paths.fastStoryLoop`), even after the runner's
+103,336 tokens (`scripts/cost-budgets.json`, `paths.fastStoryLoop`), even after the runner's
 reference was split so the loop reads only its driving half. On top of that text cost, a story
 now runs its risk check again after each later commit that changes it.
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.2.0 @ a900796, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v4.2.0 @ 97a4d43, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.2.0 | tokens@devstride--v4.2.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
 | skills/plan/SKILL.md | 25,535 | 8,512 | 25,542 | 8,514 | +2 | 8,514 |
+| skills/build-item/SKILL.md | 23,980 | 7,994 | 23,999 | 8,000 | +6 | 8,000 |
 | skills/doctor/SKILL.md | 23,995 | 7,999 | 23,995 | 7,999 | +0 | 8,000 |
 | skills/review/SKILL.md | 23,970 | 7,990 | 23,986 | 7,996 | +6 | 7,999 |
-| skills/build-item/SKILL.md | 23,980 | 7,994 | 23,975 | 7,992 | -2 | 7,992 |
 | skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
 | skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |
 | skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 11,963 | 3,988 | +0 | 3,988 |
@@ -179,7 +179,7 @@ now runs its risk check again after each later commit that changes it.
 | skills/sync-base/SKILL.md (added) | — | — | 1,471 | 491 | +491 | 500 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,472 | 1,824 | 6,277 | 2,093 | +269 | 2,100 |
-| **total (bodies)** | 279,416 | 93,149 | 299,611 | 99,884 | +6735 | |
+| **total (bodies)** | 279,416 | 93,149 | 299,635 | 99,892 | +6743 | |
 
 ## [4.2.0] — 2026-11-18
 
