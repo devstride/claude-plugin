@@ -111,6 +111,24 @@ if [ $RC -eq 1 ] && printf '%s' "$OUT" | tail -1 | grep -qx 'Fix: run the check 
 OUT="$(run check --file "$SECRET")"; RC=$?
 if [ $RC -eq 2 ] && ! printf '%s' "$OUT" | grep -q "$SECRET"; then ok "(6j) a bad path setting is never echoed"; else bad "(6j) rc=$RC $OUT"; fi
 
+# (6k) a token joined to another credential is never sent
+printf '%s,sk-ant-api03-extra\n' "$SECRET" > "$TOK"; chmod 600 "$TOK"; : > "$FAKE_LOG"
+OUT="$(run check --file "$TOK")"; RC=$?
+if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'nothing was sent' && [ ! -s "$FAKE_LOG" ]; then ok "(6k) token plus another credential → never sent"; else bad "(6k) rc=$RC $OUT"; fi
+
+# (6l) an unrelated readable file, or a large or binary one, points at the setting, never at make
+printf 'some notes\n' > "$TOK"; chmod 644 "$TOK"
+OUT="$(run check --file "$TOK")"
+A="$(printf '%s' "$OUT" | tail -1)"
+head -c 10000 /dev/zero | tr '\0' 'x' > "$TOK"; chmod 600 "$TOK"
+OUT="$(run check --file "$TOK")"
+B="$(printf '%s' "$OUT" | tail -1)"
+printf '\377\376binary' > "$TOK"
+OUT="$(run check --file "$TOK")"
+C="$(printf '%s' "$OUT" | tail -1)"
+case "$A|$B|$C" in "Fix: point drillSessions.tokenFile"*"|Fix: point drillSessions.tokenFile"*"|Fix: point drillSessions.tokenFile"*) ok "(6l) unrelated, large and binary files → correct the setting";; *) bad "(6l) $A / $B / $C";; esac
+printf '%s\n' "$SECRET" > "$TOK"; chmod 600 "$TOK"
+
 # (7) no claude on PATH → NOT READY with that reason
 printf '%s\n' "$SECRET" > "$TOK"; chmod 600 "$TOK"
 OUT="$(PATH=/usr/bin:/bin python3 "$SC" check --file "$TOK" 2>&1)"; RC=$?

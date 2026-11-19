@@ -39,6 +39,7 @@ Never prints, logs or passes on the command line the token itself. Standard libr
 import getpass
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -49,7 +50,8 @@ FIX = "Fix: /devstride:setup drills"
 AGAIN = "Fix: run the check again later"
 PATH_FIX = "Fix: put the claude command on PATH, then run the check again"
 WRONG_FILE = "Fix: point drillSessions.tokenFile at the drill token's own file, or move this file away, then /devstride:setup drills"
-PREFIX = "sk-ant-oat"  # what claude setup-token makes; an API key (sk-ant-api…) is never sent or overwritten
+TOKEN = re.compile(r"sk-ant-oat[0-9]{2}-[A-Za-z0-9_-]+")  # what claude setup-token makes; nothing else is sent or overwritten
+LIMIT = 4096  # a token is far shorter; a larger file is never read whole
 OTHER = "Fix: remove this machine's other Claude credential (an API key or key helper), then run the check again"
 PROOF = ["claude", "-p", "Reply with the word ok.", "--model", "haiku", "--tools", "", "--setting-sources", "user",
          "--strict-mcp-config", "--no-session-persistence", "--system-prompt", "Reply briefly.",
@@ -175,17 +177,17 @@ def check(path):
         return not_ready("cannot read %s (%s)" % (path, error.strerror))
     if not stat.S_ISREG(info.st_mode):
         return not_ready("%s is not a file" % path, WRONG_FILE)
+    fix = WRONG_FILE if holds_other(path) else FIX
     if info.st_mode & 0o077:
-        return not_ready("%s can be read by others (mode %o); it must be owner-only (chmod 600)" % (path, stat.S_IMODE(info.st_mode)))
+        return not_ready("%s can be read by others (mode %o); it must be owner-only (chmod 600)" % (path, stat.S_IMODE(info.st_mode)), fix)
     try:
-        with open(path, encoding="utf-8") as f:
-            token = f.read().strip()
+        token = read_token(path)
     except (OSError, ValueError) as error:
-        return not_ready("cannot read %s (%s)" % (path, getattr(error, "strerror", None) or "not text"))
+        return not_ready("cannot read %s (%s)" % (path, getattr(error, "strerror", None) or "not a token-sized text file"), fix)
     if not token:
         return not_ready("%s is empty" % path)
     if not usable(token):
-        return not_ready("%s does not hold one Claude Code token alone (sk-ant-oat…); nothing was sent" % path, WRONG_FILE)
+        return not_ready("%s does not hold one Claude Code token alone (sk-ant-oat01-…); nothing was sent" % path, WRONG_FILE)
     failed = prove(token)
     if failed:
         return not_ready(*failed)
@@ -195,7 +197,16 @@ def check(path):
 
 def usable(token):
     """One Claude Code token and nothing else, so no other credential is ever sent or overwritten."""
-    return token.startswith(PREFIX) and not any(c.isspace() or ord(c) < 32 for c in token)
+    return TOKEN.fullmatch(token) is not None
+
+
+def read_token(path):
+    """The file's text, stripped; ValueError when it is too large or not text."""
+    with open(path, encoding="utf-8") as f:
+        text = f.read(LIMIT + 1)
+    if len(text) > LIMIT:
+        raise ValueError("too large")
+    return text.strip()
 
 
 def holds_other(path):
@@ -203,8 +214,7 @@ def holds_other(path):
     try:
         if not stat.S_ISREG(os.stat(path).st_mode):
             return True
-        with open(path, encoding="utf-8") as f:
-            content = f.read().strip()
+        content = read_token(path)
         return bool(content) and not usable(content)
     except FileNotFoundError:
         return False
@@ -262,7 +272,7 @@ def make(path):
     print("Step 2 of 2: paste the token it printed (it is not shown as you paste).")
     token = getpass.getpass("Token: ").strip()
     if not token or not usable(token):
-        print("drill-token: that was not one Claude Code token (sk-ant-oat…); nothing was saved.", file=sys.stderr)
+        print("drill-token: that was not one Claude Code token (sk-ant-oat01-…); nothing was saved.", file=sys.stderr)
         return 1
     failed = prove(token)
     if failed:
