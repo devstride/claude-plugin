@@ -38,7 +38,7 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.3.0 @ a321834, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v4.3.0 @ 49cca53, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.3.0 | tokens@devstride--v4.3.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
@@ -63,7 +63,7 @@ for what each version component means here and how a release is cut.
 | skills/local-checks/SKILL.md | 3,593 | 1,198 | 3,593 | 1,198 | +0 | 1,200 |
 | skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
 | skills/merge-story/SKILL.md | 3,242 | 1,081 | 3,242 | 1,081 | +0 | 1,081 |
-| skills/run-workflow/SKILL.md | 3,129 | 1,043 | 3,129 | 1,043 | +0 | 1,043 |
+| skills/run-workflow/SKILL.md | 3,129 | 1,043 | 3,112 | 1,038 | -5 | 1,043 |
 | skills/review-story/SKILL.md | 3,020 | 1,007 | 3,020 | 1,007 | +0 | 1,007 |
 | skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
 | skills/claim-story/SKILL.md | 2,875 | 959 | 2,875 | 959 | +0 | 1,000 |
@@ -81,7 +81,7 @@ for what each version component means here and how a release is cut.
 | skills/sync-base/SKILL.md | 1,471 | 491 | 1,471 | 491 | +0 | 500 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 6,277 | 2,093 | 6,277 | 2,093 | +0 | 2,100 |
-| **total (bodies)** | 299,635 | 99,892 | 299,633 | 99,891 | -1 | |
+| **total (bodies)** | 299,635 | 99,892 | 299,616 | 99,886 | -6 | |
 
 ## [4.3.0] — 2026-11-18
 
