@@ -54,9 +54,8 @@ may mutate only a project/local row recorded in that very checkout. A checkout s
 recorded in another checkout reports `shared-checkout-auto-deferred`, and one
 whose owning checkout pins the copy reports `bound-checkout-pinned` (`bound-checkout-pin-drift`
 when the copy is off that pin). Shared user rows hand off to update,
-managed rows to their administrator, and unbound/ambiguous rows to Doctor, except that in a
-workspace with no `.claude/ds-config.json` a copy recorded only for another folder is told to
-`/reload-plugins` (then `/devstride:update`). Exit zero alone proves nothing. After native bootstrap, verify with `claude plugin list`, then reload and check for errors.
+managed rows to their administrator, and unbound/ambiguous rows to Doctor. Exit zero alone proves
+nothing. After native bootstrap, verify with `claude plugin list`, then reload and check for errors.
 
 **Install line (doctor's repo declaration).** No DevStride project/local row recorded in any
 checkout of this repository (this one, the main checkout or a worktree) in

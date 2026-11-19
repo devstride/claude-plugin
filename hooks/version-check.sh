@@ -667,17 +667,44 @@ except Exception: pass' 2>/dev/null)
 
 if [ -z "$INSTALL" ]; then
   RESULT="lookup-failed"
-  # In a workspace with no DevStride setup, a lookup that found no install recorded for this folder
-  # (the copy belongs to another project or folder) is usually a session still serving an older copy
-  # than the one installed, which a reload fixes; doctor has no setup there to diagnose. Every other
-  # reason (two installs at once, a copy that does not match its record, a disabled install) still
-  # goes to doctor.
-  INSPECT_CODE=$(printf '%s' "$INSPECT" | python3 -c 'import json,sys
-try: print(json.load(sys.stdin).get("code", ""))
-except Exception: pass' 2>/dev/null)
-  if [ ! -e "$REPO/.claude/ds-config.json" ] && [ ! -L "$REPO/.claude/ds-config.json" ] \
-     && { [ "$INSPECT_CODE" = "project-install-unbound" ] || [ "$INSPECT_CODE" = "loaded-install-not-found" ]; }; then
-    echo "devstride plugin: $RUNNING running, $NEWEST available. This workspace has no DevStride setup and no install recorded for it, so this check cannot tell which installed copy it uses. Type /reload-plugins to load the newest copy installed on this machine and confirm no DevStride load error (restart if reload fails); if it still runs $RUNNING, run /devstride:update. Do not guess an update id or scope."
+  # A workspace with no DevStride setup has no config that ties an install to it, and doctor has no
+  # setup there to diagnose. When Claude Code's own install record holds exactly one DevStride copy,
+  # newer than this session's, in the same cache folder as the loaded copy and with a matching
+  # manifest, the session is only serving an older copy than the one installed: say to reload, and
+  # to run doctor if that does not help. Anything else (no record, two installs, another cache
+  # folder, a copy that does not match its record) goes to doctor as before.
+  STALE=""
+  if [ ! -e "$REPO/.claude/ds-config.json" ] && [ ! -L "$REPO/.claude/ds-config.json" ]; then
+    STALE=$(python3 - "$ROOT" "$RUNNING" <<'PY' 2>/dev/null
+import json,os,re,stat,sys
+root=os.path.realpath(sys.argv[1]); running=sys.argv[2]
+def read(path,limit):
+  fd=os.open(path,os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
+  try:
+    info=os.fstat(fd)
+    if not stat.S_ISREG(info.st_mode) or info.st_uid not in (os.getuid(),0) or info.st_size>limit: raise ValueError()
+    return json.loads(os.read(fd,limit+1))
+  finally: os.close(fd)
+try:
+  base=os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+  plugins=read(os.path.join(base,"plugins","installed_plugins.json"),16777216)["plugins"]
+  rows=[row for key in ("devstride@devstride","ds@devstride") for row in (plugins.get(key) or [])]
+  if len(rows)==1 and isinstance(rows[0],dict):
+    version=rows[0].get("version"); path=rows[0].get("installPath")
+    semver=r"[0-9]+\.[0-9]+\.[0-9]+"
+    if isinstance(version,str) and re.fullmatch(semver,version) and isinstance(path,str) and path:
+      path=os.path.realpath(path)
+      newer=tuple(map(int,version.split(".")))>tuple(map(int,running.split(".")))
+      manifest=read(os.path.join(path,".claude-plugin","plugin.json"),65536)
+      if newer and os.path.dirname(path)==os.path.dirname(root) and path!=root \
+         and manifest.get("name")=="devstride" and manifest.get("version")==version:
+        print(version)
+except Exception: pass
+PY
+)
+  fi
+  if [ -n "$STALE" ]; then
+    echo "devstride plugin: this session runs $RUNNING, but $STALE is installed on this machine ($NEWEST is the newest release). This workspace has no DevStride setup, so this check cannot update it for you. Type /reload-plugins to load $STALE and confirm no DevStride load error (restart if reload fails); if it still runs $RUNNING, run /devstride:doctor. Do not guess an update id or scope."
     finish
   fi
   echo "devstride plugin: $RUNNING running, $NEWEST available, but the active install is ambiguous or unsafe. Run /devstride:doctor; do not guess an update id or scope."

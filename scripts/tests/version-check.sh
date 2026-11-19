@@ -199,36 +199,65 @@ if result_is lookup-failed && printf '%s' "$OUT" | grep -q 'active install is am
   ok "(4c) unbound project row → safe lookup failure, no guessed authority"
 else bad "(4c) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
 
-# A workspace with no DevStride setup can never tie an install to itself, so the same failed lookup
-# sends the person to /reload-plugins (with update as the fallback), not to doctor, when the copy is
-# recorded for another folder; still no mutation.
-setup_case no-setup 2.9.0 '{}' project 2.9.0 0
-rm "$REPO/.claude/ds-config.json"
-OUT="$(run_hook)"
-if result_is lookup-failed && printf '%s' "$OUT" | grep -q 'This workspace has no DevStride setup' \
-   && printf '%s' "$OUT" | grep -qF 'Type /reload-plugins' \
-   && printf '%s' "$OUT" | grep -qF 'if it still runs 2.8.0, run /devstride:update' \
-   && ! printf '%s' "$OUT" | grep -qF '/devstride:doctor' \
-   && not_called 'plugin marketplace' && not_called 'plugin update' \
-   && [ "$(grep -c 'claude:plugin list --json' "$VC_LOG")" -eq 1 ]; then
-  ok "(4d) no DevStride setup → reload instruction instead of doctor, no mutation"
+# A workspace with no DevStride setup: when Claude Code's install record (a private one per case)
+# holds exactly one DevStride copy, newer than the session's, in the loaded copy's cache folder and
+# with a matching manifest, the failed lookup says to reload (doctor as the fallback). Every other
+# shape of the record still goes straight to doctor. Nothing is ever updated.
+# no_setup_case NAME REGISTRY-SHAPE: newer | none | two | elsewhere | mismatch | older
+no_setup_case() {
+  setup_case "no-setup-$1" 2.9.0 '{}' project 2.9.0 0
+  rm "$REPO/.claude/ds-config.json"
+  CLAUDE_CONFIG_DIR="$CASE_DIR/claude"; export CLAUDE_CONFIG_DIR; mkdir -p "$CLAUDE_CONFIG_DIR/plugins"
+  python3 - "$CLAUDE_CONFIG_DIR/plugins/installed_plugins.json" "$LINEAGE" "$CASE_DIR" "$1" <<'PY'
+import json, os, sys
+path, lineage, case, shape = sys.argv[1:]
+row = {"scope": "project", "projectPath": os.path.join(case, "elsewhere"), "version": "2.9.0",
+       "installPath": os.path.join(lineage, "2.9.0")}
+if shape == "elsewhere":
+    other = os.path.join(case, "other-cache", "2.9.0", ".claude-plugin"); os.makedirs(other)
+    json.dump({"name": "devstride", "version": "2.9.0"}, open(os.path.join(other, "plugin.json"), "w"))
+    row["installPath"] = os.path.dirname(other)
+if shape == "mismatch":
+    json.dump({"name": "devstride", "version": "2.9.1"},
+              open(os.path.join(lineage, "2.9.0", ".claude-plugin", "plugin.json"), "w"))
+if shape == "older":
+    row.update(version="2.8.0", installPath=os.path.join(lineage, "2.8.0"))
+rows = {"none": [], "two": [row, dict(row, scope="user")]}.get(shape, [row])
+json.dump({"version": 2, "plugins": {"devstride@devstride": rows} if rows else {}}, open(path, "w"))
+PY
+  OUT="$(run_hook)"
+}
+no_mutation() { not_called 'plugin marketplace' && not_called 'plugin update'; }
+
+no_setup_case newer
+if result_is lookup-failed && printf '%s' "$OUT" | grep -q 'this session runs 2.8.0, but 2.9.0 is installed on this machine' \
+   && printf '%s' "$OUT" | grep -qF 'This workspace has no DevStride setup' \
+   && printf '%s' "$OUT" | grep -qF 'Type /reload-plugins to load 2.9.0' \
+   && printf '%s' "$OUT" | grep -qF 'if it still runs 2.8.0, run /devstride:doctor' \
+   && ! printf '%s' "$OUT" | grep -q 'ambiguous or unsafe' \
+   && no_mutation && [ "$(grep -c 'claude:plugin list --json' "$VC_LOG")" -eq 1 ]; then
+  ok "(4d) no DevStride setup, one newer copy installed beside the loaded one → reload, doctor as fallback, no mutation"
 else bad "(4d) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
 
-# Without setup, two installs at once are still an ambiguity for doctor, never reload advice.
-setup_case no-setup-two 2.9.0 '{}' user 2.9.0 0
-rm "$REPO/.claude/ds-config.json"
-python3 - "$VC_STATE/list-before.json" <<'PY'
-import json, sys
-rows = json.load(open(sys.argv[1])); rows.append(dict(rows[0], scope="managed"))
-json.dump(rows, open(sys.argv[1], "w"))
-PY
-OUT="$(run_hook)"
+V=""
+for shape in none two elsewhere mismatch older; do
+  no_setup_case "$shape"
+  if result_is lookup-failed && printf '%s' "$OUT" | grep -q 'active install is ambiguous or unsafe' \
+     && printf '%s' "$OUT" | grep -qF '/devstride:doctor' && ! printf '%s' "$OUT" | grep -qF '/reload-plugins' \
+     && no_mutation; then V="$V $shape:doctor"; else V="$V $shape:WRONG($OUT)"; fi
+done
+if [ "$V" = " none:doctor two:doctor elsewhere:doctor mismatch:doctor older:doctor" ]; then
+  ok "(4e) no DevStride setup but no record, two installs, another cache folder, a mismatched manifest or no newer copy → still doctor"
+else bad "(4e)$V"; fi
+
+# A set-up repository never gets the reload advice, whatever the record holds.
+no_setup_case configured
+printf '{}' > "$REPO/.claude/ds-config.json"; rm -f "$VC_LOG"; OUT="$(run_hook)"
 if result_is lookup-failed && printf '%s' "$OUT" | grep -q 'active install is ambiguous or unsafe' \
-   && printf '%s' "$OUT" | grep -qF '/devstride:doctor' \
-   && ! printf '%s' "$OUT" | grep -qF '/reload-plugins' \
-   && not_called 'plugin marketplace' && not_called 'plugin update'; then
-  ok "(4e) no DevStride setup but two installs → still doctor, never reload advice"
-else bad "(4e) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
+   && ! printf '%s' "$OUT" | grep -qF '/reload-plugins' && no_mutation; then
+  ok "(4f) a set-up repository with the same record → doctor, never reload advice"
+else bad "(4f) out=$OUT"; fi
+unset CLAUDE_CONFIG_DIR
 
 # (5) An explicit pin suppresses all install/update commands; a disabled check suppresses network too.
 setup_case pinned 2.9.0 '{"plugin":{"pin":"2.8.0","autoUpdate":true}}' project 2.9.0
