@@ -13,7 +13,7 @@ Claude's fan-out narrowed to the change; anything else runs step 5's full target
 engine at its `initial` effort, keep P1 and serious-P2 continuation, and record the same receipt:
 sizing narrows how wide the Claude pass looks, never who reviews or whether the CLI engine runs.
 
-**Entry:** `build-item` 4a, when `review-gate.py check` refuses, or a person or another tool running
+**Entry:** `review-story` or `merge-story`, when `review-gate.py check` refuses, or a person or another tool running
 `/devstride:review local-full <base>` in the story's checkout, where `<base>` is the ref it lands on
 (`origin/<train>`). With no caller ledger, seed one from the story's commits and the item.
 
@@ -49,3 +49,10 @@ sizing narrows how wide the Claude pass looks, never who reviews or whether the 
 **A later change to the patch** (a fix, or merging a moved train into the story) is a new head. Run
 step 5's contextual follow-up on the delta with the ledger carried. A clean merge whose scope is
 `none` spends nothing. Then **record again**: the gate admits only the head it recorded.
+
+## Cited by
+
+- `skills/review/SKILL.md` — the LOCAL-FULL mode's pointer ("Read … before running it").
+- `skills/review-story/references/review-routes.md` — the train's landing review.
+- `skills/merge-story/references/merge-paths.md` — the landing gate's follow-up.
+- `skills/review/scripts/reviewed-status.py` — the landing proof of step 3.

@@ -74,7 +74,7 @@ On a READY outcome only, then leave the settled review's durable proof on the fi
 `devstride/reviewed` commit status naming the pull request and its base; only an admin's counts).
 `NOT POSTED` is degradation to report, never a stop: a release then checks that unit file by file.
 For a release unit into the train, `NOT POSTED` is a STOP before the merge: the merge gate refuses it, and a merged pull request takes no proof. Post only here and in
-`build-item` 5b's carry, never to clear a release refusal.
+`merge-story`'s pull-request carry, never to clear a release refusal.
 
 If a configured local command cannot accept context, never spend a follow-up cycle on a blind
 repeat. Use Claude effective-scope validation for that engine's slot, report the local engine as

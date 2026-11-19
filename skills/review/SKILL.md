@@ -79,7 +79,7 @@ workflows SUPPORT** — no profile bypasses a supported hold.
 **Configured-but-failing is NOT not-configured**: a failed probe or
 silent configured reviewer is this-run degradation, reported; an unconfigured engine is silent by
 design. A missing engine narrows the roster, never a hard stop — except a fast story merge needs a
-completed local risk screen (`build-item` step 4). **No config file → CLAUDE-ONLY**, said.
+completed local risk screen (`risk-check`). **No config file → CLAUDE-ONLY**, said.
 Substitute `<effort>` from the task/risk route (or `review.localEffort`, `delta-re-review.md`);
 a legacy Codex template's literal
 `model_reasoning_effort` is replaced per invocation (stale config never pins `xhigh`; never pick
@@ -93,14 +93,14 @@ definition or a deferral route.**
   summary + untracked-deferrals; capture per step 4, never ask. `late-arrivals` →
   until the first flip, check the train before each cycle and flip; arrivals → `LATE-ARRIVAL`. **Standalone**: keep
   the ask-gates; notify per `review.notifyWhenSettled`.
-- **LOCAL-ONLY** (fast develop mode, `build-item` step 4a; a base REF, no PR): no routine second
+- **LOCAL-ONLY** (fast develop mode, `review-story`'s fast path; a base REF, no PR): no routine second
   review. Consume the hand-off — story review ledger and risk-check findings, SHA-keyed verification
   receipt, dismissed-findings list (imported dispositions, never re-raised without new evidence),
   untracked-deferral list — run steps 3–5 for triage and fixes, then **step 6.5, which this path
   MUST write**; return the triaged findings, the untracked-deferral list **and the lessons tally**.
   The caller owns the merge. Never launch `review.localAssistCommand` here. Missing risk-screen evidence → the full PR path. Runs without a CLI engine. Skips 0–2 and 6–8.
-- **LOCAL-FULL** (`build-item` 4a for a train one-off the landing gate holds, or the argument
-  `local-full <base>`; no PR): the merge-boundary review with no PR, cloud reviewer or CI, recorded
+- **LOCAL-FULL** (`review-story` or `merge-story`, for a train one-off the landing gate holds, or
+  the argument `local-full <base>`; no PR): the merge-boundary review with no PR, cloud reviewer or CI, recorded
   for the landing gate. **Read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/local-full.md`
   before running it.**
 - **PRE-SHIP RESUME** (`pr`/`release` step 2c) — the return from a **7.1b** hold. **Start at 7.1**:

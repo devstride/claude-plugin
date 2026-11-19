@@ -6,7 +6,8 @@ and reads a repository only through three read-only git commands (`rev-parse`, `
 `patch-id`) plus the remote lookup of the reporting helper. A person, another agent or the
 plugin's own loop asks it what is next, runs that step, hands the step's answer back, and gets
 the same answers every time, also after a restart or a cleared conversation. The rules are in
-`skills/run-workflow/references/workflow-runner.md`; the step contracts are in
+`skills/run-workflow/references/workflow-runner.md` (driving a run) and
+`skills/run-workflow/references/workflow-contracts.md` (definitions and proofs); the step contracts are in
 `schemas/step-contracts.json`.
 
   python3 -B workflow.py <command>     one JSON object on stdin, one JSON object on stdout
@@ -70,8 +71,8 @@ FENCE_OPEN = re.compile(r"^\s*```json\s*$")
 TEMPLATE_FIELD = re.compile(r"\{([A-Za-z][A-Za-z0-9]*)\}")
 PAYLOAD_PATH = re.compile(
     r"^(?:context(?:\.[A-Za-z][A-Za-z0-9]*)+"
-    r"|result:[a-z][a-z0-9-]*@[0-9]+(?:\.[A-Za-z][A-Za-z0-9]*)*"
-    r"|step\.(?:answer|proof|head))\??$")
+    r"|(?:result|proof):[a-z][a-z0-9-]*@[0-9]+(?:\.[A-Za-z][A-Za-z0-9]*)*"
+    r"|step\.(?:answer|proof|head|passedProof|passedResult|passedUnreadable))\??$")
 
 # The catalog's vocabulary (schemas/step-contracts.json).
 ENTRY_FIELDS = ("summary", "builtinSkill", "payload", "argument", "verdict", "result", "proof",
@@ -79,8 +80,8 @@ ENTRY_FIELDS = ("summary", "builtinSkill", "payload", "argument", "verdict", "re
 CLASSES = ("continue", "skipped", "redo:self", "stop", "ask")
 END_CLASS = re.compile(r"^end:([a-z][a-z-]*)$")
 DETAILS = ("none", "optional", "required")
-BINDINGS = ("none", "tree", "patch")
-BINDING_FIELDS = {"none": (), "tree": ("tree",), "patch": ("base", "patchId")}
+BINDINGS = ("none", "tree", "patch", "story")
+BINDING_FIELDS = {"none": (), "tree": ("tree",), "patch": ("base", "patchId"), "story": ("base", "head")}
 TYPE_NAMES = ("string", "number", "count", "boolean", "array", "object", "null")
 STAGES = ("building", "reviewing", "verifying", "landing")
 RESERVED_PAYLOAD_KEYS = ("step", "contract")
@@ -237,6 +238,24 @@ class World:
             raise GitFailed("git patch-id --verbatim failed; a git too old to support --verbatim cannot check a review")
         return out[0] if out else None
 
+    def readable(self, cwd, name):
+        """True when `name` (a commit id or a ref) names a commit this checkout can read."""
+        if not isinstance(name, str) or not GIT_REF.match(name):
+            return False
+        try:
+            self.git(cwd, "rev-parse", "--verify", "--quiet", name + "^{commit}")
+        except GitFailed:
+            return False
+        return True
+
+    def branch(self, cwd):
+        """The branch the checkout is on, or None when HEAD is detached or cannot be read."""
+        try:
+            out = self.git(cwd, "rev-parse", "--abbrev-ref", "HEAD").decode("utf-8", "replace").strip()
+        except GitFailed:
+            return None
+        return out if out and out != "HEAD" else None
+
     def in_work_tree(self, cwd):
         try:
             return self.git(cwd, "rev-parse", "--is-inside-work-tree").strip() == b"true"
@@ -261,12 +280,13 @@ def is_type(value, spec):
 
 
 def parse_path(path):
-    """A payload path as (kind, contract, keys, optional). Kinds: context, result, step."""
+    """A payload path as (kind, contract, keys, optional). Kinds: context, result, proof, step."""
     optional = path.endswith("?")
     body = path[:-1] if optional else path
-    if body.startswith("result:"):
-        contract, _, rest = body[len("result:"):].partition(".")
-        return "result", contract, rest.split(".") if rest else [], optional
+    for kind in ("result", "proof"):
+        if body.startswith(kind + ":"):
+            contract, _, rest = body[len(kind) + 1:].partition(".")
+            return kind, contract, rest.split(".") if rest else [], optional
     kind, _, rest = body.partition(".")
     return kind, None, rest.split("."), optional
 
@@ -315,7 +335,7 @@ def _entry_shape(entry):
         return "result needs required keys, each with a type"
     proof = entry["proof"]
     if not isinstance(proof, dict) or proof.get("binding") not in BINDINGS:
-        return "proof.binding is none, tree or patch"
+        return "proof.binding is none, tree, patch or story"
     if ("required" in proof or "types" in proof) and not _keys_and_types(proof):
         return "proof needs required keys, each with a type"
     values = proof.get("values", {})
@@ -407,7 +427,7 @@ def check_catalog(catalog):
             kind, contract, _, optional = parse_path(path)
             if kind == "step" and not optional:
                 fault("payload-path", name, "%s: a step path is always optional" % key)
-            if kind == "result":
+            if kind in ("result", "proof"):
                 if contract not in contracts:
                     fault("payload-path", name, "%s reads %s, which the catalog does not hold" % (key, contract))
                 elif contract not in closure and not (optional and order.index(contract) < order.index(name)):
@@ -742,6 +762,8 @@ def proof_fault(contract, entry, proof, value=None, result=None):
             return "the verdict %s needs a proof whose %s is %s" % (value["value"], key, wanted)
     if contract == "risk-check@1" and proof["triggers"] and proof["verifiers"] < 1:
         return "risk-triggers-need-verifiers: the risk check names triggers and ran no verifier"
+    if contract == "review@1" and result is not None and result.get("path") != proof["path"]:
+        return "review-names-one-path: the review's result and its proof name different paths"
     if contract == "local-checks@1" and proof["kind"] == "receipt":
         named = lambda text: isinstance(text, str) and bool(text.strip())
         commands = (result or {}).get("commands")
@@ -750,15 +772,80 @@ def proof_fault(contract, entry, proof, value=None, result=None):
     return None
 
 
+ACCUMULATED = ("untrackedDeferrals", "dismissed", "deferrals", "deviations")
+COUNTED = {"untrackedDeferrals": "deferred", "deferrals": "deferred", "dismissed": "dismissed"}
+
+
+def entry_id(entry):
+    """A finding's identity, in two namespaces kept apart: ("id", its `id`) for an object carrying a
+    non-empty string one, which a later screen can name in `resolved`; else ("json", the whole
+    entry as canonical JSON), which only keeps an entry from being listed twice."""
+    if isinstance(entry, dict) and isinstance(entry.get("id"), str) and entry["id"]:
+        return ("id", entry["id"])
+    return ("json", json.dumps(entry, sort_keys=True))
+
+
+def accumulate(before, after):
+    """risk-check-accumulates: a risk check screened again after a later commit reports only the
+    delta, so its accepted result is added to the last accepted one. Each list keeps every earlier
+    entry that the new screen does not name in `resolved` (by `id`: an entry without one is never
+    resolved) and gains the new ones it lacks (by identity);
+    the counts are summed, less one `deferred` or `dismissed` for each earlier entry resolved; the
+    ledger is appended to, so it keeps the whole history; `resolved` gathers every id resolved so
+    far. The report is the new one. Downstream steps receive only what is still open."""
+    merged = dict(after)
+    resolved = set(("id", name) for name in after.get("resolved") or [] if isinstance(name, str))
+    counts = dict(before.get("counts") or {})
+    for key, value in (after.get("counts") or {}).items():
+        earlier = counts.get(key)
+        counts[key] = earlier + value if is_type(earlier, "count") and is_type(value, "count") else value
+    for key in ACCUMULATED:
+        old, new = before.get(key) or [], after.get(key) or []
+        if not (old or key in after):
+            continue
+        kept = [entry for entry in old if entry_id(entry) not in resolved]
+        if COUNTED.get(key) in counts and is_type(counts[COUNTED[key]], "count"):
+            counts[COUNTED[key]] = max(0, counts[COUNTED[key]] - (len(old) - len(kept)))
+        seen = set(entry_id(entry) for entry in kept)
+        merged[key] = kept + [entry for entry in new if entry_id(entry) not in seen]
+    if counts:
+        merged["counts"] = counts
+    if before.get("resolved") or after.get("resolved"):
+        history = []
+        for name in list(before.get("resolved") or []) + list(after.get("resolved") or []):
+            if isinstance(name, str) and name not in history:
+                history.append(name)
+        merged["resolved"] = history
+    old, new = before.get("ledger") or "", after.get("ledger") or ""
+    if old and not new.startswith(old):
+        merged["ledger"] = old + ("\n\n" + new if new else "")
+    return merged
+
+
 def binding_holds(binding, proof, world, cwd, commit):
     """True when a proof still matches `commit`, the commit HEAD was found on. `tree`: the proof's
     tree is that commit's tree. `patch`: its patch id is the id of everything on that commit since
-    its base, so a base that moved under an unchanged patch keeps the proof. `none`: nothing binds it."""
+    its base, so a base that moved under an unchanged patch keeps the proof. `story`: the story's
+    patch since the proof's base is the same at the proof's `head` as at that commit, so any later
+    commit that changes the story voids it while a base that moved under it (`base` being the moving
+    `origin/<workingBase>`) does not; a head that
+    cannot be read voids it too. `none`: nothing binds it."""
     if binding == "tree":
         return isinstance(proof, dict) and proof.get("tree") == world.tree(cwd, commit)
     if binding == "patch":
         real = isinstance(proof, dict) and world.patch_id(cwd, proof.get("base"), commit)
         return bool(real) and proof.get("patchId") == real
+    if binding == "story":
+        head = proof.get("head") if isinstance(proof, dict) else None
+        if isinstance(head, str) and head == commit:
+            return True
+        if not (isinstance(head, str) and COMMIT_ID.match(head)):
+            return False
+        try:
+            covered = world.patch_id(cwd, proof.get("base"), head)
+        except GitFailed:
+            return False  # a head or base no longer readable: screened again, never assumed
+        return covered == world.patch_id(cwd, proof.get("base"), commit)
     return True
 
 
@@ -980,8 +1067,47 @@ class Run:
         record = self.record(index)
         if self.steps[index]["contract"] != "merge@1" or proof.get("head") == record.get("issuedHead"):
             return None
-        return ("merge-lands-what-was-checked: the merge names another commit than %s, the one the local checks "
-                "and the review were proven on; resume to check what changed" % (record.get("issuedHead") or "none"))
+        # The verdict cap is 200 characters: what to do comes first, so it is never cut off.
+        return ("merge-lands-what-was-checked: if exactly %s landed, report it with done; unproven: a person "
+                "checks; done if no later story commit landed, else close" % (record.get("issuedHead") or "none"))
+
+    def risk_base_fault(self, index, proof):
+        """A risk check screens the story against the moving `origin/<workingBase>` the run was
+        started with, and that base must be readable: any other base, or none, is refused."""
+        if self.steps[index]["contract"] != "risk-check@1":
+            return None
+        wanted = "origin/%s" % self.state["context"].get("workingBase")
+        if proof.get("base") != wanted:
+            return "the risk check's proof names the base %s; this run screens against %s" % (proof.get("base"), wanted)
+        if not self.world.readable(self.state["context"]["cwd"], wanted):
+            return "%s cannot be read here, so nothing was screened against it; fetch it, then screen again" % wanted
+        return None
+
+    def story_branch(self):
+        """The branch an adopted run is carried on in its new checkout: known once the branch step
+        finished, and needed until the merge has finished. None for a run never adopted."""
+        if not self.state.get("adoptedFrom"):
+            return None
+        branch, merged = None, False
+        for index, step in enumerate(self.steps):
+            record = self.record(index)
+            if step["contract"] == "branch@1" and ended_well(record):
+                branch = record["result"].get("branch")
+            if step["contract"] == "merge@1" and ended_well(record):
+                merged = True
+        return None if merged or not isinstance(branch, str) else branch
+
+    def branch_fault(self, index, handed_back=False):
+        """wrong-branch: an adopted run never hands out a step while its checkout is not on the
+        story branch. One exception: a merge handed back as it was issued, which may already have
+        landed (and deleted the branch); its landing is checked first."""
+        branch = self.story_branch()
+        if branch is None or (handed_back and self.steps[index]["contract"] == "merge@1"):
+            return
+        here = self.world.branch(self.state["context"]["cwd"])
+        if here != branch:
+            raise Refuse("wrong-branch", "this adopted run is carried on only on its story branch %s, and the checkout is "
+                         "on %s; check out %s there, then send the same request again" % (branch, here or "no branch", branch))
 
     # -- what a step is handed --
 
@@ -992,11 +1118,19 @@ class Run:
             kind, contract, keys, optional = parse_path(path)
             if kind == "context":
                 value = dig(self.state["context"], keys)
-            elif kind == "result":
+            elif kind in ("result", "proof"):
                 given = self.provider(index, contract)
-                value = dig(self.record(given)["result"], keys) if given is not None and ended_well(self.record(given)) else MISSING
+                value = dig(self.record(given)[kind] or {}, keys) if given is not None and ended_well(self.record(given)) else MISSING
             else:
-                value = {"answer": record["answer"], "proof": record["proof"], "head": record.get("issuedHead")}[keys[0]]
+                passed = record.get("passed") or {}
+                proof, unreadable = passed.get("proof"), None
+                if proof is not None and not self.world.readable(self.state["context"]["cwd"], (proof or {}).get("head")):
+                    # A baseline whose head this checkout cannot read (a force-pushed rebase, another
+                    # clone) is never handed as one: the step is told, and screens in full.
+                    proof, unreadable = None, True
+                value = {"answer": record["answer"], "proof": record["proof"], "head": record.get("issuedHead"),
+                         "passedProof": proof, "passedResult": passed.get("result"),
+                         "passedUnreadable": unreadable}[keys[0]]
                 value = MISSING if value is None else value
             if value is MISSING and not optional:
                 raise KeyError(key)
@@ -1062,6 +1196,7 @@ class Run:
         """Hand out a step. `cause` names the runner's own reason for a re-issue (None when a
         person or the plain order asked): those are counted, and the fifth stops the run."""
         step, record = self.steps[index], self.record(index)
+        self.branch_fault(index)
         refused = self.merge_refused(index)
         if refused:
             return self.stop("proof", refused, index)
@@ -1109,6 +1244,7 @@ class Run:
             # An issued step is handed back as it was: it may already have acted (a merge that
             # landed), so only its answer moves the run on, and its proofs are checked then.
             index = self.index_of(state["current"]["stepId"])
+            self.branch_fault(index, handed_back=True)
             self.report(index)  # the same running report again: harmless, and a lost one is not lost
             return self.run_answer(index)
         for index, step in enumerate(self.steps):
@@ -1148,6 +1284,7 @@ class Run:
             self.report(index)
             self.stop("no-verdict", "step %s did not open its answer with a `%s: …` verdict its contract lists" % (
                 step["id"], entry["verdict"]["label"]), index)
+            self.may_have_landed(index)
             return
         value, detail = parsed
         if has_secret(detail):
@@ -1162,7 +1299,7 @@ class Run:
         if kind == "continue":
             # The merge rule is asked again here: a step repaired by hand was never issued past it.
             fault = (problem or proof_fault(step["contract"], entry, proof, value, result) or self.merge_refused(index)
-                     or self.landed_fault(index, proof or {}))
+                     or self.landed_fault(index, proof or {}) or self.risk_base_fault(index, proof or {}))
             try:
                 holds = fault is not None or self.binding_holds(index, proof)
             except GitFailed as error:
@@ -1175,6 +1312,9 @@ class Run:
                 record.update(status="failed", redo="mismatch")
             else:
                 record["status"] = "done"
+                if step["contract"] == "risk-check@1" and record.get("passed"):
+                    record["result"] = accumulate(record["passed"]["result"], result)
+                record["passed"] = {"proof": proof, "result": record["result"]}
                 if not (record.get("refresh") and record["doneSeq"]):
                     record["doneSeq"] = state["seq"] + 1
                 record.update(refresh=False, autoRedo=0)  # its proof holds: the runner's re-issues start again from 0
@@ -1191,8 +1331,16 @@ class Run:
         self.report(index)
         if after:
             self.stop(after[0], after[1], index)
+            self.may_have_landed(index)
         elif END_CLASS.match(kind):
             self.finish(END_CLASS.match(kind).group(1))
+
+    def may_have_landed(self, index):
+        """merge-may-have-landed: a merge that answered and then stopped may have landed first, so
+        resume answers with the stop again until the driver says it did not (`landed: false`)."""
+        if self.steps[index]["contract"] == "merge@1":
+            record = self.record(index)
+            self.state["stopped"].update(mayHaveLanded=True, attempt=record["attempt"], commit=record.get("issuedHead"))
 
     # -- reporting --
 
@@ -1243,7 +1391,7 @@ def read_definition_file(path):
 def new_record():
     return {"attempt": 0, "autoRedo": 0, "status": "pending", "verdict": None, "class": None, "evidence": [],
             "result": {}, "proof": None, "links": {}, "startedAt": None, "endedAt": None, "doneSeq": None,
-            "ran": None, "answer": None, "refresh": False, "redo": None, "issuedHead": None}
+            "ran": None, "answer": None, "refresh": False, "redo": None, "issuedHead": None, "passed": None}
 
 
 def close_replaced(old, world):
@@ -1355,14 +1503,39 @@ def command_status(world, request, contracts):
             "position": position, "rows": rows, "table": "\n".join(table), "reports": run.reports()}
 
 
-def adopt(world, request, session):
+def common_dir(world, cwd):
+    """The git folder a checkout shares with every other worktree of its repository, or None."""
+    try:
+        out = world.git(cwd, "rev-parse", "--git-common-dir").decode("utf-8", "replace").strip()
+    except GitFailed:
+        return None
+    return os.path.realpath(os.path.join(cwd, out)) if out else None
+
+
+def same_repository(world, state, cwd):
+    """A run is adopted only into a checkout of its own repository: the same remote, or, for a
+    repository with none, a worktree of the same git folder."""
+    old = state["context"].get("repository")
+    if old is not None:
+        return old == REPORT.read_repository(cwd)
+    if REPORT.read_repository(cwd) is not None:
+        return False
+    old_cwd = os.path.realpath(state["context"].get("cwd") or "")
+    here, there = common_dir(world, cwd), common_dir(world, old_cwd)
+    return here == there and (here is not None or old_cwd == cwd)  # outside git: the same folder only
+
+
+def adopt(world, request, session, cwd):
     """An unfinished run for the same item (or with the named run id) that another of this user's
-    sessions left on this machine, newest first, rewritten under this session."""
+    sessions left on this machine for this repository, newest first, taken over by this session and
+    re-bound to the adopting checkout. Nothing is written here: the resume writes it once its answer
+    is known, so a refused resume leaves the run where it was. Returns (folder, state, adoptedFrom,
+    the old state file)."""
     item, run_id = item_of(request.get("item")), request.get("runId")
     folder = state_dir(world, create=False)
     if folder is None or not (item or run_id):
         raise Refuse("no-run", "there is no unfinished run to resume")
-    found = []
+    found, elsewhere = [], 0
     for name in os.listdir(folder):
         if not name.endswith(".%s.json" % item if item else ".json") or name.startswith("."):
             continue
@@ -1374,7 +1547,13 @@ def adopt(world, request, session):
             continue  # not this user's, not a state file, or gone: never adopted
         if (not state["outcome"] and state["sessionId"] != session and (item is None or state["item"] == item)
                 and (not run_id or state["runId"] == run_id) and state_name(state["sessionId"], state["item"]) == name):
-            found.append((modified, path, state))
+            if same_repository(world, state, cwd):
+                found.append((modified, path, state))
+            else:
+                elsewhere += 1
+    if not found and elsewhere:
+        raise Refuse("run-other-repository", "the unfinished run for %s belongs to another repository; it is never "
+                     "adopted here: start a run in this repository" % (item or run_id))
     if not found:
         raise Refuse("no-run", "there is no unfinished run to resume")
     _, old_path, state = max(found, key=lambda entry: entry[0])
@@ -1382,11 +1561,12 @@ def adopt(world, request, session):
     if os.path.lexists(mine) and not read_state(mine, world)["outcome"]:
         # As start: an open run of this session's own is never overwritten.
         raise Refuse("run-open", "this session already has an open run for %s; finish it, or start with replace" % (state["item"] or "no item"))
+    adopted_from = {"sessionId": state["sessionId"], "cwd": state["context"].get("cwd")}
     state["sessionId"] = session
+    state["context"]["cwd"] = cwd  # proofs are read in the checkout that carries the run on
     state["definitionReported"] = False  # the first report after an adoption carries the definition again
-    write_state(folder, state)
-    os.unlink(old_path)
-    return folder, state
+    state["adoptedFrom"] = adopted_from  # kept: an adopted run goes on only on its story branch
+    return folder, state, adopted_from, old_path
 
 
 def command_resume(world, request, contracts):
@@ -1394,6 +1574,12 @@ def command_resume(world, request, contracts):
     answer_text = request.get("answer")
     if answer_text is not None and not (isinstance(answer_text, str) and len(answer_text) <= ANSWER_MAX_CHARS):
         raise Refuse("bad-request", "answer is text of at most %d characters" % ANSWER_MAX_CHARS)
+    if ("landed" in request and request["landed"] is not False) or ("close" in request and request["close"] is not True):
+        raise Refuse("bad-request", "landed is only ever false, and close only ever true")
+    cwd = request.get("cwd", os.getcwd())
+    if not isinstance(cwd, str) or not os.path.isdir(cwd):
+        raise Refuse("bad-request", "cwd must be a directory")
+    cwd, adopted_from, old_path = os.path.realpath(cwd), None, None
     try:
         folder, state = find_run(world, request, session)
         if state["outcome"]:
@@ -1401,9 +1587,23 @@ def command_resume(world, request, contracts):
     except Refuse as refusal:
         if refusal.code != "no-run":
             raise
-        folder, state = adopt(world, request, session)
+        folder, state, adopted_from, old_path = adopt(world, request, session, cwd)
     prune(folder, world)
     run = Run(state, contracts, world)
+    if request.get("close") is True:
+        # A run whose item was finished elsewhere: ended as interrupted, never carried on.
+        answer = run.finish("interrupted")
+    elif (state["stopped"] or {}).get("mayHaveLanded") and "landed" not in request:
+        # merge-may-have-landed: answered with the stop until the driver has checked the landing.
+        answer = run.stopped_answer()
+    else:
+        answer = None
+    if answer is not None:
+        if adopted_from:
+            answer["adoptedFrom"] = adopted_from
+        answer["reports"] = run.reports()
+        write_adopted(folder, state, old_path)
+        return answer
     at = (state["stopped"] or state["current"] or {}).get("stepId")
     if at:
         record = state["steps"][at]
@@ -1413,9 +1613,18 @@ def command_resume(world, request, contracts):
             record["answer"] = answer_text
     state["stopped"] = None
     answer = run.advance()
+    if adopted_from:
+        answer["adoptedFrom"] = adopted_from
     answer["reports"] = run.reports()
-    write_state(folder, state)
+    write_adopted(folder, state, old_path)
     return answer
+
+
+def write_adopted(folder, state, old_path):
+    """The resumed run's state, written under this session; an adopted run's old file goes."""
+    write_state(folder, state)
+    if old_path and os.path.lexists(old_path):
+        os.unlink(old_path)
 
 
 HANDLERS = {"start": command_start, "next": command_next, "done": command_done,

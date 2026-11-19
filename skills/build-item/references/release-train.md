@@ -12,8 +12,8 @@ is a config error — STOP and name it.
 
 `releaseTrain.branch` absent → none of this runs: a one-off's working base is `baseBranch` and it
 takes the full per-story PR ritual, as before. `releaseTrain.fastMerges` absent or `false` → a
-one-off on the train still takes the full per-story PR ritual (4b), with the train as the pull
-request's base.
+one-off on the train still takes the full per-story PR ritual (the review moment `pr-boundary`),
+with the train as the pull request's base.
 
 ## Routing (step 0)
 
@@ -31,14 +31,15 @@ request's base.
 - **One-offs touching deploy configuration or migrations never ride the train; a reviewed release unit may.** A one-off whose change touches a
   path matching an entry of `release.releaseBranchFixExclusions` (absent → nothing is excluded;
   matching per `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`) ships to
-  `baseBranch` by the full 4b ritual instead, announced with the matching paths. Decide it at step 0
-  from the validated spec, and check it again on the real diff (`git diff --name-only --no-renames
-  origin/<train>...HEAD`) immediately before anything merges onto the train — the 5a merge, or the
-  4b pull request's merge — since a review fix can add such a path. A story branch that turns out to
-  touch one is moved with `git rebase --onto origin/<baseBranch> origin/<train>` (a disposable story
-  branch; this drops the other one-offs the train carries), its verification receipt is void (rerun
-  the local gate on the new tree), and it continues by 4b into `baseBranch` as a `pr-boundary`
-  review. A reviewed release unit (an epic's pull request, merged onto the train through its own
+  `baseBranch` by the full pull-request ritual instead, announced with the matching paths. Decide it
+  at step 0 from the validated spec, and check it again on the real diff (`git diff --name-only
+  --no-renames origin/<train>...HEAD`) immediately before anything merges onto the train — the fast
+  merge, or the train pull request's merge, both `merge-story`'s — since a review fix can add such a
+  path. A story branch that turns out to touch one is moved with `git rebase --onto
+  origin/<baseBranch> origin/<train>` (a disposable story branch; this drops the other one-offs the
+  train carries), its verification receipt is void (rerun the local gate on the new tree), and it
+  continues by the pull-request path into `baseBranch` as a `pr-boundary` review (the loop starts
+  its run again: `skills/build-item/SKILL.md`, The run). A reviewed release unit (an epic's pull request, merged onto the train through its own
   review) may carry migrations and infrastructure on the train: `release` checks only work no pull
   request reviewed, and, when `release.devDeployVerification` is set, waits for the development
   deploy before merging production.
@@ -48,50 +49,15 @@ request's base.
 
 ## Delivery path
 
-- **`releaseTrain.fastMerges` true → fast mode (4a, then 5a) exactly as for an epic branch, with the
-  train in its place**: the completed risk check (immediate-risk verifier and matched lenses
-  included), a green local gate at the profile's `storyVerify` width, a `--no-ff` merge onto the
-  train with the subject `merge: <itemNumber> <short scope> into <train>` — the item number always
-  leads, whatever `commitConventions.epicMergeFormat` says, because `release` reads it later — the
-  push, then the story branch deleted. The full review, the configured engines and CI move to the
-  train's pull request into `baseBranch`, which `release` opens before every cut. 4a's floor holds:
-  no completed risk check or receipt → 4b.
-- **A small, clean fix skips its own review pass.** With `releaseTrain.smallFixes` set, on the fast
-  path only, after the build run `git diff --numstat -z --no-renames origin/<train>...HEAD |
-  python3 -c 'import json,sys; print(json.dumps({"config": json.load(open(".claude/ds-config.json")),
-  "numstat": sys.stdin.read()}))' | python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/routing.py
-  small` — never through a shell variable, which drops the NULs (exit 2 → STOP naming the error). `small: true`, AND
-  the risk check raised no finding, launched no immediate-risk verifier and matched no mandatory
-  lens → 4a's `review` LOCAL-ONLY call does not run: with no finding there is nothing to triage
-  or distill into lessons. The progress table's review row reads "covered by the train's release
-  review (small fix: N files, M lines)". Everything else in 4a holds: the floor, the local gate,
-  the merge-commit body. `small: true` with a finding → 4a runs as usual (the finding still reaches
-  the lessons store through it), the reason said once.
-- **A larger or riskier fix gets its full review before it lands, on this machine.** `small: false`
-  (over either limit, a binary file, or a high-risk path; computed only with `smallFixes` set) → 4a's `review` call runs in
-  **LOCAL-FULL** mode: Claude and the configured CLI engine at merge-boundary depth, the full cycle
-  target and P1 continuation; no pull request, no cloud reviewer, no CI. 4a's gate runs at
-  `storyVerify: full` (a touched-suite receipt never counts). A missing risk check or receipt is
-  made good here, never by 4b, which would spend a CI run. **The landing gate:** in the story's checkout, before 5a
-  switches branches, `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/review-gate.py
-  check` with `{"base": "origin/<train>", "head": "<story head SHA>"}` must answer `small`,
-  `reviewed` or `not-applicable`; 5a merges exactly that SHA, with the `mergeBody` in the
-  merge-commit body. A moved train merged into the story is a new head: check again. Exit 2 →
-  LOCAL-FULL (or its follow-up), which records the review, then check again; never merge on a
-  non-zero exit. Why local: cloud
-  runners are paid per run, so the train's pull request into `baseBranch` stays the batch's one CI
-  run, while a late find on a large fix is caught here before it can hold up a release.
-- **Every one-off reviewed before it lands** (`releaseTrain.reviewEveryLanding` true). The small-fix
-  skip above never applies: every train one-off runs 4a's `review` call in LOCAL-FULL mode, sized to
-  the change (`local-full.md`: a small fix gets one cycle, anything else the full target), and the
-  landing gate answers `reviewed` only with a receipt at exactly that head, whatever the size; its
-  refusal names the size. The receipt's first line rides in the landing's merge-commit body, and,
-  with the repository admin's landing proof `local-full.md` step 3 posts on the reviewed head, it
-  is the train pull request's review evidence: that pull request then reviews only what no receipt
-  covers (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` §1 step 4r). Why:
-  each landing session reviews its own one-off, so many reviews run at once, and the train's pull
-  request into `baseBranch` waits only for its one CI run instead of a batch review.
-- **Otherwise → 4b with the train as the base.**
+- **`releaseTrain.fastMerges` true → fast mode exactly as for an epic branch, with the train in its
+  place** (review moment `release-deferred`): the completed risk check, a green local gate, the
+  review the fix's size calls for, a `--no-ff` merge onto the train, the push, then the story branch
+  deleted. Which review each landing gets (a small fix's skip, LOCAL-FULL for a larger or riskier
+  fix, every landing reviewed) and the landing gate are `review-story`'s:
+  `${CLAUDE_PLUGIN_ROOT}/skills/review-story/references/review-routes.md`, "The train's landing
+  review". The merge and its subject are `merge-story`'s
+  (`${CLAUDE_PLUGIN_ROOT}/skills/merge-story/references/merge-paths.md`).
+- **Otherwise → the pull-request path with the train as the base** (review moment `pr-boundary`).
 
 ## Settings
 
@@ -102,15 +68,12 @@ request's base.
   with its own review receipt, and `smallFixes` only sizes that review.
 - `releaseTrain.lateArrivals` — `"restart"` or `"offer"` (absent: `"offer"`); what `release` does
   with a one-off that lands while the train's review is running
-  (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` step 4a).
+  (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md`, Late landings).
 
-## Completion ritual (step 6) for a one-off on the train
+## After a one-off lands on the train
 
-- **It is NOT Done yet.** `item-status.py decide` with `target.kind: train` (`item-status.md`):
-  the merged status and the comment "merged to the release train <name> (<pull request link, or merge SHA>); ships with the
-  next release". Set `startDate`, set no `dueDate`. `release` marks it Done when the train's pull
-  request reaches `baseBranch`.
-- The pull request link (4b) and the as-built reconciliation run as usual.
+- Its completion (status, comment, dates: NOT Done yet) is `story-lifecycle`'s complete step
+  (`${CLAUDE_PLUGIN_ROOT}/skills/story-lifecycle/references/complete.md`).
 - Step 7 terminates as for any one-off; the recap says it is on the release train and becomes Done
   when the next release ships it.
 - **Last, after step 7's recap and clean-up:** `release.autoStart.enabled` → its trigger
@@ -128,4 +91,7 @@ CI and an earlier deploy to a development stage.
 
 ## Cited by
 
-- `skills/build-item/SKILL.md` — the working-base precedence, one-off mode, step 4 and step 6.
+- `skills/build-item/SKILL.md` — the working-base precedence, one-off mode and The run.
+- `skills/review-story/references/review-routes.md` — the train's landing review.
+- `skills/merge-story/references/merge-paths.md` — the exclusion check before a train merge.
+- `skills/story-lifecycle/references/complete.md` — a train landing's completion.

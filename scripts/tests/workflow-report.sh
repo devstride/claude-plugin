@@ -97,7 +97,7 @@ check("(1f) the largest safe integer is accepted", w.canonical_json({"n": 2 ** 5
 build = json.load(open(os.path.join(root, "workflows", "build.json"), encoding="utf-8"))
 independent = hashlib.sha256(json.dumps(build, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
 rc, out, _ = run("definition")
-check("(2) definition prints id build, version 1 and the independently computed hash", (rc, out.get("id"), out.get("version"), out.get("hash"), "canonical" in out), (0, "build", 1, independent, False))
+check("(2) definition prints id build, version 2 and the independently computed hash", (rc, out.get("id"), out.get("version"), out.get("hash"), "canonical" in out), (0, "build", 2, independent, False))
 
 # (3) the verdict
 check("(3a) a two-line verdict keeps the first line", w.clean_verdict("Merged cleanly\nand more detail"), "Merged cleanly")
@@ -142,7 +142,7 @@ check("(6d) a remote carrying a user and token prints neither", (out, "someone" 
 state = os.path.join(tmp, "state"); os.makedirs(state)
 ENV = {"CLAUDE_CODE_SESSION_ID": "session-one", "DEVSTRIDE_WORKFLOW_STATE_DIR": state}
 first = {"config": {}, "item": "I101", "now": "2026-01-02T03:04:05.000Z",
-         "reports": [{"step": "select", "status": "done", "verdict": "I101 — one-off, base develop", "evidence": ["ready set: 3"]}]}
+         "reports": [{"step": "claim", "status": "done", "verdict": "I101 — claim won", "evidence": ["ready set: 3"]}]}
 check("(7a) no session id skips with no-session", run("payload", first, {"DEVSTRIDE_WORKFLOW_STATE_DIR": state})[1], {"skip": "no-session"})
 check("(7b) config null skips with off", run("payload", dict(first, config=None), ENV)[1], {"skip": "off"})
 check("(7c) DEVSTRIDE_WORKFLOWS of 0, false, OFF and ' no ' skips with off whatever the config says",
@@ -158,7 +158,7 @@ check("(7g) the arguments carry the run, session, item, repository and the full 
       (True, "session-one", "I101", "example.com/owner/name", True))
 check("(7h) the report carries stepId, attempt 1, start, end and what ran",
       (rep.get("stepId"), rep.get("attempt"), rep.get("startedAt"), rep.get("endedAt"), rep.get("ran", {}).get("source"), rep.get("ran", {}).get("ref"), rep.get("verdict"), rep.get("evidence")),
-      ("select", 1, "2026-01-02T03:04:05.000Z", "2026-01-02T03:04:05.000Z", "builtin", "build-item", "I101 — one-off, base develop", ["ready set: 3"]))
+      ("claim", 1, "2026-01-02T03:04:05.000Z", "2026-01-02T03:04:05.000Z", "builtin", "claim-story", "I101 — claim won", ["ready set: 3"]))
 check("(7i) what ran names this plugin's version", rep.get("ran", {}).get("version"), json.load(open(os.path.join(root, ".claude-plugin", "plugin.json")))["version"])
 check("(7j) a block naming commands.report reports through commands", run("payload", dict(first, item="I102", config={"commands": {"report": "./report"}}), ENV)[1].get("via"), "commands")
 check("(7k) a provider block reports through the provider", run("payload", dict(first, item="I103", config={"provider": "devstride"}), ENV)[1].get("via"), "provider")

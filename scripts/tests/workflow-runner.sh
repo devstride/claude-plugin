@@ -3,7 +3,7 @@
 # skills/run-workflow/scripts/workflow-fixtures.json, the refusal contract (exit 2, exactly one
 # `workflow:` line, nothing on stdout, never a traceback), and a run driven end to end with
 # canned step answers. Everything happens in a throwaway directory: its own cache folder, copies
-# of the plugin that hold the step skills this release does not ship yet, and small git
+# of the plugin whose step skills are placeholders, and small git
 # repositories for the proof cases. No network.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -52,7 +52,7 @@ def stand_in_catalog():
 
 
 def plugin_copy(name, catalog=None):
-    """A copy of the plugin that also holds the step skills a later release adds."""
+    """A copy of the plugin whose Build step skills are placeholders."""
     root = os.path.join(WORK, name)
     if os.path.isdir(root):
         return root
@@ -69,7 +69,7 @@ def plugin_copy(name, catalog=None):
     for skill in PENDING + ["stand-in"]:
         os.makedirs(os.path.join(root, "skills", skill))
         with open(os.path.join(root, "skills", skill, "SKILL.md"), "w") as out:
-            out.write("---\nname: %s\n---\nA placeholder for a step skill a later release ships.\n" % skill)
+            out.write("---\nname: %s\n---\nA placeholder for a step skill.\n" % skill)
     return root
 
 
@@ -178,6 +178,8 @@ def new_repo(remote=None):
     git(repo, "init", "-q")
     git(repo, "checkout", "-q", "-b", "main")
     commit(repo, "readme.txt", "one\n", "first")
+    # origin/main follows main: the base a risk check screens against, with no remote to fetch.
+    git(repo, "symbolic-ref", "refs/remotes/origin/main", "refs/heads/main")
     git(repo, "checkout", "-q", "-b", "feature")
     commit(repo, "export.txt", "export\n", "add the export")
     if remote:
@@ -384,9 +386,9 @@ def section_validation():
     del context["goal"]
     result = cli(roots("fixture"), "start", {"definition": FIX["definitions"]["build"], "context": dict(context, cwd=repo)}, fresh("cache"), cwd=repo)
     check("refused: a context that lacks what a step is handed", refused(result, "context-missing"), result[3])
-    # the inert guarantee: the plugin as released refuses its own shipped Build definition too
-    result = cli(ROOT, "start", {"definitionFile": os.path.join(ROOT, "workflows", "build.json"), "context": dict(FIX["context"], cwd=repo)}, fresh("cache"), cwd=repo)
-    check("the released plugin runs nothing: workflows/build.json is refused (its draft contract names are unknown)", refused(result, "unknown-contract"), result[3])
+    # the plugin as released starts its own shipped Build definition (the whole run: build-workflow-run.sh)
+    rc, answer, _, err = cli(ROOT, "start", {"definitionFile": os.path.join(ROOT, "workflows", "build.json"), "context": dict(FIX["context"], cwd=repo)}, fresh("cache"), cwd=repo)
+    check("the released plugin starts workflows/build.json at its claim step", rc == 0 and is_run(answer, "claim", 1), err)
     # a refusal never echoes what looks like a credential
     edits = [{"op": "set", "step": "sync", "path": ["run", "ref"], "value": "gh" + "p_abcdefghijklmnop"}]
     result = cli(roots("fixture"), "start", {"definition": edit(FIX["definitions"]["build"], edits), "context": dict(FIX["context"], cwd=repo)}, fresh("cache"), cwd=repo)
@@ -443,6 +445,8 @@ def section_proof_fixtures():
                 return answers["tree"].encode()
             if args[0] == "diff" and args[-2].endswith("...c0"):
                 return ("diff " + args[-2][:-len("...c0")]).encode()
+            if args[0] == "diff":  # a story binding's other head: keyed by the whole range
+                return ("diff " + args[-2]).encode()
             if args[0] == "patch-id" and options.get("stdin", b"").decode()[5:] in answers.get("patchIds", {}):
                 patch = answers["patchIds"][options["stdin"].decode()[5:]]
                 return (patch + " 0000\n").encode() if patch else b""
@@ -451,7 +455,7 @@ def section_proof_fixtures():
         world = module.World(env={}, git=fake, uid=os.getuid())
         entry = contracts[case["contract"]]
         value = [v for v in entry["verdict"]["values"] if v["value"] == case["verdict"]][0] if "verdict" in case else None
-        fault = module.proof_fault(case["contract"], entry, case["proof"], value)
+        fault = module.proof_fault(case["contract"], entry, case["proof"], value, case.get("result"))
         if fault:
             got = "refused"
         else:
@@ -551,7 +555,8 @@ def section_lifecycle():
     answer = run.done()
     commit(run.repo, "export.txt", "export\nchanged under the merge\n", "a late change")
     answer = run.done("MERGE: REFRESHED\n")
-    check("... and is still required: the merge waits for the checks and the renamed review again", is_run(answer, "local-checks", 2) and is_run(run.done(), "second-opinion", 3), answer)
+    check("... and is still required: the merge waits for the risk check, the checks and the renamed review again",
+          is_run(answer, "risk-check", 2) and is_run(run.done(), "local-checks", 2) and is_run(run.done(), "second-opinion", 3), answer)
 
     # position while running
     run = Driver()
@@ -658,11 +663,14 @@ def section_proofs():
     answer = run.done()
     check("a proof with the right tree passes", is_run(answer, "review", 1) and answer["recorded"]["status"] == "done", answer)
 
-    # a new commit before the merge re-issues the local checks
+    # a new commit before the merge re-issues the risk check, for the delta, then the local checks
     commit(run.repo, "export.txt", "export\nmore\n", "a review fix")
     answer = run.done()
-    check("after a new commit, the local checks are issued again before the merge",
-          is_run(answer, "local-checks", 3) and answer["recorded"] == {"stepId": "review", "attempt": 1, "verdict": "REVIEW: SETTLED", "class": "continue", "status": "done"}, answer)
+    check("after a new commit, the risk check is issued again before the merge, handed the proof it gave",
+          is_run(answer, "risk-check", 2) and answer["recorded"] == {"stepId": "review", "attempt": 1, "verdict": "REVIEW: SETTLED", "class": "continue", "status": "done"}
+          and answer["payload"]["previousProof"]["head"] != facts(run.repo)["head"], answer)
+    answer = run.done()
+    check("... then the local checks, the review keeping its own proof", is_run(answer, "local-checks", 3), answer)
     answer = run.done()
     check("then the merge, since the review was of the patch as it now is", is_run(answer, "merge", 1), answer)
 
@@ -674,7 +682,8 @@ def section_proofs():
     after = facts(run.repo)
     answer = run.done("MERGE: REFRESHED\n")
     check("(the refresh changed the tree and left the patch alone)", before["tree"] != after["tree"] and before["patchId"] == after["patchId"])
-    check("REFRESHED: the local checks, gone stale, are issued again first", is_run(answer, "local-checks", 4) and answer["recorded"]["class"] == "redo:self", answer)
+    check("REFRESHED: the local checks, gone stale, are issued again first; the risk check, of an unchanged story, is not",
+          is_run(answer, "local-checks", 4) and answer["recorded"]["class"] == "redo:self" and run.state()["steps"]["risk-check"]["attempt"] == 2, answer)
     answer = run.done()
     check("after a base refresh that leaves the patch identical the review is not issued again; the merge is",
           is_run(answer, "merge", 2) and run.state()["steps"]["review"]["attempt"] == 1, answer)
@@ -682,7 +691,9 @@ def section_proofs():
     # a commit that changes the patch
     commit(run.repo, "export.txt", "export\nmore\nand more\n", "another fix")
     answer = run.done("MERGE: REFRESHED\n")
-    check("after a commit that changes the patch: the local checks again", is_run(answer, "local-checks", 5), answer)
+    check("after a commit that changes the patch: the risk check again", is_run(answer, "risk-check", 3), answer)
+    answer = run.done()
+    check("... then the local checks", is_run(answer, "local-checks", 5), answer)
     answer = run.done()
     check("... and then the review again", is_run(answer, "review", 2), answer)
     answer = run.done()
@@ -695,7 +706,7 @@ def section_proofs():
     final = run.to_end()
     attempts = dict((name, record["attempt"]) for name, record in run.state()["steps"].items())
     check("... and nothing before the merge is re-opened", final["action"] == "finished" and final["outcome"] == "completed"
-          and attempts["local-checks"] == 5 and attempts["review"] == 2 and attempts["risk-check"] == 1, attempts)
+          and attempts["local-checks"] == 5 and attempts["review"] == 2 and attempts["risk-check"] == 3, attempts)
 
     # supersession: the build completed again. No command of this release runs a finished step
     # again, so the test marks the build as issued in the state file, as a later loop would.
@@ -756,7 +767,8 @@ def section_proofs():
     run = Driver()
     run.until("merge")
     commit(run.repo, "export.txt", "export\nrefreshed\n", "a refresh")
-    run.done("MERGE: REFRESHED\n")
+    check("(the changed story is screened again first)", is_run(run.done("MERGE: REFRESHED\n"), "risk-check", 2), run.answer)
+    run.done()
     block = json.loads(canned("local-checks@1", run.repo, **{"proof.kind": "none-configured"}).split("```json\n")[1].split("```")[0])
     answer = run.done("LOCAL CHECKS: NOT CONFIGURED\n```json\n%s\n```\n" % json.dumps(block))
     check("(the review is issued again for the changed patch)", is_run(answer, "review", 2), answer)
@@ -821,8 +833,8 @@ def section_proofs():
     check("resume during a review that committed fixes hands the review back", is_run(answer, "review", 1), answer)
     run.answer = answer
     answer = run.done()
-    check("... its answer is accepted, and the local checks are issued again for the new commit",
-          is_run(answer, "local-checks", 2) and answer["recorded"]["status"] == "done", answer)
+    check("... its answer is accepted, and the risk check, then the local checks are issued again for the new commit",
+          is_run(answer, "risk-check", 2) and answer["recorded"]["status"] == "done" and is_run(run.done(), "local-checks", 2), answer)
     check("... then the merge, without a second review", is_run(run.done(), "merge", 1) and run.state()["steps"]["review"]["attempt"] == 1, run.answer)
 
     # a merge reported landed names the commit the checks and the review were proven on
@@ -832,8 +844,16 @@ def section_proofs():
     answer = run.done()
     check("a merge that landed a commit added after it was issued stops the run",
           is_stopped(answer, "proof", "merge") and "merge-lands-what-was-checked" in answer["reason"] and answer["recorded"]["status"] == "failed", answer)
+    issued = run.state()["steps"]["merge"]["issuedHead"]
     rc, answer, _, _ = run.call("resume", {"item": "I123"})
-    check("... and resume checks the new commit first", is_run(answer, "local-checks", 2), answer)
+    check("... and resume answers with that stop, naming the commit the merge was handed, until told it did not land",
+          is_stopped(answer, "proof", "merge") and answer.get("mayHaveLanded") is True and answer.get("commit") == issued
+          and answer.get("attempt") == 1 and run.state()["stopped"] is not None, answer)
+    rc, answer, _, _ = run.call("resume", {"item": "I123", "landed": False})
+    check("... then, told it did not land, screens and checks the new commit first", is_run(answer, "risk-check", 2), answer)
+    for bad_value in ({"landed": True}, {"landed": "no"}, {"close": False}):
+        rc, answer, _, err = run.call("resume", dict({"item": "I123"}, **bad_value))
+        check("resume refuses %s: landed is only ever false, close only ever true" % json.dumps(bad_value), rc == 2 and "bad-request" in err, err)
     run = Driver()
     run.until("merge")
     answer = run.done(output="MERGE: BLOCKED conflicts\n")
@@ -857,7 +877,8 @@ def section_proofs():
     check("(an indentation change keeps the stable patch id and changes the verbatim one)",
           facts(run.repo)["patchId"] != before[0] and stable() == before[1], before)
     answer = run.done("MERGE: REFRESHED\n")
-    check("a change of indentation alone: the local checks again", is_run(answer, "local-checks", 2), answer)
+    check("a change of indentation alone: the risk check and the local checks again",
+          is_run(answer, "risk-check", 2) and is_run(run.done(), "local-checks", 2), answer)
     check("... and the review again, never straight to the merge", is_run(run.done(), "review", 2), run.answer)
 
     # git settings neither break the patch id nor run anything

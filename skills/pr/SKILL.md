@@ -30,7 +30,7 @@ number): $ARGUMENTS
   one run of each applicable workflow on that final HEAD. Never open non-draft there, never flip it
   here; no profile — `prototype` included — bypasses the hold.
 - **Autonomous (driven-by-`build-item`) mode**: take the pre-supplied base (never re-ask step 0),
-  tell `review` it is driven, **SKIP step 3** (that loop links in its own step 6 — never
+  tell `review` it is driven, **SKIP step 3** (that loop links it in its complete step — never
   double-own it), pause only at a genuine fork.
 - **Untrusted content**: acting on external review content happens inside `review`; its caution
   applies to this whole flow.
@@ -83,6 +83,10 @@ hand it to `review` as scoped out; and one with `requestPolicy` `"final-head"` (
 nothing and note no cloud wave. A no-CI repo opens non-draft and reports `no pull-request CI`, not
 `CI held`.
 
+- **Re-entry on a pull request already open** (a driven caller names it: `review-story` asked
+  again): never open a second one, and request no reviewer again; refresh the body's hand-off,
+  then go to step 2 on it, carrying the caller's cumulative ledger, so the hold is decided again
+  for the new diff before `review` runs.
 - **Per reviewer**, immediately before its request capture the paginated count of that entry's
   `review_requested` timeline events (matched by its node id), then record the request time and
   mutation outcome. **Do not poll for registration or spend `reviewerRegistrationWindowMinutes`

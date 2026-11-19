@@ -222,16 +222,19 @@ are reported and ignored.
 | Skill | Knobs it honours |
 |---|---|
 | `plan` | `grain`, `specDepth`; writes the root marker; reports against the shape targets |
-| `ultracode-build` | `understandReaders`, `fixFloor`, `storyVerify` |
+| `ultracode-build` | `understandReaders` |
+| `risk-check` | `fixFloor` |
+| `local-checks` | `storyVerify` |
 | `review` | `reviewBreadthCeiling`, `verificationDefault`, `verificationGrouping`, `localCliEngine`, `maxLocalReviewRounds`, `targetAdversarialCycles`, `fixFloor`, reviewer timeouts, `releaseCiOrdering` |
-| `build-item` | resolves the profile; `perStoryPullRequest`, `storyVerify`, `autoRelease`, `targetAdversarialCycles`, `releaseCiOrdering` |
+| `build-item` | resolves the profile; `perStoryPullRequest`, `autoRelease`, `targetAdversarialCycles`, `releaseCiOrdering` |
 | `setup` | asks the profile; writes `profile` and the profile-consistent defaults |
 | `doctor` | reports the effective profile, its source, and any config key that contradicts it |
 | `rebalance` | takes the target profile; rewrites the root marker; re-slices not-started leaves to the new `grain` and `specDepth`; reports against the shape targets |
 
 ## Cited by
 
-- The SKILL.md of `plan`, `ultracode-build`, `review`, `build-item`, `setup` (plus
+- The SKILL.md of `plan`, `ultracode-build`, `risk-check`, `local-checks`, `review`, `build-item`,
+  `setup` (plus
   `setup/references/config-defaults.md`), `doctor` and `rebalance` — each for the knobs listed
   against it in the table above.
 - `build-item/references/plan-scope.md` — the `Release scope:` marker is read on the root-marker walk.

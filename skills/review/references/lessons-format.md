@@ -153,4 +153,5 @@ the report, not an engine round.
 - `.claude/ds-config.json` `_lessonsDoc_readme` — the addressing key.
 - `review/SKILL.md` — the writer (classification, merge-by-ID, cap enforcement) and the
   dedup guard.
-- `ultracode-build/SKILL.md` — phase-1 build context and phase-3 risk-screen checks.
+- `ultracode-build/SKILL.md` — phase-1 build context; `risk-check` applies lessons as hypotheses
+  in its self-check.

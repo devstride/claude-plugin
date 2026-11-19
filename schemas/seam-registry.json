@@ -240,7 +240,8 @@
       "verdict": "stdout's first line (WON, LOST, OK, NOT HOLDER, ABSENT, FORBIDDEN, UNREACHABLE, ERROR), then the claim JSON; exit 0 won or ok, 2 lost, 4 not the holder, 1 anything else",
       "calledBy": [
         "build-item 0",
-        "build-item 6",
+        "claim-story",
+        "story-lifecycle",
         "doctor 7"
       ],
       "unset": "no claims: build-item selects and builds exactly as before and claims nothing",
@@ -261,7 +262,7 @@
       ],
       "verdict": "stdout's first line (OK, ABSENT, FORBIDDEN, UNREACHABLE, ERROR), then the stored run as JSON; exit 0 ok, 1 anything else",
       "calledBy": [
-        "build-item progress table"
+        "build-item run"
       ],
       "unset": "reports go to DevStride through the agent's own connection when the session has one, and nothing is sent or said when it does not or the server cannot take them; set the key to null to switch reporting off (the machine variable DEVSTRIDE_WORKFLOWS=0 does the same)",
       "contract": "skills/build-item/references/workflow-reports.md",
@@ -321,9 +322,8 @@
       "payload": "none; run from the repository root, in array order",
       "verdict": "exit 0 passes; an error outside generated.paths fails",
       "calledBy": [
-        "ultracode-build 2",
+        "local-checks",
         "push rules",
-        "build-item 4a",
         "setup G"
       ],
       "unset": "push asks for a command; fast story merges stay off",
@@ -352,7 +352,7 @@
       "payload": "none",
       "verdict": "exit 0 is green; red is a stop",
       "calledBy": [
-        "ultracode-build 2",
+        "local-checks",
         "build-item 8",
         "setup G"
       ],
@@ -383,7 +383,7 @@
       "payload": "none",
       "verdict": "exit 0 is green",
       "calledBy": [
-        "ultracode-build 2",
+        "local-checks",
         "setup G"
       ],
       "unset": "no lint step",
@@ -638,7 +638,7 @@
       "verdict": "advisory findings on stdout",
       "calledBy": [
         "ultracode-build 1",
-        "ultracode-build 3",
+        "risk-check",
         "doctor 6",
         "setup G"
       ],

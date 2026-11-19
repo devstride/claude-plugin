@@ -4,8 +4,8 @@ load: contract
 # Item status — the one rule for status moves at start and landing
 
 `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/item-status.py decide` decides an item's
-status move and comment as its build starts (`build-item` step 1) and lands (step 6, a train
-merge, an epic or plan merge). Its docstring is the contract; `item-status-fixtures.json` beside
+status move and comment as its build starts (`story-lifecycle`'s start step) and lands (its
+complete step, a train merge, an epic or plan merge). Its docstring is the contract; `item-status-fixtures.json` beside
 it holds the canonical cases. Any other tool that moves item status for the loop (a repository's
 own CLI, a script) runs this file, never a copy.
 
@@ -31,3 +31,10 @@ own CLI, a script) runs this file, never a copy.
 
 `item-status.py` never moves an item out of a done-type status (the landed comment still posts) and never posts
 progress comments.
+
+## Cited by
+
+- `skills/story-lifecycle/references/start.md` and `complete.md` — the start and landed moves.
+- `skills/build-item/references/next-unblocked.md` — the merged status of a landed leaf.
+- `skills/build-item/references/board-placement.md` — step 0's placement.
+- `skills/release/references/estimates.md` — step 4's quote at landing.

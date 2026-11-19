@@ -117,7 +117,7 @@ parts = {
     "the closing reply carries no option text": "`Taking option <letter>.`",
     "For names the top-level skill": "`<skill>` is the TOP-LEVEL skill of the run (`build-item` or `release`), never the sub-skill that hit the fork",
     "the top-level caller writes the entry": "A sub-skill returns the fork to its top-level caller, which writes the entry.",
-    "one-off pick-up": "a given item or a one-off (no root needed): before step 1, that item itself",
+    "one-off pick-up": "a given item or a one-off (no root needed): before its run starts, that item itself",
     "resolve before posting": "Either fails → fail open, posting nothing.",
     "one tag rule for both kinds": "only when NO entry on the item, CHOICE or NOTICE, remains open",
     "the tag repaired after a crash": "a tagged item whose entries are all answered removes it",

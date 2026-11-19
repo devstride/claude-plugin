@@ -8,14 +8,15 @@ FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 export PYTHONDONTWRITEBYTECODE=1
 
-# The step skills a later release adds. That release empties this list; from then on each must
-# exist, keep the step-skill shape and carry its contract's verdict line.
-PENDING_SKILLS="claim-story story-lifecycle risk-check local-checks review-story merge-story capture-findings sync-base"
+# Step skills the catalog names that a later release adds. Empty: every Build step skill ships,
+# keeps the step-skill shape and carries its contract's verdict line.
+PENDING_SKILLS=""
 
 cat > "$WORK/cases.py" <<'PY'
 import importlib.util, json, math, os, re, sys
 
 root, work, pending = sys.argv[1], sys.argv[2], sys.argv[3:]
+STEP_POINTER = "Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows."
 POINTER = "**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message."
 
 
@@ -83,7 +84,7 @@ PUBLISHED = {
     "start@1": ("story-lifecycle", "START: MOVED=continue | UNCHANGED=continue | FAILED=stop", "none", [], "Mark In Progress", None),
     "branch@1": ("branch-feature", "BRANCH: CREATED=continue | EXISTS=continue | REFUSED=stop", "none", [], "Branch", None),
     "build@1": ("ultracode-build", "BUILD: READY=continue | NEEDS DECISION=ask | BLOCKED=stop", "none", ["branch@1"], "Build", "building"),
-    "risk-check@1": ("risk-check", "RISK CHECK: CLEAR=continue | FIXED=continue | NEEDS DECISION=ask | BLOCKED=stop", "none", ["build@1"], "STORY RISK CHECK", None),
+    "risk-check@1": ("risk-check", "RISK CHECK: CLEAR=continue | FIXED=continue | NEEDS DECISION=ask | BLOCKED=stop", "story", ["build@1"], "STORY RISK CHECK", None),
     "local-checks@1": ("local-checks", "LOCAL CHECKS: PASS=continue | NOT CONFIGURED=continue | FAIL=stop", "tree", ["risk-check@1"], "Verify", "verifying"),
     "review@1": ("review-story", "REVIEW: SETTLED=continue | COVERED=continue | BLOCKED=stop", "patch", ["risk-check@1", "local-checks@1"], "Review", "reviewing"),
     "merge@1": ("merge-story", "MERGE: LANDED=continue | REFRESHED=redo:self | HELD=end:held | BLOCKED=stop", "none", ["review@1", "local-checks@1", "risk-check@1"], "Merge", "landing"),
@@ -125,11 +126,13 @@ RESULTS = {
     "build@1": (["deferrals", "deviations", "untrackedDeferrals", "dismissed", "scopeLine", "head"],
                 {"deferrals": "array", "deviations": "array", "untrackedDeferrals": "array", "dismissed": "array", "scopeLine": "string", "head": "string"}),
     "risk-check@1": (["ledger", "report", "counts", "untrackedDeferrals", "dismissed"],
-                     {"ledger": "string", "report": "string", "counts": "object", "untrackedDeferrals": "array", "dismissed": "array"}),
+                     {"ledger": "string", "report": "string", "counts": "object", "untrackedDeferrals": "array", "dismissed": "array",
+                      "deferrals": "array", "deviations": "array", "resolved": "array"}),
     "local-checks@1": (["commands", "results", "receipt", "tree", "head", "skippedSuites"],
                        {"commands": "array", "results": "array", "receipt": "string|null", "tree": "string", "head": "string", "skippedSuites": "array"}),
     "review@1": (["path", "cycles", "untrackedDeferrals", "dismissed", "pullRequest", "mergeBody"],
-                 {"path": "string", "cycles": "count", "untrackedDeferrals": "array", "dismissed": "array", "pullRequest": "number|null", "mergeBody": "string|null"}),
+                 {"path": "string", "cycles": "count", "untrackedDeferrals": "array", "dismissed": "array", "pullRequest": "number|null", "mergeBody": "string|null",
+                  "deferrals": "array", "deviations": "array"}),
     "merge@1": (["target", "sha", "pullRequest", "deletedBranch"], {"target": "string", "sha": "string", "pullRequest": "number|null", "deletedBranch": "boolean"}),
     "complete@1": (["status", "statusName", "startDate", "dueDate", "pullRequest", "asBuilt", "claimReleased", "shipIntentReleased"],
                    {"status": "string", "statusName": "string|null", "startDate": "string|null", "dueDate": "string|null", "pullRequest": "number|null",
@@ -140,6 +143,26 @@ RESULTS = {
 }
 for name, entry in contracts.items():
     check("%s: its result keys and their types are as published" % name, (entry["result"]["required"], entry["result"]["types"]) == RESULTS.get(name), entry["result"])
+# Every contract's payload, key by key: a key is only ever added, never renamed or dropped.
+PAYLOADS = {
+    "risk-check@1": {"item": "context.item", "profile": "context.profile.name", "reviewMoment": "context.reviewMoment",
+                     "workingBase": "context.workingBase", "build": "result:build@1", "answer": "step.answer?",
+                     "previousProof": "step.passedProof?", "previousResult": "step.passedResult?",
+                     "baselineUnreadable": "step.passedUnreadable?"},
+    "review@1": {"item": "context.item", "profile": "context.profile.name", "reviewMoment": "context.reviewMoment",
+                 "workingBase": "context.workingBase", "route": "context.route", "riskCheck": "result:risk-check@1",
+                 "build": "result:build@1", "localChecks": "result:local-checks@1", "localChecksProof": "proof:local-checks@1"},
+    "local-checks@1": {"item": "context.item", "profile": "context.profile.name", "workingBase": "context.workingBase", "route": "context.route",
+                       "oneOff": "context.oneOff", "branch": "result:branch@1.branch", "previousProof": "step.proof?", "reviewMoment": "context.reviewMoment"},
+    "merge@1": {"item": "context.item", "profile": "context.profile.name", "workingBase": "context.workingBase", "route": "context.route",
+                "branch": "result:branch@1.branch", "review": "result:review@1", "build": "result:build@1", "riskCheck": "result:risk-check@1",
+                "commit": "step.head?", "reviewProof": "proof:review@1", "localChecks": "result:local-checks@1"},
+    "complete@1": {"item": "context.item", "profile": "context.profile.name", "workingBase": "context.workingBase", "oneOff": "context.oneOff",
+                   "releaseUnit": "context.releaseUnit", "route": "context.route", "profileSource": "context.profile.source", "merge": "result:merge@1",
+                   "build": "result:build@1", "riskCheck": "result:risk-check@1", "review": "result:review@1"},
+}
+for name, payload in PAYLOADS.items():
+    check("%s: its payload is as published" % name, contracts[name]["payload"] == payload, contracts[name]["payload"])
 check("the two skills that take text keep their argument templates",
       dict((n, e["argument"]) for n, e in contracts.items() if e["argument"]) ==
       {"branch@1": "{branchSlug} base: {workingBase}", "build@1": "{item} {goal} profile: {profile} review-moment: {reviewMoment}"})
@@ -162,39 +185,118 @@ faults = skill_faults(root, "run-workflow", None, 15, 1200)
 check("run-workflow: name, a description of at most 15 words, a body of at most 1,200 tokens, the pointer once", faults == [], faults)
 skill = open(os.path.join(root, "skills/run-workflow/SKILL.md"), encoding="utf-8").read()
 check("run-workflow can be invoked by the loop (no disable-model-invocation)", "disable-model-invocation" not in skill)
+# the reference is split: the loop half (driving a run) and the contracts half (definitions and proofs)
 reference = "skills/run-workflow/references/workflow-runner.md"
+authoring = "skills/run-workflow/references/workflow-contracts.md"
 text = open(os.path.join(root, reference), encoding="utf-8").read()
-check("the reference opens with load: contract", text.startswith("---\nload: contract\n---\n"))
-last = re.findall(r"^## .*$", text, re.M)[-1]
-cited = text[text.rindex("\n## Cited by"):]
-check("the reference ends with ## Cited by, naming the skill", last == "## Cited by" and "`skills/run-workflow/SKILL.md`" in cited, last)
-check("the reference is reachable from the skill", "${CLAUDE_PLUGIN_ROOT}/" + reference in skill)
+rules = open(os.path.join(root, authoring), encoding="utf-8").read()
+for path, body in ((reference, text), (authoring, rules)):
+    check("%s opens with load: contract" % path, body.startswith("---\nload: contract\n---\n"))
+    last = re.findall(r"^## .*$", body, re.M)[-1]
+    cited = body[body.rindex("\n## Cited by"):]
+    check("%s ends with ## Cited by, naming the skill" % path, last == "## Cited by" and "`skills/run-workflow/SKILL.md`" in cited, last)
+    check("%s is reachable from the skill with a read-in-full instruction" % path,
+          re.search(r"Read\s+`\$\{CLAUDE_PLUGIN_ROOT\}/%s`\s+in\s+full" % re.escape(path), skill) is not None)
+check("the loop half points at the contracts half, and the Build loop reads the loop half in full",
+      "${CLAUDE_PLUGIN_ROOT}/" + authoring in text
+      and re.search(r"Read\s+`\$\{CLAUDE_PLUGIN_ROOT\}/%s` in full" % re.escape(reference),
+                    open(os.path.join(root, "skills/build-item/SKILL.md"), encoding="utf-8").read()) is not None)
+SECTIONS = {reference: ["## Commands", "## A step's answer", "## Stops", "## Reporting", "## Heartbeat and ship intent", "## Resuming", "## Cited by"],
+            authoring: ["## What `start` refuses", "## What is reported", "## Payloads", "## Proofs",
+                        "## satisfiedBy — one step standing in for another's proof", "## Cited by"]}
+check("every section of the reference before the split is in exactly one half",
+      re.findall(r"^## .*$", text, re.M) == SECTIONS[reference] and re.findall(r"^## .*$", rules, re.M) == SECTIONS[authoring],
+      (re.findall(r"^## .*$", text, re.M), re.findall(r"^## .*$", rules, re.M)))
 check("the skill names the five commands' loop and the reference names all five",
       all("`%s`" % c in text for c in runner.COMMANDS) and all("`%s`" % c in skill for c in ("start", "done", "status", "resume")))
 codes = ["bad-schema", "duplicate-step-id", "unknown-contract", "unknown-contract-major", "requires-missing", "requires-not-earlier",
          "required-not-always", "required-not-stop", "required-off", "skill-missing", "plugin-too-old", "repository-required",
          "unsupported-gate", "unsupported-when", "unsupported-source", "unsupported-on-fail", "credential-in-definition"]
 source = open(os.path.join(root, "skills/run-workflow/scripts/workflow.py"), encoding="utf-8").read()
-check("every validation code is in the runner and in the reference", all('"%s"' % c in source and "`%s`" % c in text for c in codes),
-      [c for c in codes if '"%s"' % c not in source or "`%s`" % c not in text])
+check("every validation code is in the runner and in the contracts half", all('"%s"' % c in source and "`%s`" % c in rules for c in codes),
+      [c for c in codes if '"%s"' % c not in source or "`%s`" % c not in rules])
 kinds = ["failed", "needs-person", "attempts-exhausted", "no-verdict", "proof"]
 check("every stop kind is in the reference's table", all("| `%s` |" % k in text for k in kinds))
-check("the three named proof rules are in the runner and the reference", all(r in source and "`%s`" % r in text for r in (
-    "risk-triggers-need-verifiers", "none-configured-needs-pull-request-route", "merge-lands-what-was-checked")))
+check("the five named proof rules are in the runner and the contracts half", all(r in source and "`%s`" % r in rules for r in (
+    "risk-triggers-need-verifiers", "risk-check-accumulates", "none-configured-needs-pull-request-route", "review-names-one-path",
+    "merge-lands-what-was-checked")))
+check("the merge stop's own rule is in the runner and the loop half", "merge-may-have-landed" in source and "`merge-may-have-landed`" in text)
+check("adoption's refusal across repositories is in the runner and the loop half", '"run-other-repository"' in source and "`run-other-repository`" in text)
+check("an adopted run's story-branch refusal is in the runner and the loop half", '"wrong-branch"' in source and "`wrong-branch`" in text)
+check("every binding the runner knows is spelled in the contracts half", all("- **%s**:" % b in rules for b in runner.BINDINGS), runner.BINDINGS)
 
 # the skills the catalog names
 present = sorted(n for n in os.listdir(os.path.join(root, "skills")) if os.path.isfile(os.path.join(root, "skills", n, "SKILL.md")))
 named = sorted(set(e["builtinSkill"] for e in contracts.values() if e["builtinSkill"]))
 check("every skill the catalog names exists or is pending", all(n in present or n in pending for n in named), [n for n in named if n not in present and n not in pending])
-check("a pending skill is not shipped yet (when it ships, take it off PENDING_SKILLS)", not [n for n in pending if n in present], [n for n in pending if n in present])
-check("the pending list names only skills the catalog names", all(n in named for n in pending), pending)
-existing = ("branch-feature", "ultracode-build")  # shipped before the catalog, with their own verdict text
+check("nothing is pending: every skill the catalog names ships", pending == [], pending)
+flat = lambda s: re.sub(r"\s+", " ", s)
+BUILD_STEPS = ["claim-story", "story-lifecycle", "risk-check", "local-checks", "review-story", "merge-story", "capture-findings", "sync-base"]
+check("the eight Build step skills are the catalog's own skills, less the two engines", sorted(BUILD_STEPS) == sorted(set(named) - {"branch-feature", "ultracode-build"}), named)
 for name in named:
-    if name in pending or name in existing:
+    if name in pending:
         continue
-    serves = [e for e in contracts.values() if e["builtinSkill"] == name]
-    faults = skill_faults(root, name, serves, 25, 1200)
-    check("step skill %s keeps its shape and its contract's verdict" % name, faults == [], faults)
+    serves = [(n, e) for n, e in contracts.items() if e["builtinSkill"] == name]
+    text = open(os.path.join(root, "skills", name, "SKILL.md"), encoding="utf-8").read()
+    if name in ("branch-feature", "ultracode-build"):
+        # engines with floors of their own: the verdict, the step pointer (branch-feature), a short description
+        faults = skill_faults(root, name, [e for _, e in serves], 15, 10 ** 9)
+        if name == "branch-feature" and STEP_POINTER not in text:
+            faults.append("no step-skill pointer")
+        check("%s carries its contract's verdict, the pointer once and a description of at most 15 words" % name, faults == [], faults)
+        continue
+    faults = skill_faults(root, name, [e for _, e in serves], 15, 1200)
+    if flat(text).count(STEP_POINTER) != 1:
+        faults.append("the step-skill pointer does not appear exactly once")
+    if "disable-model-invocation" in text:
+        faults.append("the loop cannot invoke it")
+    if "$ARGUMENTS" not in text or "one JSON object" not in text:
+        faults.append("no arguments line naming one JSON object")
+    result = re.search(r"^## Result\n(.*?)(?=^## |\Z)", text, re.S | re.M)
+    result = flat(result.group(1)) if result else ""
+    if "After the verdict and its evidence, one fenced `json` block" not in result:
+        faults.append("no result-block statement")
+    for _, entry in serves:
+        keys = entry["result"]["required"] + sorted(k for k in entry["result"]["types"] if k not in entry["result"]["required"])
+        keys += entry["proof"].get("required", [])
+        lost = [k for k in keys if "`%s`" % k not in result]
+        if lost:
+            faults.append("its Result section does not name %s" % lost)
+        if entry["proof"].get("required") and "`proof`" not in result:
+            faults.append("its Result section does not name the proof")
+    rules = re.search(r"\*\*Step rules\.\*\*(.*)", flat(text))
+    rules = rules.group(1) if rules else ""
+    for rule in ("verdict first", "safe to re-run", "config wins", "never decides what runs next"):
+        if rule not in rules:
+            faults.append("its step rules lack %r" % rule)
+    if "subagent" not in rules:
+        faults.append("its step rules do not say which subagents it may start")
+    if len(serves) > 1:
+        for contract, _ in serves:
+            line = re.search(r"`%s` → \*\*read `\$\{CLAUDE_PLUGIN_ROOT\}/(skills/%s/references/[a-z-]+\.md)` in full" % (re.escape(contract), name), flat(text))
+            if not line:
+                faults.append("no dispatch line for %s" % contract)
+        if "Any other contract, or none → no verdict line" not in flat(text):
+            faults.append("no answer for a contract it does not carry")
+    check("step skill %s keeps the step-skill shape, its contract's verdict and result keys" % name, faults == [], faults)
+    # every reference it or its own references cite is a contract with a Cited by list, and its own are reachable
+    own = sorted(os.path.join("skills", name, "references", f) for f in os.listdir(os.path.join(root, "skills", name, "references"))) \
+        if os.path.isdir(os.path.join(root, "skills", name, "references")) else []
+    cited = set(re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/(skills/[a-z-]+/references/[a-z0-9-]+\.md)", text))
+    for ref in own:
+        cited |= set(re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/(skills/[a-z-]+/references/[a-z0-9-]+\.md)", open(os.path.join(root, ref), encoding="utf-8").read()))
+    bad_refs = []
+    for ref in sorted(cited):
+        body = open(os.path.join(root, ref), encoding="utf-8").read() if os.path.isfile(os.path.join(root, ref)) else ""
+        if not body.startswith("---\nload: contract\n---\n") or re.findall(r"^## .*$", body, re.M)[-1:] != ["## Cited by"]:
+            bad_refs.append(ref)
+    unreached = [ref for ref in own if "${CLAUDE_PLUGIN_ROOT}/" + ref not in text]
+    check("%s: every reference it cites is a contract ending with Cited by, and its own are reachable" % name,
+          (bad_refs, unreached) == ([], []), (bad_refs, unreached))
+rule = flat(open(os.path.join(root, "skills/release/references/step-skills.md"), encoding="utf-8").read())
+check("the step-skill rule carries the one-skill-many-steps clause",
+      "A step skill may carry several steps of ONE workflow, one per invocation, chosen by the payload's reserved `contract` key (never the step id)" in rule
+      and '"One seam, nothing else" is read per invocation' in rule)
 
 # the step-skill check itself, on a throwaway plugin: one skill that conforms, three that do not
 def write(name, body, described="Step: do the thing and print one verdict."):
@@ -208,17 +310,17 @@ write("good", "## Verdict\n\n%s\n\n## Steps\n\nDo it.\n" % lines)
 write("stale", "## Verdict\n\n`START: MOVED | STAYED`\n")
 write("silent", "Do it.\n")
 write("wordy", "## Verdict\n\n%s\n" % lines, "Step: " + "word " * 30)
-check("a grouped skill carries one verdict line per contract it serves", skill_faults(work, "good", grouped, 25, 1200) == [], skill_faults(work, "good", grouped, 25, 1200))
-check("a verdict that differs from the catalog is caught", any("Verdict" in f for f in skill_faults(work, "stale", grouped, 25, 1200)))
-check("a missing Verdict section is caught", any("Verdict" in f for f in skill_faults(work, "silent", grouped, 25, 1200)))
-check("a description that is too long is caught", any("description" in f for f in skill_faults(work, "wordy", grouped, 25, 1200)))
-check("a skill that is not there is caught", skill_faults(work, "absent", grouped, 25, 1200) == ["missing"])
+check("a grouped skill carries one verdict line per contract it serves", skill_faults(work, "good", grouped, 15, 1200) == [], skill_faults(work, "good", grouped, 15, 1200))
+check("a verdict that differs from the catalog is caught", any("Verdict" in f for f in skill_faults(work, "stale", grouped, 15, 1200)))
+check("a missing Verdict section is caught", any("Verdict" in f for f in skill_faults(work, "silent", grouped, 15, 1200)))
+check("a description that is too long is caught", any("description" in f for f in skill_faults(work, "wordy", grouped, 15, 1200)))
+check("a skill that is not there is caught", skill_faults(work, "absent", grouped, 15, 1200) == ["missing"])
 PY
 OUT="$(python3 -B "$WORK/cases.py" "$ROOT" "$WORK/plugin" $PENDING_SKILLS 2>&1)"; RC=$?
 printf '%s\n' "$OUT" | sed 's/^/  /'
 N="$(printf '%s\n' "$OUT" | grep -c '^ok')"
 if [ $RC -ne 0 ] || printf '%s\n' "$OUT" | grep -q '^FAIL'; then bad "a case failed or the script did not finish (exit $RC)"
-elif [ "$N" -lt 61 ]; then bad "only $N cases ran, expected at least 61"
+elif [ "$N" -lt 80 ]; then bad "only $N cases ran, expected at least 80"
 else ok "(all $N cases passed)"; fi
 
 # the ten seam steps of scripts/tests/step-skills.sh are a separate list: no Build step has a seam

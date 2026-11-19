@@ -169,8 +169,8 @@ F11. No result, no review. An engine's result is its findings or its explicit no
 
 ## G. Mandatory review lenses (config: `review.mandatoryLenses`; contract: `skills/ultracode-build/references/mandatory-lenses.md`)
 G1. An entry `{name, paths, question}` whose ANCHORED `paths` match a hand-written file in the diff
-    under review adds ONE focused finder carrying its `name` and `question`, in `ultracode-build`
-    phase 3 and in the merge-boundary fan-out, on the same footing as the forced security lens: the
+    under review adds ONE focused finder carrying its `name` and `question`, in `risk-check`
+    and in the merge-boundary fan-out, on the same footing as the forced security lens: the
     breadth ceiling and the delivery profile clamp generic breadth and never remove it.
 G2. Its findings are verified like any other (REFUTED by default; CONFIRMED reproduces; PLAUSIBLE
     names mechanism and path) and are not P1 by virtue of the lens.
@@ -194,7 +194,7 @@ H4. Never use `gh pr view --json files` (100 cap) or REST pull-files (3000 cap) 
     decision; use a SHA-pinned three-dot local diff. Glob-match renames on BOTH source and
     destination.
 H5. [Same condition] Recompute applicability after the last fix push and BEFORE releasing CI — and
-    after a post-review rebase in build-item step 5, from the new SHA. Where the list is empty there
+    after a post-review rebase in merge-story, from the new SHA. Where the list is empty there
     is nothing to recompute, and an absent check is settled rather than pending.
 H6. Absent/skipped non-applicable checks are EXPECTED, not red.
 H7. Above GitHub's 3000-file cap the workflow paths-filter can miss a match the local diff finds —
@@ -264,7 +264,7 @@ K6. Infra-touching fixes never land on a release branch: a commit staging any pa
     commit-time check. The same list keeps such one-offs off the release train. A release unit
     merges onto the train only with a settled review's proof on its merged head (an admin's
     `devstride/reviewed` status naming that pull request and base, `reviewed-status.py`), posted
-    only at settle or 5b's carry, never to clear a refusal; a branch name is never proof. The
+    only at settle or `merge-story`'s carry, never to clear a refusal; a branch name is never proof. The
     merge gate enforces it at the merge, not hours later at the release: a pull request into the
     train headed by an epic or plan integration branch merges only when `reviewed-status.py verify
     <head> --pr <n> --base <train>` passes, whatever it changes; any other head changing such a
@@ -776,7 +776,7 @@ skills/release/SKILL.md|0a. Clearance
 skills/branch-hotfix/SKILL.md|never claims release clearance
 skills/build-item/SKILL.md|profile: <name>
 skills/build-item/SKILL.md|view: 'full'
-skills/ultracode-build/SKILL.md|review-moment: release-deferred
+skills/risk-check/references/story-risk-check.md|review-moment: release-deferred
 skills/review/SKILL.md|Spend full adversarial review at a merge boundary
 skills/review/SKILL.md|targetAdversarialCycles
 skills/review/SKILL.md|serious P2
@@ -810,10 +810,10 @@ skills/doctor/SKILL.md|null **or absent**
 skills/setup/references/config-defaults.md|the tooling's way back
 skills/setup/SKILL.md|instanceBoundTo
 skills/doctor/SKILL.md|localEnvironment
-skills/ultracode-build/SKILL.md|SHA-keyed verification receipt
+skills/local-checks/SKILL.md|SHA-keyed verification receipt
 skills/ultracode-build/references/engineering-economy.md|Keep the main skill's model inherited
 skills/ultracode-build/references/engineering-economy.md|standard library
-skills/ultracode-build/SKILL.md|focused `opus`/`xhigh` verifier
+skills/risk-check/references/story-risk-check.md|focused `opus`/`xhigh` verifier
 skills/pr/SKILL.md|ONE call
 skills/pr/SKILL.md|references/pre-ship-hold.md
 skills/pr/references/pre-ship-hold.md|stranded
@@ -864,7 +864,7 @@ skills/review/SKILL.md|never pasted
 skills/review/scripts/rereview-scope.sh|numstat
 skills/review/references/delta-re-review.md|threshold
 skills/plan/references/delivery-profiles.md|verificationGrouping
-skills/build-item/SKILL.md|verification receipt keyed
+skills/local-checks/SKILL.md|SHA-keyed verification receipt
 RELEASING.md|validate.sh
 CONTRIBUTING.md|measure-cost.sh
 skills/doctor/references/version-currency.md|devstride--v
@@ -910,7 +910,7 @@ skills/release/SKILL.md|post-deploy only
 skills/release/references/post-deploy-check.md|POST-DEPLOY HEALTH: NOT RUN
 skills/doctor/SKILL.md|postDeployCheckSkill
 hooks/version-check.sh|fetchOnSessionStart
-skills/ultracode-build/SKILL.md|mandatoryLenses
+skills/risk-check/SKILL.md|mandatoryLenses
 skills/ultracode-build/references/review-fanout.md|mandatory-lenses.md
 skills/review/SKILL.md|mandatoryLenses
 skills/doctor/SKILL.md|mandatoryLenses
@@ -928,11 +928,11 @@ skills/pr/SKILL.md|requestPolicy
 skills/pr/SKILL.md|releaseBranchPattern
 skills/build-item/SKILL.md|releaseTrain.branch
 skills/build-item/references/release-train.md|NOT Done
-skills/build-item/references/release-train.md|`small: false`
+skills/review-story/references/review-routes.md|`small: false`
 skills/build-item/references/release-train.md|LOCAL-FULL
-skills/build-item/SKILL.md|LOCAL-FULL
+skills/review-story/SKILL.md|LOCAL-FULL
 skills/review/SKILL.md|LOCAL-FULL
-skills/build-item/references/release-train.md|review-gate.py
+skills/review-story/references/review-routes.md|review-gate.py
 skills/review/references/local-full.md|review-gate.py record
 skills/review/SKILL.md|No result, no review
 skills/review/SKILL.md|through `round`
@@ -942,9 +942,9 @@ skills/release/SKILL.md|merge-gate.py <n> <reviewedHead> --all-green
 skills/release/references/release-branch.md|merge-gate.py <n> <reviewedHead> --delete-branch
 skills/release/references/release-branch.md|merge-gate.py <n> <settled head>
 skills/release/references/auto-start.md|merge-gate.py <n> <sha> --all-green
-skills/build-item/SKILL.md|never the live one
-skills/build-item/SKILL.md|merge-gate.py <n> <head>
-skills/build-item/SKILL.md|reviewed-status.py post <new head> --from
+skills/merge-story/references/merge-paths.md|never the live one
+skills/merge-story/references/merge-paths.md|merge-gate.py <n> <head>
+skills/merge-story/references/merge-paths.md|reviewed-status.py post <commit> --from
 skills/review/references/review-ledger.md|reviewed-status.py post <final head>
 skills/review/references/review-ledger.md|On a READY outcome only
 skills/release/scripts/train_exclusions.py|reviewed_status.verify
@@ -953,7 +953,7 @@ skills/build-item/references/epic-release-steps.md|merge-gate.py
 skills/pr/scripts/merge-gate.py|an admin merge would bypass a block it cannot name
 skills/pr/scripts/merge-gate.py|has no review proof
 skills/review/references/review-ledger.md|`NOT POSTED` is a STOP before the
-skills/build-item/SKILL.md|release-holds.md
+skills/merge-story/references/merge-paths.md|release-holds.md
 skills/release/SKILL.md|release-holds.md
 skills/release/references/release-branch.md|Release holds.
 skills/release/SKILL.md|light or written
@@ -987,7 +987,7 @@ skills/build-item/references/release-holds.md|scripts/release-holds.py
 skills/build-item/references/next-unblocked.md|SAME nearest release-unit ancestor
 skills/build-item/references/next-unblocked.md|landed set BEFORE the merge
 skills/build-item/SKILL.md|neither Done nor landed
-skills/build-item/SKILL.md|any other is dismissed, never filed
+skills/capture-findings/SKILL.md|any other is dismissed, never filed
 skills/review/SKILL.md|one both likely and
 skills/review/SKILL.md|worth filing
 skills/build-item/references/next-unblocked.md|merged status alone never satisfies
@@ -996,9 +996,9 @@ skills/build-item/references/next-unblocked.md|release-unit cycle
 skills/plan/references/splice-mechanics.md|already holds landed leaves
 skills/build-item/SKILL.md|awaiting their release
 skills/build-item/references/epic-release-steps.md|merge-only: true
-skills/build-item/SKILL.md|Merge pull request #<n> from <owner>/<head branch>
-skills/build-item/SKILL.md|integration-branch or train base
-skills/build-item/SKILL.md|never step 1
+skills/merge-story/references/merge-paths.md|Merge pull request #<n> from <owner>/<head branch>
+skills/merge-story/references/merge-paths.md|integration-branch or train base
+skills/build-item/SKILL.md|merged or Done → never started
 skills/build-item/references/next-unblocked.md|A story named by number
 skills/build-item/references/next-unblocked.md|The release unit first
 skills/release/SKILL.md|create-defect deferred
@@ -1029,7 +1029,7 @@ skills/plan/references/splice-mechanics.md|else an explicit `null`
 skills/plan/references/splice-mechanics.md|Step 3's board rule applies to each
 skills/rebalance/SKILL.md|by that step's board rule
 skills/create-story/references/one-off-handoff.md|leave it out of the list
-skills/build-item/SKILL.md|its step 0 places the item first
+skills/story-lifecycle/references/start.md|its step 0 places the item first
 skills/build-item/references/item-status.md|board-placement.md
 skills/build-item/references/board-placement.md|Only these two items are ever placed here
 skills/build-item/references/board-placement.md|never takes an item off a board

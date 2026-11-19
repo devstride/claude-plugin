@@ -35,7 +35,7 @@ At **each** item picked up (every iteration, a given item number too), after ste
 
 ## 2. After each merge and at every terminal exit: a finished plan comes off
 
-After step 6 records a merge, and at every terminal exit (plan complete, DRY-CHAIN, an explicit
+After the run's complete step records a merge, and at every terminal exit (plan complete, DRY-CHAIN, an explicit
 stop, an unrecoverable error), for each root this run started (at a terminal exit before any
 pickup: the root `resolve-root` gives with the plan root as the item):
 

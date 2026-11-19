@@ -93,6 +93,19 @@ else
   bad "(8) direct pull-request merge recap is missing"
 fi
 
+# (2) walks whatever skills exist; this makes sure the Build workflow's step skills are among them
+MISSING_STEPS=""
+for step in claim-story story-lifecycle risk-check local-checks review-story merge-story capture-findings sync-base; do
+  if ! has_normalized_once "skills/$step/SKILL.md" "$POINTER"; then
+    MISSING_STEPS="${MISSING_STEPS}${MISSING_STEPS:+, }$step"
+  fi
+done
+if [ -z "$MISSING_STEPS" ]; then
+  ok "(8b) the eight Build step skills each carry the pointer once"
+else
+  bad "(8b) Build step skill missing or without the pointer once: $MISSING_STEPS"
+fi
+
 RAW_CONTRADICTIONS=""
 for phrase in 'relay its verdict and fix verbatim' 'Relay exactly what it reports' \
   'relay what it reports' 'relays what they report' 'reports what it printed'; do

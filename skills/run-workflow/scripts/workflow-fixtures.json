@@ -412,7 +412,7 @@
   "start@1": "START: MOVED In Progress\n```json\n{\n \"statusBefore\": \"To Do\",\n \"statusAfter\": \"In Progress\",\n \"boardPlaced\": true\n}\n```\n",
   "branch@1": "BRANCH: CREATED feature\n```json\n{\n \"branch\": \"feature\",\n \"base\": \"main\",\n \"created\": true\n}\n```\n",
   "build@1": "BUILD: READY\n3 files changed\n12 tests pass\n```json\n{\n \"deferrals\": [],\n \"deviations\": [],\n \"untrackedDeferrals\": [\n  \"tidy the export menu\"\n ],\n \"dismissed\": [],\n \"scopeLine\": \"3 files\",\n \"head\": \"{head}\"\n}\n```\n",
-  "risk-check@1": "RISK CHECK: CLEAR\n```json\n{\n \"ledger\": \"ledger text\",\n \"report\": \"risk check: clear\",\n \"counts\": {\n  \"raised\": 0,\n  \"fixed\": 0,\n  \"deferred\": 0,\n  \"dismissed\": 0\n },\n \"untrackedDeferrals\": [],\n \"dismissed\": [],\n \"proof\": {\n  \"base\": \"main\",\n  \"head\": \"{head}\",\n  \"triggers\": [],\n  \"verifiers\": 0,\n  \"lenses\": []\n }\n}\n```\n",
+  "risk-check@1": "RISK CHECK: CLEAR\n```json\n{\n \"ledger\": \"ledger text\",\n \"report\": \"risk check: clear\",\n \"counts\": {\n  \"raised\": 0,\n  \"fixed\": 0,\n  \"deferred\": 0,\n  \"dismissed\": 0\n },\n \"untrackedDeferrals\": [],\n \"dismissed\": [],\n \"proof\": {\n  \"base\": \"origin/main\",\n  \"head\": \"{head}\",\n  \"triggers\": [],\n  \"verifiers\": 0,\n  \"lenses\": []\n }\n}\n```\n",
   "local-checks@1": "LOCAL CHECKS: PASS (2 ran)\nunit: 12 passed\nlint: clean\n```json\n{\n \"commands\": [\n  \"unit\",\n  \"lint\"\n ],\n \"results\": [\n  {\n   \"command\": \"unit\",\n   \"status\": \"pass\",\n   \"count\": 12\n  }\n ],\n \"receipt\": \"unit+lint@{tree}\",\n \"tree\": \"{tree}\",\n \"head\": \"{head}\",\n \"skippedSuites\": [],\n \"proof\": {\n  \"kind\": \"receipt\",\n  \"tree\": \"{tree}\",\n  \"head\": \"{head}\",\n  \"receipt\": \"unit+lint@{tree}\"\n }\n}\n```\n",
   "review@1": "REVIEW: SETTLED\n1 cycle, nothing open\n```json\n{\n \"path\": \"fast-local\",\n \"cycles\": 1,\n \"untrackedDeferrals\": [],\n \"dismissed\": [],\n \"pullRequest\": null,\n \"mergeBody\": null,\n \"proof\": {\n  \"path\": \"fast-local\",\n  \"head\": \"{head}\",\n  \"base\": \"main\",\n  \"patchId\": \"{patchId}\"\n }\n}\n```\n",
   "merge@1": "MERGE: LANDED main\n```json\n{\n \"target\": \"main\",\n \"sha\": \"0f0e0d0c0b0a09080706050403020100ffeeddcc\",\n \"pullRequest\": null,\n \"deletedBranch\": true,\n \"links\": {\n  \"commit\": \"https://example.com/commit/1\"\n },\n \"proof\": {\n  \"head\": \"{head}\"\n }\n}\n```\n",
@@ -975,6 +975,54 @@
      }
     ],
     "expect": "shape"
+   },
+   {
+    "name": "a proof path to a contract that is not required",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "start@1",
+       "payload",
+       "claimProof"
+      ],
+      "value": "proof:claim@1"
+     }
+    ],
+    "expect": "payload-order"
+   },
+   {
+    "name": "a proof path to a contract the catalog does not hold",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "merge@1",
+       "payload",
+       "other"
+      ],
+      "value": "proof:deploy@1"
+     }
+    ],
+    "expect": "payload-path"
+   },
+   {
+    "name": "an unknown proof binding",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "risk-check@1",
+       "proof",
+       "binding"
+      ],
+      "value": "commit"
+     }
+    ],
+    "expect": "shape"
    }
   ],
   "sound": [
@@ -1018,6 +1066,21 @@
       ]
      }
     ]
+   },
+   {
+    "name": "an optional proof path to an earlier contract",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "payload",
+       "reviewProof"
+      ],
+      "value": "proof:review@1?"
+     }
+    ]
    }
   ]
  },
@@ -1031,12 +1094,12 @@
    "expect": "ok"
   },
   {
-   "name": "the same definition is refused by the released plugin, which lacks the step skills",
+   "name": "the same definition is accepted by the released plugin, which ships the step skills",
    "definition": "build",
    "edits": [],
    "root": "real",
    "git": true,
-   "expect": "skill-missing"
+   "expect": "ok"
   },
   {
    "name": "a definition that is not an object",
@@ -3474,7 +3537,7 @@
    "contract": "risk-check@1",
    "proof": {
     "base": "main",
-    "head": "abc",
+    "head": "c0",
     "lenses": [],
     "triggers": [],
     "verifiers": 0
@@ -3487,7 +3550,7 @@
    "contract": "risk-check@1",
    "proof": {
     "base": "main",
-    "head": "abc",
+    "head": "c0",
     "lenses": [],
     "triggers": [
      "auth"
@@ -3502,7 +3565,7 @@
    "contract": "risk-check@1",
    "proof": {
     "base": "main",
-    "head": "abc",
+    "head": "c0",
     "lenses": [],
     "triggers": [
      "auth"
@@ -3518,7 +3581,7 @@
    "contract": "risk-check@1",
    "proof": {
     "base": "main",
-    "head": "abc",
+    "head": "c0",
     "lenses": [],
     "triggers": [
      "auth"
@@ -3632,7 +3695,7 @@
    "contract": "risk-check@1",
    "proof": {
     "base": "main",
-    "head": "abc",
+    "head": "c0",
     "lenses": [],
     "triggers": [
      "auth"
@@ -3647,7 +3710,7 @@
    "contract": "risk-check@1",
    "proof": {
     "base": "main",
-    "head": "abc",
+    "head": "c0",
     "lenses": [],
     "triggers": [
      "auth"
@@ -3662,7 +3725,7 @@
    "contract": "risk-check@1",
    "proof": {
     "base": "main",
-    "head": "abc",
+    "head": "c0",
     "lenses": [],
     "triggers": [
      "auth"
@@ -3692,6 +3755,96 @@
     "tree": "t1"
    },
    "expect": "refused"
+  },
+  {
+   "name": "a risk check whose head is another commit with the same story patch (a base that moved under it)",
+   "contract": "risk-check@1",
+   "proof": {
+    "base": "main",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "lenses": [],
+    "triggers": [],
+    "verifiers": 0
+   },
+   "git": {
+    "patchIds": {
+     "main": "p1",
+     "main...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "p1"
+    }
+   },
+   "expect": "holds"
+  },
+  {
+   "name": "a risk check whose head is an older commit: a later commit changed the story",
+   "contract": "risk-check@1",
+   "proof": {
+    "base": "main",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "lenses": [],
+    "triggers": [],
+    "verifiers": 0
+   },
+   "git": {
+    "patchIds": {
+     "main": "p2",
+     "main...aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "p1"
+    }
+   },
+   "expect": "stale"
+  },
+  {
+   "name": "a risk check whose head can no longer be read",
+   "contract": "risk-check@1",
+   "proof": {
+    "base": "main",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "lenses": [],
+    "triggers": [],
+    "verifiers": 0
+   },
+   "git": {
+    "patchIds": {
+     "main": "p1"
+    }
+   },
+   "expect": "stale"
+  },
+  {
+   "name": "a risk check whose head is not a commit id",
+   "contract": "risk-check@1",
+   "proof": {
+    "base": "main",
+    "head": "HEAD",
+    "lenses": [],
+    "triggers": [],
+    "verifiers": 0
+   },
+   "git": {
+    "patchIds": {
+     "main": "p1"
+    }
+   },
+   "expect": "stale"
+  },
+  {
+   "name": "a review whose result and proof name different paths",
+   "contract": "review@1",
+   "proof": {
+    "path": "pull-request",
+    "head": "h",
+    "base": "main",
+    "patchId": "p1"
+   },
+   "result": {
+    "path": "fast-local"
+   },
+   "git": {
+    "patchIds": {
+     "main": "p1"
+    }
+   },
+   "expect": "refused",
+   "rule": "review-names-one-path"
   }
  ],
  "repository": [

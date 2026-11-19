@@ -3,7 +3,8 @@ load: rationale
 ---
 # The epic release, and the one-off bypass — why they are shaped this way
 
-The rules live in the body (step 8's gate, the one-off mode section, 5a and 6.5) and in
+The rules live in the body (step 8's gate, the one-off mode section), in the Build step skills
+(`merge-story`'s fast merge, `capture-findings`) and in
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release-steps.md` (step 8 once its gate
 fires); this file holds the reasoning, read before cutting a release PR or changing the one-off
 classification.
@@ -20,7 +21,7 @@ reviewer whose `baseBranches` exclude the epic's release target is not part of t
 full-diff scope still binds every engine that is, and that reviewer first sees the code at the
 first pull request whose base it admits — typically the production release, where cloud
 reviewers cover the whole PR. When
-the stories took the full 4b ritual instead, each was already cloud-reviewed at its own PR, so
+the stories took the full pull-request ritual instead, each was already cloud-reviewed at its own PR, so
 the release review points at what per-story review could not see: the cross-story integration
 surface and the develop-merge conflict resolutions.
 
@@ -126,7 +127,7 @@ container is the plan's scope, never a one-off.
 a release-unit ancestor — and without the explicit bypass, the general derivation rule would route
 it onto that epic's integration branch and strand it there until an unrelated epic releases. A
 one-off ships straight to develop, and because nothing comes after it, its own PR is the only place
-the cloud roster and CI will ever see the code — which is why it takes the full 4b ritual under
+the cloud roster and CI will ever see the code — which is why it takes the full pull-request ritual under
 every profile, and why fast mode is never available to it. The one exception is a configured release
 train (`release-train.md`): there something DOES come after it — the train's own pull request into
 develop, a full-diff review with CI — so with `releaseTrain.fastMerges` a one-off on the train may
@@ -141,7 +142,6 @@ take fast mode, exactly as an epic story does.
   unit at zero") and the one-off section's pointer ("Read … before changing the one-off
   classification or its step-0 delta").
 - `skills/build-item/SKILL.md` — the working-base note on why stories merge into the integration
-  branch and step 6.5's deferred finding placement, each citing
-  this file with "(why: …)", as does step 7's release-unit count; step 8's auto-release gate
+  branch, citing this file, as does step 7's release-unit count with "(why: …)"; step 8's auto-release gate
   is covered by the step-8 pointer above, and its `live: false` and no-release-notes rules by its
   pointer to `epic-release-steps.md`.

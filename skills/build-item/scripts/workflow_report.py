@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Shapes what the build loop reports about the workflow it follows: which step it is on and what
 each step produced. Standard library only, no network: it prints the one call the agent then makes
-(or a reason to make none) and remembers a little per-run state. The rules for when to report are
-in `skills/build-item/references/workflow-reports.md`.
+(or a reason to make none) and remembers a little per-run state. The step runner builds every
+report with `build_report_arguments`; the rule for sending them is in
+`skills/build-item/references/workflow-reports.md`.
 
 A module first and a command line second. Importing it runs nothing, reads no state, no clock and
 no environment variable; later tools load it by file path and call these functions directly:

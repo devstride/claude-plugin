@@ -277,7 +277,7 @@ After step 5 verifies zero orphans, invoke `rationalize-gantt` on the plan root 
 it traces to a step-5 wiring decision with `add_relationship`/`remove_relationship`, never by
 re-running the plan. **If it STOPS on a dependency cycle it wrote no dates at all**: fix the edges it
 names and re-invoke; never move on undated. On the EXTEND path it re-dates **not-done items
-only** (its default): shipped items keep the completion dates `build-item`'s ritual stamped.
+only** (its default): shipped items keep the completion dates `build-item`'s complete step stamped.
 
 ## 6.5 Stamp execution-order numbers into leaf titles
 

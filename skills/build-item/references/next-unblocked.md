@@ -15,7 +15,10 @@ satisfied, in the earliest-dated open container (this org: Capability/Epic) on t
 path. Priority breaks ties; earlier `startDate` breaks remaining ties. Exclude anything the gating
 check catches (`build-item` step 0's GATING CHECK — items that depend on a human/infra decision
 that is the user's). With `claims` configured it also skips a candidate another live agent holds
-(`story-claims.md`).
+(`story-claims.md`). **It also skips a candidate held for release**: one the merge answered `HELD`
+for a release hold (its built branch waits, the item still in progress) is passed over while
+`release-holds.py decide` still answers held for it and its ancestors (`release-holds.md`), and
+selected again only once the hold lifts — never rebuilt while it waits.
 
 **A `blocked_by` target is satisfied** when it is Done, OR when it is in the git-confirmed landed
 set (below) AND has the SAME nearest release-unit ancestor as the dependent leaf, so the same
@@ -41,19 +44,19 @@ USER names explicitly by number is still built, as a one-off.
 
 ## Landed leaves — merged onto an integration branch, not yet Done
 
-A leaf merged onto its release unit's integration branch (`build-item` 5a, or a 4b pull request
-into that branch) has not reached its release target: it is **landed**, not Done. It is never a
+A leaf merged onto its release unit's integration branch (`merge-story`'s fast merge, or a
+pull-request merge into that branch) has not reached its release target: it is **landed**, not Done. It is never a
 candidate and never counts as remaining (`build-item` steps 0 and 7). A caller that reads
 DevStride but never git (`comprehend-plan`, `splice-mechanics.md`, `rationalize-gantt`,
 `rebalance`) has no landed set: it counts a leaf as landed when it sits in the merged status or
 carries the landed comment.
 
-- **At the merge (`build-item` step 6)** — not Done. `item-status.py decide` (`item-status.md`)
+- **At the merge (`story-lifecycle`'s complete step)** — not Done. `item-status.py decide` (`item-status.md`)
   gives the **merged status** — `epicIntegrationBranches.mergedStatusName` (absent → `"Review"`;
   `null` → none), by name in the leaf's status collection, never a hard-coded id; none, or a move
   that fails → leave its status and say so — and the **landed comment**, ALWAYS posted: "merged
   onto <integration branch> at <merge SHA> (<pull request link, if any>); Done when the <release
-  unit> release pull request reaches <release target>". Write step 6's dates: `startDate`/`dueDate`
+  unit> release pull request reaches <release target>". Write the complete step's dates: `startDate`/`dueDate`
   = branch creation → this merge.
 - **The git history is the record.** `git fetch origin`, then once per integration branch:
   `git log --first-parent --merges --format=%s origin/<release target>..origin/<integration
@@ -65,7 +68,7 @@ carries the landed comment.
   number. **A leaf is landed when its number is in that landed set** (plan scope: or the plan's,
   and `plan-scope.md` overrides recovery and close-out). The merged status is only
   the visible signal and never stands in for the set. A pull-request merge subject names the
-  branch only because `build-item` 5b passes GitHub's default subject with `--subject` (into an
+  branch only because `merge-story`'s pull-request merge passes GitHub's default subject with `--subject` (into an
   integration branch or the train): a repository set to use the pull-request title as the merge
   subject would leave no number for this read, or for `release`'s read of the train.
 - **Recovery — keyed on the landed comment, never the status** (it may be `null`, missing, or a
@@ -76,7 +79,7 @@ carries the landed comment.
   close-out: run the close-out below now and compute the ready-set again after it — never select
   from one computed before. Otherwise report the mismatch and ask.
 - **A story named by number** (`build-item` step 0, a one-off too) skips selection, never this
-  guard: it is never rebuilt and stops before step 1. Done → report it; in the landed set → report
+  guard: it is never rebuilt and stops before its run starts. Done → report it; in the landed set → report
   "landed, awaiting its release"; the landed comment outside the set → the recovery above; the
   release-train comment ("merged to the release train …") → report it ships with the next release.
 - **Close-out (`build-item` step 8, first thing after the release pull request merges; or
@@ -92,7 +95,7 @@ carries the landed comment.
   tracked), **then its leaves**, last, so an open leaf keeps recovery armed
   until the whole close-out is done. For each number: `get_item`; keep only a not-Done
   `hierarchyRoles.leaf` under this release unit; `update_item` → Done (it works off-board;
-  `mark_done` does not), writing NO dates — they stay step 6's, so no auto-scheduler check — then
+  `mark_done` does not), writing NO dates — they stay the complete step's, so no auto-scheduler check — then
   `add_comment` "reached <release target> with the <release unit> release pull request #<n>". Every
   part skips what is done already (a unit comment naming this pull request, a Done unit, a leaf
   Done or carrying its comment), so a re-run after any partial run finishes only what is missing;
@@ -126,8 +129,9 @@ the ready-set lets a HUMAN fan the waves out deliberately; the loop itself stays
 ## Cited by
 
 - `build-item` SKILL.md step 0 (canonical owner — selection, recovery, a story named by number)
-  and the "Serial by design" rule (the ready-set-is-shape reasoning); steps 6, 7 and 8 (landed
+  and the "Serial by design" rule (the ready-set-is-shape reasoning); steps 7 and 8 (landed
   leaves, the close-out)
+- `skills/story-lifecycle/references/complete.md` (Landed leaves: an epic-branch landing)
 - `plan/references/splice-mechanics.md` (where a splice lands, and which release unit houses it),
   and through it `insert-story` and `insert-defect`
 - `comprehend-plan` SKILL.md (the next-unblocked read and the landed count)

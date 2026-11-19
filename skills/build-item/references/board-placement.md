@@ -12,7 +12,7 @@ decision is the script's `resolve`, never judged by eye.
 
 ## 1. Every pickup: place the item, then its release unit
 
-At **each** item picked up, as step 1 starts it (before its status moves) and after the Active
+At **each** item picked up, as `story-lifecycle`'s start step starts it (before its status moves) and after the Active
 Agents step (when it is configured) has resolved its root:
 
 - **Once per run, the boards**: `list_boards` (every page, archived ones included) → for each
@@ -51,7 +51,7 @@ a question, never a stop.**
 
 ## Cited by
 
-- `skills/build-item/SKILL.md` step 1, through `skills/build-item/references/item-status.md`
+- `skills/story-lifecycle/references/start.md` step 1, and `skills/build-item/references/item-status.md` step 0
 - `skills/setup/references/boards-mode.md`
 - `skills/create-story/references/one-off-handoff.md` step 0
 - `skills/setup/references/config-defaults.md` (Board placement)

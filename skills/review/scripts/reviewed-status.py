@@ -15,7 +15,7 @@ resolves `{owner}/{repo}`.
         Post a `success` status on <sha>, the head of open pull request <n>, whose base must still be
         <branch>, the base the review was done against (GitHub's own head, state and base for <n> are
         read; a pull request retargeted after its review gets no proof). `review` runs it once a pull
-        request settles READY, with the final reviewed head; `build-item` 5b runs it with `--from` to carry
+        request settles READY, with the final reviewed head; `merge-story` runs it with `--from` to carry
         a review to a tree-identical rebase: <sha> and <reviewed-sha> must have the same tree, and
         <reviewed-sha> must itself verify for <n> and its base. Post ONLY there: never to clear a
         release refusal (a refused unit goes back to the owner). After posting it verifies; a post
