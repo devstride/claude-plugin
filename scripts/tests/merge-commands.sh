@@ -121,10 +121,10 @@ bare, repo, story = setup()
 past = commit(repo, "export.txt", "export\nunchecked change\n", "an unchecked commit on top of the checked one")
 git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--ff-only", past); git(repo, "push", "-q", "origin", "main")
 check("a base fast-forwarded past the checked commit is landed but unproven, for a person", landing(repo, story) == ("unproven", None), landing(repo, story))
-# --- an unproven landing: did a later story commit land? every commit listed, then the direct test ----
+# --- an unproven landing: everything the base gained listed, and the story branch hint ------------
 WR = os.path.join(ROOT, "skills/run-workflow/references/workflow-runner.md")
-GAINED = command(MP, "git log --no-merges --oneline <commit>..origin/<workingBase>")
-STORY_LATER = command(MP, "git rev-list <commit>..origin/<branch>")
+GAINED = command(MP, "git log --oneline <commit>..origin/<workingBase>")
+STORY_LATER = command(MP, "git rev-list <commit>..<story-ref>")
 ON_BASE = command(MP, "git merge-base --is-ancestor <that> origin/<workingBase>")
 check("(run-stops.md and workflow-runner.md spell the same commands)",
       all("`%s`" % c in flat(RS) and "`%s`" % c in flat(WR) for c in (GAINED, STORY_LATER, ON_BASE)))
@@ -153,24 +153,53 @@ def later_shape(shape):
     git(repo, "push", "-q", "origin", "main")
     return repo, story
 def later_found(repo, story):
-    """What the person sees: the subjects the base gained, and the story commits the direct test finds on it."""
+    """What the person sees: the subjects the base gained, and the commits the hint finds on it."""
     listed = [line.split(" ", 1)[1] for line in sh(repo, filled(GAINED, "main", story)).stdout.strip().split("\n") if line]
-    found = [c for c in sh(repo, STORY_LATER.replace("<commit>", story).replace("<branch>", "feature")).stdout.split()
+    found = [c for c in sh(repo, STORY_LATER.replace("<commit>", story).replace("<story-ref>", "origin/feature")).stdout.split()
              if sh(repo, filled(ON_BASE, "main", story).replace("<that>", c), check_rc=False).returncode == 0]
     return listed, found
 for shape, how in (("B", "a --no-ff merge at a later head"), ("C2", "a release fast-forward carrying a later head's merge"),
                    ("D", "a stacked branch"), ("E", "an octopus merge")):
     repo, story = later_shape(shape)
     listed, found = later_found(repo, story)
-    check("%s: unproven, the base's commits list the later story commit, and the direct test finds it on the base" % how,
+    check("%s: unproven, the listing shows the later story commit, and the hint finds it on the base" % how,
           landing(repo, story) == ("unproven", None) and LATER in listed and found == [git(repo, "rev-parse", "feature")], (listed, found))
     if shape == "B":
         old_listed = sh(repo, "git log --first-parent --oneline %s..origin/main" % story).stdout
         check("(the old --first-parent listing showed only the merge commit)", LATER not in old_listed, old_listed)
 repo, story = later_shape("F2")
 listed, found = later_found(repo, story)
-check("only another author's work past C: listed without any story commit, and the direct test finds none, so done naming C is valid",
-      landing(repo, story) == ("unproven", None) and listed == ["another author: their work"] and found == [], (listed, found))
+check("only another author's work past C: listed (their merge too) without any story commit, and the hint finds none, so done naming C is valid",
+      landing(repo, story) == ("unproven", None) and listed == ["merge their work", "another author: their work"] and found == [], (listed, found))
+# (1) the base merged into the story with changes of its own, then fast-forwarded onto the base, story refs deleted
+bare, repo, story = setup()
+other_author(bare, "upstream U")
+git(repo, "fetch", "-q", "origin")
+git(repo, "merge", "-q", "--no-commit", "--no-ff", "origin/main")
+with open(os.path.join(repo, "export.txt"), "a") as out:
+    out.write("a change made while resolving the merge\n")
+git(repo, "add", "-A"); git(repo, "commit", "-q", "-m", "merge the base into the story")
+git(repo, "push", "-q", "origin", "feature:main")
+git(repo, "push", "-q", "origin", "--delete", "feature"); git(repo, "checkout", "-q", "main"); git(repo, "branch", "-q", "-D", "feature")
+listed = [line.split(" ", 1)[1] for line in sh(repo, filled(GAINED, "main", story)).stdout.strip().split("\n") if line]
+check("a merge made on the story branch and fast-forwarded onto the base: unproven, and the listing shows that merge for the person to account for",
+      landing(repo, story) == ("unproven", None) and "merge the base into the story" in listed and "upstream U" in listed, listed)
+check("(the --no-merges listing hid it, showing only the upstream commit)",
+      sh(repo, "git log --no-merges --format=%%s %s..origin/main" % story).stdout.split("\n")[:1] == ["upstream U"])
+# (2) the story rebased onto upstream U as C', while a release merge R(C, U) lands the original C
+bare, repo, story = setup()
+other_author(bare, "upstream U")
+git(repo, "fetch", "-q", "origin")
+upstream = git(repo, "rev-parse", "origin/main")
+git(repo, "checkout", "-q", "-b", "release", story); git(repo, "merge", "-q", "--no-ff", "-m", "release merge", upstream)
+git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--ff-only", "release"); git(repo, "push", "-q", "origin", "main")
+git(repo, "checkout", "-q", "feature"); git(repo, "rebase", "-q", upstream); git(repo, "push", "-q", "-f", "origin", "feature")
+listed, found = later_found(repo, story)
+check("a rebased story beside a release landing the original C: the listing shows only the release merge and the upstream commit",
+      landing(repo, story) == ("unproven", None) and listed == ["release merge", "upstream U"], listed)
+check("... and the hint's one hit is U, an upstream commit the rebased branch merely contains: one to look at, not story work",
+      found == [upstream] and git(repo, "log", "-1", "--format=%s", upstream) == "upstream U"
+      and "an upstream commit the story branch merely contains (through a rebase or a base merge) is not story work" in flat(RS), found)
 bare, repo, story = setup()
 later = commit(repo, "export.txt", "export\nunchecked change\n", "a later commit inside the merge step")
 git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--no-ff", "-m", "merge: I123", later); git(repo, "push", "-q", "origin", "main")

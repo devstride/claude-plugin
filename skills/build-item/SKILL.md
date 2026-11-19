@@ -223,11 +223,11 @@ command, and again after a compaction**: the commands, the answers, the stops an
    (a cleared conversation, a crash), re-bound to this checkout (`adoptedFrom` names the one it
    came from: say it), and hands back its current step. Any command refused `wrong-branch` (a `resume`,
    `next` or `done` of an adopted run off its story branch, named) → `git fetch origin
-   "+refs/heads/<branch>:refs/remotes/origin/<branch>"` (it fails, changing nothing, for a
-   branch only here); then `git checkout <branch>` when it exists here, else `git checkout -b
+   "+refs/heads/<branch>:refs/remotes/origin/<branch>"` (for a branch only here it fails,
+   harmlessly); then `git checkout <branch>` when it exists here, else `git checkout -b
    <branch> origin/<branch> && git config branch.<branch>.remote origin && git config
-   branch.<branch>.merge refs/heads/<branch>`; `git rev-parse --abbrev-ref HEAD`
-   printing it; then the same request again. The branch held by another worktree (`git worktree list`), or absent
+   branch.<branch>.merge refs/heads/<branch>` (so a bare `git push` works where the clone's
+   fetch rule misses the branch); `git rev-parse --abbrev-ref HEAD` printing it; then the same request again. The branch held by another worktree (`git worktree list`), or absent
    here and on the remote → STOP, naming what a person must do: free it there, or push it from the
    checkout that has it.
    Refused `no-run` or `run-other-repository` → **`start`** with
@@ -272,9 +272,8 @@ command, and again after a compaction**: the commands, the answers, the stops an
 - After a completed run, its last step (`sync-base`) left the checkout on the working base with a
   clean tree. **Terminal exit or hand-over only: `return-checkout`, after its own check**: `git
   checkout <working base> && git pull --ff-only`, then `git status --porcelain` empty — dirty →
-  name the drift and STOP, lease kept, nothing reset or staged. The check is repeated
-  here because a terminal exit may follow a run that never reached its sync (a release hold, a
-  hand-over).
+  name the drift and STOP, lease kept, nothing reset or staged. Repeated here: a
+  terminal exit may follow a run that never synced (a release hold).
 - **Handoff memory**: what shipped, what remains, the plan root WITH profile and source (never the
   profile alone), the epic's integration branch keyed to its number (or "develop — no epic").
 - **Counts**: `hierarchyRoles.leaf` descendants neither Done nor landed, of **the SAME

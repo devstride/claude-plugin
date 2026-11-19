@@ -99,12 +99,13 @@ stopped. Check its `commit` with the landing test
 (`${CLAUDE_PLUGIN_ROOT}/skills/merge-story/references/merge-paths.md`, "Already landed"), which has
 three answers. Exactly that commit landed → report it with `done` on that attempt; never `resume`,
 which reads the moved checkout as new work. It landed, but the check cannot prove how → a person
-reads every commit the base gained past it (`git log --no-merges --oneline
-<commit>..origin/<workingBase>`; while the story branch exists, a commit of `git rev-list
-<commit>..origin/<branch>` that `git merge-base --is-ancestor <that> origin/<workingBase>` finds on
-the base is a later story commit): no later commit of this story's branch among it (a release or
-other checked landings) → `done` naming that commit; a later story commit among it → `done` is not
-valid: `resume` with `"close": true`, and the person is told that work landed without this run's
+reads everything the base gained past it, merges included (`git log --oneline
+<commit>..origin/<workingBase>`), for any later commit of this story and any merge commit made on
+the story's branch. A hint, not decisive: a commit of `git rev-list <commit>..<story-ref>`
+(`origin/<branch>` where it exists, else the local `<branch>`) that `git merge-base --is-ancestor
+<that> origin/<workingBase>` finds on the base is one to look at; an upstream commit the story
+branch merely contains (a rebase, a base merge) is not story work. Neither among it (a release or
+other checked landings) → `done` naming that commit; either among it → `done` is not valid: `resume` with `"close": true`, and the person is told that work landed without this run's
 checks and review; unsure → the stop stays
 (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/run-stops.md`). Nothing landed → `resume` with
 `"landed": false`. Until then `resume` answers with the same stop (`merge-may-have-landed`).

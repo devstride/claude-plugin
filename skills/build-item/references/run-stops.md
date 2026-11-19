@@ -14,14 +14,16 @@ which its The run section handles itself. Read in full before acting on any othe
   the moved checkout as new work. Landed, but the check cannot prove how → stop for a person,
   saying exactly that: "it landed, but this check cannot prove how" (never that it went unchecked:
   after a release fast-forward it was checked and reviewed). The run waits, lease kept. The person
-  reads every commit the base gained past it, merged ones too: `git log --no-merges --oneline
-  <commit>..origin/<workingBase>`. While the story branch exists (`origin/<branch>`, or the local
-  `<branch>`), test it directly: for each commit of `git rev-list <commit>..origin/<branch>`, `git
-  merge-base --is-ancestor <that> origin/<workingBase>` succeeding means a later story commit
-  landed. None of it a later commit of this story's branch (the base moved
-  on by a release or by other checked landings) → `done` on the stopped attempt, its proof's
-  `head` the handed commit (completion then runs). A later story commit among it (work added after
-  the checks) → `done` is not valid: `resume` with `"close": true`, and tell the person that work
+  reads everything the base gained past it, merges included: `git log --oneline
+  <commit>..origin/<workingBase>`, accounting for any later commit of this story and any merge
+  commit made on the story's branch (a merge of the base into the story can itself carry changes).
+  A hint, not decisive: `<story-ref>` is `origin/<branch>` where it exists, else the local
+  `<branch>`; a commit of `git rev-list <commit>..<story-ref>` that `git merge-base --is-ancestor
+  <that> origin/<workingBase>` finds on the base means look at where it came from, since an
+  upstream commit the story branch merely contains (through a rebase or a base merge) is not story
+  work. Neither among what the base gained (a release or other checked landings moved it on) →
+  `done` on the stopped attempt, its proof's `head` the handed commit (completion then runs).
+  Either among it (work added after the checks) → `done` is not valid: `resume` with `"close": true`, and tell the person that work
   landed without this run's checks and review; then step 0 of `SKILL.md`, where the merged item is
   never started again. Unsure → the stop stays. Nothing landed → put the checkout back on the story branch, then `resume` with
   `"landed": false`: at once for a push refused in a race (the merge step tries again), otherwise
