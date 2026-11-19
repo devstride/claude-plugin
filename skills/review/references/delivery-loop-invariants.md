@@ -864,7 +864,7 @@ skills/review/SKILL.md|never pasted
 skills/review/scripts/rereview-scope.sh|numstat
 skills/review/references/delta-re-review.md|threshold
 skills/plan/references/delivery-profiles.md|verificationGrouping
-skills/local-checks/SKILL.md|verification receipt keyed
+skills/local-checks/SKILL.md|SHA-keyed verification receipt for the final tree
 RELEASING.md|validate.sh
 CONTRIBUTING.md|measure-cost.sh
 skills/doctor/references/version-currency.md|devstride--v
