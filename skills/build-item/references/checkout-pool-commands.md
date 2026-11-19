@@ -47,11 +47,11 @@ STOPS and asks, and never retries with another name.
   and the lease is KEPT across loop iterations: a story that ends in "then step 0" never hands
   the checkout back.
 - **`return-checkout` only after the last checkout operation** — for a run that built something,
-  after step 7's checkout, pull and clean-tree check, never before them — and only at a terminal exit (a one-off's TERMINATE, step
-  8's release-ready stop) or a hand-over to another session or the owner. A STOP in steps 1–7 that
+  after the run's sync step (its checkout, pull and clean-tree check), never before it — and only at a terminal exit (a one-off's TERMINATE, step
+  8's release-ready stop) or a hand-over to another session or the owner. A STOP during the run or in step 7 that
   leaves the work for this session to resume keeps the lease.
 - **Every exit from step 0 returns it too**, before the run ends — DRY-CHAIN or plan complete, an
-  ambiguous plan root, a given item already merged or Done, any other stop before step 1: nothing
+  ambiguous plan root, a given item already merged or Done, any other stop before the run starts: nothing
   is built in the checkout yet, so nothing is lost, and the next run leases again.
 - Every process the run started in the checkout stops before the return.
 

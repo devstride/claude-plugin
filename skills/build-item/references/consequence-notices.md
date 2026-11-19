@@ -30,9 +30,9 @@ surface (an OpenAPI path, a published tool or command, a URL in user docs) count
 ## When — once per item, on the final reviewed diff
 
 After the review settles, just before the merge command, on the head that merges, whatever the
-profile: `build-item` 5a after any refresh and its re-run gate, right before the `--no-ff` merge;
-5b right before the `MERGE` line, on the head it passes (the final reviewed head, or 5b's
-tree-identical rebase of it); step 8 for the release unit itself, right before its merge, on its
+profile: `merge-story` on the fast path, after any refresh and its re-run local checks, right before
+the `--no-ff` merge; on the pull-request path right before the `MERGE` line, on the head it passes
+(the final reviewed head, or its tree-identical rebase); `build-item` step 8 for the release unit itself, right before its merge, on its
 release pull request's final reviewed head (`epic-release-steps.md`). A story held by a release
 hold runs it when it merges. Fetch first; the base is the SHA of `origin/<working base>` (step 8:
 of `origin/<the routing.py release-target branch>`) recorded now, never a local branch that may be
@@ -106,7 +106,7 @@ recorded before the merge". They inform the owner's yes and never condition it, 
 
 ## Cited by
 
-- `skills/build-item/SKILL.md` — step 5, before the merge.
+- `skills/merge-story/references/merge-paths.md` — before the merge, on either path.
 - `skills/build-item/references/epic-release-steps.md` — the release unit's own check and recap.
 - `skills/release/SKILL.md` — step 6's recap; `references/merge-and-deploy.md` — 4's.
 - `skills/doctor/SKILL.md` — §4, the `consequenceNotices` block.

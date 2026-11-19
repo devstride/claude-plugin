@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """May this landing go onto the release train? The one gate for a one-off's fast merge.
 
-The single implementation of the rule in `references/release-train.md` ("A larger or riskier fix
-gets its full review before it lands"): a train one-off lands when it is a small fix (`routing.py
-small`, never a second copy of that rule), or when a LOCAL-FULL review (`review` skill) settled at
-exactly this head. `build-item` 5a runs `check` before every fast merge onto the train; any other
+The single implementation of the rule in `skills/review-story/references/review-routes.md` ("A
+larger or riskier fix gets its full review before it lands"): a train one-off lands when it is a
+small fix (`routing.py small`, never a second copy of that rule), or when a LOCAL-FULL review
+(`review` skill) settled at exactly this head. `merge-story` runs `check` before every fast merge
+onto the train; any other
 tool that lands one-offs (a repository's own CLI) runs this file, never a copy. No network.
 
   check   stdin {"base", "head"?, "targetKind"?, "config"?, "receiptsDir"?,

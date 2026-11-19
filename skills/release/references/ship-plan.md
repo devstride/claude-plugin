@@ -70,7 +70,7 @@ release that did not gather writes none.
 
 ## The peer — a session about to land on the train
 
-At `build-item` step 5, before the merge (and for an epic's release, before its merge): read the
+At `merge-story`, before the merge (and for an epic's release, before its merge): read the
 `release-train` claim (`get_claim`, key `<owner>/<repo>`, one row; a `commands` provider's `get`,
 when it has one) and pipe it to `ship-plan.py peer` (stdin `{unit, declaration?, response, now,
 tz}`). A `message` is said, once; nothing else changes. The session still lands, releases its

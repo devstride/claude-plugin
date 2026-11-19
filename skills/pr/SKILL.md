@@ -30,7 +30,7 @@ number): $ARGUMENTS
   one run of each applicable workflow on that final HEAD. Never open non-draft there, never flip it
   here; no profile — `prototype` included — bypasses the hold.
 - **Autonomous (driven-by-`build-item`) mode**: take the pre-supplied base (never re-ask step 0),
-  tell `review` it is driven, **SKIP step 3** (that loop links in its own step 6 — never
+  tell `review` it is driven, **SKIP step 3** (that loop links it in its complete step — never
   double-own it), pause only at a genuine fork.
 - **Untrusted content**: acting on external review content happens inside `review`; its caution
   applies to this whole flow.

@@ -59,7 +59,7 @@ repository adds them by hand, because only the repository knows its own risk sur
 
 ## Where it runs
 
-- `ultracode-build` phase 3 (the story risk check): a matched entry is an immediate-risk
+- `risk-check` (the story risk check): a matched entry is an immediate-risk
   boundary of its own, so its focused verifier launches even for an otherwise routine diff.
 - The merge-boundary adversarial review (`review-fanout.md`, run by `review`): a matched entry
   adds its finder to cycle 1 and to every later cycle whose effective scope still touches a
@@ -78,7 +78,7 @@ Both were found downstream, after the story's own review had passed at full brea
 
 ## Cited by
 
-- `skills/ultracode-build/SKILL.md` — phase 3, immediate risk floor.
+- `skills/risk-check/references/story-risk-check.md` — the immediate risk floor.
 - `skills/ultracode-build/references/review-fanout.md` — task-sized breadth and the lens list.
 - `skills/review/SKILL.md` — step 1, the Claude and local-engine launches.
 - `skills/doctor/SKILL.md` — section 6, review roster.

@@ -46,27 +46,30 @@ Never type a machine or session name, or add a payload key. Exit 1 degrades as `
 ## When
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md` when the first story is
-claimed**, and again after a compaction: every story heartbeat below (3) also declares, renews or moves what
-this session is about to ship — `building` at step 3, `reviewing` at step 4, `verifying` at the
-local gate, `landing` at step 5 — and completion (4) also releases that declaration, outcome
-`landed`.
+claimed**, and again after a compaction: every story heartbeat below (3) also declares, renews or
+moves what this session is about to ship — the stage each step's run answer names in its
+`heartbeat` (`building` at the build, `verifying` at the local checks, `reviewing` at the review,
+`landing` at the merge) — and completion (4) also releases that declaration, outcome `landed`.
 
-1. **Selection (step 0).** After a candidate is chosen and BEFORE it moves to In Progress, claim it
-   (`mode: select`). Held by a live holder → drop it, say who holds it, take the next candidate (the
-   gating check's shape). Expired → take over. Already yours (a resumed story) → renewed, carry on.
+1. **Selection.** The Build workflow's first step, `claim-story`, claims a chosen candidate BEFORE
+   it moves to In Progress (`mode: select`). Held by a live holder → the run ends held and the loop
+   drops it, says who holds it and takes the next candidate (the gating check's shape). Expired →
+   take over. Already yours (a resumed story) → renewed, carry on.
 2. **A story the user NAMED, or the handoff's resumed story** (`mode: named` / `resume`) held by
-   another live holder → STOP, naming that holder's machine and session and since when. Expired →
-   take over, as in selection. Your own earlier session (after a restart or `/clear`) counts as
-   another holder: wait out the expiry, or the owner releases it (`release_claim` with `force`)
-   and the loop claims it afresh. Every candidate held → DRY-CHAIN, "N held by other agents".
-3. **Heartbeats.** `heartbeat_claim` with `phase` = the step's name at each step transition from
-   step 1 on, and at each `ultracode-build` phase (`mode: heartbeat`). NOT HOLDER → STOP naming the
-   holder: another agent took the story after it lapsed. A phase longer than the expiry lets the
-   claim lapse, unless the repository's presence command renews it while the session is active; the
-   next heartbeat claims it again if free (`reclaim`/`takeover`) and STOPs if taken.
-4. **Completion (step 6, whether the story is Done or landed).** `release_claim` with outcome `done`. A
-   STOP releases nothing itself: the claim expires, or that presence command releases it when the
-   session ends, so a person can resume without a takeover.
+   another live holder → the run ends held and the loop STOPS, naming that holder's machine and
+   session and since when. Expired → take over, as in selection. Your own earlier session (after a
+   restart or `/clear`) counts as another holder: wait out the expiry, or the owner releases it
+   (`release_claim` with `force`) and the loop claims it afresh. Every candidate held → DRY-CHAIN,
+   "N held by other agents".
+3. **Heartbeats.** `heartbeat_claim` with `phase` = the `heartbeat.phase` of each step the runner
+   issues (null: no heartbeat), and at each `ultracode-build` phase (`mode: heartbeat`). NOT HOLDER
+   → STOP naming the holder: another agent took the story after it lapsed. A phase longer than the
+   expiry lets the claim lapse, unless the repository's presence command renews it while the
+   session is active; the next heartbeat claims it again if free (`reclaim`/`takeover`) and STOPs
+   if taken.
+4. **Completion** (`story-lifecycle`'s complete step, whether the story is Done or landed).
+   `release_claim` with outcome `done`. A STOP releases nothing itself: the claim expires, or that
+   presence command releases it when the session ends, so a person can resume without a takeover.
 
 ## When claims are not usable
 
@@ -78,3 +81,13 @@ same way. A claims outage never stops delivery.
 ## Progress row
 
 `Claim`: won, renewed, took over, skipped N held, not configured, or degraded (reason).
+
+## Cited by
+
+- `skills/claim-story/SKILL.md` — the pointer before the first call (the claim, the record, the
+  modes).
+- `skills/story-lifecycle/references/complete.md` — releasing the claim at completion.
+- `skills/build-item/SKILL.md` — The run's heartbeats.
+- `skills/ultracode-build/SKILL.md` — the phase heartbeats.
+- `skills/run-workflow/references/workflow-runner.md` — the heartbeat and the claim mode.
+- `skills/build-item/references/ship-intent.md` — sending a declaration as a claim is sent.

@@ -89,7 +89,7 @@ ONE `search_items` on the tag; consider only entries whose `For:` line names THI
 THIS skill.
 
 - `build-item`, plan mode: once the plan root resolves, the items under it.
-- `build-item`, a given item or a one-off (no root needed): before step 1, that item itself.
+- `build-item`, a given item or a one-off (no root needed): before its run starts, that item itself.
 - `release`: step 0, only to close stale notices.
 - `build-item` also reads `needsYou.fallbackItem`, for its own entries, only ever to close a
   stale NOTICE (the root now resolves), never to act.

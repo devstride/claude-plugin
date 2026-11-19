@@ -33,7 +33,7 @@ With `claims` set, the release is declared as
   lists its stories), with the profile, the verification plan and the aggregate risk-check ledger.
   Full review → uncovered pre-ship checks → ready flip → CI.
 - **Review scope.** Fast mode used (`fastStoryMerges.epicReleaseIsFirstCloudPass`) → **review the
-  FULL diff**, every story, ledgers only preventing re-raised settled findings. Stories took 4b → a
+  FULL diff**, every story, ledgers only preventing re-raised settled findings. Stories took the pull-request path → a
   computed manifest of cross-story contracts, combined behaviour and develop-merge resolutions;
   cloud may still cover the whole PR. A firing
   `verify.skipDuringStoryBuilds` suite is mandatory, with no story exemption; with the list empty,
@@ -57,7 +57,8 @@ With `claims` set, the release is declared as
 - **Human recap.** Lead with `Merged / Released`: every item and its effect, where it landed,
   validation/review/CI, docs, whether live, the remaining production action, and the unit's and
   its leaves' consequence notices (`consequence-notices.md`). Surface, never
-  perform, the owner-cut promotion (`/devstride:release`). New findings → 6.5.
+  perform, the owner-cut promotion (`/devstride:release`). New findings → invoke `capture-findings`
+  with the release unit.
 - **Last, after the recap:** merged onto the train with `release.autoStart.enabled` → its trigger
   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`), after docs staged `live: false`.
   The checkout lease is KEPT through it: `return-checkout` waits until the trigger answers SKIP or ERROR, loses the claim, or the release it starts stops, and that release runs in this same leased checkout.

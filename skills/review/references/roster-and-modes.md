@@ -92,7 +92,7 @@ execution-order number, so no build agent ever picks it up and no release unit i
 zero remaining leaves by work that was explicitly deferred. Discovered SCOPE is the exception: a story the plan actually
 needs belongs in the dependency chain, so it splices in through `insert-story`. Driven runs
 hand both kinds back on the untracked-deferral list instead of filing them inline, because
-`build-item` step 6.5 is the single place that files them — one writer, one shape.
+`capture-findings` is the single place that files them — one writer, one shape.
 
 ## Cited by
 

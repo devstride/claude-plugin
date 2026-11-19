@@ -878,7 +878,7 @@ operator hand-edit; it applies to every later cycle. Reasoning and the verified 
 
 Absent or `[]` means no mandatory lens. Each entry names a lens, the ANCHORED path globs that
 select it, and the question its finder must answer for every changed hunk. When a file in the
-diff under review matches an entry, `ultracode-build` phase 3 and the merge-boundary review each
+diff under review matches an entry, `risk-check` and the merge-boundary review each
 add ONE focused finder for it, on the same footing as the forced security lens — the breadth
 ceiling and the delivery profile never remove it — and the local review engine receives the
 question as a hypothesis through `<context>`. Findings are verified like any other. `setup`

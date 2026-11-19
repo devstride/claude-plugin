@@ -26,7 +26,7 @@ history, as a range with a confidence, and to score every quote against what hap
 
 `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/estimate.py quote --sha <landing sha>` from
 the repository's checkout, right after the landing is pushed: a one-off's merge onto the train or
-the source (`build-item` step 6, `item-status.md`), or a release unit's release pull request merged
+the source (`story-lifecycle`'s complete step, `item-status.md`), or a release unit's release pull request merged
 onto its release target (its merge commit; the quote goes on the release-unit item).
 
 | Verdict | Exit | Then |

@@ -24,16 +24,24 @@ root, each read with `get_item(view: 'full')`. Fetch the production branch first
 cases any other tool must pass.
 
 **Where it is checked:**
-- `build-item` step 5, before any merge onto the release train or `baseBranch` (a one-off, or a
-  plan story whose working base is one of them): held → no merge; the story branch waits, the item
-  stays in progress, and the run reports "held: <reason>" and moves on.
+- `merge-story`, before any merge onto the release train or `baseBranch` (a one-off, or a
+  plan story whose working base is one of them): held → no merge (`MERGE: HELD`); the story branch
+  waits, the item stays in progress, and the run reports "held: <reason>" and moves on.
 - `build-item` step 8, before an epic's release is cut or merged, over the unit, its ancestors and
   every leaf it carries (a leaf's hold travels with its epic): held → the epic waits on its
   integration branch, reported "release-ready, held until …".
 - `release`, before the train snapshot and on its final head (`release-branch.md` §1), and over the
   delta before the cut:
-  the backstop, for work that reached the path without the step-5 check. Held → STOP, naming the
+  the backstop, for work that reached the path without the merge step's check. Held → STOP, naming the
   item and why: wait for the hold to lift, or the owner removes its line. Taking work back off the
   train is the owner's call, never this run's.
 
 Time spent held is reported apart from build and review time.
+
+## Cited by
+
+- `skills/merge-story/references/merge-paths.md` — release holds first, before any merge.
+- `skills/build-item/SKILL.md` — step 8, before an epic's release.
+- `skills/release/SKILL.md` and `references/release-branch.md`, `references/backstop.md`,
+  `references/ship-plan.md` — the release's own checks.
+- `skills/build-item/scripts/release-holds.py` — the code the decision runs through.

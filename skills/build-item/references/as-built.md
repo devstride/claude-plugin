@@ -21,7 +21,7 @@ has the description corrected as the work firms up.
 4. **In that call, write for the spec's readers, who may be customers.** The note's summary is
    drafted from the old and new descriptions and `reason` goes in as written, so leave branch,
    commit, pull-request and tool names out of both. Say what was built, never that it is available:
-   the work may not have reached production yet. The completion ritual already points the item at
+   the work may not have reached production yet. The complete step already points the item at
    its code.
 5. **Report what did not update.** Name each returned spec left `out_of_sync` with its
    `skippedReason`, and `hiddenSpecsSkipped`. Never retry them: their watchers and author were told.
@@ -31,4 +31,4 @@ has the description corrected as the work firms up.
 
 ## Cited by
 
-- `skills/build-item/SKILL.md` — step 6, the completion ritual.
+- `skills/story-lifecycle/references/complete.md` — step 5, the as-built reconciliation.

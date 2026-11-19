@@ -9,8 +9,8 @@ apply it by citation; their step numbers match the headings below, and each stat
 type, what "enough to act on" means, its parent hint, its priority default and any extra fields.
 
 Two phases: **(A)** CREATE + PLACE the item interactively (steps 0–1), then **(B)** DELIVER it by
-invoking `build-item` in its one-off mode (step 2). Phase B is the EXACT same branch → build →
-review → PR → merge → completion ritual the plan loop uses — it only runs once and sits outside
+invoking `build-item` in its one-off mode (step 2). Phase B runs the EXACT same Build workflow the
+plan loop uses — it only runs once and sits outside
 any sequenced plan. Work that belongs in a plan's dependency chain goes through `insert-story` /
 `insert-defect` instead, which splice, number, and let the loop pick it up in order.
 
@@ -67,9 +67,8 @@ any sequenced plan. Work that belongs in a plan's dependency chain goes through 
   repo's `.claude/ds-config.json` (develop by default), or the release train when
   `releaseTrain.branch` is configured — one item, no loop, no next-item selection. No flag is
   needed.
-- `build-item` runs the identical loop — mark In Progress → `branch-feature` → `ultracode-build` →
-  `pr` (+ `review`) → merge → completion ritual → sync the base — and TERMINATES after this one
-  item. Do not re-spell those phases; `build-item` and its sub-skills own them.
+- `build-item` runs the Build workflow, the identical loop, and TERMINATES after this one item. Do
+  not re-spell its steps; `build-item` and its step skills own them.
 - Genuine out-of-scope follow-ups become their OWN one-off items (`/devstride:create-story` or
   `/devstride:create-defect`) or a note on the item — there is no plan chain to splice into via
   `insert-*`.

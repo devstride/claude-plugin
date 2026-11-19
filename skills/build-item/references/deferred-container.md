@@ -33,7 +33,7 @@ beside the plan").
   below moves items.
 - **Closed or Done.** A set `completedAt` or `endedOutcome` (`get_item` with `view: "full"`) means
   closed: reopen and reuse it — `update_item` with `statusId` = the first open status of its work
-  type's collection (`get_workspace_context`, as `build-item` step 1 resolves In Progress); the
+  type's collection (`get_workspace_context`, as `story-lifecycle`'s start step resolves In Progress); the
   `reopen` tool only when it is already on a board. No open status resolves → STOP and report;
   never create a second container to get around it.
 - **Creation**, only when `create` is true: the work type the organization's hierarchy requires
@@ -65,7 +65,7 @@ beside the plan").
   user is present and asks; `boardId` is otherwise an explicit `null`, as on the container and
   on every node created here, and never `activeAgents.boardId`. Filing writes no date; the item is never built and never given a
   delivery phase. A person who names one by number can still build it as a one-off.
-- **What does not widen.** The bar is the CALLERS' (`review` step 4, `build-item` 6.5, `release`
+- **What does not widen.** The bar is the CALLERS' (`review` step 4, `capture-findings`, `release`
   step 2): only a verified P1, a security finding, or a finding both likely and material is filed;
   anything below it is dismissed with a one-line reason. A person's explicit `deferred` request is
   filed as asked. Discovered scope
@@ -123,3 +123,12 @@ over the root's direct children; for each `duplicates` entry, move its children 
 one at a time with `reparent_item` (related-to edges survive a reparent), add a comment on the
 emptied duplicate pointing at `container`, then `archive_item` it. Never `delete_item`. Report the
 numbers moved, or "none found".
+
+## Cited by
+
+- `skills/capture-findings/SKILL.md` — the DEFERRED placement of a deferred finding.
+- `skills/build-item/SKILL.md` — step 0 (never selected) and step 7 (counts, the Closing).
+- `skills/create-story/SKILL.md` and `skills/create-defect/SKILL.md` — `deferred <item#>` filing.
+- `skills/plan/SKILL.md`, `skills/rebalance/SKILL.md`, `skills/rationalize-gantt/SKILL.md` and
+  `skills/comprehend-plan/SKILL.md` — provisioning, planning gates, dating and reporting.
+- `skills/build-item/scripts/deferred-container.py` — the code this file's decisions run through.

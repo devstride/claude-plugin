@@ -15,39 +15,46 @@ kept re-requesting a review through a connector disabled months earlier, waiting
 after timeout, because the stale in-context copy won. A table row saying which
 engine actually registered would have surfaced that in one glance.
 
-## The PR-path shape (4b — develop-base stories and one-offs)
+The step rows are the runner's own: `workflow.py status` returns them as a ready `table`, one row
+per step of the run by its id, and the loop renders that table with its own rows around it (step
+0, the profile, each engine and matched lens, step 7, step 8, the workflow report).
+
+## The pull-request path shape (develop-base stories and one-offs)
 
 ```
 | Step | Status |
 |---|---|
 | 0 · Select | I20110 — one-off → base develop (or the release train, when configured), no epic branch |
 | Profile | standard — from `.claude/ds-config.json` (one-off: no root marker) |
-| Claim | won (or renewed, took over, skipped N held, not configured, degraded) |
-| 1 · In Progress | ✅ |
-| 2 · Branch | ✅ jane/03-14-26/I20110-… |
-| 3 · Build + risk screen | ✅ 1 finding fixed |
-| 4b · PR + review + CI | #42 — draft; cloud tests wait until review finishes |
+| claim | won (or renewed, took over, held, not configured, degraded) |
+| start | ✅ In Progress |
+| branch | ✅ jane/03-14-26/I20110-… |
+| build | ✅ |
+| risk-check | ✅ 1 finding fixed |
+| local-checks | ✅ 3 commands passed |
+| review | #42 — draft; cloud tests wait until review finishes |
 | — Configured local review | ✅ 3 findings found and fixed |
 | — Copilot (cloud) | ⏳ request registered in timeline |
-| 5b · Merge | — |
-| 6 · Completion ritual | — |
-| 6.5 · Findings filed | I20111, I20112 |
-| 7 · Sync + close-out | — |
+| merge | — |
+| complete | — |
+| capture | I20111, I20112 |
+| sync | — |
+| 7 · Close-out | — |
 | 8 · Epic release | n/a — one-off |
 | Workflow report | on (run 3f9c1a) |
 ```
 
-## The fast-path shape (4a/5a) — deferred cloud rows stay visible
+## The fast-path shape — deferred cloud rows stay visible
 
 ```
 | Profile | standard — from the plan root I20100 |
 | Release scope | plan — from the plan root I20100; held by I20102 until it lands |
-| 4a · Fast review (no PR) | epic branch — cloud gate deferred to step 8 |
-| — Story risk screen | ✅ 2 findings found and fixed |
+| risk-check | ✅ 2 findings found and fixed |
+| local-checks | ✅ passed — file/test counts recorded in the commit body |
+| review | fast local review (no PR) — epic branch, cloud gate deferred to step 8 |
 | — Configured local review | ✅ 4 findings → 3 fixed, 1 captured |
-| — Required local checks | ✅ passed — file/test counts recorded in the commit body |
 | — Copilot + CI | ⏸ deferred to the epic release PR (step 8) |
-| 5a · Fast merge | ✅ merged --no-ff → jane/03-14-26/I20104-attachment-storage |
+| merge | ✅ merged --no-ff → jane/03-14-26/I20104-attachment-storage |
 | Workflow report | on (run 3f9c1a) |
 ```
 
@@ -64,16 +71,16 @@ Without the deferred rows, "no Copilot row" is indistinguishable from "Copilot w
   verified; a missing row is indistinguishable from a forgotten engine.
 - **A missing CI check is not a passing one** — `skipping` and "never ran" render identically in
   `gh pr checks`, so the row says which, and why.
-- **One row per numbered step, in this skill's own names** — a row labelled for something the
-  step does not do resumes at the wrong operation; CI release/settling belong to `review` step
+- **One row per step, by the runner's step id** — a row labelled for something the step does not
+  do resumes at the wrong operation; CI release/settling belong to `review` step
   7, not to a row of their own. Step 8 stays `n/a` on a one-off so "absent" never has to be
   told apart from "not reached". The `Profile` row exists because a resumed session re-derives
   the review path and verify width from it.
 - It is a status render, not a gate — it must never delay the step it describes.
 - **The `Workflow report` row** is shown only while reporting is on and the run's last answer was
   not an error, so a resumed session knows reporting is live; its id is the first six characters
-  of the `runId` the helper printed. Off or unavailable, the row is left out, and a resumed
-  session that finds no row simply reports its next step as usual: the helper decides
+  of the run's `runId`. Off or unavailable, the row is left out, and a resumed session that finds
+  no row simply forwards its next reports as usual: the gate decides
   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md`).
 
 ## Cited by

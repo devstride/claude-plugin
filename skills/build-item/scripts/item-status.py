@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Which status a leaf item moves to, and what it is told, as a build starts and lands.
 
-The single implementation of the status moves in `skills/build-item/SKILL.md` (steps 1 and 6),
-`references/next-unblocked.md` ("At the merge") and `references/release-train.md` (the train's
-completion ritual). Claude follows those documents; any other agent or tool (a repository's own
+The single implementation of the status moves in `skills/story-lifecycle/references/start.md` and
+`complete.md` (the Build workflow's start and complete steps) and
+`skills/build-item/references/next-unblocked.md` ("At the merge"). Claude follows those documents; any other agent or tool (a repository's own
 CLI, Codex, a script) runs this file and gets the same answer. Deterministic: no
 network, no clock, no DevStride call. The caller reads the item and the workspace, runs this, then
 does the `update_item` / `add_comment` itself and reads the item back.

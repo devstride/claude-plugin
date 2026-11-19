@@ -8,7 +8,7 @@ description: Create a Defect (inbound bug report / ad-hoc fix not in a sequenced
 **Goal.** Create a NEW Defect (the one-day leaf role — this org's Defect type) outside any sequenced `/devstride:plan` roadmap, in one of two PLACEMENT modes — decide the mode FIRST:
 
 - **ONE-OFF** (default, steps 0–2): an inbound bug report or ad-hoc fix — file it in the map, put it on a board, assign it, then deliver it with the SAME build loop `/devstride:build-item` runs, exactly ONCE.
-- **DEFERRED** (section D, replacing steps 0–2 entirely): park a postponed finding that is a bug under the plan root, relate it back, and STOP — never built. Its callers (`review` step 4, `build-item` 6.5) dismiss a finding not worth filing (not a P1, not security, not both likely and material); a person's explicit `deferred` request is filed as asked.
+- **DEFERRED** (section D, replacing steps 0–2 entirely): park a postponed finding that is a bug under the plan root, relate it back, and STOP — never built. Its callers (`review` step 4, `capture-findings`) dismiss a finding not worth filing (not a P1, not security, not both likely and material); a person's explicit `deferred` request is filed as asked.
 
 Use **`/devstride:insert-defect`** instead when the fix belongs in a sequenced plan — it splices into the dependency chain, numbers it, and lets the loop pick it up in order.
 
@@ -37,7 +37,7 @@ Argument — free text describing the defect, optionally with a parent item or w
 
 ## D. DEFERRED placement — park a finding that is a bug, never build it now
 
-Enter this mode INSTEAD of steps 0–2 when `build-item` step 6.5 invokes this skill in DEFERRED
+Enter this mode INSTEAD of steps 0–2 when `capture-findings` invokes this skill in DEFERRED
 placement, or when `$ARGUMENTS` says `deferred` together with the item number the finding was
 found against (e.g. `deferred I20431 retry loop double-counts on 429`). It applies under EVERY
 delivery profile. A finding that is not a bug is filed by `/devstride:create-story deferred
