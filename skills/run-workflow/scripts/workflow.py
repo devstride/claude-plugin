@@ -1068,8 +1068,8 @@ class Run:
         if self.steps[index]["contract"] != "merge@1" or proof.get("head") == record.get("issuedHead"):
             return None
         # The verdict cap is 200 characters: what to do comes first, so it is never cut off.
-        return ("merge-lands-what-was-checked: if exactly %s landed, report it with done; landed unproven: a "
-                "person confirms, then done or close; never resume" % (record.get("issuedHead") or "none"))
+        return ("merge-lands-what-was-checked: if exactly %s landed, report it with done; unproven: a person "
+                "checks; done if no later story commit landed, else close" % (record.get("issuedHead") or "none"))
 
     def risk_base_fault(self, index, proof):
         """A risk check screens the story against the moving `origin/<workingBase>` the run was

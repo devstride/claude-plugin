@@ -14,13 +14,17 @@ which its The run section handles itself. Read in full before acting on any othe
   the moved checkout as new work. Landed, but the check cannot prove how → stop for a person,
   saying exactly that: "it landed, but this check cannot prove how" (never that it went unchecked:
   after a release fast-forward it was checked and reviewed). The run waits, lease kept. The person
-  confirms what landed, then either reports the merge with `done` on the stopped attempt, its
-  proof's `head` the handed commit (completion then runs), or ends the run with `resume` and
-  `"close": true`. Nothing landed → put the checkout back on the story branch, then `resume` with
+  reads what the base gained past it: `git log --first-parent --oneline
+  <commit>..origin/<workingBase>`. None of it a later commit of this story's branch (the base moved
+  on by a release or by other checked landings) → `done` on the stopped attempt, its proof's
+  `head` the handed commit (completion then runs). A later story commit among it (work added after
+  the checks) → `done` is not valid: `resume` with `"close": true`, and tell the person that work
+  landed without this run's checks and review; then step 0 of `SKILL.md`, where the merged item is
+  never started again. Unsure → the stop stays. Nothing landed → put the checkout back on the story branch, then `resume` with
   `"landed": false`: at once for a push refused in a race (the merge step tries again), otherwise
   once its cause is fixed. Step 0 of `SKILL.md` applies the same three answers to a run it resumes
-  while its merge row is `issued` or stopped; a merge row `done` is carried on, never checked
-  again.
+  while its merge row is `issued` or stopped; a merge row `done` with `MERGE: LANDED` is carried
+  on, never checked again (`MERGE: REFRESHED` is not a landing).
 - **A merge `BLOCKED` on excluded paths** (a train one-off carrying deploy configuration or a
   migration): never on a protected or merge-only head (`protectedBranches`, an epic or plan
   integration branch, the train:

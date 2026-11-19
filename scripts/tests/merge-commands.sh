@@ -121,6 +121,19 @@ bare, repo, story = setup()
 past = commit(repo, "export.txt", "export\nunchecked change\n", "an unchecked commit on top of the checked one")
 git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--ff-only", past); git(repo, "push", "-q", "origin", "main")
 check("a base fast-forwarded past the checked commit is landed but unproven, for a person", landing(repo, story) == ("unproven", None), landing(repo, story))
+GAINED = command(MP, "git log --first-parent --oneline <commit>..origin/<workingBase>")
+check("(run-stops.md and workflow-runner.md spell the same command)",
+      "`%s`" % GAINED in flat(RS) and "`%s`" % GAINED in flat(os.path.join(ROOT, "skills/run-workflow/references/workflow-runner.md")))
+gained = sh(repo, filled(GAINED, "main", story)).stdout.split()
+check("what the base gained past the checked commit C lists the unchecked later story commit D, so done is not valid",
+      gained[:1] == [git(repo, "rev-parse", "--short", past)] and git(repo, "merge-base", "--is-ancestor", past, "feature") == "", gained)  # D is the story branch's own
+bare, repo, story = setup()
+git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--ff-only", story); git(repo, "push", "-q", "origin", "main")
+other_author(bare, "another checked landing")
+check("... while a base moved on only by other landings lists none of the story's commits, so done naming C is valid",
+      landing(repo, story) == ("unproven", None)
+      and [line.split(" ", 1)[1] for line in sh(repo, filled(GAINED, "main", story)).stdout.strip().split("\n")] == ["another checked landing"],
+      sh(repo, filled(GAINED, "main", story)).stdout)
 bare, repo, story = setup()
 later = commit(repo, "export.txt", "export\nunchecked change\n", "a later commit inside the merge step")
 git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--no-ff", "-m", "merge: I123", later); git(repo, "push", "-q", "origin", "main")
@@ -244,15 +257,42 @@ check("... and its own instruction, a plain first push, moves and publishes it",
 # --- wrong-branch recovery: fetch into a tracking ref, then check the story branch out ----------
 BI = os.path.join(ROOT, "skills/build-item/SKILL.md")
 FETCH = command(BI, 'git fetch origin "+refs/heads/<branch>:refs/remotes/origin/<branch>"')
-FROM_REMOTE = command(BI, "git checkout -b <branch> origin/<branch>")
+SET_BRANCHES = command(BI, "git remote set-branches --add origin <branch>")
+CHECKOUT = command(BI, "git checkout <branch>")
+def fresh_clone(bare, single=True):
+    clone = fresh("single" if single else "full")
+    git(clone, "clone", "-q", *((["--single-branch", "--branch", "main"] if single else []) + [bare, "."]))
+    return clone
+def recover(clone):
+    for step in (SET_BRANCHES, FETCH, CHECKOUT):
+        sh(clone, step.replace("<branch>", "feature"))
 bare, repo, story = setup()
-single = fresh("single")
-git(single, "clone", "-q", "--single-branch", "--branch", "main", bare, ".")
+single = fresh_clone(bare)
 check("(a clone tracking only the base: the old plain fetch fills FETCH_HEAD and the checkout fails)",
       sh(single, "git fetch -q origin feature && git checkout -q feature", check_rc=False).returncode != 0)
-sh(single, FETCH.replace("<branch>", "feature") + " && " + FROM_REMOTE.replace("<branch>", "feature"))
+recover(single)
 check("the recovery fetches into origin/<branch> and checks the story branch out at its pushed commit",
       git(single, "rev-parse", "--abbrev-ref", "HEAD") == "feature" and git(single, "rev-parse", "HEAD") == story)
+commit(single, "later.txt", "later\n", "a later commit on the recovered branch")
+check("... tracking origin/<branch>, so a later bare git push publishes it",
+      git(single, "rev-parse", "--abbrev-ref", "@{u}") == "origin/feature" and sh(single, "git push -q", check_rc=False).returncode == 0
+      and git(bare, "rev-parse", "feature") == git(single, "rev-parse", "HEAD"))
+full = fresh_clone(bare, single=False)
+recover(full)
+check("... and the same steps work in a full clone", git(full, "rev-parse", "--abbrev-ref", "@{u}") == "origin/feature")
+check("(--track alone is refused there: origin/<branch> is outside the clone's fetch refspec)",
+      sh(fresh_clone(bare), FETCH.replace("<branch>", "feature") + " && git checkout -q -b feature --track origin/feature", check_rc=False).returncode != 0)
+plain = fresh_clone(bare)
+sh(plain, FETCH.replace("<branch>", "feature") + " && git checkout -q -b feature origin/feature")
+check("(the earlier plain checkout, in a clone tracking only the base, left the bare push without an upstream)",
+      sh(plain, "git push -q", check_rc=False).returncode != 0)
+local_only = fresh_clone(bare)
+git(local_only, "checkout", "-q", "-b", "local-only"); git(local_only, "checkout", "-q", "main")
+sh(local_only, SET_BRANCHES.replace("<branch>", "local-only"))
+check("a fetch of a branch that exists only here fails, and the checkout still recovers it",
+      sh(local_only, FETCH.replace("<branch>", "local-only"), check_rc=False).returncode != 0
+      and sh(local_only, CHECKOUT.replace("<branch>", "local-only"), check_rc=False).returncode == 0
+      and git(local_only, "rev-parse", "--abbrev-ref", "HEAD") == "local-only")
 
 # --- the durable proof's carry passes the bare branch the script requires ----------------------
 CARRY = command(MP, "python3 ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post <commit> --from")

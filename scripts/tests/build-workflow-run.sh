@@ -396,8 +396,9 @@ run = Run()
 run.until("merge")
 commit(run.repo, "late.txt", "late\n", "a commit after the merge was issued")
 answer = run.done()
-check("a merge stop for another commit tells the person to report a landing with done, never to resume",
-      stopped(answer, "proof", "merge") and "report it with done" in answer["reason"] and "never resume" in answer["reason"], answer)
+check("a merge stop for another commit tells the person to report a landing with done, and when an unproven one is not done",
+      stopped(answer, "proof", "merge") and "report it with done" in answer["reason"] and "done if no later story commit landed, else close" in answer["reason"]
+      and answer["reason"].endswith("else close") and "resume" not in answer["reason"], answer)  # never cut off at the cap
 
 # --- a refused fast-merge push: the checkout put back on the story branch before BLOCKED -----
 run = Run()
@@ -563,6 +564,33 @@ check("an id resolves only the entry carrying it; a string shaped like an entry'
 check("... and an id named twice in one screen is kept once in the history",
       risk.get("resolved") == ["F1", json.dumps(plain, sort_keys=True)], risk.get("resolved"))
 
+# --- step 0's guard carries on only a merge row done with an accepted MERGE: LANDED ---------------
+GUARD = re.search(r"The merge row in `status` `done` with the verdict `([^`]+)` → the run carries on",
+                  re.sub(r"\s+", " ", open(os.path.join(ROOT, "skills/build-item/SKILL.md"), encoding="utf-8").read()))
+check("(build-item step 0 names the verdict its guard carries on)", GUARD is not None and GUARD.group(1) == "MERGE: LANDED")
+def carries_on(run):
+    """Step 0's guard as build-item spells it, read from the runner's status rows."""
+    row = [r for r in run.call("status", {"item": "I123"})[1]["rows"] if r["stepId"] == "merge"][0]
+    return row["status"] == "done" and (row["verdict"] or "").startswith(GUARD.group(1)), row
+run = Run()
+run.until("merge")
+git(run.repo, "checkout", "-q", "main"); commit(run.repo, "readme.txt", "one\ntwo\n", "base moves"); git(run.repo, "checkout", "-q", "feature")
+git(run.repo, "rebase", "-q", "main")
+answer = run.done("MERGE: REFRESHED\n")
+guard, row = carries_on(run)
+check("a merge answered REFRESHED is a row done while its renewed checks run, and the guard does not carry it on",
+      is_run(answer, "local-checks", 2) and row["status"] == "done" and row["verdict"].startswith("MERGE: REFRESHED") and not guard, row)
+git(run.repo, "checkout", "-q", "main"); commit(run.repo, "done.txt", "finished elsewhere\n", "another run finishes the item")
+git(run.repo, "checkout", "-q", "feature")
+run.session = "s2"
+answer = run.resume()
+check("... so when another commit finished the item, the new session's resume hands back the renewed checks, not a merge",
+      is_run(answer, "local-checks", 2) and answer.get("adoptedFrom", {}).get("sessionId") == "s1", answer)
+answer = run.resume(close=True)
+check("... and case (iii) closes the run, interrupted, with no second merge, completion or sync",
+      finished(answer, "interrupted") and closes(answer, "interrupted")
+      and [a for a in run.issued() if a[0] in ("merge", "complete", "sync")] == [("merge", 1)], (run.issued(), answer))
+
 # --- interrupted after the merge and the completion: the new session finishes, nothing closed ---
 run = Run()
 answer = run.until("merge")
@@ -573,6 +601,7 @@ answer = run.until("capture")  # the completion step moved the item to Done; the
 check("(the merge and the completion are done, the capture issued)", is_run(answer, "capture", 1)
       and [r for r in run.call("status", {"item": "I123"})[1]["rows"] if r["stepId"] in ("merge", "complete")] ==
       [r for r in run.call("status", {"item": "I123"})[1]["rows"] if r["stepId"] in ("merge", "complete") and r["status"] == "done"], answer)
+check("(a merge answered LANDED is the row the guard carries on)", carries_on(run)[0], carries_on(run)[1])
 run.session = "s2"
 answer = run.resume()
 check("a new session's resume of a run whose merge row is done hands back the capture as it was, on the base",
