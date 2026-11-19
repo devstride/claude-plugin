@@ -944,7 +944,7 @@ skills/release/references/release-branch.md|merge-gate.py <n> <settled head>
 skills/release/references/auto-start.md|merge-gate.py <n> <sha> --all-green
 skills/merge-story/references/merge-paths.md|never the live one
 skills/merge-story/references/merge-paths.md|merge-gate.py <n> <head>
-skills/merge-story/references/merge-paths.md|reviewed-status.py post <new head> --from
+skills/merge-story/references/merge-paths.md|reviewed-status.py post <commit> --from
 skills/review/references/review-ledger.md|reviewed-status.py post <final head>
 skills/review/references/review-ledger.md|On a READY outcome only
 skills/release/scripts/train_exclusions.py|reviewed_status.verify
