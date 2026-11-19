@@ -564,7 +564,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `branch-feature` / `branch-hotfix` | Cuts a working branch from the working base (`base: <branch>`) or from the production branch |
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end; `create-story deferred <item>` / `create-defect deferred <item>` instead parks a follow-up or a bug in the plan's deferred container |
 | `release` | Promotes the release branch to production with a full gated review; with `release.clearance` set, claims one-release-at-a-time clearance first and hands it back last; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
-| `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it — including that the configured local review engine actually runs read-only; `setup agents` sets up the Active Agents board, tag and view after a typed yes |
+| `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it — including that the configured local review engine actually runs read-only; `setup agents` sets up the Active Agents board, tag and view after a typed yes; `setup drills` checks the sign-in token for a repository's throwaway drill sessions and tells you the one command that makes it |
 | `doctor` | Checks git, `gh`, the plugin, DevStride, config, CI gates, docs, the Active Agents board and personal status-line settings; after the shared replacement is committed and verified, it can separately remove only the personal `statusLine` key you approve while preserving every other setting and script |
 | `update` | Updates the exact loaded copy, verifies its official tag and files, then stops for a checked plugin reload (restart is the fallback) |
 | `ci-audit` | Measures what CI actually costs: executed runs per workflow per pull request (the design is one each), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
@@ -681,7 +681,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **4.3.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **4.4.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

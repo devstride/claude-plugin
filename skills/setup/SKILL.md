@@ -13,10 +13,10 @@ existing config (F), then prove it by running it (G).
 
 Optional argument: $ARGUMENTS
 
-- **`validate`** — skip to Phase G on the config already there; nothing asked or written.
-  **Run A1 first even so** — Phase G assumes the repository root.
+- **`validate`** — Phase G on the existing config; nothing asked or written.
+  **Run A1 first** — Phase G assumes the repository root.
 - **A detector name** — `ecosystem` (A2–A3), `verify` (A4), `ci-inspect` (A5), `branches` (A6),
-  `engines` (A7) — inspect and report that part (`ci-inspect`, not `ci`: the bare word writes).
+  `engines` (A7) — inspect and report it (`ci-inspect`: bare `ci` writes).
 - **`docs`** — documentation hooks, a narrowed run that WRITES: A1 + A8, Phase
   D's three documentation questions and `release.deployVerification`, then write **only** the
   `docs` block and that key (create-with-just-those-keys or Phase F merge, `release.docsRepo`
@@ -37,12 +37,15 @@ Optional argument: $ARGUMENTS
 - **`connect`** — this machine's key-based DevStride connection, anywhere (its
   proof, on a typed yes, sends two reports):
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/session-presence.md`, Connecting this machine.
+- **`drills`** — WRITES only `drillSessions`: A1, then
+  `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/drill-sessions.md` end to end.
 - **Nothing** — the full run: inspect, ask, write, scaffold, validate, plus §0 of the `agents`
-  and `boards` modes; after A1, `connect`'s check, and its step on `NOT READY`.
+  and `boards` modes; after A1, `connect`'s check, and its step on `NOT READY`, then
+  `drills` likewise if `drillSessions` is set.
 
 **Run each mode's prerequisites silently — A1 (not `connect`), A2–A3 before A4.** A narrowed run reports
 fewer keys, never worse ones, and **stops after Phase B, writing nothing**; a full run writes. **`docs`,
-`ci`, `agents`, `boards` and `connect` are exceptions by design** — each writes exactly what its own questions answer.
+`ci`, `agents`, `boards`, `connect` and `drills` are exceptions by design** — each writes exactly what its own questions answer.
 
 **The whole write boundary**: `.claude/ds-config.json`; in E2 only, the scaffolded
 skills (never overwriting); in `ci` mode only, the pull-request workflows under
@@ -250,8 +253,7 @@ every `detected` row becomes a prefilled default, every `ambiguous`/`unknown` ro
 ## Phase B — report what was found
 
 Group the summary as it is read — detected / needs a decision / undetermined — leading with
-counts. **On a narrowed run this is the end.** On a full run go to Phase C; Phase D's bulk
-confirmation is where detected values get sign-off.
+counts. **On a narrowed run this is the end.** On a full run go to Phase C.
 
 ## Phase C — map the organization's work types onto the loop's roles
 
@@ -293,8 +295,7 @@ Four things no inspection can reach, asked every run — the first one first:
   produces it): the loop then asks the owner once per release unit. The
   profile is never `detected`.
 - **What does merging to the production branch actually do?** (`release.autoDeployOnMerge`) —
-  one plain-English sentence; the release skill quotes it back at the production gate. Nothing
-  can detect it; no sensible default exists.
+  one plain-English sentence; the release skill quotes it back at the production gate.
 - **Documentation, asked in dependency order** (`docs.*`): first ask **where it lives** — a
   directory here, a sibling checkout (path + branch), a hosted service (URL), or "nowhere" →
   `docs.updateSkill: null`. When it exists, next ask **how it is updated** — publishing branch /
@@ -311,7 +312,7 @@ Four things no inspection can reach, asked every run — the first one first:
   the `statusLine` setting, both the owner's to edit afterwards, and that declining changes nothing
   else. Written in E3.
 - **Where the lessons store lives**, if not the default path. **Never offer to create the file**
-  — the store has a single writer, and it is not this skill. Write the key, nothing else.
+  (it has a single writer). Write the key, nothing else.
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/interview-rationale.md` when a Phase C/D
 answer needs justifying, or when a re-run (Phase F) proposes removing or migrating a key.**

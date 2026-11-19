@@ -8,6 +8,77 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.4.0] — 2026-11-19
+
+### Added
+
+- **Drill sessions get their own sign-in, set up and checked like everything else.** A repository
+  that starts throwaway test sessions on purpose (drills that check its agent tracking, for
+  example) runs each in a Claude Code folder of its own, so none appears in the person's Claude
+  Code app, and signs each in with a long-lived token the person makes once per machine. Such a
+  repository now says where that token lives with the new `drillSessions.tokenFile` setting, and:
+  - `/devstride:setup drills` (and the full setup run, when the setting is there) checks the token
+    and, when it is missing, refused or readable by others, gives the person one command to run
+    in their own terminal. That command makes the token, takes it through a hidden prompt and
+    saves it owner-only. It refuses to run through an agent's prompt, so the token never lands in
+    a conversation's transcript.
+  - `/devstride:doctor` reports the same check as one line: `READY`, `NOT READY` with its fix, or
+    `N/A` for a repository without drill sessions.
+  - The check proves the token works with one tiny real request in a fresh, empty folder that is
+    removed afterwards, and tells a refused token (make a new one) from a service failure (check
+    again later). It never prints the token or puts it on a command line, and refuses a token file
+    inside a repository, where it could be committed. A mistyped paste never replaces a working
+    token. Repositories that do not set the key see no change.
+
+### Cost
+
+Every skill body is the same size or smaller; only references the drill-token check loads grow.
+
+<!-- scripts/measure-cost.sh --table --since devstride--v4.3.0 @ 98affeb, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v4.3.0 | tokens@devstride--v4.3.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 25,542 | 8,514 | 25,542 | 8,514 | +0 | 8,514 |
+| skills/build-item/SKILL.md | 23,999 | 8,000 | 23,999 | 8,000 | +0 | 8,000 |
+| skills/doctor/SKILL.md | 23,995 | 7,999 | 23,994 | 7,998 | -1 | 8,000 |
+| skills/review/SKILL.md | 23,986 | 7,996 | 23,986 | 7,996 | +0 | 7,999 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
+| skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |
+| skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 11,963 | 3,988 | +0 | 3,988 |
+| skills/pr/SKILL.md | 11,538 | 3,846 | 11,538 | 3,846 | +0 | 3,846 |
+| skills/ultracode-build/SKILL.md | 10,327 | 3,443 | 10,327 | 3,443 | +0 | 3,443 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,730 | 2,244 | 6,730 | 2,244 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,649 | 2,217 | 6,649 | 2,217 | +0 | 2,217 |
+| skills/create-story/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 5,622 | 1,874 | 5,622 | 1,874 | +0 | 1,874 |
+| skills/insert-defect/SKILL.md | 5,255 | 1,752 | 5,255 | 1,752 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,578 | 1,526 | 4,578 | 1,526 | +0 | 1,527 |
+| skills/branch-feature/SKILL.md | 3,707 | 1,236 | 3,707 | 1,236 | +0 | 1,236 |
+| skills/risk-check/SKILL.md | 3,598 | 1,200 | 3,598 | 1,200 | +0 | 1,200 |
+| skills/local-checks/SKILL.md | 3,593 | 1,198 | 3,593 | 1,198 | +0 | 1,200 |
+| skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
+| skills/merge-story/SKILL.md | 3,242 | 1,081 | 3,242 | 1,081 | +0 | 1,081 |
+| skills/run-workflow/SKILL.md | 3,129 | 1,043 | 3,129 | 1,043 | +0 | 1,043 |
+| skills/review-story/SKILL.md | 3,020 | 1,007 | 3,020 | 1,007 | +0 | 1,007 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/claim-story/SKILL.md | 2,875 | 959 | 2,875 | 959 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/story-lifecycle/SKILL.md | 2,700 | 900 | 2,700 | 900 | +0 | 900 |
+| skills/capture-findings/SKILL.md | 2,696 | 899 | 2,696 | 899 | +0 | 900 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/sync-base/SKILL.md | 1,471 | 491 | 1,471 | 491 | +0 | 500 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 6,277 | 2,093 | 6,277 | 2,093 | +0 | 2,100 |
+| **total (bodies)** | 299,635 | 99,892 | 299,636 | 99,891 | -1 | |
+
 ## [4.3.0] — 2026-11-18
 
 ### Added
@@ -6227,7 +6298,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.3.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.4.0...HEAD
+[4.4.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.3.0...devstride--v4.4.0
 [4.3.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.2.0...devstride--v4.3.0
 [4.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.1.0...devstride--v4.2.0
 [4.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.0.0...devstride--v4.1.0

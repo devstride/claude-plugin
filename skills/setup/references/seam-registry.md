@@ -6,7 +6,7 @@ load: contract
 Generated from `schemas/seam-registry.json` by `scripts/build-config-schema.py --write`;
 never edit it by hand. The same registry generates `schemas/ds-config.schema.json`, which
 `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/validate-config.py` checks a repository's
-`.claude/ds-config.json` against. Schema version: 4.3.0.
+`.claude/ds-config.json` against. Schema version: 4.4.0.
 
 A key written `a[].b` is the field `b` of each entry in the array `a`. `since` is the first
 release that carries the key, `pre-registry` for every key older than the registry, and
@@ -288,6 +288,8 @@ starting with `_` and `$schema` are never reported as unknown.
 | `needsYou.label` | string | — | — | the tracker tag that marks an item with an open question; absent means the feature is off and every skill stops and asks as before | 3.52.0 |
 | `needsYou.view` | string | — | — | the saved view that shows the tagged items, a URL or a name; only ever quoted to people | 3.52.0 |
 | `needsYou.fallbackItem` | string | — | — | the item number a question that belongs to no item (a release, a machine problem) is queued on | 3.52.0 |
+| `drillSessions` | object, null | — | — | throwaway test sessions this repository starts on purpose (drills that check its agent tracking, for example): each runs in a Claude Code folder of its own, so none appears in the person's Claude Code, signed in with a long-lived token the person makes once per machine; absent or null means none, and setup and doctor say nothing about it; contract: skills/setup/references/drill-sessions.md | 4.4.0 |
+| `drillSessions.tokenFile` | string | — | — | the file that holds that token, owner-only: an absolute or ~ path outside every repository; written only by the person's own `drill-token.py make`, never by an agent | 4.4.0 |
 | `localEnvironment` | object, null | — | — | this repository's isolated local instances; null reads as absent | pre-registry |
 | `localEnvironment.recreateMode` | string, null | inPlace, newInstance, `null` | `null` | which shape recreate is | pre-registry |
 | `pool` | object, null | — | — | the repository's checkout-pool commands, set both or neither (one alone is an error); null reads as absent; contract: skills/build-item/references/checkout-pool-commands.md | 3.20.0 |
