@@ -617,9 +617,10 @@ under your cache folder, not in the conversation.
 It decides and records; it never acts. It refuses a step list that drops, weakens or reorders a
 required step (a merge needs a review, green local checks and a risk check before it, and no step
 may repeat what a required step provides after a step that requires it, since nothing would check
-that second one), and it will not say "go on to the merge" while the local checks or the review are
-stale: the checks are bound to the exact tree they ran on and the review to the exact patch it
-read, byte for byte, white space included. Before it hands out the merge it reads the branch's
+that second one), and it will not say "go on to the merge" while the risk check, the local checks
+or the review are stale: the risk check is bound to the story as it stood when it ran (any later
+commit that changes the story screens it again), the checks to the exact tree they ran on and the
+review to the exact patch it read, byte for byte, white space included. Before it hands out the merge it reads the branch's
 commit once, checks both against that commit and hands the merge exactly that commit; a merge
 reported as landed must name it. A step already handed out is handed back unchanged if asked
 again, because it may already have acted. The catalog holds twelve contracts: the eleven Build
@@ -631,8 +632,10 @@ question, a red check or a cleared conversation resumes at the step it stopped o
 is never handed out without the risk check, the local checks and the review before it.
 `/devstride:run-workflow build` runs the same list by hand, given the context `build-item` would
 otherwise resolve. A workflow that names a step skill this plugin does not have is refused
-(`skill-missing`). Its rules are in `skills/run-workflow/references/workflow-runner.md`, and
-`workflow-fixtures.json` beside the script holds its canonical cases.
+(`skill-missing`). Driving a run is in `skills/run-workflow/references/workflow-runner.md`, what a
+definition may hold and the proof each step leaves in `skills/run-workflow/references/workflow-contracts.md`,
+and `workflow-fixtures.json` beside the script holds its canonical cases. A review whose result and proof
+name different paths is refused.
 
 ### Agents that do not run these skills
 

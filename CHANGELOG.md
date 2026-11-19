@@ -29,11 +29,30 @@ for what each version component means here and how a release is cut.
     tree clean). Each can be run by itself after a fix.
   - Five new references hold the moved procedures in full: `risk-check/references/story-risk-check.md`,
     `review-story/references/review-routes.md`, `merge-story/references/merge-paths.md`,
-    `story-lifecycle/references/start.md` and `story-lifecycle/references/complete.md`.
-  - New tests: `build-workflow-coverage.sh` (every rule that left `build-item` or
-    `ultracode-build` at 4.2.0 lives in exactly one new home), `build-workflow-run.sh` (the real
-    step list driven end to end with canned answers, no model) and `build-citations.sh` (nothing
-    cites a removed step number).
+    `story-lifecycle/references/start.md` and `story-lifecycle/references/complete.md`; and
+    `build-item/references/run-stops.md` says what the loop does when a run stops.
+  - **A fix made after the risk check is screened too.** A red local check fixed on the branch, a
+    review fix, or any other commit that changes the story sends it back through the risk check,
+    for that change only, before the merge; a migration or sign-in change added by a fix gets its
+    focused verifier like any other. A base that moved under an unchanged story does not.
+  - **An interrupted story is picked up where it stopped, also from a new conversation.** The loop
+    looks for an unfinished run of the item before starting one, so a cleared conversation no
+    longer starts a duplicate, and a story whose merge landed just before an interruption still
+    gets its completion steps. A merge that landed is reported as landed even when a clean-up after
+    it failed, and the loop records it instead of asking for the checks again.
+  - New tests: `build-workflow-coverage.sh` (each of the 94 listed rules that left `build-item` or
+    `ultracode-build` at 4.2.0 lives, with its instruction and not only its heading, in exactly one
+    new home, and each reference home is read in full by its step skill), `build-workflow-run.sh`
+    (the real step list driven end to end with canned answers, no model), `build-loop-rules.sh`
+    (the loop rules that live only in prose, each in its home) and `build-citations.sh` (nothing
+    cites a removed step number in either word order, with a mutation check).
+  - **Step contract catalog, additively:** a fourth proof binding, `story` (the story's patch at
+    the proof's head equals the story's patch now), which the risk check now uses instead of
+    `none`; a payload path kind `proof:<contract>` (an earlier step's proof); payload keys
+    `risk-check@1.previousProof`, `local-checks@1.reviewMoment`, `merge@1.reviewProof`,
+    `merge@1.localChecks` and `complete@1.profileSource`; optional result keys `deferrals` and
+    `deviations` on `risk-check@1` and `review@1`; and the named rule `review-names-one-path` (a
+    review whose result and proof name different paths is refused).
 
 ### Changed
 
@@ -51,26 +70,39 @@ for what each version component means here and how a release is cut.
   verdict, refuses a dirty tree and reports an existing branch instead of failing, so the loop can
   run it again safely.
 - **`run-workflow` runs the shipped Build workflow.** Use `/devstride:build-item` for the Build
-  loop itself: it supplies the context the runner needs.
+  loop itself: it supplies the context the runner needs. Its reference is split in two:
+  `workflow-runner.md` (driving a run, which the Build loop reads) and `workflow-contracts.md`
+  (what a definition may hold and the proof each step leaves, read when writing one).
+- **The local gate decides its own width.** `local-checks` now applies `profileOverrides.storyVerify`,
+  the release train's full-width rule for a one-off reviewed before it lands, and
+  `generated.toleratedTypeErrors`, all of which used to sit in steps that no longer run the gate.
+- **A re-review of an open pull request goes through `pr` again**, so the pre-ship checks still run
+  before the pull request is marked ready; with nothing configured locally the review takes the
+  pull-request path, on the release train too.
 - **Every session's always-loaded skill listing grows by eight description lines** (1,824 to
   2,093 tokens, measured): each step another workflow reuses or a person re-runs alone is its own skill, and the
   two Build-only steps share one to keep the raise down.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.2.0 @ 8de943a, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+The bodies below shrink where rules moved out, but a fast story now loads the eight step skills
+and their references as well: the fast story loop path grows from 80,771 tokens at 4.2.0 to
+100,400 tokens (`scripts/cost-budgets.json`, `paths.fastStoryLoop`), even after the runner's
+reference was split so the loop reads only its driving half.
+
+<!-- scripts/measure-cost.sh --table --since devstride--v4.2.0 @ cb6efba, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.2.0 | tokens@devstride--v4.2.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
 | skills/plan/SKILL.md | 25,535 | 8,512 | 25,542 | 8,514 | +2 | 8,514 |
 | skills/doctor/SKILL.md | 23,995 | 7,999 | 23,995 | 7,999 | +0 | 8,000 |
 | skills/review/SKILL.md | 23,970 | 7,990 | 23,986 | 7,996 | +6 | 7,999 |
-| skills/build-item/SKILL.md | 23,980 | 7,994 | 20,389 | 6,797 | -1197 | 6,800 |
+| skills/build-item/SKILL.md | 23,980 | 7,994 | 21,859 | 7,287 | -707 | 7,287 |
 | skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
 | skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |
 | skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 11,963 | 3,988 | +0 | 3,988 |
-| skills/pr/SKILL.md | 11,205 | 3,735 | 11,211 | 3,737 | +2 | 3,737 |
-| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 10,002 | 3,334 | -1657 | 3,400 |
+| skills/pr/SKILL.md | 11,205 | 3,735 | 11,538 | 3,846 | +111 | 3,846 |
+| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 10,327 | 3,443 | -1548 | 3,443 |
 | skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
 | skills/create-defect/SKILL.md | 6,731 | 2,244 | 6,730 | 2,244 | +0 | 2,500 |
 | skills/branch-hotfix/SKILL.md | 6,649 | 2,217 | 6,649 | 2,217 | +0 | 2,217 |
@@ -78,19 +110,19 @@ for what each version component means here and how a release is cut.
 | skills/comprehend-plan/SKILL.md | 5,622 | 1,874 | 5,622 | 1,874 | +0 | 1,874 |
 | skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,255 | 1,752 | -1 | 1,753 |
 | skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,578 | 1,526 | -1 | 1,527 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 3,707 | 1,236 | +377 | 1,236 |
+| skills/local-checks/SKILL.md (added) | — | — | 3,594 | 1,198 | +1198 | 1,200 |
+| skills/risk-check/SKILL.md (added) | — | — | 3,593 | 1,198 | +1198 | 1,198 |
 | skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
-| skills/branch-feature/SKILL.md | 2,577 | 859 | 3,526 | 1,176 | +317 | 1,176 |
-| skills/local-checks/SKILL.md (added) | — | — | 3,348 | 1,116 | +1116 | 1,200 |
-| skills/risk-check/SKILL.md (added) | — | — | 3,026 | 1,009 | +1009 | 1,100 |
+| skills/run-workflow/SKILL.md | 2,956 | 986 | 3,129 | 1,043 | +57 | 1,043 |
+| skills/merge-story/SKILL.md (added) | — | — | 3,064 | 1,022 | +1022 | 1,022 |
 | skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
-| skills/run-workflow/SKILL.md | 2,956 | 986 | 2,951 | 984 | -2 | 1,000 |
-| skills/claim-story/SKILL.md (added) | — | — | 2,898 | 966 | +966 | 1,000 |
+| skills/review-story/SKILL.md (added) | — | — | 2,986 | 996 | +996 | 1,000 |
+| skills/claim-story/SKILL.md (added) | — | — | 2,875 | 959 | +959 | 1,000 |
 | skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
-| skills/review-story/SKILL.md (added) | — | — | 2,716 | 906 | +906 | 1,000 |
-| skills/story-lifecycle/SKILL.md (added) | — | — | 2,683 | 895 | +895 | 900 |
-| skills/capture-findings/SKILL.md (added) | — | — | 2,671 | 891 | +891 | 900 |
+| skills/story-lifecycle/SKILL.md (added) | — | — | 2,700 | 900 | +900 | 900 |
+| skills/capture-findings/SKILL.md (added) | — | — | 2,696 | 899 | +899 | 900 |
 | skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
-| skills/merge-story/SKILL.md (added) | — | — | 2,561 | 854 | +854 | 900 |
 | skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
 | skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
 | skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
@@ -101,7 +133,7 @@ for what each version component means here and how a release is cut.
 | skills/sync-base/SKILL.md (added) | — | — | 1,471 | 491 | +491 | 500 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,472 | 1,824 | 6,277 | 2,093 | +269 | 2,100 |
-| **total (bodies)** | 279,416 | 93,149 | 293,193 | 97,745 | +4596 | |
+| **total (bodies)** | 279,416 | 93,149 | 297,279 | 99,107 | +5958 | |
 
 ## [4.2.0] — 2026-11-18
 
