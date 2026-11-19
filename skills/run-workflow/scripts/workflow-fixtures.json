@@ -3723,5 +3723,337 @@
  "definitionHash": {
   "definition": "claim-only",
   "sha256": "52cd714a579502ce0bb0a3608b0f5cc40fdcc747281a08ae287313a3f2bcaff4"
+ },
+ "credentials": {
+  "_readme": "Lines the credential check must catch (`caught`) and must leave alone (`kept`). Every line any earlier revision of the check caught is in `caught`, except the agreed ordinary lines in `kept`. A line that holds a provider's token prefix is a list of parts, cut inside each prefix, that the test joins, so no file holds a string a secret scanner would take for a real token.",
+  "caught": [
+   [
+    "AK",
+    "IAIOSFODNN7EXAMPLE"
+   ],
+   "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+   "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+   [
+    "gh",
+    "p_16C7e42F292c6912E7710c838347Ae178B4a"
+   ],
+   [
+    "githu",
+    "b_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyz"
+   ],
+   [
+    "gh",
+    "o_abcdefghij"
+   ],
+   [
+    "glp",
+    "at-xxxxxxxxxxxxxxxxxxxx"
+   ],
+   [
+    "xo",
+    "xb-123456789012-1234567890123-abcdefghijklmnopqrstuvwx"
+   ],
+   [
+    "sk_l",
+    "ive_4eC39HqLyjWDarjtT1zdp7dc"
+   ],
+   [
+    "rk_l",
+    "ive_abcdefghij"
+   ],
+   [
+    "sk-",
+    "ant-api03-abcdefghijklmnop"
+   ],
+   [
+    "np",
+    "m_abcdefghijklmnopqrstuvwxyz0123456789"
+   ],
+   [
+    "AI",
+    "zaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI"
+   ],
+   [
+    "S",
+    "G.ngeVfQFYQlKU0ufo8x5d1A.TwL2iGABf9DHoTf-09kqeF8tAmbihYzrnopKc-1s5cr"
+   ],
+   [
+    "s",
+    "k-proj-abcdefghijklmnopqrstuvwxyz"
+   ],
+   [
+    "whs",
+    "ec_abcdefghij"
+   ],
+   [
+    "token e",
+    "yJraWQiOiJhYmNkRUZHSGlqa2xNTk9QcXJzdFVWV1h5ejAxMjM0NTY3ODkrL0FCPSIsImFsZyI6IlJTMjU2In0.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   [
+    "id e",
+    "yJhbGciOiJSUzI1NiIsImtpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1NjciLCJ0eXAiOiJKV1QifQ.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   [
+    "log e",
+    "yJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   [
+    "e",
+    "yJraWQiOiJhYmNkRUZHSGlqa2xNTk9QcXJzdFVWV1h5ejAxMjM0NTY3ODkrL0FCPSIsImFsZyI6IlJTMjU2In0.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   [
+    "e",
+    "yJhbGciOiJSUzI1NiIsImtpZCI6IjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1NjciLCJ0eXAiOiJKV1QifQ.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   [
+    "the cookie was e",
+    "yJraWQiOiJhYmNkRUZHSGlqa2xNTk9QcXJzdFVWV1h5ejAxMjM0NTY3ODkrL0FCPSIsImFsZyI6IlJTMjU2In0.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c ok"
+   ],
+   [
+    "jwt=e",
+    "yJraWQiOiJhYmNkRUZHSGlqa2xNTk9QcXJzdFVWV1h5ejAxMjM0NTY3ODkrL0FCPSIsImFsZyI6IlJTMjU2In0.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   "Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
+   "authorization: Basic dXNlcm5hbWU6cGFzc3dvcmQxMjM=",
+   "Authorization: token ghx_abcdefghijklmnop123",
+   "Authorization: Negotiate YIIabcdefghijklmnopqrstu",
+   "Authorization: AWS4-HMAC-SHA256 Credential=abc/20200101",
+   "\"Authorization\": \"Bearer abcdefghijklmnopqrstuvwxyz\"",
+   "authorization='abcdefghijklmnopqrstuvwxyz'",
+   "-H 'Authorization: Bearer abcdefghijklmnopqrstuvwxyz'",
+   "postgres://admin:s3cr3tpass@db.example.com:5432/app",
+   "https://user:pass@example.com",
+   "redis://:pw@host",
+   "mongodb+srv://u:p@cluster0.example.net",
+   "password=hunter2x",
+   "PASSWORD: correcthorsebattery",
+   "\"password\": \"correcthorse\"",
+   "{'apiKey': 'abcdefghijk'}",
+   "apiKey: abcdefghijkl",
+   [
+    "accessKeyId=AK",
+    "IAEXAMPLE1234"
+   ],
+   "client_secret=abcdefghijklm",
+   "--password=hunter22",
+   "--token abcdefghi",
+   "db.password=huntertwo",
+   "spring.datasource.password: huntertwo",
+   "a.b.c.d.e.f.g.h.i.password=huntertwo",
+   "app.config.oauth.clientSecret = abcdefghij",
+   "PRIVATE_KEY=abcdefghijkl",
+   [
+    "-----BE",
+    "GIN RSA PRIVATE KEY-----"
+   ],
+   "x-api-key: abc",
+   "CLAIM_HOLDER=me",
+   "export GITHUB_TOKEN=abcdefghijk",
+   "MY_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX_TOKEN=abcdefghijk",
+   "TOKEN_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX=abcdefghijk",
+   "secret: 'abcdefg1'",
+   "token=1234567a",
+   "Authorization: Bearer abc/def/ghijklmnop.txt",
+   "Authorization: Bearer //79//79//79//79//79//79//79//79//79//79//79//79//79//79//79//79//79//79//79//79",
+   "Authorization: Basic dXNlcjpwYXNzd29yZA==",
+   "Authorization: Token abcd/efghijklmnop.js",
+   "Authorization: abcdefghij/klmnopqr.gz",
+   "Authorization: Api-Key abc/defghijklmnopq.json",
+   "Authorization: +/+/+/+/+/+/+/+/+/+/+/+/+/+/+/+/+/+/+/+/+/+/+/+/.",
+   "authorization=abcdefghijklmn/op.qrstu",
+   "export PASSWORD=huntertwo",
+   "-Dpassword=huntertwo",
+   "-Ddb.password=huntertwo",
+   "--db-password=huntertwo",
+   "$PASSWORD=huntertwo",
+   "\"db.password\": \"huntertwo\"",
+   "'api_key':'abcdefghij'",
+   "{\"password\":\"huntertwo\"}",
+   "db:password: huntertwo",
+   "db@password=huntertwo",
+   "db,password=huntertwo",
+   "db;password=huntertwo",
+   "db|password=huntertwo",
+   "db+password=huntertwo",
+   "db~password=huntertwo",
+   "db#password=huntertwo",
+   "a=password=huntertwo",
+   "user: password: huntertwo",
+   ".password=huntertwo",
+   "a.b.c.d.e.f.g.h.i.j.k.password=huntertwo",
+   "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP_password=huntertwo",
+   "password_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x_x=huntertwo",
+   "secret_key\t=\thuntertwo",
+   "password :=huntertwo",
+   "password = 'huntertwo'",
+   "password=`huntertwo`",
+   "password=(huntertwo)",
+   "-dpostgres://u:pw@h",
+   "...postgres://user:pw@host",
+   "x_postgres://u:pw@h",
+   "jdbc:postgresql://u:pw@h",
+   "+redis://u:pw@h",
+   "1redis://u:pw@h",
+   [
+    "e",
+    "yJhbGciOiJIUzI1NiJ9.e",
+    "yJzdWIiOiIxIn0"
+   ],
+   [
+    "e",
+    "yJhbGciOiJIUzI1NiJ9.e",
+    "yJzdWIiOiIxIn0 "
+   ],
+   [
+    "-e",
+    "yJraWQiOiJhYmNkRUZHSGlqa2xNTk9QcXJzdFVWV1h5ejAxMjM0NTY3ODkrL0FCPSIsImFsZyI6IlJTMjU2In0.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   [
+    "_e",
+    "yJraWQiOiJhYmNkRUZHSGlqa2xNTk9QcXJzdFVWV1h5ejAxMjM0NTY3ODkrL0FCPSIsImFsZyI6IlJTMjU2In0.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   [
+    "ae",
+    "yJraWQiOiJhYmNkRUZHSGlqa2xNTk9QcXJzdFVWV1h5ejAxMjM0NTY3ODkrL0FCPSIsImFsZyI6IlJTMjU2In0.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   [
+    "%3De",
+    "yJraWQiOiJhYmNkRUZHSGlqa2xNTk9QcXJzdFVWV1h5ejAxMjM0NTY3ODkrL0FCPSIsImFsZyI6IlJTMjU2In0.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   [
+    ".e",
+    "yJraWQiOiJhYmNkRUZHSGlqa2xNTk9QcXJzdFVWV1h5ejAxMjM0NTY3ODkrL0FCPSIsImFsZyI6IlJTMjU2In0.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   [
+    "/e",
+    "yJraWQiOiJhYmNkRUZHSGlqa2xNTk9QcXJzdFVWV1h5ejAxMjM0NTY3ODkrL0FCPSIsImFsZyI6IlJTMjU2In0.e",
+    "yJzdWIiOiJhYWFhYWFhYS1iYmJiLWNjY2MtZGRkZC1lZWVlZWVlZWVlZWUiLCJpc3MiOiJodHRwczovL2NvZ25pdG8taWRwLnVzLWVhc3QtMS5hbWF6b25hd3MuY29tL3VzLWVhc3QtMV9hYmNkZWZnaGkiLCJjbGllbnRfaWQiOiJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIsImV4cCI6MTcwMDAwMDAwMCwiaWF0IjoxNjkwMDAwMDAwLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+   ],
+   [
+    "e",
+    "yJhbGciOiJub25lIn0.e",
+    "yJzdWIiOiIxIn0."
+   ],
+   [
+    "S",
+    "G.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbb"
+   ],
+   "Authorization: Bearer_abcdefghijklmnopqrstuvwx",
+   "Authorization:abcdefghijklmnopqrstuvwx",
+   "Authorization : Bearer abcdefghijklmnopqrstuvwx",
+   "Authorization: Digest-X abcdefghijklmnopqrstu",
+   "Authorization: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA abcdefghijklmnopqrstu",
+   "+https://owner:huntertwo@example.com/db",
+   [
+    "\"-\" + e",
+    "yJhbGciOiJIUzI1NiJ9.e",
+    "yJzdWIiOiIxIn0"
+   ],
+   [
+    "x=e",
+    "yJhbGciOiJIUzI1NiJ9.e",
+    "yJzdWIiOiIxIn0"
+   ],
+   [
+    "-e",
+    "yJhbGciOiJIUzI1NiJ9.e",
+    "yJzdWIiOiIxIn0.sig"
+   ],
+   "Authorization: /////3N5bnRoZXRpYy10ZXN0.wAA",
+   "Authorization: Custom a/b/c/d/e/f/g/h.txt",
+   "paſſword=huntertwo",
+   "db.paſſword=huntertwo",
+   "apiKey=huntertwo",
+   "credential_for_production_region_production_region_production_region_password=huntertwo",
+   "Authorization: Api-Key abcdefghijklmnopqrstuvwx",
+   "redis://:pw@cache.example.com"
+  ],
+  "kept": [
+   "password=12345678",
+   "Authorization: Basic dXNlcjpwYXNz",
+   "Authorization: Basic dXNlcjpwYXNz...",
+   "${DB_PASSWORD}=huntertwo",
+   "db/password=huntertwo",
+   "db\\password=huntertwo",
+   "[password]=huntertwo",
+   "password[0]=huntertwo",
+   "PASSWORD=\"hunter two\"",
+   "x.password.=huntertwo",
+   "password.x=huntertwo",
+   [
+    "S",
+    "G.aaaaaaa.bbbbbbbbbb"
+   ],
+   "3 files changed, 12 insertions(+), 4 deletions(-)",
+   "unit: 412 passed",
+   "lint: clean",
+   "tokens: 91100 used",
+   "the token rotation is documented",
+   "src/auth/token.ts:12:5 - error TS2322",
+   "backend/tests/suits/password-reset.spec.ts passed",
+   "auth.token.ts: fixed",
+   "commit 7083b4ff1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
+   "https://github.com/example/widgets/pull/4716",
+   "git@github.com:example/widgets.git",
+   "the password reset flow works",
+   "Rotate the token: weekly",
+   "the Authorization header is checked",
+   "Authorization: required",
+   "authorization: handled by the gateway",
+   "a bearer of good news",
+   "basic checks ok",
+   "main...HEAD",
+   "patch-id 0123456789abcdef0123456789abcdef01234567",
+   "ran 7 suites in 12.3s",
+   "secretary: Jane",
+   "has_token=true",
+   "token: 911",
+   [
+    "e",
+    "yJ is the prefix of a token"
+   ],
+   "https://example.com/a/b/c?x=1",
+   "docs/permissions/architecture.md",
+   "PASS tests/auth/authorizer.spec.ts (5 tests)",
+   "authorization: ok, middleware/authorizerHandler.ts",
+   "token.count: 1234567",
+   "tokens.used: 9123456",
+   "the secrets.json file is ignored",
+   "config.token_ttl_seconds: 3600",
+   "password_min_length: 12",
+   "Bearer tokens are rotated",
+   "Basic authentication is disabled",
+   [
+    "e",
+    "yJmb28iOiJiYXIifQ.json"
+   ],
+   "password_reset.py: 12 passed",
+   "auth/token.py:40: unused import",
+   "token.ts: compiled",
+   "src/password.ts: 3 passed",
+   "db.password_policy: strict",
+   "password.length: 12345678",
+   "Token: 911",
+   "token_count=12",
+   "secret-scanner: clean",
+   "api_key_rotation: 0 failures",
+   "Authorization: header is now checked",
+   "tokens: 911 used",
+   "commit 0123456789abcdef0123456789abcdef01234567",
+   "https://github.com/example/widgets/pull/12",
+   "ssh://git@github.com/example/widgets.git"
+  ]
  }
 }

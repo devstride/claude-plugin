@@ -117,29 +117,30 @@ RUN_OUTCOME = {
 # a verdict detail or a refusal message is replaced, and a definition that holds one is refused.
 # A value is one unbroken run of at least 7 characters that is not all digits, so `token: 911`,
 # `has_token=true` and `Rotate the token: weekly` are ordinary text and `password: hunter2` is not.
-# Each rule may start only at the beginning of a run of the characters it reads (a lookbehind or a
-# fixed word), and reads that run once, so the scan stays linear in the text's length.
+# An Authorization value (any scheme word or none) and a Bearer or Basic value are 16 characters
+# or more; a web token is `eyJ`, a dot and a second part of 8 characters or more.
 CREDENTIAL_WORD = re.compile(r"secret|token|passw(?:or)?d|api[_-]?key|access_?key|private_?key", re.I)
 CREDENTIAL_VALUE = r"(?=[^\s\"']{7})(?![0-9]+(?:[\s\"']|$))"
 SECRET = re.compile(
     r"CLAIM_HOLDER|-----BEGIN"
-    r"|\bauthorization[\"']?\s*[:=]\s*[\"']?(?:[A-Za-z][A-Za-z0-9_-]{0,31}\s+)?"   # an Authorization header, any scheme,
-    r"(?![A-Za-z0-9._~+/=-]*/[A-Za-z0-9_.-]*\.[A-Za-z]{1,5}(?![A-Za-z0-9._~+/=-]))[A-Za-z0-9._~+/=-]{16}"  # not a file path
-    r"|\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{16}"                     # a bearer or basic credential
-    r"|\bx-api-key[\"']?\s*:\s*[\"']?[^\s\"']"                           # an API key header
-    r"|(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*://[^\s/@:]*:[^\s/@]+@"              # a URL with a user and password
+    r"|authorization[\"']?\s*[:=]\s*[\"']?(?:[A-Za-z][A-Za-z0-9_-]*\s+)?[A-Za-z0-9._~+/=-]{16}"  # an Authorization value
+    r"|(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]{16}"                       # a bearer or basic credential
+    r"|x-api-key[\"']?\s*:\s*[\"']?[^\s\"']"                             # an API key header
+    r"|[a-z][0-9+.-]*://[^\s/@:]*:[^\s/@]+@"           # a URL with a password (a scheme holding a letter)
     r"|\b(?:sk_live_|sk_test_|rk_live_|sk-ant-|ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|xox[abpors]-|whsec_)[A-Za-z0-9_-]{4}"
     r"|\bnpm_[A-Za-z0-9]{16}|\bAIza[A-Za-z0-9_-]{16}|\bSG\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8}"
     r"|\bsk-[A-Za-z0-9_-]{16}|(?-i:\b(?:AKIA|ASIA)[0-9A-Z]{12})"
-    r"|(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\."            # a JSON web token
+    r"|(?<![A-Za-z0-9])eyJ(?:[A-Za-z0-9]|[_-](?!eyJ)){4,}\.[A-Za-z0-9_-]{8}"  # a web token (a later -eyJ starts its own try)
     r"|(?:--(?:password|token)|\bclient_secret)(?:\s+|=)[\"']?" + CREDENTIAL_VALUE,   # a flag and its value
     re.I)
-# A key assigned a value: the whole key is read once (a lookahead and a back-reference, so no
-# backtracking into it), then its last dotted part must name a credential: db.password=… is one,
-# password_reset.py: … is not.
-ASSIGNED = re.compile(r"(?<![A-Za-z0-9_./\\-])(?=([A-Za-z0-9_.-]+))\1[\"']?\s*[:=]\s*[\"']?" + CREDENTIAL_VALUE)
-KEY = re.compile(r"^[A-Za-z0-9_.-]+$")
+# A key assigned a value: the whole key, then its last dotted part must name a credential:
+# db.password=… is one, password_reset.py: … is not.
+ASSIGNED = re.compile(r"(?<![A-Za-z0-9_./\\-])(?=([A-Za-z0-9_.-]+))\1[\"']?\s*[:=]\s*[\"']?" + CREDENTIAL_VALUE, re.I)
+KEY = re.compile(r"^[A-Za-z0-9_.-]+$", re.I)
 CREDENTIAL_STRING = re.compile(r"^\s*(?![0-9]+\s*$)\S{7,}\s*$")
+# Text is scanned in overlapping windows, so the scan's cost is linear in the text's length
+# whatever the rules are; a credential up to the overlap long is always whole in one window.
+SCAN_WINDOW, SCAN_OVERLAP = 2048, 512
 
 
 def credential_key(key):
@@ -649,7 +650,12 @@ def validate_definition(definition, contracts, plugin_version, in_work_tree, roo
 # --- a step's answer ---------------------------------------------------------------------------
 
 def has_secret(text):
-    return bool(SECRET.search(text)) or any(credential_key(m.group(1)) for m in ASSIGNED.finditer(text))
+    """True when the text holds what looks like a credential, read window by window."""
+    for at in range(0, max(len(text) - SCAN_OVERLAP, 1), SCAN_WINDOW - SCAN_OVERLAP):
+        window = text[at:at + SCAN_WINDOW]
+        if SECRET.search(window) or any(credential_key(m.group(1)) for m in ASSIGNED.finditer(window)):
+            return True
+    return False
 
 
 def parse_verdict(entry, output):

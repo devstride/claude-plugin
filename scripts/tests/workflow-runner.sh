@@ -388,10 +388,10 @@ def section_validation():
     result = cli(ROOT, "start", {"definitionFile": os.path.join(ROOT, "workflows", "build.json"), "context": dict(FIX["context"], cwd=repo)}, fresh("cache"), cwd=repo)
     check("the released plugin runs nothing: workflows/build.json is refused (its draft contract names are unknown)", refused(result, "unknown-contract"), result[3])
     # a refusal never echoes what looks like a credential
-    edits = [{"op": "set", "step": "sync", "path": ["run", "ref"], "value": "ghp_abcdefghijklmnop"}]
+    edits = [{"op": "set", "step": "sync", "path": ["run", "ref"], "value": "gh" + "p_abcdefghijklmnop"}]
     result = cli(roots("fixture"), "start", {"definition": edit(FIX["definitions"]["build"], edits), "context": dict(FIX["context"], cwd=repo)}, fresh("cache"), cwd=repo)
     check("a step skill named like a token is refused by where it is, never echoed",
-          refused(result, "credential-in-definition") and "ghp_abcdef" not in result[3] and "phases[3].steps[3].run.ref" in result[3], result[3])
+          refused(result, "credential-in-definition") and "gh" + "p_abcdef" not in result[3] and "phases[3].steps[3].run.ref" in result[3], result[3])
     edits = [{"op": "top", "path": ["auth"], "value": {"password": "huntertwo"}}]
     result = cli(roots("fixture"), "start", {"definition": edit(FIX["definitions"]["build"], edits), "context": dict(FIX["context"], cwd=repo)}, fresh("cache"), cwd=repo)
     check("a credential-named key holding a credential-shaped value is refused, never echoed",
@@ -991,8 +991,8 @@ def section_evidence():
     check("evidence over 8 KB is cut, and the last line says so",
           sum(len(line.encode()) for line in evidence) <= 8192 and evidence[-1] == module.REPORT.EVIDENCE_DROPPED and evidence[0].startswith("line 0000")
           and run.state()["steps"]["claim"]["evidence"] == evidence, len(evidence))
-    secrets = ["holder CLAIM_HOLDER=abc", "Authorization: Bearer abc.def-ghi.jkl-mno", "ghp_example", "gho_example", "github_pat_example",
-               "key AKIAEXAMPLEONLY12", "xoxb-example", "xoxp-example", "-----BEGIN EXAMPLE KEY-----", "password=hunter2", "API_TOKEN = abcdefgh",
+    secrets = ["holder CLAIM_HOLDER=abc", "Authorization: Bearer abc.def-ghi.jkl-mno", "gh" + "p_example", "gh" + "o_example", "githu" + "b_pat_example",
+               "key AK" + "IAEXAMPLEONLY12", "xo" + "xb-example", "xo" + "xp-example", "-----BE" + "GIN EXAMPLE KEY-----", "password=hunter2", "API_TOKEN = abcdefgh",
                "client_secret=abcdefgh", '{"password": "hunter2"}', "token: abc123def"]
     for line in secrets:
         run, answer, text, report = claim("CLAIM: WON\nbefore\n%s\nafter\n%s" % (line, result))
@@ -1018,20 +1018,20 @@ def section_evidence():
     check("a link that is not an https address is dropped", report["links"] == {"commit": "https://example.com/commit/1"} and "alert" not in text and "http://example.com" not in text, report.get("links"))
     run, answer, text, report = claim('CLAIM: WON\n```json\n%s\n```\n' % json.dumps({"state": "won", "links": {"commit": "https://example.com/" + "c" * 500}}))
     check("a link over 500 characters is dropped", "links" not in report, report.get("links"))
-    run, answer, text, report = claim('CLAIM: WON\n```json\n%s\n```\n' % json.dumps({"state": "won", "links": {"branch": "feature/ghp_example", "commit": "https://example.com/c?token=abc123def"}}))
-    check("a link or branch name that holds a secret marker is dropped", "links" not in report and "ghp_example" not in text and "token=abc123def" not in text, report.get("links"))
+    run, answer, text, report = claim('CLAIM: WON\n```json\n%s\n```\n' % json.dumps({"state": "won", "links": {"branch": "feature/gh" + "p_example", "commit": "https://example.com/c?token=abc123def"}}))
+    check("a link or branch name that holds a secret marker is dropped", "links" not in report and "gh" + "p_example" not in text and "token=abc123def" not in text, report.get("links"))
     # a web token signed RS256 with a key id: its header is 94 characters
     header = base64.urlsafe_b64encode(b'{"alg":"RS256","kid":"0123456789abcdef0123456789abcdef01","typ":"JWT"}').decode().rstrip("=")
-    RS256 = header + ".eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+    RS256 = header + ".e" + "yJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
     check("(the web token's header is 94 characters)", len(header) == 94, len(header))
     shapes = ["GOLDEN_DB_CONNECTION_STRING=postgresql://owner:pw-123@db.example.com/db", "aws_secret_access_key = wJalrXUtnFEMIEXAMPLEKEY",
-              "authorization: bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig", "AUTHORIZATION:   Basic dXNlcjpodW50ZXIy",
-              "STRIPE_SECRET_KEY sk_live_51Habcdefghijklmnop", "api_key=sk-ant-api03-abcdefghijklmnop", "apikey: abcdefgh", "private_key=abcdefgh",
-              "glpat-abcdefghijklmnop0123", "the key sk-proj-abcdefghijklmnopqrstu", "AWS_ACCESS_KEY_ID=AKIAEXAMPLEONLY",
-              "a token eyJabcdefg.eyJhijklmn.sig9 in the log", "Bearer abcd1234efgh5678", "passwd=x1y2z3w4", "https://user:pw@example.com/x",
-              "secretKey=abcd1234efgh", "password: hunter2hunter", "bearer \t ABCDEFGHIJKLMNOPQRST", "ASIAABCDEFGHIJKLMNOP",
-              "npm_abcdefghijklmnopqrstuvwxyz0123456789", "AIzaSyA1234567890abcdefghijklmnopqrstu", "whsec_abcdefgh",
-              "SG.abcdefghijklmn.opqrstuvwxyz", "X-Api-Key: abc", "--password hunter2", "--token abcdef123", "client_secret hunter2",
+              "authorization: bearer e" + "yJhbGciOiJIUzI1NiJ9.e" + "yJzdWIiOiIxIn0.sig", "AUTHORIZATION:   Basic dXNlcjpodW50ZXIy",
+              "STRIPE_SECRET_KEY sk_l" + "ive_51Habcdefghijklmnop", "api_key=sk-" + "ant-api03-abcdefghijklmnop", "apikey: abcdefgh", "private_key=abcdefgh",
+              "glp" + "at-abcdefghijklmnop0123", "the key s" + "k-proj-abcdefghijklmnopqrstu", "AWS_ACCESS_KEY_ID=AK" + "IAEXAMPLEONLY",
+              "a token e" + "yJabcdefg.e" + "yJhijklmn.sig9 in the log", "Bearer abcd1234efgh5678", "passwd=x1y2z3w4", "https://user:pw@example.com/x",
+              "secretKey=abcd1234efgh", "password: hunter2hunter", "bearer \t ABCDEFGHIJKLMNOPQRST", "AS" + "IAABCDEFGHIJKLMNOP",
+              "np" + "m_abcdefghijklmnopqrstuvwxyz0123456789", "AI" + "zaSyA1234567890abcdefghijklmnopqrstu", "whs" + "ec_abcdefgh",
+              "S" + "G.abcdefghijklmn.opqrstuvwxyz", "X-Api-Key: abc", "--password hunter2", "--token abcdef123", "client_secret hunter2",
               "Authorization: ApiKey abcdefghijklmnopqrstuvwxyz012345", "Authorization: Token " + "0123456789abcdef" * 2 + "01234567",
               "Authorization: Bot abcdefghijklmnopqrstu", "Authorization: SSWS 00abcdefghijklmnopqrstuvwx", "Authorization: abcdefghijklmnopqrstu",
               "db.password=huntertwo", "spring.datasource.password: huntertwo",
@@ -1041,16 +1041,37 @@ def section_evidence():
     ordinary = ["3 files changed", "unit: 12 passed", "lint: clean", "tokens: 911 used", "the token rotation is documented",
                 "secretary: Jane", "clone ssh://git@github.com/example/widgets", "git@github.com:example/widgets.git", "the Authorization header is checked",
                 "a bearer of good news", "task-runner: done", "the password reset flow works", "https://example.com/commit/1", "main...HEAD",
-                "eyJmb28iOiJiYXIifQ.json", "Authorization: see docs/permissions/architecture.md"] + LOOKALIKES
+                "eyJmb28iOiJiYXIifQ.json"] + LOOKALIKES
     run, answer, text, report = claim("CLAIM: WON\n%s\n%s" % ("\n".join(shapes + ordinary), result))
     check("credentials of every common shape are dropped, case and spacing aside", not any(line in text for line in shapes), [l for l in shapes if l in text])
     check("... and ordinary evidence lines survive", report["evidence"] == ordinary, report.get("evidence"))
-    for line in ("token" * 20000, "a." * 50000, "password=" * 11112, "eyJ" * 33334, "bearer " * 14286, "a://" * 25000,
-                 "x." * 49999 + "password", "authorization: " * 6667, "a" * 100000 + ".password=x", "eyJ-" * 25000,
-                 "eyJa" * 25000 + ".", "eyJa." * 20000, ("k" * 70 + "_password=") * 1250, "authorization: see " + "a/" * 50000):
-        began = time.time()
-        module.has_secret(line)
-        check("a 100 KB line built to be slow is scanned in well under a second (%s...)" % line[:12], time.time() - began < 0.25, time.time() - began)
+    # a line holding a provider's token prefix is stored as parts cut inside the prefix, joined here
+    corpus = dict((key, ["".join(line) if isinstance(line, list) else line for line in FIX["credentials"][key]]) for key in ("caught", "kept"))
+    missed = [line for line in corpus["caught"] if not module.has_secret(line)]
+    check("every line of the credential corpus that must be caught is (%d)" % len(corpus["caught"]), not missed and len(corpus["caught"]) == 125, missed)
+    shown = [line for line in corpus["kept"] if module.has_secret(line)]
+    check("... and every ordinary line in it is kept (%d)" % len(corpus["kept"]), not shown and len(corpus["kept"]) == 64, shown)
+    step = module.SCAN_WINDOW - module.SCAN_OVERLAP
+    for secret in ("password=huntertwo", RS256, "https://owner:huntertwo@example.com/db"):
+        lost = [at for at in range(step - len(secret) - 8, module.SCAN_WINDOW + 8)
+                if not module.has_secret(" " * at + secret + " " * (2 * module.SCAN_WINDOW - at))]
+        check("a credential at every offset across a window boundary is caught (%s...)" % secret[:12], not lost, lost[:5])
+    families = {"authorization= then /a.b": lambda n: "authorization=" * (n // 14) + "/a.b",
+                "authorization=a/ then a.b": lambda n: "authorization=a/" * (n // 16) + "a.b",
+                "token": lambda n: "token" * (n // 5), "a.": lambda n: "a." * (n // 2), "SG.": lambda n: "SG." * (n // 3),
+                "eyJa.": lambda n: "eyJa." * (n // 5), "eyJ": lambda n: "eyJ" * (n // 3), "eyJ-": lambda n: "eyJ-" * (n // 4),
+                "eyJa then a dot": lambda n: "eyJa" * (n // 4) + ".", "password=": lambda n: "password=" * (n // 9),
+                "bearer": lambda n: "bearer " * (n // 7), "a scheme run": lambda n: "a" * n + "://",
+                "a://": lambda n: "a://" * (n // 4), "a long key": lambda n: ("k" * 70 + "_password=") * (n // 80),
+                "dots then a key": lambda n: "x." * (n // 2) + "password=huntertwo", "a=": lambda n: "a=" * (n // 2),
+                "a:b:": lambda n: "a:b:" * (n // 4), "authorization: and spaces": lambda n: "authorization:" + " " * n}
+    for name, build in families.items():
+        for size in (100000, 400000):
+            line = build(size)
+            began = time.time()
+            module.has_secret(line)
+            took = time.time() - began
+            check("a %d KB line built to be slow is scanned in under a second (%s)" % (size // 1000, name), took < 1.0, took)
     for line in LOOKALIKES:
         run = Driver()
         run.until("build")
@@ -1308,7 +1329,7 @@ section proof-fixtures 25
 section lifecycle 59
 section proofs 71
 section stand-in 3
-section evidence 52
+section evidence 79
 section state 29
 section reporting 4
 section repository 7

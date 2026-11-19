@@ -96,13 +96,14 @@ the contract does not list are dropped. A `count` is a whole number of at least 
 
 **Reported:** the verdict line (200 characters), the evidence (the reporting helper's caps), https
 links (`pullRequest`, `commit`, `comment`) and the branch name from `links`, the skill that ran,
-and the definition. What is shaped like a credential (an Authorization, Bearer or Basic value of 16
-characters or more, an `x-api-key` header, a web token, a URL with a password, a known token prefix,
-a private key, a claim holder, or a key naming a secret, token, password or API, access or
-private key, assigned, or a `--password`/`--token`/`client_secret` flag, followed by 7 or more
-characters, not all digits) is never reported: the evidence
-line or link is dropped, the verdict detail becomes `[withheld]`, the definition is refused (also for such a key holding such a
-string), and a refusal line says it is not shown. **Not scrubbed:** the result and the proof, kept as given in the
+and the definition. What is shaped like a credential (any Authorization value, Bearer or Basic
+value of 16 characters or more, an `x-api-key` header, a two-part web token, a URL with a
+password, a known token prefix, a private key, a claim holder, or a key whose last dotted part names
+a secret, token, password or API, access or private key, assigned, or a `--password`/`--token`/
+`client_secret` flag, followed by 7 or more characters, not all digits; read in overlapping
+windows) is never reported: the evidence line or link is dropped, the verdict detail becomes
+`[withheld]`, the definition is refused (also a key holding such a string), and a refusal
+line says it is not shown. **Not scrubbed:** the result and the proof, kept as given in the
 owner-only state file and handed to later payloads and to `finished`, never reported.
 
 ## Payloads
@@ -111,8 +112,7 @@ Each contract maps payload keys to paths: a context path (`context.` and a key),
 result (`result:`, a contract, optionally a key), or a step path: the step's own answer from a
 person, the proof of its previous attempt, or the commit it was issued on (`head`). A trailing `?`
 makes a path optional (null when missing). The runner then adds two reserved keys, `step` (the
-issued step's id) and `contract` (its contract), so one skill that serves several steps can tell
-them apart.
+issued step's id) and `contract` (its contract).
 
 ## Proofs
 
