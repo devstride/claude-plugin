@@ -171,11 +171,14 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
 - **Active Agents** (`activeAgents` set, plan mode only): at EVERY pickup, after each merge and at
   every terminal exit (step 0's, step 7's, a STOP — before it exits), apply
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`. Never asks; fails open.
-- **An unfinished run first.** A given story number, or the story the handoff names as in
-  progress, → `resume` with that item before anything below (The run, item 2): a run that answers
-  carries on from its own position, whatever the item's status now says, because the runner never
-  runs a finished step again — a merge that landed before an interruption still owes its
-  completion steps. Only with no unfinished run does the next rule apply.
+- **An unfinished run first**, for a given story number or the story the handoff names as in
+  progress, in this order. (1) `claims` set → invoke `claim-story` with the item and its mode
+  before the runner: `HELD` → never adopt; item 6's held exit. Any other verdict → go on (the
+  run's own claim step renews it). (2) `resume` with the item (The run, item 2). (3) The item
+  merged or Done, but not by this run (its merge row in `status` is not `done`, and a stopped merge
+  fails `run-stops.md`'s landing check) → `resume` with `"close": true` (reported interrupted),
+  then the next rule. Otherwise the run carries on from its own position, whatever the item's
+  status says: a merge that landed before an interruption still owes its completion steps.
 - A given story number IS the story; merged or Done → never started, no run (`next-unblocked.md`).
   Otherwise apply `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full
   (projection warning too). **Never auto-select from the deferred container.** Surface the
@@ -206,9 +209,10 @@ command, and again after a compaction**: the commands, the answers, the stops an
    (`name` and `source`), `workingBase`, `oneOff`, `route`, `releaseUnit` (the release-unit ancestor
    step 0 resolved; null for a one-off), `reviewMoment` (Working base), `branchSlug`
    (`I<number>-` plus `routing.py slug` of the title) and `mode` (`select`, `named` or `resume`).
-2. **`resume` with the item first**: it finds this session's open run, or adopts the newest
-   unfinished one another session left for the item (a cleared conversation, a crash), and hands
-   back its current step. Refused `no-run` → **`start`** with
+2. **`resume` with the item first** (after step 0's claim check): it finds this session's open
+   run, or adopts the newest unfinished one another session left for the item in this repository
+   (a cleared conversation, a crash), re-bound to this checkout (`adoptedFrom` names the one it
+   came from: say it), and hands back its current step. Refused `no-run` or `run-other-repository` → **`start`** with
    `definitionFile` `${CLAUDE_PLUGIN_ROOT}/workflows/build.json` and that context. A `start` refused
    `run-open` means a run exists: `resume` it; only the excluded-paths re-route replaces one. Any other refusal (exit 2) or a
    runner failure (exit 1) → say its line and STOP; never build without the runner.
@@ -232,15 +236,17 @@ command, and again after a compaction**: the commands, the answers, the stops an
    reply as `answer`; unattended with `needsYou.label` set → `references/needs-you.md`. A red local
    check (`LOCAL CHECKS: FAIL`) is the build's to fix: fix the named check on the story branch as
    the build step would, commit, then `resume` (the runner screens and checks the new commit).
-   **Any other stop: read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/run-stops.md` in
-   full before acting on it**: a merge stop (landed or not), a train one-off moved off the train,
-   and every other stop, which waits for this session with the lease kept.
-6. **`finished`, outcome `held`**: a claim held by another agent or a release hold. A selected
-   story → the next candidate (step 0); a named or resumed one → STOP, naming the holder, after
-   **`return-checkout`** when this run leased and nothing was built in it (the claim is the run's
-   first step: the checkout is unused, exactly as at step 0's exits); a release hold → the story
-   branch waits, the item stays in progress, report "held: <reason>" and go to step 0, whose
-   selection passes over it until the hold lifts (`next-unblocked.md`).
+   **Any other stop, and every answer carrying `mayHaveLanded`: read
+   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/run-stops.md` in full before acting on it**:
+   a merge stop (landed or not), a train one-off moved off the train, and every other stop, which
+   waits for this session with the lease kept.
+6. **`finished`, outcome `held`**: a claim held by another agent or a release hold. A story the
+   loop SELECTED → the next candidate (step 0), lease kept: selection passes over a release-held
+   one until the hold lifts (`next-unblocked.md`). A named or resumed story, or a one-off, has no
+   next candidate: a terminal exit, through step 7's terminal exit (its check, then
+   **`return-checkout`**). A claim held → name the holder (nothing was built: the claim comes
+   first). A release hold → the item stays in progress; push the story branch (`git push origin
+   <branch>`), then report "held: <reason>" and what lifts it (`release-holds.md`).
 7. **`finished`, outcome `completed`** → step 7.
 
 ## 7. Sync and proceed
@@ -249,7 +255,7 @@ command, and again after a compaction**: the commands, the answers, the stops an
   clean tree. **Terminal exit or hand-over only: `return-checkout`, after its own check**: `git
   checkout <working base> && git pull --ff-only`, then `git status --porcelain` empty — dirty →
   name the drift and STOP, lease kept, nothing reset or staged. The check is repeated
-  here because a terminal exit may follow a run that never reached its sync (`SYNC: DIRTY`, a
+  here because a terminal exit may follow a run that never reached its sync (a release hold, a
   hand-over).
 - **Handoff memory**: what shipped, what remains, the plan root WITH profile and source (never the
   profile alone), the epic's integration branch keyed to its number (or "develop — no epic").

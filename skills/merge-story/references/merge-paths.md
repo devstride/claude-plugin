@@ -12,12 +12,15 @@ and the `receipt` for this tree).
 
 ## Before any merge, on either path
 
-1. **Already landed** (a re-run after an interruption): fast path, `git fetch origin` and `git
-   merge-base --is-ancestor <commit> origin/<workingBase>` → find the merge commit that brought it
-   (`git log --merges --first-parent --format=%H -n 1 --ancestry-path <commit>..origin/<workingBase>`)
-   and answer `LANDED`; pull-request path, `gh pr view <n> --json state,headRefOid,mergeCommit`
-   merged with `headRefOid` = `commit` → `LANDED` with its merge commit. Another head merged →
-   `BLOCKED`, naming it.
+1. **Already landed** (a re-run after an interruption) means exactly `commit` landed. Fast path:
+   `git fetch origin`, then `git rev-list --first-parent --parents origin/<workingBase> | awk -v
+   c=<commit> '$1 == c || $3 == c { print $1; exit }'` prints the commit that landed it (a merge
+   whose second parent is `commit`, or `commit` itself, fast-forwarded) → `LANDED` with it.
+   Pull-request path: `gh pr view <n> --json state,headRefOid,mergeCommit` merged with `headRefOid`
+   = `commit` → `LANDED` with its merge commit. Nothing printed while `git merge-base --is-ancestor
+   <commit> origin/<workingBase>` succeeds, or a pull request merged with another head → another
+   commit landed carrying it, never checked or reviewed: `BLOCKED another commit landed: <it>`, for
+   a person.
 2. **Release holds first**, before any merge onto the train or `baseBranch` (one-off or plan
    story; a story merging onto an epic's integration branch is not held: it accumulates there, and
    the hold applies at the epic's release): a hold on the item or an ancestor
@@ -49,18 +52,22 @@ and the `receipt` for this tree).
   which records the review, then check again; a follow-up that changed the head answers
   `REFRESHED`. A moved train merged into the story is a new head: check again. Never merge on a
   non-zero exit.
-- `git checkout <workingBase> && git pull --ff-only`; merge the story `--no-ff <commit>` per
+- `git checkout <workingBase> && git pull --ff-only`, then `git rev-list --count
+  origin/<workingBase>..<workingBase>` must print `0`: a local base ahead of its remote →
+  `MERGE: BLOCKED local <workingBase> is ahead of origin`, nothing merged. Record the tip (`tip=$(git
+  rev-parse HEAD)`), then merge the story `--no-ff <commit>` per
   `commitConventions.epicMergeFormat` (fallback
   `merge: <itemNumber> [<N>] <short scope> into <epic-slug> integration`). On the train the subject
   is `merge: <itemNumber> <short scope> into <train>`: the item number always leads, whatever
   `epicMergeFormat` says, because `release` reads it later. The BODY carries the review's
   `mergeBody` (each dismissed finding from the risk check and the review, with its rationale, and
   the landing gate's lines) and the commands and counts of the verification receipt for this tree.
-- Push. **Only once that push SUCCEEDS** delete the story branch locally AND remotely. A refused
-  push → first put the checkout back as it was: `git reset --hard origin/<workingBase>` on the
-  working base (the local merge commit is dropped; nothing of the story is lost, it is on the story
-  branch), then `git checkout <branch>`; then `MERGE: BLOCKED push refused: <first line>`, nothing
-  deleted. Never leave HEAD on the local merge commit: the runner would read it as a new commit.
+- `git push origin <workingBase>`. **Only once that push SUCCEEDS** delete the story branch locally
+  AND remotely. A refused push → undo exactly this merge, never reset to the remote: when `git
+  rev-parse HEAD^1 HEAD^2` prints `$tip` and `commit` (HEAD is the merge just made), `git reset
+  --hard $tip`; then `git checkout <branch>`; then `MERGE: BLOCKED push refused: <first line>`,
+  nothing deleted. Never leave HEAD on the local merge commit: the runner would read it as a new
+  commit.
 
 ## Pull-request merge (review path `pull-request`)
 
@@ -73,11 +80,12 @@ and the `receipt` for this tree).
   patch held) → compare their trees (`git rev-parse <commit>^{tree} <reviewProof.head>^{tree}`):
   - **the same tree** → carry the proof: `python3
     ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post <commit> --from
-    <reviewProof.head> --pr <n> --base <reviewProof.base>`;
+    <reviewProof.head> --pr <n> --base <workingBase>` (the bare branch: the script refuses a ref);
   - **another tree** (the base moved under an unchanged patch) → `--from` refuses unequal trees, so
-    nothing is carried: invoke `review` on the pull request for its settle of this head (its step 7
-    on `commit`: CI at this head and, on READY, the proof posted on it, `review-ledger.md`). The
-    patch is unchanged, so it raises nothing new. A settle that changed the head → `REFRESHED`.
+    nothing is carried: invoke `review` driven in PRE-SHIP RESUME mode on the pull request. It
+    starts at its step 7.1, finds the head current, skips the flip of a pull request already ready
+    and settles CI at this head, posting the proof on READY (`review-ledger.md`). The patch is
+    unchanged, so it raises nothing new. A settle that changed the head → `REFRESHED`.
   `NOT POSTED` on either is the degradation `review-ledger.md` names (said; the merge goes on).
   Then RECOMPUTE `verify.skipDuringStoryBuilds` applicability from the new SHA.
 - **Observe greenness**: non-draft, every applicable check succeeded — actually RAN — at the

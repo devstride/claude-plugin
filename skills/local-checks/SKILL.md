@@ -20,12 +20,12 @@ in full before the first command**: the receipt rules.
 
 1. **Commands come from config, never from memory**: `verify.*` and `preCommitWiringChecks` in
    `.claude/ds-config.json`. Nothing configured → `NOT CONFIGURED`, proof kind `none-configured`
-   (the review then takes the pull-request path, where CI is the gate).
+   (the review then takes the pull-request path, CI its gate).
 2. **The width**, decided here before anything runs. The profile's complete `storyVerify` gate
    runs once on the final story SHA, at the profile's width (`delivery-profiles.md`) unless
    `profileOverrides.storyVerify` (`touched` | `full`) pins it. A train one-off reviewed LOCAL-FULL
    (`route` `train`, `reviewMoment` `release-deferred`, and `releaseTrain.reviewEveryLanding` true
-   or `routing.py small` answering `small: false`, run as `review-routes.md`'s "The train's landing
+   or, with `releaseTrain.smallFixes` set, `routing.py small` answering `small: false`, run as `review-routes.md`'s "The train's landing
    review" spells it) runs at `full`: that review is its whole pre-landing review, so a touched-suite
    receipt never counts. **Local suites are the gate** (`fastStoryMerges.requireLocalVerifyGreen`).
 3. **Skipped suites.** `verify.skipDuringStoryBuilds` suites are skipped during story builds (gated
@@ -49,8 +49,7 @@ Commands and counts go in the merge-commit body of a fast merge, read from the r
 After the verdict and its evidence, one fenced `json` block: `commands` (in the order run),
 `results` (`{command, status, count}` each), `receipt` (its path; null when nothing is configured),
 `tree` and `head` (the full ids checked), `skippedSuites`, and `proof`: `kind` (`receipt`, or
-`none-configured`), `tree`, `head` and `receipt`: the SHA-keyed verification receipt, a verification receipt keyed
-to the final tree.
+`none-configured`), `tree`, `head` and `receipt`: the SHA-keyed verification receipt for the final tree.
 A pass names at least one command.
 
 **Step rules.** This step only; verdict first; safe to re-run; config wins; it never starts a

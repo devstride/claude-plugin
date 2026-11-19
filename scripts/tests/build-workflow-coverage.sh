@@ -61,7 +61,8 @@ N = [
     # step 2
     (BI, "passing the working base explicitly", "skills/branch-feature/SKILL.md", None),
     # step 3
-    (BI, "a verification receipt keyed to the final tree", "skills/local-checks/SKILL.md", None),
+    (BI, "a verification receipt keyed to the final tree", "skills/local-checks/SKILL.md",
+     "the SHA-keyed verification receipt for the final tree"),
     # step 4, 4a, 4b
     (BI, "the working base picks the path, never the diff", "skills/review-story/references/review-routes.md",
      "The working base picks the path, never the diff"),

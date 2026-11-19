@@ -36,8 +36,9 @@ STOPS and asks, and never retries with another name.
   branches freely while holding it.
 - **Busy** → ask the holder or the owner. Never create another checkout or worktree to get round
   it, and never delete or overwrite another session's lease.
-- **Returned** → only after the work has merged or been handed over, or the run ended at step 0
-  before building anything, and every process this session started there has stopped.
+- **Returned** → only after the work has merged or been handed over (a release-held story, its
+  branch pushed, is handed over to the run after the hold), or nothing was built in it yet, and
+  every process this session started there has stopped.
 - **Unset** (`pool.checkout` null or absent): the repository's own lease protocol applies when its conventions declare a pool; otherwise there is no pool and no lease (the generic protocol in
   `ground-truth-at-start.md`), said once.
 
@@ -47,9 +48,10 @@ STOPS and asks, and never retries with another name.
   and the lease is KEPT across loop iterations: a story that ends in "then step 0" never hands
   the checkout back.
 - **`return-checkout` only after the last checkout operation** — for a run that built something,
-  after the run's sync step (its checkout, pull and clean-tree check), never before it — and only at a terminal exit (a one-off's TERMINATE, step
-  8's release-ready stop) or a hand-over to another session or the owner. A STOP during the run or in step 7 that
-  leaves the work for this session to resume keeps the lease.
+  after a checkout, pull and clean-tree check (the run's sync step, or step 7's own), never before it — and only at a terminal exit (a one-off's TERMINATE, step
+  8's release-ready stop, a named or resumed story or a one-off ending held: a claim held by
+  another agent, or a release hold) or a hand-over to another session or the owner. A STOP during the run or in step 7 that
+  leaves the work for this session to resume keeps the lease (`run-stops.md`).
 - **Every exit from step 0 returns it too**, before the run ends — DRY-CHAIN or plan complete, an
   ambiguous plan root, a given item already merged or Done, any other stop before the run starts: nothing
   is built in the checkout yet, so nothing is lost, and the next run leases again.

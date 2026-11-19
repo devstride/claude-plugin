@@ -10,7 +10,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the
 Arguments: $ARGUMENTS — one JSON object, the `review@1` payload
 (`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`): `item`, `profile`, `reviewMoment`,
 `workingBase`, `route`, and the results of the risk check (`riskCheck`), the build (`build`) and
-the local checks (`localChecks`). **Read
+the local checks (`localChecks`, and its proof `localChecksProof`). **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/review-story/references/review-routes.md` in full before choosing the
 path**: both paths, the train's landing review and the proof are spelled there.
 

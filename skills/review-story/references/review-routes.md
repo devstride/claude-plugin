@@ -14,7 +14,7 @@ The working base picks the path, never the diff. The loop resolved it as the rev
 never cloud-reviewed, so a story whose working base is `baseBranch` is never reviewed on the fast
 path, whatever it is passed.
 
-**Nothing configured locally** (the payload's `localChecks` proof kind `none-configured`) → the
+**Nothing configured locally** (the payload's `localChecksProof` kind `none-configured`) → the
 pull-request path, on the release train too: CI on the pull request is then the only gate, and the
 runner refuses a merge of it after any other review (`none-configured-needs-pull-request-route`).
 
