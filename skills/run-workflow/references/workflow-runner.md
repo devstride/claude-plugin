@@ -99,8 +99,10 @@ stopped. Check its `commit` with the landing test
 (`${CLAUDE_PLUGIN_ROOT}/skills/merge-story/references/merge-paths.md`, "Already landed"), which has
 three answers. Exactly that commit landed → report it with `done` on that attempt; never `resume`,
 which reads the moved checkout as new work. It landed, but the check cannot prove how → a person
-reads what the base gained past it (`git log --first-parent --oneline
-<commit>..origin/<workingBase>`): no later commit of this story's branch among it (a release or
+reads every commit the base gained past it (`git log --no-merges --oneline
+<commit>..origin/<workingBase>`; while the story branch exists, a commit of `git rev-list
+<commit>..origin/<branch>` that `git merge-base --is-ancestor <that> origin/<workingBase>` finds on
+the base is a later story commit): no later commit of this story's branch among it (a release or
 other checked landings) → `done` naming that commit; a later story commit among it → `done` is not
 valid: `resume` with `"close": true`, and the person is told that work landed without this run's
 checks and review; unsure → the stop stays

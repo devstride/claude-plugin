@@ -14,8 +14,11 @@ which its The run section handles itself. Read in full before acting on any othe
   the moved checkout as new work. Landed, but the check cannot prove how → stop for a person,
   saying exactly that: "it landed, but this check cannot prove how" (never that it went unchecked:
   after a release fast-forward it was checked and reviewed). The run waits, lease kept. The person
-  reads what the base gained past it: `git log --first-parent --oneline
-  <commit>..origin/<workingBase>`. None of it a later commit of this story's branch (the base moved
+  reads every commit the base gained past it, merged ones too: `git log --no-merges --oneline
+  <commit>..origin/<workingBase>`. While the story branch exists (`origin/<branch>`, or the local
+  `<branch>`), test it directly: for each commit of `git rev-list <commit>..origin/<branch>`, `git
+  merge-base --is-ancestor <that> origin/<workingBase>` succeeding means a later story commit
+  landed. None of it a later commit of this story's branch (the base moved
   on by a release or by other checked landings) → `done` on the stopped attempt, its proof's
   `head` the handed commit (completion then runs). A later story commit among it (work added after
   the checks) → `done` is not valid: `resume` with `"close": true`, and tell the person that work

@@ -21,9 +21,11 @@ and the `receipt` for this tree).
    merge-base --is-ancestor <commit> origin/<workingBase>` succeeding → it landed some other way (a
    later commit on top of it, a merge off the first-parent line or with more parents, a release
    that fast-forwarded the base), and topology cannot tell a release from unchecked work:
-   `BLOCKED landed, but this check cannot prove how: <commit>`, for a person, who reads what the
-   base gained past it, `git log --first-parent --oneline <commit>..origin/<workingBase>`: no
-   later commit of this story's branch among it (a release or other checked landings) → `done`
+   `BLOCKED landed, but this check cannot prove how: <commit>`, for a person, who reads every
+   commit the base gained past it, merged ones too, `git log --no-merges --oneline
+   <commit>..origin/<workingBase>`, and, while the story branch exists, tests each commit of `git
+   rev-list <commit>..origin/<branch>` with `git merge-base --is-ancestor <that>
+   origin/<workingBase>` (any succeeding: a later story commit landed): no later commit of this story's branch among it (a release or other checked landings) → `done`
    naming `commit`; a later story commit among it → not `done`: the run is closed and the person
    told that work landed without this run's checks and review; unsure → the stop stays. Never
    call `commit` itself unchecked or unreviewed: after a release it was both. Pull-request path: `gh pr view <n>

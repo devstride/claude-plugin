@@ -176,10 +176,10 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
   before the runner: `HELD` → never adopt; item 6's held exit. Any other verdict → go on (the
   run's own claim step renews it). (2) `resume` with the item (The run, item 2). (3) The merge row in
   `status` `done` with the verdict `MERGE: LANDED` → the run carries on from its own position,
-  whatever the item's status says: a landed merge still owes its completion,
-  capture and sync. Otherwise (`MERGE: REFRESHED` included: its merge is not
+  whatever the item's status says: it still owes completion, capture and
+  sync. Otherwise (`MERGE: REFRESHED` included: its merge is not
   reached), the landing test's answer for a merge row `issued` or stopped (its `commit`: the
-  stop's, or the handed-back merge's; `run-stops.md`): (i) exactly it → `done` on that attempt, so completion
+  stop's or the handed-back merge's): (i) exactly it → `done` on that attempt, so completion
   runs; (ii) landed, but the check cannot prove how → for a person, who checks what landed after
   it, as `run-stops.md` says; (iii) nothing landed, or the merge not reached → the run carries
   on (a stopped merge: back on the story branch, `resume` with `"landed": false`), unless the item
@@ -222,11 +222,12 @@ command, and again after a compaction**: the commands, the answers, the stops an
    run, or adopts the newest unfinished one another session left for the item in this repository
    (a cleared conversation, a crash), re-bound to this checkout (`adoptedFrom` names the one it
    came from: say it), and hands back its current step. Any command refused `wrong-branch` (a `resume`,
-   `next` or `done` of an adopted run off its story branch, named) → `git remote set-branches
-   --add origin <branch>`, then `git fetch origin "+refs/heads/<branch>:refs/remotes/origin/<branch>"`
-   (a fetch failing for a branch only here is harmless); then `git checkout <branch>`, making a
-   missing one from `origin/<branch>`, tracking it, for a bare `git push`; `git rev-parse
-   --abbrev-ref HEAD` printing it; then the same request again. The branch held by another worktree (`git worktree list`), or absent
+   `next` or `done` of an adopted run off its story branch, named) → `git fetch origin
+   "+refs/heads/<branch>:refs/remotes/origin/<branch>"` (it fails, changing nothing, for a
+   branch only here); then `git checkout <branch>` when it exists here, else `git checkout -b
+   <branch> origin/<branch> && git config branch.<branch>.remote origin && git config
+   branch.<branch>.merge refs/heads/<branch>`; `git rev-parse --abbrev-ref HEAD`
+   printing it; then the same request again. The branch held by another worktree (`git worktree list`), or absent
    here and on the remote → STOP, naming what a person must do: free it there, or push it from the
    checkout that has it.
    Refused `no-run` or `run-other-repository` → **`start`** with
