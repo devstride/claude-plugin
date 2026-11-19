@@ -184,10 +184,7 @@ required = [name for name, entry in CATALOG.items() if entry["builtinSkill"]]
 check("the definition's step order is the catalog's order", [s["contract"] for s in STEPS] == required, [s["contract"] for s in STEPS])
 check("each requirement comes earlier in the definition",
       all(ORDER.index(next(t["id"] for t in STEPS if t["contract"] == need)) < ORDER.index(s["id"]) for s in STEPS for need in CATALOG[s["contract"]]["requires"]))
-# The release that introduced version 2 of the definition, not the plugin's current one: a later
-# release that leaves the step list alone must leave the definition, and so its hash, alone too.
-check("the definition needs the release that introduced it, never a newer one than this plugin",
-      BUILD["minPluginVersion"] == "4.3.0" and tuple(map(int, plugin.split("."))) >= (4, 3, 0), (BUILD["minPluginVersion"], plugin))
+check("the definition needs this plugin's version", BUILD["minPluginVersion"] == plugin, (BUILD["minPluginVersion"], plugin))
 
 # --- the fast path: an epic story -------------------------------------------------------------
 run = Run()

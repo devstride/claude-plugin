@@ -1854,6 +1854,23 @@
       "additionalProperties": false,
       "description": "the Needs-you list: where an unattended run queues a question only the owner can answer; contract: skills/build-item/references/needs-you.md"
     },
+    "drillSessions": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "tokenFile": {
+          "type": "string",
+          "description": "the file that holds that token, owner-only: an absolute or ~ path outside every repository; written only by the person's own `drill-token.py make`, never by an agent"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "throwaway test sessions this repository starts on purpose (drills that check its agent tracking, for example): each runs in a Claude Code folder of its own, so none appears in the person's Claude Code, signed in with a long-lived token the person makes once per machine; absent or null means none, and setup and doctor say nothing about it; contract: skills/setup/references/drill-sessions.md"
+    },
     "localEnvironment": {
       "type": [
         "object",
