@@ -8,6 +8,26 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Drill sessions get their own sign-in, set up and checked like everything else.** A repository
+  that starts throwaway test sessions on purpose (drills that check its agent tracking, for
+  example) runs each in a Claude Code folder of its own, so none appears in the person's Claude
+  Code app, and signs each in with a long-lived token the person makes once per machine. Such a
+  repository now says where that token lives with the new `drillSessions.tokenFile` setting, and:
+  - `/devstride:setup drills` (and the full setup run, when the setting is there) checks the token
+    and, when it is missing, refused or readable by others, gives the person one command to run
+    in their own terminal. That command makes the token, takes it through a hidden prompt and
+    saves it owner-only. It refuses to run through an agent's prompt, so the token never lands in
+    a conversation's transcript.
+  - `/devstride:doctor` reports the same check as one line: `READY`, `NOT READY` with its fix, or
+    `N/A` for a repository without drill sessions.
+  - The check proves the token works with one tiny real request in a fresh, empty folder that is
+    removed afterwards, and tells a refused token (make a new one) from a service failure (check
+    again later). It never prints the token or puts it on a command line, and refuses a token file
+    inside a repository, where it could be committed. A mistyped paste never replaces a working
+    token. Repositories that do not set the key see no change.
+
 ## [4.3.0] — 2026-11-18
 
 ### Added

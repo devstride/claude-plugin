@@ -561,6 +561,15 @@ and asks as before), `needsYou.view` (the saved view's URL or name, quoted in re
 `needsYou.fallbackItem` (an item number for a notice that belongs to no item). Contract:
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md`.
 
+## Drill sessions
+
+Optional, and only `/devstride:setup drills` writes it, after a yes:
+`${CLAUDE_PLUGIN_ROOT}/skills/setup/references/drill-sessions.md`.
+
+| Key | Shape | Absent means |
+| --- | --- | --- |
+| `drillSessions` | `null`, or `{ "tokenFile": "~/.devstride/drill-claude-token" }` | the repository starts no drill sessions: setup asks nothing, doctor reports `N/A` |
+
 ## Active Agents
 
 Optional, and only `/devstride:setup agents` writes it, after a typed yes:

@@ -2313,6 +2313,21 @@
       "since": "3.52.0"
     },
     {
+      "key": "drillSessions",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "throwaway test sessions this repository starts on purpose (drills that check its agent tracking, for example): each runs in a Claude Code folder of its own, so none appears in the person's Claude Code, signed in with a long-lived token the person makes once per machine; absent or null means none, and setup and doctor say nothing about it; contract: skills/setup/references/drill-sessions.md",
+      "since": "unreleased"
+    },
+    {
+      "key": "drillSessions.tokenFile",
+      "type": "string",
+      "description": "the file that holds that token, owner-only: an absolute or ~ path outside every repository; written only by the person's own `drill-token.py make`, never by an agent",
+      "since": "unreleased"
+    },
+    {
       "key": "localEnvironment",
       "type": [
         "object",

@@ -140,5 +140,6 @@
     "planning": { "model": "fable[1m]", "effort": "xhigh" },
     "runner": { "model": "claude-opus-5", "effort": "high" }
   },
-  "needsYou": { "label": "needs you", "view": "Needs you", "fallbackItem": "I20100" }
+  "needsYou": { "label": "needs you", "view": "Needs you", "fallbackItem": "I20100" },
+  "drillSessions": { "tokenFile": "~/.devstride/drill-claude-token" }
 }

@@ -30,10 +30,9 @@ next action. For each failure symptom, read
 
 ## 1. Environment (`env`)
 
-- **git** — `git --version`; confirm you are inside a repo (`git rev-parse --is-inside-work-tree`).
+- **git** — `git --version`; confirm a repo (`git rev-parse --is-inside-work-tree`).
   Not a repo → the rest is N/A; say so, stop the section.
-- **An `origin` remote** — `git remote get-url origin`, checked **by name** because delivery
-  skills hardcode it. Other remotes but no `origin` → name them.
+- **An `origin` remote** — `git remote get-url origin`, checked **by name**. Other remotes but no `origin` → name them.
 - **gh present** — `gh --version`. Missing → no delivery half. Fix:
   install GitHub CLI (cli.github.com).
 - **gh authenticated** — `gh auth status`. Fix: `gh auth login`.
@@ -156,13 +155,13 @@ next action. For each failure symptom, read
   gives no way to make one); and under `directory`, a null **or absent** `recreate` beside a
   non-null `migrate` (`branch-hotfix` then has no backward path; why: `config-defaults.md`). **Never warn under
   `branch` binding** — no backward transition happens there.
-- **`stage`** — absent, or `resolve: null` → **N/A, not a failure**: this repository deploys no
-  per-environment infrastructure. Present → run `resolve` ONCE from the
+- **`stage`** — absent, or `resolve: null` → **N/A, not a failure** (no per-environment
+  infrastructure). Present → run `resolve` ONCE from the
   repository root and report what it printed; empty output is "no stage bound here", never an
   error. A non-zero exit WITH output, or output spanning several lines, is a FAIL. Report
   `productionStages`, and WARN when the resolved stage is in it: this checkout points at
   production. **Never infer a stage from the branch name, and never report
-  `localEnvironment.instanceName` as one** — different axes.
+  `localEnvironment.instanceName` as one**.
 - **Status line / personal settings** — run
   `${CLAUDE_PLUGIN_ROOT}/skills/doctor/scripts/statusline-override.py` as
   `inspect --local <repo-root>` and `inspect --user <repo-root>`. Read shared settings too;
@@ -179,8 +178,8 @@ next action. For each failure symptom, read
   `/status`, report rendered segments. Only structural `stage` absence becomes a question; never
   ask about transient blanks. Details:
   `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
-- **Commands resolve** — for each configured command (`verify.*` — note `verify.typecheck` is an
-  **array**, so iterate it — `review.localCommand`, `review.localAssistCommand`,
+- **Commands resolve** — for each configured command (`verify.*` — `verify.typecheck` is an
+  **array**: iterate it — `review.localCommand`, `review.localAssistCommand`,
   `generated.regenCommand`, `preShipChecks[].command`, each non-null `localEnvironment.*` command,
   `stage.resolve`, `session.nameCommand`/`titleCommand`, `pool.checkout`/`checkin`): split on `&&` and `;`,
   take the first token of **each** segment, skip shell builtins. A
@@ -192,6 +191,7 @@ next action. For each failure symptom, read
   and `python3 ${CLAUDE_PLUGIN_ROOT}/hooks/session-runtime.py models-report` (`WARN` warns); a
   `notify` name `resolve_user` cannot find WARNs.
 - **`needsYou`** — `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md` "Doctor".
+- **`drillSessions`** — `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/drill-sessions.md` "Doctor".
 
 ## 5. The CI draft gate (`ci`)
 
