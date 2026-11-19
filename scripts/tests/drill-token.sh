@@ -116,6 +116,13 @@ printf '%s,sk-ant-api03-extra\n' "$SECRET" > "$TOK"; chmod 600 "$TOK"; : > "$FAK
 OUT="$(run check --file "$TOK")"; RC=$?
 if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'nothing was sent' && [ ! -s "$FAKE_LOG" ]; then ok "(6k) token plus another credential → never sent"; else bad "(6k) rc=$RC $OUT"; fi
 
+printf '%ssk-ant-api03-extra\n' "$SECRET" > "$TOK"; chmod 600 "$TOK"; : > "$FAKE_LOG"
+OUT="$(run check --file "$TOK")"; RC=$?
+if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'nothing was sent' && [ ! -s "$FAKE_LOG" ]; then ok "(6k2) token run into another credential → never sent"; else bad "(6k2) rc=$RC $OUT"; fi
+printf 'x\n' > "$TMP/person/plainfile"
+OUT="$(run check --file "$TMP/person/plainfile/token")"
+if printf '%s' "$OUT" | tail -1 | grep -q '^Fix: point drillSessions.tokenFile'; then ok "(6m) a parent that is a file → correct the setting"; else bad "(6m) $OUT"; fi
+
 # (6l) an unrelated readable file, or a large or binary one, points at the setting, never at make
 printf 'some notes\n' > "$TOK"; chmod 644 "$TOK"
 OUT="$(run check --file "$TOK")"

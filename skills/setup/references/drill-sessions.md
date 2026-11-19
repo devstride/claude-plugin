@@ -18,8 +18,9 @@ setup run asks nothing and doctor reports `N/A`.
 
 After A1: with `drillSessions` absent or `null`, ask whether this repository starts throwaway drill sessions;
 on a no, stop, writing nothing. On a yes, ask for the token file (default
-`~/.devstride/drill-claude-token`); an answer that is not an absolute or `~` path is never written
-(it may be a pasted token): ask again. Then write only `{ "drillSessions": { "tokenFile": <it> } }`
+`~/.devstride/drill-claude-token`); before writing it, run the check below with `--file '<answer>'`: an
+exit of 2 (not an absolute or `~` path, perhaps a pasted token, or a path inside a repository) is
+never written; say why and ask again. Then write only `{ "drillSessions": { "tokenFile": <it> } }`
 (create-with-just-that-key, or the Phase F merge). Then run the check below, and on `NOT READY` the
 person's step after it. **The agent never writes the token file**: only the person's own `make`, in
 their own terminal, does — it is outside setup's write boundary.

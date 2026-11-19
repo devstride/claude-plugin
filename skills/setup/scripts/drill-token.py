@@ -174,7 +174,7 @@ def check(path):
     except FileNotFoundError:
         return not_ready("no token file at %s; the person makes it once on this machine" % path)
     except OSError as error:
-        return not_ready("cannot read %s (%s)" % (path, error.strerror))
+        return not_ready("cannot read %s (%s)" % (path, error.strerror), WRONG_FILE)
     if not stat.S_ISREG(info.st_mode):
         return not_ready("%s is not a file" % path, WRONG_FILE)
     fix = WRONG_FILE if holds_other(path) else FIX
@@ -197,7 +197,7 @@ def check(path):
 
 def usable(token):
     """One Claude Code token and nothing else, so no other credential is ever sent or overwritten."""
-    return TOKEN.fullmatch(token) is not None
+    return TOKEN.fullmatch(token) is not None and token.count("sk-ant-") == 1
 
 
 def read_token(path):
