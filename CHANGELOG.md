@@ -32,27 +32,50 @@ for what each version component means here and how a release is cut.
     `story-lifecycle/references/start.md` and `story-lifecycle/references/complete.md`; and
     `build-item/references/run-stops.md` says what the loop does when a run stops.
   - **A fix made after the risk check is screened too.** A red local check fixed on the branch, a
-    review fix, or any other commit that changes the story sends it back through the risk check,
-    for that change only, before the merge; a migration or sign-in change added by a fix gets its
-    focused verifier like any other. A base that moved under an unchanged story does not.
+    review fix, or any other commit that changes the story sends it back through the risk check
+    before the merge, for the story's own new change only (never another author's work that
+    arrived with the base); a migration or sign-in change added by a fix gets its focused verifier
+    like any other. Refreshing the base, by merging it in or rebasing, does not. This is a run-time
+    cost as well as a text one: the risk check now runs again after each such commit. A screen
+    after a refused, blocked or unanswered one is a full screen, and what the first screen
+    deferred, dismissed or found to differ from the spec is kept for the review, the findings and
+    the completion report.
   - **An interrupted story is picked up where it stopped, also from a new conversation.** The loop
-    looks for an unfinished run of the item before starting one, so a cleared conversation no
-    longer starts a duplicate, and a story whose merge landed just before an interruption still
-    gets its completion steps. A merge that landed is reported as landed even when a clean-up after
-    it failed, and the loop records it instead of asking for the checks again.
+    checks the story's claim, then looks for an unfinished run of the item in this repository
+    before starting one, so a cleared conversation no longer starts a duplicate, a run another live
+    session is driving is left alone, and the run carries on in the checkout that picks it up. A
+    story whose merge landed just before an interruption still gets its completion steps. After a
+    merge stops, the loop first checks whether exactly the checked commit landed: if it did, it is
+    recorded as landed instead of asking for the checks again; if a different commit landed, a
+    person decides. A merge that landed is reported as landed even when a clean-up after it failed.
+    A left-over run for a story someone else finished is closed instead of carried on.
+  - **A named story or a one-off held for a release stops there**, with its branch pushed and the
+    hold named, instead of being built again; a story the loop chose moves on to the next one.
   - New tests: `build-workflow-coverage.sh` (each of the 94 listed rules that left `build-item` or
     `ultracode-build` at 4.2.0 lives, with its instruction and not only its heading, in exactly one
     new home, and each reference home is read in full by its step skill), `build-workflow-run.sh`
-    (the real step list driven end to end with canned answers, no model), `build-loop-rules.sh`
-    (the loop rules that live only in prose, each in its home) and `build-citations.sh` (nothing
-    cites a removed step number in either word order, with a mutation check).
-  - **Step contract catalog, additively:** a fourth proof binding, `story` (the story's patch at
-    the proof's head equals the story's patch now), which the risk check now uses instead of
-    `none`; a payload path kind `proof:<contract>` (an earlier step's proof); payload keys
-    `risk-check@1.previousProof`, `local-checks@1.reviewMoment`, `merge@1.reviewProof`,
-    `merge@1.localChecks` and `complete@1.profileSource`; optional result keys `deferrals` and
-    `deviations` on `risk-check@1` and `review@1`; and the named rule `review-names-one-path` (a
-    review whose result and proof name different paths is refused).
+    (the real step list driven end to end with canned answers, no model, including re-screens,
+    adoption across checkouts and merge stops in a new session), `merge-commands.sh` (the git
+    commands the merge and its stops spell out, run as written in throwaway repositories),
+    `build-loop-rules.sh` (the loop rules that live only in prose, each in its home) and
+    `build-citations.sh` (nothing cites a removed step number in either word order, with a
+    mutation check).
+  - **Step contract catalog:** a fourth proof binding, `story` (the story's patch at the proof's
+    head equals the story's patch now, measured from the moving `origin/<workingBase>`), which the
+    risk check now uses instead of `none`, the one change that is not an addition; a payload path
+    kind `proof:<contract>` (an earlier step's proof) and two step paths, `step.passedProof` and
+    `step.passedResult` (the step's last accepted pass); payload keys
+    `risk-check@1.previousProof` and `previousResult`, `local-checks@1.reviewMoment`,
+    `review@1.localChecksProof`, `merge@1.reviewProof`, `merge@1.localChecks` and
+    `complete@1.profileSource`; optional result keys `deferrals` and `deviations` on
+    `risk-check@1` and `review@1`; and the named rules `review-names-one-path` (a review whose
+    result and proof name different paths is refused) and `risk-check-accumulates` (a re-screen's
+    result is added to the earlier screen's).
+  - **Step runner, additively:** `resume` takes `cwd`, `landed` (only `false`) and `close` (only
+    `true`); a run stopped at its merge comes back as that stop, marked `mayHaveLanded` with its
+    `attempt` and `commit`, until `landed` is `false`; an adopted run is re-bound to the adopting
+    checkout and named in `adoptedFrom`; and a run is never adopted from another repository
+    (`run-other-repository`).
 
 ### Changed
 
@@ -74,8 +97,16 @@ for what each version component means here and how a release is cut.
   `workflow-runner.md` (driving a run, which the Build loop reads) and `workflow-contracts.md`
   (what a definition may hold and the proof each step leaves, read when writing one).
 - **The local gate decides its own width.** `local-checks` now applies `profileOverrides.storyVerify`,
-  the release train's full-width rule for a one-off reviewed before it lands, and
-  `generated.toleratedTypeErrors`, all of which used to sit in steps that no longer run the gate.
+  the release train's full-width rule for a one-off reviewed before it lands (with
+  `releaseTrain.reviewEveryLanding`, or with `releaseTrain.smallFixes` set and the change too big
+  to count as small), and `generated.toleratedTypeErrors`, all of which used to sit in steps that
+  no longer run the gate.
+- **The fast merge never starts on a local base ahead of its remote**, and a refused push undoes
+  exactly the merge it made instead of resetting the base to the remote, which could drop someone's
+  unpushed commit. Moving a one-off off the train rebases and force-pushes only the story branch,
+  by name, with an explicit lease, and never a protected or integration branch. Carrying a review's
+  proof to a tree-identical rebase now passes the base branch's plain name, which the proof script
+  requires.
 - **A re-review of an open pull request goes through `pr` again**, so the pre-ship checks still run
   before the pull request is marked ready; with nothing configured locally the review takes the
   pull-request path, on the release train too.
@@ -87,17 +118,18 @@ for what each version component means here and how a release is cut.
 
 The bodies below shrink where rules moved out, but a fast story now loads the eight step skills
 and their references as well: the fast story loop path grows from 80,771 tokens at 4.2.0 to
-100,400 tokens (`scripts/cost-budgets.json`, `paths.fastStoryLoop`), even after the runner's
-reference was split so the loop reads only its driving half.
+101,480 tokens (`scripts/cost-budgets.json`, `paths.fastStoryLoop`), even after the runner's
+reference was split so the loop reads only its driving half. On top of that text cost, a story
+now runs its risk check again after each later commit that changes it.
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.2.0 @ cb6efba, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v4.2.0 @ 39d076f, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.2.0 | tokens@devstride--v4.2.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
 | skills/plan/SKILL.md | 25,535 | 8,512 | 25,542 | 8,514 | +2 | 8,514 |
 | skills/doctor/SKILL.md | 23,995 | 7,999 | 23,995 | 7,999 | +0 | 8,000 |
 | skills/review/SKILL.md | 23,970 | 7,990 | 23,986 | 7,996 | +6 | 7,999 |
-| skills/build-item/SKILL.md | 23,980 | 7,994 | 21,859 | 7,287 | -707 | 7,287 |
+| skills/build-item/SKILL.md | 23,980 | 7,994 | 22,470 | 7,490 | -504 | 7,490 |
 | skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
 | skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |
 | skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 11,963 | 3,988 | +0 | 3,988 |
@@ -111,13 +143,13 @@ reference was split so the loop reads only its driving half.
 | skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,255 | 1,752 | -1 | 1,753 |
 | skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,578 | 1,526 | -1 | 1,527 |
 | skills/branch-feature/SKILL.md | 2,577 | 859 | 3,707 | 1,236 | +377 | 1,236 |
-| skills/local-checks/SKILL.md (added) | — | — | 3,594 | 1,198 | +1198 | 1,200 |
-| skills/risk-check/SKILL.md (added) | — | — | 3,593 | 1,198 | +1198 | 1,198 |
+| skills/risk-check/SKILL.md (added) | — | — | 3,595 | 1,199 | +1199 | 1,199 |
+| skills/local-checks/SKILL.md (added) | — | — | 3,593 | 1,198 | +1198 | 1,200 |
 | skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
 | skills/run-workflow/SKILL.md | 2,956 | 986 | 3,129 | 1,043 | +57 | 1,043 |
 | skills/merge-story/SKILL.md (added) | — | — | 3,064 | 1,022 | +1022 | 1,022 |
+| skills/review-story/SKILL.md (added) | — | — | 3,020 | 1,007 | +1007 | 1,007 |
 | skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
-| skills/review-story/SKILL.md (added) | — | — | 2,986 | 996 | +996 | 1,000 |
 | skills/claim-story/SKILL.md (added) | — | — | 2,875 | 959 | +959 | 1,000 |
 | skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
 | skills/story-lifecycle/SKILL.md (added) | — | — | 2,700 | 900 | +900 | 900 |
@@ -133,7 +165,7 @@ reference was split so the loop reads only its driving half.
 | skills/sync-base/SKILL.md (added) | — | — | 1,471 | 491 | +491 | 500 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,472 | 1,824 | 6,277 | 2,093 | +269 | 2,100 |
-| **total (bodies)** | 279,416 | 93,149 | 297,279 | 99,107 | +5958 | |
+| **total (bodies)** | 279,416 | 93,149 | 297,925 | 99,322 | +6173 | |
 
 ## [4.2.0] — 2026-11-18
 
