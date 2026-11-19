@@ -10,7 +10,7 @@
     "tags": [],
     "repositories": []
   },
-  "minPluginVersion": "4.4.0",
+  "minPluginVersion": "4.5.0",
   "phases": [
     {
       "id": "start",
