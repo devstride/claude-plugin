@@ -44,6 +44,7 @@ import tempfile
 
 FIX = "Fix: /devstride:setup drills"
 AGAIN = "Fix: run the check again later"
+PREFIX = "sk-ant-"
 PROOF = ["claude", "-p", "Reply with the word ok.", "--model", "haiku", "--tools", "", "--setting-sources", "user",
          "--strict-mcp-config", "--no-session-persistence", "--system-prompt", "Reply briefly.",
          "--output-format", "json"]
@@ -135,7 +136,9 @@ def prove(token):
     try:
         try:
             _, status = run_claude(["claude", "auth", "status"], token, folder)
-            if not status or status.get("authMethod") != "oauth_token":
+            if status is None:
+                return "claude auth status gave no readable answer", AGAIN
+            if status.get("authMethod") != "oauth_token":
                 return "this machine supplies another credential ahead of the token, so it cannot be tried", FIX
             code, answer = run_claude(PROOF, token, folder)
         except subprocess.TimeoutExpired:
@@ -175,7 +178,7 @@ def check(path):
     if not token:
         return not_ready("%s is empty" % path)
     if not usable(token):
-        return not_ready("%s holds more than one line of text; it must hold the token alone" % path)
+        return not_ready("%s does not hold one Claude Code token alone (sk-ant-…); nothing was sent" % path)
     failed = prove(token)
     if failed:
         return not_ready(*failed)
@@ -184,7 +187,19 @@ def check(path):
 
 
 def usable(token):
-    return not any(c.isspace() or ord(c) < 32 for c in token)
+    """One Claude Code token and nothing else, so no other credential is ever sent or overwritten."""
+    return token.startswith(PREFIX) and not any(c.isspace() or ord(c) < 32 for c in token)
+
+
+def holds_other(path):
+    """True when the file exists and holds something that is not a Claude Code token."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return not usable(f.read().strip())
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError):
+        return True
 
 
 def save(path, token):
@@ -225,6 +240,10 @@ def make(path):
     if not shutil.which("claude"):
         print("drill-token: the claude command is not on PATH.", file=sys.stderr)
         return 2
+    if holds_other(path):
+        print("drill-token: refused. %s already holds something that is not a Claude Code token; "
+              "check drillSessions.tokenFile, or move that file away first." % path, file=sys.stderr)
+        return 2
     print("Step 1 of 2: Claude Code makes a long-lived sign-in token (a browser page opens).")
     result = subprocess.run(["claude", "setup-token"])
     if result.returncode:
@@ -233,7 +252,7 @@ def make(path):
     print("Step 2 of 2: paste the token it printed (it is not shown as you paste).")
     token = getpass.getpass("Token: ").strip()
     if not token or not usable(token):
-        print("drill-token: that was not one token; nothing was saved.", file=sys.stderr)
+        print("drill-token: that was not one Claude Code token (sk-ant-…); nothing was saved.", file=sys.stderr)
         return 1
     failed = prove(token)
     if failed:

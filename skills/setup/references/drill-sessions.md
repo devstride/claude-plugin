@@ -30,7 +30,8 @@ their own terminal, does — it is outside setup's write boundary.
 
 - `DRILL TOKEN: N/A (drillSessions not set)` — nothing to do.
 - `DRILL TOKEN: READY (<file>, signed in in a separate Claude Code folder)` — the file exists, is
-  owner-only and not empty, and one tiny real request (Haiku, no tools, no settings, a one-line
+  owner-only and holds one Claude Code token alone (`sk-ant-…`; anything else is never sent, and
+  `make` never overwrites it), and one tiny real request (Haiku, no tools, no settings, a one-line
   prompt, no saved session) succeeded in a fresh, empty folder that is removed afterwards, so it
   appears in no one's Claude Code. `claude auth status` is not a proof: it reports any token as
   signed in without asking the server.

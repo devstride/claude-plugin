@@ -5,20 +5,20 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; SC="$ROOT/skills/setup/scripts/drill-token.py"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-SECRET="sk-test-drill-$$-secret"
+SECRET="sk-ant-test-drill-$$-secret"
 mkdir -p "$TMP/bin" "$TMP/repo/.claude"
 cat > "$TMP/bin/claude" <<'FAKE'
 #!/bin/bash
 # fake claude: logs argv and where the token came from, never the token itself
 printf '%s\n' "$*" >> "$FAKE_LOG"
 case "$1" in
-  auth) echo "{\"loggedIn\": true, \"authMethod\": \"${FAKE_AUTH_METHOD:-oauth_token}\"}" ;;
+  auth) [ -n "${FAKE_AUTH_BROKEN:-}" ] && { echo "boom" >&2; exit 1; }; echo "{\"loggedIn\": true, \"authMethod\": \"${FAKE_AUTH_METHOD:-oauth_token}\"}" ;;
   -p)
     [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ -d "$CLAUDE_CONFIG_DIR" ] && [ -z "$(ls -A "$CLAUDE_CONFIG_DIR")" ] \
       && [ "$(pwd -P)" = "$(cd "$CLAUDE_CONFIG_DIR" && pwd -P)" ] && echo "config-dir: fresh, and the working directory" >> "$FAKE_LOG"
     echo "stdin bytes: $(head -c 100 | wc -c | tr -d ' ')" >> "$FAKE_LOG"
     if [ "${CLAUDE_CODE_OAUTH_TOKEN:-}" = "$FAKE_GOOD" ]; then echo '{"is_error": false, "result": "ok"}'
-    elif [ "${CLAUDE_CODE_OAUTH_TOKEN:-}" = "sk-busy" ]; then echo '{"is_error": true, "terminal_reason": "api_error", "api_error_status": 429}'; exit 1
+    elif [ "${CLAUDE_CODE_OAUTH_TOKEN:-}" = "sk-ant-busy" ]; then echo '{"is_error": true, "terminal_reason": "api_error", "api_error_status": 429}'; exit 1
     else echo '{"is_error": true, "terminal_reason": "sk-leak-me", "api_error_status": 401}'; exit 1; fi ;;
   setup-token) echo "Your token: (fake, printed here only)" ;;
 esac
@@ -64,13 +64,13 @@ if grep -qx 'stdin bytes: 0' "$FAKE_LOG"; then ok "(5d) the caller's input never
 if ! printf '%s' "$OUT" | grep -q "$SECRET"; then ok "(5c) the token never appears in the output"; else bad "(5c) token printed"; fi
 
 # (6) a token the server refuses → NOT READY, make a new one; nothing the server said is echoed
-printf 'sk-other\n' > "$TOK"; chmod 600 "$TOK"
+printf 'sk-ant-other\n' > "$TOK"; chmod 600 "$TOK"
 OUT="$(run check --file "$TOK")"; RC=$?
 if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'refused (HTTP 401); make a new one' && ! printf '%s' "$OUT" | grep -q 'sk-leak-me' \
    && printf '%s' "$OUT" | tail -1 | grep -qx 'Fix: /devstride:setup drills'; then ok "(6) refused token → NOT READY, make a new one"; else bad "(6) rc=$RC $OUT"; fi
 
 # (6b) a service failure is not a refusal: check again later, never make a new one
-printf 'sk-busy\n' > "$TOK"
+printf 'sk-ant-busy\n' > "$TOK"
 OUT="$(run check --file "$TOK")"; RC=$?
 if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'HTTP 429); the token was not refused' \
    && printf '%s' "$OUT" | tail -1 | grep -qx 'Fix: run the check again later'; then ok "(6b) HTTP 429 → check again later"; else bad "(6b) rc=$RC $OUT"; fi
@@ -83,7 +83,10 @@ if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'another credential ahead of th
 # (6d) two lines in the file → NOT READY before anything is tried
 printf '%s\nsecond\n' "$SECRET" > "$TOK"; : > "$FAKE_LOG"
 OUT="$(run check --file "$TOK")"; RC=$?
-if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'more than one line' && [ ! -s "$FAKE_LOG" ]; then ok "(6d) two lines → NOT READY, nothing tried"; else bad "(6d) rc=$RC $OUT"; fi
+if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'does not hold one Claude Code token alone' && [ ! -s "$FAKE_LOG" ]; then ok "(6d) two lines → NOT READY, nothing tried"; else bad "(6d) rc=$RC $OUT"; fi
+printf '//registry.example/:_authToken=npm-secret\n' > "$TOK"; : > "$FAKE_LOG"
+OUT="$(run check --file "$TOK")"; RC=$?
+if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'nothing was sent' && [ ! -s "$FAKE_LOG" ]; then ok "(6g) another service's credential → NOT READY, never sent"; else bad "(6g) rc=$RC $OUT"; fi
 
 # (6e) a relative path, or one inside a git repository, is refused (it could be committed)
 OUT="$(run check --file relative/token)"; RC=$?
@@ -91,6 +94,11 @@ if [ $RC -eq 2 ] && printf '%s' "$OUT" | grep -q 'absolute or ~ path'; then ok "
 git init -q "$TMP/repo"
 OUT="$(run check --file "$TMP/repo/.claude/token")"; RC=$?
 if [ $RC -eq 2 ] && printf '%s' "$OUT" | grep -q 'inside a git repository'; then ok "(6f) path inside a repository → refused"; else bad "(6f) rc=$RC $OUT"; fi
+
+# (6h) auth status itself fails → check again later, never "make a new one"
+printf '%s\n' "$SECRET" > "$TOK"
+OUT="$(FAKE_AUTH_BROKEN=1 run check --file "$TOK")"; RC=$?
+if [ $RC -eq 1 ] && printf '%s' "$OUT" | tail -1 | grep -qx 'Fix: run the check again later'; then ok "(6h) auth status unreadable → check again later"; else bad "(6h) rc=$RC $OUT"; fi
 
 # (7) no claude on PATH → NOT READY with that reason
 printf '%s\n' "$SECRET" > "$TOK"; chmod 600 "$TOK"
@@ -134,8 +142,14 @@ if printf '%s' "$OUT" | grep -q 'EXIT=0' && printf '%s' "$OUT" | grep -q '^DRILL
 if ! printf '%s' "$OUT" | grep -q "$SECRET"; then ok "(9b) the pasted token is never echoed"; else bad "(9b) token echoed"; fi
 
 # (10) a mistyped paste during renewal is refused before anything is saved; the old token stays
-OUT="$(python3 "$TMP/drive.py" "$SC" "$NEW" "sk-typo")"
+OUT="$(python3 "$TMP/drive.py" "$SC" "$NEW" "sk-ant-typo")"
 if printf '%s' "$OUT" | grep -q 'not saved' && printf '%s' "$OUT" | grep -q 'EXIT=1' && [ "$(cat "$NEW")" = "$SECRET" ]; then
   ok "(10) a refused paste keeps the token already saved"; else bad "(10) $OUT"; fi
+
+# (11) make never overwrites a file holding something else
+printf 'ssh-private-key-material\n' > "$NEW"; chmod 600 "$NEW"
+OUT="$(python3 "$TMP/drive.py" "$SC" "$NEW" "$SECRET")"
+if printf '%s' "$OUT" | grep -q 'not a Claude Code token' && [ "$(cat "$NEW")" = "ssh-private-key-material" ]; then
+  ok "(11) make refuses to overwrite another file"; else bad "(11) $OUT"; fi
 
 exit $FAIL
