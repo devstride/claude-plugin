@@ -619,8 +619,9 @@ required step (a merge needs a review, green local checks and a risk check befor
 may repeat what a required step provides after a step that requires it, since nothing would check
 that second one), and it will not say "go on to the merge" while the risk check, the local checks
 or the review are stale: the risk check is bound to the story as it stood when it ran (any later
-commit that changes the story screens it again, for that change only and with the first screen's
-findings kept; refreshing the base does not), the checks to the exact tree they ran on and the
+commit that changes the story screens it again, for that change only, against the base branch on
+the remote, with the earlier screens' open findings kept and those since resolved dropped;
+refreshing the base does not), the checks to the exact tree they ran on and the
 review to the exact patch it read, byte for byte, white space included. Before it hands out the merge it reads the branch's
 commit once, checks both against that commit and hands the merge exactly that commit; a merge
 reported as landed must name it, and a run stopped at its merge is not carried on until the
@@ -631,7 +632,8 @@ steps and one for a repository's own step.
 **The Build loop runs through it.** `build-item` starts a run of the shipped
 `workflows/build.json` for each story and does what the runner says, so a loop stopped by a
 question, a red check or a cleared conversation resumes at the step it stopped on (a new
-conversation picks the run up only in the same repository, and carries it on in its own checkout), and the merge
+conversation picks the run up only in the same repository, and carries it on in its own checkout
+once that checkout is on the story branch), and the merge
 is never handed out without the risk check, the local checks and the review before it.
 `/devstride:run-workflow build` runs the same list by hand, given the context `build-item` would
 otherwise resolve. A workflow that names a step skill this plugin does not have is refused
