@@ -251,6 +251,13 @@ class Driver:
         self.answer = self.result[1]
         return self.answer
 
+    def done_by_hand(self, step_id, attempt, output=None):
+        """Report a stopped step again, repaired by hand, with its passing answer."""
+        contract = next(step["contract"] for phase in FIX["definitions"]["build"]["phases"] for step in phase["steps"] if step["id"] == step_id)
+        self.result = self.call("done", {"item": "I123", "stepId": step_id, "attempt": attempt, "output": output or canned(contract, self.repo)})
+        self.answer = self.result[1]
+        return self.answer
+
     def next(self):
         self.result = self.call("next", {"item": "I123"})
         self.answer = self.result[1]
@@ -1255,6 +1262,85 @@ def section_reporting():
                         open(os.path.join(ROOT, RUNNER)).read()))
 
 
+def section_records():
+    """What became of a run's reports, the replay of unsent ones, a repaired step's attempt and
+    the completeness check."""
+    run = Driver()
+    run.until("build")
+    first = run.call("reported", {"item": "I123", "ok": False})[1]
+    check("the first failed report marks the run and hands back the one line to say",
+          first["unsent"] is True and isinstance(first["say"], str) and "next session start" in first["say"]
+          and isinstance(run.state().get("reportsUnsent"), str), first)
+    again = run.call("reported", {"item": "I123", "ok": False})[1]
+    check("a second failed report says nothing more", again["unsent"] is True and again["say"] is None, again)
+    check("reported needs ok to be true or false", refused(run.call("reported", {"item": "I123"}), "bad-request"))
+    check("reported for an unknown run id is refused", refused(run.call("reported", {"runId": "0" * 32, "ok": True}), "no-run"))
+    run.until("review")
+    unsent = run.call("unsent", {"cwd": run.cwd}, session="another-session")[1]
+    reports = [r for call in unsent["runs"][0]["reports"] for r in call["reports"]]
+    started = [s for s in ("claim", "start", "branch", "build", "risk-check", "local-checks", "review")]
+    check("another session of the same repository is handed the run's reports in full",
+          len(unsent["runs"]) == 1 and unsent["more"] == 0 and unsent["runs"][0]["runId"] == run.answer["runId"]
+          and [r["stepId"] for r in reports] == started and [r["status"] for r in reports] == ["done"] * 6 + ["running"]
+          and "definition" in unsent["runs"][0]["reports"][0] and all(len(call["reports"]) <= 4 for call in unsent["runs"][0]["reports"])
+          and "run" not in unsent["runs"][0]["reports"][-1], unsent)
+    elsewhere = run.call("unsent", {"cwd": new_repo(remote="https://example.com/other/repo.git")}, session="another-session")[1]
+    check("a checkout of another repository is handed nothing", elsewhere == {"runs": [], "more": 0}, elsewhere)
+    before = run.state()["seq"]
+    run.call("unsent", {"cwd": run.cwd})
+    check("unsent changes nothing", run.state()["seq"] == before and run.state().get("reportsUnsent"))
+    cleared = run.call("reported", {"runId": run.answer["runId"], "ok": True}, session="another-session")[1]
+    check("a replay that went through clears the mark, from any session of this user",
+          cleared == {"runId": run.answer["runId"], "unsent": False, "say": None} and "reportsUnsent" not in run.state()
+          and run.call("unsent", {"cwd": run.cwd})[1]["runs"] == [], cleared)
+    run.to_end()
+    run.call("reported", {"item": "I123", "runId": run.state()["runId"], "ok": False})
+    ended = run.call("unsent", {"cwd": run.cwd})[1]["runs"][0]["reports"]
+    check("a finished run's replay ends with the run's own end",
+          ended[-1].get("run", {}).get("outcome") == "completed" and sum(len(call["reports"]) for call in ended) == 11, ended)
+    check("unsent refuses a cwd that is not a directory", refused(run.call("unsent", {"cwd": os.path.join(WORK, "no-such-folder")}), "bad-request"))
+
+    run = Driver()
+    run.until("review")
+    stopped = run.done(canned("review@1", run.repo).replace('"cycles"', '"rounds"'))
+    failed = run.step_reports([stopped])[-1]
+    repaired = run.done_by_hand("review", 1)
+    fixed = [r for r in run.step_reports([repaired]) if r["stepId"] == "review"]
+    check("a step repaired by hand is reported as a later attempt, so the tracker's finished failure does not hide it",
+          is_stopped(stopped, "failed", "review") and (failed["status"], failed["attempt"]) == ("failed", 1)
+          and is_run(repaired, "merge", 1) and [(r["status"], r["attempt"]) for r in fixed] == [("done", 2)]
+          and repaired["recorded"]["attempt"] == 1, (failed, fixed))
+
+    module = load()
+    definition = FIX["definitions"]["build"]
+    ids = [step["id"] for phase in definition["phases"] for step in phase["steps"]]
+    tracked = lambda statuses, state="ended": {"runs": [{"state": state, "workflow": {"hash": "h"}, "reports": [
+        {"stepId": step, "attempt": attempt, "status": status} for step, attempt, status in statuses]}], "definitions": {"h": definition}}
+    judge = lambda answer: run.call("judge", {"item": "I123", "answer": answer})[1]
+    done = [(step, 1, "done") for step in ids]
+    check("every step done is complete", judge(tracked(done)) == {"item": "I123", "verdict": "complete", "gaps": [], "line": "I123: complete"})
+    missing = judge(tracked([entry for entry in done if entry[0] not in ("risk-check", "review")]))
+    check("a required step never reported is named", missing["verdict"] == "incomplete"
+          and missing["gaps"] == [{"stepId": "risk-check", "reason": "missing"}, {"stepId": "review", "reason": "missing"}]
+          and missing["line"] == "I123: incomplete (never reported: risk-check, review)", missing)
+    check("a later attempt that passed overrides an earlier failure",
+          judge(tracked(done + [("review", 1, "failed"), ("review", 2, "done")]))["verdict"] == "complete")
+    check("a newest attempt that failed is a gap",
+          judge(tracked(done + [("merge", 2, "failed")]))["gaps"] == [{"stepId": "merge", "reason": "failed"}])
+    check("a step still running in an ended run never finished",
+          judge(tracked(done[:4] + [("risk-check", 1, "running")]))["gaps"][0] == {"stepId": "risk-check", "reason": "unfinished"})
+    check("a run still going is running, not incomplete", judge(tracked(done[:4] + [("risk-check", 1, "running")], "open"))["verdict"] == "running")
+    check("an item with no run was not reported", judge({"runs": [], "definitions": {}})["verdict"] == "not-reported")
+    check("a run whose definition the tracker does not hold cannot be judged",
+          judge({"runs": [{"state": "ended", "workflow": {"hash": "x"}, "reports": []}], "definitions": {}})["verdict"] == "unknown")
+    check("judge needs the item and the tracker's answer", refused(run.call("judge", {"item": "I123"}), "bad-request")
+          and refused(run.call("judge", {"answer": {"runs": []}}), "bad-request"))
+    check("the completeness rule skips a step that is switched off or does not always run",
+          module.judge_run({"reports": []}, {"phases": [{"name": "p", "steps": [
+              {"id": "a", "run": {"source": "off"}, "when": {"mode": "always"}, "onFail": "stop"},
+              {"id": "b", "run": {"source": "builtin"}, "when": {"mode": "manual"}, "onFail": "stop"}]}]}) == ("complete", []))
+
+
 def section_repository():
     module = load()
     for case in FIX["repository"]:
@@ -1328,7 +1414,7 @@ def section_static():
 SECTIONS = {"catalog": section_catalog, "validation": section_validation, "verdicts": section_verdicts,
             "proof-fixtures": section_proof_fixtures, "lifecycle": section_lifecycle, "proofs": section_proofs,
             "stand-in": section_stand_in, "evidence": section_evidence, "state": section_state,
-            "reporting": section_reporting, "repository": section_repository, "static": section_static}
+            "reporting": section_reporting, "records": section_records, "repository": section_repository, "static": section_static}
 SECTIONS[SECTION]()
 print("ran %d" % counter[0])
 PY
@@ -1353,6 +1439,7 @@ section stand-in 3
 section evidence 79
 section state 29
 section reporting 4
+section records 21
 section repository 7
 section static 18
 exit $FAIL

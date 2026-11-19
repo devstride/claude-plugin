@@ -25,6 +25,12 @@ With `claims` set, the release is declared as
   exactly is not run locally; a required command CI lacks runs once as a pre-ship check on the final
   reviewed head; `preShipChecks` stay local; a firing `verify.skipDuringStoryBuilds` entry stays
   cloud-only. Record where each runs; never infer coverage from a job name.
+- **Step records**: for each story of the unit, read its runs from the tracker
+  (`list_item_workflow_runs`) and hand the answer to the runner's `judge` with the item. List every
+  story whose verdict is not `complete` under `Step records` in the pull request body, with the
+  `line` `judge` gives (`not-reported`: no run was recorded; `incomplete`: the steps named).
+  **A warning for the reviewer, never a block**: the release goes on, and the full review covers
+  those stories like any other. No tracker tool, or reporting off → one line saying so.
 - **Migrations first**: before the cut, always, run the check in
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/migration-approval.md` on the unit's head; an
   unapproved migration is asked about now, never after the cut.

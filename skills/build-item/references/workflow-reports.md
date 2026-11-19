@@ -30,13 +30,23 @@ the `definition` from the object it returns, and send the REFUSED object again w
 `definition` added (its `reports` and `run` unchanged), once; then carry on with the next object.
 The `status` object alone carries no step reports, so sending only it would lose the refused batch.
 
-## Fail open, silently
+## Fail open, and say it once
 
-**Any tool failure, refusal, error line or missing tool means: send nothing and carry on.** The
-first report of a run is its availability check; once any call fails, send nothing more for that
-run, and the next run tries again. Never retry in a loop, never wait on a report, never stop or slow
-a step because of one, and never say or explain anything about reporting to the person; the
-progress table's `Workflow report` row is the only trace.
+**Any tool failure, refusal, error line or missing tool means: send nothing more for that run and
+carry on.** The first report of a run is its availability check. On the first failure, tell the
+runner once: `reported` with the item and `"ok": false`. When its answer carries `say`, say that
+one line to the person, once, in plain words; a later failure of the same run says nothing. Never
+retry in a loop, never wait on a report, never stop or slow a step because of one; the next run
+tries again.
+
+## Unsent reports, at the start of a run
+
+A run whose reports failed keeps them on this machine. Once per session, before the first forward
+of its first run (and only when the gate is on), run `unsent` (its `cwd` the checkout). For each run it
+lists, send its `reports` objects in order, exactly as above; when every one went through, run
+`reported` with that `runId` and `"ok": true`. Any failure → stop sending for this session and
+leave the rest marked: they are tried again at the next session start. This never delays the
+story: at most ten runs are handed out, and a failure ends it at once.
 
 ## Cited by
 

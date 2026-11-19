@@ -8,6 +8,31 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Step reports that could not be sent are no longer lost, and no longer fail in silence.** When
+  a run's reports cannot reach the tracker (no such tool in the session, a refusal, an outage),
+  the loop now says so once, in one plain line, and carries on. The run keeps its reports on the
+  machine, and the next session that starts a story in the same repository sends them, so a run
+  that could not report shows up late on the tracker rather than never. Before, the loop said
+  nothing and the run simply never appeared.
+  - Three new commands of the step runner (`skills/run-workflow/scripts/workflow.py`): `reported`
+    (what became of a run's reports), `unsent` (this repository's runs whose reports failed, each
+    shaped again in full, read-only) and `judge` (whether the newest tracked run of an item did
+    every step its definition requires).
+- **An epic's release pull request lists the stories without a complete step record.** Before the
+  cut, the loop reads each story's runs from the tracker and lists, under `Step records` in the
+  pull request body, every story with no recorded run or with a required step that was never
+  reported, failed or never finished. It is a warning for the reviewer, never a block.
+
+### Fixed
+
+- **A step repaired by hand no longer stays recorded as failed.** When a step's answer was refused
+  (a missing result key, say) and the step was then reported again with `done`, the tracker kept
+  the first, failed report, because it never changes an attempt it holds as finished; the run read
+  as incomplete although the step had passed. The repaired step is now reported as a later
+  attempt, which the tracker shows as the newest.
+
 ## [4.3.0] — 2026-11-18
 
 ### Added
