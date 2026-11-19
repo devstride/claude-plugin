@@ -69,7 +69,7 @@ and the `receipt` for this tree).
   `MERGE: REFRESHED`. Compare patches: the runner does, on the review's proof — a changed patch
   sends the story back through the review with its ledger; an identical patch keeps the review, and
   the local checks rerun on the new tree.
-- **The durable proof follows the head.** `commit` is not `reviewProof.head` (a rebase whose
+- **The durable proof follows the head.** `commit` is not the reviewed head (a rebase whose
   patch held) → compare their trees (`git rev-parse <commit>^{tree} <reviewProof.head>^{tree}`):
   - **the same tree** → carry the proof: `python3
     ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post <commit> --from
