@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "build",
-  "version": 1,
+  "version": 2,
   "name": "Build",
   "startsWhen": "item-picked-up",
   "endsBy": null,
@@ -10,38 +10,21 @@
     "tags": [],
     "repositories": []
   },
-  "minPluginVersion": "4.1.0",
+  "minPluginVersion": "4.3.0",
   "phases": [
     {
-      "id": "pick-up",
-      "name": "Pick up",
+      "id": "start",
+      "name": "Start",
       "steps": [
         {
-          "id": "select",
-          "name": "Select the story",
-          "summary": "Choose the next unblocked item, check its spec against the code and resolve its delivery profile.",
-          "contract": "select-item@1",
-          "kind": "step",
-          "run": {
-            "source": "builtin",
-            "ref": "build-item",
-            "version": null
-          },
-          "when": {
-            "mode": "always",
-            "condition": null
-          },
-          "onFail": "stop"
-        },
-        {
           "id": "claim",
-          "name": "Claim it",
-          "summary": "Claim the item so no other session builds it at the same time.",
-          "contract": "claim-item@1",
+          "name": "Claim the story",
+          "summary": "The story is claimed so no other agent builds it at the same time.",
+          "contract": "claim@1",
           "kind": "step",
           "run": {
             "source": "builtin",
-            "ref": "build-item",
+            "ref": "claim-story",
             "version": null
           },
           "when": {
@@ -52,13 +35,30 @@
         },
         {
           "id": "start",
-          "name": "Mark In Progress",
-          "summary": "Move the item to its in-progress status.",
-          "contract": "start-item@1",
+          "name": "Mark in progress",
+          "summary": "The item moves to its in-progress status before any branch exists.",
+          "contract": "start@1",
           "kind": "step",
           "run": {
             "source": "builtin",
-            "ref": "build-item",
+            "ref": "story-lifecycle",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "branch",
+          "name": "Create the branch",
+          "summary": "The story's branch is cut from its working base and pushed.",
+          "contract": "branch@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "branch-feature",
             "version": null
           },
           "when": {
@@ -74,26 +74,9 @@
       "name": "Build",
       "steps": [
         {
-          "id": "branch",
-          "name": "Branch",
-          "summary": "Create the item's branch from its working base.",
-          "contract": "branch@1",
-          "kind": "step",
-          "run": {
-            "source": "builtin",
-            "ref": "branch-feature",
-            "version": null
-          },
-          "when": {
-            "mode": "always",
-            "condition": null
-          },
-          "onFail": "stop"
-        },
-        {
           "id": "build",
-          "name": "Build",
-          "summary": "Understand the item, write the change and its tests, and get the local checks green.",
+          "name": "Build the change",
+          "summary": "The change and its tests are written, with the quick checks green while building.",
           "contract": "build@1",
           "kind": "step",
           "run": {
@@ -109,13 +92,30 @@
         },
         {
           "id": "risk-check",
-          "name": "Story risk check",
-          "summary": "Check the finished change for risks before it is handed to review.",
+          "name": "Check for risk",
+          "summary": "The finished change is checked for risk, and anything serious is fixed before review.",
           "contract": "risk-check@1",
           "kind": "step",
           "run": {
             "source": "builtin",
-            "ref": "ultracode-build",
+            "ref": "risk-check",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "local-checks",
+          "name": "Run the local checks",
+          "summary": "The complete local checks run once on the final change and leave a receipt.",
+          "contract": "local-checks@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "local-checks",
             "version": null
           },
           "when": {
@@ -131,53 +131,19 @@
       "name": "Review",
       "steps": [
         {
-          "id": "review-local",
-          "name": "Local review",
-          "summary": "Run the configured local review and fix what it finds.",
+          "id": "review",
+          "name": "Review the change",
+          "summary": "The change is reviewed, by the fast local review or the full pull request review, before it can merge.",
           "contract": "review@1",
           "kind": "step",
           "run": {
             "source": "builtin",
-            "ref": "review",
+            "ref": "review-story",
             "version": null
           },
           "when": {
             "mode": "always",
             "condition": null
-          },
-          "onFail": "stop"
-        },
-        {
-          "id": "local-checks",
-          "name": "Required local checks",
-          "summary": "Run the required local checks that gate a merge with no pull request.",
-          "contract": "local-checks@1",
-          "kind": "step",
-          "run": {
-            "source": "builtin",
-            "ref": "build-item",
-            "version": null
-          },
-          "when": {
-            "mode": "condition",
-            "condition": "review-path:fast"
-          },
-          "onFail": "stop"
-        },
-        {
-          "id": "pull-request-review",
-          "name": "Pull request, review and CI",
-          "summary": "Open the pull request, settle every reviewer and wait for CI to pass.",
-          "contract": "pull-request-review@1",
-          "kind": "step",
-          "run": {
-            "source": "builtin",
-            "ref": "pr",
-            "version": null
-          },
-          "when": {
-            "mode": "condition",
-            "condition": "review-path:pull-request"
           },
           "onFail": "stop"
         }
@@ -190,12 +156,12 @@
         {
           "id": "merge",
           "name": "Merge",
-          "summary": "Merge the change into its working base once nothing holds it.",
+          "summary": "The reviewed and checked change lands on its working base once nothing holds it.",
           "contract": "merge@1",
           "kind": "step",
           "run": {
             "source": "builtin",
-            "ref": "build-item",
+            "ref": "merge-story",
             "version": null
           },
           "when": {
@@ -206,13 +172,13 @@
         },
         {
           "id": "complete",
-          "name": "Completion ritual",
-          "summary": "Record on the item what landed, where and when.",
-          "contract": "complete-item@1",
+          "name": "Complete the item",
+          "summary": "The item records what landed, where and when.",
+          "contract": "complete@1",
           "kind": "step",
           "run": {
             "source": "builtin",
-            "ref": "build-item",
+            "ref": "story-lifecycle",
             "version": null
           },
           "when": {
@@ -222,14 +188,14 @@
           "onFail": "stop"
         },
         {
-          "id": "file-findings",
-          "name": "File untracked findings",
-          "summary": "Turn every finding left without a home into a tracked item.",
-          "contract": "file-findings@1",
+          "id": "capture",
+          "name": "File follow-ups",
+          "summary": "Findings left without a home become tracked items, and discovered scope joins the plan.",
+          "contract": "capture@1",
           "kind": "step",
           "run": {
             "source": "builtin",
-            "ref": "build-item",
+            "ref": "capture-findings",
             "version": null
           },
           "when": {
@@ -240,13 +206,13 @@
         },
         {
           "id": "sync",
-          "name": "Sync",
-          "summary": "Return the checkout to its working base and report what remains.",
+          "name": "Sync the checkout",
+          "summary": "The checkout returns to its working base with a clean tree.",
           "contract": "sync@1",
           "kind": "step",
           "run": {
             "source": "builtin",
-            "ref": "build-item",
+            "ref": "sync-base",
             "version": null
           },
           "when": {
