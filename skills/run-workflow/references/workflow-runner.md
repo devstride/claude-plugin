@@ -116,12 +116,21 @@ Every answer's `reports` is a list of ready argument objects for the tracker's s
 a running report when a step is issued, a finished one when it ends, at most four per object, the
 definition in a run's first object (and again after an adoption), the run's end in its last. A run
 that finishes is reported `completed`; one held, replaced or waiting for a person `interrupted`;
-any other stop `failed`. **The runner never sends them.**
+any other stop `failed`. A step repaired by hand (`done` on the step a run stopped on) is reported
+as a later attempt, because the tracker never changes an attempt it holds as finished. **The runner
+never sends them.**
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` is the authority for
 sending: its gate (the `workflows` key and `DEVSTRIDE_WORKFLOWS`) decides whether anything is sent
 and through which provider or command, and its fail-open rule holds as written: send nothing more
-for the run after the first failure, never retry, never stop or slow a step, and never say anything
-about reporting to the person. When the tracker asks for the definition, the refused object is sent
+for the run after the first failure, never retry, never stop or slow a step, tell the runner
+(`reported`, `"ok": false`) and say its one line once. `unsent` lists the runs of this repository
+on this machine that are over (ended, or stopped) and whose reports failed, each with its reports
+shaped again in full (at most ten, oldest first; read-only; state is pruned after seven days);
+`reported` with a `runId` and `"ok": true` clears an ended one after a replay.
+`judge` reads an item and the tracker's answer for that item's runs and says whether the newest
+run did every step its definition requires: `complete`, `incomplete` (with the steps never
+reported, failed or never finished), `running`, `unknown` (no stored definition) or
+`not-reported`. When the tracker asks for the definition, the refused object is sent
 again with the `definition` from `status` with `includeDefinition` added, as that file says.
 
 ## Heartbeat and ship intent

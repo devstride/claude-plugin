@@ -40,7 +40,7 @@ means the runner itself failed: say its line and stop, without retrying.
    `attempt` and `output` (that skill's WHOLE final answer). Its answer is the next action.
 4. **Send `reports`** in order exactly as
    `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` says: its gate decides
-   whether and how, and it fails open silently, never a word to the person about reporting.
+   whether and how; it fails open, and a run's first failure is said once.
 5. **On `stopped`**: say the reason in plain words and what the person can do about that kind of
    stop, then stop. `resume` continues the run once the cause is fixed.
 6. **On `finished`**: say the outcome in plain words.

@@ -657,11 +657,13 @@ U6. **A config claim lives in more than one file** (L8) — grep them all when c
 ## V. Workflow reports (config: `workflows`; contract: `skills/build-item/references/workflow-reports.md`)
 
 V1. Workflow reports only observe. They are on unless `workflows` is `null` or the machine sets
-    `DEVSTRIDE_WORKFLOWS` to `0`, and they fail open, silently: any non-zero exit, unparsable
-    output, skip or tool failure means send nothing and carry on; the first report of a run is its
-    availability check, and once any answer is an error nothing more is sent for that run; a
-    report is never retried in a loop, never waited on, never a reason to stop, and nothing about
-    reporting is said to the person beyond the progress table's own row. A report never chooses,
+    `DEVSTRIDE_WORKFLOWS` to `0`, and they fail open: any non-zero exit, unparsable
+    output, skip or tool failure means send nothing more for that run and carry on; the first
+    report of a run is its availability check; a report is never retried in a loop, never waited
+    on, never a reason to stop. The first failure of a run is told to the runner and said to the
+    person once, in one line, and never again for that run; the run's reports stay on the machine
+    and the next session of the same repository sends them (a run that could not report was
+    once simply absent from the tracker, with nothing to say why). A report never chooses,
     reorders, gates or skips a step. The body carries the gate and the fail-open sentence itself,
     not only the pointer.
 
@@ -756,9 +758,11 @@ skills/build-item/SKILL.md|autoRelease
 skills/build-item/SKILL.md|workflow-reports.md
 skills/build-item/SKILL.md|never gates, delays or stops a step
 skills/build-item/SKILL.md|then report nothing
-skills/build-item/references/workflow-reports.md|never say or explain anything about reporting
-skills/build-item/references/workflow-reports.md|send nothing and carry on
+skills/build-item/references/workflow-reports.md|a later failure of the same run says nothing
+skills/build-item/references/workflow-reports.md|send nothing more for that run
 skills/build-item/references/workflow-reports.md|never choose, reorder, gate or skip a step
+skills/build-item/references/workflow-reports.md|Unsent reports, at the start of a run
+skills/build-item/references/epic-release-steps.md|never a block
 skills/build-item/references/epic-release-steps.md|deleteBranchAfterRelease
 skills/build-item/references/epic-release-steps.md|NEVER rebase shared story SHAs
 skills/build-item/SKILL.md|epic-release-steps.md

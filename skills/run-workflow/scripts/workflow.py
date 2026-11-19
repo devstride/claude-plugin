@@ -17,6 +17,9 @@ the same answers every time, also after a restart or a cleared conversation. The
   done    {"runId"?, "item"?, "stepId", "attempt", "output"}
   status  {"runId"?, "item"?, "includeDefinition"?}
   resume  {"runId"?, "item"?, "answer"?, "session"?}
+  reported {"runId"?, "item"?, "ok"}       what became of a run's reports; the first failure hands back one line to say
+  unsent  {"cwd"?}                         this repository's runs whose reports failed, each shaped again in full
+  judge   {"item", "answer"}               whether the newest tracked run of an item did every required step
 
 Every request may carry `session` (else the agent's own session id, else `manual-<pid of the
 calling shell>`) and `now` (an ISO time, for tests). `start`, `next`, `done` and `resume` answer
@@ -47,7 +50,7 @@ sys.dont_write_bytecode = True  # loading the helpers below must never write int
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 CATALOG_PATH = os.path.join(PLUGIN_ROOT, "schemas", "step-contracts.json")
-COMMANDS = ("start", "next", "done", "status", "resume")
+COMMANDS = ("start", "next", "done", "status", "resume", "reported", "unsent", "judge")
 
 KEEP_SECONDS = 7 * 24 * 3600
 STATE_MAX_BYTES = 1048576
@@ -55,6 +58,9 @@ REQUEST_MAX_BYTES = 4 * 1048576
 DEFINITION_FILE_MAX_BYTES = 256 * 1024
 RESULT_MAX_BYTES = 16 * 1024
 ANSWER_MAX_CHARS = 8000
+UNSENT_MAX_RUNS = 10
+UNSENT_LINE = ("Step reports for this run are not reaching the tracker, so it will not show there yet. "
+               "The run carries on; once it is over, a later session building in this repository sends them.")
 AUTO_REDO_LIMIT = 5
 GIT_READ_ONLY = ("rev-parse", "diff", "patch-id")
 GIT_TIMEOUT, GIT_DIFF_TIMEOUT = 30, 120
@@ -1166,7 +1172,10 @@ class Run:
     def report(self, index):
         step, record = self.steps[index], self.record(index)
         status = "running" if record["status"] == "issued" else record["status"]
-        self.events.append({"step": step["id"], "attempt": max(record["attempt"], 1), "status": status,
+        # A step repaired by hand is reported as a later attempt: the tracker never changes an
+        # attempt it holds as finished, so the repair would otherwise stay recorded as the failure.
+        attempt = min(max(record["attempt"], 1) + record.get("repairs", 0), REPORT.MAX_ATTEMPT)
+        self.events.append({"step": step["id"], "attempt": attempt, "status": status,
                             "verdict": record["verdict"], "evidence": record["evidence"], "links": record["links"],
                             "startedAt": record["startedAt"], "endedAt": record["endedAt"], "ran": record["ran"]})
 
@@ -1473,6 +1482,8 @@ def command_done(world, request, contracts):
     if not (issued or repaired):
         raise Refuse("not-current-step", "the run is not waiting for attempt %s of step %s" % (attempt, step_id))
     index = run.index_of(step_id)
+    if repaired and not issued:
+        run.record(index)["repairs"] = run.record(index).get("repairs", 0) + 1
     run.complete(index, request.get("output"))
     record = run.record(index)
     recorded = {"stepId": step_id, "attempt": attempt, "verdict": record["verdict"], "class": record["class"], "status": record["status"]}
@@ -1501,6 +1512,151 @@ def command_status(world, request, contracts):
         run.resend_definition = True
     return {"runId": state["runId"], "state": "finished" if state["outcome"] else "stopped" if state["stopped"] else "running",
             "position": position, "rows": rows, "table": "\n".join(table), "reports": run.reports()}
+
+
+def replay_reports(state, contracts, world):
+    """Everything a run has to say, shaped again from its state: each step that has started, the
+    definition, and the run's end. The tracker keeps what it already holds, so sending it twice
+    changes nothing."""
+    run = Run(state, contracts, world)
+    for index in range(len(run.steps)):
+        if run.record(index)["status"] != "pending":
+            run.report(index)
+    run.resend_definition = True
+    ended = state["outcome"] or (state["stopped"] or {}).get("kind")
+    if ended:
+        run.closing = {"outcome": RUN_OUTCOME.get(ended, "interrupted"), "endedAt": state.get("endedAt") or world.now()}
+    return run.reports()
+
+
+def own_states(world, folder):
+    """Every run state in the folder that this runner wrote for this user, with its file name."""
+    found = []
+    for name in sorted(os.listdir(folder)):
+        if name.startswith(".") or not name.endswith(".json"):
+            continue
+        try:
+            state = read_state(os.path.join(folder, name), world)
+            named = state_name(state["sessionId"], state["item"]) == name and "outcome" in state and "stopped" in state
+        except (Refuse, OSError, KeyError, TypeError):
+            continue  # not this user's, not a state file, or gone
+        if named:
+            found.append(state)
+    return found
+
+
+def command_reported(world, request, contracts):
+    """What became of a run's reports: `ok: false` once they fail (the run is then marked as having
+    unsent reports, and the first such call hands back the one line to say), `ok: true` once a
+    replay went through. A run named by its id may be another session's: a replay sends those too.
+    The mark is cleared only once the run has ended: a run that is merely stopped may go on in a
+    session that has given up reporting it, so it is replayed again until it ends."""
+    good, run_id = request.get("ok"), request.get("runId")
+    if not isinstance(good, bool):
+        raise Refuse("bad-request", "reported says ok: true or false")
+    if run_id is not None and not (isinstance(run_id, str) and RUN_ID.match(run_id)):
+        raise Refuse("bad-request", "runId is 32 lower-case hex characters")
+    folder = state_dir(world, create=False)
+    if run_id and folder:
+        states = [state for state in own_states(world, folder) if state["runId"] == run_id]
+        if len(states) != 1:
+            raise Refuse("no-run", "there is no such run on this machine")
+        state = states[0]
+    else:
+        folder, state = find_run(world, request, session_of(request, world))
+    first = not good and not state.get("reportsUnsent")
+    if good and state["outcome"]:
+        state.pop("reportsUnsent", None)
+    elif first:
+        state["reportsUnsent"] = world.now()
+    if first or (good and state["outcome"]):
+        write_state(folder, state)  # a stopped run's replay writes nothing: its file is not kept alive by it
+    return {"runId": state["runId"], "unsent": bool(state.get("reportsUnsent")), "say": UNSENT_LINE if first else None}
+
+
+def command_unsent(world, request, contracts):
+    """The runs on this machine, of this repository, that are over (ended, or stopped) and whose
+    reports did not reach the tracker, each with its reports shaped again in full. A run still
+    going is never handed out: its own session is driving it. Read-only: `reported` with
+    `ok: true` clears an ended one."""
+    cwd = request.get("cwd", os.getcwd())
+    if not isinstance(cwd, str) or not os.path.isdir(cwd):
+        raise Refuse("bad-request", "cwd must be a directory")
+    cwd, folder, runs = os.path.realpath(cwd), state_dir(world, create=False), []
+    for state in (own_states(world, folder) if folder else []):
+        if not (state.get("reportsUnsent") and (state["outcome"] or state["stopped"]) and same_repository(world, state, cwd)):
+            continue
+        try:
+            reports = replay_reports(state, contracts, world)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            continue  # a state this runner cannot shape again is left for a person
+        if reports:
+            runs.append({"runId": state["runId"], "item": state["item"], "sessionId": state["sessionId"],
+                         "since": str(state["reportsUnsent"]), "reports": reports, "ended": bool(state["outcome"])})
+    # Ended runs first (a replay clears them), then stopped ones: ten stopped runs never crowd out
+    # a finished one.
+    runs.sort(key=lambda run: (not run.pop("ended"), run["since"]))
+    return {"runs": runs[:UNSENT_MAX_RUNS], "more": max(0, len(runs) - UNSENT_MAX_RUNS)}
+
+
+def judge_run(run, definition):
+    """Whether a recorded run did every step its workflow requires: (verdict, gaps). A step is
+    required when it always runs and is not switched off; done or skipped satisfies it."""
+    if not isinstance(definition, dict):
+        return "unknown", []
+    newest = {}
+    listed = run.get("reports") or run.get("steps") or []
+    for report in listed if isinstance(listed, list) else []:
+        if isinstance(report, dict) and isinstance(report.get("stepId"), str):
+            attempt = report.get("attempt") if isinstance(report.get("attempt"), int) else 0
+            if attempt >= newest.get(report["stepId"], (-1, None))[0]:
+                newest[report["stepId"]] = (attempt, report.get("status"))
+    gaps = []
+    try:
+        steps = flat_steps(definition)
+        if not all(isinstance(step.get("id"), str) for step in steps):
+            return "unknown", []
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return "unknown", []
+    for step in steps:
+        if dig(step, ["run", "source"]) == "off":
+            continue
+        status = newest.get(step["id"], (0, None))[1]
+        if status is None:
+            if dig(step, ["when", "mode"]) == "always":
+                gaps.append({"stepId": step["id"], "reason": "missing"})
+        elif status == "failed":
+            if step.get("onFail") == "stop":
+                gaps.append({"stepId": step["id"], "reason": "failed"})
+        elif status in ("running", "waiting"):
+            gaps.append({"stepId": step["id"], "reason": "unfinished"})
+    return ("incomplete" if gaps else "complete"), gaps
+
+
+def command_judge(world, request, contracts):
+    """Reads the tracker's answer for one item's runs and says whether its newest run did every
+    required step: complete, incomplete (with the steps), running, unknown or not-reported."""
+    item, answer = item_of(request.get("item")), request.get("answer")
+    runs = answer.get("runs") if isinstance(answer, dict) else None
+    if not item or not isinstance(runs, list):
+        raise Refuse("bad-request", "judge reads an item and the tracker's answer for that item's runs (answer)")
+    runs = [run for run in runs if isinstance(run, dict)]
+    if not runs:
+        return {"item": item, "verdict": "not-reported", "gaps": [], "line": "%s: no run was reported" % item}
+    run = runs[0]  # the tracker lists the newest first
+    definitions = answer.get("definitions") if isinstance(answer.get("definitions"), dict) else {}
+    try:
+        key = dig(run, ["workflow", "hash"])
+        verdict, gaps = judge_run(run, definitions.get(key) if isinstance(key, str) else None)
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise Refuse("bad-request", "judge cannot read that answer: it is not the tracker's answer for an item's runs")
+    if run.get("state") == "open" and gaps and all(gap["reason"] != "failed" for gap in gaps):
+        verdict = "running"
+    words = {"missing": "never reported", "failed": "failed", "unfinished": "never finished"}
+    detail = "; ".join("%s: %s" % (words[reason], ", ".join(gap["stepId"] for gap in gaps if gap["reason"] == reason))
+                       for reason in ("missing", "failed", "unfinished") if any(gap["reason"] == reason for gap in gaps))
+    return {"item": item, "verdict": verdict, "gaps": gaps,
+            "line": "%s: %s%s" % (item, verdict, " (%s)" % detail if detail and verdict != "complete" else "")}
 
 
 def common_dir(world, cwd):
@@ -1628,7 +1784,8 @@ def write_adopted(folder, state, old_path):
 
 
 HANDLERS = {"start": command_start, "next": command_next, "done": command_done,
-            "status": command_status, "resume": command_resume}
+            "status": command_status, "resume": command_resume, "reported": command_reported,
+            "unsent": command_unsent, "judge": command_judge}
 
 
 def run_command(command, request, world=None):
