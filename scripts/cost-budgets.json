@@ -130,7 +130,7 @@
     "skills/release/references/migration-approval.md": 1530,
     "skills/release/references/ship-plan.md": 1861,
     "skills/build-item/references/workflow-reports.md": 1938,
-    "skills/run-workflow/references/workflow-runner.md": 4070,
+    "skills/run-workflow/references/workflow-runner.md": 4097,
     "skills/risk-check/references/story-risk-check.md": 2873,
     "skills/review-story/references/review-routes.md": 2967,
     "skills/merge-story/references/merge-paths.md": 3448,
@@ -185,7 +185,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 103789,
+      "budget": 103916,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",

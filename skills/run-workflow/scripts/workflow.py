@@ -60,7 +60,7 @@ RESULT_MAX_BYTES = 16 * 1024
 ANSWER_MAX_CHARS = 8000
 UNSENT_MAX_RUNS = 10
 UNSENT_LINE = ("Step reports for this run are not reaching the tracker, so it will not show there yet. "
-               "The run carries on; they are sent again at the next session start.")
+               "The run carries on; once it is over, a later session building in this repository sends them.")
 AUTO_REDO_LIMIT = 5
 GIT_READ_ONLY = ("rev-parse", "diff", "patch-id")
 GIT_TIMEOUT, GIT_DIFF_TIMEOUT = 30, 120
@@ -1174,7 +1174,8 @@ class Run:
         status = "running" if record["status"] == "issued" else record["status"]
         # A step repaired by hand is reported as a later attempt: the tracker never changes an
         # attempt it holds as finished, so the repair would otherwise stay recorded as the failure.
-        self.events.append({"step": step["id"], "attempt": max(record["attempt"], 1) + record.get("repairs", 0), "status": status,
+        attempt = min(max(record["attempt"], 1) + record.get("repairs", 0), REPORT.MAX_ATTEMPT)
+        self.events.append({"step": step["id"], "attempt": attempt, "status": status,
                             "verdict": record["verdict"], "evidence": record["evidence"], "links": record["links"],
                             "startedAt": record["startedAt"], "endedAt": record["endedAt"], "ran": record["ran"]})
 
@@ -1536,9 +1537,10 @@ def own_states(world, folder):
             continue
         try:
             state = read_state(os.path.join(folder, name), world)
-        except (Refuse, OSError):
+            named = state_name(state["sessionId"], state["item"]) == name and "outcome" in state and "stopped" in state
+        except (Refuse, OSError, KeyError, TypeError):
             continue  # not this user's, not a state file, or gone
-        if state_name(state["sessionId"], state["item"]) == name:
+        if named:
             found.append(state)
     return found
 
@@ -1546,7 +1548,9 @@ def own_states(world, folder):
 def command_reported(world, request, contracts):
     """What became of a run's reports: `ok: false` once they fail (the run is then marked as having
     unsent reports, and the first such call hands back the one line to say), `ok: true` once a
-    replay went through. A run named by its id may be another session's: a replay sends those too."""
+    replay went through. A run named by its id may be another session's: a replay sends those too.
+    The mark is cleared only once the run has ended: a run that is merely stopped may go on in a
+    session that has given up reporting it, so it is replayed again until it ends."""
     good, run_id = request.get("ok"), request.get("runId")
     if not isinstance(good, bool):
         raise Refuse("bad-request", "reported says ok: true or false")
@@ -1561,25 +1565,34 @@ def command_reported(world, request, contracts):
     else:
         folder, state = find_run(world, request, session_of(request, world))
     first = not good and not state.get("reportsUnsent")
-    if good:
+    if good and state["outcome"]:
         state.pop("reportsUnsent", None)
     elif first:
         state["reportsUnsent"] = world.now()
-    write_state(folder, state)
-    return {"runId": state["runId"], "unsent": not good, "say": UNSENT_LINE if first else None}
+    if first or good:
+        write_state(folder, state)
+    return {"runId": state["runId"], "unsent": bool(state.get("reportsUnsent")), "say": UNSENT_LINE if first else None}
 
 
 def command_unsent(world, request, contracts):
-    """The runs on this machine, of this repository, whose reports did not reach the tracker, each
-    with its reports shaped again in full. Read-only: `reported` with `ok: true` clears one."""
+    """The runs on this machine, of this repository, that are over (ended, or stopped) and whose
+    reports did not reach the tracker, each with its reports shaped again in full. A run still
+    going is never handed out: its own session is driving it. Read-only: `reported` with
+    `ok: true` clears an ended one."""
     cwd = request.get("cwd", os.getcwd())
     if not isinstance(cwd, str) or not os.path.isdir(cwd):
         raise Refuse("bad-request", "cwd must be a directory")
     cwd, folder, runs = os.path.realpath(cwd), state_dir(world, create=False), []
     for state in (own_states(world, folder) if folder else []):
-        if state.get("reportsUnsent") and same_repository(world, state, cwd):
+        if not (state.get("reportsUnsent") and (state["outcome"] or state["stopped"]) and same_repository(world, state, cwd)):
+            continue
+        try:
+            reports = replay_reports(state, contracts, world)
+        except (KeyError, TypeError, ValueError, AttributeError):
+            continue  # a state this runner cannot shape again is left for a person
+        if reports:
             runs.append({"runId": state["runId"], "item": state["item"], "sessionId": state["sessionId"],
-                         "since": state["reportsUnsent"], "reports": replay_reports(state, contracts, world)})
+                         "since": str(state["reportsUnsent"]), "reports": reports})
     runs.sort(key=lambda run: run["since"])
     return {"runs": runs[:UNSENT_MAX_RUNS], "more": max(0, len(runs) - UNSENT_MAX_RUNS)}
 
@@ -1590,7 +1603,8 @@ def judge_run(run, definition):
     if not isinstance(definition, dict):
         return "unknown", []
     newest = {}
-    for report in run.get("reports") or run.get("steps") or []:
+    listed = run.get("reports") or run.get("steps") or []
+    for report in listed if isinstance(listed, list) else []:
         if isinstance(report, dict) and isinstance(report.get("stepId"), str):
             attempt = report.get("attempt") if isinstance(report.get("attempt"), int) else 0
             if attempt >= newest.get(report["stepId"], (-1, None))[0]:
@@ -1598,7 +1612,9 @@ def judge_run(run, definition):
     gaps = []
     try:
         steps = flat_steps(definition)
-    except (KeyError, TypeError, AttributeError):
+        if not all(isinstance(step.get("id"), str) for step in steps):
+            return "unknown", []
+    except (KeyError, TypeError, ValueError, AttributeError):
         return "unknown", []
     for step in steps:
         if dig(step, ["run", "source"]) == "off":
@@ -1627,8 +1643,12 @@ def command_judge(world, request, contracts):
         return {"item": item, "verdict": "not-reported", "gaps": [], "line": "%s: no run was reported" % item}
     run = runs[0]  # the tracker lists the newest first
     definitions = answer.get("definitions") if isinstance(answer.get("definitions"), dict) else {}
-    verdict, gaps = judge_run(run, definitions.get(dig(run, ["workflow", "hash"])))
-    if run.get("state") == "open" and all(gap["reason"] != "failed" for gap in gaps):
+    try:
+        key = dig(run, ["workflow", "hash"])
+        verdict, gaps = judge_run(run, definitions.get(key) if isinstance(key, str) else None)
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise Refuse("bad-request", "judge cannot read that answer: it is not the tracker's answer for an item's runs")
+    if run.get("state") == "open" and gaps and all(gap["reason"] != "failed" for gap in gaps):
         verdict = "running"
     words = {"missing": "never reported", "failed": "failed", "unfinished": "never finished"}
     detail = "; ".join("%s: %s" % (words[reason], ", ".join(gap["stepId"] for gap in gaps if gap["reason"] == reason))

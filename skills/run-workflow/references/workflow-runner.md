@@ -124,8 +124,9 @@ sending: its gate (the `workflows` key and `DEVSTRIDE_WORKFLOWS`) decides whethe
 and through which provider or command, and its fail-open rule holds as written: send nothing more
 for the run after the first failure, never retry, never stop or slow a step, tell the runner
 (`reported`, `"ok": false`) and say its one line once. `unsent` lists the runs of this repository
-on this machine whose reports failed, each with its reports shaped again in full (at most ten,
-oldest first; read-only); `reported` with a `runId` and `"ok": true` clears one after a replay.
+on this machine that are over (ended, or stopped) and whose reports failed, each with its reports
+shaped again in full (at most ten, oldest first; read-only; state is pruned after seven days);
+`reported` with a `runId` and `"ok": true` clears an ended one after a replay.
 `judge` reads an item and the tracker's answer for that item's runs and says whether the newest
 run did every step its definition requires: `complete`, `incomplete` (with the steps never
 reported, failed or never finished), `running`, `unknown` (no stored definition) or

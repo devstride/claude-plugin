@@ -41,12 +41,15 @@ tries again.
 
 ## Unsent reports, at the start of a run
 
-A run whose reports failed keeps them on this machine. Once per session, before the first forward
-of its first run (and only when the gate is on), run `unsent` (its `cwd` the checkout). For each run it
-lists, send its `reports` objects in order, exactly as above; when every one went through, run
-`reported` with that `runId` and `"ok": true`. Any failure → stop sending for this session and
-leave the rest marked: they are tried again at the next session start. This never delays the
-story: at most ten runs are handed out, and a failure ends it at once.
+A run whose reports failed keeps them on this machine for seven days. Once per session, before
+the first forward of its first run (and only when the gate is on), run `unsent` (its `cwd` the
+checkout). It lists only runs that are over (ended, or stopped): a run still going belongs to the
+session driving it. For each run it lists, send its `reports` objects in order, exactly as above;
+when every call for that run answered without an error, run `reported` with that `runId` and
+`"ok": true` (the runner clears an ended run's mark; a stopped one is sent again until it ends).
+Any failure → send no more of these older runs in this session and leave them marked: the next
+session that builds here tries again. The new run's own reports are not affected: they have their
+own availability check. At most ten runs are handed out, and a failure ends it at once.
 
 ## Cited by
 

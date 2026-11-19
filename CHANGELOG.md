@@ -15,8 +15,9 @@ for what each version component means here and how a release is cut.
 - **Step reports that could not be sent are no longer lost, and no longer fail in silence.** When
   a run's reports cannot reach the tracker (no such tool in the session, a refusal, an outage),
   the loop now says so once, in one plain line, and carries on. The run keeps its reports on the
-  machine, and the next session that starts a story in the same repository sends them, so a run
-  that could not report shows up late on the tracker rather than never. Before, the loop said
+  machine for seven days, and once it is over, the next session that builds in the same
+  repository sends them, so a run that could not report shows up late on the tracker rather
+  than never. Before, the loop said
   nothing and the run simply never appeared.
   - Three new commands of the step runner (`skills/run-workflow/scripts/workflow.py`): `reported`
     (what became of a run's reports), `unsent` (this repository's runs whose reports failed, each
