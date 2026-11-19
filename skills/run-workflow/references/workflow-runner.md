@@ -92,12 +92,15 @@ What is reported, and what is never reported: `workflow-contracts.md`.
 | `needs-person` | The step asked a question | `resume` with the `answer` |
 | `no-verdict` | The answer did not open with a verdict the contract lists | Run the step again (`resume`), or report its real verdict with `done` |
 | `proof` | A proof was refused by a value or a named rule, or could not be checked | Fix what the reason names, then `resume` |
+| `attempts-exhausted` | The same step was re-issued until the limit, or has run 50 times | Find why its proof never holds, then `resume`, which resets the re-issue count but never the 50 |
 
 **A merge stop** (`mayHaveLanded`, any kind): the merge answered, so it may have landed before it
-stopped. First check whether exactly its `commit` landed. It did → report it with `done` on that
-attempt; never `resume`, which reads the moved checkout as new work. It did not → `resume` with
-`"landed": false`. Until then `resume` answers with the same stop (`merge-may-have-landed`).
-| `attempts-exhausted` | The same step was re-issued until the limit, or has run 50 times | Find why its proof never holds, then `resume`, which resets the re-issue count but never the 50 |
+stopped. Check its `commit` with the landing test
+(`${CLAUDE_PLUGIN_ROOT}/skills/merge-story/references/merge-paths.md`, "Already landed"), which has
+three answers. Exactly that commit landed → report it with `done` on that attempt; never `resume`,
+which reads the moved checkout as new work. A different commit landed carrying it → a person's
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/run-stops.md`). Nothing landed → `resume` with `"landed": false`. Until then `resume` answers
+with the same stop (`merge-may-have-landed`).
 
 ## Reporting
 
@@ -132,8 +135,13 @@ remote, or, with none, the same git folder; another repository's is refused,
 `run-other-repository`), keeps its run id, re-binds it to the adopting checkout (`cwd`, default the
 current directory) and names the old session and checkout in `adoptedFrom`; the next report carries
 the definition again under the new session. A finished run is never adopted, and an adoption that
-would overwrite this session's own open run for that item is refused (`run-open`). The runner
-cannot tell a live session's run from a dead one's: the driver checks the story's claim first. Two
+would overwrite this session's own open run for that item is refused (`run-open`). **An adopted
+run goes on only on its story branch** (the branch step's `branch`) until its merge has finished:
+while the checkout is on any other branch, or none, every command that would hand out a step is
+refused (`wrong-branch`, naming the branch; nothing changes, the adoption included), so check the
+branch out and send the same request again. Stops are still answered, and a merge handed back as it
+was issued is exempt: it may have landed and deleted the branch, and its landing is checked first.
+The runner cannot tell a live session's run from a dead one's: the driver checks the story's claim first. Two
 sessions driving one run at once are not supported.
 
 ## Cited by
@@ -142,3 +150,5 @@ sessions driving one run at once are not supported.
   command, and again after a compaction").
 - `skills/build-item/SKILL.md` — The run ("Read … in full before the first command, and again
   after a compaction").
+- `skills/run-workflow/references/workflow-contracts.md` — `merge-lands-what-was-checked` (the
+  merge stop).

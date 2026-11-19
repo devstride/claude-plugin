@@ -12,15 +12,18 @@ and the `receipt` for this tree).
 
 ## Before any merge, on either path
 
-1. **Already landed** (a re-run after an interruption) means exactly `commit` landed. Fast path:
-   `git fetch origin`, then `git rev-list --first-parent --parents origin/<workingBase> | awk -v
-   c=<commit> '$1 == c || $3 == c { print $1; exit }'` prints the commit that landed it (a merge
-   whose second parent is `commit`, or `commit` itself, fast-forwarded) → `LANDED` with it.
-   Pull-request path: `gh pr view <n> --json state,headRefOid,mergeCommit` merged with `headRefOid`
-   = `commit` → `LANDED` with its merge commit. Nothing printed while `git merge-base --is-ancestor
-   <commit> origin/<workingBase>` succeeds, or a pull request merged with another head → another
-   commit landed carrying it, never checked or reviewed: `BLOCKED another commit landed: <it>`, for
-   a person.
+1. **Already landed** (a re-run after an interruption) has three answers: exactly `commit` landed,
+   a different commit landed carrying it, or nothing landed. Fast path, after `git fetch origin`: (a) `git rev-list --parents
+   origin/<workingBase> | awk -v c=<commit> '$3 == c { print $1; exit }'` prints a merge whose second
+   parent is `commit`, anywhere in the base's history (a release that fast-forwarded the base to
+   another branch leaves earlier story merges on the second-parent side) → `LANDED` with it; (b)
+   else `git rev-parse origin/<workingBase>` printing `commit` itself (the base moved exactly to it,
+   nothing on top) → `LANDED` with `commit`; (c) else `git merge-base --is-ancestor <commit>
+   origin/<workingBase>` succeeding → a different commit landed carrying it (a fast-forward past
+   it, a later commit merged, or history this test cannot read), never checked or reviewed:
+   `BLOCKED another commit landed carrying <commit>`, for a person. Pull-request path: `gh pr view
+   <n> --json state,headRefOid,mergeCommit` merged with `headRefOid` = `commit` → `LANDED` with its
+   merge commit; merged with another head → (c). Anything else: nothing landed, go on.
 2. **Release holds first**, before any merge onto the train or `baseBranch` (one-off or plan
    story; a story merging onto an epic's integration branch is not held: it accumulates there, and
    the hold applies at the epic's release): a hold on the item or an ancestor
@@ -54,8 +57,9 @@ and the `receipt` for this tree).
   non-zero exit.
 - `git checkout <workingBase> && git pull --ff-only`, then `git rev-list --count
   origin/<workingBase>..<workingBase>` must print `0`: a local base ahead of its remote →
-  `MERGE: BLOCKED local <workingBase> is ahead of origin`, nothing merged. Record the tip (`tip=$(git
-  rev-parse HEAD)`), then merge the story `--no-ff <commit>` per
+  `MERGE: BLOCKED local <workingBase> is ahead of origin`, nothing merged. Record the tip: `git rev-parse
+  HEAD` prints it, written into the undo below as `<tip>` (a shell variable does not outlive its
+  call), then merge the story `--no-ff <commit>` per
   `commitConventions.epicMergeFormat` (fallback
   `merge: <itemNumber> [<N>] <short scope> into <epic-slug> integration`). On the train the subject
   is `merge: <itemNumber> <short scope> into <train>`: the item number always leads, whatever
@@ -64,8 +68,8 @@ and the `receipt` for this tree).
   the landing gate's lines) and the commands and counts of the verification receipt for this tree.
 - `git push origin <workingBase>`. **Only once that push SUCCEEDS** delete the story branch locally
   AND remotely. A refused push → undo exactly this merge, never reset to the remote: when `git
-  rev-parse HEAD^1 HEAD^2` prints `$tip` and `commit` (HEAD is the merge just made), `git reset
-  --hard $tip`; then `git checkout <branch>`; then `MERGE: BLOCKED push refused: <first line>`,
+  rev-parse HEAD^1 HEAD^2` prints `<tip>` and `commit` (HEAD is the merge just made), `git reset
+  --hard <tip>`; then `git checkout <branch>`; then `MERGE: BLOCKED push refused: <first line>`,
   nothing deleted. Never leave HEAD on the local merge commit: the runner would read it as a new
   commit.
 

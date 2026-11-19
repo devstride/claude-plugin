@@ -174,11 +174,13 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
 - **An unfinished run first**, for a given story number or the story the handoff names as in
   progress, in this order. (1) `claims` set → invoke `claim-story` with the item and its mode
   before the runner: `HELD` → never adopt; item 6's held exit. Any other verdict → go on (the
-  run's own claim step renews it). (2) `resume` with the item (The run, item 2). (3) The item
-  merged or Done, but not by this run (its merge row in `status` is not `done`, and a stopped merge
-  fails `run-stops.md`'s landing check) → `resume` with `"close": true` (reported interrupted),
-  then the next rule. Otherwise the run carries on from its own position, whatever the item's
-  status says: a merge that landed before an interruption still owes its completion steps.
+  run's own claim step renews it). (2) `resume` with the item (The run, item 2). (3) One of three
+  cases, as `references/run-stops.md` says: (i) the merge row `issued` or stopped and its `commit`
+  (the stop's, or the handed-back merge's) the exact landing (`merge-paths.md`, "Already landed")
+  → `done` on that attempt, so completion runs; (ii) else, no different commit landed and the item
+  neither merged nor Done → carry on (a stopped merge: back on the story branch, `resume` with
+  `"landed": false`); (iii) else a different commit finished it → `resume` with `"close": true`,
+  tell a person it was never checked or reviewed here, then the next rule.
 - A given story number IS the story; merged or Done → never started, no run (`next-unblocked.md`).
   Otherwise apply `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full
   (projection warning too). **Never auto-select from the deferred container.** Surface the
@@ -188,7 +190,9 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
   step 8 for it, then step 0) / N blocked by X, Y / N gated. Suggest `/devstride:plan <root>` only
   when the chain ran out; never invoke it.
 - **Every exit from step 0** (DRY-CHAIN/TERMINAL, ambiguous root, a given item merged or Done, any
-  other stop before the run starts) → **`return-checkout`** first when this run leased.
+  other stop before the run starts) → **`return-checkout`** first when this run leased, and a claim
+  the unfinished-run check took is released, also when the gating check passes over that story
+  (`release_claim`, outcome `released`: `references/story-claims.md`).
 - **GATING CHECK** (a decision that is the user's → flag, next candidate), **SCOPE CHECK**
   (buildable now vs deferred, recorded), **VALIDATE THE SPEC** (re-fetch with `view: 'full'`; confirm
   paths, symbols and assumptions against the code).
@@ -209,10 +213,16 @@ command, and again after a compaction**: the commands, the answers, the stops an
    (`name` and `source`), `workingBase`, `oneOff`, `route`, `releaseUnit` (the release-unit ancestor
    step 0 resolved; null for a one-off), `reviewMoment` (Working base), `branchSlug`
    (`I<number>-` plus `routing.py slug` of the title) and `mode` (`select`, `named` or `resume`).
-2. **`resume` with the item first** (after step 0's claim check): it finds this session's open
+2. **`resume` with the item first** (a named or handed-off story after step 0's claim check; a
+   selected one straight away): it finds this session's open
    run, or adopts the newest unfinished one another session left for the item in this repository
    (a cleared conversation, a crash), re-bound to this checkout (`adoptedFrom` names the one it
-   came from: say it), and hands back its current step. Refused `no-run` or `run-other-repository` → **`start`** with
+   came from: say it), and hands back its current step. Refused `wrong-branch` (an adopted run goes on
+   only on its story branch, named) → `git fetch origin <branch>`, `git checkout <branch>`, `git
+   rev-parse --abbrev-ref HEAD` printing it, then the same request again; the branch held by
+   another worktree (`git worktree list`), or absent here and on the remote → STOP, naming what a
+   person must do: free it there, or push it from the checkout that has it.
+   Refused `no-run` or `run-other-repository` → **`start`** with
    `definitionFile` `${CLAUDE_PLUGIN_ROOT}/workflows/build.json` and that context. A `start` refused
    `run-open` means a run exists: `resume` it; only the excluded-paths re-route replaces one. Any other refusal (exit 2) or a
    runner failure (exit 1) → say its line and STOP; never build without the runner.

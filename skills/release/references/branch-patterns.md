@@ -75,3 +75,5 @@ much as in `release`; a match is refused and handed back to `release`.
 - `skills/push/SKILL.md` — never force-push a protected branch.
 - `skills/branch-feature/SKILL.md` — never delete a protected branch.
 - `skills/doctor/SKILL.md` — the release-branch protection warning.
+- `skills/build-item/references/run-stops.md` — the excluded-paths re-route, never on a protected
+  or merge-only head.

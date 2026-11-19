@@ -60,7 +60,8 @@ the missing caller context — never guess that a full review happened.
   one both likely and material) is DEFERRED — with a home (a tracked downstream item or this
   story's intentional seam: rationale + owning item) or, with no home, on the **untracked-deferral
   list** for `capture-findings`; any other is DISMISSED with its reason, never filed. Drop
-  REFUTED. Commit fixes per `commitConventions.reviewFixFormat` (fallback
+  REFUTED. Every deferral, dismissal and deviation carries an `id` (short, unique in the story,
+  kept whenever it is reported again), so a later screen can resolve it. Commit fixes per `commitConventions.reviewFixFormat` (fallback
   `fix(<scope>): <summary> [<itemNumber> review]`), regenerating artifacts if routes changed. A genuinely ambiguous risky finding is asked about,
   with a recommendation (`RISK CHECK: NEEDS DECISION <question>`; an unattended loop applies
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md`). Asked again with the person's
@@ -79,12 +80,19 @@ affected checks.
 ## Screened again after a later commit
 
 The risk check's proof is bound to the story as it stood at the proof's `head`, measured from its
-`base`, the moving `origin/<workingBase>`. Any later commit that changes the story's own patch (a
-red local check fixed on the branch, a review fix, a hand repair) makes the runner issue the check
-again before the local checks and the merge read it again; a base refresh (the base merged into the
-story, or the story rebased) that leaves that patch unchanged does not. The re-issued check is
-handed its last ACCEPTED screen as `previousProof` and `previousResult`: never a refused proof, a
-`BLOCKED` or an unanswered question. None → the full screen.
+`base`, the moving `origin/<workingBase>` (the runner refuses any other base). Any later commit
+that changes the story's own patch (a red local check fixed on the branch, a review fix, a hand
+repair) makes the runner issue the check again before the local checks and the merge read it
+again; a base refresh (the base merged into the story, or the story rebased) that leaves that patch
+unchanged does not. The re-issued check is handed its last ACCEPTED screen as `previousProof` and
+`previousResult`: never a refused proof, a `BLOCKED` or an unanswered question. None → the full
+screen. `origin/<workingBase>` unreadable after `git fetch origin` → `BLOCKED`, never `CLEAR`: there
+is nothing to screen against.
+
+**A baseline that cannot be read means a full screen, with the finding history kept**:
+`baselineUnreadable` true (the earlier `head` is not in this checkout: a force-pushed rebase, a
+separate clone), or `git diff origin/<workingBase>...<previousProof.head>` failing. Screen the
+whole story; report only what `previousResult` does not already hold, by id.
 
 The delta is the story's own change and nothing else: compare `git diff origin/<workingBase>...<previousProof.head>`
 with `git diff origin/<workingBase>...HEAD`; what differs is what to screen. Commits that arrived
@@ -95,11 +103,12 @@ a fix that adds a migration, or touches sign-in code or a lens's paths, from lan
 the fast path, where the review launches no finders.
 
 Report the delta only: its ledger entries, its counts and its new deferrals, dismissals and
-deviations; never repeat `previousResult`'s. The runner adds them to the earlier screen
-(`risk-check-accumulates`): each list keeps every earlier entry, the counts are summed and the
-ledger is appended to, so nothing the first screen recorded is lost before review, capture and
-completion. The proof names `origin/<workingBase>`, the new `head`, and the delta's triggers and
-lenses.
+deviations; never repeat `previousResult`'s. Name in `resolved` the ids of earlier entries the
+delta fixed or overtook. The runner adds the delta to the earlier screen
+(`risk-check-accumulates`): each list keeps every earlier entry not resolved, the counts are summed
+less what was resolved, and the ledger is appended to, so the history stays in the ledger while
+review, capture and completion receive only what is still open. The proof names
+`origin/<workingBase>`, the new `head`, and the delta's triggers and lenses.
 
 ## Cited by
 

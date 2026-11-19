@@ -7,21 +7,31 @@ load: contract
 which its The run section handles itself. Read in full before acting on any other stop.
 
 - **A merge stop**: a `stopped` answer carrying `mayHaveLanded` (from `done`, or from `resume`,
-  which answers with that stop until told otherwise). First check whether exactly the stopped
-  merge's commit landed (`merge-paths.md`, "Already landed", for the stop's `commit`). Exactly it → report it with `done` on the stopped merge (its `attempt`), its
-  result naming the merge and its proof's `head` that commit; never `resume`, which would read the
-  moved checkout as new work. Another commit landed carrying it → a person decides, said plainly:
-  what landed was never checked or reviewed. Nothing landed → put the checkout back on the story
-  branch, then `resume` with `"landed": false`: at once for a push refused in a race (the merge
-  step tries again), otherwise once its cause is fixed.
+  which answers with that stop until told otherwise). Check the stop's `commit` with the landing
+  test (`${CLAUDE_PLUGIN_ROOT}/skills/merge-story/references/merge-paths.md`, "Already landed"),
+  which has three answers. Exactly it → report it with `done` on the stopped merge (its `attempt`),
+  its result naming the merge and its proof's `head` that commit; never `resume`, which would read
+  the moved checkout as new work. A different commit landed carrying it → `resume` with `"close":
+  true` (the run ends interrupted, never carried on) and tell a person plainly that what landed was
+  never checked or reviewed; then step 0 of `SKILL.md`, where the merged item is never started
+  again. Nothing landed → put the
+  checkout back on the story branch, then `resume` with `"landed": false`: at once for a push
+  refused in a race (the merge step tries again), otherwise once its cause is fixed. Step 0 of
+  `SKILL.md` applies the same three answers to a run it resumes, the merge's row `issued` or
+  stopped.
 - **A merge `BLOCKED` on excluded paths** (a train one-off carrying deploy configuration or a
   migration): never on a protected or merge-only head (`protectedBranches`, an epic or plan
   integration branch, the train:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`, "Protected and merge-only
-  heads") → a person. Read `pushed=$(git rev-parse origin/<branch>)`, move the story branch by name
-  with `git rebase --onto origin/<baseBranch> origin/<train> <branch>`, then push that one ref
-  with an explicit lease: `git push --force-with-lease=refs/heads/<branch>:$pushed origin
-  refs/heads/<branch>:refs/heads/<branch>` (its receipt is void). Then `start` again with `replace`, the base branch as working base, route
+  heads") → a person. Move the story branch by name off the train and push that one ref with an
+  explicit lease, in ONE shell call, because the lease reads a value that same call records:
+  `git fetch origin && pushed=$(git rev-parse --verify --quiet refs/remotes/origin/<branch>) && git
+  rebase --onto origin/<baseBranch> origin/<train> <branch> && git push
+  --force-with-lease=refs/heads/<branch>:$pushed origin refs/heads/<branch>:refs/heads/<branch>`.
+  A branch never pushed (that `rev-parse` prints nothing, so the call stops before the rebase) →
+  `git rebase --onto origin/<baseBranch> origin/<train> <branch> && git push origin
+  refs/heads/<branch>:refs/heads/<branch>`: a plain first push, no lease. Either way its receipt
+  is void. Then `start` again with `replace`, the base branch as working base, route
   `develop-pr` and `reviewMoment` `pr-boundary`. The new run's branch step answers `EXISTS` on it
   and its build step finds the story already built (`ultracode-build`, "Already built"), so the
   risk check, the local checks and the pull-request review run on the moved branch.
@@ -34,4 +44,5 @@ which its The run section handles itself. Read in full before acting on any othe
 
 - `skills/build-item/SKILL.md` — The run, its `stopped` answer ("read … in full before acting on
   it").
+- `skills/build-item/SKILL.md` — step 0, an unfinished run's three cases.
 - `skills/build-item/references/checkout-pool-commands.md` — the stops that keep the lease.

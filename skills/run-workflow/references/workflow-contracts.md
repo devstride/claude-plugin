@@ -47,8 +47,9 @@ Each contract maps payload keys to paths: a context path (`context.` and a key),
 result (`result:`, a contract, optionally a key), an earlier step's proof (`proof:`, the same
 shape), or a step path: the step's own answer from a
 person, the proof of its previous attempt (`proof`, whatever its verdict), the proof and result of
-its last accepted pass (`passedProof`, `passedResult`: null until one), or the commit it was issued
-on (`head`). A trailing `?`
+its last accepted pass (`passedProof`, `passedResult`: null until one; a `passedProof` whose `head`
+this checkout cannot read is handed as null, with `passedUnreadable` true, never as a baseline), or
+the commit it was issued on (`head`). A trailing `?`
 makes a path optional (null when missing). The runner then adds two reserved keys, `step` (the
 issued step's id) and `contract` (its contract).
 
@@ -72,9 +73,9 @@ Each command reads HEAD once, as a full commit id, and checks every proof agains
   that moved under a byte-identical patch keeps the proof.
 - **story**: the story's patch since the proof's `base`, computed as for `patch`, must be the same
   at the proof's `head` as at that commit. Any later commit that changes the story (a gate fix, a
-  review fix) voids it; a base merged into the story or a rebase does not, provided the `base` is
-  the moving `origin/<workingBase>` ref (a commit id there voids it at every base refresh). A
-  `head` that cannot be read voids it too. The risk check is bound this way: what it screened is
+  review fix) voids it; a base merged into the story or a rebase does not, because the `base` is
+  the moving `origin/<workingBase>` ref: a risk-check proof naming any other base, or one this
+  checkout cannot read, is refused (kind `proof`). A `head` that cannot be read voids it too. The risk check is bound this way: what it screened is
   the story as it then stood.
 - **none**: nothing in the repository binds it.
 
@@ -98,10 +99,15 @@ Five named rules, a closed list:
 - `risk-triggers-need-verifiers`: a risk-check proof that names triggers and ran no verifier is
   refused.
 - `risk-check-accumulates`: a risk check accepted after an earlier accepted one reports only the
-  delta, and its result is added to the earlier: each of `untrackedDeferrals`, `dismissed`,
-  `deferrals` and `deviations` keeps every earlier entry and gains the new ones, the `counts` are
-  summed, the `ledger` is appended to (unless the new one already starts with it), and the
-  `report` is the new one. A refused attempt is never accumulated, and never handed on.
+  delta, and its result is added to the earlier. An entry's id is its `id` when it is an object
+  carrying a non-empty string one, else the whole entry as canonical JSON. Each of
+  `untrackedDeferrals`, `dismissed`, `deferrals` and `deviations` keeps every earlier entry the new
+  result does not name in `resolved` (the ids a later screen fixed or overtook) and gains the new
+  ones whose id it lacks; the `counts` are summed, less one `deferred` (or `dismissed`) per earlier
+  deferral (or dismissal) resolved; `resolved` gathers every id resolved so far; the `ledger` is
+  appended to (unless the new one already starts with it), so it keeps the whole history; and the
+  `report` is the new one. Later steps receive only the entries still open. A refused attempt is
+  never accumulated, and never handed on.
 - `none-configured-needs-pull-request-route`: local checks that found nothing configured are
   accepted by a merge only when the review ran on a pull request (path `pull-request`), where CI is
   the gate.
