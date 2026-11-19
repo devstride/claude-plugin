@@ -147,7 +147,8 @@
         "build": "result:build@1",
         "answer": "step.answer?",
         "previousProof": "step.passedProof?",
-        "previousResult": "step.passedResult?"
+        "previousResult": "step.passedResult?",
+        "baselineUnreadable": "step.passedUnreadable?"
       },
       "argument": null,
       "verdict": {
@@ -168,7 +169,8 @@
           "untrackedDeferrals": "array",
           "dismissed": "array",
           "deferrals": "array",
-          "deviations": "array"
+          "deviations": "array",
+          "resolved": "array"
         }
       },
       "proof": {

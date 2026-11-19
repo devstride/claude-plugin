@@ -127,7 +127,7 @@ RESULTS = {
                 {"deferrals": "array", "deviations": "array", "untrackedDeferrals": "array", "dismissed": "array", "scopeLine": "string", "head": "string"}),
     "risk-check@1": (["ledger", "report", "counts", "untrackedDeferrals", "dismissed"],
                      {"ledger": "string", "report": "string", "counts": "object", "untrackedDeferrals": "array", "dismissed": "array",
-                      "deferrals": "array", "deviations": "array"}),
+                      "deferrals": "array", "deviations": "array", "resolved": "array"}),
     "local-checks@1": (["commands", "results", "receipt", "tree", "head", "skippedSuites"],
                        {"commands": "array", "results": "array", "receipt": "string|null", "tree": "string", "head": "string", "skippedSuites": "array"}),
     "review@1": (["path", "cycles", "untrackedDeferrals", "dismissed", "pullRequest", "mergeBody"],
@@ -147,7 +147,8 @@ for name, entry in contracts.items():
 PAYLOADS = {
     "risk-check@1": {"item": "context.item", "profile": "context.profile.name", "reviewMoment": "context.reviewMoment",
                      "workingBase": "context.workingBase", "build": "result:build@1", "answer": "step.answer?",
-                     "previousProof": "step.passedProof?", "previousResult": "step.passedResult?"},
+                     "previousProof": "step.passedProof?", "previousResult": "step.passedResult?",
+                     "baselineUnreadable": "step.passedUnreadable?"},
     "review@1": {"item": "context.item", "profile": "context.profile.name", "reviewMoment": "context.reviewMoment",
                  "workingBase": "context.workingBase", "route": "context.route", "riskCheck": "result:risk-check@1",
                  "build": "result:build@1", "localChecks": "result:local-checks@1", "localChecksProof": "proof:local-checks@1"},
@@ -221,6 +222,7 @@ check("the five named proof rules are in the runner and the contracts half", all
     "merge-lands-what-was-checked")))
 check("the merge stop's own rule is in the runner and the loop half", "merge-may-have-landed" in source and "`merge-may-have-landed`" in text)
 check("adoption's refusal across repositories is in the runner and the loop half", '"run-other-repository"' in source and "`run-other-repository`" in text)
+check("an adopted run's story-branch refusal is in the runner and the loop half", '"wrong-branch"' in source and "`wrong-branch`" in text)
 check("every binding the runner knows is spelled in the contracts half", all("- **%s**:" % b in rules for b in runner.BINDINGS), runner.BINDINGS)
 
 # the skills the catalog names

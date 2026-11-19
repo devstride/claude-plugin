@@ -178,6 +178,8 @@ def new_repo(remote=None):
     git(repo, "init", "-q")
     git(repo, "checkout", "-q", "-b", "main")
     commit(repo, "readme.txt", "one\n", "first")
+    # origin/main follows main: the base a risk check screens against, with no remote to fetch.
+    git(repo, "symbolic-ref", "refs/remotes/origin/main", "refs/heads/main")
     git(repo, "checkout", "-q", "-b", "feature")
     commit(repo, "export.txt", "export\n", "add the export")
     if remote:
