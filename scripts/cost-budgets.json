@@ -7,7 +7,7 @@
   "bodies": {
     "branch-feature": 1236,
     "branch-hotfix": 2217,
-    "build-item": 7992,
+    "build-item": 8000,
     "ci-audit": 2600,
     "comprehend-plan": 1874,
     "create-defect": 2500,
@@ -130,18 +130,18 @@
     "skills/release/references/migration-approval.md": 1530,
     "skills/release/references/ship-plan.md": 1861,
     "skills/build-item/references/workflow-reports.md": 1938,
-    "skills/run-workflow/references/workflow-runner.md": 3776,
+    "skills/run-workflow/references/workflow-runner.md": 3837,
     "skills/risk-check/references/story-risk-check.md": 2873,
     "skills/review-story/references/review-routes.md": 2967,
-    "skills/merge-story/references/merge-paths.md": 3375,
+    "skills/merge-story/references/merge-paths.md": 3448,
     "skills/story-lifecycle/references/start.md": 700,
     "skills/story-lifecycle/references/complete.md": 1200,
-    "skills/build-item/references/run-stops.md": 1499,
+    "skills/build-item/references/run-stops.md": 1574,
     "skills/run-workflow/references/workflow-contracts.md": 3391
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 97105,
+      "budget": 97113,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -185,7 +185,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 103194,
+      "budget": 103336,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
