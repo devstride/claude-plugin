@@ -53,7 +53,10 @@ for what each version component means here and how a release is cut.
     checks whether exactly the checked commit landed: if it did, it is recorded as landed instead of
     asking for the checks again; if it landed in a way the check cannot prove (moved past by a
     fast-forward, carried in by another branch's merge, or after a release fast-forwarded the base),
-    a person confirms what landed and either records it or closes the run. A merge that landed is reported as landed even when a clean-up after it failed.
+    a person looks at what the base gained after the checked commit: when only a release or other
+    checked work moved it on, the landing is recorded; when later work on the story itself landed,
+    the run is closed and the person told that this work landed without the run's checks and
+    review. A merge that only refreshed its base is never taken for a landing. A merge that landed is reported as landed even when a clean-up after it failed.
     A left-over run for a story someone else finished is closed instead of carried on.
   - **A named story or a one-off held for a release stops there**, with its branch pushed and the
     hold named, instead of being built again; a story the loop chose moves on to the next one.
@@ -129,18 +132,18 @@ for what each version component means here and how a release is cut.
 
 The bodies below shrink where rules moved out, but a fast story now loads the eight step skills
 and their references as well: the fast story loop path grows from 80,771 tokens at 4.2.0 to
-102,771 tokens (`scripts/cost-budgets.json`, `paths.fastStoryLoop`), even after the runner's
+103,049 tokens (`scripts/cost-budgets.json`, `paths.fastStoryLoop`), even after the runner's
 reference was split so the loop reads only its driving half. On top of that text cost, a story
 now runs its risk check again after each later commit that changes it.
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.2.0 @ a059b48, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v4.2.0 @ c9dd5be, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.2.0 | tokens@devstride--v4.2.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
 | skills/plan/SKILL.md | 25,535 | 8,512 | 25,542 | 8,514 | +2 | 8,514 |
 | skills/doctor/SKILL.md | 23,995 | 7,999 | 23,995 | 7,999 | +0 | 8,000 |
 | skills/review/SKILL.md | 23,970 | 7,990 | 23,986 | 7,996 | +6 | 7,999 |
-| skills/build-item/SKILL.md | 23,980 | 7,994 | 23,821 | 7,941 | -53 | 7,941 |
+| skills/build-item/SKILL.md | 23,980 | 7,994 | 23,971 | 7,991 | -3 | 7,991 |
 | skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
 | skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |
 | skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 11,963 | 3,988 | +0 | 3,988 |
@@ -176,7 +179,7 @@ now runs its risk check again after each later commit that changes it.
 | skills/sync-base/SKILL.md (added) | — | — | 1,471 | 491 | +491 | 500 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,472 | 1,824 | 6,277 | 2,093 | +269 | 2,100 |
-| **total (bodies)** | 279,416 | 93,149 | 299,457 | 99,833 | +6684 | |
+| **total (bodies)** | 279,416 | 93,149 | 299,607 | 99,883 | +6734 | |
 
 ## [4.2.0] — 2026-11-18
 
