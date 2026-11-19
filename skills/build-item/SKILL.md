@@ -64,8 +64,9 @@ An item outside a sequenced plan is auto-detected as a one-off: $ARGUMENTS
   gate green) or a one-off that settled the same gates. Out-of-scope findings:
   `capture-findings`.
 - **Required steps are the runner's, not memory's.** The step runner issues each step in order and
-  never issues the merge without a current risk check, current green local checks and a current
-  review; a stale proof is re-earned, never waived.
+  never issues the merge without a current risk check (of the story as it now stands: any later
+  commit that changes it, a gate or review fix included, is screened again first), current green
+  local checks and a current review; a stale proof is re-earned, never waived.
 
 ## Delivery profile — resolve once per story, announce with its source
 
@@ -170,6 +171,11 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
 - **Active Agents** (`activeAgents` set, plan mode only): at EVERY pickup, after each merge and at
   every terminal exit (step 0's, step 7's, a STOP — before it exits), apply
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`. Never asks; fails open.
+- **An unfinished run first.** A given story number, or the story the handoff names as in
+  progress, → `resume` with that item before anything below (The run, item 2): a run that answers
+  carries on from its own position, whatever the item's status now says, because the runner never
+  runs a finished step again — a merge that landed before an interruption still owes its
+  completion steps. Only with no unfinished run does the next rule apply.
 - A given story number IS the story; merged or Done → never started, no run (`next-unblocked.md`).
   Otherwise apply `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full
   (projection warning too). **Never auto-select from the deferred container.** Surface the
@@ -190,7 +196,9 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
 ## The run
 
 Every command is `python3 -B "${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py"
-<command>` with one JSON object on stdin (a file or a here-document, never inside quotes). **Read
+<command>` with one JSON object on stdin (a file or a here-document, never inside quotes), and
+every `next`, `done`, `status` and `resume` names the `item`: a session holding two open runs is
+refused one that does not. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md` in full before the first
 command, and again after a compaction**: the commands, the answers, the stops and resuming.
 
@@ -198,9 +206,12 @@ command, and again after a compaction**: the commands, the answers, the stops an
    (`name` and `source`), `workingBase`, `oneOff`, `route`, `releaseUnit` (the release-unit ancestor
    step 0 resolved; null for a one-off), `reviewMoment` (Working base), `branchSlug`
    (`I<number>-` plus `routing.py slug` of the title) and `mode` (`select`, `named` or `resume`).
-2. **`start`** with `definitionFile` `${CLAUDE_PLUGIN_ROOT}/workflows/build.json` and that context;
-   a run already open for this item → `resume` instead (`status` first says where it is). A refusal
-   (exit 2) or a runner failure (exit 1) → say its line and STOP; never build without the runner.
+2. **`resume` with the item first**: it finds this session's open run, or adopts the newest
+   unfinished one another session left for the item (a cleared conversation, a crash), and hands
+   back its current step. Refused `no-run` → **`start`** with
+   `definitionFile` `${CLAUDE_PLUGIN_ROOT}/workflows/build.json` and that context. A `start` refused
+   `run-open` means a run exists: `resume` it; only the excluded-paths re-route replaces one. Any other refusal (exit 2) or a
+   runner failure (exit 1) → say its line and STOP; never build without the runner.
 3. **For each `run` answer**: send the story claim heartbeat with `heartbeat.phase` and the
    ship-intent update from `heartbeat.shipIntent` (each only when configured and not null, each
    failing open, `references/story-claims.md` and `references/ship-intent.md`; a heartbeat's own
@@ -220,19 +231,26 @@ command, and again after a compaction**: the commands, the answers, the stops an
    question (`needs-person`), attended → ask it and, once the person replies, `resume` with their
    reply as `answer`; unattended with `needsYou.label` set → `references/needs-you.md`. A red local
    check (`LOCAL CHECKS: FAIL`) is the build's to fix: fix the named check on the story branch as
-   the build step would, commit, then `resume` (the runner checks the new tree). Any other stop, or
-   a question left unanswered → exit through step 7's terminal exit. A merge `BLOCKED` on excluded paths: move the story branch with `git rebase
-   --onto origin/<baseBranch> origin/<train>` (its receipt is void), and `start` again with
-   `replace`, the base branch as working base, route `develop-pr` and `reviewMoment` `pr-boundary`.
+   the build step would, commit, then `resume` (the runner screens and checks the new commit).
+   **Any other stop: read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/run-stops.md` in
+   full before acting on it**: a merge stop (landed or not), a train one-off moved off the train,
+   and every other stop, which waits for this session with the lease kept.
 6. **`finished`, outcome `held`**: a claim held by another agent or a release hold. A selected
-   story → the next candidate (step 0); a named or resumed one → STOP, naming the holder; a release
-   hold → the story branch waits, the item stays in progress, report "held: <reason>" and move on.
+   story → the next candidate (step 0); a named or resumed one → STOP, naming the holder, after
+   **`return-checkout`** when this run leased and nothing was built in it (the claim is the run's
+   first step: the checkout is unused, exactly as at step 0's exits); a release hold → the story
+   branch waits, the item stays in progress, report "held: <reason>" and go to step 0, whose
+   selection passes over it until the hold lifts (`next-unblocked.md`).
 7. **`finished`, outcome `completed`** → step 7.
 
 ## 7. Sync and proceed
 
-- The run's last step (`sync-base`) left the checkout on the working base with a clean tree.
-  Terminal exit or hand-over only: **`return-checkout`**, after that sync.
+- After a completed run, its last step (`sync-base`) left the checkout on the working base with a
+  clean tree. **Terminal exit or hand-over only: `return-checkout`, after its own check**: `git
+  checkout <working base> && git pull --ff-only`, then `git status --porcelain` empty — dirty →
+  name the drift and STOP, lease kept, nothing reset or staged. The check is repeated
+  here because a terminal exit may follow a run that never reached its sync (`SYNC: DIRTY`, a
+  hand-over).
 - **Handoff memory**: what shipped, what remains, the plan root WITH profile and source (never the
   profile alone), the epic's integration branch keyed to its number (or "develop — no epic").
 - **Counts**: `hierarchyRoles.leaf` descendants neither Done nor landed, of **the SAME

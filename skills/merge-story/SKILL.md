@@ -9,9 +9,9 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the
 
 Arguments: $ARGUMENTS — one JSON object, the `merge@1` payload
 (`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`): `item`, `profile`, `workingBase`, `route`,
-`branch` (the story branch), the results of the review (`review`), the build (`build`) and the risk
-check (`riskCheck`), and `commit`: the full commit the local checks and the review were just proven
-on. **Read `${CLAUDE_PLUGIN_ROOT}/skills/merge-story/references/merge-paths.md` in full before the
+`branch` (the story branch), the results of the review (`review`), the build (`build`), the risk
+check (`riskCheck`) and the local checks (`localChecks`), the review's proof (`reviewProof`), and
+`commit`: the full commit the local checks and the review were just proven on. **Read `${CLAUDE_PLUGIN_ROOT}/skills/merge-story/references/merge-paths.md` in full before the
 first git command**: the order, both merge paths and every refusal are spelled there.
 
 ## Verdict
@@ -22,7 +22,9 @@ first git command**: the order, both merge paths and every refusal are spelled t
 
 1. **Already landed?** `commit` on `origin/<workingBase>` (fast) or its pull request merged at that
    head → `LANDED` with the merge found; nothing merges twice.
-2. **Holds**: a release hold on the item or an ancestor → `HELD <reason>`; the story branch waits.
+2. **Holds**, on a landing onto the train or the base branch only (an epic-branch story
+   accumulates under a hold): a release hold on the item or an ancestor → `HELD <reason>`; the
+   story branch waits.
 3. **Never production**: a working base equal to `release.productionBranch` → `BLOCKED`.
 4. **Exactly this commit**: the branch no longer at `commit`, or the base moved and was merged in
    (fast) or rebased onto (pull request) → `REFRESHED`, so the runner re-earns what went stale and
@@ -31,7 +33,11 @@ first git command**: the order, both merge paths and every refusal are spelled t
    pull-request merge, each exactly as the reference spells it, the consequence notices last
    before it.
 6. On the pull-request path a red check or an open thread goes back through `review`, never merged
-   red; anything the reference stops on → `BLOCKED`, said.
+   red; the durable review proof follows the head (carried when the tree is the reviewed one,
+   else re-earned through `review`); anything the reference stops on → `BLOCKED`, said, with the
+   checkout restored to the story branch first.
+7. **Landed is landed**: once the push or the pull-request merge succeeded, answer `LANDED`, naming
+   any clean-up left undone; never `BLOCKED`.
 
 ## Result
 

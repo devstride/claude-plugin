@@ -35,8 +35,7 @@ before the first call**: the claim, the record, the modes and what degrades.
 4. The holder token is never printed, logged or put in a comment; only its digest is ever shown.
 
 `HELD` only reports. It ends the run, and what follows is the loop's: a selected story gives way to
-the next candidate, while a story the person named or the handoff resumed stops the run (held,
-named → STOP, naming the holder). This step never takes over a live claim by itself.
+the next candidate, while a story the person named or the handoff resumed stops the run, naming the holder. This step never takes over a live claim by itself.
 
 ## Result
 

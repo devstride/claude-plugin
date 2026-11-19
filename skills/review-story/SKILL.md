@@ -29,7 +29,8 @@ path**: both paths, the train's landing review and the proof are spelled there.
    for this story, route what is worth filing, dismiss the rest with reasons. No pull request, no
    cloud request, no CI.
 4. **Pull-request path**: `pr` in its driven mode, the working base pre-answered and the profile
-   by name; asked again with the pull request open, `review` on it, carrying its ledger.
+   by name; asked again with the pull request open, `pr`'s re-entry on it (never `review` alone),
+   carrying its ledger, so the pre-ship hold still comes before the ready flip.
 5. A stall, an unavailable required reviewer, or a red check `review` cannot settle → `BLOCKED`.
 6. Report the fixes it made: the runner, never this step, decides what they make stale.
 
@@ -37,6 +38,8 @@ path**: both paths, the train's landing review and the proof are spelled there.
 
 After the verdict and its evidence, one fenced `json` block: `path` (`fast-local` or
 `pull-request`), `cycles` (a whole number; 0 when covered), `untrackedDeferrals`, `dismissed`,
+`deferrals` (each finding deferred to an existing item or seam, with that home and why),
+`deviations` (each way the story now differs from its spec, found or caused by the review),
 `pullRequest` (its number, or null), `mergeBody` (the fast merge's body lines, or null), and
 `proof`: `path`, `head` (the full reviewed commit), `base` (`origin/<workingBase>`), `patchId`
 (the runner's verbatim patch id of `<base>...<head>`, computed as the reference spells) and

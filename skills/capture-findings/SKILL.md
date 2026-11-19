@@ -9,8 +9,8 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the
 
 Arguments: $ARGUMENTS — one JSON object, the `capture@1` payload
 (`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`): `item`, `oneOff`, and the results of the
-build (`build`), the risk check (`riskCheck`) and the review (`review`), whose `untrackedDeferrals`
-lists (and the build's `deferrals`) are what this step files. The epic release calls it too, for its
+build (`build`), the risk check (`riskCheck`) and the review (`review`): it files their
+`untrackedDeferrals`, and puts their `deferrals` (each owned by an existing item) on their owners. The epic release calls it too, for its
 release unit's review (`item` is the release unit; only `review` is given).
 
 ## Verdict

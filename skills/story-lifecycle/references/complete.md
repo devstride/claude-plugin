@@ -32,8 +32,8 @@ stops the run.
    `link_pull_request` with the review's `pullRequest`. Fast path: the landed comment, which names
    the merge SHA. Never invent a PR number: one the merge or review result does not carry does not
    exist.
-5. **Reconcile as-built** on a material deviation (the build's `deviations`, or one the review
-   added): read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/as-built.md` in full before
+5. **Reconcile as-built** on a material deviation (the `deviations` of the build, the risk check
+   and the review, all three read): read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/as-built.md` in full before
    acting on it. None → report "shipped as specified" and write nothing. The dismissed-findings
    list never goes here: it lives in the pull request or merge-commit body.
 6. **Release the claim** (`claims` set): `release_claim` with outcome `done`
@@ -41,7 +41,8 @@ stops the run.
    ship-intent declaration with outcome `landed`
    (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md`). Not configured, off or
    degraded → `claimReleased` / `shipIntentReleased` false, said once; never a failure.
-7. **Report** item + `[N]`, status, dates, PR link or SHA + branch, profile + source, reconciled.
+7. **Report** item + `[N]`, status, dates, PR link or SHA + branch, profile + source, reconciled
+   (the profile is the payload's `profile`, its source the payload's `profileSource`).
 
 ## Cited by
 

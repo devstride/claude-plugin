@@ -12,8 +12,8 @@ Holding when nothing will run buys a pointless round trip: a repo can have sever
 suites, or entries that are all `releaseOnly` — and 2b is then a documented no-op.
 
 A declared hold that is never discharged is a stranded PR — permanently draft, CI never
-released — and the caller above (`build-item`) then refuses to merge it with no explanation:
-from its side the PR simply never became ready.
+released — and the merge step (`merge-story`) then never finds it green, unexplained: from its
+side the PR simply never became ready.
 
 ## Cited by
 

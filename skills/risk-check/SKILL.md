@@ -10,9 +10,13 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the
 Arguments: $ARGUMENTS — one JSON object, the `risk-check@1` payload
 (`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`): `item`, `profile`, `reviewMoment`
 (`release-deferred` or `pr-boundary`), `workingBase`, `build` (the build step's result: its four
-lists, scope line and head) and `answer` (a person's reply to this step's question, or null).
-**Read `${CLAUDE_PLUGIN_ROOT}/skills/risk-check/references/story-risk-check.md` in full before
-inspecting the diff**: every rule below is spelled there.
+lists, scope line and head), `answer` (a person's reply, or null) and `previousProof` (this step's
+last proof, or null). **Read
+`${CLAUDE_PLUGIN_ROOT}/skills/risk-check/references/story-risk-check.md` in full before
+inspecting the diff**: every rule below is spelled there. Then load, once per story and after a
+compaction, what it applies: config's `conventionsDoc` (binding) and `lessonsDoc` (fallback
+`.claude/ds-lessons.md`, advisory), and, before choosing a verifier's model or effort,
+`${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/engineering-economy.md`.
 
 ## Verdict
 
@@ -21,30 +25,34 @@ inspecting the diff**: every rule below is spelled there.
 ## Steps
 
 1. Inspect the hand-written diff of the story against `origin/<workingBase>` once, generated files
-   excluded. No `reviewMoment` (a standalone run) → run the check anyway and report the missing
-   caller context; never assume a full review followed.
+   excluded. `previousProof` set (a later commit changed the story) → only the delta since its
+   `head`, floors included (the reference's "Screened again"). No `reviewMoment` (a standalone
+   run) → run the check anyway and report the missing caller context; never assume a full review
+   followed.
 2. Every story: the main agent's own self-check.
-3. The DIFF decides, under every profile: sign-in or authorization, a migration or irreversible
+3. The DIFF decides, every profile: sign-in or authorization, a migration or irreversible
    state change, or a deployed-runtime contract → focused verifiers (at most two, grouped by
    boundary); each matching `review.mandatoryLenses` entry → its own verifier, even on a routine
    diff.
 4. A configured `review.localAssistCommand` may add one read-only, advisory call.
 5. Fix every verified P1 or serious P2 and re-verify with the cumulative ledger, with no numeric cap;
    then apply the profile's `fixFloor`. A stall → `BLOCKED`, for a person.
-6. Leave nothing unaccounted for: each unfixed finding is deferred with a home, put on the
-   untracked list, or dismissed with its reason.
+6. Nothing unaccounted for: each unfixed finding is deferred with a home, untracked, or dismissed
+   with its reason.
 7. A genuinely ambiguous risky finding → `NEEDS DECISION` with the question and your recommendation;
    with `answer` set, apply it and finish.
 8. Write the story review ledger and the one-line report; commit fixes per
    `commitConventions.reviewFixFormat`.
 
-`FIXED` counts the findings fixed; `CLEAR` means none needed fixing.
+`FIXED` counts the fixes; `CLEAR`: none needed.
 
 ## Result
 
 After the verdict and its evidence, one fenced `json` block: `ledger`, `report`, `counts` (whole
-numbers: `raised`, `fixed`, `deferred`, `dismissed`), `untrackedDeferrals`, `dismissed`, and
-`proof`: `base` and `head` (the full commits checked), `triggers` (each immediate-risk boundary and
+numbers: `raised`, `fixed`, `deferred`, `dismissed`), `untrackedDeferrals`, `dismissed`,
+`deferrals` (each with its home and why), `deviations` (each way the story now differs from its
+spec), and `proof`: `base` and `head` (the full commits checked; `head` is HEAD after your own
+fixes), `triggers` (each immediate-risk boundary and
 `lens:<name>` matched; empty for a routine diff), `verifiers` (how many ran) and `lenses` (the
 names of the lenses that ran). A proof naming a trigger with no verifier is refused.
 

@@ -83,6 +83,10 @@ hand it to `review` as scoped out; and one with `requestPolicy` `"final-head"` (
 nothing and note no cloud wave. A no-CI repo opens non-draft and reports `no pull-request CI`, not
 `CI held`.
 
+- **Re-entry on a pull request already open** (a driven caller names it: `review-story` asked
+  again): never open a second one, and request no reviewer again; refresh the body's hand-off,
+  then go to step 2 on it, carrying the caller's cumulative ledger, so the hold is decided again
+  for the new diff before `review` runs.
 - **Per reviewer**, immediately before its request capture the paginated count of that entry's
   `review_requested` timeline events (matched by its node id), then record the request time and
   mutation outcome. **Do not poll for registration or spend `reviewerRegistrationWindowMinutes`

@@ -4,7 +4,7 @@ load: contract
 # Review routes — the fast local review or the full pull-request review
 
 `review-story`'s procedure: which path a story's review takes, what each path does, the release
-train's landing review, the width of the local gate, and the proof the step leaves.
+train's landing review, and the proof the step leaves.
 
 ## Which path
 
@@ -14,13 +14,17 @@ The working base picks the path, never the diff. The loop resolved it as the rev
 never cloud-reviewed, so a story whose working base is `baseBranch` is never reviewed on the fast
 path, whatever it is passed.
 
+**Nothing configured locally** (the payload's `localChecks` proof kind `none-configured`) → the
+pull-request path, on the release train too: CI on the pull request is then the only gate, and the
+runner refuses a merge of it after any other review (`none-configured-needs-pull-request-route`).
+
 **THE FLOOR:** no completed risk check (the payload's `riskCheck` with no `ledger`, its
 immediate-risk verifiers and matched lenses included) or no valid verification receipt (the
 payload's `localChecks` with a null `receipt`, or one
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/verification-receipts.md` says no longer holds
 for this tree) → the pull-request path, saying why. On the release train a missing risk check or
-receipt is made good by the LOCAL-FULL review below, never by a pull request, which would spend a CI
-run.
+receipt (local checks configured) is made good by the LOCAL-FULL review below, never by a pull
+request, which would spend a CI run.
 
 ## Fast path
 
@@ -46,12 +50,16 @@ name — `review` owns the cycle target, P1/serious-P2 continuation and fix floo
 step (`story-lifecycle`) owns linking the pull request to the item. It opens a draft wherever the
 repo holds CI on drafts (`prototype` too), requests every in-scope cloud reviewer in the same call
 and settles through `review`. Deferrals, deviations and dismissals (with rationale) go in the PR
-body. The push/ready-flip race is `review` step 7's; the merge step never reads `skipping` as green.
+body (the build's and the risk check's, from the payload). The push/ready-flip race is `review` step 7's; the merge step never reads `skipping` as green.
 
 **Asked again** (the runner found the patch changed, or the merge refreshed it): a pull request
-already open for the branch is never opened twice. Invoke `review` driven on it, with its
-cumulative ledger, target and safety state, never a fresh budget. A merged or closed pull request
-for the branch → `BLOCKED`, naming it.
+already open for the branch is never opened twice. Re-enter through `pr` driven, naming that pull
+request (its re-entry: no second open, no new reviewer requests), never `review` directly: `pr`
+selects the pre-ship checks again on the new diff and declares the hold, invokes `review` on it
+with its cumulative ledger, target and safety state, never a fresh budget, then runs the checks and
+discharges the hold (`pr` 2b and 2c, `review` in PRE-SHIP RESUME mode). Why: a direct `review`
+would flip the pull request ready, releasing CI, before the pre-ship checks ran on the diff it
+settled. A merged or closed pull request for the branch → `BLOCKED`, naming it.
 
 ## The train's landing review
 
@@ -96,14 +104,6 @@ calls for:
   `mergeBody` joins this step's `mergeBody`. Exit 2 → LOCAL-FULL (or its follow-up), which records
   the review, then check again. `merge-story` checks again at the exact head it merges.
 
-## The gate's width
-
-The local gate (`local-checks`) runs at the profile's `storyVerify` width, with one exception decided
-here: a train one-off that gets the LOCAL-FULL review (`small: false` with `releaseTrain.smallFixes`
-set, or any train one-off with `releaseTrain.reviewEveryLanding` true) runs it at
-`storyVerify: full` — a touched-suite receipt never counts. `local-checks` reads this section;
-`routing.py small` answers the size, run as above.
-
 ## The proof
 
 Once the review is settled and every fix is committed (a clean tree), the proof names `path`
@@ -111,7 +111,7 @@ Once the review is settled and every fix is committed (a clean tree), the proof 
 rev-parse HEAD`, `base` = `origin/<workingBase>` (the ref name, so a base that moves under an
 unchanged patch keeps the proof), `pullRequest`, and `patchId`, the first field of exactly the
 command the runner checks it with
-(`${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md`, Proofs):
+(`${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-contracts.md`, Proofs):
 
 ```bash
 git diff --no-color --no-ext-diff --no-textconv --no-relative --src-prefix=a/ --dst-prefix=b/ \
@@ -126,5 +126,6 @@ before computing it.
 
 - `skills/review-story/SKILL.md` — the pointer before choosing the path ("Read … in full before
   choosing the path").
-- `skills/local-checks/SKILL.md` — section "The gate's width".
+- `skills/local-checks/SKILL.md` — the size command, in "The train's landing review", for the
+  gate's width.
 - `skills/build-item/references/release-train.md` — the train's delivery path.

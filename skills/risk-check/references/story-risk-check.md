@@ -76,6 +76,19 @@ the missing caller context — never guess that a full review happened.
 The local checks run after this step, once, on the final tree: a fix made here reruns only its
 affected checks.
 
+## Screened again after a later commit
+
+The risk check's proof is bound to the story as it stood at the proof's `head`. Any later commit
+that changes the story (a red local check fixed on the branch, a review fix, a hand repair) makes
+the runner issue the check again, handed `previousProof`, before the local checks and the merge
+read it again; a base refresh that leaves the story's patch unchanged does not. The re-issued check
+screens only the delta `previousProof.head..HEAD`, generated files excluded, and still runs every
+diff-triggered floor on it: the immediate-risk verifier and each matching mandatory lens. A delta
+that trips none is a self-check and a `CLEAR`. This is what keeps a fix that adds a migration, or
+touches sign-in code or a lens's paths, from landing unscreened on the fast path, where the review
+launches no finders. Its ledger appends to the story's, its counts are the delta's, and its proof
+names the whole story's `base` and the new `head`, with the triggers and lenses of the delta.
+
 ## Cited by
 
 - `skills/risk-check/SKILL.md` — the pointer before inspecting the diff ("Read … in full before

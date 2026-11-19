@@ -17,8 +17,10 @@ and anyone can run it alone as `/devstride:<name>` — for example to re-run one
   the command that produced it.
 - **Config wins** over every default; arguments the caller passes (payload, member, mode) win over
   both. **Safe to re-run**: re-running after a failure is the supported recovery.
-- **Unset or null seam:** the `NOT CONFIGURED` verdict (or the step's stated default), naming the
-  generic default that applies instead; the caller continues.
+- **Unset or null seam:** the `NOT CONFIGURED` verdict (or the step's stated default); the caller
+  continues. The generic default that applies instead goes on the evidence line below it, never on
+  the verdict line: a verdict whose contract takes no detail (`LOCAL CHECKS: NOT CONFIGURED`) is
+  refused as no verdict when anything follows it.
 - **Named but missing** (no `.claude/skills/<name>/SKILL.md`, or a command that does not
   resolve): `NOT CONFIGURED` with the setting and its fix — except a safety step.
 - **Safety steps** (`pre-ship`, `post-deploy`, `classify-release`, `pre-merge-check`): configured

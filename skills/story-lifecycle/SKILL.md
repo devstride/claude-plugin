@@ -9,8 +9,8 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the
 
 Arguments: $ARGUMENTS — one JSON object, the payload of the step being run
 (`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`). `start@1`: `item`, `workingBase`, `oneOff`.
-`complete@1`: those plus `profile`, `releaseUnit`, `route` and the earlier steps' results `merge`,
-`build`, `riskCheck` and `review`. The reserved `contract` key says which step this call runs.
+`complete@1`: those plus `profile`, `profileSource`, `releaseUnit`, `route` and the earlier steps'
+results `merge`, `build`, `riskCheck` and `review`. The reserved `contract` key says which step this call runs.
 
 Two steps of the Build workflow share this skill: the two that only Build runs and nobody re-runs
 alone. They run at two places in the workflow, one per call.

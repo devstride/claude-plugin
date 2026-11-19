@@ -61,6 +61,11 @@ unknown knob.
 **Story claim.** With `claims` set, heartbeat the story at the start of each phase below, phase
 name as `phase` (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/story-claims.md`).
 
+**Already built.** The branch already holds this story's commits (a train one-off moved to the
+base branch, or a run started again on a built branch): read them against the spec, build nothing
+twice, and answer `BUILD: READY` with the result for the branch as it stands (its `head`; the
+lists empty unless the reading finds something). A gap the reading finds is built as usual.
+
 ## 1. UNDERSTAND
 
 An evidence-backed picture of "done" before any code. **Provision readers proportional to the
@@ -118,9 +123,8 @@ Implement in the main agent (not a Workflow), in coherent increments: targeted c
   optional; never invent or reuse attribution metadata; PR bodies get none.
 - **Fastest relevant feedback while building**: the affected type-check, configured wiring checks,
   touched tests via `verify.testSingle` — widened when the change is broad.
-- **Generated files**: a type error is tolerated only in a `generated.paths` file matching
-  `generated.toleratedTypeErrors`; everything else stops. Fix by re-running
-  `generated.regenCommand`, never by hand. When routes/handlers change, regenerate and commit the
+- **Generated files**: fix them by re-running `generated.regenCommand`, never by hand (which type
+  errors in them the gate tolerates is `local-checks`'). When routes/handlers change, regenerate and commit the
   output in its OWN commit — build output, excluded from review, and it keeps the pre-push hook's
   regen a no-op instead of amending after you push.
 - **Let the git hooks own wiring checks, regen and the commit-amend**; a commit failing a wiring

@@ -15,7 +15,10 @@ satisfied, in the earliest-dated open container (this org: Capability/Epic) on t
 path. Priority breaks ties; earlier `startDate` breaks remaining ties. Exclude anything the gating
 check catches (`build-item` step 0's GATING CHECK — items that depend on a human/infra decision
 that is the user's). With `claims` configured it also skips a candidate another live agent holds
-(`story-claims.md`).
+(`story-claims.md`). **It also skips a candidate held for release**: one the merge answered `HELD`
+for a release hold (its built branch waits, the item still in progress) is passed over while
+`release-holds.py decide` still answers held for it and its ancestors (`release-holds.md`), and
+selected again only once the hold lifts — never rebuilt while it waits.
 
 **A `blocked_by` target is satisfied** when it is Done, OR when it is in the git-confirmed landed
 set (below) AND has the SAME nearest release-unit ancestor as the dependent leaf, so the same

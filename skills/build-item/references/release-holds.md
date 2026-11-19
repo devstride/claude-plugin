@@ -26,7 +26,8 @@ cases any other tool must pass.
 **Where it is checked:**
 - `merge-story`, before any merge onto the release train or `baseBranch` (a one-off, or a
   plan story whose working base is one of them): held → no merge (`MERGE: HELD`); the story branch
-  waits, the item stays in progress, and the run reports "held: <reason>" and moves on.
+  waits, the item stays in progress, and the run reports "held: <reason>" and moves on; selection
+  passes over it until the hold lifts (`next-unblocked.md`).
 - `build-item` step 8, before an epic's release is cut or merged, over the unit, its ancestors and
   every leaf it carries (a leaf's hold travels with its epic): held → the epic waits on its
   integration branch, reported "release-ready, held until …".

@@ -234,7 +234,10 @@ run = Run()
 run.until("review")
 commit(run.repo, "export.txt", "export\nfixed\n", "a review fix")
 answer = run.done()
-check("a review fix re-issues the local checks before the merge", is_run(answer, "local-checks", 2), answer)
+check("a review fix re-issues the risk check before the merge, handed the head it last covered",
+      is_run(answer, "risk-check", 2) and answer["payload"]["previousProof"]["head"] != facts(run.repo)["head"], answer)
+answer = run.done()
+check("... then the local checks", is_run(answer, "local-checks", 2), answer)
 answer = run.done()
 check("... while the review, of the patch as it now is, stays valid: the merge is next", is_run(answer, "merge", 1), answer)
 
@@ -279,8 +282,29 @@ answer = run.done("LOCAL CHECKS: FAIL unit\nunit: 2 failed\n")
 check("a red local gate stops the run before the review", stopped(answer, "failed", "local-checks") and ("review", 1) not in run.issued(), answer)
 commit(run.repo, "export.txt", "export\nfixed the unit test\n", "fix the red check")
 answer = run.resume()
-check("... and after the fix a resume runs the local checks again", is_run(answer, "local-checks", 2), answer)
+check("... and after the fix a resume screens the fix first: the risk check again", is_run(answer, "risk-check", 2), answer)
+check("... then the local checks again", is_run(run.done(), "local-checks", 2), run.answer)
 check("... then the review", is_run(run.done(), "review", 1), run.answer)
+
+# --- a gate fix that adds a migration is screened before the merge (the fast path launches no finders)
+run = Run()
+run.until("local-checks")
+run.done("LOCAL CHECKS: FAIL unit\nunit: 1 failed\n")
+commit(run.repo, "migration-0001.sql", "alter table items add column archived boolean;\n", "fix the red check with a migration")
+order = []
+answer = run.resume()
+while answer and answer["action"] == "run" and answer["step"]["id"] != "merge":
+    order.append(answer["step"]["id"])
+    answer = run.done()
+check("a migration added by a gate fix gets the risk check again before the review and the merge",
+      order[:1] == ["risk-check"] and "review" in order and is_run(answer, "merge"), (order, answer))
+# a base refresh alone (the story unchanged) does not
+run = Run()
+run.until("merge")
+git(run.repo, "checkout", "-q", "main"); commit(run.repo, "base.txt", "moved\n", "base moves"); git(run.repo, "checkout", "-q", "feature")
+git(run.repo, "rebase", "-q", "main")
+check("a base refresh that leaves the story unchanged does not screen it again",
+      is_run(run.done("MERGE: REFRESHED\n"), "local-checks", 2) and ("risk-check", 2) not in run.issued(), run.issued())
 run = Run()
 run.until("sync")
 answer = run.done("SYNC: DIRTY notes.txt\n")
@@ -312,6 +336,115 @@ for step_id in needed:
     run = Run(definition=edited)
     check("a definition without the %s step is refused" % step_id, run.rc == 2 and re.match(r"^workflow: requires-missing: [^\n]+\n$", run.err) is not None and run.answer is None, (run.rc, run.err))
 
+# --- a review whose result and proof name different paths is refused -------------------------
+run = Run()
+run.until("local-checks")
+run.done(canned("local-checks@1", run.repo, verdict="LOCAL CHECKS: NOT CONFIGURED", **{"proof.kind": "none-configured"}))
+answer = run.done(**{"path": "fast-local", "proof.path": "pull-request"})
+check("a review answering the fast path with a pull-request proof is refused, never merged fast",
+      stopped(answer, "proof", "review") and "review-names-one-path" in answer["reason"] and ("merge", 1) not in run.issued(), answer)
+
+# --- a cleared conversation after the merge landed: the new session resumes, never starts again
+run = Run()
+answer = run.until("merge")
+story = answer["payload"]["commit"]
+git(run.repo, "checkout", "-q", "main"); git(run.repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
+run.session = "s2"
+check("(a new session sees no run of its own)", run.call("status", {"item": "I123"})[0] == 2)
+answer = run.resume()
+check("resume with the item adopts the run left unfinished, handing back the merge and its commit",
+      is_run(answer, "merge", 1) and answer["payload"]["commit"] == story, answer)
+answer = run.done(canned("merge@1", run.repo, **{"proof.head": story}))
+check("... the merge that already landed, reported with done, leads to the remaining steps", is_run(answer, "complete", 1), answer)
+while run.answer and run.answer["action"] == "run":
+    run.done()
+check("... which finish the run completed", finished(run.answer, "completed"), run.answer)
+run2 = Run()
+run2.until("merge")
+run2.session = "s3"
+rc, second, _, err = run2.call("start", {"definitionFile": BUILD_FILE, "context": dict(CONTEXT, cwd=run2.repo)})
+check("a start in a new session would open a second run at the claim, leaving the merge behind: why the loop resumes first",
+      rc == 0 and is_run(second, "claim", 1), (rc, second, err))
+
+# --- a merge that landed and then reported BLOCKED is repaired with done, never resumed ------
+run = Run()
+answer = run.until("merge")
+story = answer["payload"]["commit"]
+git(run.repo, "checkout", "-q", "main"); git(run.repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
+answer = run.done("MERGE: BLOCKED pushed, but deleting the remote story branch was refused\n")
+check("(a merge reported BLOCKED after it landed stops the run)", stopped(answer, "failed", "merge"), answer)
+answer = run.call("done", {"item": "I123", "stepId": "merge", "attempt": 1, "output": canned("merge@1", run.repo, **{"proof.head": story})})[1]
+check("reporting the landed merge with done on the stopped step carries the run on to completion",
+      is_run(answer, "complete", 1), answer)
+run = Run()
+answer = run.until("merge")
+story = answer["payload"]["commit"]
+git(run.repo, "checkout", "-q", "main"); git(run.repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
+answer = run.done("MERGE: BLOCKED pushed, but deleting the remote story branch was refused\n")
+answer = run.resume()
+check("whereas resume after it landed reads the moved checkout as new work (why the loop reports it with done)",
+      answer is not None and answer.get("action") == "run" and answer["step"]["id"] in ("risk-check", "local-checks", "review"), answer)
+run = Run()
+run.until("merge")
+commit(run.repo, "late.txt", "late\n", "a commit after the merge was issued")
+answer = run.done()
+check("a merge stop for another commit tells the person to report a landing with done, never to resume",
+      stopped(answer, "proof", "merge") and "report it with done" in answer["reason"] and "never resume" in answer["reason"], answer)
+
+# --- a refused fast-merge push: the checkout put back on the story branch before BLOCKED -----
+run = Run()
+answer = run.until("merge")
+story = answer["payload"]["commit"]
+git(run.repo, "checkout", "-q", "main"); git(run.repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
+git(run.repo, "reset", "-q", "--hard", "HEAD~1"); git(run.repo, "checkout", "-q", "feature")  # as merge-paths restores it
+answer = run.done("MERGE: BLOCKED push refused: the remote rejected it\n")
+answer = run.resume()
+check("after a refused push, restored as merge-paths says, resume hands the merge the story commit again",
+      is_run(answer, "merge", 2) and answer["payload"]["commit"] == story, answer)
+
+# --- a train one-off moved off the train for excluded paths: the new run on the moved branch ---
+run = Run(context={"route": "train", "oneOff": True, "workingBase": "train", "reviewMoment": "release-deferred"})
+git(run.repo, "branch", "-q", "train", "main")
+answer = run.until("merge")
+answer = run.done("MERGE: BLOCKED excluded paths: migrations/0001.sql\n")
+check("(a merge blocked on excluded paths stops the run)", stopped(answer, "failed", "merge"), answer)
+git(run.repo, "rebase", "-q", "--onto", "main", "train")
+rc, answer, _, err = run.call("start", {"definitionFile": BUILD_FILE, "replace": True,
+                                        "context": dict(CONTEXT, cwd=run.repo, route="develop-pr", oneOff=True, workingBase="main", reviewMoment="pr-boundary")})
+check("start with replace on the moved branch opens a new run", rc == 0 and is_run(answer, "claim", 1), err)
+run.answer = answer
+run.until("branch")
+answer = run.done(canned("branch@1", run.repo, verdict="BRANCH: EXISTS feature", created=False))
+check("... whose branch step answers EXISTS on the built branch and hands on to the build", is_run(answer, "build", 1), answer)
+order = []
+while run.answer["action"] == "run" and run.answer["step"]["id"] != "merge":
+    order.append(run.answer["step"]["id"])
+    run.done(**({"path": "pull-request", "proof.path": "pull-request", "pullRequest": 9} if run.answer["step"]["id"] == "review" else {}))
+check("... then screens, checks and reviews the moved branch on the pull-request path before the merge",
+      order == ["build", "risk-check", "local-checks", "review"] and run.answer["payload"]["review"]["path"] == "pull-request"
+      and run.answer["payload"]["reviewProof"]["path"] == "pull-request", (order, run.answer))
+
+# --- the merge payload carries what the merge reads after a compaction ----------------------
+check("the merge is handed the review's proof and the local checks' receipt",
+      set(seen["merge"]["payload"]["reviewProof"]) >= {"head", "base", "path", "patchId"}
+      and seen["merge"]["payload"]["localChecks"]["receipt"] and seen["merge"]["payload"]["localChecks"]["commands"], seen["merge"]["payload"])
+check("the complete step is handed the profile's source", seen["complete"]["payload"]["profileSource"] == "config", seen["complete"]["payload"])
+
+# --- a report the tracker refused for want of the definition is sent again with it ----------
+run = Run()
+run.until("build")
+refused_call = [c for c in run.answer["reports"] if c.get("reports")][-1]
+rc, status, _, _ = run.call("status", {"item": "I123", "includeDefinition": True})
+definition = status["reports"][0]["definition"]
+check("(the status object alone carries no step reports: sending only it would lose the refused batch)",
+      status["reports"][0].get("reports") in (None, []), status["reports"][0])
+resent = dict(refused_call, definition=definition)
+rebuilt = REPORT.build_report_arguments(resent["runId"], resent["sessionId"], [dict(r, step=r["stepId"]) for r in resent["reports"]],
+                                        item_number=resent.get("itemNumber"), repository=resent.get("repository"),
+                                        definition=definition, run=resent.get("run"))
+check("the refused object with the definition added is a report the helper accepts unchanged, carrying the refused steps",
+      rebuilt == resent and resent["reports"] == refused_call["reports"], (rebuilt, resent))
+
 # --- what looks like a credential never reaches a report ----------------------------------
 token = "".join(FIX["credentials"]["caught"][3])  # stored in two parts: never one literal in the repository
 run = Run()
@@ -324,6 +457,6 @@ OUT="$(python3 -B "$WORK/cases.py" "$ROOT" "$WORK" 2>&1)"; RC=$?
 printf '%s\n' "$OUT" | sed 's/^/  /'
 N="$(printf '%s\n' "$OUT" | grep -c '^ok')"
 if [ $RC -ne 0 ] || printf '%s\n' "$OUT" | grep -q '^FAIL'; then bad "a case failed or the script did not finish (exit $RC)"
-elif [ "$N" -lt 48 ]; then bad "only $N cases ran, expected at least 48"
+elif [ "$N" -lt 70 ]; then bad "only $N cases ran, expected at least 70"
 else ok "(all $N cases passed)"; fi
 exit $FAIL

@@ -5,7 +5,10 @@ load: contract
 
 `merge-story`'s procedure. The payload's `commit` is the commit the runner found the local checks'
 tree and the review's patch to hold for when it issued this step; whatever merges is exactly that
-commit, and the proof's `head` names it.
+commit, and the proof's `head` names it. The payload also carries what this procedure reads after a
+compaction: `reviewProof` (the review's proof: the `head` it settled on, its `base`, its `path` and
+`pullRequest`) and `localChecks` (the local checks' result: the `commands` run and their `results`,
+and the `receipt` for this tree).
 
 ## Before any merge, on either path
 
@@ -16,7 +19,8 @@ commit, and the proof's `head` names it.
    merged with `headRefOid` = `commit` → `LANDED` with its merge commit. Another head merged →
    `BLOCKED`, naming it.
 2. **Release holds first**, before any merge onto the train or `baseBranch` (one-off or plan
-   story): a hold on the item or an ancestor
+   story; a story merging onto an epic's integration branch is not held: it accumulates there, and
+   the hold applies at the epic's release): a hold on the item or an ancestor
    (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/release-holds.md`) → no merge; the story
    branch waits, said: `MERGE: HELD <reason>`. The item stays in progress and the run ends held.
 3. **Never production.** A working base equal to `release.productionBranch` → `MERGE: BLOCKED`:
@@ -53,18 +57,29 @@ commit, and the proof's `head` names it.
   `mergeBody` (each dismissed finding from the risk check and the review, with its rationale, and
   the landing gate's lines) and the commands and counts of the verification receipt for this tree.
 - Push. **Only once that push SUCCEEDS** delete the story branch locally AND remotely. A refused
-  push → `MERGE: BLOCKED`, nothing deleted.
+  push → first put the checkout back as it was: `git reset --hard origin/<workingBase>` on the
+  working base (the local merge commit is dropped; nothing of the story is lost, it is on the story
+  branch), then `git checkout <branch>`; then `MERGE: BLOCKED push refused: <first line>`, nothing
+  deleted. Never leave HEAD on the local merge commit: the runner would read it as a new commit.
 
 ## Pull-request merge (review path `pull-request`)
 
 - **The rebase already happened** in `review` step 7; rebase again only if the base moved, via
   `/devstride:push` (conflict → `BLOCKED`, a fork for a person). A rebase makes a new head: answer
   `MERGE: REFRESHED`. Compare patches: the runner does, on the review's proof — a changed patch
-  sends the story back through the review with its ledger; a tree-identical head keeps its receipt.
-- **Carry the proof** when `commit` is not the `head` of the review's proof (a rebase whose patch held):
-  `python3 ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post <new head> --from
-  <reviewed head> --pr <n> --base <ledger's Base branch>`. Then RECOMPUTE
-  `verify.skipDuringStoryBuilds` applicability from the new SHA.
+  sends the story back through the review with its ledger; an identical patch keeps the review, and
+  the local checks rerun on the new tree.
+- **The durable proof follows the head.** `commit` is not `reviewProof.head` (a rebase whose
+  patch held) → compare their trees (`git rev-parse <commit>^{tree} <reviewProof.head>^{tree}`):
+  - **the same tree** → carry the proof: `python3
+    ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post <commit> --from
+    <reviewProof.head> --pr <n> --base <reviewProof.base>`;
+  - **another tree** (the base moved under an unchanged patch) → `--from` refuses unequal trees, so
+    nothing is carried: invoke `review` on the pull request for its settle of this head (its step 7
+    on `commit`: CI at this head and, on READY, the proof posted on it, `review-ledger.md`). The
+    patch is unchanged, so it raises nothing new. A settle that changed the head → `REFRESHED`.
+  `NOT POSTED` on either is the degradation `review-ledger.md` names (said; the merge goes on).
+  Then RECOMPUTE `verify.skipDuringStoryBuilds` applicability from the new SHA.
 - **Observe greenness**: non-draft, every applicable check succeeded — actually RAN — at the
   CURRENT head SHA. Re-poll only after a re-push, with `review` step 7's background poll; never
   `gh pr checks --watch`.
@@ -81,6 +96,15 @@ commit, and the proof's `head` names it.
   (integration-branch or train base: add `--subject "Merge pull request #<n> from <owner>/<head branch>"`); `REFUSE` or `ERROR`
   → `BLOCKED` with its reason — **never `--delete-branch` on a head matching `protectedBranches`**
   (anchored: `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`).
+
+## Landed means landed
+
+Once the fast merge's push or the pull request's merge has SUCCEEDED, the answer is `MERGE: LANDED
+<target>`, whatever fails after it: a refused remote branch delete, a local clean-up, a link that
+could not be read. Name what was left undone in the verdict's evidence (`left: the remote story
+branch`), for a person to finish; never `BLOCKED`. A `BLOCKED` after the change landed would stop a
+run whose merge cannot be asked again: the checks and the review would be issued for a checkout
+that has moved on. Only a merge that did not land answers `BLOCKED`.
 
 ## Cited by
 

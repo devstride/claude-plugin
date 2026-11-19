@@ -59,4 +59,5 @@ STOPS and asks, and never retries with another name.
 
 - `skills/lease-checkout/SKILL.md`, `skills/return-checkout/SKILL.md` — the two steps.
 - `skills/build-item/SKILL.md` — the checkout-pool floor, step 0 and step 7.
+- `skills/build-item/references/run-stops.md` — a stop that waits for this session keeps the lease.
 - `skills/build-item/references/ground-truth-at-start.md` — the lease protocol's hand-off.

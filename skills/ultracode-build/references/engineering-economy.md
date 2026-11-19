@@ -61,3 +61,11 @@ distilled prompt on stdin from a file (`< prompt`, never an inherited stdin, whi
 question to answer, and required structured output. The command is advisory and read-only: it never
 writes files, invokes DevStride MCP, decides scope, or substitutes for the merge gate. Verify useful
 claims against the repository before acting on them and carry the disposition in the shared ledger.
+
+## Cited by
+
+- `skills/ultracode-build/SKILL.md` — before choosing an approach or launching agents.
+- `skills/risk-check/SKILL.md` — before choosing a verifier's model or effort.
+- `skills/ultracode-build/references/review-fanout.md` — the merge-boundary fan-out.
+- `skills/plan/SKILL.md`, `skills/plan/references/session-models.md` — task-sized models.
+- `skills/review/references/delivery-loop-invariants.md` — the invariant list.

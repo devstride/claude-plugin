@@ -37,8 +37,10 @@ No name → ask for one, standalone only.
   from `git config user.name`, lowercased ("Jane Doe" → `jane/03-14-26/new-feature`); empty or
   ambiguous → `REFUSED`, asking for the prefix.
 - **Safe to re-run.** A branch of that name already on origin or local, any date
-  (`<user-prefix>/*/<branch-name>`: a resumed story) → check it out, `git pull --ff-only`, and answer
-  `EXISTS`; never cut a second one.
+  (`<user-prefix>/*/<branch-name>`: a resumed story, or one moved to another base) → check it out,
+  `git pull --ff-only`, and answer `EXISTS`; never cut a second one. A pull that cannot
+  fast-forward (a local branch rewritten and never pushed) → `REFUSED`, naming both heads; never
+  merge or reset to get past it.
 - **Never delete the previous branch automatically** — keep it until its PR merges. Only on an
   explicit request: `git branch -d <previous>` (`-D` only once confirmed), and never a branch
   matching `protectedBranches` (anchored, per
