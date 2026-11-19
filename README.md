@@ -555,13 +555,13 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 
 | Skill | What it does |
 |---|---|
-| `build-item` | The orchestrator: select → branch → build → review → merge → completion ritual → repeat |
-| `run-workflow` | Runs a workflow one step at a time with the step runner. Nothing calls it yet, and it refuses the shipped Build workflow: see [The step runner](#the-step-runner) |
-| `ultracode-build` | The build engine for one scoped item: fast feedback, exact-tree verification receipt, bounded risk screen, and focused critical-boundary verification when needed |
+| `build-item` | The orchestrator: select a story, run the Build workflow's steps through the step runner (claim → start → branch → build → risk check → local checks → review → merge → complete → capture findings → sync), then the next story |
+| `run-workflow` | Runs a workflow one step at a time with the step runner; `build-item` runs the Build workflow this way: see [The step runner](#the-step-runner) |
+| `ultracode-build` | The build engine for one scoped item: understand it, build it with fast feedback, and hand back the evidence; the risk check and the local gate follow as steps of their own |
 | `review` | Runs every configured reviewer, settles findings, then releases CI — re-reviewing from the latest common cycle anchor and continuing P1/serious-P2 fixes until clear |
 | `pr` | Opens a pull request and runs the review-and-settle loop |
 | `push` | Stages, commits, type-checks, and pushes following the repo's commit conventions |
-| `branch-feature` / `branch-hotfix` | Cuts a working branch from the development or production branch |
+| `branch-feature` / `branch-hotfix` | Cuts a working branch from the working base (`base: <branch>`) or from the production branch |
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end; `create-story deferred <item>` / `create-defect deferred <item>` instead parks a follow-up or a bug in the plan's deferred container |
 | `release` | Promotes the release branch to production with a full gated review; with `release.clearance` set, claims one-release-at-a-time clearance first and hands it back last; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
 | `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it — including that the configured local review engine actually runs read-only; `setup agents` sets up the Active Agents board, tag and view after a typed yes |
@@ -588,6 +588,22 @@ take the stricter path when their hook is missing or cannot answer. Shared rule:
 | `classify-release` | Asks `release.classifySkill` whether a release is light or full; anything but a clear answer is FULL |
 | `pre-merge-check` | Asks `release.preMergeSkill` whether production needs anything before the merge: clear, hold, not run or not configured |
 
+**Build steps (one step of the Build loop each)** — the steps `workflows/build.json` lists, each
+answering with the verdict line and result block its contract in `schemas/step-contracts.json`
+names. `build-item` runs them in order through the step runner; run one by name to re-run a step
+after a fix.
+
+| Skill | What it does |
+|---|---|
+| `claim-story` | Claims the story so no other agent builds it; a story someone else holds ends the run, naming them |
+| `story-lifecycle` | Starts the story (moves it to In Progress) and completes it when it lands: status, dates, the link to its code, the as-built note, the claim released |
+| `risk-check` | The bounded risk check of the built change, with focused verifiers where it touches a critical boundary |
+| `local-checks` | The profile's complete local gate, once, on the final tree, with its receipt |
+| `review-story` | The fast local review or the full pull-request review, whichever the route needs |
+| `merge-story` | Lands exactly the commit that was checked and reviewed onto the working base, never production |
+| `capture-findings` | Files deferred findings as tracked items and splices discovered scope into the plan |
+| `sync-base` | Returns the checkout to the working base and proves the tree clean |
+
 ### The step runner
 
 `skills/run-workflow/scripts/workflow.py` walks a workflow definition one step at a time, and
@@ -609,13 +625,14 @@ reported as landed must name it. A step already handed out is handed back unchan
 again, because it may already have acted. The catalog holds twelve contracts: the eleven Build
 steps and one for a repository's own step.
 
-**Nothing calls it yet.** `build-item` runs exactly as before. `/devstride:run-workflow build` is
-refused before anything is written: the shipped `workflows/build.json` still uses its draft
-contract names (`unknown-contract`). Its step skills arrive in a later release, and a workflow
-that names a step skill this plugin does not have is refused too (`skill-missing`). Until then the
-runner is there to read and to try. Its rules are in
-`skills/run-workflow/references/workflow-runner.md`, and `workflow-fixtures.json` beside the script
-holds its canonical cases.
+**The Build loop runs through it.** `build-item` starts a run of the shipped
+`workflows/build.json` for each story and does what the runner says, so a loop stopped by a
+question, a red check or a cleared conversation resumes at the step it stopped on, and the merge
+is never handed out without the risk check, the local checks and the review before it.
+`/devstride:run-workflow build` runs the same list by hand, given the context `build-item` would
+otherwise resolve. A workflow that names a step skill this plugin does not have is refused
+(`skill-missing`). Its rules are in `skills/run-workflow/references/workflow-runner.md`, and
+`workflow-fixtures.json` beside the script holds its canonical cases.
 
 ### Agents that do not run these skills
 

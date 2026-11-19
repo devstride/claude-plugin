@@ -8,6 +8,52 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **The Build loop now runs from a step list, and each step is a skill of its own.** `build-item`
+  hands every story to the step runner with `workflows/build.json` (now version 2, eleven steps,
+  needing this release), and the runner says which step comes next, checks each step's answer and
+  proof, and remembers where the run is. A loop stopped by a question, a red check or a cleared
+  conversation now resumes at the exact step it stopped on, and a required step (the risk check,
+  the local checks, the review) can no longer be skipped by a loop that forgot it, because the
+  runner will not hand out the merge without them.
+  - Eight new step skills, each with one verdict line from `schemas/step-contracts.json` and one
+    result block: `claim-story` (claim the story), `story-lifecycle` (start a story and complete
+    it: two steps the Build workflow alone runs, sharing one skill), `risk-check` (the bounded
+    risk check and its focused verifiers), `local-checks` (the complete local gate, once, on the
+    final tree), `review-story` (the fast local review or the full pull-request review),
+    `merge-story` (land onto the working base, never production), `capture-findings` (file
+    deferred findings and splice in discovered scope) and `sync-base` (back to the working base,
+    tree clean). Each can be run by itself after a fix.
+  - Five new references hold the moved procedures in full: `risk-check/references/story-risk-check.md`,
+    `review-story/references/review-routes.md`, `merge-story/references/merge-paths.md`,
+    `story-lifecycle/references/start.md` and `story-lifecycle/references/complete.md`.
+  - New tests: `build-workflow-coverage.sh` (every rule that left `build-item` or
+    `ultracode-build` at 4.2.0 lives in exactly one new home), `build-workflow-run.sh` (the real
+    step list driven end to end with canned answers, no model) and `build-citations.sh` (nothing
+    cites a removed step number).
+
+### Changed
+
+- **`build-item` is now the loop around the step runner.** It still selects the story, resolves
+  the profile, the working base and the route, and runs the epic release and the completion
+  report; the steps between (claim, start, branch, build, risk check, local checks, review, merge,
+  complete, capture, sync) are the runner's, in its new `## The run` section. The old numbered
+  steps 1 to 6.5 are gone, with no alias: every citation of them now names the step skill.
+- **`ultracode-build` only understands, builds and hands back.** Its risk check moved to
+  `risk-check` and its complete local gate to `local-checks`, which the Build workflow runs right
+  after it. It answers with `BUILD: READY | NEEDS DECISION <question> | BLOCKED [<reason>]` and a
+  result block, and takes a person's reply as `answer:`. Run by itself, finish with
+  `/devstride:risk-check` and `/devstride:local-checks`.
+- **`branch-feature` takes the working base** (`base: <branch>`), answers with a `BRANCH:`
+  verdict, refuses a dirty tree and reports an existing branch instead of failing, so the loop can
+  run it again safely.
+- **`run-workflow` runs the shipped Build workflow.** Use `/devstride:build-item` for the Build
+  loop itself: it supplies the context the runner needs.
+- **Every session's always-loaded skill listing grows by eight description lines** (1,824 to
+  2,093 tokens, measured): each step another workflow reuses or a person re-runs alone is its own skill, and the
+  two Build-only steps share one to keep the raise down.
+
 ## [4.2.0] — 2026-11-18
 
 ### Added
