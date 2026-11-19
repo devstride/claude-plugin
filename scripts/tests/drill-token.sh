@@ -5,7 +5,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; SC="$ROOT/skills/setup/scripts/drill-token.py"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-SECRET="sk-ant-test-drill-$$-secret"
+SECRET="sk-ant-oat01-test-drill-$$-secret"
 mkdir -p "$TMP/bin" "$TMP/repo/.claude"
 cat > "$TMP/bin/claude" <<'FAKE'
 #!/bin/bash
@@ -18,7 +18,7 @@ case "$1" in
       && [ "$(pwd -P)" = "$(cd "$CLAUDE_CONFIG_DIR" && pwd -P)" ] && echo "config-dir: fresh, and the working directory" >> "$FAKE_LOG"
     echo "stdin bytes: $(head -c 100 | wc -c | tr -d ' ')" >> "$FAKE_LOG"
     if [ "${CLAUDE_CODE_OAUTH_TOKEN:-}" = "$FAKE_GOOD" ]; then echo '{"is_error": false, "result": "ok"}'
-    elif [ "${CLAUDE_CODE_OAUTH_TOKEN:-}" = "sk-ant-busy" ]; then echo '{"is_error": true, "terminal_reason": "api_error", "api_error_status": 429}'; exit 1
+    elif [ "${CLAUDE_CODE_OAUTH_TOKEN:-}" = "sk-ant-oat01-busy" ]; then echo '{"is_error": true, "terminal_reason": "api_error", "api_error_status": 429}'; exit 1
     else echo '{"is_error": true, "terminal_reason": "sk-leak-me", "api_error_status": 401}'; exit 1; fi ;;
   setup-token) echo "Your token: (fake, printed here only)" ;;
 esac
@@ -64,13 +64,13 @@ if grep -qx 'stdin bytes: 0' "$FAKE_LOG"; then ok "(5d) the caller's input never
 if ! printf '%s' "$OUT" | grep -q "$SECRET"; then ok "(5c) the token never appears in the output"; else bad "(5c) token printed"; fi
 
 # (6) a token the server refuses → NOT READY, make a new one; nothing the server said is echoed
-printf 'sk-ant-other\n' > "$TOK"; chmod 600 "$TOK"
+printf 'sk-ant-oat01-other\n' > "$TOK"; chmod 600 "$TOK"
 OUT="$(run check --file "$TOK")"; RC=$?
 if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'refused (HTTP 401); make a new one' && ! printf '%s' "$OUT" | grep -q 'sk-leak-me' \
    && printf '%s' "$OUT" | tail -1 | grep -qx 'Fix: /devstride:setup drills'; then ok "(6) refused token → NOT READY, make a new one"; else bad "(6) rc=$RC $OUT"; fi
 
 # (6b) a service failure is not a refusal: check again later, never make a new one
-printf 'sk-ant-busy\n' > "$TOK"
+printf 'sk-ant-oat01-busy\n' > "$TOK"
 OUT="$(run check --file "$TOK")"; RC=$?
 if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'HTTP 429); the token was not refused' \
    && printf '%s' "$OUT" | tail -1 | grep -qx 'Fix: run the check again later'; then ok "(6b) HTTP 429 → check again later"; else bad "(6b) rc=$RC $OUT"; fi
@@ -78,7 +78,8 @@ if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'HTTP 429); the token was not r
 # (6c) another credential ahead of the token (a machine-managed key) → NOT READY, never a false READY
 printf '%s\n' "$SECRET" > "$TOK"
 OUT="$(FAKE_AUTH_METHOD=api_key run check --file "$TOK")"; RC=$?
-if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'another credential ahead of the token'; then ok "(6c) another credential in use → NOT READY"; else bad "(6c) rc=$RC $OUT"; fi
+if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'another credential ahead of the token' \
+   && printf '%s' "$OUT" | tail -1 | grep -q "^Fix: remove this machine's other Claude credential"; then ok "(6c) another credential in use → NOT READY"; else bad "(6c) rc=$RC $OUT"; fi
 
 # (6d) two lines in the file → NOT READY before anything is tried
 printf '%s\nsecond\n' "$SECRET" > "$TOK"; : > "$FAKE_LOG"
@@ -142,7 +143,7 @@ if printf '%s' "$OUT" | grep -q 'EXIT=0' && printf '%s' "$OUT" | grep -q '^DRILL
 if ! printf '%s' "$OUT" | grep -q "$SECRET"; then ok "(9b) the pasted token is never echoed"; else bad "(9b) token echoed"; fi
 
 # (10) a mistyped paste during renewal is refused before anything is saved; the old token stays
-OUT="$(python3 "$TMP/drive.py" "$SC" "$NEW" "sk-ant-typo")"
+OUT="$(python3 "$TMP/drive.py" "$SC" "$NEW" "sk-ant-oat01-typo")"
 if printf '%s' "$OUT" | grep -q 'not saved' && printf '%s' "$OUT" | grep -q 'EXIT=1' && [ "$(cat "$NEW")" = "$SECRET" ]; then
   ok "(10) a refused paste keeps the token already saved"; else bad "(10) $OUT"; fi
 
@@ -151,5 +152,23 @@ printf 'ssh-private-key-material\n' > "$NEW"; chmod 600 "$NEW"
 OUT="$(python3 "$TMP/drive.py" "$SC" "$NEW" "$SECRET")"
 if printf '%s' "$OUT" | grep -q 'not a Claude Code token' && [ "$(cat "$NEW")" = "ssh-private-key-material" ]; then
   ok "(11) make refuses to overwrite another file"; else bad "(11) $OUT"; fi
+
+# (12) an empty file (the state check sends to make) is replaced, never a dead end
+: > "$NEW"; chmod 600 "$NEW"
+OUT="$(python3 "$TMP/drive.py" "$SC" "$NEW" "$SECRET")"
+if printf '%s' "$OUT" | grep -q 'EXIT=0' && [ "$(cat "$NEW")" = "$SECRET" ]; then ok "(12) make replaces an empty file"; else bad "(12) $OUT"; fi
+
+# (13) an API key in the file is never sent, and make never overwrites it
+printf 'sk-ant-api03-not-a-drill-token\n' > "$NEW"; chmod 600 "$NEW"; : > "$FAKE_LOG"
+OUT="$(run check --file "$NEW")"; RC=$?
+OUT2="$(python3 "$TMP/drive.py" "$SC" "$NEW" "$SECRET")"
+if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'nothing was sent' && ! grep -q '^-p' "$FAKE_LOG" \
+   && printf '%s' "$OUT2" | grep -q 'not a Claude Code token' && [ "$(cat "$NEW")" = "sk-ant-api03-not-a-drill-token" ]; then
+  ok "(13) an API key is never sent or overwritten"; else bad "(13) rc=$RC $OUT $OUT2"; fi
+
+# (14) make refuses a path that is not a file, rather than waiting on it
+mkfifo "$TMP/person/pipe"
+OUT="$(python3 "$TMP/drive.py" "$SC" "$TMP/person/pipe" "$SECRET")"
+if printf '%s' "$OUT" | grep -q 'not a Claude Code token' && [ -p "$TMP/person/pipe" ]; then ok "(14) make refuses a FIFO without hanging"; else bad "(14) $OUT"; fi
 
 exit $FAIL

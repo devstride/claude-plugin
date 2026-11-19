@@ -15,6 +15,7 @@ person's Claude Code, and signs each in with a long-lived token the person makes
   DRILL TOKEN: NOT READY — <reason>
   Fix: /devstride:setup drills        (make the token)
   Fix: run the check again later      (the service failed; the token was not refused)
+  Fix: remove this machine's other Claude credential …  (an API key or key helper wins over the token)
 Exit 0 for READY and N/A, 1 for NOT READY, 2 for a usage or config error.
 The token file must be an absolute or ~ path outside the repository, so it can never be committed.
 The sign-in proof is one real, tiny request: `claude -p` on Haiku, with no tools, no settings, no
@@ -44,7 +45,8 @@ import tempfile
 
 FIX = "Fix: /devstride:setup drills"
 AGAIN = "Fix: run the check again later"
-PREFIX = "sk-ant-"
+PREFIX = "sk-ant-oat"  # what claude setup-token makes; an API key (sk-ant-api…) is never sent or overwritten
+OTHER = "Fix: remove this machine's other Claude credential (an API key or key helper), then run the check again"
 PROOF = ["claude", "-p", "Reply with the word ok.", "--model", "haiku", "--tools", "", "--setting-sources", "user",
          "--strict-mcp-config", "--no-session-persistence", "--system-prompt", "Reply briefly.",
          "--output-format", "json"]
@@ -139,7 +141,7 @@ def prove(token):
             if status is None:
                 return "claude auth status gave no readable answer", AGAIN
             if status.get("authMethod") != "oauth_token":
-                return "this machine supplies another credential ahead of the token, so it cannot be tried", FIX
+                return "this machine supplies another credential ahead of the token, so it cannot be tried", OTHER
             code, answer = run_claude(PROOF, token, folder)
         except subprocess.TimeoutExpired:
             return "the sign-in request did not answer within 120 seconds", AGAIN
@@ -178,7 +180,7 @@ def check(path):
     if not token:
         return not_ready("%s is empty" % path)
     if not usable(token):
-        return not_ready("%s does not hold one Claude Code token alone (sk-ant-…); nothing was sent" % path)
+        return not_ready("%s does not hold one Claude Code token alone (sk-ant-oat…); nothing was sent" % path)
     failed = prove(token)
     if failed:
         return not_ready(*failed)
@@ -192,10 +194,13 @@ def usable(token):
 
 
 def holds_other(path):
-    """True when the file exists and holds something that is not a Claude Code token."""
+    """True when the path exists and is anything but an empty file or a Claude Code token file."""
     try:
+        if not stat.S_ISREG(os.stat(path).st_mode):
+            return True
         with open(path, encoding="utf-8") as f:
-            return not usable(f.read().strip())
+            content = f.read().strip()
+        return bool(content) and not usable(content)
     except FileNotFoundError:
         return False
     except (OSError, ValueError):
@@ -252,7 +257,7 @@ def make(path):
     print("Step 2 of 2: paste the token it printed (it is not shown as you paste).")
     token = getpass.getpass("Token: ").strip()
     if not token or not usable(token):
-        print("drill-token: that was not one Claude Code token (sk-ant-…); nothing was saved.", file=sys.stderr)
+        print("drill-token: that was not one Claude Code token (sk-ant-oat…); nothing was saved.", file=sys.stderr)
         return 1
     failed = prove(token)
     if failed:

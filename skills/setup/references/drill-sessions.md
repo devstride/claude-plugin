@@ -30,16 +30,18 @@ their own terminal, does — it is outside setup's write boundary.
 
 - `DRILL TOKEN: N/A (drillSessions not set)` — nothing to do.
 - `DRILL TOKEN: READY (<file>, signed in in a separate Claude Code folder)` — the file exists, is
-  owner-only and holds one Claude Code token alone (`sk-ant-…`; anything else is never sent, and
+  owner-only and holds one Claude Code token alone (`sk-ant-oat…`; anything else is never sent, and
   `make` never overwrites it), and one tiny real request (Haiku, no tools, no settings, a one-line
   prompt, no saved session) succeeded in a fresh, empty folder that is removed afterwards, so it
   appears in no one's Claude Code. `claude auth status` is not a proof: it reports any token as
   signed in without asking the server.
-- `DRILL TOKEN: NOT READY — <reason>`, then one of two fix lines:
+- `DRILL TOKEN: NOT READY — <reason>`, then one of three fix lines:
   `Fix: /devstride:setup drills` — the file is missing, unsafe or malformed, or the server refused
   the token (HTTP 401 or 403): the person makes one, below.
   `Fix: run the check again later` — the request failed for another reason (a rate limit, an
   outage, a timeout): the token was not refused, so nobody makes a new one; report it and move on.
+  `Fix: remove this machine's other Claude credential …` — an API key or key helper wins over the
+  token: a new token would not help; report it to the person.
 
 It never prints the token, never puts it on a command line and never writes the file.
 
