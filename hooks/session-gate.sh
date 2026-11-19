@@ -2,7 +2,7 @@
 # hooks/session-gate.sh — one job class per session. A UserPromptSubmit hook.
 #
 # Why: every turn re-sends the whole conversation, so a session's cost is turns × context. An
-# AUTHORING job (setup, plan, …) and an EXECUTION job (build-item, pr, review, …) each
+# AUTHORING job (setup, plan, …) and an EXECUTION job (build-item, run-workflow, pr, review, …) each
 # carry their own context; run in one session, everything after the switch pays for both. The
 # rule is NOT one skill per session — build-item walking story after story is one job and is
 # never blocked — it is that the two classes do not share a session.
@@ -36,7 +36,7 @@ import json, os, re, subprocess, sys, time
 
 AUTHORING = {"setup", "plan", "ci-audit", "rebalance", "rationalize-gantt", "comprehend-plan"}
 EXECUTION = {"build-item", "pr", "review", "release", "push", "create-story", "create-defect",
-             "insert-story", "insert-defect"}
+             "insert-story", "insert-defect", "run-workflow"}
 TTL = 7 * 24 * 3600
 
 def main():

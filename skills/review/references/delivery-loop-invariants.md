@@ -570,11 +570,11 @@ R6. Direct `/devstride:update` is separate user authority for the exact loaded u
     DevStride load error and restart on failure. Never continue a loop with mid-session behavior.
 R7. One job class per session (`hooks/session-gate.sh`, UserPromptSubmit). Every turn re-sends the
     whole conversation, so an authoring job (setup, plan, doctor, ci-audit, rebalance,
-    rationalize-gantt, comprehend-plan) and an execution job (build-item, pr, review, release, push,
-    create-story, create-defect, insert-story, insert-defect) never share a session; the gate blocks
-    the mixing command with a plain-language reason and `/clear` as the cure. It is NOT one skill
-    per session — build-item's story-after-story loop is one job. Nested invocations never pass
-    through a user prompt, so driven mode needs no exemption.
+    rationalize-gantt, comprehend-plan) and an execution job (build-item, run-workflow, pr, review,
+    release, push, create-story, create-defect, insert-story, insert-defect) never share a session;
+    the gate blocks the mixing command with a plain-language reason and `/clear` as the cure. It is
+    NOT one skill per session — build-item's story-after-story loop is one job. Nested invocations
+    never pass through a user prompt, so driven mode needs no exemption.
 R8. The gate fails open: no session id, no git, an unwritable `.git`, malformed JSON → exit 0
     silently. Escape hatches: `--same-session`, `session.jobClassGate: false`,
     `DEVSTRIDE_SESSION_GATE=0`. Markers live under `<git-common-dir>/devstride/session/` and are

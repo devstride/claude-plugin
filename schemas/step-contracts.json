@@ -1,0 +1,458 @@
+{
+  "schema": 1,
+  "contracts": {
+    "claim@1": {
+      "summary": "Claim the item so no other session builds it at the same time.",
+      "builtinSkill": "claim-story",
+      "payload": {
+        "item": "context.item",
+        "mode": "context.mode"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "CLAIM",
+        "values": [
+          { "value": "WON", "detail": "none", "class": "continue" },
+          { "value": "RENEWED", "detail": "none", "class": "continue" },
+          { "value": "TOOK OVER", "detail": "none", "class": "continue" },
+          { "value": "HELD", "detail": "required", "class": "end:held", "detailName": "holder" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "DEGRADED", "detail": "optional", "class": "skipped", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string",
+          "heldBy": "string",
+          "since": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "start@1": {
+      "summary": "Move the item to its in-progress status.",
+      "builtinSkill": "story-lifecycle",
+      "payload": {
+        "item": "context.item",
+        "workingBase": "context.workingBase",
+        "oneOff": "context.oneOff"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "START",
+        "values": [
+          { "value": "MOVED", "detail": "optional", "class": "continue", "detailName": "status" },
+          { "value": "UNCHANGED", "detail": "none", "class": "continue" },
+          { "value": "FAILED", "detail": "optional", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["statusBefore", "statusAfter", "boardPlaced"],
+        "types": {
+          "statusBefore": "string",
+          "statusAfter": "string",
+          "boardPlaced": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Mark In Progress",
+      "shipIntentStage": null
+    },
+    "branch@1": {
+      "summary": "Create the item's branch from its working base.",
+      "builtinSkill": "branch-feature",
+      "payload": {
+        "branchSlug": "context.branchSlug",
+        "workingBase": "context.workingBase"
+      },
+      "argument": "{branchSlug} base: {workingBase}",
+      "verdict": {
+        "label": "BRANCH",
+        "values": [
+          { "value": "CREATED", "detail": "optional", "class": "continue", "detailName": "branch" },
+          { "value": "EXISTS", "detail": "optional", "class": "continue", "detailName": "branch" },
+          { "value": "REFUSED", "detail": "optional", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["branch", "base", "created"],
+        "types": {
+          "branch": "string",
+          "base": "string",
+          "created": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Branch",
+      "shipIntentStage": null
+    },
+    "build@1": {
+      "summary": "Build the item on its branch and hand back what was deferred, changed or dismissed.",
+      "builtinSkill": "ultracode-build",
+      "payload": {
+        "item": "context.item",
+        "goal": "context.goal",
+        "profile": "context.profile.name",
+        "reviewMoment": "context.reviewMoment",
+        "workingBase": "context.workingBase",
+        "answer": "step.answer?"
+      },
+      "argument": "{item} {goal} profile: {profile} review-moment: {reviewMoment}",
+      "verdict": {
+        "label": "BUILD",
+        "values": [
+          { "value": "READY", "detail": "none", "class": "continue" },
+          { "value": "NEEDS DECISION", "detail": "required", "class": "ask", "detailName": "question" },
+          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["deferrals", "deviations", "untrackedDeferrals", "dismissed", "scopeLine", "head"],
+        "types": {
+          "deferrals": "array",
+          "deviations": "array",
+          "untrackedDeferrals": "array",
+          "dismissed": "array",
+          "scopeLine": "string",
+          "head": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["branch@1"],
+      "claimPhase": "Build",
+      "shipIntentStage": "building"
+    },
+    "risk-check@1": {
+      "summary": "Check the finished build for the risks its changes carry, and fix or raise what it finds.",
+      "builtinSkill": "risk-check",
+      "payload": {
+        "item": "context.item",
+        "profile": "context.profile.name",
+        "reviewMoment": "context.reviewMoment",
+        "workingBase": "context.workingBase",
+        "build": "result:build@1",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RISK CHECK",
+        "values": [
+          { "value": "CLEAR", "detail": "none", "class": "continue" },
+          { "value": "FIXED", "detail": "optional", "class": "continue", "detailName": "count" },
+          { "value": "NEEDS DECISION", "detail": "required", "class": "ask", "detailName": "question" },
+          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["ledger", "report", "counts", "untrackedDeferrals", "dismissed"],
+        "types": {
+          "ledger": "string",
+          "report": "string",
+          "counts": "object",
+          "untrackedDeferrals": "array",
+          "dismissed": "array"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": ["base", "head", "triggers", "verifiers", "lenses"],
+        "types": {
+          "base": "string",
+          "head": "string",
+          "triggers": "array",
+          "verifiers": "count",
+          "lenses": "array"
+        }
+      },
+      "requires": ["build@1"],
+      "claimPhase": "STORY RISK CHECK",
+      "shipIntentStage": null
+    },
+    "local-checks@1": {
+      "summary": "Run the repository's local checks on the final tree and leave a receipt.",
+      "builtinSkill": "local-checks",
+      "payload": {
+        "item": "context.item",
+        "profile": "context.profile.name",
+        "workingBase": "context.workingBase",
+        "route": "context.route",
+        "oneOff": "context.oneOff",
+        "branch": "result:branch@1.branch",
+        "previousProof": "step.proof?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "LOCAL CHECKS",
+        "values": [
+          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "count", "proof": { "kind": "receipt" } },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "continue", "proof": { "kind": "none-configured" } },
+          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "checks" }
+        ]
+      },
+      "result": {
+        "required": ["commands", "results", "receipt", "tree", "head", "skippedSuites"],
+        "types": {
+          "commands": "array",
+          "results": "array",
+          "receipt": "string|null",
+          "tree": "string",
+          "head": "string",
+          "skippedSuites": "array"
+        }
+      },
+      "proof": {
+        "binding": "tree",
+        "required": ["kind", "tree", "head", "receipt"],
+        "types": {
+          "kind": "string",
+          "tree": "string",
+          "head": "string",
+          "receipt": "string|null"
+        },
+        "values": {
+          "kind": ["receipt", "none-configured"]
+        }
+      },
+      "requires": ["risk-check@1"],
+      "claimPhase": "Verify",
+      "shipIntentStage": "verifying"
+    },
+    "review@1": {
+      "summary": "Review the change with the configured reviewers and settle every finding.",
+      "builtinSkill": "review-story",
+      "payload": {
+        "item": "context.item",
+        "profile": "context.profile.name",
+        "reviewMoment": "context.reviewMoment",
+        "workingBase": "context.workingBase",
+        "route": "context.route",
+        "riskCheck": "result:risk-check@1",
+        "build": "result:build@1",
+        "localChecks": "result:local-checks@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "REVIEW",
+        "values": [
+          { "value": "SETTLED", "detail": "none", "class": "continue" },
+          { "value": "COVERED", "detail": "optional", "class": "continue", "detailName": "reason" },
+          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["path", "cycles", "untrackedDeferrals", "dismissed", "pullRequest", "mergeBody"],
+        "types": {
+          "path": "string",
+          "cycles": "count",
+          "untrackedDeferrals": "array",
+          "dismissed": "array",
+          "pullRequest": "number|null",
+          "mergeBody": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "patch",
+        "required": ["path", "head", "base", "patchId"],
+        "types": {
+          "path": "string",
+          "head": "string",
+          "base": "string",
+          "patchId": "string",
+          "pullRequest": "count|null"
+        },
+        "values": {
+          "path": ["fast-local", "pull-request"]
+        }
+      },
+      "requires": ["risk-check@1", "local-checks@1"],
+      "claimPhase": "Review",
+      "shipIntentStage": "reviewing"
+    },
+    "merge@1": {
+      "summary": "Land the reviewed change on its target.",
+      "builtinSkill": "merge-story",
+      "payload": {
+        "item": "context.item",
+        "profile": "context.profile.name",
+        "workingBase": "context.workingBase",
+        "route": "context.route",
+        "branch": "result:branch@1.branch",
+        "review": "result:review@1",
+        "build": "result:build@1",
+        "riskCheck": "result:risk-check@1",
+        "commit": "step.head?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "MERGE",
+        "values": [
+          { "value": "LANDED", "detail": "optional", "class": "continue", "detailName": "target" },
+          { "value": "REFRESHED", "detail": "none", "class": "redo:self" },
+          { "value": "HELD", "detail": "optional", "class": "end:held", "detailName": "reason" },
+          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["target", "sha", "pullRequest", "deletedBranch"],
+        "types": {
+          "target": "string",
+          "sha": "string",
+          "pullRequest": "number|null",
+          "deletedBranch": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": ["head"],
+        "types": {
+          "head": "string"
+        }
+      },
+      "requires": ["review@1", "local-checks@1", "risk-check@1"],
+      "claimPhase": "Merge",
+      "shipIntentStage": "landing"
+    },
+    "complete@1": {
+      "summary": "Record the landed work on the item: its status, dates, links and claims.",
+      "builtinSkill": "story-lifecycle",
+      "payload": {
+        "item": "context.item",
+        "profile": "context.profile.name",
+        "workingBase": "context.workingBase",
+        "oneOff": "context.oneOff",
+        "releaseUnit": "context.releaseUnit",
+        "route": "context.route",
+        "merge": "result:merge@1",
+        "build": "result:build@1",
+        "riskCheck": "result:risk-check@1",
+        "review": "result:review@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "COMPLETE",
+        "values": [
+          { "value": "DONE", "detail": "none", "class": "continue" },
+          { "value": "LANDED", "detail": "none", "class": "continue" },
+          { "value": "FAILED", "detail": "optional", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["status", "statusName", "startDate", "dueDate", "pullRequest", "asBuilt", "claimReleased", "shipIntentReleased"],
+        "types": {
+          "status": "string",
+          "statusName": "string|null",
+          "startDate": "string|null",
+          "dueDate": "string|null",
+          "pullRequest": "number|null",
+          "asBuilt": "string",
+          "claimReleased": "boolean",
+          "shipIntentReleased": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["merge@1"],
+      "claimPhase": "Completion ritual",
+      "shipIntentStage": null
+    },
+    "capture@1": {
+      "summary": "File the follow-up work the build, the risk check and the review left untracked.",
+      "builtinSkill": "capture-findings",
+      "payload": {
+        "item": "context.item",
+        "oneOff": "context.oneOff",
+        "build": "result:build@1",
+        "riskCheck": "result:risk-check@1",
+        "review": "result:review@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "FINDINGS",
+        "values": [
+          { "value": "FILED", "detail": "optional", "class": "continue", "detailName": "items" },
+          { "value": "NONE", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["filed", "inserted"],
+        "types": {
+          "filed": "array",
+          "inserted": "array"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["complete@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "sync@1": {
+      "summary": "Bring the working base up to date and confirm the tree is clean.",
+      "builtinSkill": "sync-base",
+      "payload": {
+        "workingBase": "context.workingBase"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "SYNC",
+        "values": [
+          { "value": "CLEAN", "detail": "none", "class": "continue" },
+          { "value": "DIRTY", "detail": "optional", "class": "stop", "detailName": "paths" }
+        ]
+      },
+      "result": {
+        "required": ["branch", "clean"],
+        "types": {
+          "branch": "string",
+          "clean": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["complete@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "custom@1": {
+      "summary": "A repository's own step: it passes, fails or holds, with evidence.",
+      "builtinSkill": null,
+      "payload": {},
+      "argument": null,
+      "verdict": {
+        "label": "STEP",
+        "values": [
+          { "value": "PASS", "detail": "none", "class": "continue" },
+          { "value": "FAIL", "detail": "none", "class": "stop" },
+          { "value": "HOLD", "detail": "none", "class": "end:held" }
+        ]
+      },
+      "result": {
+        "required": [],
+        "types": {}
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    }
+  }
+}

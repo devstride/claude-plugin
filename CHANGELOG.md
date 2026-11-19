@@ -8,6 +8,117 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.2.0] — 2026-11-18
+
+### Added
+
+- **A step runner and a catalog of step contracts. Nothing calls them yet.** Until now the order
+  of the Build loop, which of its steps are required, and where a run had got to lived only in the
+  agent's head and in the prose of `build-item`. This release adds the two pieces a later release
+  will move that onto, and changes no existing flow: `build-item` and every other skill run
+  exactly as before.
+  - `schemas/step-contracts.json` lists twelve step contracts (the eleven Build steps and one for a
+    repository's own step). Each says how a step must answer (one verdict line, written exactly as
+    listed), what result it must hand on, what proof it must leave, and which other steps it
+    requires. Hand-edited, and additive within a major version.
+  - `skills/run-workflow/scripts/workflow.py` is the runner: one plain Python 3 file, standard
+    library only, no network. A person, Codex or the plugin's own loop asks it `next`, runs the
+    step it names, hands the step's answer back with `done`, and asks `status` to see where the run
+    is; `start` and `resume` begin and continue a run. It gives the same answers after a restart or
+    a cleared conversation, because the run's position is kept in a small owner-only file under
+    your cache folder. It decides and records and never acts: it runs no skill, calls no tracker
+    and only reads git.
+  - It refuses a step list that drops, weakens, switches off or moves a required step: a merge
+    cannot lack a review, green local checks or a risk check before it, and no step may repeat
+    what a required step provides after a step that requires it (a second build after the review,
+    say, whose changes nothing would check), whatever the steps are called and whichever skill runs
+    them. It also refuses a step list that does not meet its schema in full, and one that
+    holds anything shaped like a credential (`credential-in-definition`), because the step list
+    is reported as written. Each refusal has a fixed code.
+  - It will not say "go on to the merge" on stale checks. The local checks are bound to the exact
+    tree they ran on and the review to the exact patch it read, every byte of it, white space
+    included (`git patch-id --verbatim`, from a diff whose flags fix colour, prefixes, context,
+    hunk joining, renames, the diff algorithm and submodules, so those git settings cannot change
+    it; a git without `--verbatim` stops the run rather than guess). A refreshed base under a byte-identical
+    patch keeps the review. When either goes stale it issues that step again first. Before it hands
+    out the merge it reads the branch's commit once, checks both proofs against that one commit and
+    hands the merge that commit to merge exactly; a merge reported as landed must name it
+    (`merge-lands-what-was-checked`), and anything else stops the run. A step already handed out is
+    handed back unchanged when asked again, because it may already have acted (a merge that landed
+    just before a restart is reported with `done`, never run twice). A missing or malformed verdict
+    stops the run and is never read as a pass, and so does a proof that disagrees with its verdict:
+    "nothing configured" is believed only from the `NOT CONFIGURED` verdict, and a pass only when
+    it names a command it ran and carries their receipt.
+  - What it reports about a step is small: the verdict line, a few lines of evidence and https
+    links, with anything shaped like a credential (an Authorization, Bearer or Basic value, a known
+    token prefix, a URL with a password, or a secret, token, password or key name assigned a value
+    of 7 characters or more, not all digits, in any case) dropped or withheld, and no refusal line
+    echoes one. Ordinary lines that only mention such a word (`token_count=12`,
+    `password_reset.py: 12 passed`) are kept. The result and
+    the proof a step hands back are kept as given in the owner-only state file and passed to later
+    steps; they are never reported. It hands back ready-made step reports for DevStride and never
+    sends them itself.
+- **`/devstride:run-workflow <workflow id> [<item>]`**, the skill that drives the runner. It is
+  inert in this release: `/devstride:run-workflow build` is refused before anything is written,
+  because the shipped `workflows/build.json` still uses its draft contract names
+  (`unknown-contract`); the step skills the catalog names arrive in a later release, and a workflow
+  naming one before then is refused (`skill-missing`). Use `/devstride:build-item` to build. Contract:
+  `skills/run-workflow/references/workflow-runner.md`; canonical cases:
+  `skills/run-workflow/scripts/workflow-fixtures.json`.
+
+### Changed
+
+- **The always-loaded skill listing grows by one line**, the new skill's description, and its
+  budget rises from 1,800 to 1,900 tokens (it measures 1,824). The other rows that move do so by
+  naming the new skill: `plain-language-output.md` (+11 tokens, its Cited by list), and
+  `config-defaults.md` (+6) and `delivery-loop-invariants.md` (+5), which list it among the
+  execution jobs; the four composed paths that load `plain-language-output.md` rise by the same 11.
+  No loop loads the new skill or its reference yet.
+- **`run-workflow` counts as an execution job** for the one-job-per-session gate, beside
+  `build-item`.
+- **The plugin's descriptions no longer count its skills.** `plugin.json`, `marketplace.json` and
+  the README's status line said "thirty"; they now say "the delivery-loop skills", so the number is
+  never wrong by one.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v4.1.0 @ e2b8774, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v4.1.0 | tokens@devstride--v4.1.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
+| skills/plan/SKILL.md | 25,535 | 8,512 | 25,535 | 8,512 | +0 | 8,512 |
+| skills/doctor/SKILL.md | 23,995 | 7,999 | 23,995 | 7,999 | +0 | 8,000 |
+| skills/build-item/SKILL.md | 23,980 | 7,994 | 23,980 | 7,994 | +0 | 7,994 |
+| skills/review/SKILL.md | 23,970 | 7,990 | 23,970 | 7,990 | +0 | 7,999 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
+| skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |
+| skills/ultracode-build/SKILL.md | 14,973 | 4,991 | 14,973 | 4,991 | +0 | 4,991 |
+| skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 11,963 | 3,988 | +0 | 3,988 |
+| skills/pr/SKILL.md | 11,205 | 3,735 | 11,205 | 3,735 | +0 | 3,735 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,731 | 2,244 | 6,731 | 2,244 | +0 | 2,500 |
+| skills/branch-hotfix/SKILL.md | 6,649 | 2,217 | 6,649 | 2,217 | +0 | 2,217 |
+| skills/create-story/SKILL.md | 6,322 | 2,108 | 6,322 | 2,108 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 5,622 | 1,874 | 5,622 | 1,874 | +0 | 1,874 |
+| skills/insert-defect/SKILL.md | 5,258 | 1,753 | 5,258 | 1,753 | +0 | 1,753 |
+| skills/insert-story/SKILL.md | 4,581 | 1,527 | 4,581 | 1,527 | +0 | 1,527 |
+| skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/run-workflow/SKILL.md (added) | — | — | 2,956 | 986 | +986 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/branch-feature/SKILL.md | 2,577 | 859 | 2,577 | 859 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,066 | 689 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 5,374 | 1,792 | 5,472 | 1,824 | +32 | 1,900 |
+| **total (bodies)** | 276,460 | 92,163 | 279,416 | 93,149 | +986 | |
+
 ## [4.1.0] — 2026-11-17
 
 ### Added
@@ -5943,7 +6054,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.1.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.2.0...HEAD
+[4.2.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.1.0...devstride--v4.2.0
 [4.1.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.0.0...devstride--v4.1.0
 [4.0.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.67.0...devstride--v4.0.0
 [3.67.0]: https://github.com/devstride/claude-plugin/compare/devstride--v3.66.0...devstride--v3.67.0
