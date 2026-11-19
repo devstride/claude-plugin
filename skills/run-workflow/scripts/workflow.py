@@ -1569,8 +1569,8 @@ def command_reported(world, request, contracts):
         state.pop("reportsUnsent", None)
     elif first:
         state["reportsUnsent"] = world.now()
-    if first or good:
-        write_state(folder, state)
+    if first or (good and state["outcome"]):
+        write_state(folder, state)  # a stopped run's replay writes nothing: its file is not kept alive by it
     return {"runId": state["runId"], "unsent": bool(state.get("reportsUnsent")), "say": UNSENT_LINE if first else None}
 
 
@@ -1592,8 +1592,10 @@ def command_unsent(world, request, contracts):
             continue  # a state this runner cannot shape again is left for a person
         if reports:
             runs.append({"runId": state["runId"], "item": state["item"], "sessionId": state["sessionId"],
-                         "since": str(state["reportsUnsent"]), "reports": reports})
-    runs.sort(key=lambda run: run["since"])
+                         "since": str(state["reportsUnsent"]), "reports": reports, "ended": bool(state["outcome"])})
+    # Ended runs first (a replay clears them), then stopped ones: ten stopped runs never crowd out
+    # a finished one.
+    runs.sort(key=lambda run: (not run.pop("ended"), run["since"]))
     return {"runs": runs[:UNSENT_MAX_RUNS], "more": max(0, len(runs) - UNSENT_MAX_RUNS)}
 
 

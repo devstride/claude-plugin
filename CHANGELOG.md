@@ -38,13 +38,13 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.3.0 @ 49cca53, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v4.3.0 @ c3be7e0, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.3.0 | tokens@devstride--v4.3.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
 | skills/plan/SKILL.md | 25,542 | 8,514 | 25,542 | 8,514 | +0 | 8,514 |
-| skills/doctor/SKILL.md | 23,995 | 7,999 | 23,995 | 7,999 | +0 | 8,000 |
 | skills/build-item/SKILL.md | 23,999 | 8,000 | 23,997 | 7,999 | -1 | 8,000 |
+| skills/doctor/SKILL.md | 23,995 | 7,999 | 23,995 | 7,999 | +0 | 8,000 |
 | skills/review/SKILL.md | 23,986 | 7,996 | 23,986 | 7,996 | +0 | 7,999 |
 | skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
 | skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |

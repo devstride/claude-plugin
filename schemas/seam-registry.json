@@ -264,7 +264,7 @@
       "calledBy": [
         "build-item run"
       ],
-      "unset": "reports go to DevStride through the agent's own connection when the session has one, and nothing is sent or said when it does not or the server cannot take them; set the key to null to switch reporting off (the machine variable DEVSTRIDE_WORKFLOWS=0 does the same)",
+      "unset": "reports go to DevStride through the agent's own connection when the session has one, and when it has none or the server cannot take them, the run sends no more and says so once; set the key to null to switch reporting off (the machine variable DEVSTRIDE_WORKFLOWS=0 does the same)",
       "contract": "skills/build-item/references/workflow-reports.md",
       "since": "4.1.0"
     },

@@ -1291,14 +1291,18 @@ def section_records():
     before = run.state()["seq"]
     run.call("unsent", {"cwd": run.cwd})
     check("unsent changes nothing", run.state()["seq"] == before and run.state().get("reportsUnsent"))
+    before = run.state()["seq"]
     kept = run.call("reported", {"runId": stopped["runId"], "ok": True}, session="another-session")[1]
+    check("... and that replay writes nothing to it", run.state()["seq"] == before)
     check("a replayed run that has only stopped keeps its mark: its own session may carry it on unreported",
           kept == {"runId": stopped["runId"], "unsent": True, "say": None} and run.state().get("reportsUnsent"), kept)
     run.answer = run.call("resume", {"item": "I123"})[1]
     run.to_end()
     ended = run.call("unsent", {"cwd": run.cwd}, session="another-session")[1]["runs"][0]["reports"]
     check("a finished run's replay ends with the run's own end",
-          ended[-1].get("run", {}).get("outcome") == "completed" and sum(len(call["reports"]) for call in ended) == 11, ended)
+          ended[-1].get("run", {}).get("outcome") == "completed" and sum(len(call["reports"]) for call in ended) == 11
+          and ended[-1]["run"]["endedAt"] == run.state()["endedAt"]
+          and run.call("unsent", {"cwd": run.cwd, "now": "2030-01-01T00:00:00Z"})[1]["runs"][0]["reports"][-1]["run"]["endedAt"] == run.state()["endedAt"], ended)
     cleared = run.call("reported", {"runId": stopped["runId"], "ok": True}, session="another-session")[1]
     check("once the run has ended, a replay that went through clears the mark, from any session of this user",
           cleared == {"runId": stopped["runId"], "unsent": False, "say": None} and "reportsUnsent" not in run.state()
