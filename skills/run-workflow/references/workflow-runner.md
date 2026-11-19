@@ -98,9 +98,11 @@ What is reported, and what is never reported: `workflow-contracts.md`.
 stopped. Check its `commit` with the landing test
 (`${CLAUDE_PLUGIN_ROOT}/skills/merge-story/references/merge-paths.md`, "Already landed"), which has
 three answers. Exactly that commit landed → report it with `done` on that attempt; never `resume`,
-which reads the moved checkout as new work. A different commit landed carrying it → a person's
-(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/run-stops.md`). Nothing landed → `resume` with `"landed": false`. Until then `resume` answers
-with the same stop (`merge-may-have-landed`).
+which reads the moved checkout as new work. It landed, but the check cannot prove how → a person
+confirms what landed, then reports the merge with `done` naming that commit, or ends the run with
+`resume` and `"close": true`
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/run-stops.md`). Nothing landed → `resume` with
+`"landed": false`. Until then `resume` answers with the same stop (`merge-may-have-landed`).
 
 ## Reporting
 

@@ -174,13 +174,16 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
 - **An unfinished run first**, for a given story number or the story the handoff names as in
   progress, in this order. (1) `claims` set → invoke `claim-story` with the item and its mode
   before the runner: `HELD` → never adopt; item 6's held exit. Any other verdict → go on (the
-  run's own claim step renews it). (2) `resume` with the item (The run, item 2). (3) One of three
-  cases, as `references/run-stops.md` says: (i) the merge row `issued` or stopped and its `commit`
-  (the stop's, or the handed-back merge's) the exact landing (`merge-paths.md`, "Already landed")
-  → `done` on that attempt, so completion runs; (ii) else, no different commit landed and the item
-  neither merged nor Done → carry on (a stopped merge: back on the story branch, `resume` with
-  `"landed": false`); (iii) else a different commit finished it → `resume` with `"close": true`,
-  tell a person it was never checked or reviewed here, then the next rule.
+  run's own claim step renews it). (2) `resume` with the item (The run, item 2). (3) The merge row in
+  `status` `done` → the run carries on from its own position, whatever the item's status says: a
+  merge that landed before an interruption still owes its completion, capture and sync. Otherwise,
+  the landing test's answer for a merge row `issued` or stopped (its `commit`: the stop's, or the
+  handed-back merge's; `run-stops.md`): (i) exactly it → `done` on that attempt, so completion
+  runs; (ii) landed, but the check cannot prove how → a person confirms, then `done` or `"close":
+  true`, as `run-stops.md` says; (iii) nothing landed, or the merge not reached → the run carries
+  on (a stopped merge: back on the story branch, `resume` with `"landed": false`), unless the item
+  is already merged or Done without this run's merge: then `resume` with `"close": true`, tell a
+  person what finished it, then the next rule.
 - A given story number IS the story; merged or Done → never started, no run (`next-unblocked.md`).
   Otherwise apply `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full
   (projection warning too). **Never auto-select from the deferred container.** Surface the
@@ -217,11 +220,14 @@ command, and again after a compaction**: the commands, the answers, the stops an
    selected one straight away): it finds this session's open
    run, or adopts the newest unfinished one another session left for the item in this repository
    (a cleared conversation, a crash), re-bound to this checkout (`adoptedFrom` names the one it
-   came from: say it), and hands back its current step. Refused `wrong-branch` (an adopted run goes on
-   only on its story branch, named) → `git fetch origin <branch>`, `git checkout <branch>`, `git
-   rev-parse --abbrev-ref HEAD` printing it, then the same request again; the branch held by
-   another worktree (`git worktree list`), or absent here and on the remote → STOP, naming what a
-   person must do: free it there, or push it from the checkout that has it.
+   came from: say it), and hands back its current step. Any command refused `wrong-branch` (a `resume`,
+   `next` or `done` of an adopted run off its story branch, named) → `git fetch origin
+   "+refs/heads/<branch>:refs/remotes/origin/<branch>"` (into a tracking ref, which a clone
+   tracking only the base would not make); then `git checkout <branch>` when it exists here, else
+   `git checkout -b <branch> origin/<branch>`; `git rev-parse --abbrev-ref HEAD` printing it; then
+   the same request again. The branch held by another worktree (`git worktree list`), or absent
+   here and on the remote → STOP, naming what a person must do: free it there, or push it from the
+   checkout that has it.
    Refused `no-run` or `run-other-repository` → **`start`** with
    `definitionFile` `${CLAUDE_PLUGIN_ROOT}/workflows/build.json` and that context. A `start` refused
    `run-open` means a run exists: `resume` it; only the excluded-paths re-route replaces one. Any other refusal (exit 2) or a

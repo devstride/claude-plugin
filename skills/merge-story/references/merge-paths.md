@@ -12,17 +12,18 @@ and the `receipt` for this tree).
 
 ## Before any merge, on either path
 
-1. **Already landed** (a re-run after an interruption) has three answers: exactly `commit` landed,
-   a different commit landed carrying it, or nothing landed. Fast path, after `git fetch origin`: (a) `git rev-list --parents
-   origin/<workingBase> | awk -v c=<commit> '$3 == c { print $1; exit }'` prints a merge whose second
-   parent is `commit`, anywhere in the base's history (a release that fast-forwarded the base to
-   another branch leaves earlier story merges on the second-parent side) → `LANDED` with it; (b)
-   else `git rev-parse origin/<workingBase>` printing `commit` itself (the base moved exactly to it,
-   nothing on top) → `LANDED` with `commit`; (c) else `git merge-base --is-ancestor <commit>
-   origin/<workingBase>` succeeding → a different commit landed carrying it (a fast-forward past
-   it, a later commit merged, or history this test cannot read), never checked or reviewed:
-   `BLOCKED another commit landed carrying <commit>`, for a person. Pull-request path: `gh pr view
-   <n> --json state,headRefOid,mergeCommit` merged with `headRefOid` = `commit` → `LANDED` with its
+1. **Already landed** (a re-run after an interruption) has three answers: exactly `commit` landed;
+   it landed, but this check cannot prove how; or nothing landed. Fast path, after `git fetch
+   origin`: (a) `git rev-list --first-parent --parents origin/<workingBase> | awk -v c=<commit> 'NF
+   == 3 && $3 == c { print $1; exit }'` prints a two-parent merge on the base's own first-parent
+   line whose second parent is `commit` → `LANDED` with it; (b) else `git rev-parse
+   origin/<workingBase>` printing `commit` itself → `LANDED` with `commit`; (c) else `git
+   merge-base --is-ancestor <commit> origin/<workingBase>` succeeding → it landed some other way (a
+   later commit on top of it, a merge off the first-parent line or with more parents, a release
+   that fast-forwarded the base), and topology cannot tell a release from unchecked work:
+   `BLOCKED landed, but this check cannot prove how: <commit>`, for a person to confirm. Never call
+   it unchecked or unreviewed: after a release it was both. Pull-request path: `gh pr view <n>
+   --json state,headRefOid,mergeCommit` merged with `headRefOid` = `commit` → `LANDED` with its
    merge commit; merged with another head → (c). Anything else: nothing landed, go on.
 2. **Release holds first**, before any merge onto the train or `baseBranch` (one-off or plan
    story; a story merging onto an epic's integration branch is not held: it accumulates there, and

@@ -20,9 +20,10 @@ first git command**: the order, both merge paths and every refusal are spelled t
 
 ## Steps
 
-1. **Already landed?** Exactly `commit` (a merge whose second parent is it, the base moved exactly
-   to it, or its pull request merged at that head) → `LANDED` with it; nothing merges twice. A
-   different commit landed carrying it → `BLOCKED`, for a person. Nothing landed → go on.
+1. **Already landed?** Exactly `commit` (a two-parent merge of it on the base's first-parent line,
+   the base's tip itself, or its pull request merged at that head) → `LANDED` with it; nothing
+   merges twice. Landed any other way → `BLOCKED landed, but this check cannot prove how`, for a
+   person to confirm. Nothing landed → go on.
 2. **Holds**, on a landing onto the train or the base branch only (an epic-branch story
    accumulates under a hold): a release hold on the item or an ancestor → `HELD <reason>`; the
    story branch waits.

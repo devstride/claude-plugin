@@ -11,14 +11,16 @@ which its The run section handles itself. Read in full before acting on any othe
   test (`${CLAUDE_PLUGIN_ROOT}/skills/merge-story/references/merge-paths.md`, "Already landed"),
   which has three answers. Exactly it → report it with `done` on the stopped merge (its `attempt`),
   its result naming the merge and its proof's `head` that commit; never `resume`, which would read
-  the moved checkout as new work. A different commit landed carrying it → `resume` with `"close":
-  true` (the run ends interrupted, never carried on) and tell a person plainly that what landed was
-  never checked or reviewed; then step 0 of `SKILL.md`, where the merged item is never started
-  again. Nothing landed → put the
-  checkout back on the story branch, then `resume` with `"landed": false`: at once for a push
-  refused in a race (the merge step tries again), otherwise once its cause is fixed. Step 0 of
-  `SKILL.md` applies the same three answers to a run it resumes, the merge's row `issued` or
-  stopped.
+  the moved checkout as new work. Landed, but the check cannot prove how → stop for a person,
+  saying exactly that: "it landed, but this check cannot prove how" (never that it went unchecked:
+  after a release fast-forward it was checked and reviewed). The run waits, lease kept. The person
+  confirms what landed, then either reports the merge with `done` on the stopped attempt, its
+  proof's `head` the handed commit (completion then runs), or ends the run with `resume` and
+  `"close": true`. Nothing landed → put the checkout back on the story branch, then `resume` with
+  `"landed": false`: at once for a push refused in a race (the merge step tries again), otherwise
+  once its cause is fixed. Step 0 of `SKILL.md` applies the same three answers to a run it resumes
+  while its merge row is `issued` or stopped; a merge row `done` is carried on, never checked
+  again.
 - **A merge `BLOCKED` on excluded paths** (a train one-off carrying deploy configuration or a
   migration): never on a protected or merge-only head (`protectedBranches`, an epic or plan
   integration branch, the train:

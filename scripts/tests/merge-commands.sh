@@ -87,15 +87,15 @@ def other_author(bare, message):
     git(other, "push", "-q", "origin", "main")
 
 
-# --- Already landed: three answers, exactly `commit`, a different commit, or nothing ------------
-MERGED = command(MP, "git rev-list --parents origin/<workingBase>")
+# --- Already landed: three answers, exactly `commit`, landed but unproven, or nothing ----------
+MERGED = command(MP, "git rev-list --first-parent --parents origin/<workingBase>")
 TIP = command(MP, "git rev-parse origin/<workingBase>")
 CARRIED = command(MP, "git merge-base --is-ancestor <commit> origin/<workingBase>")
-OLD = "git rev-list --first-parent --parents origin/main | awk -v c=%s '$1 == c || $3 == c { print $1; exit }'"
+OLD = "git rev-list --parents origin/%s | awk -v c=%s '$3 == c { print $1; exit }'"  # the round before: any merge, anywhere
 def filled(text, base, commit_id):
     return text.replace("<workingBase>", base).replace("<commit>", commit_id)
 def landing(repo, commit_id, base="main"):
-    """The landing test as the reference spells it, in its order: (exact, what) or (another, None) or (nothing, None)."""
+    """The landing test as the reference spells it, in its order: (exact, what), (unproven, None) or (nothing, None)."""
     git(repo, "fetch", "-q", "origin")
     merge = sh(repo, filled(MERGED, base, commit_id)).stdout.strip()
     if merge:
@@ -103,48 +103,65 @@ def landing(repo, commit_id, base="main"):
     if sh(repo, filled(TIP, base, commit_id)).stdout.strip() == commit_id:
         return "exact", commit_id
     if sh(repo, filled(CARRIED, base, commit_id), check_rc=False).returncode == 0:
-        return "another", None
+        return "unproven", None
     return "nothing", None
 def old(repo, commit_id, base="main"):
-    return sh(repo, (OLD % commit_id).replace("origin/main", "origin/" + base)).stdout.strip()
+    return sh(repo, OLD % (base, commit_id)).stdout.strip()
 
 bare, repo, story = setup()
 git(repo, "checkout", "-q", "main")
 git(repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
 merge = git(repo, "rev-parse", "HEAD")
 git(repo, "push", "-q", "origin", "main")
-check("the landing test names the merge that brought exactly the story commit", landing(repo, story) == ("exact", merge), landing(repo, story))
+check("the landing test names the two-parent merge of exactly the story commit on the base's own line", landing(repo, story) == ("exact", merge), landing(repo, story))
 bare, repo, story = setup()
 git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--ff-only", story); git(repo, "push", "-q", "origin", "main")
-check("... and the story commit itself when the base was moved exactly to it", landing(repo, story) == ("exact", story), landing(repo, story))
+check("... and the story commit itself when it is the base's tip", landing(repo, story) == ("exact", story), landing(repo, story))
 bare, repo, story = setup()
 past = commit(repo, "export.txt", "export\nunchecked change\n", "an unchecked commit on top of the checked one")
 git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--ff-only", past); git(repo, "push", "-q", "origin", "main")
-check("a base fast-forwarded past the checked commit to an unchecked one is a different commit, for a person",
-      landing(repo, story) == ("another", None), landing(repo, story))
-check("(the old first-parent test printed the checked commit there: a false landing)", old(repo, story) == story, old(repo, story))
+check("a base fast-forwarded past the checked commit is landed but unproven, for a person", landing(repo, story) == ("unproven", None), landing(repo, story))
 bare, repo, story = setup()
 later = commit(repo, "export.txt", "export\nunchecked change\n", "a later commit inside the merge step")
 git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--no-ff", "-m", "merge: I123", later); git(repo, "push", "-q", "origin", "main")
-check("a later commit that landed carrying the story commit is a different commit", landing(repo, story) == ("another", None), landing(repo, story))
+check("a later commit that landed carrying the story commit is landed but unproven", landing(repo, story) == ("unproven", None), landing(repo, story))
 bare, repo, story = setup()
 git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--ff-only", story)
 commit(repo, "notes.txt", "someone else's\n", "work landed on top"); git(repo, "push", "-q", "origin", "main")
-check("the checked commit fast-forwarded and then built on is history the test cannot read: a person's",
-      landing(repo, story) == ("another", None), landing(repo, story))
+check("the checked commit fast-forwarded and then built on is landed but unproven", landing(repo, story) == ("unproven", None), landing(repo, story))
 bare, repo, story = setup()
 check("a story commit that never landed is nothing landed", landing(repo, story) == ("nothing", None), landing(repo, story))
-# a release fast-forwards the train to develop: the story's merge onto the train is now on the second-parent side
+# a stacked branch: the story merged into another branch, which then gains an unchecked commit and lands
+bare, repo, story = setup()
+git(repo, "checkout", "-q", "-b", "stack", "main")
+git(repo, "merge", "-q", "--no-ff", "-m", "take the story into the stack", story)
+carried = git(repo, "rev-parse", "HEAD")
+commit(repo, "stack.txt", "unchecked\n", "an unchecked commit on the stack")
+git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--no-ff", "-m", "merge the stack", "stack"); git(repo, "push", "-q", "origin", "main")
+check("a story merged into another branch that gained unchecked work and then landed is unproven, for a person",
+      landing(repo, story) == ("unproven", None), landing(repo, story))
+check("(the any-history test named that other branch's merge as the story's exact landing)", old(repo, story) == carried, old(repo, story))
+# an octopus merge carrying the story onto the base
+bare, repo, story = setup()
+git(repo, "checkout", "-q", "-b", "other", "main"); commit(repo, "other.txt", "other\n", "another branch")
+git(repo, "checkout", "-q", "main"); git(repo, "merge", "-q", "--no-ff", "-m", "octopus", story, "other")
+octopus = git(repo, "rev-parse", "HEAD"); git(repo, "push", "-q", "origin", "main")
+check("an octopus merge carrying the story is unproven, for a person", landing(repo, story) == ("unproven", None), landing(repo, story))
+check("(the any-history test took it as exact)", old(repo, story) == octopus, old(repo, story))
+# a release fast-forwards the train to develop: the story's merge is now off the train's first-parent line
 bare, repo, story = setup()
 git(repo, "checkout", "-q", "-b", "train", "main"); git(repo, "push", "-q", "-u", "origin", "train")
 git(repo, "merge", "-q", "--no-ff", "-m", "merge: I123 into train", story)
 merge = git(repo, "rev-parse", "HEAD"); git(repo, "push", "-q", "origin", "train")
+check("(before the release, the train's own merge is the exact landing)", landing(repo, story, "train") == ("exact", merge), landing(repo, story, "train"))
 git(repo, "checkout", "-q", "main"); commit(repo, "develop.txt", "other develop work\n", "other develop work")
 git(repo, "merge", "-q", "--no-ff", "-m", "Merge the release train", "train"); git(repo, "push", "-q", "origin", "main")
 git(repo, "checkout", "-q", "train"); git(repo, "merge", "-q", "--ff-only", "main"); git(repo, "push", "-q", "origin", "train")
-check("after a release fast-forwards the train, the story's merge is still found, wherever it sits",
-      landing(repo, story, "train") == ("exact", merge), landing(repo, story, "train"))
-check("(the old first-parent walk no longer reached it: a false refusal)", old(repo, story, "train") == "", old(repo, story, "train"))
+check("after a release fast-forwards the train, the landing is unproven: a person confirms, since topology cannot tell it from unchecked work",
+      landing(repo, story, "train") == ("unproven", None), landing(repo, story, "train"))
+check("the unproven answer says exactly that, and never that the code went unchecked",
+      "landed, but this check cannot prove how" in flat(MP) and "landed, but this check cannot prove how" in flat(RS)
+      and "never checked or reviewed" not in flat(RS) and "carrying <commit>" not in flat(MP))
 
 # --- the fast merge: never on a base ahead of its remote; a refused push undoes exactly the merge
 AHEAD = command(MP, "git rev-list --count origin/<workingBase>..<workingBase>").replace("<workingBase>", "main")
@@ -224,6 +241,19 @@ check("... and its own instruction, a plain first push, moves and publishes it",
       git(repo, "rev-parse", "origin/feature") == git(repo, "rev-parse", "feature") and git(repo, "rev-parse", "feature^") == git(repo, "rev-parse", "main")
       and git(repo, "rev-parse", "origin/other") != git(repo, "rev-parse", "other"))
 
+# --- wrong-branch recovery: fetch into a tracking ref, then check the story branch out ----------
+BI = os.path.join(ROOT, "skills/build-item/SKILL.md")
+FETCH = command(BI, 'git fetch origin "+refs/heads/<branch>:refs/remotes/origin/<branch>"')
+FROM_REMOTE = command(BI, "git checkout -b <branch> origin/<branch>")
+bare, repo, story = setup()
+single = fresh("single")
+git(single, "clone", "-q", "--single-branch", "--branch", "main", bare, ".")
+check("(a clone tracking only the base: the old plain fetch fills FETCH_HEAD and the checkout fails)",
+      sh(single, "git fetch -q origin feature && git checkout -q feature", check_rc=False).returncode != 0)
+sh(single, FETCH.replace("<branch>", "feature") + " && " + FROM_REMOTE.replace("<branch>", "feature"))
+check("the recovery fetches into origin/<branch> and checks the story branch out at its pushed commit",
+      git(single, "rev-parse", "--abbrev-ref", "HEAD") == "feature" and git(single, "rev-parse", "HEAD") == story)
+
 # --- the durable proof's carry passes the bare branch the script requires ----------------------
 CARRY = command(MP, "python3 ${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/reviewed-status.py post <commit> --from")
 bin_dir = fresh("bin")
@@ -247,6 +277,6 @@ OUT="$(python3 -B "$WORK/cases.py" "$ROOT" "$WORK" 2>&1)"; RC=$?
 printf '%s\n' "$OUT" | sed 's/^/  /'
 N="$(printf '%s\n' "$OUT" | grep -c '^ok')"
 if [ $RC -ne 0 ] || printf '%s\n' "$OUT" | grep -q '^FAIL'; then bad "a case failed or the script did not finish (exit $RC)"
-elif [ "$N" -lt 22 ]; then bad "only $N cases ran, expected at least 22"
+elif [ "$N" -lt 30 ]; then bad "only $N cases ran, expected at least 30"
 fi
 exit $FAIL

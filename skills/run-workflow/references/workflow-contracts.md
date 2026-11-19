@@ -99,12 +99,13 @@ Five named rules, a closed list:
 - `risk-triggers-need-verifiers`: a risk-check proof that names triggers and ran no verifier is
   refused.
 - `risk-check-accumulates`: a risk check accepted after an earlier accepted one reports only the
-  delta, and its result is added to the earlier. An entry's id is its `id` when it is an object
-  carrying a non-empty string one, else the whole entry as canonical JSON. Each of
-  `untrackedDeferrals`, `dismissed`, `deferrals` and `deviations` keeps every earlier entry the new
-  result does not name in `resolved` (the ids a later screen fixed or overtook) and gains the new
-  ones whose id it lacks; the `counts` are summed, less one `deferred` (or `dismissed`) per earlier
-  deferral (or dismissal) resolved; `resolved` gathers every id resolved so far; the `ledger` is
+  delta, and its result is added to the earlier. An entry's identity is its `id` when it is an
+  object carrying a non-empty string one, else the whole entry as canonical JSON; the two never
+  match each other, and only an `id` can be named in `resolved`. Each of `untrackedDeferrals`,
+  `dismissed`, `deferrals` and `deviations` keeps every earlier entry the new result does not name
+  in `resolved` (the ids a later screen fixed or overtook) and gains the new ones whose identity it
+  lacks; the `counts` are summed, less one `deferred` (or `dismissed`) per earlier
+  deferral (or dismissal) resolved; `resolved` gathers every id resolved so far, each once; the `ledger` is
   appended to (unless the new one already starts with it), so it keeps the whole history; and the
   `report` is the new one. Later steps receive only the entries still open. A refused attempt is
   never accumulated, and never handed on.
@@ -120,8 +121,9 @@ Five named rules, a closed list:
   another commit, or none, stops the run (kind `proof`). After a merge stop, first check whether
   exactly that commit landed: if it did, report it with `done` on the stopped merge, its proof's
   `head` naming that commit, and never `resume` (a checkout left on the base reads as a new
-  commit); if another commit landed carrying it, a person decides
-  (`workflow-runner.md`, "A merge stop").
+  commit); if it landed in a way the landing test cannot prove, a person confirms what landed,
+  then reports it with `done` the same way or closes the run (`workflow-runner.md`, "A merge
+  stop").
 
 ## satisfiedBy — one step standing in for another's proof
 
