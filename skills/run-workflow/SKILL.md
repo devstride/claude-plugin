@@ -29,12 +29,12 @@ means the runner itself failed: say its line and stop, without retrying.
    say so and stop.
 2. **`start`** with that path as `definitionFile` and a `context` holding every key the
    reference's Commands section lists (`mode` is a story-claim mode, `named` for a named item).
-   Nothing in this release resolves them: the person starting the run supplies them, and a missing one is
-   refused (`context-missing`). The shipped Build definition is refused too (`unknown-contract`),
-   before anything is written.
+   This skill resolves none of them: the person starting the run supplies them, and a missing one is
+   refused (`context-missing`).
 3. **For each `run` answer**: send its heartbeat (the phase to the story claim, the ship-intent
    request to the ship-intent helper; skip whichever is null), invoke the named skill through the
-   Skill tool with `argument` unchanged, then call `done` with `stepId` (the step's `id`),
+   Skill tool with `argument` unchanged (plus ` answer: <it>` when the payload carries a person's
+   `answer` and the argument does not), then call `done` with `stepId` (the step's `id`),
    `attempt` and `output` (that skill's WHOLE final answer). Its answer is the next action.
 4. **Send `reports`** in order exactly as
    `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` says: its gate decides

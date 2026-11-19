@@ -1,39 +1,40 @@
 ---
 name: ultracode-build
-description: "Build engine for a scoped DevStride story: understand, build, verify, and run a risk-sized pre-handoff check"
+description: "Build engine for a scoped DevStride story: understand, build and hand back evidence"
 ---
 
 **Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message.
 
 **Session model.** Read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/session-models.md` once per top-level run, role `runner`, first — never when `build-item` invoked this skill.
 
-**Goal:** one scoped story built, verified green at its profile's width, risk-checked and handed
-back with evidence — understand → build → verify → risk check → hand back. Invoked by `build-item`
-once the branch exists and the item is In Progress; it never opens a PR or merges.
+**Goal:** one scoped story understood, built and handed back with evidence — understand → build →
+hand back. The Build workflow's build step, run once the branch exists and the item is In
+Progress; the risk check (`risk-check`) and the local gate (`local-checks`) are steps of their own
+that follow it. It never opens a PR or merges.
 
-Argument — item number + one-line goal, optionally `profile: <name>` and
-`review-moment: release-deferred|pr-boundary` (e.g. `I20130 enforce the seat-count invariant
-profile: standard review-moment: release-deferred`): $ARGUMENTS
+Argument — item number + one-line goal, optionally `profile: <name>`, `review-moment:
+release-deferred|pr-boundary` (read by `risk-check`, not here) and `answer: <text>` (a person's
+reply to this step's last question) (e.g. `I20130 enforce the seat-count invariant profile:
+standard review-moment: release-deferred`): $ARGUMENTS
+
+## Verdict
+
+`BUILD: READY | NEEDS DECISION <question> | BLOCKED [<reason>]`
 
 ## Hard floors
 
 - **Config wins.** `.claude/ds-config.json` (`verify.*`, `baseBranch`, `generated.*`,
   `preCommitWiringChecks`, `conventionsDoc`, `lessonsDoc`, `commitConventions`, `itemTagFormat`,
-  `review.localAssistCommand`, `review.mandatoryLenses`, `profile`, `profileOverrides`) is
+  `review.localAssistCommand`, `profile`, `profileOverrides`) is
   authoritative over any literal here; every command comes from it. Coding conventions live in
   `conventionsDoc`, which is human-owned and BINDING — obey every rule in it; never substitute
   conventions remembered from elsewhere.
 - **Lessons are read-only here and advisory.** `lessonsDoc` (fallback `.claude/ds-lessons.md`) is
   READ, never written — `review` owns every write. An absent or empty file is a valid state: proceed
   exactly as without it — no note, no prompt, no setup step.
-- **The immediate-risk verifier and mandatory lenses fire from the DIFF**, not the plan's theme,
-  under every profile — `extended` included — and no override removes them (phase 3).
-- **Verified P1 and serious-P2 findings are always fixed** — no numeric cap; a stall STOPS for
-  human help (phase 3).
-- **Green means observed.** A red required check is stop-and-fix, never commit-anyway; the gate's
-  proof is a verification receipt, never a remembered result.
-- **Stop and ask ONLY at a genuine fork**: an ambiguous or risky finding, scope that turns out
-  human- or infra-gated, a destructive or outward-facing action. Read
+- **Stop and ask ONLY at a genuine fork** (`BUILD: NEEDS DECISION <question>`, with your
+  recommendation): an ambiguous or risky choice, scope that turns out human- or infra-gated, a
+  destructive or outward-facing action. Given an `answer`, apply it and carry on. Read
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/needs-you.md` when the top-level run is
   unattended, `needsYou.label` set.
 
@@ -44,8 +45,7 @@ models/effort, and the optional read-only local support call.
 
 **Delivery profile.** The contract is
 `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/delivery-profiles.md`; this skill honours
-`understandReaders` (phase 1), `fixFloor` (3) and `storyVerify` (2, 4). Resolve it ONCE, before
-phase 1, and announce it with its source:
+`understandReaders` (phase 1). Resolve it ONCE, before phase 1, and announce it with its source:
 
 - **Passed** (`profile: <name>`, the `build-item` path): use it as given, never re-resolve —
   "profile: standard — from the invocation". A name the contract does not define
@@ -74,7 +74,7 @@ it does not, ignore it silently. A lesson never overrides `conventionsDoc`, the 
 reading of the code.
 
 - **Trivial** (one-line fix, copy tweak, rename, config flip with no contract surface): no
-  Workflow; read the few files inline; phase 3 still self-checks. **Unsure → not trivial.**
+  Workflow; read the few files inline; the risk check still self-checks. **Unsure → not trivial.**
 - **Fresh grounding refresh on the item** (a dated section naming files, symbols, prior art,
   adjusted scope): pre-paid — verify its claims with targeted reads; at most 1–2 readers for
   angles it misses.
@@ -103,8 +103,9 @@ warranted.
 
 Synthesize (1) a **build plan** — files, order, the contract each satisfies, tests — and (2) a
 one-line **buildable-now-vs-deferred scope line** with a rationale per deferral; it becomes the PR
-body's Deferred note. Gated on a human decision or user-provisioned infra → STOP and surface it;
-never build a half-thing around a missing dependency.
+body's Deferred note. Gated on a human decision or user-provisioned infra → STOP and surface it
+(`BUILD: NEEDS DECISION`, or `BLOCKED` when nothing a person can answer here unblocks it); never
+build a half-thing around a missing dependency.
 
 ## 2. BUILD
 
@@ -117,89 +118,28 @@ Implement in the main agent (not a Workflow), in coherent increments: targeted c
   optional; never invent or reuse attribution metadata; PR bodies get none.
 - **Fastest relevant feedback while building**: the affected type-check, configured wiring checks,
   touched tests via `verify.testSingle` — widened when the change is broad.
-- **The profile's complete `storyVerify` gate runs once on the final story SHA** — a floor whose
-  width the profile sets. If phase 3 changes the SHA, rerun the affected checks and any gate the
-  change can invalidate; never repeat an unchanged command on an unchanged SHA. Record tree/SHA,
-  config hash, commands, results and counts exactly as
-  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/verification-receipts.md` defines.
 - **Generated files**: a type error is tolerated only in a `generated.paths` file matching
   `generated.toleratedTypeErrors`; everything else stops. Fix by re-running
   `generated.regenCommand`, never by hand. When routes/handlers change, regenerate and commit the
   output in its OWN commit — build output, excluded from review, and it keeps the pre-push hook's
   regen a no-op instead of amending after you push.
-- **`verify.skipDuringStoryBuilds` suites are skipped** during story builds (gated where their
-  entries say); an empty list skips nothing, and a full `verify.test` run still leaves listed
-  suites out — except a touched spec of one of them, run directly.
 - **Let the git hooks own wiring checks, regen and the commit-amend**; a commit failing a wiring
   check is surfaced and the omission fixed.
 
-## 3. STORY RISK CHECK (before hand-off)
+## 3. Hand back
 
-Inspect the hand-written diff against the working base once, generated files excluded. This is a
-bounded story check; the full merge-boundary pass uses
-`${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/review-fanout.md`.
-`review-moment: release-deferred` means a fast story whose complete finder/verifier and
-configured-engine pass waits for the release PR's full diff; `review-moment: pr-boundary` means
-`review` runs it on the direct story PR next; no marker (standalone) → this check plus a report of
-the missing caller context — never guess that a full review happened.
+Done when the branch holds the built story: commits made and pushed, the affected type-checks,
+wiring checks and touched tests green. The risk check and the complete local gate are not run here.
 
-- **Every story** gets a main-agent self-check: acceptance-criteria match, correctness at changed
-  boundaries, meaningful negative tests, repo conventions, needless custom machinery or duplication.
-  Lessons apply as hypotheses. A routine diff: fix what it finds, launch no generic fan-out.
-- **Immediate risk floor.** When the DIFF touches authentication/authorization, a migration or
-  irreversible state transition, or a deployed-runtime contract (including migration and durable-
-  event safety under a rolling deploy), name the files and risk and launch one
-  focused `opus`/`xhigh` verifier per independent boundary, maximum two — grouping related ones, dropping
-  none. It tries to reproduce a concrete failure, checks the matching security/deploy invariant and
-  returns anchored findings as CONFIRMED / PLAUSIBLE / REFUTED; REFUTED is the default and "could
-  not rule it out" is not evidence. The profile cannot remove this floor.
-- **Mandatory lenses.** A `review.mandatoryLenses` entry whose `paths` match a hand-written file
-  is an immediate-risk boundary of its own: one focused verifier carrying its `name` and
-  `question`, even on a routine diff, reported as `mandatory lens <name>: ran (N findings)`; an
-  unmatched entry is not mentioned; a malformed one is named once and ignored. Read
-  `${CLAUDE_PLUGIN_ROOT}/skills/ultracode-build/references/mandatory-lenses.md` when one matches.
-- A configured `review.localAssistCommand` may take one read-only call, concurrently, on a distinct
-  risk question — advisory, never a second mandatory pass.
-- **Ids** `F1…Fn` follow `review-fanout`'s fingerprint/occurrence rule, keeping every source and
-  anchor; a security duplicate keeps its classification. A verdict from a browser, service or
-  manual run names the path exercised and those not exercised — never a bare "verified".
-- **Universal fix floor.** A verified P1 or serious P2 (defined in `review-fanout`) is fixed, its
-  affected checks rerun, and a focused verifier re-run with the cumulative story ledger until a
-  pass finds none — no numeric cap. No patch change, no progress or an unavailable verifier while
-  one remains STOPS for human help. Then the profile's `fixFloor`: **`p1-security`**
-  (`prototype`) — P1 correctness and any security finding, the rest routed by the next
-  bullet; **`likely-important`** (`standard`, `extended`) — findings both likely and material (a
-  security finding is material by definition), the rest dismissed with a one-line rationale;
-  **`all-confirmed`** (override) — **fix every CONFIRMED and PLAUSIBLE.**
-- **Nothing is silently dropped**: an unfixed finding worth filing (a P1, a security finding, or
-  one both likely and material) is DEFERRED — with a home (a tracked downstream item or this
-  story's intentional seam: rationale + owning item) or, with no home, on the **untracked-deferral
-  list** for `build-item` step 6.5; any other is DISMISSED with its reason, never filed. Drop
-  REFUTED. Commit fixes per `commitConventions.reviewFixFormat` (fallback
-  `fix(<scope>): <summary> [<itemNumber> review]`), regenerating artifacts if routes changed. A genuinely ambiguous risky finding is asked about,
-  with a recommendation.
-- **Story review ledger**: item-number namespace, base/head SHA, risk and files, each finding's
-  id/fingerprint/anchors/claim/verdict/disposition, checks rerun, any local-assist conclusion. The
-  later review receives it and may challenge it, but never rediscovers or reverses a settled finding
-  without new evidence.
-- **Risk-check report**, one line: profile, review moment, routine vs immediate-risk, agents used
-  (normally zero; focused verifier count when required), matched lenses, raised/fixed/deferred/
-  dismissed totals.
-
-## 4. Hand back
-
-Done when the branch holds a built, risk-checked, all-green story: commits made and pushed,
-type-checks and wiring checks green, the test gate green at the profile's `storyVerify` width.
-
-**Human recap.** Lead with `Built / Checked / Next`: outcomes, what validation and review ran or did
-not run, and whether the story is ready for its merge path. Then report to `build-item`: the item,
-**the profile and its source**, the SHA-keyed verification receipt, the phase-3 risk-check report
-and story review ledger, and four lists — each stated as empty when empty, never omitted:
+**Human recap.** The answer's first line is its verdict (`BUILD: READY`). Then lead with
+`Built / Checked / Next`: outcomes, what validation ran or did not run, and what still has to run
+before the story can merge. Then the item, **the profile and its source**, and four lists — each
+stated as empty when empty, never omitted:
 
 - **buildable-now-vs-deferred scope line** — build and review deferrals, each tagged has-a-home or
   untracked;
-- **untracked-deferral list** — each homeless finding worth filing; load-bearing: step 6.5 turns
-  each into a tracked item;
+- **untracked-deferral list** — each homeless finding worth filing; load-bearing:
+  `capture-findings` turns each into a tracked item;
 - **dismissed-findings list** — every verified finding left unfixed and not worth filing, with its
   rationale, so the PR body shows what was judged rather than missed (normally empty under
   `all-confirmed`);
@@ -208,4 +148,8 @@ and story review ledger, and four lists — each stated as empty when empty, nev
   scope cut or added, each with a one-line rationale. It feeds the PR body AND the as-built
   reconciliation; a deviation only in your head ships undocumented.
 
-Do NOT open the PR or merge — that is `pr` / `build-item`'s job.
+After the evidence, one fenced `json` block: `deferrals`, `deviations`, `untrackedDeferrals`,
+`dismissed` (the four lists, each an array), `scopeLine` and `head` (the full commit handed back).
+
+Do NOT open the PR or merge — those are later steps of the Build workflow. Standalone, finish with
+/devstride:risk-check and /devstride:local-checks.
