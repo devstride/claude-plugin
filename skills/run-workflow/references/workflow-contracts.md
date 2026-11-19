@@ -46,7 +46,9 @@ owner-only state file and handed to later payloads and to `finished`, never repo
 Each contract maps payload keys to paths: a context path (`context.` and a key), an earlier step's
 result (`result:`, a contract, optionally a key), an earlier step's proof (`proof:`, the same
 shape), or a step path: the step's own answer from a
-person, the proof of its previous attempt, or the commit it was issued on (`head`). A trailing `?`
+person, the proof of its previous attempt (`proof`, whatever its verdict), the proof and result of
+its last accepted pass (`passedProof`, `passedResult`: null until one), or the commit it was issued
+on (`head`). A trailing `?`
 makes a path optional (null when missing). The runner then adds two reserved keys, `step` (the
 issued step's id) and `contract` (its contract).
 
@@ -70,8 +72,10 @@ Each command reads HEAD once, as a full commit id, and checks every proof agains
   that moved under a byte-identical patch keeps the proof.
 - **story**: the story's patch since the proof's `base`, computed as for `patch`, must be the same
   at the proof's `head` as at that commit. Any later commit that changes the story (a gate fix, a
-  review fix) voids it; a base that moved under the story does not. A `head` that cannot be read
-  voids it too. The risk check is bound this way: what it screened is the story as it then stood.
+  review fix) voids it; a base merged into the story or a rebase does not, provided the `base` is
+  the moving `origin/<workingBase>` ref (a commit id there voids it at every base refresh). A
+  `head` that cannot be read voids it too. The risk check is bound this way: what it screened is
+  the story as it then stood.
 - **none**: nothing in the repository binds it.
 
 Whatever the binding, a proof is void once a step it requires is completed again after it
@@ -89,10 +93,15 @@ runner counts its own re-issues per step (not a step's own `redo:self`), starts 
 the step finishes with a proof that holds, and stops at the fifth in a row (kind
 `attempts-exhausted`). A local-checks pass names at least one command and carries a receipt.
 
-Four named rules, a closed list:
+Five named rules, a closed list:
 
 - `risk-triggers-need-verifiers`: a risk-check proof that names triggers and ran no verifier is
   refused.
+- `risk-check-accumulates`: a risk check accepted after an earlier accepted one reports only the
+  delta, and its result is added to the earlier: each of `untrackedDeferrals`, `dismissed`,
+  `deferrals` and `deviations` keeps every earlier entry and gains the new ones, the `counts` are
+  summed, the `ledger` is appended to (unless the new one already starts with it), and the
+  `report` is the new one. A refused attempt is never accumulated, and never handed on.
 - `none-configured-needs-pull-request-route`: local checks that found nothing configured are
   accepted by a merge only when the review ran on a pull request (path `pull-request`), where CI is
   the gate.
@@ -102,10 +111,11 @@ Four named rules, a closed list:
   and the review's patch were just found to hold for. A merge skill merges exactly that commit
   (for a pull request, `--match-head-commit <commit>`) and answers `MERGE: REFRESHED` when HEAD is
   no longer it. Reported landed (also by hand, after a stop), its proof's `head` names that id;
-  another commit, or none, stops the run (kind `proof`). After a merge stop, first check whether the
-commit landed: if it did, report it with `done` on the stopped merge, its proof's `head` naming that
-commit, and never `resume` (a checkout left on the base reads as a new commit, and the run would
-ask for the checks and the review again).
+  another commit, or none, stops the run (kind `proof`). After a merge stop, first check whether
+  exactly that commit landed: if it did, report it with `done` on the stopped merge, its proof's
+  `head` naming that commit, and never `resume` (a checkout left on the base reads as a new
+  commit); if another commit landed carrying it, a person decides
+  (`workflow-runner.md`, "A merge stop").
 
 ## satisfiedBy — one step standing in for another's proof
 

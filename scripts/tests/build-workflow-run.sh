@@ -382,7 +382,10 @@ story = answer["payload"]["commit"]
 git(run.repo, "checkout", "-q", "main"); git(run.repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
 answer = run.done("MERGE: BLOCKED pushed, but deleting the remote story branch was refused\n")
 answer = run.resume()
-check("whereas resume after it landed reads the moved checkout as new work (why the loop reports it with done)",
+check("resume after a merge stop answers with the stop, naming the merge's commit, until told it did not land",
+      stopped(answer, "failed", "merge") and answer.get("mayHaveLanded") is True and answer.get("commit") == story, answer)
+answer = run.resume(landed=False)
+check("... and told wrongly that it did not land, reads the moved checkout as new work (why the loop checks first)",
       answer is not None and answer.get("action") == "run" and answer["step"]["id"] in ("risk-check", "local-checks", "review"), answer)
 run = Run()
 run.until("merge")
@@ -398,8 +401,8 @@ story = answer["payload"]["commit"]
 git(run.repo, "checkout", "-q", "main"); git(run.repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
 git(run.repo, "reset", "-q", "--hard", "HEAD~1"); git(run.repo, "checkout", "-q", "feature")  # as merge-paths restores it
 answer = run.done("MERGE: BLOCKED push refused: the remote rejected it\n")
-answer = run.resume()
-check("after a refused push, restored as merge-paths says, resume hands the merge the story commit again",
+answer = run.resume(landed=False)
+check("after a refused push, restored as merge-paths says, resume told it did not land hands the merge the story commit again",
       is_run(answer, "merge", 2) and answer["payload"]["commit"] == story, answer)
 
 # --- a train one-off moved off the train for excluded paths: the new run on the moved branch ---
@@ -445,6 +448,194 @@ rebuilt = REPORT.build_report_arguments(resent["runId"], resent["sessionId"], [d
 check("the refused object with the definition added is a report the helper accepts unchanged, carrying the refused steps",
       rebuilt == resent and resent["reports"] == refused_call["reports"], (rebuilt, resent))
 
+# --- a re-issued risk check is handed only its last ACCEPTED screen --------------------------
+for verdict, extra in (("RISK CHECK: BLOCKED verifier unavailable", {}), ("RISK CHECK: NEEDS DECISION keep the token check?", {"answer": "keep it"})):
+    run = Run()
+    run.until("risk-check")
+    commit(run.repo, "auth.txt", "auth change\n", "the build touches sign-in")
+    run.done(canned("risk-check@1", run.repo, verdict=verdict, **{"proof.triggers": ["auth"], "proof.verifiers": 0}))
+    answer = run.resume(**extra)
+    check("after %s the re-issued risk check gets no previous proof or result: the full screen" % verdict.split(":")[1].split()[0],
+          is_run(answer, "risk-check", 2) and answer["payload"]["previousProof"] is None and answer["payload"]["previousResult"] is None, answer)
+run = Run()
+run.until("risk-check")
+answer = run.done(canned("risk-check@1", run.repo, **{"proof.triggers": ["auth"], "proof.verifiers": 0}))
+check("(a proof naming a trigger and no verifier is refused)", stopped(answer, "proof", "risk-check"), answer)
+answer = run.resume()
+check("... and a resume after that refusal hands no previous proof: the full screen again",
+      is_run(answer, "risk-check", 2) and answer["payload"]["previousProof"] is None, answer)
+run = Run()
+run.until("local-checks")
+first = facts(run.repo)["head"]
+run.done("LOCAL CHECKS: FAIL unit\n")
+commit(run.repo, "fix.txt", "fix\n", "fix the red check")
+answer = run.resume()
+check("a re-issued risk check after a gate fix is handed the accepted screen it follows",
+      is_run(answer, "risk-check", 2) and answer["payload"]["previousProof"]["head"] == first, answer)
+run.done(canned("risk-check@1", run.repo, **{"proof.triggers": ["auth"], "proof.verifiers": 0}))
+answer = run.resume()
+check("... and after that attempt's proof is refused, still that accepted screen, never the refused one",
+      is_run(answer, "risk-check", 3) and answer["payload"]["previousProof"]["head"] == first
+      and answer["payload"]["previousProof"]["triggers"] == [], answer)
+
+# --- what the first screen recorded reaches capture and completion after a re-screen -------------
+for cause in ("gate fix", "review fix"):
+    run = Run()
+    run.until("risk-check")
+    run.done(canned("risk-check@1", run.repo, **{"ledger": "screen one", "untrackedDeferrals": ["first-screen finding"],
+                                                    "deviations": ["kept the old export format"], "dismissed": [{"id": "F1", "why": "test only"}],
+                                                    "counts": {"raised": 2, "fixed": 0, "deferred": 1, "dismissed": 1}}))
+    if cause == "gate fix":
+        run.until("local-checks")
+        run.done("LOCAL CHECKS: FAIL unit\n")
+        commit(run.repo, "fix.txt", "fix\n", "fix the red check")
+        answer = run.resume()
+    else:
+        run.until("review")
+        commit(run.repo, "export.txt", "export\nreview fix\n", "a review fix")
+        answer = run.done()
+    check("(after a %s the risk check is screened again, handed the first screen's result)" % cause,
+          is_run(answer, "risk-check", 2) and answer["payload"]["previousResult"]["untrackedDeferrals"] == ["first-screen finding"], answer)
+    run.done(canned("risk-check@1", run.repo, **{"ledger": "screen two", "deviations": ["a second deviation"],
+                                                    "counts": {"raised": 1, "fixed": 1, "deferred": 0, "dismissed": 0}}))
+    handed = {}
+    while run.answer and run.answer["action"] == "run":
+        handed[run.answer["step"]["id"]] = run.answer["payload"]
+        run.done()
+    for step_id in ("capture", "complete"):
+        risk = handed.get(step_id, {}).get("riskCheck") or {}
+        check("after a %s, %s still gets the first screen's untracked deferral and deviation, with the second's" % (cause, step_id),
+              risk.get("untrackedDeferrals") == ["first-screen finding"] and risk.get("deviations") == ["kept the old export format", "a second deviation"]
+              and risk.get("dismissed") == [{"id": "F1", "why": "test only"}] and risk.get("counts", {}).get("raised") == 3
+              and risk.get("ledger", "").startswith("screen one") and "screen two" in risk.get("ledger", ""), risk)
+
+# --- a base that really moves: the risk check is bound to origin/<workingBase> ---------------------
+def origin_run(rebase=False, base_ref="origin/main"):
+    bare = fresh("origin")
+    git(bare, "init", "-q", "--bare")
+    run = Run()
+    git(run.repo, "remote", "add", "origin", bare)
+    git(run.repo, "push", "-q", "origin", "main", "feature")
+    git(run.repo, "fetch", "-q", "origin")
+    def answer(step):
+        """The canned answer with the facts measured from origin/main, and proofs naming it."""
+        patch = git(run.repo, "patch-id", "--verbatim", stdin=git(run.repo, *(DIFF + ["origin/main...HEAD", "--"]))).decode().split()
+        text = FIX["outputs"][step["contract"]]
+        for key, value in dict(facts(run.repo), patchId=patch[0] if patch else "").items():
+            text = text.replace("{%s}" % key, value)
+        head, _, block = text.partition("```json\n")
+        result = json.loads(block.split("```")[0])
+        if step["contract"] == "review@1":
+            result["proof"]["base"] = "origin/main"
+        if step["contract"] == "risk-check@1":
+            result["proof"]["base"] = base_ref if base_ref == "origin/main" else git(run.repo, "rev-parse", "origin/main").decode().strip()
+        return head + "```json\n" + json.dumps(result) + "\n```\n"
+    issued = []
+    while run.answer["action"] == "run" and run.answer["step"]["id"] != "merge":
+        run.done(answer(run.answer["step"]))
+    first_head = facts(run.repo)["head"]
+    other = fresh("other")
+    git(other, "clone", "-q", bare, ".")
+    git(other, "checkout", "-q", "main")
+    commit(other, "upstream.txt", "another author's work\n", "another author lands")
+    git(other, "push", "-q", "origin", "main")
+    git(run.repo, "fetch", "-q", "origin")
+    if rebase:
+        git(run.repo, "rebase", "-q", "origin/main")
+    else:
+        git(run.repo, "merge", "-q", "--no-edit", "origin/main")
+    run.done("MERGE: REFRESHED\n")
+    while run.answer["action"] == "run" and run.answer["step"]["id"] != "merge":
+        issued.append(run.answer["step"]["id"])
+        run.done(answer(run.answer["step"]))
+    return run, issued, first_head, answer
+for rebase in (False, True):
+    run, issued, first_head, answer = origin_run(rebase=rebase)
+    how = "a rebase onto the moved base" if rebase else "the moved base merged into the story"
+    check("after %s, with the risk proof on origin/main, the story is not screened again (only the local checks rerun)" % how,
+          issued == ["local-checks"] and is_run(run.answer, "merge"), (issued, run.answer))
+run, issued, first_head, answer = origin_run()
+own = git(run.repo, "diff", "origin/main...HEAD").decode()
+check("the story's own change after a base merge (origin/main...HEAD) holds none of the other author's work, which a plain diff from the screened head does",
+      "export" in own and "another author's work" not in own and "another author's work" in git(run.repo, "diff", first_head, "HEAD").decode(), own)
+commit(run.repo, "export.txt", "export\nlater fix\n", "a later fix on the story")
+answer_now = run.done("MERGE: REFRESHED\n")
+check("... while a later commit on the story after the base merge is screened again, from the head it last covered",
+      is_run(answer_now, "risk-check", 2) and answer_now["payload"]["previousProof"]["head"] == first_head, answer_now)
+run, issued, first_head, answer = origin_run(base_ref="sha")
+check("(a risk proof whose base is a commit id would be screened again at every base refresh: why the skill names origin/main)",
+      issued[:1] == ["risk-check"], issued)
+
+# --- adopting a run: only in its own repository, re-bound to the adopting checkout ----------
+run = Run()
+git(run.repo, "remote", "add", "origin", "https://example.com/acme/app.git")
+run.rc, run.answer, _, _ = run.call("start", {"definitionFile": BUILD_FILE, "replace": True, "context": dict(CONTEXT, cwd=run.repo)})
+run.until("local-checks")
+run.done("LOCAL CHECKS: FAIL unit\n")
+elsewhere = fresh("elsewhere")
+git(elsewhere, "init", "-q"); commit(elsewhere, "a.txt", "a\n", "a")
+git(elsewhere, "remote", "add", "origin", "https://example.com/acme/other.git")
+env = dict(os.environ, XDG_CACHE_HOME=run.cache)
+done = subprocess.run([sys.executable, "-B", RUNNER, "resume"], input=json.dumps({"item": "I123", "session": "s2"}),
+                      capture_output=True, text=True, env=env, cwd=elsewhere)
+check("a run is never adopted from another repository's checkout (run-other-repository), and stays the old session's",
+      done.returncode == 2 and "run-other-repository" in done.stderr and run.call("status", {"item": "I123"})[0] == 0, done.stderr)
+second = fresh("second")
+git(run.repo, "worktree", "add", "-q", "--detach", second, "feature")
+done = subprocess.run([sys.executable, "-B", RUNNER, "resume"], input=json.dumps({"item": "I123", "session": "s2"}),
+                      capture_output=True, text=True, env=env, cwd=second)
+answer = json.loads(done.stdout) if done.returncode == 0 else None
+check("a run is adopted in another checkout of the same repository, and says which checkout it came from",
+      is_run(answer, "local-checks", 2) and answer["adoptedFrom"] == {"sessionId": "s1", "cwd": os.path.realpath(run.repo)}, (done.stderr, answer))
+commit(run.repo, "old.txt", "old checkout\n", "a commit in the old checkout")
+run.session = "s2"
+done = subprocess.run([sys.executable, "-B", RUNNER, "done"], capture_output=True, text=True, env=env, cwd=second,
+                      input=json.dumps({"item": "I123", "session": "s2", "stepId": "local-checks", "attempt": 2, "output": canned("local-checks@1", second)}))
+answer = json.loads(done.stdout) if done.returncode == 0 else None
+check("... and its proofs are read there: a commit in the old checkout changes nothing",
+      is_run(answer, "review", 1), (done.stderr, answer))
+commit(second, "new.txt", "adopting checkout\n", "a commit in the adopting checkout")
+done = subprocess.run([sys.executable, "-B", RUNNER, "done"], capture_output=True, text=True, env=env, cwd=second,
+                      input=json.dumps({"item": "I123", "session": "s2", "stepId": "review", "attempt": 1, "output": canned("review@1", second)}))
+answer = json.loads(done.stdout) if done.returncode == 0 else None
+check("... while a commit in the adopting checkout is screened again", is_run(answer, "risk-check", 2), (done.stderr, answer))
+
+# --- a merge stop in a new session: answered with the stop, never cleared by the resume ------
+run = Run()
+answer = run.until("merge")
+story = answer["payload"]["commit"]
+git(run.repo, "checkout", "-q", "main"); git(run.repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
+answer = run.done(canned("merge@1", run.repo))
+check("(a merge that names the base's head, not the story commit, stops the run)", stopped(answer, "proof", "merge"), answer)
+run.session = "s2"
+answer = run.resume()
+check("a new session's resume of that run answers with the merge stop, its commit and attempt, adopting it",
+      stopped(answer, "proof", "merge") and answer.get("mayHaveLanded") is True and answer.get("commit") == story
+      and answer.get("attempt") == 1 and answer.get("adoptedFrom", {}).get("sessionId") == "s1", answer)
+answer = run.call("done", {"item": "I123", "stepId": "merge", "attempt": 1, "output": canned("merge@1", run.repo, **{"proof.head": story})})[1]
+check("... and the exact landing, reported with done, carries the run on to its completion", is_run(answer, "complete", 1), answer)
+
+# --- a named one-off held by a release hold: nothing to select, so the loop must not go round ---
+run = Run(context={"route": "train", "oneOff": True, "releaseUnit": None})
+run.until("merge")
+answer = run.done("MERGE: HELD Release hold: not before 2026-12-01\n")
+check("(a release hold ends the run held)", finished(answer, "held"), answer)
+rc, _, _, err = run.call("resume", {"item": "I123"})
+rc2, again, _, _ = run.call("start", {"definitionFile": BUILD_FILE, "context": dict(CONTEXT, cwd=run.repo, route="train", oneOff=True, releaseUnit=None)})
+check("after it, resume finds no run and a start builds the story again from the claim: why a named one-off's hold is a terminal exit",
+      rc == 2 and "no-run" in err and rc2 == 0 and is_run(again, "claim", 1), (err, again))
+
+# --- a stale run for an item finished elsewhere is closed, never carried on --------------------
+run = Run()
+run.until("local-checks")
+run.done("LOCAL CHECKS: FAIL unit\n")
+run.session = "s2"
+answer = run.resume(close=True)
+check("resume with close ends a run (adopted here) as interrupted, reporting its end",
+      finished(answer, "interrupted") and closes(answer, "interrupted") and answer.get("adoptedFrom", {}).get("sessionId") == "s1", answer)
+rc, _, _, err = run.call("resume", {"item": "I123"})
+check("... and nothing is left to resume", rc == 2 and "no-run" in err, err)
+
 # --- what looks like a credential never reaches a report ----------------------------------
 token = "".join(FIX["credentials"]["caught"][3])  # stored in two parts: never one literal in the repository
 run = Run()
@@ -457,6 +648,6 @@ OUT="$(python3 -B "$WORK/cases.py" "$ROOT" "$WORK" 2>&1)"; RC=$?
 printf '%s\n' "$OUT" | sed 's/^/  /'
 N="$(printf '%s\n' "$OUT" | grep -c '^ok')"
 if [ $RC -ne 0 ] || printf '%s\n' "$OUT" | grep -q '^FAIL'; then bad "a case failed or the script did not finish (exit $RC)"
-elif [ "$N" -lt 70 ]; then bad "only $N cases ran, expected at least 70"
+elif [ "$N" -lt 90 ]; then bad "only $N cases ran, expected at least 90"
 else ok "(all $N cases passed)"; fi
 exit $FAIL

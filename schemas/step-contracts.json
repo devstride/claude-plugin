@@ -146,7 +146,8 @@
         "workingBase": "context.workingBase",
         "build": "result:build@1",
         "answer": "step.answer?",
-        "previousProof": "step.proof?"
+        "previousProof": "step.passedProof?",
+        "previousResult": "step.passedResult?"
       },
       "argument": null,
       "verdict": {
@@ -246,7 +247,8 @@
         "route": "context.route",
         "riskCheck": "result:risk-check@1",
         "build": "result:build@1",
-        "localChecks": "result:local-checks@1"
+        "localChecks": "result:local-checks@1",
+        "localChecksProof": "proof:local-checks@1"
       },
       "argument": null,
       "verdict": {

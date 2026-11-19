@@ -146,7 +146,11 @@ for name, entry in contracts.items():
 # Every contract's payload, key by key: a key is only ever added, never renamed or dropped.
 PAYLOADS = {
     "risk-check@1": {"item": "context.item", "profile": "context.profile.name", "reviewMoment": "context.reviewMoment",
-                     "workingBase": "context.workingBase", "build": "result:build@1", "answer": "step.answer?", "previousProof": "step.proof?"},
+                     "workingBase": "context.workingBase", "build": "result:build@1", "answer": "step.answer?",
+                     "previousProof": "step.passedProof?", "previousResult": "step.passedResult?"},
+    "review@1": {"item": "context.item", "profile": "context.profile.name", "reviewMoment": "context.reviewMoment",
+                 "workingBase": "context.workingBase", "route": "context.route", "riskCheck": "result:risk-check@1",
+                 "build": "result:build@1", "localChecks": "result:local-checks@1", "localChecksProof": "proof:local-checks@1"},
     "local-checks@1": {"item": "context.item", "profile": "context.profile.name", "workingBase": "context.workingBase", "route": "context.route",
                        "oneOff": "context.oneOff", "branch": "result:branch@1.branch", "previousProof": "step.proof?", "reviewMoment": "context.reviewMoment"},
     "merge@1": {"item": "context.item", "profile": "context.profile.name", "workingBase": "context.workingBase", "route": "context.route",
@@ -212,8 +216,11 @@ check("every validation code is in the runner and in the contracts half", all('"
       [c for c in codes if '"%s"' % c not in source or "`%s`" % c not in rules])
 kinds = ["failed", "needs-person", "attempts-exhausted", "no-verdict", "proof"]
 check("every stop kind is in the reference's table", all("| `%s` |" % k in text for k in kinds))
-check("the four named proof rules are in the runner and the contracts half", all(r in source and "`%s`" % r in rules for r in (
-    "risk-triggers-need-verifiers", "none-configured-needs-pull-request-route", "review-names-one-path", "merge-lands-what-was-checked")))
+check("the five named proof rules are in the runner and the contracts half", all(r in source and "`%s`" % r in rules for r in (
+    "risk-triggers-need-verifiers", "risk-check-accumulates", "none-configured-needs-pull-request-route", "review-names-one-path",
+    "merge-lands-what-was-checked")))
+check("the merge stop's own rule is in the runner and the loop half", "merge-may-have-landed" in source and "`merge-may-have-landed`" in text)
+check("adoption's refusal across repositories is in the runner and the loop half", '"run-other-repository"' in source and "`run-other-repository`" in text)
 check("every binding the runner knows is spelled in the contracts half", all("- **%s**:" % b in rules for b in runner.BINDINGS), runner.BINDINGS)
 
 # the skills the catalog names

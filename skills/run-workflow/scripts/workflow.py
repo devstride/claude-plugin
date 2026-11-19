@@ -72,7 +72,7 @@ TEMPLATE_FIELD = re.compile(r"\{([A-Za-z][A-Za-z0-9]*)\}")
 PAYLOAD_PATH = re.compile(
     r"^(?:context(?:\.[A-Za-z][A-Za-z0-9]*)+"
     r"|(?:result|proof):[a-z][a-z0-9-]*@[0-9]+(?:\.[A-Za-z][A-Za-z0-9]*)*"
-    r"|step\.(?:answer|proof|head))\??$")
+    r"|step\.(?:answer|proof|head|passedProof|passedResult))\??$")
 
 # The catalog's vocabulary (schemas/step-contracts.json).
 ENTRY_FIELDS = ("summary", "builtinSkill", "payload", "argument", "verdict", "result", "proof",
@@ -754,12 +754,40 @@ def proof_fault(contract, entry, proof, value=None, result=None):
     return None
 
 
+ACCUMULATED = ("untrackedDeferrals", "dismissed", "deferrals", "deviations")
+
+
+def accumulate(before, after):
+    """risk-check-accumulates: a risk check screened again after a later commit reports only the
+    delta, so its accepted result is added to the last accepted one: each list keeps every earlier
+    entry and gains the new ones it lacks, the counts are summed and the ledger is appended to.
+    The report is the new one. Nothing the first screen deferred, dismissed or found is lost."""
+    merged = dict(after)
+    for key in ACCUMULATED:
+        old, new = before.get(key) or [], after.get(key) or []
+        if not (old or key in after):
+            continue
+        seen = [json.dumps(entry, sort_keys=True) for entry in old]
+        merged[key] = list(old) + [entry for entry in new if json.dumps(entry, sort_keys=True) not in seen]
+    counts = dict(before.get("counts") or {})
+    for key, value in (after.get("counts") or {}).items():
+        earlier = counts.get(key)
+        counts[key] = earlier + value if is_type(earlier, "count") and is_type(value, "count") else value
+    if counts:
+        merged["counts"] = counts
+    old, new = before.get("ledger") or "", after.get("ledger") or ""
+    if old and not new.startswith(old):
+        merged["ledger"] = old + ("\n\n" + new if new else "")
+    return merged
+
+
 def binding_holds(binding, proof, world, cwd, commit):
     """True when a proof still matches `commit`, the commit HEAD was found on. `tree`: the proof's
     tree is that commit's tree. `patch`: its patch id is the id of everything on that commit since
     its base, so a base that moved under an unchanged patch keeps the proof. `story`: the story's
     patch since the proof's base is the same at the proof's `head` as at that commit, so any later
-    commit that changes the story voids it while a base that moved under it does not; a head that
+    commit that changes the story voids it while a base that moved under it (`base` being the moving
+    `origin/<workingBase>`) does not; a head that
     cannot be read voids it too. `none`: nothing binds it."""
     if binding == "tree":
         return isinstance(proof, dict) and proof.get("tree") == world.tree(cwd, commit)
@@ -998,8 +1026,9 @@ class Run:
         record = self.record(index)
         if self.steps[index]["contract"] != "merge@1" or proof.get("head") == record.get("issuedHead"):
             return None
-        return ("merge-lands-what-was-checked: if %s landed, report it with done naming it, never resume; "
-                "the merge named another commit than the one checked and reviewed" % (record.get("issuedHead") or "none"))
+        # The verdict cap is 200 characters: what to do comes first, so it is never cut off.
+        return ("merge-lands-what-was-checked: if exactly %s landed, report it with done naming it; "
+                "another commit landed: a person decides; never resume" % (record.get("issuedHead") or "none"))
 
     # -- what a step is handed --
 
@@ -1014,7 +1043,9 @@ class Run:
                 given = self.provider(index, contract)
                 value = dig(self.record(given)[kind] or {}, keys) if given is not None and ended_well(self.record(given)) else MISSING
             else:
-                value = {"answer": record["answer"], "proof": record["proof"], "head": record.get("issuedHead")}[keys[0]]
+                passed = record.get("passed") or {}
+                value = {"answer": record["answer"], "proof": record["proof"], "head": record.get("issuedHead"),
+                         "passedProof": passed.get("proof"), "passedResult": passed.get("result")}[keys[0]]
                 value = MISSING if value is None else value
             if value is MISSING and not optional:
                 raise KeyError(key)
@@ -1166,6 +1197,7 @@ class Run:
             self.report(index)
             self.stop("no-verdict", "step %s did not open its answer with a `%s: …` verdict its contract lists" % (
                 step["id"], entry["verdict"]["label"]), index)
+            self.may_have_landed(index)
             return
         value, detail = parsed
         if has_secret(detail):
@@ -1193,6 +1225,9 @@ class Run:
                 record.update(status="failed", redo="mismatch")
             else:
                 record["status"] = "done"
+                if step["contract"] == "risk-check@1" and record.get("passed"):
+                    record["result"] = accumulate(record["passed"]["result"], result)
+                record["passed"] = {"proof": proof, "result": record["result"]}
                 if not (record.get("refresh") and record["doneSeq"]):
                     record["doneSeq"] = state["seq"] + 1
                 record.update(refresh=False, autoRedo=0)  # its proof holds: the runner's re-issues start again from 0
@@ -1209,8 +1244,16 @@ class Run:
         self.report(index)
         if after:
             self.stop(after[0], after[1], index)
+            self.may_have_landed(index)
         elif END_CLASS.match(kind):
             self.finish(END_CLASS.match(kind).group(1))
+
+    def may_have_landed(self, index):
+        """merge-may-have-landed: a merge that answered and then stopped may have landed first, so
+        resume answers with the stop again until the driver says it did not (`landed: false`)."""
+        if self.steps[index]["contract"] == "merge@1":
+            record = self.record(index)
+            self.state["stopped"].update(mayHaveLanded=True, attempt=record["attempt"], commit=record.get("issuedHead"))
 
     # -- reporting --
 
@@ -1261,7 +1304,7 @@ def read_definition_file(path):
 def new_record():
     return {"attempt": 0, "autoRedo": 0, "status": "pending", "verdict": None, "class": None, "evidence": [],
             "result": {}, "proof": None, "links": {}, "startedAt": None, "endedAt": None, "doneSeq": None,
-            "ran": None, "answer": None, "refresh": False, "redo": None, "issuedHead": None}
+            "ran": None, "answer": None, "refresh": False, "redo": None, "issuedHead": None, "passed": None}
 
 
 def close_replaced(old, world):
@@ -1373,14 +1416,37 @@ def command_status(world, request, contracts):
             "position": position, "rows": rows, "table": "\n".join(table), "reports": run.reports()}
 
 
-def adopt(world, request, session):
+def common_dir(world, cwd):
+    """The git folder a checkout shares with every other worktree of its repository, or None."""
+    try:
+        out = world.git(cwd, "rev-parse", "--git-common-dir").decode("utf-8", "replace").strip()
+    except GitFailed:
+        return None
+    return os.path.realpath(os.path.join(cwd, out)) if out else None
+
+
+def same_repository(world, state, cwd):
+    """A run is adopted only into a checkout of its own repository: the same remote, or, for a
+    repository with none, a worktree of the same git folder."""
+    old = state["context"].get("repository")
+    if old is not None:
+        return old == REPORT.read_repository(cwd)
+    if REPORT.read_repository(cwd) is not None:
+        return False
+    old_cwd = os.path.realpath(state["context"].get("cwd") or "")
+    here, there = common_dir(world, cwd), common_dir(world, old_cwd)
+    return here == there and (here is not None or old_cwd == cwd)  # outside git: the same folder only
+
+
+def adopt(world, request, session, cwd):
     """An unfinished run for the same item (or with the named run id) that another of this user's
-    sessions left on this machine, newest first, rewritten under this session."""
+    sessions left on this machine for this repository, newest first, rewritten under this session
+    and re-bound to the adopting checkout. Returns (folder, state, adoptedFrom)."""
     item, run_id = item_of(request.get("item")), request.get("runId")
     folder = state_dir(world, create=False)
     if folder is None or not (item or run_id):
         raise Refuse("no-run", "there is no unfinished run to resume")
-    found = []
+    found, elsewhere = [], 0
     for name in os.listdir(folder):
         if not name.endswith(".%s.json" % item if item else ".json") or name.startswith("."):
             continue
@@ -1392,7 +1458,13 @@ def adopt(world, request, session):
             continue  # not this user's, not a state file, or gone: never adopted
         if (not state["outcome"] and state["sessionId"] != session and (item is None or state["item"] == item)
                 and (not run_id or state["runId"] == run_id) and state_name(state["sessionId"], state["item"]) == name):
-            found.append((modified, path, state))
+            if same_repository(world, state, cwd):
+                found.append((modified, path, state))
+            else:
+                elsewhere += 1
+    if not found and elsewhere:
+        raise Refuse("run-other-repository", "the unfinished run for %s belongs to another repository; it is never "
+                     "adopted here: start a run in this repository" % (item or run_id))
     if not found:
         raise Refuse("no-run", "there is no unfinished run to resume")
     _, old_path, state = max(found, key=lambda entry: entry[0])
@@ -1400,11 +1472,13 @@ def adopt(world, request, session):
     if os.path.lexists(mine) and not read_state(mine, world)["outcome"]:
         # As start: an open run of this session's own is never overwritten.
         raise Refuse("run-open", "this session already has an open run for %s; finish it, or start with replace" % (state["item"] or "no item"))
+    adopted_from = {"sessionId": state["sessionId"], "cwd": state["context"].get("cwd")}
     state["sessionId"] = session
+    state["context"]["cwd"] = cwd  # proofs are read in the checkout that carries the run on
     state["definitionReported"] = False  # the first report after an adoption carries the definition again
     write_state(folder, state)
     os.unlink(old_path)
-    return folder, state
+    return folder, state, adopted_from
 
 
 def command_resume(world, request, contracts):
@@ -1412,6 +1486,12 @@ def command_resume(world, request, contracts):
     answer_text = request.get("answer")
     if answer_text is not None and not (isinstance(answer_text, str) and len(answer_text) <= ANSWER_MAX_CHARS):
         raise Refuse("bad-request", "answer is text of at most %d characters" % ANSWER_MAX_CHARS)
+    if ("landed" in request and request["landed"] is not False) or ("close" in request and request["close"] is not True):
+        raise Refuse("bad-request", "landed is only ever false, and close only ever true")
+    cwd = request.get("cwd", os.getcwd())
+    if not isinstance(cwd, str) or not os.path.isdir(cwd):
+        raise Refuse("bad-request", "cwd must be a directory")
+    cwd, adopted_from = os.path.realpath(cwd), None
     try:
         folder, state = find_run(world, request, session)
         if state["outcome"]:
@@ -1419,9 +1499,23 @@ def command_resume(world, request, contracts):
     except Refuse as refusal:
         if refusal.code != "no-run":
             raise
-        folder, state = adopt(world, request, session)
+        folder, state, adopted_from = adopt(world, request, session, cwd)
     prune(folder, world)
     run = Run(state, contracts, world)
+    if request.get("close") is True:
+        # A run whose item was finished elsewhere: ended as interrupted, never carried on.
+        answer = run.finish("interrupted")
+    elif (state["stopped"] or {}).get("mayHaveLanded") and "landed" not in request:
+        # merge-may-have-landed: answered with the stop until the driver has checked the landing.
+        answer = run.stopped_answer()
+    else:
+        answer = None
+    if answer is not None:
+        if adopted_from:
+            answer["adoptedFrom"] = adopted_from
+        answer["reports"] = run.reports()
+        write_state(folder, state)
+        return answer
     at = (state["stopped"] or state["current"] or {}).get("stepId")
     if at:
         record = state["steps"][at]
@@ -1431,6 +1525,8 @@ def command_resume(world, request, contracts):
             record["answer"] = answer_text
     state["stopped"] = None
     answer = run.advance()
+    if adopted_from:
+        answer["adoptedFrom"] = adopted_from
     answer["reports"] = run.reports()
     write_state(folder, state)
     return answer

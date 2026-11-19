@@ -842,8 +842,16 @@ def section_proofs():
     answer = run.done()
     check("a merge that landed a commit added after it was issued stops the run",
           is_stopped(answer, "proof", "merge") and "merge-lands-what-was-checked" in answer["reason"] and answer["recorded"]["status"] == "failed", answer)
+    issued = run.state()["steps"]["merge"]["issuedHead"]
     rc, answer, _, _ = run.call("resume", {"item": "I123"})
-    check("... and resume screens and checks the new commit first", is_run(answer, "risk-check", 2), answer)
+    check("... and resume answers with that stop, naming the commit the merge was handed, until told it did not land",
+          is_stopped(answer, "proof", "merge") and answer.get("mayHaveLanded") is True and answer.get("commit") == issued
+          and answer.get("attempt") == 1 and run.state()["stopped"] is not None, answer)
+    rc, answer, _, _ = run.call("resume", {"item": "I123", "landed": False})
+    check("... then, told it did not land, screens and checks the new commit first", is_run(answer, "risk-check", 2), answer)
+    for bad_value in ({"landed": True}, {"landed": "no"}, {"close": False}):
+        rc, answer, _, err = run.call("resume", dict({"item": "I123"}, **bad_value))
+        check("resume refuses %s: landed is only ever false, close only ever true" % json.dumps(bad_value), rc == 2 and "bad-request" in err, err)
     run = Driver()
     run.until("merge")
     answer = run.done(output="MERGE: BLOCKED conflicts\n")

@@ -27,7 +27,7 @@ session id) and names its run by `item`, by `runId`, or by being the session's o
 | `next` | | The next action. Asked again before `done`, it hands back the issued step and attempt as they were: the step may already have acted, so only its `done` moves the run on |
 | `done` | `stepId`, `attempt`, `output` (the step's whole final answer, as text) | Records the issued step's answer and returns the next action plus `recorded`. Any other step or attempt is refused (`not-current-step`), except the step a stopped run stopped on, repaired by hand |
 | `status` | `includeDefinition`? | Read-only: `state` (running, stopped or finished), `position`, one row per step and a ready Markdown `table`. With `includeDefinition`, one report object carrying the definition |
-| `resume` | `answer`? | Continues after a restart or a stop: an issued step comes back as it was, otherwise as `next`. `answer`, a person's reply to a question, reaches that step's payload for that attempt only |
+| `resume` | `answer`?, `cwd`?, `landed`?, `close`? | Continues after a restart or a stop: an issued step comes back as it was, otherwise as `next`. `answer`, a person's reply to a question, reaches that step's payload for that attempt only. A merge stop comes back as the stop until `landed` is `false`. `close` `true` ends the run as interrupted |
 
 The context: `item` (an item number or null), `goal`, `profile` (`name` and `source`),
 `workingBase`, `oneOff`, `route` (`train`, `develop-pr` or `epic-release`), `releaseUnit`,
@@ -43,7 +43,8 @@ An action is one of:
   payload as one compact JSON string: pass it to the skill unchanged) and `heartbeat`.
 - **`finished`**: `outcome` (`completed`, or the outcome a step ended the run with, such as `held`)
   and `results`, each finished step's result by contract.
-- **`stopped`**: `kind`, `reason`, `stepId`.
+- **`stopped`**: `kind`, `reason`, `stepId`; a stop of a merge that answered adds `mayHaveLanded`
+  (true), its `attempt` and the `commit` it was handed.
 
 Every answer also carries `runId` and `reports`; `start` adds the definition's hash.
 
@@ -90,7 +91,12 @@ What is reported, and what is never reported: `workflow-contracts.md`.
 | `failed` | The step answered with a stopping verdict, or its result was incomplete | Fix the cause, then `resume`; or do the step by hand and report it with `done` |
 | `needs-person` | The step asked a question | `resume` with the `answer` |
 | `no-verdict` | The answer did not open with a verdict the contract lists | Run the step again (`resume`), or report its real verdict with `done` |
-| `proof` | A proof was refused by a value or a named rule, or could not be checked | Fix what the reason names, then `resume`; a merge stop: first check whether it landed, and if so report it with `done` |
+| `proof` | A proof was refused by a value or a named rule, or could not be checked | Fix what the reason names, then `resume` |
+
+**A merge stop** (`mayHaveLanded`, any kind): the merge answered, so it may have landed before it
+stopped. First check whether exactly its `commit` landed. It did → report it with `done` on that
+attempt; never `resume`, which reads the moved checkout as new work. It did not → `resume` with
+`"landed": false`. Until then `resume` answers with the same stop (`merge-may-have-landed`).
 | `attempts-exhausted` | The same step was re-issued until the limit, or has run 50 times | Find why its proof never holds, then `resume`, which resets the re-issue count but never the 50 |
 
 ## Reporting
@@ -121,10 +127,14 @@ State is one owner-only file per session and item under the user's cache folder
 (`$XDG_CACHE_HOME`, else `~/.cache`), refused when that folder is under a `.git` folder or inside
 the plugin, pruned after seven days. After a compaction: `status`, then `resume`. A cleared
 conversation is a new session: `resume` with the item (or the run id) adopts the newest unfinished
-run that another of this user's sessions left on this machine, keeps its run id, and the next
-report carries the definition again under the new session. A finished run is never adopted, and an
-adoption that would overwrite this session's own open run for that item is refused (`run-open`).
-Two sessions driving one run at once are not supported.
+run that another of this user's sessions left on this machine for this repository (the same
+remote, or, with none, the same git folder; another repository's is refused,
+`run-other-repository`), keeps its run id, re-binds it to the adopting checkout (`cwd`, default the
+current directory) and names the old session and checkout in `adoptedFrom`; the next report carries
+the definition again under the new session. A finished run is never adopted, and an adoption that
+would overwrite this session's own open run for that item is refused (`run-open`). The runner
+cannot tell a live session's run from a dead one's: the driver checks the story's claim first. Two
+sessions driving one run at once are not supported.
 
 ## Cited by
 
