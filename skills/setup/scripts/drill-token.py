@@ -16,6 +16,8 @@ person's Claude Code, and signs each in with a long-lived token the person makes
   Fix: /devstride:setup drills        (make the token)
   Fix: run the check again later      (the service failed; the token was not refused)
   Fix: remove this machine's other Claude credential …  (an API key or key helper wins over the token)
+  Fix: point drillSessions.tokenFile at …  (the path holds something else, which make never overwrites)
+  Fix: put the claude command on PATH …
 Exit 0 for READY and N/A, 1 for NOT READY, 2 for a usage or config error.
 The token file must be an absolute or ~ path outside the repository, so it can never be committed.
 The sign-in proof is one real, tiny request: `claude -p` on Haiku, with no tools, no settings, no
@@ -45,6 +47,8 @@ import tempfile
 
 FIX = "Fix: /devstride:setup drills"
 AGAIN = "Fix: run the check again later"
+PATH_FIX = "Fix: put the claude command on PATH, then run the check again"
+WRONG_FILE = "Fix: point drillSessions.tokenFile at the drill token's own file, or move this file away, then /devstride:setup drills"
 PREFIX = "sk-ant-oat"  # what claude setup-token makes; an API key (sk-ant-api…) is never sent or overwritten
 OTHER = "Fix: remove this machine's other Claude credential (an API key or key helper), then run the check again"
 PROOF = ["claude", "-p", "Reply with the word ok.", "--model", "haiku", "--tools", "", "--setting-sources", "user",
@@ -69,7 +73,7 @@ def git_top(directory):
 def resolve(raw):
     raw = raw.strip()
     if not (raw.startswith("/") or raw.startswith("~")):
-        usage("the token file must be an absolute or ~ path, not %r" % raw)
+        usage("the token file must be an absolute or ~ path")
     path = os.path.abspath(os.path.expanduser(raw))
     folder = os.path.dirname(path)
     while folder and not os.path.isdir(folder):
@@ -133,14 +137,15 @@ def run_claude(args, token, folder):
 def prove(token):
     """None when the token signs a fresh folder in, else (reason, fix line). Never echoes output."""
     if not shutil.which("claude"):
-        return "the claude command is not on PATH, so the token cannot be tried", FIX
+        return "the claude command is not on PATH, so the token cannot be tried", PATH_FIX
     folder = tempfile.mkdtemp(prefix="drill-token-check-")
     try:
         try:
-            _, status = run_claude(["claude", "auth", "status"], token, folder)
-            if status is None:
-                return "claude auth status gave no readable answer", AGAIN
-            if status.get("authMethod") != "oauth_token":
+            code, status = run_claude(["claude", "auth", "status"], token, folder)
+            method = status.get("authMethod") if status else None
+            if code or method in (None, "", "none"):
+                return "claude auth status gave no usable answer", AGAIN
+            if method != "oauth_token":
                 return "this machine supplies another credential ahead of the token, so it cannot be tried", OTHER
             code, answer = run_claude(PROOF, token, folder)
         except subprocess.TimeoutExpired:
@@ -169,7 +174,7 @@ def check(path):
     except OSError as error:
         return not_ready("cannot read %s (%s)" % (path, error.strerror))
     if not stat.S_ISREG(info.st_mode):
-        return not_ready("%s is not a file" % path)
+        return not_ready("%s is not a file" % path, WRONG_FILE)
     if info.st_mode & 0o077:
         return not_ready("%s can be read by others (mode %o); it must be owner-only (chmod 600)" % (path, stat.S_IMODE(info.st_mode)))
     try:
@@ -180,7 +185,7 @@ def check(path):
     if not token:
         return not_ready("%s is empty" % path)
     if not usable(token):
-        return not_ready("%s does not hold one Claude Code token alone (sk-ant-oat…); nothing was sent" % path)
+        return not_ready("%s does not hold one Claude Code token alone (sk-ant-oat…); nothing was sent" % path, WRONG_FILE)
     failed = prove(token)
     if failed:
         return not_ready(*failed)

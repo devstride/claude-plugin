@@ -12,7 +12,8 @@ cat > "$TMP/bin/claude" <<'FAKE'
 # fake claude: logs argv and where the token came from, never the token itself
 printf '%s\n' "$*" >> "$FAKE_LOG"
 case "$1" in
-  auth) [ -n "${FAKE_AUTH_BROKEN:-}" ] && { echo "boom" >&2; exit 1; }; echo "{\"loggedIn\": true, \"authMethod\": \"${FAKE_AUTH_METHOD:-oauth_token}\"}" ;;
+  auth) [ -n "${FAKE_AUTH_BROKEN:-}" ] && { echo "boom" >&2; exit 1; }
+        [ -n "${FAKE_AUTH_OUT:-}" ] && { echo '{"loggedIn": false, "authMethod": "none"}'; exit 1; }; echo "{\"loggedIn\": true, \"authMethod\": \"${FAKE_AUTH_METHOD:-oauth_token}\"}" ;;
   -p)
     [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ -d "$CLAUDE_CONFIG_DIR" ] && [ -z "$(ls -A "$CLAUDE_CONFIG_DIR")" ] \
       && [ "$(pwd -P)" = "$(cd "$CLAUDE_CONFIG_DIR" && pwd -P)" ] && echo "config-dir: fresh, and the working directory" >> "$FAKE_LOG"
@@ -87,7 +88,8 @@ OUT="$(run check --file "$TOK")"; RC=$?
 if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'does not hold one Claude Code token alone' && [ ! -s "$FAKE_LOG" ]; then ok "(6d) two lines → NOT READY, nothing tried"; else bad "(6d) rc=$RC $OUT"; fi
 printf '//registry.example/:_authToken=npm-secret\n' > "$TOK"; : > "$FAKE_LOG"
 OUT="$(run check --file "$TOK")"; RC=$?
-if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'nothing was sent' && [ ! -s "$FAKE_LOG" ]; then ok "(6g) another service's credential → NOT READY, never sent"; else bad "(6g) rc=$RC $OUT"; fi
+if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'nothing was sent' && [ ! -s "$FAKE_LOG" ] \
+   && printf '%s' "$OUT" | tail -1 | grep -q '^Fix: point drillSessions.tokenFile'; then ok "(6g) another service's credential → NOT READY, never sent"; else bad "(6g) rc=$RC $OUT"; fi
 
 # (6e) a relative path, or one inside a git repository, is refused (it could be committed)
 OUT="$(run check --file relative/token)"; RC=$?
@@ -101,10 +103,18 @@ printf '%s\n' "$SECRET" > "$TOK"
 OUT="$(FAKE_AUTH_BROKEN=1 run check --file "$TOK")"; RC=$?
 if [ $RC -eq 1 ] && printf '%s' "$OUT" | tail -1 | grep -qx 'Fix: run the check again later'; then ok "(6h) auth status unreadable → check again later"; else bad "(6h) rc=$RC $OUT"; fi
 
+# (6i) auth status failing with a readable answer → check again later, never "remove a credential"
+OUT="$(FAKE_AUTH_OUT=1 run check --file "$TOK")"; RC=$?
+if [ $RC -eq 1 ] && printf '%s' "$OUT" | tail -1 | grep -qx 'Fix: run the check again later'; then ok "(6i) auth status exit 1 → check again later"; else bad "(6i) rc=$RC $OUT"; fi
+
+# (6j) a token pasted into the setting by mistake is never echoed
+OUT="$(run check --file "$SECRET")"; RC=$?
+if [ $RC -eq 2 ] && ! printf '%s' "$OUT" | grep -q "$SECRET"; then ok "(6j) a bad path setting is never echoed"; else bad "(6j) rc=$RC $OUT"; fi
+
 # (7) no claude on PATH → NOT READY with that reason
 printf '%s\n' "$SECRET" > "$TOK"; chmod 600 "$TOK"
 OUT="$(PATH=/usr/bin:/bin python3 "$SC" check --file "$TOK" 2>&1)"; RC=$?
-if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'not on PATH'; then ok "(7) claude missing → NOT READY"; else bad "(7) rc=$RC $OUT"; fi
+if [ $RC -eq 1 ] && printf '%s' "$OUT" | grep -q 'not on PATH' && printf '%s' "$OUT" | tail -1 | grep -q '^Fix: put the claude command on PATH'; then ok "(7) claude missing → NOT READY"; else bad "(7) rc=$RC $OUT"; fi
 
 # (8) make refuses without a terminal and writes nothing
 rm -f "$TOK"

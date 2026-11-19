@@ -35,13 +35,15 @@ their own terminal, does — it is outside setup's write boundary.
   prompt, no saved session) succeeded in a fresh, empty folder that is removed afterwards, so it
   appears in no one's Claude Code. `claude auth status` is not a proof: it reports any token as
   signed in without asking the server.
-- `DRILL TOKEN: NOT READY — <reason>`, then one of three fix lines:
+- `DRILL TOKEN: NOT READY — <reason>`, then one of these fix lines:
   `Fix: /devstride:setup drills` — the file is missing, unsafe or malformed, or the server refused
   the token (HTTP 401 or 403): the person makes one, below.
   `Fix: run the check again later` — the request failed for another reason (a rate limit, an
   outage, a timeout): the token was not refused, so nobody makes a new one; report it and move on.
   `Fix: remove this machine's other Claude credential …` — an API key or key helper wins over the
   token: a new token would not help; report it to the person.
+  `Fix: point drillSessions.tokenFile at …` (the path holds something else, which `make` never
+  overwrites) and `Fix: put the claude command on PATH …`: no new token; report them.
 
 It never prints the token, never puts it on a command line and never writes the file.
 
