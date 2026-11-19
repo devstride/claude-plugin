@@ -6,7 +6,8 @@ and reads a repository only through three read-only git commands (`rev-parse`, `
 `patch-id`) plus the remote lookup of the reporting helper. A person, another agent or the
 plugin's own loop asks it what is next, runs that step, hands the step's answer back, and gets
 the same answers every time, also after a restart or a cleared conversation. The rules are in
-`skills/run-workflow/references/workflow-runner.md`; the step contracts are in
+`skills/run-workflow/references/workflow-runner.md` (driving a run) and
+`skills/run-workflow/references/workflow-contracts.md` (definitions and proofs); the step contracts are in
 `schemas/step-contracts.json`.
 
   python3 -B workflow.py <command>     one JSON object on stdin, one JSON object on stdout
@@ -70,7 +71,7 @@ FENCE_OPEN = re.compile(r"^\s*```json\s*$")
 TEMPLATE_FIELD = re.compile(r"\{([A-Za-z][A-Za-z0-9]*)\}")
 PAYLOAD_PATH = re.compile(
     r"^(?:context(?:\.[A-Za-z][A-Za-z0-9]*)+"
-    r"|result:[a-z][a-z0-9-]*@[0-9]+(?:\.[A-Za-z][A-Za-z0-9]*)*"
+    r"|(?:result|proof):[a-z][a-z0-9-]*@[0-9]+(?:\.[A-Za-z][A-Za-z0-9]*)*"
     r"|step\.(?:answer|proof|head))\??$")
 
 # The catalog's vocabulary (schemas/step-contracts.json).
@@ -79,8 +80,8 @@ ENTRY_FIELDS = ("summary", "builtinSkill", "payload", "argument", "verdict", "re
 CLASSES = ("continue", "skipped", "redo:self", "stop", "ask")
 END_CLASS = re.compile(r"^end:([a-z][a-z-]*)$")
 DETAILS = ("none", "optional", "required")
-BINDINGS = ("none", "tree", "patch")
-BINDING_FIELDS = {"none": (), "tree": ("tree",), "patch": ("base", "patchId")}
+BINDINGS = ("none", "tree", "patch", "story")
+BINDING_FIELDS = {"none": (), "tree": ("tree",), "patch": ("base", "patchId"), "story": ("base", "head")}
 TYPE_NAMES = ("string", "number", "count", "boolean", "array", "object", "null")
 STAGES = ("building", "reviewing", "verifying", "landing")
 RESERVED_PAYLOAD_KEYS = ("step", "contract")
@@ -261,12 +262,13 @@ def is_type(value, spec):
 
 
 def parse_path(path):
-    """A payload path as (kind, contract, keys, optional). Kinds: context, result, step."""
+    """A payload path as (kind, contract, keys, optional). Kinds: context, result, proof, step."""
     optional = path.endswith("?")
     body = path[:-1] if optional else path
-    if body.startswith("result:"):
-        contract, _, rest = body[len("result:"):].partition(".")
-        return "result", contract, rest.split(".") if rest else [], optional
+    for kind in ("result", "proof"):
+        if body.startswith(kind + ":"):
+            contract, _, rest = body[len(kind) + 1:].partition(".")
+            return kind, contract, rest.split(".") if rest else [], optional
     kind, _, rest = body.partition(".")
     return kind, None, rest.split("."), optional
 
@@ -315,7 +317,7 @@ def _entry_shape(entry):
         return "result needs required keys, each with a type"
     proof = entry["proof"]
     if not isinstance(proof, dict) or proof.get("binding") not in BINDINGS:
-        return "proof.binding is none, tree or patch"
+        return "proof.binding is none, tree, patch or story"
     if ("required" in proof or "types" in proof) and not _keys_and_types(proof):
         return "proof needs required keys, each with a type"
     values = proof.get("values", {})
@@ -407,7 +409,7 @@ def check_catalog(catalog):
             kind, contract, _, optional = parse_path(path)
             if kind == "step" and not optional:
                 fault("payload-path", name, "%s: a step path is always optional" % key)
-            if kind == "result":
+            if kind in ("result", "proof"):
                 if contract not in contracts:
                     fault("payload-path", name, "%s reads %s, which the catalog does not hold" % (key, contract))
                 elif contract not in closure and not (optional and order.index(contract) < order.index(name)):
@@ -742,6 +744,8 @@ def proof_fault(contract, entry, proof, value=None, result=None):
             return "the verdict %s needs a proof whose %s is %s" % (value["value"], key, wanted)
     if contract == "risk-check@1" and proof["triggers"] and proof["verifiers"] < 1:
         return "risk-triggers-need-verifiers: the risk check names triggers and ran no verifier"
+    if contract == "review@1" and result is not None and result.get("path") != proof["path"]:
+        return "review-names-one-path: the review's result and its proof name different paths"
     if contract == "local-checks@1" and proof["kind"] == "receipt":
         named = lambda text: isinstance(text, str) and bool(text.strip())
         commands = (result or {}).get("commands")
@@ -753,12 +757,26 @@ def proof_fault(contract, entry, proof, value=None, result=None):
 def binding_holds(binding, proof, world, cwd, commit):
     """True when a proof still matches `commit`, the commit HEAD was found on. `tree`: the proof's
     tree is that commit's tree. `patch`: its patch id is the id of everything on that commit since
-    its base, so a base that moved under an unchanged patch keeps the proof. `none`: nothing binds it."""
+    its base, so a base that moved under an unchanged patch keeps the proof. `story`: the story's
+    patch since the proof's base is the same at the proof's `head` as at that commit, so any later
+    commit that changes the story voids it while a base that moved under it does not; a head that
+    cannot be read voids it too. `none`: nothing binds it."""
     if binding == "tree":
         return isinstance(proof, dict) and proof.get("tree") == world.tree(cwd, commit)
     if binding == "patch":
         real = isinstance(proof, dict) and world.patch_id(cwd, proof.get("base"), commit)
         return bool(real) and proof.get("patchId") == real
+    if binding == "story":
+        head = proof.get("head") if isinstance(proof, dict) else None
+        if isinstance(head, str) and head == commit:
+            return True
+        if not (isinstance(head, str) and COMMIT_ID.match(head)):
+            return False
+        try:
+            covered = world.patch_id(cwd, proof.get("base"), head)
+        except GitFailed:
+            return False  # a head or base no longer readable: screened again, never assumed
+        return covered == world.patch_id(cwd, proof.get("base"), commit)
     return True
 
 
@@ -980,8 +998,8 @@ class Run:
         record = self.record(index)
         if self.steps[index]["contract"] != "merge@1" or proof.get("head") == record.get("issuedHead"):
             return None
-        return ("merge-lands-what-was-checked: the merge names another commit than %s, the one the local checks "
-                "and the review were proven on; resume to check what changed" % (record.get("issuedHead") or "none"))
+        return ("merge-lands-what-was-checked: if %s landed, report it with done naming it, never resume; "
+                "the merge named another commit than the one checked and reviewed" % (record.get("issuedHead") or "none"))
 
     # -- what a step is handed --
 
@@ -992,9 +1010,9 @@ class Run:
             kind, contract, keys, optional = parse_path(path)
             if kind == "context":
                 value = dig(self.state["context"], keys)
-            elif kind == "result":
+            elif kind in ("result", "proof"):
                 given = self.provider(index, contract)
-                value = dig(self.record(given)["result"], keys) if given is not None and ended_well(self.record(given)) else MISSING
+                value = dig(self.record(given)[kind] or {}, keys) if given is not None and ended_well(self.record(given)) else MISSING
             else:
                 value = {"answer": record["answer"], "proof": record["proof"], "head": record.get("issuedHead")}[keys[0]]
                 value = MISSING if value is None else value

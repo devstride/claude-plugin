@@ -7,6 +7,11 @@ load: contract
 (`${CLAUDE_PLUGIN_ROOT}/schemas/workflow.schema.json`) against the step contract catalog
 (`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`). **It decides and records; it never acts**: no
 network, no tracker call, no skill run, and git only to read. Whoever drives it runs the steps.
+This file is what a driver needs: the commands, the answers, the stops, reporting and resuming.
+**Read `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-contracts.md` in full before
+writing or changing a definition or a contract, or when a stop names a refused proof and you need
+why**: what `start` refuses, payloads, proofs and their bindings, the named rules, and what is
+reported.
 
 ## Commands
 
@@ -42,24 +47,6 @@ An action is one of:
 
 Every answer also carries `runId` and `reports`; `start` adds the definition's hash.
 
-## What `start` refuses
-
-`bad-schema` (a field the definition schema requires is missing, of the wrong type or past its
-limit: at most 12 phases, 40 steps in a phase, 100 in all), `credential-in-definition` (a string
-that looks like a credential, anywhere in it, named by where it is, never echoed),
-`duplicate-step-id`, `plugin-too-old` (the definition needs a newer plugin), `unknown-contract`,
-`unknown-contract-major`, `requires-missing` and `requires-not-earlier` (a contract's required step
-is absent, or only later, or a second step providing it comes after a step that requires it, whose
-changes then nothing would check), `required-not-always`, `required-not-stop` and `required-off`
-(the step that provides a required contract must always run, must stop the run when it fails and
-cannot be switched off), `unsupported-gate`, `unsupported-when`, `unsupported-source` and
-`unsupported-on-fail` (features this plugin does not run: a gate, a conditional or manual step, a
-library or repository skill, a step that carries on after a failure), `skill-missing` (a step names
-a skill this plugin does not have) and `repository-required` (a contract bound to the tree or the
-patch, outside a git work tree). Required steps come only from each contract's `requires` list in
-the catalog, so a renamed or re-sourced step is covered whatever skill runs it: a workflow can
-replace a required step, never drop, weaken or move it.
-
 ## A step's answer
 
 The first non-blank line is the verdict: the contract's label, a colon and a space, one listed
@@ -94,83 +81,7 @@ A missing, unlisted or malformed verdict is a stop of kind `no-verdict`; a `cont
 result lacks a required key is a stop of kind `failed`. Neither is ever read as a pass. Result keys
 the contract does not list are dropped. A `count` is a whole number of at least 0.
 
-**Reported:** the verdict line (200 characters), the evidence (the reporting helper's caps), https
-links (`pullRequest`, `commit`, `comment`) and the branch name from `links`, the skill that ran,
-and the definition. What is shaped like a credential (any Authorization value, Bearer or Basic
-value of 16 characters or more, an `x-api-key` header, a two-part web token, a URL with a
-password, a known token prefix, a private key, a claim holder, or a key whose last dotted part names
-a secret, token, password or API, access or private key, assigned, or a `--password`/`--token`/
-`client_secret` flag, followed by 7 or more characters, not all digits; read in overlapping
-windows) is never reported: the evidence line or link is dropped, the verdict detail becomes
-`[withheld]`, the definition is refused (also a key holding such a string), and a refusal
-line says it is not shown. **Not scrubbed:** the result and the proof, kept as given in the
-owner-only state file and handed to later payloads and to `finished`, never reported.
-
-## Payloads
-
-Each contract maps payload keys to paths: a context path (`context.` and a key), an earlier step's
-result (`result:`, a contract, optionally a key), or a step path: the step's own answer from a
-person, the proof of its previous attempt, or the commit it was issued on (`head`). A trailing `?`
-makes a path optional (null when missing). The runner then adds two reserved keys, `step` (the
-issued step's id) and `contract` (its contract).
-
-## Proofs
-
-A step's proof is the `proof` object inside its result. A proof key the catalog lists `values` for
-takes only those, and a verdict value that pins one (its `proof`) needs exactly it:
-`LOCAL CHECKS: NOT CONFIGURED` carries kind `none-configured`, a pass `receipt`. Its contract binds
-it:
-
-Each command reads HEAD once, as a full commit id, and checks every proof against that commit.
-
-- **tree**: the proof's `tree` must be that commit's tree when the step answers, and stays valid
-  only while it is.
-- **patch**: the proof's `patchId` must be the verbatim patch id of everything on that commit since
-  the proof's `base`, every byte counted, white space too:
-  `git diff --no-color --no-ext-diff --no-textconv --no-relative --src-prefix=a/ --dst-prefix=b/ --ignore-submodules=none --unified=3 --no-renames --diff-algorithm=myers --inter-hunk-context=0 <base>...<commit> -- | git patch-id --verbatim`.
-  The flags override git's settings for colour, prefixes, paths, submodules, context, hunk joining,
-  renames and the algorithm; its suppressBlankEmpty and quotePath settings are not covered, and fail closed
-  (the proof reads as stale). A git without `--verbatim` stops the run (kind `proof`). A base
-  that moved under a byte-identical patch keeps the proof.
-- **none**: nothing in the repository binds it.
-
-Whatever the binding, a proof is void once a step it requires is completed again after it
-(supersession): a second build voids the risk check, the local checks and the review that came from
-the first. One exception keeps the patch binding meaningful: a step issued again only to refresh
-its own stale proof does not void the steps that rely on it (here the review, which holds its own
-patch proof, and the merge).
-
-A finished step is re-examined only while a later step that requires it has not finished, so
-nothing before a finished merge is re-opened. `next` issues the first step, in order, that is not
-finished with a valid proof: a stale proof re-issues the step that produced it before anything that
-relies on it. A proof that does not match the
-repository when the step answers counts as a failed attempt and the step is issued again. The
-runner counts its own re-issues per step (not a step's own `redo:self`), starts again from 0 when
-the step finishes with a proof that holds, and stops at the fifth in a row (kind
-`attempts-exhausted`). A local-checks pass names at least one command and carries a receipt.
-
-Three named rules, a closed list:
-
-- `risk-triggers-need-verifiers`: a risk-check proof that names triggers and ran no verifier is
-  refused.
-- `none-configured-needs-pull-request-route`: local checks that found nothing configured are
-  accepted by a merge only when the review ran on a pull request (path `pull-request`), where CI is
-  the gate.
-- `merge-lands-what-was-checked`: the merge is handed `commit`, the full id the local checks' tree
-  and the review's patch were just found to hold for. A merge skill merges exactly that commit
-  (for a pull request, `--match-head-commit <commit>`) and answers `MERGE: REFRESHED` when HEAD is
-  no longer it. Reported landed (also by hand, after a stop), its proof's `head` names that id;
-  another commit, or none, stops the run (kind `proof`), and `resume` checks the new commit first.
-
-## satisfiedBy — one step standing in for another's proof
-
-A catalog entry may carry `satisfiedBy`: a list of other catalog contracts, no duplicates, never
-itself. Wherever a `requires` list names contract X, the nearest earlier step carrying X **or a
-contract in X's list** meets it. It is honoured in three places: start validation (a stand-in that
-is absent, later, conditional, non-stopping or switched off is refused exactly as the original
-would be), payload paths (a result path naming X reads the stand-in's result, so a stand-in must
-always give every key a dependent reads without a `?`), and supersession. Only a release adding a
-stand-in contract appends to a list. No shipped contract carries the field yet.
+What is reported, and what is never reported: `workflow-contracts.md`.
 
 ## Stops
 
@@ -179,7 +90,7 @@ stand-in contract appends to a list. No shipped contract carries the field yet.
 | `failed` | The step answered with a stopping verdict, or its result was incomplete | Fix the cause, then `resume`; or do the step by hand and report it with `done` |
 | `needs-person` | The step asked a question | `resume` with the `answer` |
 | `no-verdict` | The answer did not open with a verdict the contract lists | Run the step again (`resume`), or report its real verdict with `done` |
-| `proof` | A proof was refused by a value or a named rule, or could not be checked | Fix what the reason names, then `resume` |
+| `proof` | A proof was refused by a value or a named rule, or could not be checked | Fix what the reason names, then `resume`; a merge stop: first check whether it landed, and if so report it with `done` |
 | `attempts-exhausted` | The same step was re-issued until the limit, or has run 50 times | Find why its proof never holds, then `resume`, which resets the re-issue count but never the 50 |
 
 ## Reporting
@@ -193,8 +104,8 @@ any other stop `failed`. **The runner never sends them.**
 sending: its gate (the `workflows` key and `DEVSTRIDE_WORKFLOWS`) decides whether anything is sent
 and through which provider or command, and its fail-open rule holds as written: send nothing more
 for the run after the first failure, never retry, never stop or slow a step, and never say anything
-about reporting to the person. When the tracker asks for the definition, send the object `status`
-returns with `includeDefinition`.
+about reporting to the person. When the tracker asks for the definition, the refused object is sent
+again with the `definition` from `status` with `includeDefinition` added, as that file says.
 
 ## Heartbeat and ship intent
 
@@ -219,3 +130,5 @@ Two sessions driving one run at once are not supported.
 
 - `skills/run-workflow/SKILL.md` — the pointer before the loop ("Read … in full before the first
   command, and again after a compaction").
+- `skills/build-item/SKILL.md` — The run ("Read … in full before the first command, and again
+  after a compaction").

@@ -145,7 +145,8 @@
         "reviewMoment": "context.reviewMoment",
         "workingBase": "context.workingBase",
         "build": "result:build@1",
-        "answer": "step.answer?"
+        "answer": "step.answer?",
+        "previousProof": "step.proof?"
       },
       "argument": null,
       "verdict": {
@@ -164,11 +165,13 @@
           "report": "string",
           "counts": "object",
           "untrackedDeferrals": "array",
-          "dismissed": "array"
+          "dismissed": "array",
+          "deferrals": "array",
+          "deviations": "array"
         }
       },
       "proof": {
-        "binding": "none",
+        "binding": "story",
         "required": ["base", "head", "triggers", "verifiers", "lenses"],
         "types": {
           "base": "string",
@@ -192,7 +195,8 @@
         "route": "context.route",
         "oneOff": "context.oneOff",
         "branch": "result:branch@1.branch",
-        "previousProof": "step.proof?"
+        "previousProof": "step.proof?",
+        "reviewMoment": "context.reviewMoment"
       },
       "argument": null,
       "verdict": {
@@ -261,7 +265,9 @@
           "untrackedDeferrals": "array",
           "dismissed": "array",
           "pullRequest": "number|null",
-          "mergeBody": "string|null"
+          "mergeBody": "string|null",
+          "deferrals": "array",
+          "deviations": "array"
         }
       },
       "proof": {
@@ -294,7 +300,9 @@
         "review": "result:review@1",
         "build": "result:build@1",
         "riskCheck": "result:risk-check@1",
-        "commit": "step.head?"
+        "commit": "step.head?",
+        "reviewProof": "proof:review@1",
+        "localChecks": "result:local-checks@1"
       },
       "argument": null,
       "verdict": {
@@ -336,6 +344,7 @@
         "oneOff": "context.oneOff",
         "releaseUnit": "context.releaseUnit",
         "route": "context.route",
+        "profileSource": "context.profile.source",
         "merge": "result:merge@1",
         "build": "result:build@1",
         "riskCheck": "result:risk-check@1",

@@ -84,7 +84,7 @@ PUBLISHED = {
     "start@1": ("story-lifecycle", "START: MOVED=continue | UNCHANGED=continue | FAILED=stop", "none", [], "Mark In Progress", None),
     "branch@1": ("branch-feature", "BRANCH: CREATED=continue | EXISTS=continue | REFUSED=stop", "none", [], "Branch", None),
     "build@1": ("ultracode-build", "BUILD: READY=continue | NEEDS DECISION=ask | BLOCKED=stop", "none", ["branch@1"], "Build", "building"),
-    "risk-check@1": ("risk-check", "RISK CHECK: CLEAR=continue | FIXED=continue | NEEDS DECISION=ask | BLOCKED=stop", "none", ["build@1"], "STORY RISK CHECK", None),
+    "risk-check@1": ("risk-check", "RISK CHECK: CLEAR=continue | FIXED=continue | NEEDS DECISION=ask | BLOCKED=stop", "story", ["build@1"], "STORY RISK CHECK", None),
     "local-checks@1": ("local-checks", "LOCAL CHECKS: PASS=continue | NOT CONFIGURED=continue | FAIL=stop", "tree", ["risk-check@1"], "Verify", "verifying"),
     "review@1": ("review-story", "REVIEW: SETTLED=continue | COVERED=continue | BLOCKED=stop", "patch", ["risk-check@1", "local-checks@1"], "Review", "reviewing"),
     "merge@1": ("merge-story", "MERGE: LANDED=continue | REFRESHED=redo:self | HELD=end:held | BLOCKED=stop", "none", ["review@1", "local-checks@1", "risk-check@1"], "Merge", "landing"),
@@ -126,11 +126,13 @@ RESULTS = {
     "build@1": (["deferrals", "deviations", "untrackedDeferrals", "dismissed", "scopeLine", "head"],
                 {"deferrals": "array", "deviations": "array", "untrackedDeferrals": "array", "dismissed": "array", "scopeLine": "string", "head": "string"}),
     "risk-check@1": (["ledger", "report", "counts", "untrackedDeferrals", "dismissed"],
-                     {"ledger": "string", "report": "string", "counts": "object", "untrackedDeferrals": "array", "dismissed": "array"}),
+                     {"ledger": "string", "report": "string", "counts": "object", "untrackedDeferrals": "array", "dismissed": "array",
+                      "deferrals": "array", "deviations": "array"}),
     "local-checks@1": (["commands", "results", "receipt", "tree", "head", "skippedSuites"],
                        {"commands": "array", "results": "array", "receipt": "string|null", "tree": "string", "head": "string", "skippedSuites": "array"}),
     "review@1": (["path", "cycles", "untrackedDeferrals", "dismissed", "pullRequest", "mergeBody"],
-                 {"path": "string", "cycles": "count", "untrackedDeferrals": "array", "dismissed": "array", "pullRequest": "number|null", "mergeBody": "string|null"}),
+                 {"path": "string", "cycles": "count", "untrackedDeferrals": "array", "dismissed": "array", "pullRequest": "number|null", "mergeBody": "string|null",
+                  "deferrals": "array", "deviations": "array"}),
     "merge@1": (["target", "sha", "pullRequest", "deletedBranch"], {"target": "string", "sha": "string", "pullRequest": "number|null", "deletedBranch": "boolean"}),
     "complete@1": (["status", "statusName", "startDate", "dueDate", "pullRequest", "asBuilt", "claimReleased", "shipIntentReleased"],
                    {"status": "string", "statusName": "string|null", "startDate": "string|null", "dueDate": "string|null", "pullRequest": "number|null",
@@ -141,6 +143,21 @@ RESULTS = {
 }
 for name, entry in contracts.items():
     check("%s: its result keys and their types are as published" % name, (entry["result"]["required"], entry["result"]["types"]) == RESULTS.get(name), entry["result"])
+# Every contract's payload, key by key: a key is only ever added, never renamed or dropped.
+PAYLOADS = {
+    "risk-check@1": {"item": "context.item", "profile": "context.profile.name", "reviewMoment": "context.reviewMoment",
+                     "workingBase": "context.workingBase", "build": "result:build@1", "answer": "step.answer?", "previousProof": "step.proof?"},
+    "local-checks@1": {"item": "context.item", "profile": "context.profile.name", "workingBase": "context.workingBase", "route": "context.route",
+                       "oneOff": "context.oneOff", "branch": "result:branch@1.branch", "previousProof": "step.proof?", "reviewMoment": "context.reviewMoment"},
+    "merge@1": {"item": "context.item", "profile": "context.profile.name", "workingBase": "context.workingBase", "route": "context.route",
+                "branch": "result:branch@1.branch", "review": "result:review@1", "build": "result:build@1", "riskCheck": "result:risk-check@1",
+                "commit": "step.head?", "reviewProof": "proof:review@1", "localChecks": "result:local-checks@1"},
+    "complete@1": {"item": "context.item", "profile": "context.profile.name", "workingBase": "context.workingBase", "oneOff": "context.oneOff",
+                   "releaseUnit": "context.releaseUnit", "route": "context.route", "profileSource": "context.profile.source", "merge": "result:merge@1",
+                   "build": "result:build@1", "riskCheck": "result:risk-check@1", "review": "result:review@1"},
+}
+for name, payload in PAYLOADS.items():
+    check("%s: its payload is as published" % name, contracts[name]["payload"] == payload, contracts[name]["payload"])
 check("the two skills that take text keep their argument templates",
       dict((n, e["argument"]) for n, e in contracts.items() if e["argument"]) ==
       {"branch@1": "{branchSlug} base: {workingBase}", "build@1": "{item} {goal} profile: {profile} review-moment: {reviewMoment}"})
@@ -163,25 +180,41 @@ faults = skill_faults(root, "run-workflow", None, 15, 1200)
 check("run-workflow: name, a description of at most 15 words, a body of at most 1,200 tokens, the pointer once", faults == [], faults)
 skill = open(os.path.join(root, "skills/run-workflow/SKILL.md"), encoding="utf-8").read()
 check("run-workflow can be invoked by the loop (no disable-model-invocation)", "disable-model-invocation" not in skill)
+# the reference is split: the loop half (driving a run) and the contracts half (definitions and proofs)
 reference = "skills/run-workflow/references/workflow-runner.md"
+authoring = "skills/run-workflow/references/workflow-contracts.md"
 text = open(os.path.join(root, reference), encoding="utf-8").read()
-check("the reference opens with load: contract", text.startswith("---\nload: contract\n---\n"))
-last = re.findall(r"^## .*$", text, re.M)[-1]
-cited = text[text.rindex("\n## Cited by"):]
-check("the reference ends with ## Cited by, naming the skill", last == "## Cited by" and "`skills/run-workflow/SKILL.md`" in cited, last)
-check("the reference is reachable from the skill", "${CLAUDE_PLUGIN_ROOT}/" + reference in skill)
+rules = open(os.path.join(root, authoring), encoding="utf-8").read()
+for path, body in ((reference, text), (authoring, rules)):
+    check("%s opens with load: contract" % path, body.startswith("---\nload: contract\n---\n"))
+    last = re.findall(r"^## .*$", body, re.M)[-1]
+    cited = body[body.rindex("\n## Cited by"):]
+    check("%s ends with ## Cited by, naming the skill" % path, last == "## Cited by" and "`skills/run-workflow/SKILL.md`" in cited, last)
+    check("%s is reachable from the skill with a read-in-full instruction" % path,
+          re.search(r"Read\s+`\$\{CLAUDE_PLUGIN_ROOT\}/%s`\s+in\s+full" % re.escape(path), skill) is not None)
+check("the loop half points at the contracts half, and the Build loop reads the loop half in full",
+      "${CLAUDE_PLUGIN_ROOT}/" + authoring in text
+      and re.search(r"Read\s+`\$\{CLAUDE_PLUGIN_ROOT\}/%s` in full" % re.escape(reference),
+                    open(os.path.join(root, "skills/build-item/SKILL.md"), encoding="utf-8").read()) is not None)
+SECTIONS = {reference: ["## Commands", "## A step's answer", "## Stops", "## Reporting", "## Heartbeat and ship intent", "## Resuming", "## Cited by"],
+            authoring: ["## What `start` refuses", "## What is reported", "## Payloads", "## Proofs",
+                        "## satisfiedBy — one step standing in for another's proof", "## Cited by"]}
+check("every section of the reference before the split is in exactly one half",
+      re.findall(r"^## .*$", text, re.M) == SECTIONS[reference] and re.findall(r"^## .*$", rules, re.M) == SECTIONS[authoring],
+      (re.findall(r"^## .*$", text, re.M), re.findall(r"^## .*$", rules, re.M)))
 check("the skill names the five commands' loop and the reference names all five",
       all("`%s`" % c in text for c in runner.COMMANDS) and all("`%s`" % c in skill for c in ("start", "done", "status", "resume")))
 codes = ["bad-schema", "duplicate-step-id", "unknown-contract", "unknown-contract-major", "requires-missing", "requires-not-earlier",
          "required-not-always", "required-not-stop", "required-off", "skill-missing", "plugin-too-old", "repository-required",
          "unsupported-gate", "unsupported-when", "unsupported-source", "unsupported-on-fail", "credential-in-definition"]
 source = open(os.path.join(root, "skills/run-workflow/scripts/workflow.py"), encoding="utf-8").read()
-check("every validation code is in the runner and in the reference", all('"%s"' % c in source and "`%s`" % c in text for c in codes),
-      [c for c in codes if '"%s"' % c not in source or "`%s`" % c not in text])
+check("every validation code is in the runner and in the contracts half", all('"%s"' % c in source and "`%s`" % c in rules for c in codes),
+      [c for c in codes if '"%s"' % c not in source or "`%s`" % c not in rules])
 kinds = ["failed", "needs-person", "attempts-exhausted", "no-verdict", "proof"]
 check("every stop kind is in the reference's table", all("| `%s` |" % k in text for k in kinds))
-check("the three named proof rules are in the runner and the reference", all(r in source and "`%s`" % r in text for r in (
-    "risk-triggers-need-verifiers", "none-configured-needs-pull-request-route", "merge-lands-what-was-checked")))
+check("the four named proof rules are in the runner and the contracts half", all(r in source and "`%s`" % r in rules for r in (
+    "risk-triggers-need-verifiers", "none-configured-needs-pull-request-route", "review-names-one-path", "merge-lands-what-was-checked")))
+check("every binding the runner knows is spelled in the contracts half", all("- **%s**:" % b in rules for b in runner.BINDINGS), runner.BINDINGS)
 
 # the skills the catalog names
 present = sorted(n for n in os.listdir(os.path.join(root, "skills")) if os.path.isfile(os.path.join(root, "skills", n, "SKILL.md")))
