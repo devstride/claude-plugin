@@ -667,6 +667,13 @@ except Exception: pass' 2>/dev/null)
 
 if [ -z "$INSTALL" ]; then
   RESULT="lookup-failed"
+  # A workspace with no DevStride setup has nothing that ties an install to it, so the lookup can
+  # never succeed there and doctor has no setup to diagnose. The usual cause is a session still
+  # serving an older copy than the one installed, which a reload fixes.
+  if [ ! -e "$REPO/.claude/ds-config.json" ] && [ ! -L "$REPO/.claude/ds-config.json" ]; then
+    echo "devstride plugin: $RUNNING running, $NEWEST available. This workspace has no DevStride setup, so this check cannot tell which installed copy it uses. Type /reload-plugins to load the newest copy installed on this machine and confirm no DevStride load error (restart if reload fails); if it still runs $RUNNING, run /devstride:update."
+    finish
+  fi
   echo "devstride plugin: $RUNNING running, $NEWEST available, but the active install is ambiguous or unsafe. Run /devstride:doctor; do not guess an update id or scope."
   finish
 fi

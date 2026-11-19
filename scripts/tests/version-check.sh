@@ -199,6 +199,20 @@ if result_is lookup-failed && printf '%s' "$OUT" | grep -q 'active install is am
   ok "(4c) unbound project row → safe lookup failure, no guessed authority"
 else bad "(4c) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
 
+# A workspace with no DevStride setup can never tie an install to itself, so the same failed lookup
+# sends the person to /reload-plugins (with update as the fallback), never to doctor; still no mutation.
+setup_case no-setup 2.9.0 '{}' project 2.9.0 0
+rm "$REPO/.claude/ds-config.json"
+OUT="$(run_hook)"
+if result_is lookup-failed && printf '%s' "$OUT" | grep -q 'This workspace has no DevStride setup' \
+   && printf '%s' "$OUT" | grep -qF 'Type /reload-plugins' \
+   && printf '%s' "$OUT" | grep -qF 'if it still runs 2.8.0, run /devstride:update' \
+   && ! printf '%s' "$OUT" | grep -qF '/devstride:doctor' \
+   && not_called 'plugin marketplace' && not_called 'plugin update' \
+   && [ "$(grep -c 'claude:plugin list --json' "$VC_LOG")" -eq 1 ]; then
+  ok "(4d) no DevStride setup → reload instruction instead of doctor, no mutation"
+else bad "(4d) out=$OUT calls=$(cat "$VC_LOG" 2>/dev/null)"; fi
+
 # (5) An explicit pin suppresses all install/update commands; a disabled check suppresses network too.
 setup_case pinned 2.9.0 '{"plugin":{"pin":"2.8.0","autoUpdate":true}}' project 2.9.0
 OUT="$(run_hook)"
