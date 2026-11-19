@@ -8,14 +8,15 @@ FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 export PYTHONDONTWRITEBYTECODE=1
 
-# The step skills a later release adds. That release empties this list; from then on each must
-# exist, keep the step-skill shape and carry its contract's verdict line.
-PENDING_SKILLS="claim-story story-lifecycle risk-check local-checks review-story merge-story capture-findings sync-base"
+# Step skills the catalog names that a later release adds. Empty: every Build step skill ships,
+# keeps the step-skill shape and carries its contract's verdict line.
+PENDING_SKILLS=""
 
 cat > "$WORK/cases.py" <<'PY'
 import importlib.util, json, math, os, re, sys
 
 root, work, pending = sys.argv[1], sys.argv[2], sys.argv[3:]
+STEP_POINTER = "Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows."
 POINTER = "**Human output.** Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plain-language-output.md` once per top-level run; composed skills reuse it. Apply it to every message."
 
 
@@ -186,15 +187,74 @@ check("the three named proof rules are in the runner and the reference", all(r i
 present = sorted(n for n in os.listdir(os.path.join(root, "skills")) if os.path.isfile(os.path.join(root, "skills", n, "SKILL.md")))
 named = sorted(set(e["builtinSkill"] for e in contracts.values() if e["builtinSkill"]))
 check("every skill the catalog names exists or is pending", all(n in present or n in pending for n in named), [n for n in named if n not in present and n not in pending])
-check("a pending skill is not shipped yet (when it ships, take it off PENDING_SKILLS)", not [n for n in pending if n in present], [n for n in pending if n in present])
-check("the pending list names only skills the catalog names", all(n in named for n in pending), pending)
-existing = ("branch-feature", "ultracode-build")  # shipped before the catalog, with their own verdict text
+check("nothing is pending: every skill the catalog names ships", pending == [], pending)
+flat = lambda s: re.sub(r"\s+", " ", s)
+BUILD_STEPS = ["claim-story", "story-lifecycle", "risk-check", "local-checks", "review-story", "merge-story", "capture-findings", "sync-base"]
+check("the eight Build step skills are the catalog's own skills, less the two engines", sorted(BUILD_STEPS) == sorted(set(named) - {"branch-feature", "ultracode-build"}), named)
 for name in named:
-    if name in pending or name in existing:
+    if name in pending:
         continue
-    serves = [e for e in contracts.values() if e["builtinSkill"] == name]
-    faults = skill_faults(root, name, serves, 25, 1200)
-    check("step skill %s keeps its shape and its contract's verdict" % name, faults == [], faults)
+    serves = [(n, e) for n, e in contracts.items() if e["builtinSkill"] == name]
+    text = open(os.path.join(root, "skills", name, "SKILL.md"), encoding="utf-8").read()
+    if name in ("branch-feature", "ultracode-build"):
+        # engines with floors of their own: the verdict, the step pointer (branch-feature), a short description
+        faults = skill_faults(root, name, [e for _, e in serves], 15, 10 ** 9)
+        if name == "branch-feature" and STEP_POINTER not in text:
+            faults.append("no step-skill pointer")
+        check("%s carries its contract's verdict, the pointer once and a description of at most 15 words" % name, faults == [], faults)
+        continue
+    faults = skill_faults(root, name, [e for _, e in serves], 15, 1200)
+    if flat(text).count(STEP_POINTER) != 1:
+        faults.append("the step-skill pointer does not appear exactly once")
+    if "disable-model-invocation" in text:
+        faults.append("the loop cannot invoke it")
+    if "$ARGUMENTS" not in text or "one JSON object" not in text:
+        faults.append("no arguments line naming one JSON object")
+    result = re.search(r"^## Result\n(.*?)(?=^## |\Z)", text, re.S | re.M)
+    result = flat(result.group(1)) if result else ""
+    if "After the verdict and its evidence, one fenced `json` block" not in result:
+        faults.append("no result-block statement")
+    for _, entry in serves:
+        keys = entry["result"]["required"] + sorted(k for k in entry["result"]["types"] if k not in entry["result"]["required"])
+        keys += entry["proof"].get("required", [])
+        lost = [k for k in keys if "`%s`" % k not in result]
+        if lost:
+            faults.append("its Result section does not name %s" % lost)
+        if entry["proof"].get("required") and "`proof`" not in result:
+            faults.append("its Result section does not name the proof")
+    rules = re.search(r"\*\*Step rules\.\*\*(.*)", flat(text))
+    rules = rules.group(1) if rules else ""
+    for rule in ("verdict first", "safe to re-run", "config wins", "never decides what runs next"):
+        if rule not in rules:
+            faults.append("its step rules lack %r" % rule)
+    if "subagent" not in rules:
+        faults.append("its step rules do not say which subagents it may start")
+    if len(serves) > 1:
+        for contract, _ in serves:
+            line = re.search(r"`%s` → \*\*read `\$\{CLAUDE_PLUGIN_ROOT\}/(skills/%s/references/[a-z-]+\.md)` in full" % (re.escape(contract), name), flat(text))
+            if not line:
+                faults.append("no dispatch line for %s" % contract)
+        if "Any other contract, or none → no verdict line" not in flat(text):
+            faults.append("no answer for a contract it does not carry")
+    check("step skill %s keeps the step-skill shape, its contract's verdict and result keys" % name, faults == [], faults)
+    # every reference it or its own references cite is a contract with a Cited by list, and its own are reachable
+    own = sorted(os.path.join("skills", name, "references", f) for f in os.listdir(os.path.join(root, "skills", name, "references"))) \
+        if os.path.isdir(os.path.join(root, "skills", name, "references")) else []
+    cited = set(re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/(skills/[a-z-]+/references/[a-z0-9-]+\.md)", text))
+    for ref in own:
+        cited |= set(re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/(skills/[a-z-]+/references/[a-z0-9-]+\.md)", open(os.path.join(root, ref), encoding="utf-8").read()))
+    bad_refs = []
+    for ref in sorted(cited):
+        body = open(os.path.join(root, ref), encoding="utf-8").read() if os.path.isfile(os.path.join(root, ref)) else ""
+        if not body.startswith("---\nload: contract\n---\n") or re.findall(r"^## .*$", body, re.M)[-1:] != ["## Cited by"]:
+            bad_refs.append(ref)
+    unreached = [ref for ref in own if "${CLAUDE_PLUGIN_ROOT}/" + ref not in text]
+    check("%s: every reference it cites is a contract ending with Cited by, and its own are reachable" % name,
+          (bad_refs, unreached) == ([], []), (bad_refs, unreached))
+rule = flat(open(os.path.join(root, "skills/release/references/step-skills.md"), encoding="utf-8").read())
+check("the step-skill rule carries the one-skill-many-steps clause",
+      "A step skill may carry several steps of ONE workflow, one per invocation, chosen by the payload's reserved `contract` key (never the step id)" in rule
+      and '"One seam, nothing else" is read per invocation' in rule)
 
 # the step-skill check itself, on a throwaway plugin: one skill that conforms, three that do not
 def write(name, body, described="Step: do the thing and print one verdict."):
@@ -208,17 +268,17 @@ write("good", "## Verdict\n\n%s\n\n## Steps\n\nDo it.\n" % lines)
 write("stale", "## Verdict\n\n`START: MOVED | STAYED`\n")
 write("silent", "Do it.\n")
 write("wordy", "## Verdict\n\n%s\n" % lines, "Step: " + "word " * 30)
-check("a grouped skill carries one verdict line per contract it serves", skill_faults(work, "good", grouped, 25, 1200) == [], skill_faults(work, "good", grouped, 25, 1200))
-check("a verdict that differs from the catalog is caught", any("Verdict" in f for f in skill_faults(work, "stale", grouped, 25, 1200)))
-check("a missing Verdict section is caught", any("Verdict" in f for f in skill_faults(work, "silent", grouped, 25, 1200)))
-check("a description that is too long is caught", any("description" in f for f in skill_faults(work, "wordy", grouped, 25, 1200)))
-check("a skill that is not there is caught", skill_faults(work, "absent", grouped, 25, 1200) == ["missing"])
+check("a grouped skill carries one verdict line per contract it serves", skill_faults(work, "good", grouped, 15, 1200) == [], skill_faults(work, "good", grouped, 15, 1200))
+check("a verdict that differs from the catalog is caught", any("Verdict" in f for f in skill_faults(work, "stale", grouped, 15, 1200)))
+check("a missing Verdict section is caught", any("Verdict" in f for f in skill_faults(work, "silent", grouped, 15, 1200)))
+check("a description that is too long is caught", any("description" in f for f in skill_faults(work, "wordy", grouped, 15, 1200)))
+check("a skill that is not there is caught", skill_faults(work, "absent", grouped, 15, 1200) == ["missing"])
 PY
 OUT="$(python3 -B "$WORK/cases.py" "$ROOT" "$WORK/plugin" $PENDING_SKILLS 2>&1)"; RC=$?
 printf '%s\n' "$OUT" | sed 's/^/  /'
 N="$(printf '%s\n' "$OUT" | grep -c '^ok')"
 if [ $RC -ne 0 ] || printf '%s\n' "$OUT" | grep -q '^FAIL'; then bad "a case failed or the script did not finish (exit $RC)"
-elif [ "$N" -lt 61 ]; then bad "only $N cases ran, expected at least 61"
+elif [ "$N" -lt 80 ]; then bad "only $N cases ran, expected at least 80"
 else ok "(all $N cases passed)"; fi
 
 # the ten seam steps of scripts/tests/step-skills.sh are a separate list: no Build step has a seam

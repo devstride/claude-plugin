@@ -3,7 +3,7 @@
 # skills/run-workflow/scripts/workflow-fixtures.json, the refusal contract (exit 2, exactly one
 # `workflow:` line, nothing on stdout, never a traceback), and a run driven end to end with
 # canned step answers. Everything happens in a throwaway directory: its own cache folder, copies
-# of the plugin that hold the step skills this release does not ship yet, and small git
+# of the plugin whose step skills are placeholders, and small git
 # repositories for the proof cases. No network.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -52,7 +52,7 @@ def stand_in_catalog():
 
 
 def plugin_copy(name, catalog=None):
-    """A copy of the plugin that also holds the step skills a later release adds."""
+    """A copy of the plugin whose Build step skills are placeholders."""
     root = os.path.join(WORK, name)
     if os.path.isdir(root):
         return root
@@ -69,7 +69,7 @@ def plugin_copy(name, catalog=None):
     for skill in PENDING + ["stand-in"]:
         os.makedirs(os.path.join(root, "skills", skill))
         with open(os.path.join(root, "skills", skill, "SKILL.md"), "w") as out:
-            out.write("---\nname: %s\n---\nA placeholder for a step skill a later release ships.\n" % skill)
+            out.write("---\nname: %s\n---\nA placeholder for a step skill.\n" % skill)
     return root
 
 
@@ -384,9 +384,9 @@ def section_validation():
     del context["goal"]
     result = cli(roots("fixture"), "start", {"definition": FIX["definitions"]["build"], "context": dict(context, cwd=repo)}, fresh("cache"), cwd=repo)
     check("refused: a context that lacks what a step is handed", refused(result, "context-missing"), result[3])
-    # the inert guarantee: the plugin as released refuses its own shipped Build definition too
-    result = cli(ROOT, "start", {"definitionFile": os.path.join(ROOT, "workflows", "build.json"), "context": dict(FIX["context"], cwd=repo)}, fresh("cache"), cwd=repo)
-    check("the released plugin runs nothing: workflows/build.json is refused (its draft contract names are unknown)", refused(result, "unknown-contract"), result[3])
+    # the plugin as released starts its own shipped Build definition (the whole run: build-workflow-run.sh)
+    rc, answer, _, err = cli(ROOT, "start", {"definitionFile": os.path.join(ROOT, "workflows", "build.json"), "context": dict(FIX["context"], cwd=repo)}, fresh("cache"), cwd=repo)
+    check("the released plugin starts workflows/build.json at its claim step", rc == 0 and is_run(answer, "claim", 1), err)
     # a refusal never echoes what looks like a credential
     edits = [{"op": "set", "step": "sync", "path": ["run", "ref"], "value": "gh" + "p_abcdefghijklmnop"}]
     result = cli(roots("fixture"), "start", {"definition": edit(FIX["definitions"]["build"], edits), "context": dict(FIX["context"], cwd=repo)}, fresh("cache"), cwd=repo)

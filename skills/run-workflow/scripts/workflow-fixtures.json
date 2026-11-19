@@ -1031,12 +1031,12 @@
    "expect": "ok"
   },
   {
-   "name": "the same definition is refused by the released plugin, which lacks the step skills",
+   "name": "the same definition is accepted by the released plugin, which ships the step skills",
    "definition": "build",
    "edits": [],
    "root": "real",
    "git": true,
-   "expect": "skill-missing"
+   "expect": "ok"
   },
   {
    "name": "a definition that is not an object",

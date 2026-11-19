@@ -2,6 +2,7 @@
 # scripts/tests/orchestrator-key-parity.sh — CONTRIBUTING's key walk, made mechanical: every dotted
 # config key an orchestrator body cited at the base ref is still cited by the new body, or by a step
 # skill or contract that body now points to. A paragraph moved into a step must not drop a key.
+# ultracode-build counts as an orchestrator too: its risk check and gate moved into two steps.
 #
 # Undotted top-level keys (`preShipChecks`, `baseBranch` …) count too when the registry registers
 # them. SEAM_BASE_REF names the base (default origin/main); without that ref the walk is skipped
@@ -21,11 +22,11 @@ if ! git -C "$ROOT" rev-parse --verify -q "$BASE^{commit}" >/dev/null; then
   exit "$FAIL"
 fi
 
-for n in release build-item pr branch-hotfix doctor; do
+for n in release build-item ultracode-build pr branch-hotfix doctor; do
   git -C "$ROOT" show "$BASE:skills/$n/SKILL.md" > "$WORK/$n.base" 2>/dev/null || : > "$WORK/$n.base"
 done
 
-python3 - "$ROOT" "$WORK" release build-item pr branch-hotfix doctor > "$WORK/out.txt" 2>&1 <<'PY'
+python3 - "$ROOT" "$WORK" release build-item ultracode-build pr branch-hotfix doctor > "$WORK/out.txt" 2>&1 <<'PY'
 import os, re, sys
 root, work, names = sys.argv[1], sys.argv[2], sys.argv[3:]
 KEY = re.compile(r"`([A-Za-z]+(?:\.[A-Za-z]+)+)`")
@@ -33,7 +34,9 @@ FILE_EXT = {"md", "json", "sh", "py", "yaml", "yml", "txt", "toml"}
 POINTER = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([A-Za-z0-9_./-]+)")
 # the step skills an orchestrator may hand a paragraph to (never another orchestrator)
 steps = ["update-docs", "sync-knowledge-base", "write-release-notes", "pre-ship", "post-deploy",
-         "local-environment", "lease-checkout", "return-checkout", "classify-release", "pre-merge-check"]
+         "local-environment", "lease-checkout", "return-checkout", "classify-release", "pre-merge-check",
+         "claim-story", "story-lifecycle", "risk-check", "local-checks", "review-story", "merge-story",
+         "capture-findings", "sync-base", "run-workflow", "branch-feature", "ultracode-build"]
 import json
 reg = json.load(open(os.path.join(root, "schemas/seam-registry.json"), encoding="utf-8"))
 TOP = {re.sub(r"\[\]$", "", e["key"].split(".")[0]) for e in reg["hooks"] + reg["settings"]}
@@ -65,7 +68,7 @@ print("\n".join(problems) or "clean " + ", ".join(counts))
 PY
 OUT="$(cat "$WORK/out.txt")"
 case "$OUT" in
-  clean*) ok "(1) every key (dotted, or a registered top-level name) the five orchestrators cited at $BASE is still cited by them or by what they point to (${OUT#clean })" ;;
+  clean*) ok "(1) every key (dotted, or a registered top-level name) the six orchestrators cited at $BASE is still cited by them or by what they point to (${OUT#clean })" ;;
   *) bad "(1) $OUT" ;;
 esac
 exit "$FAIL"
