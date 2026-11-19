@@ -625,7 +625,9 @@ refreshing the base does not), the checks to the exact tree they ran on and the
 review to the exact patch it read, byte for byte, white space included. Before it hands out the merge it reads the branch's
 commit once, checks both against that commit and hands the merge exactly that commit; a merge
 reported as landed must name it, and a run stopped at its merge is not carried on until the
-driver has checked whether it landed. A step already handed out is handed back unchanged if asked
+driver has checked whether it landed: exactly the checked commit is recorded, and a landing the
+check cannot prove (such as one after a release fast-forwarded the base) waits for a person to
+confirm. A step already handed out is handed back unchanged if asked
 again, because it may already have acted. The catalog holds twelve contracts: the eleven Build
 steps and one for a repository's own step.
 

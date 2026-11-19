@@ -47,12 +47,13 @@ for what each version component means here and how a release is cut.
     checks the story's claim, then looks for an unfinished run of the item in this repository
     before starting one, so a cleared conversation no longer starts a duplicate, a run another live
     session is driving is left alone, and the run carries on in the checkout that picks it up. A
-    story whose merge landed just before an interruption still gets its completion steps, once. A
-    run picked up in another checkout carries on only once that checkout is on the story branch.
-    After a merge stops, the loop first checks whether exactly the checked commit landed (also when
-    a release has since fast-forwarded the base, and never when the base was moved past it): if it
-    did, it is recorded as landed instead of asking for the checks again; if a different commit
-    landed, the run is closed and a person is told. A merge that landed is reported as landed even when a clean-up after it failed.
+    story whose merge landed just before an interruption still gets its completion, findings and
+    sync steps, once, whatever the item's status already says. A run picked up in another checkout
+    carries on only once that checkout is on the story branch. After a merge stops, the loop first
+    checks whether exactly the checked commit landed: if it did, it is recorded as landed instead of
+    asking for the checks again; if it landed in a way the check cannot prove (moved past by a
+    fast-forward, carried in by another branch's merge, or after a release fast-forwarded the base),
+    a person confirms what landed and either records it or closes the run. A merge that landed is reported as landed even when a clean-up after it failed.
     A left-over run for a story someone else finished is closed instead of carried on.
   - **A named story or a one-off held for a release stops there**, with its branch pushed and the
     hold named, instead of being built again; a story the loop chose moves on to the next one.
@@ -75,7 +76,7 @@ for what each version component means here and how a release is cut.
     `review@1.localChecksProof`, `merge@1.reviewProof`, `merge@1.localChecks` and
     `complete@1.profileSource`; optional result keys `deferrals` and `deviations` on
     `risk-check@1` and `review@1`, and `resolved` (the ids of earlier entries a re-screen fixed or
-    overtook) on `risk-check@1`; a risk-check proof whose `base` is not the run's
+    overtook; only an entry with an `id` can be resolved) on `risk-check@1`; a risk-check proof whose `base` is not the run's
     `origin/<workingBase>`, or cannot be read, is refused; and the named rules `review-names-one-path` (a review whose
     result and proof name different paths is refused) and `risk-check-accumulates` (a re-screen's
     result is added to the earlier screen's, less the entries it resolved by id).
@@ -128,18 +129,18 @@ for what each version component means here and how a release is cut.
 
 The bodies below shrink where rules moved out, but a fast story now loads the eight step skills
 and their references as well: the fast story loop path grows from 80,771 tokens at 4.2.0 to
-102,529 tokens (`scripts/cost-budgets.json`, `paths.fastStoryLoop`), even after the runner's
+102,771 tokens (`scripts/cost-budgets.json`, `paths.fastStoryLoop`), even after the runner's
 reference was split so the loop reads only its driving half. On top of that text cost, a story
 now runs its risk check again after each later commit that changes it.
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.2.0 @ b2a2213, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v4.2.0 @ a059b48, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.2.0 | tokens@devstride--v4.2.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,095 | 10,699 | 32,095 | 10,699 | +0 | 10,700 |
 | skills/plan/SKILL.md | 25,535 | 8,512 | 25,542 | 8,514 | +2 | 8,514 |
 | skills/doctor/SKILL.md | 23,995 | 7,999 | 23,995 | 7,999 | +0 | 8,000 |
 | skills/review/SKILL.md | 23,970 | 7,990 | 23,986 | 7,996 | +6 | 7,999 |
-| skills/build-item/SKILL.md | 23,980 | 7,994 | 23,317 | 7,773 | -221 | 7,773 |
+| skills/build-item/SKILL.md | 23,980 | 7,994 | 23,821 | 7,941 | -53 | 7,941 |
 | skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
 | skills/rebalance/SKILL.md | 18,067 | 6,023 | 18,067 | 6,023 | +0 | 6,023 |
 | skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 11,963 | 3,988 | +0 | 3,988 |
@@ -156,7 +157,7 @@ now runs its risk check again after each later commit that changes it.
 | skills/risk-check/SKILL.md (added) | — | — | 3,598 | 1,200 | +1200 | 1,200 |
 | skills/local-checks/SKILL.md (added) | — | — | 3,593 | 1,198 | +1198 | 1,200 |
 | skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
-| skills/merge-story/SKILL.md (added) | — | — | 3,189 | 1,063 | +1063 | 1,063 |
+| skills/merge-story/SKILL.md (added) | — | — | 3,242 | 1,081 | +1081 | 1,081 |
 | skills/run-workflow/SKILL.md | 2,956 | 986 | 3,129 | 1,043 | +57 | 1,043 |
 | skills/review-story/SKILL.md (added) | — | — | 3,020 | 1,007 | +1007 | 1,007 |
 | skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
@@ -175,7 +176,7 @@ now runs its risk check again after each later commit that changes it.
 | skills/sync-base/SKILL.md (added) | — | — | 1,471 | 491 | +491 | 500 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 5,472 | 1,824 | 6,277 | 2,093 | +269 | 2,100 |
-| **total (bodies)** | 279,416 | 93,149 | 298,900 | 99,647 | +6498 | |
+| **total (bodies)** | 279,416 | 93,149 | 299,457 | 99,833 | +6684 | |
 
 ## [4.2.0] — 2026-11-18
 
