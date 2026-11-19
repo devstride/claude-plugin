@@ -777,22 +777,24 @@ COUNTED = {"untrackedDeferrals": "deferred", "deferrals": "deferred", "dismissed
 
 
 def entry_id(entry):
-    """A finding's identity: its `id` when it is an object carrying a non-empty string one, else
-    the whole entry as canonical JSON. A later screen names what it resolved by these ids."""
+    """A finding's identity, in two namespaces kept apart: ("id", its `id`) for an object carrying a
+    non-empty string one, which a later screen can name in `resolved`; else ("json", the whole
+    entry as canonical JSON), which only keeps an entry from being listed twice."""
     if isinstance(entry, dict) and isinstance(entry.get("id"), str) and entry["id"]:
-        return entry["id"]
-    return json.dumps(entry, sort_keys=True)
+        return ("id", entry["id"])
+    return ("json", json.dumps(entry, sort_keys=True))
 
 
 def accumulate(before, after):
     """risk-check-accumulates: a risk check screened again after a later commit reports only the
     delta, so its accepted result is added to the last accepted one. Each list keeps every earlier
-    entry that the new screen does not name in `resolved` and gains the new ones it lacks (by id);
+    entry that the new screen does not name in `resolved` (by `id`: an entry without one is never
+    resolved) and gains the new ones it lacks (by identity);
     the counts are summed, less one `deferred` or `dismissed` for each earlier entry resolved; the
     ledger is appended to, so it keeps the whole history; `resolved` gathers every id resolved so
     far. The report is the new one. Downstream steps receive only what is still open."""
     merged = dict(after)
-    resolved = set(name for name in after.get("resolved") or [] if isinstance(name, str))
+    resolved = set(("id", name) for name in after.get("resolved") or [] if isinstance(name, str))
     counts = dict(before.get("counts") or {})
     for key, value in (after.get("counts") or {}).items():
         earlier = counts.get(key)
@@ -809,8 +811,11 @@ def accumulate(before, after):
     if counts:
         merged["counts"] = counts
     if before.get("resolved") or after.get("resolved"):
-        history = list(before.get("resolved") or [])
-        merged["resolved"] = history + [name for name in after.get("resolved") or [] if isinstance(name, str) and name not in history]
+        history = []
+        for name in list(before.get("resolved") or []) + list(after.get("resolved") or []):
+            if isinstance(name, str) and name not in history:
+                history.append(name)
+        merged["resolved"] = history
     old, new = before.get("ledger") or "", after.get("ledger") or ""
     if old and not new.startswith(old):
         merged["ledger"] = old + ("\n\n" + new if new else "")
@@ -1063,8 +1068,8 @@ class Run:
         if self.steps[index]["contract"] != "merge@1" or proof.get("head") == record.get("issuedHead"):
             return None
         # The verdict cap is 200 characters: what to do comes first, so it is never cut off.
-        return ("merge-lands-what-was-checked: if exactly %s landed, report it with done naming it; "
-                "another commit landed: a person decides; never resume" % (record.get("issuedHead") or "none"))
+        return ("merge-lands-what-was-checked: if exactly %s landed, report it with done; landed unproven: a "
+                "person confirms, then done or close; never resume" % (record.get("issuedHead") or "none"))
 
     def risk_base_fault(self, index, proof):
         """A risk check screens the story against the moving `origin/<workingBase>` the run was

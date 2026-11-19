@@ -541,6 +541,50 @@ for step_id in ("capture", "complete"):
           risk.get("counts") == {"raised": 1, "fixed": 1, "deferred": 0, "dismissed": 0} and risk.get("resolved") == ["F1", "D1"]
           and "screen one" in risk.get("ledger", "") and "screen two" in risk.get("ledger", ""), risk)
 
+# --- ids and canonical-JSON identities never match; the resolved history keeps each id once -----
+run = Run()
+plain = {"what": "an entry with no id"}
+run.until("risk-check")
+run.done(**{"untrackedDeferrals": [{"id": "F1", "finding": "a"}, plain], "dismissed": [],
+            "counts": {"raised": 2, "fixed": 0, "deferred": 2, "dismissed": 0}})
+run.until("local-checks")
+run.done("LOCAL CHECKS: FAIL unit\n")
+commit(run.repo, "fix.txt", "fix\n", "fix the red check")
+run.resume()
+run.done(**{"untrackedDeferrals": [], "dismissed": [], "resolved": ["F1", "F1", json.dumps(plain, sort_keys=True)],
+            "counts": {"raised": 0, "fixed": 1, "deferred": 0, "dismissed": 0}})
+handed = {}
+while run.answer and run.answer["action"] == "run":
+    handed[run.answer["step"]["id"]] = run.answer["payload"]
+    run.done()
+risk = handed.get("capture", {}).get("riskCheck") or {}
+check("an id resolves only the entry carrying it; a string shaped like an entry's JSON resolves nothing",
+      risk.get("untrackedDeferrals") == [plain] and risk.get("counts", {}).get("deferred") == 1, risk)
+check("... and an id named twice in one screen is kept once in the history",
+      risk.get("resolved") == ["F1", json.dumps(plain, sort_keys=True)], risk.get("resolved"))
+
+# --- interrupted after the merge and the completion: the new session finishes, nothing closed ---
+run = Run()
+answer = run.until("merge")
+story = answer["payload"]["commit"]
+git(run.repo, "checkout", "-q", "main"); git(run.repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
+run.done(canned("merge@1", run.repo, **{"proof.head": story}))
+answer = run.until("capture")  # the completion step moved the item to Done; the session clears while capture runs
+check("(the merge and the completion are done, the capture issued)", is_run(answer, "capture", 1)
+      and [r for r in run.call("status", {"item": "I123"})[1]["rows"] if r["stepId"] in ("merge", "complete")] ==
+      [r for r in run.call("status", {"item": "I123"})[1]["rows"] if r["stepId"] in ("merge", "complete") and r["status"] == "done"], answer)
+run.session = "s2"
+answer = run.resume()
+check("a new session's resume of a run whose merge row is done hands back the capture as it was, on the base",
+      is_run(answer, "capture", 1) and answer.get("adoptedFrom", {}).get("sessionId") == "s1", answer)
+while run.answer and run.answer["action"] == "run":
+    run.done()
+issued = run.issued()
+check("... and finishes the capture and the sync exactly once each, completed, never closed",
+      finished(run.answer, "completed") and closes(run.answer, "completed")
+      and sorted(set(a for a in issued if a[0] in ("capture", "sync"))) == [("capture", 1), ("sync", 1)]
+      and [a for a in issued if a[0] == "complete"] == [("complete", 1)], (issued, run.answer))
+
 # --- a baseline this checkout cannot read is never handed as one: a full screen, history kept ---
 run = Run()
 git(run.repo, "remote", "add", "origin", "https://example.com/acme/app.git")
@@ -572,7 +616,7 @@ check("(a readable baseline is handed with baselineUnreadable null)",
       is_run(answer, "risk-check", 2) and answer["payload"]["previousProof"] is not None and answer["payload"]["baselineUnreadable"] is None, answer)
 
 # --- step 0, case (i): a merge pushed but never answered, picked up by a new session -----------
-LANDING = re.findall(r"`(git rev-list --parents origin/<workingBase>[^`]+)`",
+LANDING = re.findall(r"`(git rev-list --first-parent --parents origin/<workingBase>[^`]+)`",
                      re.sub(r"\s+", " ", open(os.path.join(ROOT, "skills/merge-story/references/merge-paths.md"), encoding="utf-8").read()))
 check("(the landing test's merge command is spelled once in merge-paths.md)", len(LANDING) == 1, LANDING)
 run = Run()
