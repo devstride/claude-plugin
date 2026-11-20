@@ -3,22 +3,23 @@ load: contract
 ---
 # Status-line segments: what each one needs, and what to do when it is blank
 
-The status line renders two lines, each segment led by its symbol:
+The status line renders two lines, each segment led by its dim label; the value carries the colour:
 
 ```
-◆ Opus 5 · ↯ high · ▣ acme · ⑂ i123-widget · ⎇ phil/26-11-04/widget
-⊞ 3.26.0 · ▲ phil-mac · ⇄ #412 draft · ⚑ release/26-11-04 · alice · ci
+Model: Opus 5 · Effort: high · Repo: acme · Checkout: i123-widget · Branch: phil/26-11-04/widget ✗
+Plugin: 3.26.0 · Stage: phil-mac · PR: #412 draft · Release: release/26-11-04 · alice · ci
 ```
 
 Line 2 prints only when it has a value; `"refreshInterval": 30` redraws every 30 seconds.
-**A segment with no value is not rendered**: a bare symbol reads as a failed load.
+**A segment with no value is not rendered**: a bare label reads as a failed load.
 
 **The repository holds a launcher, not the bar.** `.claude/statusline.sh` is
 `statusline-launcher.sh` (marker `# ds-statusline-launcher: managed v<n>`): each redraw runs the
 `statusline.sh` of the plugin the session has loaded, found through the session's record
-(rewritten at every prompt, so a reload shows at the next one), then `$CLAUDE_PLUGIN_ROOT`, then
+(rewritten at every prompt; until then, a `/reload-plugins` in the payload's transcript after it
+sends the lookup on, so the next redraw shows the reloaded copy), then `$CLAUDE_PLUGIN_ROOT`, then
 the registry's install for this repository; no release changes the repository. Finding no plugin
-it prints only `▣ <directory> · ⎇ <branch>`, so a bar alone never proves the plugin's status line
+it prints only `Repo: <directory> · Branch: <branch>`, so a bar alone never proves the plugin's status line
 ran.
 
 ## The proof
@@ -61,18 +62,18 @@ is not?**
 
 ## The segments
 
-| Key | Symbol | Where the value comes from | Blank means |
+| Key | Label | Where the value comes from | Blank means |
 | --- | --- | --- | --- |
-| `model` | ◆ | `model.display_name` in the status-line payload | The payload did not carry it — **transient** |
-| `effort` | ↯ | the last `"effort"` in the session transcript's tail | No assistant record yet — **transient**, fills in on the first reply |
-| `plugin` | ⊞ | `hooks/session-runtime.py check`: the running version, dim; red `3.15.0 → 3.16.0 · /reload-plugins` (newer copy installed), yellow `3.16.0 (3.16.1 out · /devstride:update)` (newer published) | No record yet — **never a finding** |
-| `session` | ☻ | this session's name: the first line of `session.nameCommand`, run from the repository root with `CLAUDE_CODE_SESSION_ID` exported, cached ~10s under `$TMPDIR` and refreshed at once when the payload's `session_name` changes; only without a command, the payload's `session_name` (a custom name, else Claude Code's generated title, which nothing else uses, so a repository that names its sessions never shows it) | The session has no custom name and no command is configured, or the command's first result is not cached yet — **never a finding** |
-| `repo` | ▣ | basename of `git rev-parse --show-toplevel` | Not a git repository — already an §1 finding |
-| `checkout` | ⑂ | linked worktree name, else the word `main` | Not a git repository — already an §1 finding |
-| `branch` | ⎇ | `git branch --show-current`, else `<sha> (detached)` | A repository with no commit yet — **transient** |
-| `stage` | ▲ | stdout of `stage.resolve`, cached ~10s | **Structural** — no `stage` block, or a `resolve` that prints nothing |
-| `pr` | ⇄ | `gh pr view` for the current branch, cached ~45s | This branch has no pull request (**transient**), or `gh` is missing/unauthenticated (an §1 finding) |
-| `release` | ⚑ | the clearance provider's `status --short` (`release.clearance`), cached ~45s: `release/26-10-17 · alice · ci`, `· STALE` past the stale threshold, `· STUCK` past the phase budget (both red); with nothing held, `close-out owed · <release> · <items>` while this machine owes close-out work | No release holds clearance (**transient**), `release.clearance` is null (by design, never asked), or no provider could be found (`doctor` config reports a `provider: github` with no installed plugin) |
+| `model` | Model | `model.display_name` in the status-line payload | The payload did not carry it — **transient** |
+| `effort` | Effort | the last `"effort"` in the session transcript's tail | No assistant record yet — **transient**, fills in on the first reply |
+| `plugin` | Plugin | `hooks/session-runtime.py check`: the running version, dim; red `3.15.0 → 3.16.0 · /reload-plugins` (newer copy installed), yellow `3.16.0 (3.16.1 out · /devstride:update)` (newer published) | No record yet — **never a finding** |
+| `session` | Session | this session's name: the first line of `session.nameCommand`, run from the repository root with `CLAUDE_CODE_SESSION_ID` exported, cached ~10s under `$TMPDIR` and refreshed at once when the payload's `session_name` changes; only without a command, the payload's `session_name` (a custom name, else Claude Code's generated title, which nothing else uses, so a repository that names its sessions never shows it) | The session has no custom name and no command is configured, or the command's first result is not cached yet — **never a finding** |
+| `repo` | Repo | basename of `git rev-parse --show-toplevel` | Not a git repository — already an §1 finding |
+| `checkout` | Checkout | linked worktree name, else the word `main` | Not a git repository — already an §1 finding |
+| `branch` | Branch | `git branch --show-current`, else `<sha> (detached)`; a yellow `✗` after it while `git --no-optional-locks status --porcelain` prints anything (uncommitted or untracked files) | A repository with no commit yet — **transient** |
+| `stage` | Stage | stdout of `stage.resolve`, cached ~10s | **Structural** — no `stage` block, or a `resolve` that prints nothing |
+| `pr` | PR | `gh pr view` for the current branch, cached ~45s | This branch has no pull request (**transient**), or `gh` is missing/unauthenticated (an §1 finding) |
+| `release` | Release | the clearance provider's `status --short` (`release.clearance`), cached ~45s: `release/26-10-17 · alice · ci`, `· STALE` past the stale threshold, `· STUCK` past the phase budget (both red); with nothing held, `close-out owed · <release> · <items>` while this machine owes close-out work | No release holds clearance (**transient**), `release.clearance` is null (by design, never asked), or no provider could be found (`doctor` config reports a `provider: github` with no installed plugin) |
 
 ## Which blanks are worth asking about
 

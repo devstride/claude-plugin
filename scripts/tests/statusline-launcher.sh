@@ -85,9 +85,9 @@ rm -f "$REGISTRY"; : > "$PYLOG"
 O="$(draw nobody "$REPO")"; printf '{"session_id":"nobody"}' | /bin/bash "$L" >/dev/null 2>&1; RC=$?
 mkdir -p "$WORK/plain dir"; O2="$(draw nobody "$WORK/plain dir")"
 O3="$(printf 'not json' | (cd "$REPO" && /bin/bash "$L") 2>&1 | perl -pe 's/\e\[[0-9;]*m//g')"
-if [ "$O" = "▣ repo · ⎇ feature" ] && [ "$RC" = 0 ] && [ "$O2" = "▣ plain dir" ] \
-   && [ "$O3" = "▣ repo · ⎇ feature" ] && [ "$(pyruns)" = 0 ]; then
-  ok "(4) no plugin copy anywhere → '▣ directory · ⎇ branch', never empty, never an error"
+if [ "$O" = "Repo: repo · Branch: feature" ] && [ "$RC" = 0 ] && [ "$O2" = "Repo: plain dir" ] \
+   && [ "$O3" = "Repo: repo · Branch: feature" ] && [ "$(pyruns)" = 0 ]; then
+  ok "(4) no plugin copy anywhere → 'Repo: directory · Branch: branch', never empty, never an error"
 else bad "(4) got: $O | rc=$RC | $O2 | $O3 | pyruns=$(pyruns)"; fi
 
 # (5) no record, but the environment names a plugin root
@@ -115,7 +115,7 @@ else bad "(7) got: $O"; fi
 BROKEN="$(plugin broken 3.3.0)"; printf '#!/bin/bash\nexit 3\n' > "$BROKEN/skills/setup/references/statusline.sh"
 loaded s8 "$BROKEN"
 O="$(draw s8 "$REPO")"; printf '{"session_id":"s8"}' | /bin/bash "$L" >/dev/null 2>&1; RC=$?
-if [ "$O" = "▣ repo · ⎇ feature" ] && [ "$RC" = 0 ]; then
+if [ "$O" = "Repo: repo · Branch: feature" ] && [ "$RC" = 0 ]; then
   ok "(8) the plugin's status line fails or prints nothing → the plain line, exit 0"
 else bad "(8) got: $O rc=$RC"; fi
 
@@ -148,7 +148,7 @@ else bad "(11) the full status line carries a marker or derives a path from itse
 #      the plugin this working copy is
 loaded real "$ROOT"
 O="$(draw real "$REPO")"
-if printf '%s' "$O" | grep -q '▣ repo · ⑂ main · ⎇ feature' && printf '%s' "$O" | grep -q '⊞ '; then
+if printf '%s' "$O" | grep -q 'Repo: repo · Checkout: main · Branch: feature' && printf '%s' "$O" | grep -q 'Plugin: '; then
   ok "(12) launcher → the shipped status line: repository, checkout, branch and the plugin segment"
 else bad "(12) got: $O"; fi
 
@@ -215,7 +215,7 @@ else bad "(14) record=$W1 registry=$W2 none=$W3 rc=$RC env=$W4"; fi
 SILENT="$(plugin silent 3.5.0)"; printf '#!/bin/bash\ncat >/dev/null\n' > "$SILENT/skills/setup/references/statusline.sh"
 loaded s8 "$BROKEN"; loaded s14b "$SILENT"
 W5="$(which s8 "$REPO")"; which s8 "$REPO" >/dev/null; RC=$?; W6="$(which s14b "$REPO")"
-if [ -z "$W5" ] && [ "$RC" = 0 ] && [ -z "$W6" ] && [ "$(draw s8 "$REPO")" = "▣ repo · ⎇ feature" ]; then
+if [ -z "$W5" ] && [ "$RC" = 0 ] && [ -z "$W6" ] && [ "$(draw s8 "$REPO")" = "Repo: repo · Branch: feature" ]; then
   ok "(14b) a resolved copy whose status line exits 3 or prints nothing → --which is empty, the draw is the plain line"
 else bad "(14b) broken=$W5 rc=$RC silent=$W6"; fi
 
@@ -244,5 +244,39 @@ if [ "$G1" = "bar-3.1.0 payload $A" ] && [ "$G2" = "bar-3.2.0 payload $B" ] && [
    && [ "$G4" = "$G1" ] && [ "$G5" = "$G2" ] && [ "$G6" = "$G3" ]; then
   ok "(16) same-scope installs across worktrees: this checkout's own, else the higher version, in either registry order"
 else bad "(16) $G1 | $G2 | $G3 | $G4 | $G5 | $G6"; fi
+
+# (17) right after /reload-plugins, before any prompt rewrites the record: the transcript's reload
+#      line is at or after the record, so the install that applies here (the copy a reload loads)
+#      draws the bar, --which names it, and a kept answer from before the reload is not used; a
+#      reload before the record, or none, leaves the record in charge; the next prompt's record
+#      (here naming the copy really loaded) takes over again; an ordinary draw starts no python
+# installed copies live in Claude Code's plugin cache; an update rewrites the registry row to the
+# new one, so the copy the session loaded is no longer listed
+CA="$(plugin claude/plugins/cache/devstride/devstride/3.1.0 3.1.0)"; CB="$(plugin claude/plugins/cache/devstride/devstride/3.2.0 3.2.0)"
+A_="$A"; B_="$B"; A="$CA"; B="$CB"
+registry "project|$B|$REPO|3.2.0"
+TR="$WORK/transcript-17.jsonl"; : > "$TR"
+rdraw() { printf '{"session_id":"%s","marker":"whole","transcript_path":"%s","workspace":{"current_dir":"%s"}}' "$1" "$TR" "$REPO" \
+  | PATH="$WORK/bin:$PATH" /bin/bash "$L" ${2:-} 2>&1 | perl -pe 's/\e\[[0-9;]*m//g'; }
+rline() { printf '{"parentUuid":"x","type":"system","subtype":"local_command","content":"<local-command-stdout>Reloaded: 1 plugin</local-command-stdout>","level":"info","timestamp":"%s","commandRun":{"command":"reload-plugins","args":""},"cwd":"%s"}\n' \
+  "$("$REAL_PY" -c 'import datetime,sys,time; print(datetime.datetime.fromtimestamp(time.time()+int(sys.argv[1]),datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.123Z"))' "$1")" "$REPO" >> "$TR"; }
+loaded s17 "$A"; printf '{"type":"user","message":{"content":"hello"}}\n' >> "$TR"
+: > "$PYLOG"; R0="$(rdraw s17)"; P0="$(pyruns)"
+rline -120; R1="$(rdraw s17)"                                          # a reload before the record
+printf '%s\n%s\n' "$(( $(date +%s) - 5 ))" "$A" > "$SESSIONS/s17.root"; chmod 600 "$SESSIONS/s17.root"
+rline 2; R2="$(rdraw s17)"; W17="$(rdraw s17 --which)"               # the reload, then redraws
+KEPT="$(sed -n 2p "$SESSIONS/s17.root")"
+loaded s17 "$A"; "$REAL_PY" - "$SESSIONS/s17.json" <<'PY'                    # next prompt, seconds later: A really loaded (a failed reload)
+import json, sys, time
+entry = json.load(open(sys.argv[1])); entry["at"] = round(time.time() + 10, 3)
+open(sys.argv[1], "w").write(json.dumps(entry, separators=(",", ":"), sort_keys=True) + "\n")
+PY
+R3="$(rdraw s17)"
+DEV="$(plugin devcopy 3.9.0)"; loaded s17d "$DEV"; R4="$(rdraw s17d)"                # a --plugin-dir copy, not in the registry
+if [ "$R0" = "bar-3.1.0 payload $A" ] && [ "$P0" = 0 ] && [ "$R1" = "$R0" ] && [ "$R2" = "bar-3.2.0 payload $B" ] \
+   && [ "$W17" = "$B" ] && [ "$KEPT" = "$B" ] && [ "$R3" = "$R0" ] && [ "$R4" = "bar-3.9.0 payload $DEV" ]; then
+  ok "(17) after /reload-plugins the next redraw runs the reloaded install's bar; before a reload, after the next prompt, and for a copy the registry does not list, the record decides"
+else bad "(17) before=$R0 py=$P0 | old-reload=$R1 | reloaded=$R2 which=$W17 kept=$KEPT | next-prompt=$R3 | plugin-dir=$R4"; fi
+A="$A_"; B="$B_"
 
 exit $FAIL

@@ -10,8 +10,8 @@ export XDG_CACHE_HOME="$WORK/cache" CLAUDE_CONFIG_DIR="$WORK/claude"
 mkdir -p "$CLAUDE_CONFIG_DIR/plugins"
 SESSIONS="$XDG_CACHE_HOME/devstride-plugin/sessions"
 
-plugin_copy() { # plugin_copy VERSION → a fixture plugin root carrying that manifest
-  local d="$WORK/plugin-$1"; mkdir -p "$d/.claude-plugin"
+plugin_copy() { # plugin_copy VERSION [DIR] → a fixture plugin root carrying that manifest, in the plugin cache as installs are (or DIR)
+  local d="${2:-$CLAUDE_CONFIG_DIR/plugins/cache/devstride/devstride/$1}"; mkdir -p "$d/.claude-plugin"
   printf '{"name":"devstride","version":"%s"}' "$1" > "$d/.claude-plugin/plugin.json"; printf '%s' "$d"
 }
 mkrepo() { # mkrepo NAME [CONFIG-JSON]
@@ -100,16 +100,29 @@ if [ "$(verdict r1 "$R")" = reload ] && [ "$(verdict r1 "$WORK/repo-wt")" = relo
    && printf '%s' "$JSON" | grep -q '"installed": "3.16.0"' && printf '%s' "$JSON" | grep -q '"running": "3.15.0"'; then
   ok "(7) running 3.15.0, installed 3.16.0 (project row of the main checkout) → reload, from the worktree too"; else bad "(7) $JSON"; fi
 
-# (8) a /reload-plugins after the record was written reads as current; one before it does not
+# (8) a /reload-plugins after the record was written reads as running the install (current, the
+#     installed version as running); one before it does not
 reload_line "$(iso 60)" >> "$T"
-V1="$(verdict r1 "$R")"
+V1="$(verdict r1 "$R")"; RUN1="$(python3 "$HELPER" check --session r1 --repo "$R" | python3 -c 'import json,sys; print(json.load(sys.stdin)["running"])')"
 : > "$T"; reload_line "$(iso -60)" >> "$T"
 V2="$(verdict r1 "$R")"
-if [ "$V1" = current ] && [ "$V2" = reload ]; then
-  ok "(8) reload after the record → current until the next prompt; reload before it → still reload"; else bad "(8) $V1 $V2"; fi
+if [ "$V1" = current ] && [ "$RUN1" = 3.16.0 ] && [ "$V2" = reload ]; then
+  ok "(8) reload after the record → running the installed 3.16.0 (current) until the next prompt; reload before it → still reload"; else bad "(8) $V1 $RUN1 $V2"; fi
 # (8b) a failed reload: the next prompt rewrites the record with what is still loaded → reload again
 : > "$T"; reload_line "$(iso -1)" >> "$T"; record "$P15" r1 UserPromptSubmit "$T" >/dev/null
 [ "$(verdict r1 "$R")" = reload ] && ok "(8b) the prompt after a failed reload shows the warning again" || bad "(8b) $(verdict r1 "$R")"
+# (8c) after a reload onto the install, a newer published release reads as update, as it would for
+#      a session that started on that install
+T8C="$WORK/transcript-8c.jsonl"; : > "$T8C"; record "$P15" r8c SessionStart "$T8C" >/dev/null; reload_line "$(iso 60)" >> "$T8C"; newest 3.16.1 0
+V8C="$(verdict r8c "$R")"; rm -f "$XDG_CACHE_HOME/devstride-plugin/newest.json"
+[ "$V8C" = update ] && ok "(8c) reloaded onto 3.16.0 with 3.16.1 published → update" || bad "(8c) $V8C"
+# (8d) a copy outside the plugin cache (claude --plugin-dir) reloads itself: after a reload it keeps
+#      its own version and reads as current, never as the registry's install
+PD="$(plugin_copy 3.15.0 "$WORK/dev-copy")"; T8D="$WORK/transcript-8d.jsonl"; : > "$T8D"
+record "$PD" r8d SessionStart "$T8D" >/dev/null; reload_line "$(iso 60)" >> "$T8D"
+J8D="$(python3 "$HELPER" check --session r8d --repo "$R")"
+if printf '%s' "$J8D" | grep -q '"running": "3.15.0"' && printf '%s' "$J8D" | grep -q '"verdict": "current"'; then
+  ok "(8d) a --plugin-dir copy after a reload keeps its own 3.15.0 and reads current"; else bad "(8d) $J8D"; fi
 
 # (9) running the installed copy, newer release published → update; stale newest, a pin, or the
 #     check switched off → current; newest equal → current
