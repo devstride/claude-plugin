@@ -320,7 +320,9 @@ unset XDG_CACHE_HOME CLAUDE_CONFIG_DIR
 #       shows the reloaded 3.16.0 on the next redraw, before any prompt rewrites the record
 export XDG_CACHE_HOME="$WORK/xdg23b" CLAUDE_CONFIG_DIR="$WORK/claude23b"; mkdir -p "$CLAUDE_CONFIG_DIR/plugins"
 RL23="$(mkrepo reload23 '{}')"; TR23="$WORK/transcript-23b.jsonl"; : > "$TR23"
-printf '{"session_id":"sl23","hook_event_name":"SessionStart","transcript_path":"%s"}' "$TR23" | CLAUDE_PLUGIN_ROOT="$WORK/loaded" python3 "$ROOT/hooks/session-runtime.py" record
+LOADED23="$CLAUDE_CONFIG_DIR/plugins/cache/devstride/devstride/3.15.0"; mkdir -p "$LOADED23/.claude-plugin"   # an installed copy lives in the plugin cache
+printf '{"name":"devstride","version":"3.15.0"}' > "$LOADED23/.claude-plugin/plugin.json"
+printf '{"session_id":"sl23","hook_event_name":"SessionStart","transcript_path":"%s"}' "$TR23" | CLAUDE_PLUGIN_ROOT="$LOADED23" python3 "$ROOT/hooks/session-runtime.py" record
 printf '{"version":2,"plugins":{"devstride@devstride":[{"scope":"project","projectPath":"%s","installPath":"%s","version":"3.16.0"}]}}' "$RL23" "$ROOT" > "$CLAUDE_CONFIG_DIR/plugins/installed_plugins.json"
 BEFORE23="$(render "$RL23" ',"session_id":"sl23"')"
 python3 -c 'import datetime,time; print("{\"type\":\"system\",\"subtype\":\"local_command\",\"timestamp\":\"%s\",\"commandRun\":{\"command\":\"reload-plugins\",\"args\":\"\"}}" % datetime.datetime.fromtimestamp(time.time()+1, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"))' >> "$TR23"

@@ -36,7 +36,8 @@ plugin data, so the loaded copy writes down what it is:
            malformed one, or no single applicable install. A `/reload-plugins` in the transcript
            after the record was written reads as running that install (so `current`, or `update`)
            until the next prompt rewrites the record, so a successful reload shows the new version
-           at once and a failed one shows its warning again.
+           at once and a failed one shows its warning again; for a copy outside the plugin cache
+           (`claude --plugin-dir`, which reloads itself) it reads as `current`.
   models --role planning|runner [--session <id>] [--repo <dir>]
            prints one JSON line {role, expected: {model, effort}, running: {model, effort},
            verdict}: the model and effort the repository expects a session in that role to run
@@ -369,6 +370,16 @@ def reloaded_since(transcript, at):
     return False
 
 
+def cached_copy(root):
+    """True for a copy inside Claude Code's plugin cache, where every installed copy lives (a
+    `claude --plugin-dir` copy does not)."""
+    if not isinstance(root, str) or not root:
+        return False
+    cache = os.path.join(os.path.realpath(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")),
+                         "plugins", "cache", "")
+    return os.path.realpath(root).startswith(cache)
+
+
 def check(session, repo=None):
     result = {"running": None, "installed": None, "newest": None, "verdict": "unknown"}
     try:
@@ -388,6 +399,9 @@ def check(session, repo=None):
         if not installed:
             return result
         if reloaded_since(entry.get("transcript"), at):
+            if not cached_copy(entry.get("root")):
+                result["verdict"] = "current"   # a --plugin-dir copy reloads itself
+                return result
             # a reload loads the install that applies here: report it as running at once (the next
             # prompt records what really loaded, so a failed reload shows its warning again)
             running = result["running"] = installed

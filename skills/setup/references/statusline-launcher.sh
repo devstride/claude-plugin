@@ -15,9 +15,11 @@
 #   1. the session's own record, which the loaded plugin's hooks write at every session start
 #      and every prompt (${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/sessions/<session id>.json),
 #      unless the session's transcript (the payload's transcript_path) shows a /reload-plugins
-#      at or after the record was written: a reload loads the install that applies here, so the
-#      record still names the copy from before it, and the registry (3) answers until the next
-#      prompt rewrites the record. So the first redraw after a reload shows the reloaded copy;
+#      at or after the record was written while the record names an installed copy (one in
+#      Claude Code's plugin cache): a reload loads the install that applies here, so the record
+#      still names the copy from before it, and the registry (3) answers until the next prompt
+#      rewrites the record. So the first redraw after a reload shows the reloaded copy. A copy
+#      outside the cache (a `claude --plugin-dir` one) reloads in place, so its record stays;
 #   2. $CLAUDE_PLUGIN_ROOT;
 #   3. the Claude Code plugin registry: the install recorded for this repository (local, then
 #      project scope; another repository's is never used), else the user's, else a managed
@@ -81,10 +83,14 @@ fi
 
 # 1b. A /reload-plugins since the record was written: the reload's own line in the transcript tail
 #     (Claude Code's record of the command), its time against the record's `at` (the record's first
-#     key), both in whole seconds. One tail and grep per draw; `date` only when a reload is there.
+#     key), both in whole seconds, and only for a record naming a copy in the plugin cache (a
+#     `--plugin-dir` copy reloads itself). One tail and grep per draw; `date` only when a reload
+#     is there.
 reloaded=""
+registry="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json"
 re='"transcript_path"[[:space:]]*:[[:space:]]*"([^"\\]+)"'
-if [ -n "$root" ] && [[ $input =~ $re ]] && [ -f "${BASH_REMATCH[1]}" ]; then
+if [ -n "$root" ] && [ "${root#"${registry%/*}/cache/"}" != "$root" ] && [[ $input =~ $re ]] \
+  && [ -f "${BASH_REMATCH[1]}" ]; then
   rline=$(tail -c 131072 "${BASH_REMATCH[1]}" 2>/dev/null | grep -F '"commandRun":{"command":"reload-plugins"' \
     | grep -F '"type":"system"' | tail -1)
   if [ -n "$rline" ]; then
@@ -107,7 +113,6 @@ fi
 # 3. The plugin registry. Skipped outright when it names no devstride plugin, so a machine
 #    without the plugin starts nothing here.
 if [ -z "$root" ]; then
-  registry="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json"
   listed=""; [ -f "$registry" ] && { listed=$(<"$registry"); } 2>/dev/null
   case "$listed" in
     *'@devstride"'*)

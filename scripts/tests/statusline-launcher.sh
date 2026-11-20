@@ -250,6 +250,10 @@ else bad "(16) $G1 | $G2 | $G3 | $G4 | $G5 | $G6"; fi
 #      draws the bar, --which names it, and a kept answer from before the reload is not used; a
 #      reload before the record, or none, leaves the record in charge; the next prompt's record
 #      (here naming the copy really loaded) takes over again; an ordinary draw starts no python
+# installed copies live in Claude Code's plugin cache; an update rewrites the registry row to the
+# new one, so the copy the session loaded is no longer listed
+CA="$(plugin claude/plugins/cache/devstride/devstride/3.1.0 3.1.0)"; CB="$(plugin claude/plugins/cache/devstride/devstride/3.2.0 3.2.0)"
+A_="$A"; B_="$B"; A="$CA"; B="$CB"
 registry "project|$B|$REPO|3.2.0"
 TR="$WORK/transcript-17.jsonl"; : > "$TR"
 rdraw() { printf '{"session_id":"%s","marker":"whole","transcript_path":"%s","workspace":{"current_dir":"%s"}}' "$1" "$TR" "$REPO" \
@@ -268,9 +272,11 @@ entry = json.load(open(sys.argv[1])); entry["at"] = round(time.time() + 10, 3)
 open(sys.argv[1], "w").write(json.dumps(entry, separators=(",", ":"), sort_keys=True) + "\n")
 PY
 R3="$(rdraw s17)"
+DEV="$(plugin devcopy 3.9.0)"; loaded s17d "$DEV"; R4="$(rdraw s17d)"                # a --plugin-dir copy, not in the registry
 if [ "$R0" = "bar-3.1.0 payload $A" ] && [ "$P0" = 0 ] && [ "$R1" = "$R0" ] && [ "$R2" = "bar-3.2.0 payload $B" ] \
-   && [ "$W17" = "$B" ] && [ "$KEPT" = "$B" ] && [ "$R3" = "$R0" ]; then
-  ok "(17) after /reload-plugins the next redraw runs the reloaded install's bar; before a reload, and after the next prompt, the record decides"
-else bad "(17) before=$R0 py=$P0 | old-reload=$R1 | reloaded=$R2 which=$W17 kept=$KEPT | next-prompt=$R3"; fi
+   && [ "$W17" = "$B" ] && [ "$KEPT" = "$B" ] && [ "$R3" = "$R0" ] && [ "$R4" = "bar-3.9.0 payload $DEV" ]; then
+  ok "(17) after /reload-plugins the next redraw runs the reloaded install's bar; before a reload, after the next prompt, and for a copy the registry does not list, the record decides"
+else bad "(17) before=$R0 py=$P0 | old-reload=$R1 | reloaded=$R2 which=$W17 kept=$KEPT | next-prompt=$R3 | plugin-dir=$R4"; fi
+A="$A_"; B="$B_"
 
 exit $FAIL
