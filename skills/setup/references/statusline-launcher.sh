@@ -1,5 +1,5 @@
 #!/bin/bash
-# ds-statusline-launcher: managed v1 — installed and kept up to date by the devstride
+# ds-statusline-launcher: managed v2 — installed and kept up to date by the devstride
 # plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
 # replaces a file that still carries it, and never touches one that does not.
 #
@@ -13,8 +13,11 @@
 #
 # Where the plugin is looked for, first hit wins:
 #   1. the session's own record, which the loaded plugin's hooks write at every session start
-#      and every prompt (${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/sessions/<session id>.json)
-#      — after an update and /reload-plugins, the next prompt moves the bar to the new version;
+#      and every prompt (${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/sessions/<session id>.json),
+#      unless the session's transcript (the payload's transcript_path) shows a /reload-plugins
+#      at or after the record was written: a reload loads the install that applies here, so the
+#      record still names the copy from before it, and the registry (3) answers until the next
+#      prompt rewrites the record. So the first redraw after a reload shows the reloaded copy;
 #   2. $CLAUDE_PLUGIN_ROOT;
 #   3. the Claude Code plugin registry: the install recorded for this repository (local, then
 #      project scope; another repository's is never used), else the user's, else a managed
@@ -76,6 +79,26 @@ sys.stdout.write(value if isinstance(value, str) else "")' "$sessions/$sid.json"
   [ -n "$root" ] && [ -f "$root/$rel" ] || root=""
 fi
 
+# 1b. A /reload-plugins since the record was written: the reload's own line in the transcript tail
+#     (Claude Code's record of the command), its time against the record's `at` (the record's first
+#     key), both in whole seconds. One tail and grep per draw; `date` only when a reload is there.
+reloaded=""
+re='"transcript_path"[[:space:]]*:[[:space:]]*"([^"\\]+)"'
+if [ -n "$root" ] && [[ $input =~ $re ]] && [ -f "${BASH_REMATCH[1]}" ]; then
+  rline=$(tail -c 131072 "${BASH_REMATCH[1]}" 2>/dev/null | grep -F '"commandRun":{"command":"reload-plugins"' \
+    | grep -F '"type":"system"' | tail -1)
+  if [ -n "$rline" ]; then
+    stamp="${rline#*\"timestamp\":\"}"; stamp="${stamp:0:19}"
+    rat="${line#*\"at\":}"; rat="${rat%%[.,\}]*}"
+    when=$(date -u -j -f '%Y-%m-%dT%H:%M:%S' "$stamp" +%s 2>/dev/null || date -u -d "${stamp}Z" +%s 2>/dev/null)
+    case "$rat" in ''|*[!0-9]*) rat="" ;; esac
+    case "$when" in ''|*[!0-9]*) when="" ;; esac
+    if [ -n "$rat" ] && [ -n "$when" ] && [ "${#rat}" -le 12 ] && [ "${#when}" -le 12 ] && [ "$when" -ge "$rat" ]; then
+      root=""; reloaded="$when"
+    fi
+  fi
+fi
+
 # 2. The environment.
 if [ -z "$root" ] && [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$CLAUDE_PLUGIN_ROOT/$rel" ]; then
   root="$CLAUDE_PLUGIN_ROOT"
@@ -96,6 +119,8 @@ if [ -z "$root" ]; then
         case "$at" in ''|*[!0-9]*) at=0 ;; esac
         [ "${#at}" -le 12 ] || at=0
         age=$(( 10#$now - 10#$at ))
+        # After a reload, only an answer kept since it: one from before may name the copy it replaced.
+        if [ -n "$reloaded" ] && [ "$at" -le "$reloaded" ]; then age=-1; fi
         if [ "$age" -ge 0 ] && [ "$age" -lt 60 ] && { [ -z "$cached" ] || [ -f "$cached/$rel" ]; }; then
           hit=1; root="$cached"
         fi
@@ -203,7 +228,7 @@ if [ -n "$root" ]; then
 fi
 [ "${1:-}" = "--which" ] && exit 0
 
-# The plain line: the directory and its branch, in the full bar's own symbols.
+# The plain line: the directory and its branch, in the full bar's own labels.
 cwd=""; re='"current_dir"[[:space:]]*:[[:space:]]*"([^"\\]+)"'
 [[ $input =~ $re ]] && cwd="${BASH_REMATCH[1]}"
 if [ -z "$cwd" ]; then
@@ -212,6 +237,6 @@ if [ -z "$cwd" ]; then
 fi
 [ -d "$cwd" ] || cwd="$PWD"
 branch=$(git -C "$cwd" branch --show-current 2>/dev/null)
-printf '\033[2m▣\033[0m %s' "${cwd##*/}"
-[ -n "$branch" ] && printf ' \033[2m·\033[0m \033[2m⎇\033[0m %s' "$branch"
+printf '\033[2mRepo:\033[0m %s' "${cwd##*/}"
+[ -n "$branch" ] && printf ' \033[2m·\033[0m \033[2mBranch:\033[0m %s' "$branch"
 exit 0

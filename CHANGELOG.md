@@ -8,6 +8,32 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **The status line names each segment in words.** Every segment now starts with a short, dim
+  label instead of a symbol: `Model: Opus 5 · Effort: high · Repo: acme · Checkout: main · Branch:
+  feature` on the first line, and `Plugin`, `Session`, `Stage`, `PR` and `Release` on the second.
+  The values keep their colours, an empty segment is still never drawn, and
+  `statusLine.hiddenSegments` takes the same names as before. The plain line a repository's
+  launcher prints when it finds no plugin reads `Repo: … · Branch: …` to match.
+
+### Added
+
+- **The status line shows when a checkout has uncommitted work.** A yellow `✗` now follows the
+  branch name while the checkout has anything not yet committed: an edited file, a staged change
+  or a new file git is not tracking yet. A clean checkout shows the branch alone, as before. The
+  check never takes git's lock on the checkout, so a commit or rebase running at the same moment
+  is never refused because the bar was drawing, and hiding the branch segment hides the mark too.
+
+### Fixed
+
+- **The status line catches up as soon as you run `/reload-plugins`.** After an update and a
+  reload, the bar kept showing the old plugin version, drawn by the old copy, with its red
+  "reload" prompt, until you next sent a prompt. Now the next redraw (within 30 seconds) shows
+  the reloaded copy and its version. If the reload did not take, the next prompt brings the
+  warning back, as before. Repositories receive this with the updated launcher, which the
+  session-start hook offers on a work branch as it does for every launcher change.
+
 ## [4.5.0] — 2026-11-19
 
 ### Added

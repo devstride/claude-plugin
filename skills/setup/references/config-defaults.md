@@ -498,7 +498,7 @@ headless runs. The recipe and the record it writes are in
 ```
 
 - **`nameCommand`** is a command whose stdout's first line is this session's display name, for the
-  status line's Session segment (☻). It runs from the repository root with
+  status line's Session segment. It runs from the repository root with
   `CLAUDE_CODE_SESSION_ID` exported, out of band and cached ~10s under `$TMPDIR`; any other output
   is ignored and a failing command shows nothing. When it is set the segment shows only its name,
   never the payload's `session_name` (for an unnamed session, a title Claude Code generated that
@@ -515,7 +515,9 @@ headless runs. The recipe and the record it writes are in
   It is applied only when there is no custom title, the custom title is the hook's own, or line 2
   is `replace`, so a `--name` or `/rename` name wins; a title set by `replace` is a person's from
   then on. Claude Code applies it only at a prompt, start, resume or fork, never mid-turn. A
-  failure changes nothing and never blocks a prompt; keep the command local and quick. `null`
+  failure changes nothing and never blocks a prompt; keep the command local and quick. Remote
+  Control (claude.ai/code, the Claude app) shows the session's title, so it follows; for a
+  `claude remote-control` session, from Claude Code 2.1.329. `null`
   (the default) sets no title.
 
 - **`jobClassGate`** turns on the plugin's `UserPromptSubmit` hook (`hooks/session-gate.sh`). The
@@ -745,12 +747,12 @@ covers two other things: `hiddenSegments`, the segments this repository has conf
 and `autoUpdate`, whether the session-start hook may replace the committed script. Both are documented
 in `${CLAUDE_PLUGIN_ROOT}/skills/setup/references/statusline-segments.md`.
 
-It renders two lines of symbol-labelled segments (`statusline-segments.md`) and **omits any
-segment with no value — symbol, value and separator together**, never a dangling `⑂`. Two of
+It renders two lines of labelled segments (`statusline-segments.md`) and **omits any
+segment with no value — label, value and separator together**, never a dangling `Checkout:`. Two of
 those segments are the reason it ships here rather than being left to each repository:
 
-- **Checkout** distinguishes the main checkout from a linked worktree, naming the REPO after `▣`
-  and the WORKTREE after `⑂`. Under `epicIntegrationBranches` the loop puts work in
+- **Checkout** distinguishes the main checkout from a linked worktree, naming the REPO after `Repo:`
+  and the WORKTREE after `Checkout:`. Under `epicIntegrationBranches` the loop puts work in
   worktrees, and "which checkout am I in" stops being obvious exactly when it starts to matter.
 - **Stage** is `stage.resolve`, so it appears only in repositories that have one, and turns red
   for a `productionStages` name.

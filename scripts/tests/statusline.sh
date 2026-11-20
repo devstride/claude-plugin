@@ -18,99 +18,100 @@ render() {
     | perl -pe 's/\e\[[0-9;]*m//g; s/\e\]8;;[^\e]*\e\\//g'
 }
 
-mkrepo() { # mkrepo NAME [CONFIG-JSON] — a git repo with one commit, on branch main
+mkrepo() { # mkrepo NAME [CONFIG-JSON] — a git repo with one commit (the config, as a real repository commits it), on branch main, clean
   local d="$WORK/$1"; mkdir -p "$d/.claude"
   git -C "$d" init -q -b main 2>/dev/null || { git -C "$d" init -q; git -C "$d" checkout -q -b main 2>/dev/null; }
+  [ $# -ge 2 ] && printf '%s' "$2" > "$d/.claude/ds-config.json" && git -C "$d" add .claude/ds-config.json
   git -C "$d" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
-  [ $# -ge 2 ] && printf '%s' "$2" > "$d/.claude/ds-config.json"
   printf '%s' "$d"
 }
 
-# No label may be left dangling: a segment symbol followed by the separator or the
+# No label may be left dangling: a segment label followed by the separator or the
 # end of a line means a segment rendered with nothing in it. This is the invariant
 # the whole seg() mechanism exists to hold, so it is asserted on every case below.
-no_dangling() { printf '%s\n' "$1" | perl -Mutf8 -CS -ne 'exit 1 if /[◆↯▣⑂⎇⊞☻▲⇄⚑](?: ·|\s*$)/'; }
+no_dangling() { printf '%s\n' "$1" | perl -Mutf8 -CS -ne 'exit 1 if /\b(?:Model|Effort|Repo|Checkout|Branch|Plugin|Session|Stage|PR|Release):(?: ·|\s*$)/'; }
 
 R="$(mkrepo plain '{}')"
 
 # (1) the ordinary case: every segment that has a value, in order, separated by ·
 O="$(render "$R" ',"model":{"display_name":"Opus 5"}')"
-if [ "$O" = "◆ Opus 5 · ▣ plain · ⑂ main · ⎇ main" ] && no_dangling "$O"; then
+if [ "$O" = "Model: Opus 5 · Repo: plain · Checkout: main · Branch: main" ] && no_dangling "$O"; then
   ok "(1) full line: Model · Repo · Checkout · Branch, no Stage/PR/Effort to show"
 else bad "(1) got: $O"; fi
 
 # (2) a missing value drops its segment AND its separator — no leading " · "
 O="$(render "$R")"
-if [ "$O" = "▣ plain · ⑂ main · ⎇ main" ] && no_dangling "$O"; then
+if [ "$O" = "Repo: plain · Checkout: main · Branch: main" ] && no_dangling "$O"; then
   ok "(2) no model in the payload → no Model segment and no orphan separator"
 else bad "(2) got: $O"; fi
 
-# (3) the regression this file exists for: a label is never printed empty
+# (3) the regression this file exists for: a label is never printed empty (and the check itself
+#     catches a dangling label mid-line and at the end)
 O="$(render "$R" ',"model":{"display_name":""}')"
-if no_dangling "$O" && ! printf '%s' "$O" | grep -q '◆'; then
-  ok "(3) an empty display_name renders no '◆' label at all"
+if no_dangling "$O" && ! printf '%s' "$O" | grep -q 'Model:' && ! no_dangling "Repo: x · Checkout: · Branch: y" && ! no_dangling "Repo: x · PR:"; then
+  ok "(3) an empty display_name renders no 'Model:' label at all"
 else bad "(3) got: $O"; fi
 
 # (4) hiddenSegments suppresses a segment that WOULD have rendered
 H="$(mkrepo hidden '{"statusLine":{"hiddenSegments":["checkout","model"]}}')"
 O="$(render "$H" ',"model":{"display_name":"Opus 5"}')"
-if [ "$O" = "▣ hidden · ⎇ main" ] && no_dangling "$O"; then
+if [ "$O" = "Repo: hidden · Branch: main" ] && no_dangling "$O"; then
   ok "(4) hiddenSegments [checkout, model] → both gone, the rest still joined correctly"
 else bad "(4) got: $O"; fi
 
 # (5) an unknown key in hiddenSegments is inert, not fatal
 O="$(render "$(mkrepo unknownkey '{"statusLine":{"hiddenSegments":["nosuchsegment"]}}')")"
-if [ "$O" = "▣ unknownkey · ⑂ main · ⎇ main" ]; then
+if [ "$O" = "Repo: unknownkey · Checkout: main · Branch: main" ]; then
   ok "(5) an unrecognized hiddenSegments entry changes nothing"
 else bad "(5) got: $O"; fi
 
 # (6) not a git repo: the message, and nothing dangling before it
 mkdir -p "$WORK/nogit"
 O="$(render "$WORK/nogit" ',"model":{"display_name":"Opus 5"}')"
-if [ "$O" = "◆ Opus 5 · —not a git repo—" ] && no_dangling "$O"; then
+if [ "$O" = "Model: Opus 5 · —not a git repo—" ] && no_dangling "$O"; then
   ok "(6) outside a repo → Model · —not a git repo—"
 else bad "(6) got: $O"; fi
 
 # (7) detached HEAD renders the sha; the "(detached)" suffix never appears alone
 D="$(mkrepo detached '{}')"; git -C "$D" checkout -q --detach HEAD
 O="$(render "$D")"
-if printf '%s' "$O" | grep -qE '⎇ [0-9a-f]+ \(detached\)' && no_dangling "$O"; then
-  ok "(7) detached HEAD → '⎇ <sha> (detached)', never a bare '(detached)'"
+if printf '%s' "$O" | grep -qE 'Branch: [0-9a-f]+ \(detached\)' && no_dangling "$O"; then
+  ok "(7) detached HEAD → 'Branch: <sha> (detached)', never a bare '(detached)'"
 else bad "(7) got: $O"; fi
 
 # (8) stage.resolve drives the Stage segment; a resolve printing nothing shows none
 S="$(mkrepo staged '{"stage":{"resolve":"echo my-stage","productionStages":["prod"]}}')"
 O="$(render "$S")"
 N="$(render "$(mkrepo unstaged '{"stage":{"resolve":"true"}}')")"
-if printf '%s' "$O" | grep -q '▲ my-stage' && ! printf '%s' "$N" | grep -q '▲' && no_dangling "$N"; then
+if printf '%s' "$O" | grep -q 'Stage: my-stage' && ! printf '%s' "$N" | grep -q 'Stage:' && no_dangling "$N"; then
   ok "(8) stage.resolve with output → Stage; resolve printing nothing → no Stage label"
 else bad "(8) got: $O | $N"; fi
 
 # (9) a production stage is still just one segment (the colour differs, stripped here)
 O="$(render "$(mkrepo prodstage '{"stage":{"resolve":"echo prod","productionStages":["prod"]}}')")"
-if printf '%s' "$O" | grep -q '▲ prod'; then
+if printf '%s' "$O" | grep -q 'Stage: prod'; then
   ok "(9) a stage named in productionStages renders normally (red, stripped in test)"
 else bad "(9) got: $O"; fi
 
 # (10) the config is found from a SUBDIRECTORY, not just the repo root
 mkdir -p "$H/packages/web"
 O="$(render "$H/packages/web" ',"model":{"display_name":"Opus 5"}')"
-if [ "$O" = "▣ hidden · ⎇ main" ]; then
+if [ "$O" = "Repo: hidden · Branch: main" ]; then
   ok "(10) config resolved by walking up from packages/web — hiddenSegments still applied"
 else bad "(10) got: $O"; fi
 
 # (11) unparsable config is tolerated: a status line must never be what breaks
 B="$(mkrepo broken 'not json at all')"
 O="$(render "$B")"
-if [ "$O" = "▣ broken · ⑂ main · ⎇ main" ]; then
+if [ "$O" = "Repo: broken · Checkout: main · Branch: main" ]; then
   ok "(11) a corrupt ds-config.json degrades to the default segments, no error"
 else bad "(11) got: $O"; fi
 
-# (12) a linked worktree renders ⑂ <worktree> and names the REPO, not the worktree dir
+# (12) a linked worktree renders Checkout: <worktree> and names the REPO, not the worktree dir
 git -C "$R" worktree add -q "$WORK/wt-feature" -b feature 2>/dev/null
 O="$(render "$WORK/wt-feature")"
-if printf '%s' "$O" | grep -q '▣ plain' && printf '%s' "$O" | grep -q '⑂ wt-feature'; then
-  ok "(12) linked worktree → Repo stays 'plain', Checkout shows ⑂ wt-feature"
+if printf '%s' "$O" | grep -q 'Repo: plain' && printf '%s' "$O" | grep -q 'Checkout: wt-feature'; then
+  ok "(12) linked worktree → Repo stays 'plain', Checkout shows Checkout: wt-feature"
 else bad "(12) got: $O"; fi
 
 # (13) the PR segment comes from the cache, and a truncated cache line renders no
@@ -123,7 +124,7 @@ printf '#412|open|https://example.test/pr/412' > "$TMPDIR/ds-statusline-pr-$key"
 O="$(render "$R")"
 printf '#412' > "$TMPDIR/ds-statusline-pr-$key"
 O2="$(render "$R")"
-if printf '%s' "$O" | grep -q '⇄ #412 open' && printf '%s' "$O2" | grep -q '⇄ #412' && no_dangling "$O2"; then
+if printf '%s' "$O" | grep -q 'PR: #412 open' && printf '%s' "$O2" | grep -q 'PR: #412' && no_dangling "$O2"; then
   ok "(13) PR from cache renders '#412 open'; a truncated line renders '#412' with no empty state"
 else bad "(13) got: $O | $O2"; fi
 
@@ -158,8 +159,8 @@ NL="$(mkrepo unreleased '{"release":{"clearance":null}}')"
 nkey=$(printf '%s' "$(git -C "$NL" rev-parse --show-toplevel)" | (md5 -q 2>/dev/null || shasum | cut -d' ' -f1))
 printf 'release/26-10-17 · alice · ci' > "$TMPDIR/ds-statusline-release-$nkey"
 O3="$(render "$NL")"
-if printf '%s' "$O" | grep -q '⚑ release/26-10-17 · alice · ci$' && printf '%s' "$O2" | grep -q '⚑ release/26-10-17 · alice · review · STALE$' \
-   && ! printf '%s' "$O3" | grep -q '⚑' && no_dangling "$O3"; then
+if printf '%s' "$O" | grep -q 'Release: release/26-10-17 · alice · ci$' && printf '%s' "$O2" | grep -q 'Release: release/26-10-17 · alice · review · STALE$' \
+   && ! printf '%s' "$O3" | grep -q 'Release:' && no_dangling "$O3"; then
   ok "(16) Release segment from the provider's short line; STALE kept; null clearance → no Release label"
 else bad "(16) got: $O | $O2 | $O3"; fi
 
@@ -171,13 +172,13 @@ O="$(DEVSTRIDE_CLEARANCE_PROVIDER="$WORK/fake-provider.sh" render "$GH")"
 gkey=$(printf '%s' "$(git -C "$GH" rev-parse --show-toplevel)" | (md5 -q 2>/dev/null || shasum | cut -d' ' -f1))
 for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$TMPDIR/ds-statusline-release-$gkey" ] && break; sleep 0.3; done
 O2="$(DEVSTRIDE_CLEARANCE_PROVIDER="$WORK/fake-provider.sh" render "$GH")"
-if ! printf '%s' "$O" | grep -q '⚑' && no_dangling "$O" && printf '%s' "$O2" | grep -q '⚑ release/26-10-18 · bob · pr$'; then
+if ! printf '%s' "$O" | grep -q 'Release:' && no_dangling "$O" && printf '%s' "$O2" | grep -q 'Release: release/26-10-18 · bob · pr$'; then
   ok "(17) provider github → resolved via DEVSTRIDE_CLEARANCE_PROVIDER, refreshed out of band, shown on the next render"
 else bad "(17) got: $O | $O2"; fi
 
 # (18) provider github with no provider anywhere → no segment, no error, nothing dangling
 O="$(DEVSTRIDE_CLEARANCE_PROVIDER=/nonexistent CLAUDE_PLUGIN_ROOT=/nonexistent CLAUDE_CONFIG_DIR="$WORK/noclaude" render "$(mkrepo noprov '{"release":{"clearance":{"provider":"github"}}}')")"
-if ! printf '%s' "$O" | grep -q '⚑' && no_dangling "$O" && [ -n "$O" ]; then
+if ! printf '%s' "$O" | grep -q 'Release:' && no_dangling "$O" && [ -n "$O" ]; then
   ok "(18) provider github with no installed provider → the segment is simply absent"
 else bad "(18) got: $O"; fi
 
@@ -197,9 +198,9 @@ sed -i.bak 's/"version":"3.16.0"/"version":"3.15.0"/g' "$CLAUDE_CONFIG_DIR/plugi
 python3 -c 'import json,time; print(json.dumps({"schema":2,"source":"https://github.com/devstride/claude-plugin","newest":"3.16.1","fetchedAt":int(time.time())}))' > "$XDG_CACHE_HOME/devstride-plugin/newest.json"
 OU="$(render "$PL" ',"session_id":"sl1"')"
 rm -f "$XDG_CACHE_HOME/devstride-plugin/newest.json"; OC="$(render "$PL" ',"session_id":"sl1"')"
-if printf '%s' "$O" | grep -q '⊞ 3.15.0 → 3.16.0 · /reload-plugins' && ! printf '%s' "$OH" | grep -q '⊞' \
-   && ! printf '%s' "$ON" | grep -q '⊞' && printf '%s' "$OU" | grep -q '⊞ 3.15.0 (3.16.1 out · /devstride:update)' \
-   && printf '%s' "$OC" | grep -q '^⊞ 3.15.0$' && no_dangling "$O" && no_dangling "$OU"; then
+if printf '%s' "$O" | grep -q 'Plugin: 3.15.0 → 3.16.0 · /reload-plugins' && ! printf '%s' "$OH" | grep -q 'Plugin:' \
+   && ! printf '%s' "$ON" | grep -q 'Plugin:' && printf '%s' "$OU" | grep -q 'Plugin: 3.15.0 (3.16.1 out · /devstride:update)' \
+   && printf '%s' "$OC" | grep -q '^Plugin: 3.15.0$' && no_dangling "$O" && no_dangling "$OU"; then
   ok "(19) Plugin segment: reload (red), update (yellow) and current (dim version) render on line 2; no record and hiddenSegments render none"
 else bad "(19) got: $O | $OH | $ON | $OU | $OC"; fi
 unset XDG_CACHE_HOME CLAUDE_CONFIG_DIR
@@ -209,7 +210,7 @@ unset XDG_CACHE_HOME CLAUDE_CONFIG_DIR
 O="$(render "$S" ',"model":{"display_name":"Opus 5"}')"
 L1="$(printf '%s\n' "$O" | sed -n 1p)"; L2="$(printf '%s\n' "$O" | sed -n 2p)"; LN="$(printf '%s\n' "$O" | wc -l | tr -d ' ')"
 ONE="$(render "$(mkrepo oneline '{}')")"
-if [ "$LN" = 2 ] && [ "$L1" = "◆ Opus 5 · ▣ staged · ⑂ main · ⎇ main" ] && [ "$L2" = "▲ my-stage" ] \
+if [ "$LN" = 2 ] && [ "$L1" = "Model: Opus 5 · Repo: staged · Checkout: main · Branch: main" ] && [ "$L2" = "Stage: my-stage" ] \
    && [ "$(printf '%s\n' "$ONE" | wc -l | tr -d ' ')" = 1 ]; then
   ok "(20) line 1 = model · repo · checkout · branch; line 2 = stage; no line 2 when it would be empty"
 else bad "(20) got [$O] / [$ONE]"; fi
@@ -222,7 +223,7 @@ else bad "(21) refreshInterval 30 missing from the setup or doctor template"; fi
 # (22) the Session segment: the repository's session.nameCommand when one is configured (even over
 #      a payload session_name, which may be Claude Code's generated title), served from a cache under
 #      $TMPDIR and refreshed in the background with the payload's session id exported; the payload's
-#      session_name only without a command; nothing (and no dangling ☻) without either; hidden by
+#      session_name only without a command; nothing (and no dangling Session:) without either; hidden by
 #      hiddenSegments; a failing command prints nothing; nothing written to the repository or the
 #      working directory
 SID=0b1c2d3e-0000-4000-8000-000000000001
@@ -243,11 +244,11 @@ N4="$(mkrepo sess4 '{"statusLine":{"hiddenSegments":["session"]}}')"
 E="$(render "$N4" ",\"session_id\":\"$SID\",\"session_name\":\"wt2-9f\"")"
 F="$(render "$WORK" ",\"session_id\":\"$SID\",\"session_name\":\"$(printf 'x|y')\"")"
 DIRTY="$(git -C "$N2" status --porcelain --untracked-files=all)"
-if printf '%s' "$A" | grep -q '☻ wt2-9f' && no_dangling "$A" && ! printf '%s' "$B" | grep -q '☻' && no_dangling "$B" \
-   && printf '%s' "$C2" | grep -qE "☻ cmd-$SID( |\$)" && [ "$CACHED" = "cmd-$SID" ] && [ "$RAN_IN" = "$(cd "$N2" && pwd -P)" -o "$RAN_IN" = "$N2" ] \
-   && printf '%s' "$P2" | grep -qE "☻ cmd-$SID( |\$)" && ! printf '%s' "$P2" | grep -q 'Generated' \
-   && ! printf '%s' "$C1" | grep -q '☻' && no_dangling "$C1" && ! printf '%s' "$D" | grep -q '☻' && no_dangling "$D" \
-   && ! printf '%s' "$E" | grep -q '☻' && printf '%s' "$F" | grep -q '☻ x y' && [ "$DIRTY" = "$BEFORE" ]; then
+if printf '%s' "$A" | grep -q 'Session: wt2-9f' && no_dangling "$A" && ! printf '%s' "$B" | grep -q 'Session:' && no_dangling "$B" \
+   && printf '%s' "$C2" | grep -qE "Session: cmd-$SID( |\$)" && [ "$CACHED" = "cmd-$SID" ] && [ "$RAN_IN" = "$(cd "$N2" && pwd -P)" -o "$RAN_IN" = "$N2" ] \
+   && printf '%s' "$P2" | grep -qE "Session: cmd-$SID( |\$)" && ! printf '%s' "$P2" | grep -q 'Generated' \
+   && ! printf '%s' "$C1" | grep -q 'Session:' && no_dangling "$C1" && ! printf '%s' "$D" | grep -q 'Session:' && no_dangling "$D" \
+   && ! printf '%s' "$E" | grep -q 'Session:' && printf '%s' "$F" | grep -q 'Session: x y' && [ "$DIRTY" = "$BEFORE" ]; then
   ok "(22) Session: nameCommand wins over a payload name (first line, session id exported, run from the repo, cached under TMPDIR); payload name only without a command; cold cache, none, failing or hidden → no segment; outside a repo too; repo left clean"
 else bad "(22) a=$A | b=$B | c1=$C1 | c2=$C2 | cached=$CACHED | ran=$RAN_IN | p2=$P2 | d=$D | e=$E | f=$F | dirty=$DIRTY"; fi
 
@@ -264,12 +265,12 @@ printf 'second\n' > "$N7/name.txt"
 G2="$(render "$N7" ",\"session_id\":\"$SID7\",\"session_name\":\"Generated title\"")"; settled "$SID7"; R2="$(n7runs)"
 G3="$(render "$N7" ",\"session_id\":\"$SID7\",\"session_name\":\"renamed\"")"; settled "$SID7"; R3="$(n7runs)"
 G4="$(render "$N7" ",\"session_id\":\"$SID7\",\"session_name\":\"renamed\"")"
-if ! printf '%s' "$G0" | grep -q '☻' && no_dangling "$G0" && printf '%s' "$G1" | grep -qE '☻ first( |$)' \
-   && [ "$R1" = 1 ] && [ "$R2" = 1 ] && printf '%s' "$G2" | grep -qE '☻ first( |$)' && [ "$R3" = 2 ] \
-   && printf '%s' "$G4" | grep -qE '☻ second( |$)' && [ "$(cat "$TMPDIR/ds-statusline-session-$SID7.payload")" = renamed ] \
+if ! printf '%s' "$G0" | grep -q 'Session:' && no_dangling "$G0" && printf '%s' "$G1" | grep -qE 'Session: first( |$)' \
+   && [ "$R1" = 1 ] && [ "$R2" = 1 ] && printf '%s' "$G2" | grep -qE 'Session: first( |$)' && [ "$R3" = 2 ] \
+   && printf '%s' "$G4" | grep -qE 'Session: second( |$)' && [ "$(cat "$TMPDIR/ds-statusline-session-$SID7.payload")" = renamed ] \
    && [ "$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode)))' "$TMPDIR/ds-statusline-session-$SID7.payload")" = 0o600 ] \
    && [ "$(cat "$TMPDIR/n7-victim")" = victim ] && [ ! -L "$TMPDIR/ds-statusline-session-$SID7.payload" ] \
-   && ! printf '%s%s%s' "$G1" "$G3" "$G4" | grep -qE 'Generated|☻ renamed'; then
+   && ! printf '%s%s%s' "$G1" "$G3" "$G4" | grep -qE 'Generated|Session: renamed'; then
   ok "(22a) Session: a cold nameCommand cache shows nothing; an unchanged payload name waits out the cache; a changed one refreshes at once; the payload name never shows"
 else bad "(22a) g0=$G0 | g1=$G1 r1=$R1 | g2=$G2 r2=$R2 | g3=$G3 r3=$R3 | g4=$G4"; fi
 
@@ -310,9 +311,45 @@ O="$(render "$PL" "$LIVE")"; B1="$(python3 -c 'import os,sys; s=os.stat(sys.argv
 VERDICT="$(python3 "$ROOT/hooks/session-runtime.py" models --role runner --session sl1 --repo "$PL" | python3 -c 'import json,sys; print(json.load(sys.stdin)["verdict"])')"
 render "$PL" ',"session_id":"nosuch","model":{"id":"claude-opus-5"},"effort":{"level":"high"}' >/dev/null
 if [ "$SEEN" = "claude-opus-5 Opus 5 xhigh 3.15.0" ] && [ "$B0" = "$B1" ] && [ "$VERDICT" = mismatch ] \
-   && printf '%s' "$O" | grep -q '⊞ 3.15.0' && [ ! -e "$XDG_CACHE_HOME/devstride-plugin/sessions/nosuch.json" ]; then
+   && printf '%s' "$O" | grep -q 'Plugin: 3.15.0' && [ ! -e "$XDG_CACHE_HOME/devstride-plugin/sessions/nosuch.json" ]; then
   ok "(23) the status line notes the payload's model and effort in the session record; the same values → no rewrite; no record → none created"
 else bad "(23) seen=$SEEN b0=$B0 b1=$B1 verdict=$VERDICT o=$O"; fi
 unset XDG_CACHE_HOME CLAUDE_CONFIG_DIR
+
+# (23b) right after /reload-plugins: the Plugin segment that read "3.15.0 → 3.16.0 · /reload-plugins"
+#       shows the reloaded 3.16.0 on the next redraw, before any prompt rewrites the record
+export XDG_CACHE_HOME="$WORK/xdg23b" CLAUDE_CONFIG_DIR="$WORK/claude23b"; mkdir -p "$CLAUDE_CONFIG_DIR/plugins"
+RL23="$(mkrepo reload23 '{}')"; TR23="$WORK/transcript-23b.jsonl"; : > "$TR23"
+printf '{"session_id":"sl23","hook_event_name":"SessionStart","transcript_path":"%s"}' "$TR23" | CLAUDE_PLUGIN_ROOT="$WORK/loaded" python3 "$ROOT/hooks/session-runtime.py" record
+printf '{"version":2,"plugins":{"devstride@devstride":[{"scope":"project","projectPath":"%s","installPath":"%s","version":"3.16.0"}]}}' "$RL23" "$ROOT" > "$CLAUDE_CONFIG_DIR/plugins/installed_plugins.json"
+BEFORE23="$(render "$RL23" ',"session_id":"sl23"')"
+python3 -c 'import datetime,time; print("{\"type\":\"system\",\"subtype\":\"local_command\",\"timestamp\":\"%s\",\"commandRun\":{\"command\":\"reload-plugins\",\"args\":\"\"}}" % datetime.datetime.fromtimestamp(time.time()+1, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z"))' >> "$TR23"
+AFTER23="$(render "$RL23" ',"session_id":"sl23"')"
+if printf '%s' "$BEFORE23" | grep -q 'Plugin: 3.15.0 → 3.16.0 · /reload-plugins' && printf '%s' "$AFTER23" | grep -q '^Plugin: 3.16.0$'; then
+  ok "(23b) after /reload-plugins the Plugin segment shows the reloaded 3.16.0 at once, not the old version"
+else bad "(23b) before=$BEFORE23 | after=$AFTER23"; fi
+unset XDG_CACHE_HOME CLAUDE_CONFIG_DIR
+
+# (24) the branch segment carries a yellow ✗ while the checkout has uncommitted changes (an untracked
+#      file, a tracked edit, a staged change), none on a clean tree, none with the segment hidden;
+#      drawing never takes git's index lock, and a lock another git command holds does not break it
+X="$(mkrepo dirtymark '{}')"; XH="$(mkrepo dirtyhidden '{"statusLine":{"hiddenSegments":["branch"]}}')"
+printf 'a\n' > "$X/tracked.txt"; git -C "$X" add tracked.txt; git -C "$X" -c user.email=t@t -c user.name=t commit -q -m tracked
+CLEAN="$(render "$X")"
+printf 'new\n' > "$X/untracked.txt"; UNTRACKED="$(render "$X")"; rm -f "$X/untracked.txt"
+printf 'b\n' >> "$X/tracked.txt"; MODIFIED="$(render "$X")"
+git -C "$X" add tracked.txt; STAGED="$(render "$X")"
+mkdir -p "$X/sub"; FROMSUB="$(render "$X/sub")"
+# every git status the bar runs is lock-free: a lock lives for milliseconds, so the source is the proof
+LOCKFREE=yes; grep -E 'git( [^|]*)? status' "$SL" | grep -v '^ *#' | grep -qv -- '--no-optional-locks' && LOCKFREE=no
+grep -q 'git --no-optional-locks status --porcelain' "$SL" || LOCKFREE=no
+: > "$X/.git/index.lock"; LOCKED="$(render "$X")"; rm -f "$X/.git/index.lock"
+printf 'new\n' > "$XH/untracked.txt"; HIDDEN="$(render "$XH")"
+if [ "$CLEAN" = "Repo: dirtymark · Checkout: main · Branch: main" ] && [ "$UNTRACKED" = "Repo: dirtymark · Checkout: main · Branch: main ✗" ] \
+   && [ "$MODIFIED" = "$UNTRACKED" ] && [ "$STAGED" = "$UNTRACKED" ] && [ "$FROMSUB" = "$UNTRACKED" ] \
+   && [ "$LOCKED" = "$UNTRACKED" ] && [ "$LOCKFREE" = yes ] && [ "$HIDDEN" = "Repo: dirtyhidden · Checkout: main" ] \
+   && no_dangling "$UNTRACKED" && no_dangling "$HIDDEN"; then
+  ok "(24) branch ✗: none on a clean tree; shown for untracked, modified and staged files, from a subdirectory and beside a held index lock; hidden with the segment; every status call lock-free"
+else bad "(24) clean=$CLEAN | untracked=$UNTRACKED | modified=$MODIFIED | staged=$STAGED | sub=$FROMSUB | locked=$LOCKED | lockfree=$LOCKFREE | hidden=$HIDDEN"; fi
 
 exit $FAIL

@@ -6,19 +6,19 @@
 # version the session has loaded. So this file carries no "managed" marker and must never
 # assume where it lives: everything about the repository comes from the payload's directory.
 #
-# Two lines, each segment led by a one-character symbol instead of a word:
+# Two lines, each segment led by a short dim label naming it; the value carries the colour:
 #
-#   ◆ Opus 5 · ↯ high · ▣ acme · ⑂ i123-widget · ⎇ phil/26-08-28/widget
-#   ⊞ 3.16.0 · ☻ blue-fox · ▲ phil-mac · ⇄ #412 draft · ⚑ release/26-10-17 · alice · ci
+#   Model: Opus 5 · Effort: high · Repo: acme · Checkout: i123-widget · Branch: phil/26-08-28/widget ✗
+#   Plugin: 3.16.0 · Session: blue-fox · Stage: phil-mac · PR: #412 draft · Release: release/26-10-17 · alice · ci
 #
-#   ◆ model   ↯ effort   ▣ repository   ⑂ checkout (a worktree's name, or main)   ⎇ branch
-#   ⊞ devstride plugin this session runs   ☻ this session's name   ▲ stage   ⇄ pull request
-#   ⚑ release in flight
+# Checkout is a linked worktree's name, or main. A yellow ✗ after the branch: the checkout has
+# uncommitted changes, untracked files included. Plugin is the devstride plugin this session runs,
+# Release the release in flight.
 #
 # The plugin segment is dim while current, and loud while this session runs an older plugin than
 # it could:
-#   ⊞ 3.15.0 → 3.16.0 · /reload-plugins        (red: the newer copy is installed, not loaded)
-#   ⊞ 3.16.0 (3.16.1 out · /devstride:update)  (yellow: a newer release is published)
+#   Plugin: 3.15.0 → 3.16.0 · /reload-plugins        (red: the newer copy is installed, not loaded)
+#   Plugin: 3.16.0 (3.16.1 out · /devstride:update)  (yellow: a newer release is published)
 # The second line is printed only when one of its segments has a value.
 #
 # `statusLine.refreshInterval` (30 seconds, as setup writes it) redraws the bar on a timer as well
@@ -30,7 +30,7 @@
 #
 # NO VALUE MEANS NO SEGMENT. Every segment is emitted through `seg`, which drops
 # it when its guard is empty, so a fact this repository does not have never
-# renders as a symbol with nothing after it ("⑂    "). A dangling label is
+# renders as a label with nothing after it ("Checkout:    "). A dangling label is
 # worse than a missing one: it reads as a value that failed to load, and sends
 # people looking for a break that is not there. `statusLine.hiddenSegments` in
 # ds-config.json suppresses a segment that DOES resolve but is not wanted.
@@ -192,7 +192,7 @@ emit("SL_CLEARANCE_CMD", clearance_cmd)
 # NOTHING USES ANSI BRIGHT BLACK (90). It is the one palette slot themes are
 # free to set AT the background - it is where most of them put comment text -
 # so a value rendered in it can come out invisible while its DIM label still
-# renders. That failure is worse than a wrong colour: "⑂" with nothing
+# renders. That failure is worse than a wrong colour: "Checkout:" with nothing
 # after it reads as a lookup that broke, which is exactly the dangling label
 # this file's header promises never to emit, and it is invisible to the person
 # who chose the theme's author rather than the theme.
@@ -210,8 +210,8 @@ MAGENTA=$'\033[35m'; RED=$'\033[31m'; BLUE=$'\033[34m'
 OSC8=$'\033]8;;'; OSC8_END=$'\033\\'
 
 # --- segment assembly ------------------------------------------------------
-# seg <line> <key> <symbol> <guard> <body>
-#   Appends "symbol body" to line 1 or 2 only when <guard> is non-empty and
+# seg <line> <key> <label> <guard> <body>
+#   Appends "label body" (the label dim) to line 1 or 2 only when <guard> is non-empty and
 #   <key> is not suppressed. <guard> is the RAW value and <body> the rendered
 #   one, because a rendered body is never empty - it always carries colour
 #   escapes - so testing it would defeat the whole check. <key> stays the
@@ -230,7 +230,7 @@ seg() {
 # Line 2 only when it has something on it: a bare newline would be an empty row.
 finish() { printf '%s' "$out"; [ -n "$out2" ] && printf '\n%s' "$out2"; exit 0; }
 
-seg 1 model "◆" "$SL_MODEL" "${BLUE}${SL_MODEL}${RESET}"
+seg 1 model "Model:" "$SL_MODEL" "${BLUE}${SL_MODEL}${RESET}"
 
 # --- effort ----------------------------------------------------------------
 # The status-line payload carries no effort field, and the persisted
@@ -256,7 +256,7 @@ if [ -n "$effort" ]; then
     medium)    ec=$YELLOW ;;
     *)         ec=$DIM ;;
   esac
-  seg 1 effort "↯" "$effort" "${ec}${effort}${RESET}"
+  seg 1 effort "Effort:" "$effort" "${ec}${effort}${RESET}"
 fi
 
 # --- plugin: the devstride plugin this session runs -------------------------
@@ -266,9 +266,9 @@ fi
 if [ -n "$SL_PLUGIN" ]; then
   IFS='|' read -r pverdict pfrom pto <<<"$SL_PLUGIN"
   case "$pverdict" in
-    reload)  seg 2 plugin "⊞" "$pfrom" "${RED}${pfrom} → ${pto} · /reload-plugins${RESET}" ;;
-    update)  seg 2 plugin "⊞" "$pfrom" "${YELLOW}${pfrom} (${pto} out · /devstride:update)${RESET}" ;;
-    current) seg 2 plugin "⊞" "$pfrom" "${DIM}${pfrom}${RESET}" ;;
+    reload)  seg 2 plugin "Plugin:" "$pfrom" "${RED}${pfrom} → ${pto} · /reload-plugins${RESET}" ;;
+    update)  seg 2 plugin "Plugin:" "$pfrom" "${YELLOW}${pfrom} (${pto} out · /devstride:update)${RESET}" ;;
+    current) seg 2 plugin "Plugin:" "$pfrom" "${DIM}${pfrom}${RESET}" ;;
   esac
 fi
 
@@ -338,7 +338,7 @@ sys.stdout.write(" ".join("".join(" " if ord(c) < 32 or ord(c) == 127 or c == "|
     nspawn
   fi
 fi
-seg 2 session "☻" "$session" "${MAGENTA}${session}${RESET}"
+seg 2 session "Session:" "$session" "${MAGENTA}${session}${RESET}"
 
 toplevel=$(git rev-parse --show-toplevel 2>/dev/null)
 if [ -z "$toplevel" ]; then
@@ -366,26 +366,37 @@ else
   repo=$(basename "$toplevel")
 fi
 
-seg 1 repo "▣" "$repo" "${CYAN}${repo}${RESET}"
+seg 1 repo "Repo:" "$repo" "${CYAN}${repo}${RESET}"
 
 # Yellow marks a linked worktree, because "you are not in the main checkout" is
 # exactly what you want to notice before you commit. The main checkout stays
 # dim so the loud colour keeps meaning the unusual case.
 if [ -n "$worktree" ]; then
-  seg 1 checkout "⑂" "$worktree" "${YELLOW}${worktree}${RESET}"
+  seg 1 checkout "Checkout:" "$worktree" "${YELLOW}${worktree}${RESET}"
 else
-  seg 1 checkout "⑂" "main" "${DIM}main${RESET}"
+  seg 1 checkout "Checkout:" "main" "${DIM}main${RESET}"
 fi
 
 # A detached HEAD with no commit yet resolves to no sha at all; rendering
-# "⎇ (detached)" with nothing in front of it is the dangling label this
+# "Branch: (detached)" with nothing in front of it is the dangling label this
 # file exists to avoid, so the fallback only applies when there IS a sha.
 branch=$(git branch --show-current 2>/dev/null)
 if [ -z "$branch" ]; then
   sha=$(git rev-parse --short HEAD 2>/dev/null)
   [ -n "$sha" ] && branch="$sha (detached)"
 fi
-seg 1 branch "⎇" "$branch" "${GREEN}${branch}${RESET}"
+# A yellow ✗ after the branch when the checkout has uncommitted changes: tracked edits, staged
+# changes or untracked files. --no-optional-locks keeps a redraw from ever taking git's index lock
+# (which would make a commit or rebase running beside it fail), and only the first line is read.
+# Part of the branch segment, so hiding the segment hides it and skips the check.
+dirty=""
+if [ -n "$branch" ]; then
+  case " $SL_HIDDEN " in
+    *" branch "*) ;;
+    *) [ -n "$(git --no-optional-locks status --porcelain 2>/dev/null | head -1)" ] && dirty=" ${YELLOW}✗${RESET}" ;;
+  esac
+fi
+seg 1 branch "Branch:" "$branch" "${GREEN}${branch}${RESET}${dirty}"
 
 # --- stage -----------------------------------------------------------------
 # Only repositories that deploy per-environment infrastructure have a stage, so
@@ -417,7 +428,7 @@ if [ -n "$stage" ]; then
   for p in $SL_PROD_STAGES; do
     [ "$stage" = "$p" ] && sc=$RED && break
   done
-  seg 2 stage "▲" "$stage" "${sc}${stage}${RESET}"
+  seg 2 stage "Stage:" "$stage" "${sc}${stage}${RESET}"
 fi
 
 # --- PR (cached, refreshed in the background) ------------------------------
@@ -462,10 +473,10 @@ if [ -n "$pr" ]; then
     link="$num"
   fi
   # A truncated cache line can yield a number with no state; guard on the number
-  # and render only the parts that resolved, rather than "⇄ #412 ".
+  # and render only the parts that resolved, rather than "PR: #412 ".
   body="${c}${link}${RESET}"
   [ -n "$state" ] && body="${c}${link} ${state}${RESET}"
-  seg 2 pr "⇄" "$num" "$body"
+  seg 2 pr "PR:" "$num" "$body"
 fi
 
 # --- release clearance (cached, refreshed in the background) ----------------
@@ -498,7 +509,7 @@ if [ -n "$SL_CLEARANCE_CMD" ]; then
     # A stale clearance (its session may be gone) or a stuck one (alive, not moving) is the
     # one worth noticing.
     case "$rel" in *STALE*|*STUCK*) rc=$RED ;; *) rc=$MAGENTA ;; esac
-    seg 2 release "⚑" "$rel" "${rc}${rel}${RESET}"
+    seg 2 release "Release:" "$rel" "${rc}${rel}${RESET}"
   fi
 fi
 

@@ -34,8 +34,9 @@ plugin data, so the loaded copy writes down what it is:
            runs that install and a newer release is published (and the repository does not pin or
            switch off the check), `current` otherwise, `unknown` when there is no record, a
            malformed one, or no single applicable install. A `/reload-plugins` in the transcript
-           after the record was written reads as `current` until the next prompt rewrites it, so a
-           successful reload never shows a false warning and a failed one shows again.
+           after the record was written reads as running that install (so `current`, or `update`)
+           until the next prompt rewrites the record, so a successful reload shows the new version
+           at once and a failed one shows its warning again.
   models --role planning|runner [--session <id>] [--repo <dir>]
            prints one JSON line {role, expected: {model, effort}, running: {model, effort},
            verdict}: the model and effort the repository expects a session in that role to run
@@ -387,8 +388,10 @@ def check(session, repo=None):
         if not installed:
             return result
         if reloaded_since(entry.get("transcript"), at):
-            result["verdict"] = "current"
-        elif version_tuple(running) < version_tuple(installed):
+            # a reload loads the install that applies here: report it as running at once (the next
+            # prompt records what really loaded, so a failed reload shows its warning again)
+            running = result["running"] = installed
+        if version_tuple(running) < version_tuple(installed):
             result["verdict"] = "reload"
         elif (running == installed and result["newest"] and updates_wanted(top)
               and version_tuple(installed) < version_tuple(result["newest"])):
