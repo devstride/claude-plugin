@@ -30,9 +30,11 @@ request appears in no one's Claude Code. Only a 401 or 403 counts as the token b
 
 `make` runs only with a terminal on both stdin and stdout, so the token is typed where only the
 person sees it and never enters an agent's transcript. It runs `claude setup-token` with the
-terminal handed over, asks for the token it printed with a hidden prompt, saves it owner-only
-(proved first, so a mistyped paste never replaces a working token; then written to a new 0600
-file beside it and moved into place).
+terminal handed over, in a fresh, empty Claude Code folder of its own (also its working directory,
+removed afterwards) and with no inherited Claude or Anthropic settings, so making the token can
+never sign the person out of, or change, their own Claude Code. It asks for the token it printed
+with a hidden prompt and saves it owner-only (proved first, so a mistyped paste never replaces a
+working token; then written to a new 0600 file beside it and moved into place).
 
 Never prints, logs or passes on the command line the token itself. Standard library only.
 """
@@ -121,9 +123,15 @@ def not_ready(reason, fix=FIX):
     return 1
 
 
-def run_claude(args, token, folder):
+def isolated_env(folder):
+    """The environment for a claude run that must never touch the person's own Claude Code."""
     env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE", "ANTHROPIC"))}
     env["CLAUDE_CONFIG_DIR"] = folder
+    return env
+
+
+def run_claude(args, token, folder):
+    env = isolated_env(folder)
     env["CLAUDE_CODE_OAUTH_TOKEN"] = token
     env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"
     env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1"
@@ -265,7 +273,13 @@ def make(path):
               "check drillSessions.tokenFile, or move that file away first." % path, file=sys.stderr)
         return 2
     print("Step 1 of 2: Claude Code makes a long-lived sign-in token (a browser page opens).")
-    result = subprocess.run(["claude", "setup-token"])
+    # A folder of its own: in the person's own Claude Code folder, the sign-in it starts can sign
+    # them out of their everyday sessions.
+    folder = tempfile.mkdtemp(prefix="drill-token-make-")
+    try:
+        result = subprocess.run(["claude", "setup-token"], env=isolated_env(folder), cwd=folder)
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
     if result.returncode:
         print("drill-token: claude setup-token ended with exit %d; nothing was saved." % result.returncode, file=sys.stderr)
         return 1
