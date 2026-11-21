@@ -1528,7 +1528,7 @@ class Run:
         record.update(attempt=record["attempt"] + 1, status="failed",
                       verdict=REPORT.clean_verdict("%s: %s skill unavailable: %s" % (entry["verdict"]["label"], failure, reason)),
                       evidence=[], links={}, startedAt=moment, endedAt=moment, refresh=False, redo=None, issuedHead=self.commit,
-                      ran={"source": "library", "ref": step["run"]["ref"], "version": step["run"]["version"],
+                      ran={"source": "library", "ref": step["run"]["ref"], "version": str(step["run"]["version"]),
                            "hash": line["hash"] if line else None}, libraryFetches=0)
         record["class"] = None
         self.report(index)
@@ -1547,7 +1547,8 @@ class Run:
         if found is None:
             return self.library_failed(index, "the saved copy on this machine cannot be read safely", line)
         if found["status"] == "hit":
-            ran = {"source": "library", "ref": line["name"], "version": line["version"], "hash": line["hash"]}
+            # The report carries the version as text, as it does a repository commit.
+            ran = {"source": "library", "ref": line["name"], "version": str(line["version"]), "hash": line["hash"]}
             return {"ran": ran, "file": found["path"]}
         tries = record.get("libraryFetches", 0)
         if tries >= LIBRARY_FETCH_TRIES:
