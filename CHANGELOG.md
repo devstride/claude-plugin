@@ -22,6 +22,17 @@ for what each version component means here and how a release is cut.
   2,200 tokens: the hotfix steps must be startable by the runner through the Skill tool, so one
   short description joins every session's context.
 
+### Changed
+
+- **`/devstride:branch-hotfix` runs the Hotfix workflow.** Typing the same command cuts the same
+  branch, makes the same choice about the local environment and stops at the same questions, and
+  then carries on through the fix, its review, the merge into production and the deploy, each on
+  the person's word. The page itself is now short: it starts the runner on `workflows/hotfix.json`,
+  and with no runner available it walks the same step list by hand, needing nothing from DevStride.
+  Every rule it used to carry now lives, word for word, in exactly one `hotfix-steps` reference,
+  and a test proves it against the last release's page. A step skill may now run a seam step by
+  name, one verb per call, as the hotfix environment step runs `local-environment`.
+
 ## [4.7.0] — 2026-11-20
 
 ### Changed

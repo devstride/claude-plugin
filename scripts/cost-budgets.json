@@ -6,7 +6,7 @@
   "alwaysOnContext": 2200,
   "bodies": {
     "branch-feature": 1236,
-    "branch-hotfix": 2217,
+    "branch-hotfix": 1600,
     "hotfix-steps": 1200,
     "build-item": 8000,
     "ci-audit": 2600,
@@ -102,7 +102,7 @@
     "skills/ultracode-build/references/engineering-economy.md": 1502,
     "skills/ultracode-build/references/mandatory-lenses.md": 1800,
     "skills/ultracode-build/references/review-fanout.md": 2200,
-    "skills/release/references/step-skills.md": 1672,
+    "skills/release/references/step-skills.md": 1800,
     "skills/release/references/release-safety-hooks.md": 1200,
     "skills/build-item/references/checkout-pool-commands.md": 1463,
     "skills/build-item/references/story-claims.md": 1944,
@@ -128,7 +128,7 @@
     "skills/release/references/merge-and-deploy.md": 1715,
     "skills/release/references/backstop.md": 2807,
     "skills/release/references/estimates.md": 1896,
-    "skills/build-item/references/ship-intent.md": 1681,
+    "skills/build-item/references/ship-intent.md": 1700,
     "skills/release/references/migration-approval.md": 1530,
     "skills/release/references/ship-plan.md": 1861,
     "skills/build-item/references/workflow-reports.md": 1938,
@@ -153,7 +153,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 97301,
+      "budget": 97400,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -197,7 +197,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 103916,
+      "budget": 104000,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -258,7 +258,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 98286,
+      "budget": 98400,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
@@ -298,6 +298,25 @@
         "skills/build-item/references/story-claims.md",
         "skills/build-item/references/ship-intent.md",
         "skills/build-item/references/consequence-notices.md"
+      ]
+    },
+    "hotfixRun": {
+      "budget": 11100,
+      "files": [
+        "skills/branch-hotfix/SKILL.md",
+        "skills/hotfix-steps/SKILL.md",
+        "skills/hotfix-steps/references/hotfix-preflight.md",
+        "skills/hotfix-steps/references/hotfix-branch.md",
+        "skills/hotfix-steps/references/hotfix-stage.md",
+        "skills/hotfix-steps/references/hotfix-environment.md",
+        "skills/hotfix-steps/references/hotfix-report.md",
+        "skills/hotfix-steps/references/hotfix-fix.md",
+        "skills/hotfix-steps/references/hotfix-merge.md",
+        "skills/hotfix-steps/references/deploy-approval.md",
+        "skills/hotfix-steps/references/deploy-confirm.md",
+        "skills/hotfix-steps/references/hotfix-close.md",
+        "skills/build-item/references/plain-language-output.md",
+        "skills/release/references/step-skills.md"
       ]
     }
   }

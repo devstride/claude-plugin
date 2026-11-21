@@ -503,9 +503,9 @@ N11. Shape targets (stories per epic, epics per capability, per profile) are a s
      plan for missing one.
 
 ## O. Local environment and hotfixes (config: `localEnvironment`)
-O1. `branch-hotfix` reads `localEnvironment` — `recreate` first (see O3), else `migrate` then `seed`
-    in that order (a seed against a stale schema fails or lies) — and falls back to ASKING when the
-    block is absent or the commands it needs are null. It never invents a reset command.
+O1. The hotfix (`hotfix-steps`' environment step) reads `localEnvironment` — `recreate` first
+    (see O3), else `migrate` then `seed` in that order (a seed against a stale schema fails or
+    lies) — and falls back to ASKING when the block is absent or the commands it needs are null. It never invents a reset command.
 O2. `instanceBoundTo` is never `detected` by setup: no file says whether a second checkout gets its
     own database. Candidates for the commands come from compose/devcontainer/nix/scripts and are
     `ambiguous`, never `detected`; nothing found is `unknown`, not `null`.
@@ -808,8 +808,8 @@ skills/doctor/SKILL.md|Changed:
 scripts/tests/plain-language-output.sh|every user-invocable skill
 skills/release/SKILL.md|delivery-profiles.md
 skills/build-item/SKILL.md|never makes the loop concurrent
-skills/branch-hotfix/SKILL.md|localEnvironment
-skills/branch-hotfix/SKILL.md|BACKWARD transition
+skills/hotfix-steps/references/hotfix-environment.md|localEnvironment
+skills/hotfix-steps/references/hotfix-environment.md|BACKWARD transition
 skills/doctor/SKILL.md|null **or absent**
 skills/setup/references/config-defaults.md|the tooling's way back
 skills/setup/SKILL.md|instanceBoundTo

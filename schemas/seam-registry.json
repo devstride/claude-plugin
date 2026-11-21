@@ -424,7 +424,7 @@
       "verdict": "exit 0 made the instance",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment",
+        "hotfix-steps hotfix-environment",
         "build-item 0"
       ],
       "unset": "no isolated instances: the current checkout is the only environment",
@@ -444,9 +444,9 @@
       "verdict": "exit 0 returned the instance to <base>'s schema",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment"
+        "hotfix-steps hotfix-environment"
       ],
-      "unset": "branch-hotfix names the missing command and offers the manual path",
+      "unset": "the hotfix environment step names the missing command and offers the manual path",
       "contract": "skills/setup/references/config-defaults.md",
       "since": "pre-registry",
       "step": "local-environment",
@@ -463,7 +463,7 @@
       "verdict": "stdout is the name of this checkout's instance",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment"
+        "hotfix-steps hotfix-environment"
       ],
       "unset": "an in-place recreate with <name> stops and asks",
       "contract": "skills/setup/references/config-defaults.md",
@@ -482,7 +482,7 @@
       "verdict": "exit 0 seeded the instance",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment"
+        "hotfix-steps hotfix-environment"
       ],
       "unset": "nothing is seeded",
       "contract": "skills/setup/references/config-defaults.md",
@@ -501,7 +501,7 @@
       "verdict": "exit 0 migrated the instance forward",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment"
+        "hotfix-steps hotfix-environment"
       ],
       "unset": "nothing is migrated",
       "contract": "skills/setup/references/config-defaults.md",
@@ -520,7 +520,7 @@
       "verdict": "exit 0 removed the instance",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment"
+        "hotfix-steps hotfix-environment"
       ],
       "unset": "instances are left for the owner to remove",
       "contract": "skills/setup/references/config-defaults.md",
