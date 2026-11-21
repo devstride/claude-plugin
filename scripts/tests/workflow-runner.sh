@@ -305,8 +305,8 @@ def section_catalog():
     module = load()
     real = module.check_catalog(REAL_CATALOG)
     check("the shipped catalog is sound", real == [], real)
-    check("the shipped catalog holds twelve contracts", len(REAL_CATALOG["contracts"]) == 12, list(REAL_CATALOG["contracts"]))
-    check("no shipped contract carries satisfiedBy yet", not any("satisfiedBy" in entry for entry in REAL_CATALOG["contracts"].values()))
+    check("the shipped catalog holds the twelve Build contracts and the ten Hotfix ones", len(REAL_CATALOG["contracts"]) == 22, list(REAL_CATALOG["contracts"]))
+    check("only the Hotfix satisfiers are shipped", dict((n, e["satisfiedBy"]) for n, e in REAL_CATALOG["contracts"].items() if "satisfiedBy" in e) == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"]})
     standin = module.check_catalog(stand_in_catalog())
     check("the fixture catalog, where stand-in@1 satisfies build@1, is sound", standin == [], standin)
 

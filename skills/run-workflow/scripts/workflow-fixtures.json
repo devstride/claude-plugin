@@ -3403,6 +3403,244 @@
    "class": "ask",
    "value": "NEEDS DECISION",
    "detail": "keep the old column?"
+  },
+  {
+   "contract": "hotfix-preflight@1",
+   "output": "HOTFIX PREFLIGHT: READY the detail\n",
+   "class": "continue",
+   "value": "READY",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-preflight@1",
+   "output": "HOTFIX PREFLIGHT: DIRTY\n",
+   "class": "ask",
+   "value": "DIRTY",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-preflight@1",
+   "output": "HOTFIX PREFLIGHT: NEEDS INPUT the detail\n",
+   "class": "ask",
+   "value": "NEEDS INPUT",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-preflight@1",
+   "output": "HOTFIX PREFLIGHT: FAILED the detail\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-branch@1",
+   "output": "HOTFIX BRANCH: CUT the detail\n",
+   "class": "continue",
+   "value": "CUT",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-branch@1",
+   "output": "HOTFIX BRANCH: FAILED the detail\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-stage@1",
+   "output": "HOTFIX STAGE: NAMED the detail\n",
+   "class": "continue",
+   "value": "NAMED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-stage@1",
+   "output": "HOTFIX STAGE: NONE\n",
+   "class": "continue",
+   "value": "NONE",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-stage@1",
+   "output": "HOTFIX STAGE: PRODUCTION the detail\n",
+   "class": "ask",
+   "value": "PRODUCTION",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-stage@1",
+   "output": "HOTFIX STAGE: DECLINED the detail\n",
+   "class": "end:environment-declined",
+   "value": "DECLINED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-environment@1",
+   "output": "HOTFIX ENVIRONMENT: RECREATED\n",
+   "class": "continue",
+   "value": "RECREATED",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-environment@1",
+   "output": "HOTFIX ENVIRONMENT: MIGRATED\n",
+   "class": "continue",
+   "value": "MIGRATED",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-environment@1",
+   "output": "HOTFIX ENVIRONMENT: UNCHANGED\n",
+   "class": "continue",
+   "value": "UNCHANGED",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-environment@1",
+   "output": "HOTFIX ENVIRONMENT: NEEDS ANSWER the detail\n",
+   "class": "ask",
+   "value": "NEEDS ANSWER",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-environment@1",
+   "output": "HOTFIX ENVIRONMENT: FAILED the detail\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-report@1",
+   "output": "HOTFIX CUT: DONE the detail\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-fix@1",
+   "output": "HOTFIX FIX: COMMITTED the detail\n",
+   "class": "continue",
+   "value": "COMMITTED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-fix@1",
+   "output": "HOTFIX FIX: NEEDS DIRECTION the detail\n",
+   "class": "ask",
+   "value": "NEEDS DIRECTION",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-fix@1",
+   "output": "HOTFIX FIX: ABANDONED\n",
+   "class": "end:abandoned",
+   "value": "ABANDONED",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-merge@1",
+   "output": "HOTFIX MERGE: MERGED the detail\n",
+   "class": "continue",
+   "value": "MERGED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-merge@1",
+   "output": "HOTFIX MERGE: WAITING FOR YES\n",
+   "class": "ask",
+   "value": "WAITING FOR YES",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-merge@1",
+   "output": "HOTFIX MERGE: REFUSED the detail\n",
+   "class": "stop",
+   "value": "REFUSED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-merge@1",
+   "output": "HOTFIX MERGE: ERROR the detail\n",
+   "class": "stop",
+   "value": "ERROR",
+   "detail": "the detail"
+  },
+  {
+   "contract": "deploy-approval@1",
+   "output": "DEPLOY APPROVAL: APPROVED\n",
+   "class": "continue",
+   "value": "APPROVED",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-approval@1",
+   "output": "DEPLOY APPROVAL: WAITING FOR YES\n",
+   "class": "ask",
+   "value": "WAITING FOR YES",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-approval@1",
+   "output": "DEPLOY APPROVAL: RETRY\n",
+   "class": "redo:self",
+   "value": "RETRY",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-approval@1",
+   "output": "DEPLOY APPROVAL: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-approval@1",
+   "output": "DEPLOY APPROVAL: STOPPED the detail\n",
+   "class": "stop",
+   "value": "STOPPED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "deploy-confirm@1",
+   "output": "DEPLOY: CONFIRMED the detail\n",
+   "class": "continue",
+   "value": "CONFIRMED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "deploy-confirm@1",
+   "output": "DEPLOY: UNCONFIRMED\n",
+   "class": "stop",
+   "value": "UNCONFIRMED",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-confirm@1",
+   "output": "DEPLOY: OWNER TO CONFIRM\n",
+   "class": "ask",
+   "value": "OWNER TO CONFIRM",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-confirm@1",
+   "output": "DEPLOY: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-close@1",
+   "output": "HOTFIX CLOSED: CLOSED the detail\n",
+   "class": "continue",
+   "value": "CLOSED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-close@1",
+   "output": "HOTFIX CLOSED: OPEN RELEASE the detail\n",
+   "class": "continue",
+   "value": "OPEN RELEASE",
+   "detail": "the detail"
   }
  ],
  "proofs": [
