@@ -21,7 +21,7 @@ changes then nothing would check), `required-not-always`, `required-not-stop` an
 (the step that provides a required contract must always run, must stop the run when it fails and
 cannot be switched off), `unsupported-gate`, `unsupported-when`, `unsupported-source` and
 `unsupported-on-fail` (features this plugin does not run: a gate, a conditional or manual step, a
-library or repository skill, a step that carries on after a failure), `skill-missing` (a step names
+library skill, a step that carries on after a failure), `skill-missing` (a step names
 a skill this plugin does not have) and `repository-required` (a contract bound to the tree, the patch or the
 story, outside a git work tree). Required steps come only from each contract's `requires` list in
 the catalog, so a renamed or re-sourced step is covered whatever skill runs it: a workflow can
