@@ -27,7 +27,7 @@
       "type": "array",
       "minItems": 1,
       "maxItems": 12,
-      "description": "At most 100 steps across all phases.",
+      "description": "At most 250 steps across all phases. The canonical form is at most 64 KB, so 250 steps fit only when they are short (about 260 bytes each).",
       "items": {
         "type": "object",
         "required": ["id", "name", "steps"],

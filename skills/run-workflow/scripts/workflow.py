@@ -114,7 +114,7 @@ WHEN_MODES = ("always", "condition", "manual")
 CONDITIONS = ("review-path:fast", "review-path:pull-request", None)
 ON_FAIL = ("stop", "continue")
 NAME_MAX, SUMMARY_MAX = 200, 500
-MAX_PHASES, MAX_PHASE_STEPS, MAX_STEPS = 12, 40, 100
+MAX_PHASES, MAX_PHASE_STEPS, MAX_STEPS = 12, 40, 250
 
 # How a run's end, or the kind of stop it is waiting at, is named to the tracker. The one table.
 RUN_OUTCOME = {

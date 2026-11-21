@@ -12,7 +12,7 @@ each step's answer to, for whoever writes or changes a definition
 ## What `start` refuses
 
 `bad-schema` (a field the definition schema requires is missing, of the wrong type or past its
-limit: at most 12 phases, 40 steps in a phase, 100 in all), `credential-in-definition` (a string
+limit: at most 12 phases, 40 steps in a phase, 250 in all), `credential-in-definition` (a string
 that looks like a credential, anywhere in it, named by where it is, never echoed),
 `duplicate-step-id`, `plugin-too-old` (the definition needs a newer plugin), `unknown-contract`,
 `unknown-contract-major`, `requires-missing` and `requires-not-earlier` (a contract's required step

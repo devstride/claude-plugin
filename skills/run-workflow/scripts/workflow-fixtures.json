@@ -1511,7 +1511,7 @@
    "expect": "bad-schema"
   },
   {
-   "name": "101 steps across the phases",
+   "name": "252 steps across the phases",
    "definition": "build",
    "edits": [
     {
@@ -1521,14 +1521,14 @@
       0,
       "steps"
      ],
-     "count": 34
+     "count": 36
     },
     {
      "op": "repeat",
      "path": [
       "phases"
      ],
-     "count": 3
+     "count": 7
     }
    ],
    "root": "fixture",
