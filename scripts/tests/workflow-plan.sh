@@ -310,6 +310,17 @@ for verdict in ("SESSION MODEL: UNKNOWN", "SESSION MODEL: OFF", "SESSION MODEL: 
 run = Run(plan)
 check("a model mismatch asks once", walk(run, {"session-check": ["SESSION MODEL: MISMATCH"]}).get("stepId") == "session-check")
 
+run = Run(plan)
+args = {}
+for _ in range(40):
+    if not run.answer or run.answer.get("action") != "run":
+        break
+    step = run.answer["step"]
+    args[step["id"]] = run.answer.get("argument")
+    run.done(CLEAN[step["contract"]], {"start": "2026-12-01", "itemDays": 2} if step["id"] == "record-sign-off" else None)
+check("the ground step gets the bare item, and the dating step the sign-off's start and item-days",
+      (args.get("ground"), args.get("rationalize-dates")) == ("I100", "I100 start: 2026-12-01 item-days: 2"), args)
+
 run = Run(reb)
 end = walk(run)
 check("a clean rebalance issues the thirteen steps in the pinned order and finishes",

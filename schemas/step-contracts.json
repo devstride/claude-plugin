@@ -586,7 +586,7 @@
       "payload": {
         "item": "context.item"
       },
-      "argument": "plan-ground {item}",
+      "argument": "{item}",
       "verdict": {
         "label": "PLAN STATE",
         "values": [
@@ -972,9 +972,11 @@
       "summary": "Date the plan from its dependency graph, with the auto-scheduler off.",
       "builtinSkill": "rationalize-gantt",
       "payload": {
-        "item": "context.item"
+        "item": "context.item",
+        "start": "result:plan-sign-off-record@1.start?",
+        "itemDays": "result:plan-sign-off-record@1.itemDays?"
       },
-      "argument": "rationalize-gantt {item}",
+      "argument": "{item} start: {start} item-days: {itemDays}",
       "verdict": {
         "label": "GANTT",
         "values": [
