@@ -37,6 +37,8 @@ import json, os, re, subprocess, sys, time
 AUTHORING = {"setup", "plan", "ci-audit", "rebalance", "rationalize-gantt", "comprehend-plan"}
 EXECUTION = {"build-item", "pr", "review", "release", "push", "create-story", "create-defect",
              "insert-story", "insert-defect", "run-workflow"}
+# run-workflow takes the class of the workflow it names; any other id stays execution.
+WORKFLOW_CLASS = {"plan": "authoring", "rebalance": "authoring"}
 TTL = 7 * 24 * 3600
 
 def main():
@@ -50,6 +52,9 @@ def main():
         return 0
     skill = m.group(1)
     cls = "authoring" if skill in AUTHORING else "execution" if skill in EXECUTION else "neutral"
+    if skill == "run-workflow":
+        named = re.match(r"\s*/(?:devstride|ds):run-workflow\s+([a-z][a-z0-9-]*)\b", prompt)
+        cls = WORKFLOW_CLASS.get(named.group(1), cls) if named else cls
     sid = payload.get("session_id") or ""
     if not sid:
         tp = payload.get("transcript_path") or ""
