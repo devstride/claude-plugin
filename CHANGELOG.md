@@ -8,6 +8,19 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **The release's step list exists as data, ready for the step runner (in progress).** Six built-in
+  release workflow definitions now ship: one full release per clearance scope (`release`,
+  `cut-to-deploy`, `merge-and-deploy`) and three partial entries (post-deploy only, documentation
+  only, release notes only). They are generated from one source by
+  `scripts/build-release-workflows.py`, which also picks the definition a repository runs from
+  `release.clearance.scope`, so the orderings never drift. Nothing runs them yet: the release
+  still follows its instructions page, and every rule is unchanged.
+- **A step's contract may allow more automatic re-runs.** A contract can raise the runner's cap of
+  five automatic re-issues for its own step (`maxAutoRedo`, at most twenty), for long steps such
+  as a release review that may restart several times.
+
 ## [4.7.0] — 2026-11-20
 
 ### Changed
