@@ -787,7 +787,7 @@
    }
   },
   {
-   "name": "a library skill source",
+   "name": "a library skill source with no pinned version",
    "answer": {
     "match": {
      "source": "organization",
@@ -864,7 +864,7 @@
    "expect": {
     "definitionSource": "builtin",
     "fallbackReason": "unrunnable",
-    "invalidCode": "unsupported-source"
+    "invalidCode": "library-version"
    }
   },
   {

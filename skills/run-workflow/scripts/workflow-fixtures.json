@@ -2335,7 +2335,24 @@
    "expect": "unsupported-when"
   },
   {
-   "name": "a library skill",
+   "name": "a built-in source for a contract with no built-in skill",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "contract"
+     ],
+     "value": "custom@1"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-source"
+  },
+  {
+   "name": "a library skill with no pinned version",
    "definition": "build",
    "edits": [
     {
@@ -2350,7 +2367,7 @@
    ],
    "root": "fixture",
    "git": true,
-   "expect": "unsupported-source"
+   "expect": "library-version"
   },
   {
    "name": "a repository skill file",

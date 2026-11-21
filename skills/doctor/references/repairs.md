@@ -32,6 +32,7 @@ config beyond the narrow personal `statusLine` exception.
 | Personal `statusLine` in local or user settings (§4) | **A, narrow exception** | After the shared pair is committed and clean, offer key-only cleanup separately |
 | A structurally absent status-line segment (§4) | **A** | Ask what it should read from; write `stage.resolve`, or record `statusLine.hiddenSegments` |
 | `gh` not authenticated (§1) | **B** | `gh auth login` |
+| A saved library skill failing its fingerprint (`skill-cache.md`) | **B** | `python3 ${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/library_skill.py remove` fed that entry's organization, name and version; not A, because the file is outside the repository's `.claude/` |
 | `gh` missing a scope (§1) | **B** | `gh auth refresh -s <all needed scopes in ONE list>` |
 | Auth coming from `GH_TOKEN`/`GITHUB_TOKEN` (§1) | **C** | `refresh` cannot touch an environment token; say to unset it or reissue |
 | Plugin behind newest (§2) | **C** | Tell the user to invoke `/devstride:update` separately, then stop. Older copies use the native bootstrap; Doctor never invokes the explicit-only skill |
