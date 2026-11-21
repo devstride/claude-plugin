@@ -46,7 +46,7 @@ An action is one of:
 - **`stopped`**: `kind`, `reason`, `stepId`; a stop of a merge that answered adds `mayHaveLanded`
   (true), its `attempt` and the `commit` it was handed.
 
-Every answer also carries `runId` and `reports`; `start` adds the definition's hash. A `run` answer for a repository step (`run.source` `repo`) has `skill: null` and `instructions` (the committed file's text, path, commit and hash).
+Every answer also carries `runId` and `reports`; `start` adds the definition's hash. A `run` answer for a repository step (its source is `repo`) has `skill: null` and `instructions` (the committed file's text, path, commit and hash).
 
 ## A step's answer
 
