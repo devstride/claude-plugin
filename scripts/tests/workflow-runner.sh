@@ -313,8 +313,19 @@ def section_catalog():
     module = load()
     real = module.check_catalog(REAL_CATALOG)
     check("the shipped catalog is sound", real == [], real)
-    check("the shipped catalog holds the twelve Build contracts, the ten Hotfix ones and the twenty-three Plan and Rebalance ones", len(REAL_CATALOG["contracts"]) == 45, list(REAL_CATALOG["contracts"]))
-    check("only the Hotfix and Rebalance satisfiers are shipped", dict((n, e["satisfiedBy"]) for n, e in REAL_CATALOG["contracts"].items() if "satisfiedBy" in e) == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"], "plan-wire@1": ["rebalance-rewire@1"]})
+    # Each workflow's own contracts, counted per workflow: 12 Build, 10 Hotfix, 23 Plan and Rebalance, 55 Release.
+    real = list(REAL_CATALOG["contracts"])
+    skill = lambda n: REAL_CATALOG["contracts"][n]["builtinSkill"]
+    check("the shipped catalog holds the twelve Build contracts first, then the ten Hotfix ones",
+          real[11] == "custom@1" and real[12] == "hotfix-preflight@1" and real[21] == "hotfix-close@1", real[:22])
+    check("the twenty-three Plan and Rebalance contracts follow them",
+          len(real[22:45]) == 23 and all(skill(n) in ("plan-steps", "comprehend-plan", "rationalize-gantt", "insert-story") for n in real[22:45]), real[22:45])
+    check("the Release contracts come last: 55, every one served by release-steps or an existing seam step",
+          len(real) - 45 == 55 and all(skill(n) in ("release-steps", "classify-release", "pre-ship", "pre-merge-check", "post-deploy") for n in real[45:]), real[45:])
+    check("the satisfiers shipped: the Hotfix and Rebalance ones, and the production merge and a found merged release for the hotfix merge",
+          dict((n, e["satisfiedBy"]) for n, e in REAL_CATALOG["contracts"].items() if "satisfiedBy" in e) ==
+          {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"], "plan-wire@1": ["rebalance-rewire@1"],
+           "hotfix-merge@1": ["production-merge@1", "merged-release@1"]})
     standin = module.check_catalog(stand_in_catalog())
     check("the fixture catalog, where stand-in@1 satisfies build@1, is sound", standin == [], standin)
 

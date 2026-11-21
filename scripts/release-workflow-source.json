@@ -320,14 +320,14 @@
     "approve-deploy": {
       "name": "Approve the deploy",
       "summary": "Approve the production deploy of the merge commit where approval is configured.",
-      "contract": "release-deploy-approval@1",
-      "skill": "release-steps"
+      "contract": "deploy-approval@1",
+      "skill": "hotfix-steps"
     },
     "confirm-deploy": {
       "name": "Confirm the deploy",
       "summary": "Confirm the production deploy of the merge commit finished.",
-      "contract": "release-deploy-confirm@1",
-      "skill": "release-steps"
+      "contract": "deploy-confirm@1",
+      "skill": "hotfix-steps"
     },
     "score-estimates": {
       "name": "Score estimates",

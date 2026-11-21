@@ -37,11 +37,11 @@
           "id": "confirm-deploy",
           "name": "Confirm the deploy",
           "summary": "Confirm the production deploy of the merge commit finished.",
-          "contract": "release-deploy-confirm@1",
+          "contract": "deploy-confirm@1",
           "kind": "step",
           "run": {
             "source": "builtin",
-            "ref": "release-steps",
+            "ref": "hotfix-steps",
             "version": null
           },
           "when": {
