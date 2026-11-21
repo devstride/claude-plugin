@@ -138,7 +138,7 @@
     "skills/review-story/references/review-routes.md": 2967,
     "skills/merge-story/references/merge-paths.md": 3448,
     "skills/story-lifecycle/references/start.md": 700,
-    "skills/hotfix-steps/references/deploy-approval.md": 400,
+    "skills/hotfix-steps/references/deploy-approval.md": 402,
     "skills/hotfix-steps/references/deploy-confirm.md": 300,
     "skills/hotfix-steps/references/hotfix-branch.md": 600,
     "skills/hotfix-steps/references/hotfix-close.md": 300,
@@ -325,7 +325,7 @@
       ]
     },
     "hotfixRun": {
-      "budget": 11328,
+      "budget": 11363,
       "files": [
         "skills/branch-hotfix/SKILL.md",
         "skills/hotfix-steps/SKILL.md",

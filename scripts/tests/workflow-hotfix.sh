@@ -358,6 +358,50 @@ run = Run()
 run.until("fix")
 run.done(answer_text("HOTFIX FIX: ABANDONED", {"commit": "", "deferrals": [], "deviations": [], "untrackedDeferrals": [], "dismissed": [], "scopeLine": "", "head": ""}))
 check("ABANDONED ends the run with outcome abandoned", run.answer.get("action") == "finished" and run.answer.get("outcome") == "abandoned", run.answer)
+
+# A rejected push stops at the cut, naming the branch the checkout is on.
+run = Run()
+run.done()
+run.done(answer_text("HOTFIX BRANCH: FAILED push", {"branch": "main", "base": "main", "baseSha": "", "pushed": False, "shipIntent": "not configured"}))
+check("FAILED at the cut stops the run there, before the stage is named", run.answer.get("action") == "stopped" and run.answer.get("stepId") == "cut-branch"
+      and "name-stage" not in [s for s, _ in run.issued()], run.answer)
+
+# Credentials in a step's evidence never reach a report.
+run = Run()
+SECRETS = ["token ghp_abcdefghijklmnop", "Authorization: Bearer abcdefghijklmnopqrstuvwx", "key AKIAABCDEFGHIJKLMNOP", "-----BEGIN PRIVATE KEY-----"]
+run.done("HOTFIX PREFLIGHT: READY %s\n%s\nclean tree\n```json\n%s\n```\n" % (BRANCH, "\n".join(SECRETS), json.dumps(
+    {"branch": BRANCH, "base": "main", "prefix": "test", "date": "11-21-26", "dateFormat": "MM-DD-YY", "configSource": "file"})))
+sent = json.dumps([a.get("reports") for a in run.answers])
+check("evidence lines that look like credentials are dropped from the built report",
+      run.answer.get("action") == "run" and all(w not in sent for w in ("ghp_", "Bearer ", "AKIA", "BEGIN PRIVATE")) and "clean tree" in sent, sent[:400])
+
+# The deploy approval's RETRY re-issues it as the next attempt; on its third attempt the step
+# answers STOPPED (the bound its reference sets), which stops the run before the confirmation.
+run = Run()
+run.until("approve-deploy")
+run.done(answer_text("DEPLOY APPROVAL: RETRY", {"mergeSha": "abc1234", "approved": False}))
+run.done(answer_text("DEPLOY APPROVAL: RETRY", {"mergeSha": "abc1234", "approved": False}))
+check("RETRY re-issues the approval as the next attempt", run.answer.get("action") == "run" and run.answer["step"]["id"] == "approve-deploy"
+      and run.answer["step"]["attempt"] == 3, run.answer)
+run.done(answer_text("DEPLOY APPROVAL: STOPPED deploy not waiting", {"mergeSha": "abc1234", "approved": False}))
+check("... and STOPPED on the third attempt stops the run before the confirmation", run.answer.get("action") == "stopped"
+      and run.answer.get("stepId") == "approve-deploy" and "confirm-deploy" not in [s for s, _ in run.issued()], run.answer)
+check("... the bound is written in the step's reference", "on its third attempt the step answers `STOPPED deploy not waiting`"
+      in " ".join(open(os.path.join(ROOT, "skills/hotfix-steps/references/deploy-approval.md"), encoding="utf-8").read().split()))
+
+# A review gone stale (the patch changed after it) is run again before the merge is handed out.
+run = Run()
+run.until("merge")
+run.done(answer_text("HOTFIX MERGE: WAITING FOR YES", {"sha": "", "pullRequest": 7}))
+commit(run.repo, "fix.txt", "fixed again\n", "a later change")
+run.resume(answer="yes, merge pull request 7")
+first = run.answer["step"]["id"] if run.answer and run.answer.get("action") == "run" else None
+check("a stale proof re-issues a required step first, not the merge", first in ("risk-check", "local-checks", "review")
+      and run.answer["step"]["attempt"] == 2, run.answer)
+while run.answer and run.answer.get("action") == "run" and run.answer["step"]["id"] != "merge":
+    run.done()
+check("... and the merge is handed out again only once every proof is fresh", run.answer.get("action") == "run" and run.answer["step"]["id"] == "merge"
+      and ("review", 2) in run.issued(), (run.issued(), run.answer))
 PY
 
 python3 "$WORK/cases.py" "$ROOT" "$WORK" > "$WORK/out.txt" 2>&1 || { cat "$WORK/out.txt"; echo "FAIL the cases did not run to the end"; exit 1; }
