@@ -1,6 +1,6 @@
 #!/bin/bash
-# Tests for the built-in workflow definitions and scripts/check-workflows.py: the shipped Build
-# workflow passes, its eleven step ids are the published ones in order, each runs its step skill
+# Tests for the built-in workflow definitions and scripts/check-workflows.py: every shipped
+# definition passes, its eleven step ids are the published ones in order, each runs its step skill
 # always and stops on failure (the whole run with canned answers: build-workflow-run.sh), and each
 # rule the checker enforces fails a scratch copy with the right reason.
 set -u
@@ -10,7 +10,7 @@ T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 
 # The cases write to a file: a here-document inside $( ) breaks on an apostrophe under bash 3.2.
 python3 - "$ROOT" "$T" > "$T/cases.out" <<'PY'
-import copy, json, os, re, shutil, subprocess, sys
+import copy, glob, json, os, re, shutil, subprocess, sys
 root, tmp = sys.argv[1], sys.argv[2]
 checker = os.path.join(root, "scripts", "check-workflows.py")
 
@@ -31,7 +31,9 @@ steps = [step for phase in build["phases"] for step in phase["steps"]]
 ids = [step["id"] for step in steps]
 
 rc, out, err = run()
-check("(1) the shipped definitions pass", (rc, out, err), (0, "WORKFLOWS: ok (%d files, %d steps)" % (len(os.listdir(os.path.join(root, "workflows"))), sum(len([s for p in json.load(open(os.path.join(root, "workflows", f), encoding="utf-8"))["phases"] for s in p["steps"]]) for f in os.listdir(os.path.join(root, "workflows")))), ""))
+shipped = [json.load(open(path, encoding="utf-8")) for path in sorted(glob.glob(os.path.join(root, "workflows", "*.json")))]
+counted = "WORKFLOWS: ok (%d files, %d steps)" % (len(shipped), sum(len(p["steps"]) for d in shipped for p in d["phases"]))
+check("(1) the shipped definitions pass", (rc, out, err), (0, counted, ""))
 as_tuple = lambda v: tuple(int(p) for p in v.split("."))
 check("(2) minPluginVersion is not newer than this plugin", as_tuple(build["minPluginVersion"]) <= as_tuple(plugin))
 check("(3) the step ids are exactly the eleven published ones, in order", ids, STEPS)

@@ -73,9 +73,17 @@ def plugin_copy(name, catalog=None):
     return root
 
 
+def raised_redo_catalog():
+    catalog = copy.deepcopy(REAL_CATALOG)
+    catalog["contracts"]["local-checks@1"]["maxAutoRedo"] = 8
+    return catalog
+
+
 def roots(which):
     if which == "real":
         return ROOT
+    if which == "raisedRedo":
+        return plugin_copy("plugin-raised-redo", raised_redo_catalog())
     return plugin_copy("plugin-stand-in", stand_in_catalog()) if which == "standIn" else plugin_copy("plugin")
 
 
@@ -796,6 +804,22 @@ def section_proofs():
     check("... and a resume continues it", is_run(answer, "local-checks", 6), answer)
     run.answer = answer
     check("... to the next step once the proof is right", is_run(run.done(), "review", 1))
+
+    # a contract's maxAutoRedo raises the cap for its own step only
+    raised = Driver("raisedRedo")
+    raised.until("local-checks")
+    for attempt_no in range(1, 8):
+        answer = raised.done(**{"proof.tree": "1" * 40})
+        check("maxAutoRedo 8: automatic re-issue %d" % attempt_no, is_run(answer, "local-checks", attempt_no + 1), answer)
+    answer = raised.done(**{"proof.tree": "1" * 40})
+    check("maxAutoRedo 8: the eighth automatic re-issue stops the run", is_stopped(answer, "attempts-exhausted", "local-checks")
+          and "re-issued 7 times" in answer["reason"], answer)
+    runner = load()
+    for bad in (5, 0, 21, True, "8"):
+        catalog = raised_redo_catalog()
+        catalog["contracts"]["local-checks@1"]["maxAutoRedo"] = bad
+        check("a maxAutoRedo of %r is refused by the catalog check" % (bad,), any("maxAutoRedo" in f for f in runner.check_catalog(catalog)), runner.check_catalog(catalog))
+    check("a maxAutoRedo of 8 is a sound catalog", runner.check_catalog(raised_redo_catalog()) == [], runner.check_catalog(raised_redo_catalog()))
 
     # a review proof that names another patch
     answer = run.done(**{"proof.patchId": "2" * 40})
