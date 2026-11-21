@@ -17,14 +17,6 @@ for what each version component means here and how a release is cut.
   `scripts/build-release-workflows.py`, which also picks the definition a repository runs from
   `release.clearance.scope`, so the orderings never drift. Nothing runs them yet: the release
   still follows its instructions page, and every rule is unchanged.
-- **The release's steps have contracts in the catalog (in progress).** Fifty-five release step
-  contracts join `schemas/step-contracts.json`: each step's verdict line and what each answer
-  means, what it hands on, and which earlier steps it needs. The production merge needs the
-  review, the pre-ship checks, the owner's go-ahead and the merge confirmations, and it stands in
-  for the hotfix merge so the release reuses the hotfix's deploy approval and confirmation steps
-  unchanged. The four existing seam steps (classify, pre-ship, pre-merge, post-deploy) serve
-  release positions with their own verdict lines. The grouped `release-steps` skill that answers
-  the rest is not written yet, so the runner still refuses the release definitions.
 - **A step's contract may allow more automatic re-runs.** A contract can raise the runner's cap of
   five automatic re-issues for its own step (`maxAutoRedo`, at most twenty), for long steps such
   as a release review that may restart several times.
