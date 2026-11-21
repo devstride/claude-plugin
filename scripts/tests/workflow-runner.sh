@@ -313,8 +313,8 @@ def section_catalog():
     module = load()
     real = module.check_catalog(REAL_CATALOG)
     check("the shipped catalog is sound", real == [], real)
-    check("the shipped catalog holds the twelve Build contracts and the ten Hotfix ones", len(REAL_CATALOG["contracts"]) == 22, list(REAL_CATALOG["contracts"]))
-    check("only the Hotfix satisfiers are shipped", dict((n, e["satisfiedBy"]) for n, e in REAL_CATALOG["contracts"].items() if "satisfiedBy" in e) == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"]})
+    check("the shipped catalog holds the twelve Build contracts, the ten Hotfix ones and the twenty-three Plan and Rebalance ones", len(REAL_CATALOG["contracts"]) == 45, list(REAL_CATALOG["contracts"]))
+    check("only the Hotfix and Rebalance satisfiers are shipped", dict((n, e["satisfiedBy"]) for n, e in REAL_CATALOG["contracts"].items() if "satisfiedBy" in e) == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"], "plan-wire@1": ["rebalance-rewire@1"]})
     standin = module.check_catalog(stand_in_catalog())
     check("the fixture catalog, where stand-in@1 satisfies build@1, is sound", standin == [], standin)
 
@@ -505,7 +505,7 @@ def section_lifecycle():
     wanted = ["claim", "start", "branch", "build", "risk-check", "local-checks", "review", "merge", "complete", "capture", "sync"]
     check("the eleven steps are issued in order, once each", order == wanted, order)
     check("the run finishes completed, with every step's result by contract",
-          final["action"] == "finished" and final["outcome"] == "completed" and set(final["results"]) == set(n for n, e in REAL_CATALOG["contracts"].items() if e["builtinSkill"] not in (None, "hotfix-steps"))
+          final["action"] == "finished" and final["outcome"] == "completed" and set(final["results"]) == set(step + "@1" for step in wanted)
           and final["results"]["sync@1"] == {"branch": "main", "clean": True}, final)
     check("the last report closes the run as completed", closes(final, "completed"), final["reports"])
     check("done says what it recorded", final["recorded"] == {"stepId": "sync", "attempt": 1, "verdict": "SYNC: CLEAN", "class": "continue", "status": "done"}, final["recorded"])

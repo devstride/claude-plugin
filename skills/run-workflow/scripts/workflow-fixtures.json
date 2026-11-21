@@ -3641,6 +3641,482 @@
    "class": "continue",
    "value": "OPEN RELEASE",
    "detail": "the detail"
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MATCH\n",
+   "class": "continue",
+   "value": "MATCH",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: UNKNOWN\n",
+   "class": "continue",
+   "value": "UNKNOWN",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: OFF\n",
+   "class": "continue",
+   "value": "OFF",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MISMATCH\n",
+   "class": "ask",
+   "value": "MISMATCH",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MISMATCH UNATTENDED\n",
+   "class": "continue",
+   "value": "MISMATCH UNATTENDED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-orient@1",
+   "output": "PLAN ORIENTATION: READY the detail\n",
+   "class": "continue",
+   "value": "READY",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-orient@1",
+   "output": "PLAN ORIENTATION: NEEDS ANSWER the detail\n",
+   "class": "ask",
+   "value": "NEEDS ANSWER",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-orient@1",
+   "output": "PLAN ORIENTATION: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: EMPTY\n",
+   "class": "continue",
+   "value": "EMPTY",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: PARTIAL\n",
+   "class": "continue",
+   "value": "PARTIAL",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: SHALLOW\n",
+   "class": "continue",
+   "value": "SHALLOW",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-discovery@1",
+   "output": "PLAN SHAPE: SIGNED OFF\n",
+   "class": "continue",
+   "value": "SIGNED OFF",
+   "detail": ""
+  },
+  {
+   "contract": "plan-discovery@1",
+   "output": "PLAN SHAPE: SIGNED OFF WITH ASSUMPTIONS\n",
+   "class": "continue",
+   "value": "SIGNED OFF WITH ASSUMPTIONS",
+   "detail": ""
+  },
+  {
+   "contract": "plan-discovery@1",
+   "output": "PLAN SHAPE: NOT SIGNED OFF\n",
+   "class": "ask",
+   "value": "NOT SIGNED OFF",
+   "detail": ""
+  },
+  {
+   "contract": "plan-sign-off-record@1",
+   "output": "SIGN-OFF RECORDED: RECORDED the detail\n",
+   "class": "continue",
+   "value": "RECORDED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-sign-off-record@1",
+   "output": "SIGN-OFF RECORDED: LINK MODE ON\n",
+   "class": "ask",
+   "value": "LINK MODE ON",
+   "detail": ""
+  },
+  {
+   "contract": "plan-sign-off-record@1",
+   "output": "SIGN-OFF RECORDED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-draft@1",
+   "output": "PLAN DRAFTED: DRAFTED the detail\n",
+   "class": "continue",
+   "value": "DRAFTED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-draft@1",
+   "output": "PLAN DRAFTED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-draft-approval@1",
+   "output": "PLAN DRAFT REVIEW: APPROVED\n",
+   "class": "continue",
+   "value": "APPROVED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-draft-approval@1",
+   "output": "PLAN DRAFT REVIEW: NOT APPROVED\n",
+   "class": "ask",
+   "value": "NOT APPROVED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-create@1",
+   "output": "PLAN CREATED: CREATED the detail\n",
+   "class": "continue",
+   "value": "CREATED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-create@1",
+   "output": "PLAN CREATED: PARTIAL the detail\n",
+   "class": "stop",
+   "value": "PARTIAL",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-create@1",
+   "output": "PLAN CREATED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-wire@1",
+   "output": "PLAN WIRED: WIRED the detail\n",
+   "class": "continue",
+   "value": "WIRED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-wire@1",
+   "output": "PLAN WIRED: ORPHANS the detail\n",
+   "class": "stop",
+   "value": "ORPHANS",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-wire@1",
+   "output": "PLAN WIRED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: DATED the detail\n",
+   "class": "continue",
+   "value": "DATED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: CYCLE the detail\n",
+   "class": "stop",
+   "value": "CYCLE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: SCHEDULER ON\n",
+   "class": "ask",
+   "value": "SCHEDULER ON",
+   "detail": ""
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: NUMBERED the detail\n",
+   "class": "continue",
+   "value": "NUMBERED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: EXTENDED the detail\n",
+   "class": "continue",
+   "value": "EXTENDED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: ALREADY NUMBERED\n",
+   "class": "continue",
+   "value": "ALREADY NUMBERED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: UNNUMBERED PLAN KEPT\n",
+   "class": "continue",
+   "value": "UNNUMBERED PLAN KEPT",
+   "detail": ""
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-hand-off@1",
+   "output": "PLAN HANDED OFF: HANDED OFF the detail\n",
+   "class": "continue",
+   "value": "HANDED OFF",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-hand-off@1",
+   "output": "PLAN HANDED OFF: ANOTHER ROUND WANTED\n",
+   "class": "end:another-round",
+   "value": "ANOTHER ROUND WANTED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: CLEAR\n",
+   "class": "continue",
+   "value": "CLEAR",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: BUILD LOOP ACTIVE the detail\n",
+   "class": "stop",
+   "value": "BUILD LOOP ACTIVE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: SCHEDULER ON\n",
+   "class": "ask",
+   "value": "SCHEDULER ON",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: BAD ARGUMENTS the detail\n",
+   "class": "ask",
+   "value": "BAD ARGUMENTS",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-partition@1",
+   "output": "REBALANCE PARTITION: PARTITIONED the detail\n",
+   "class": "continue",
+   "value": "PARTITIONED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-partition@1",
+   "output": "REBALANCE PARTITION: NO CHANGE NEEDED\n",
+   "class": "ask",
+   "value": "NO CHANGE NEEDED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-proposal@1",
+   "output": "REBALANCE PROPOSAL: SIGNED OFF\n",
+   "class": "continue",
+   "value": "SIGNED OFF",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-proposal@1",
+   "output": "REBALANCE PROPOSAL: DRY RUN\n",
+   "class": "end:dry-run",
+   "value": "DRY RUN",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-proposal@1",
+   "output": "REBALANCE PROPOSAL: DECLINED\n",
+   "class": "end:declined",
+   "value": "DECLINED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-probe@1",
+   "output": "SCHEDULER PROBE: HELD\n",
+   "class": "continue",
+   "value": "HELD",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-probe@1",
+   "output": "SCHEDULER PROBE: OVERWRITTEN\n",
+   "class": "stop",
+   "value": "OVERWRITTEN",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-probe@1",
+   "output": "SCHEDULER PROBE: LOOP ACTIVE the detail\n",
+   "class": "stop",
+   "value": "LOOP ACTIVE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-successors@1",
+   "output": "REBALANCE SUCCESSORS: CREATED the detail\n",
+   "class": "continue",
+   "value": "CREATED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-successors@1",
+   "output": "REBALANCE SUCCESSORS: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-rewire@1",
+   "output": "REBALANCE REWIRE: DONE the detail\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-rewire@1",
+   "output": "REBALANCE REWIRE: ORPHANS the detail\n",
+   "class": "stop",
+   "value": "ORPHANS",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-rewire@1",
+   "output": "REBALANCE REWIRE: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-renumber@1",
+   "output": "REBALANCE RENUMBER: DONE the detail\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-renumber@1",
+   "output": "REBALANCE RENUMBER: UNNUMBERED PLAN KEPT\n",
+   "class": "continue",
+   "value": "UNNUMBERED PLAN KEPT",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-renumber@1",
+   "output": "REBALANCE RENUMBER: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-archive@1",
+   "output": "REBALANCE ARCHIVE: ARCHIVED the detail\n",
+   "class": "continue",
+   "value": "ARCHIVED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-archive@1",
+   "output": "REBALANCE ARCHIVE: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-marker@1",
+   "output": "REBALANCE MARKER: REWRITTEN the detail\n",
+   "class": "continue",
+   "value": "REWRITTEN",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-marker@1",
+   "output": "REBALANCE MARKER: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-report@1",
+   "output": "REBALANCE REPORT: RE-SLICED the detail\n",
+   "class": "continue",
+   "value": "RE-SLICED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-report@1",
+   "output": "REBALANCE REPORT: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "splice@1",
+   "output": "SPLICE: INSERTED the detail\n",
+   "class": "continue",
+   "value": "INSERTED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "splice@1",
+   "output": "SPLICE: NEEDS ANSWER the detail\n",
+   "class": "ask",
+   "value": "NEEDS ANSWER",
+   "detail": "the detail"
+  },
+  {
+   "contract": "splice@1",
+   "output": "SPLICE: NEXT UNCHANGED the detail\n",
+   "class": "continue",
+   "value": "NEXT UNCHANGED",
+   "detail": "the detail"
   }
  ],
  "proofs": [
