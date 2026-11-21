@@ -23,7 +23,7 @@ session id) and names its run by `item`, by `runId`, or by being the session's o
 
 | Command | Request | What it does |
 |---|---|---|
-| `start` | `definition` or `definitionFile` (a file of at most 256 KB), `context`, `replace`? | Validates everything before writing anything, then issues the first step. An open run for the same session and item is refused (`run-open`) unless `replace` is true, which ends the old run as interrupted |
+| `start` | `definition` or `definitionFile` (a file of at most 256 KB), `context`, `fetched`?, `replace`? | Validates everything before writing anything, then issues the first step. An open run for the same session and item is refused (`run-open`) unless `replace` is true, which ends the old run as interrupted; with `fetched`, its current position comes back instead. `fetched` is the tracker's answer for the item (`fetching-the-workflow.md`): `start` pins the organization's definition or the built-in one and adds `definitionSource`, `workflow` and `notice` |
 | `next` | | The next action. Asked again before `done`, it hands back the issued step and attempt as they were: the step may already have acted, so only its `done` moves the run on |
 | `done` | `stepId`, `attempt`, `output` (the step's whole final answer, as text) | Records the issued step's answer and returns the next action plus `recorded`. Any other step or attempt is refused (`not-current-step`), except the step a stopped run stopped on, repaired by hand |
 | `status` | `includeDefinition`? | Read-only: `state` (running, stopped or finished), `position`, one row per step and a ready Markdown `table`. With `includeDefinition`, one report object carrying the definition |
@@ -46,7 +46,7 @@ An action is one of:
 - **`stopped`**: `kind`, `reason`, `stepId`; a stop of a merge that answered adds `mayHaveLanded`
   (true), its `attempt` and the `commit` it was handed.
 
-Every answer also carries `runId` and `reports`; `start` adds the definition's hash.
+Every answer also carries `runId` and `reports`; `start` adds the definition's hash. A `run` answer for a repository step (its source is `repo`) has `skill: null` and `instructions` (the committed file's text, path, commit and hash). Follow `instructions.text` as that step's skill, then answer `done` with the verdict line its contract names.
 
 ## A step's answer
 

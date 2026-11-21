@@ -1,0 +1,952 @@
+{
+ "_readme": "Shared cases for the plugin's handling of the tracker's answer to get_workflow_for_item, run by scripts/tests/run-workflow-fetch.sh. builtin is the definition the entry skill supplies; context is the start context; answers are sample answers in the tracker's response shape (match, ignoredOverride, skills), each with the definition the runner must pin (definitionSource), the short fallback code it keeps (fallbackReason, null for an organization run) and, for a definition the plugin deliberately refuses, the validation code (invalidCode). Every sample's hash is the canonical hash of its definition except the one changed after hashing. Example hosts and names only.",
+ "builtin": {
+  "schema": 1,
+  "id": "claim-only",
+  "version": 1,
+  "name": "Claim only",
+  "startsWhen": "item-picked-up",
+  "endsBy": null,
+  "appliesTo": {
+   "workTypes": [],
+   "tags": [],
+   "repositories": []
+  },
+  "minPluginVersion": "4.2.0",
+  "phases": [
+   {
+    "id": "pick-up",
+    "name": "Pick up",
+    "steps": [
+     {
+      "id": "claim",
+      "name": "Claim it",
+      "summary": "",
+      "contract": "claim@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "claim-story",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    ]
+   }
+  ]
+ },
+ "context": {
+  "item": "I123",
+  "mode": "named",
+  "trigger": "item-picked-up"
+ },
+ "errors": [
+  "ABSENT",
+  "FORBIDDEN",
+  "UNREACHABLE",
+  "ERROR"
+ ],
+ "answers": [
+  {
+   "name": "no workflow applies",
+   "answer": {
+    "match": null,
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "builtin",
+    "fallbackReason": "no-match",
+    "invalidCode": null
+   }
+  },
+  {
+   "name": "an organization workflow",
+   "answer": {
+    "match": {
+     "source": "organization",
+     "workflowId": "wf-acme-claim",
+     "name": "Acme claim and check",
+     "version": 3,
+     "hash": "66a2d83d427191085b2ebc2637b03d47c4fe2d22c1e1a84aba91a9aaddd72cd1",
+     "minPluginVersion": "4.2.0",
+     "startsWhen": "item-picked-up",
+     "matchedBy": "type",
+     "alsoMatched": [],
+     "definition": {
+      "schema": 1,
+      "id": "acme-claim",
+      "version": 3,
+      "name": "Acme claim and check",
+      "startsWhen": "item-picked-up",
+      "endsBy": null,
+      "appliesTo": {
+       "workTypes": [],
+       "tags": [],
+       "repositories": [
+        "example.com/acme/widgets"
+       ]
+      },
+      "minPluginVersion": "4.2.0",
+      "phases": [
+       {
+        "id": "pick-up",
+        "name": "Pick up",
+        "steps": [
+         {
+          "id": "claim",
+          "name": "Claim it",
+          "summary": "",
+          "contract": "claim@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "claim-story",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "check",
+          "name": "Our own check",
+          "summary": "",
+          "contract": "custom@1",
+          "kind": "step",
+          "run": {
+           "source": "repo",
+           "ref": "docs/agents/check.md",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "organization",
+    "fallbackReason": null,
+    "invalidCode": null
+   }
+  },
+  {
+   "name": "a match without its definition",
+   "answer": {
+    "match": {
+     "source": "organization",
+     "workflowId": "wf-acme-claim",
+     "name": "Acme claim and check",
+     "version": 3,
+     "hash": "66a2d83d427191085b2ebc2637b03d47c4fe2d22c1e1a84aba91a9aaddd72cd1",
+     "minPluginVersion": "4.2.0",
+     "startsWhen": "item-picked-up",
+     "matchedBy": "type",
+     "alsoMatched": []
+    },
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "builtin",
+    "fallbackReason": "incomplete",
+    "invalidCode": null
+   }
+  },
+  {
+   "name": "a match that starts on another trigger",
+   "answer": {
+    "match": {
+     "source": "organization",
+     "workflowId": "wf-acme-claim",
+     "name": "Acme claim and check",
+     "version": 3,
+     "hash": "66a2d83d427191085b2ebc2637b03d47c4fe2d22c1e1a84aba91a9aaddd72cd1",
+     "minPluginVersion": "4.2.0",
+     "startsWhen": "on-demand",
+     "matchedBy": "type",
+     "alsoMatched": [],
+     "definition": {
+      "schema": 1,
+      "id": "acme-claim",
+      "version": 3,
+      "name": "Acme claim and check",
+      "startsWhen": "item-picked-up",
+      "endsBy": null,
+      "appliesTo": {
+       "workTypes": [],
+       "tags": [],
+       "repositories": [
+        "example.com/acme/widgets"
+       ]
+      },
+      "minPluginVersion": "4.2.0",
+      "phases": [
+       {
+        "id": "pick-up",
+        "name": "Pick up",
+        "steps": [
+         {
+          "id": "claim",
+          "name": "Claim it",
+          "summary": "",
+          "contract": "claim@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "claim-story",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "check",
+          "name": "Our own check",
+          "summary": "",
+          "contract": "custom@1",
+          "kind": "step",
+          "run": {
+           "source": "repo",
+           "ref": "docs/agents/check.md",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "builtin",
+    "fallbackReason": "incomplete",
+    "invalidCode": null
+   }
+  },
+  {
+   "name": "a definition that starts on another trigger",
+   "answer": {
+    "match": {
+     "source": "organization",
+     "workflowId": "wf-acme-claim",
+     "name": "Acme claim and check",
+     "version": 3,
+     "hash": "a884596df027dfdd00be40bc2590a45b868b02a08142c5127c83a02cef897a50",
+     "minPluginVersion": "4.2.0",
+     "startsWhen": "item-picked-up",
+     "matchedBy": "type",
+     "alsoMatched": [],
+     "definition": {
+      "schema": 1,
+      "id": "acme-claim",
+      "version": 3,
+      "name": "Acme claim and check",
+      "startsWhen": "on-demand",
+      "endsBy": null,
+      "appliesTo": {
+       "workTypes": [],
+       "tags": [],
+       "repositories": [
+        "example.com/acme/widgets"
+       ]
+      },
+      "minPluginVersion": "4.2.0",
+      "phases": [
+       {
+        "id": "pick-up",
+        "name": "Pick up",
+        "steps": [
+         {
+          "id": "claim",
+          "name": "Claim it",
+          "summary": "",
+          "contract": "claim@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "claim-story",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "check",
+          "name": "Our own check",
+          "summary": "",
+          "contract": "custom@1",
+          "kind": "step",
+          "run": {
+           "source": "repo",
+           "ref": "docs/agents/check.md",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "builtin",
+    "fallbackReason": "incomplete",
+    "invalidCode": null
+   }
+  },
+  {
+   "name": "a definition changed by one byte after hashing",
+   "answer": {
+    "match": {
+     "source": "organization",
+     "workflowId": "wf-acme-claim",
+     "name": "Acme claim and check",
+     "version": 3,
+     "hash": "66a2d83d427191085b2ebc2637b03d47c4fe2d22c1e1a84aba91a9aaddd72cd1",
+     "minPluginVersion": "4.2.0",
+     "startsWhen": "item-picked-up",
+     "matchedBy": "type",
+     "alsoMatched": [],
+     "definition": {
+      "schema": 1,
+      "id": "acme-claim",
+      "version": 3,
+      "name": "Acme claim and checl",
+      "startsWhen": "item-picked-up",
+      "endsBy": null,
+      "appliesTo": {
+       "workTypes": [],
+       "tags": [],
+       "repositories": [
+        "example.com/acme/widgets"
+       ]
+      },
+      "minPluginVersion": "4.2.0",
+      "phases": [
+       {
+        "id": "pick-up",
+        "name": "Pick up",
+        "steps": [
+         {
+          "id": "claim",
+          "name": "Claim it",
+          "summary": "",
+          "contract": "claim@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "claim-story",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "check",
+          "name": "Our own check",
+          "summary": "",
+          "contract": "custom@1",
+          "kind": "step",
+          "run": {
+           "source": "repo",
+           "ref": "docs/agents/check.md",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "builtin",
+    "fallbackReason": "integrity",
+    "invalidCode": null
+   }
+  },
+  {
+   "name": "a definition that needs a newer plugin (numeric, not text, order)",
+   "answer": {
+    "match": {
+     "source": "organization",
+     "workflowId": "wf-acme-claim",
+     "name": "Acme claim and check",
+     "version": 3,
+     "hash": "0fd5aafa26947260e4a021f667113cc10c48df49fe23066b9e6e77e055244c85",
+     "minPluginVersion": "4.10.0",
+     "startsWhen": "item-picked-up",
+     "matchedBy": "type",
+     "alsoMatched": [],
+     "definition": {
+      "schema": 1,
+      "id": "acme-claim",
+      "version": 3,
+      "name": "Acme claim and check",
+      "startsWhen": "item-picked-up",
+      "endsBy": null,
+      "appliesTo": {
+       "workTypes": [],
+       "tags": [],
+       "repositories": [
+        "example.com/acme/widgets"
+       ]
+      },
+      "minPluginVersion": "4.10.0",
+      "phases": [
+       {
+        "id": "pick-up",
+        "name": "Pick up",
+        "steps": [
+         {
+          "id": "claim",
+          "name": "Claim it",
+          "summary": "",
+          "contract": "claim@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "claim-story",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "check",
+          "name": "Our own check",
+          "summary": "",
+          "contract": "custom@1",
+          "kind": "step",
+          "run": {
+           "source": "repo",
+           "ref": "docs/agents/check.md",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "builtin",
+    "fallbackReason": "plugin-too-old",
+    "invalidCode": null
+   }
+  },
+  {
+   "name": "an unknown contract",
+   "answer": {
+    "match": {
+     "source": "organization",
+     "workflowId": "wf-acme-claim",
+     "name": "Acme claim and check",
+     "version": 3,
+     "hash": "905f8d360db7b9e7e089896fab77a2b4176f82732a06f11185a3ce63094932dd",
+     "minPluginVersion": "4.2.0",
+     "startsWhen": "item-picked-up",
+     "matchedBy": "type",
+     "alsoMatched": [],
+     "definition": {
+      "schema": 1,
+      "id": "acme-claim",
+      "version": 3,
+      "name": "Acme claim and check",
+      "startsWhen": "item-picked-up",
+      "endsBy": null,
+      "appliesTo": {
+       "workTypes": [],
+       "tags": [],
+       "repositories": [
+        "example.com/acme/widgets"
+       ]
+      },
+      "minPluginVersion": "4.2.0",
+      "phases": [
+       {
+        "id": "pick-up",
+        "name": "Pick up",
+        "steps": [
+         {
+          "id": "claim",
+          "name": "Claim it",
+          "summary": "",
+          "contract": "claim@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "claim-story",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "check",
+          "name": "Our own check",
+          "summary": "",
+          "contract": "nonesuch@1",
+          "kind": "step",
+          "run": {
+           "source": "repo",
+           "ref": "docs/agents/check.md",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "builtin",
+    "fallbackReason": "unrunnable",
+    "invalidCode": "unknown-contract"
+   }
+  },
+  {
+   "name": "a step whose required earlier step is missing",
+   "answer": {
+    "match": {
+     "source": "organization",
+     "workflowId": "wf-acme-claim",
+     "name": "Acme claim and check",
+     "version": 3,
+     "hash": "e7ed86580738188df259e85883e04760ffc982c7d1a7f0899a160849be590db0",
+     "minPluginVersion": "4.2.0",
+     "startsWhen": "item-picked-up",
+     "matchedBy": "type",
+     "alsoMatched": [],
+     "definition": {
+      "schema": 1,
+      "id": "acme-claim",
+      "version": 3,
+      "name": "Acme claim and check",
+      "startsWhen": "item-picked-up",
+      "endsBy": null,
+      "appliesTo": {
+       "workTypes": [],
+       "tags": [],
+       "repositories": [
+        "example.com/acme/widgets"
+       ]
+      },
+      "minPluginVersion": "4.2.0",
+      "phases": [
+       {
+        "id": "pick-up",
+        "name": "Pick up",
+        "steps": [
+         {
+          "id": "claim",
+          "name": "Claim it",
+          "summary": "",
+          "contract": "claim@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "claim-story",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "check",
+          "name": "Our own check",
+          "summary": "",
+          "contract": "custom@1",
+          "kind": "step",
+          "run": {
+           "source": "repo",
+           "ref": "docs/agents/check.md",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "build",
+          "name": "Build it",
+          "summary": "",
+          "contract": "build@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "ultracode-build",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "builtin",
+    "fallbackReason": "unrunnable",
+    "invalidCode": "requires-missing"
+   }
+  },
+  {
+   "name": "a step switched off that another requires",
+   "answer": {
+    "match": {
+     "source": "organization",
+     "workflowId": "wf-acme-claim",
+     "name": "Acme claim and check",
+     "version": 3,
+     "hash": "ed3773ff2eb7f8225cd577407d7072fde04a593c8d7dda0e48e814ca60990bf7",
+     "minPluginVersion": "4.2.0",
+     "startsWhen": "item-picked-up",
+     "matchedBy": "type",
+     "alsoMatched": [],
+     "definition": {
+      "schema": 1,
+      "id": "acme-claim",
+      "version": 3,
+      "name": "Acme claim and check",
+      "startsWhen": "item-picked-up",
+      "endsBy": null,
+      "appliesTo": {
+       "workTypes": [],
+       "tags": [],
+       "repositories": [
+        "example.com/acme/widgets"
+       ]
+      },
+      "minPluginVersion": "4.2.0",
+      "phases": [
+       {
+        "id": "pick-up",
+        "name": "Pick up",
+        "steps": [
+         {
+          "id": "claim",
+          "name": "Claim it",
+          "summary": "",
+          "contract": "claim@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "claim-story",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "check",
+          "name": "Our own check",
+          "summary": "",
+          "contract": "custom@1",
+          "kind": "step",
+          "run": {
+           "source": "repo",
+           "ref": "docs/agents/check.md",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "branch",
+          "name": "Branch",
+          "summary": "",
+          "contract": "branch@1",
+          "kind": "step",
+          "run": {
+           "source": "off",
+           "ref": null,
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "build",
+          "name": "Build it",
+          "summary": "",
+          "contract": "build@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "ultracode-build",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "builtin",
+    "fallbackReason": "unrunnable",
+    "invalidCode": "required-off"
+   }
+  },
+  {
+   "name": "a library skill source",
+   "answer": {
+    "match": {
+     "source": "organization",
+     "workflowId": "wf-acme-claim",
+     "name": "Acme claim and check",
+     "version": 3,
+     "hash": "8d10cbafdf008549248178ea8d610e8753d84c3d24cde7b2199ca87c4d433f0a",
+     "minPluginVersion": "4.2.0",
+     "startsWhen": "item-picked-up",
+     "matchedBy": "type",
+     "alsoMatched": [],
+     "definition": {
+      "schema": 1,
+      "id": "acme-claim",
+      "version": 3,
+      "name": "Acme claim and check",
+      "startsWhen": "item-picked-up",
+      "endsBy": null,
+      "appliesTo": {
+       "workTypes": [],
+       "tags": [],
+       "repositories": [
+        "example.com/acme/widgets"
+       ]
+      },
+      "minPluginVersion": "4.2.0",
+      "phases": [
+       {
+        "id": "pick-up",
+        "name": "Pick up",
+        "steps": [
+         {
+          "id": "claim",
+          "name": "Claim it",
+          "summary": "",
+          "contract": "claim@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "claim-story",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "check",
+          "name": "Our own check",
+          "summary": "",
+          "contract": "custom@1",
+          "kind": "step",
+          "run": {
+           "source": "library",
+           "ref": "docs/agents/check.md",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "builtin",
+    "fallbackReason": "unrunnable",
+    "invalidCode": "unsupported-source"
+   }
+  },
+  {
+   "name": "a gate step",
+   "answer": {
+    "match": {
+     "source": "organization",
+     "workflowId": "wf-acme-claim",
+     "name": "Acme claim and check",
+     "version": 3,
+     "hash": "c14e4aad62af86cda0280223ac52693743cb069ac1eb53c2d34eac6af7b32c08",
+     "minPluginVersion": "4.2.0",
+     "startsWhen": "item-picked-up",
+     "matchedBy": "type",
+     "alsoMatched": [],
+     "definition": {
+      "schema": 1,
+      "id": "acme-claim",
+      "version": 3,
+      "name": "Acme claim and check",
+      "startsWhen": "item-picked-up",
+      "endsBy": null,
+      "appliesTo": {
+       "workTypes": [],
+       "tags": [],
+       "repositories": [
+        "example.com/acme/widgets"
+       ]
+      },
+      "minPluginVersion": "4.2.0",
+      "phases": [
+       {
+        "id": "pick-up",
+        "name": "Pick up",
+        "steps": [
+         {
+          "id": "claim",
+          "name": "Claim it",
+          "summary": "",
+          "contract": "claim@1",
+          "kind": "step",
+          "run": {
+           "source": "builtin",
+           "ref": "claim-story",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         },
+         {
+          "id": "check",
+          "name": "Our own check",
+          "summary": "",
+          "contract": "custom@1",
+          "kind": "gate",
+          "run": {
+           "source": "repo",
+           "ref": "docs/agents/check.md",
+           "version": null
+          },
+          "when": {
+           "mode": "always",
+           "condition": null
+          },
+          "onFail": "stop"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "ignoredOverride": null,
+    "skills": []
+   },
+   "expect": {
+    "definitionSource": "builtin",
+    "fallbackReason": "unrunnable",
+    "invalidCode": "unsupported-gate"
+   }
+  }
+ ]
+}

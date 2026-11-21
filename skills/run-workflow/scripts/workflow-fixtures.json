@@ -2368,7 +2368,7 @@
    ],
    "root": "fixture",
    "git": true,
-   "expect": "unsupported-source"
+   "expect": "ok"
   },
   {
    "name": "the custom contract, which no built-in skill carries",

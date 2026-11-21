@@ -207,21 +207,20 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
 ## The run
 
 Every command is `python3 -B "${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py"
-<command>` with one JSON object on stdin (a file or a here-document, never inside quotes), and
-every `next`, `done`, `status` and `resume` names the `item`: a session holding two open runs is
+<command>` with one JSON object on stdin (a file or here-document, never quoted), and every `next`, `done`, `status` and `resume` names the `item`: a session holding two open runs is
 refused one that does not. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md` in full before the first
 command, and again after a compaction**: the commands, the answers, the stops and resuming.
 
-1. **The context**, built once the story is selected: `item`, `goal` (its one-line goal), `profile`
-   (`name` and `source`), `workingBase`, `oneOff`, `route`, `releaseUnit` (the release-unit ancestor
-   step 0 resolved; null for a one-off), `reviewMoment` (Working base), `branchSlug`
-   (`I<number>-` plus `routing.py slug` of the title) and `mode` (`select`, `named` or `resume`).
+1. **The context**, once the story is selected: `item`, `goal` (one line), `profile`
+   (`name`, `source`), `workingBase`, `oneOff`, `route`, `releaseUnit` (step 0's release-unit
+   ancestor; null for a one-off), `reviewMoment` (Working base), `branchSlug`
+   (`I<number>-` plus `routing.py slug` of the title), `mode` (`select`, `named` or `resume`), `trigger` `item-picked-up`.
 2. **`resume` with the item first** (a named or handed-off story after step 0's claim check; a
    selected one straight away): it finds this session's open
    run, or adopts the newest unfinished one another session left for the item in this repository
-   (a cleared conversation, a crash), re-bound to this checkout (`adoptedFrom` names the one it
-   came from: say it), and hands back its current step. Any command refused `wrong-branch` (a `resume`,
+   (a cleared conversation, a crash), re-bound here (`adoptedFrom` names where
+   it came from: say it), and hands back its current step. Any command refused `wrong-branch` (a `resume`,
    `next` or `done` of an adopted run off its story branch, named) → `git fetch origin
    "+refs/heads/<branch>:refs/remotes/origin/<branch>"` (for a branch only here it fails,
    harmlessly); then `git checkout <branch>` when it exists here, else `git checkout -b
@@ -230,16 +229,16 @@ command, and again after a compaction**: the commands, the answers, the stops an
    fetch rule misses the branch); `git rev-parse --abbrev-ref HEAD` printing it; then the same request again. The branch held by another worktree (`git worktree list`), or absent
    here and on the remote → STOP, naming what a person must do: free it there, or push it from the
    checkout that has it.
-   Refused `no-run` or `run-other-repository` → **`start`** with
-   `definitionFile` `${CLAUDE_PLUGIN_ROOT}/workflows/build.json` and that context. A `start` refused
-   `run-open` means a run exists: `resume` it; only the excluded-paths re-route replaces one. Any other refusal (exit 2) or a
-   runner failure (exit 1) → say its line and STOP; never build without the runner.
+   Refused `no-run` or `run-other-repository` → **`start`** with `definitionFile`
+   `${CLAUDE_PLUGIN_ROOT}/workflows/build.json`, that context and `fetched` (run-workflow's `references/fetching-the-workflow.md`).
+   A `start` refused `run-open` means a run exists: `resume` it; only the excluded-paths re-route
+   replaces one. Other refusals (exit 2), runner failures (exit 1) → say its line, STOP; never build without the runner.
 3. **For each `run` answer**: send the story claim heartbeat with `heartbeat.phase` and the
    ship-intent update from `heartbeat.shipIntent` (each only when configured and not null, each
    failing open, `references/story-claims.md` and `references/ship-intent.md`; a heartbeat's own
-   stop stops the run); invoke the named skill (`claim-story`, `story-lifecycle`, `branch-feature`,
-   `ultracode-build`, `risk-check`, `local-checks`, `review-story`, `merge-story`,
-   `capture-findings`, `sync-base`) through the Skill tool with `argument` unchanged — plus, when the
+   stop stops the run); invoke the named skill through the Skill tool with `argument` unchanged (`skill`
+   null: follow `instructions.text` as that step's skill, run-workflow's
+   `references/fetching-the-workflow.md`) — plus, when the
    payload carries a person's `answer` and the argument does not, ` answer: <it>` after it; then
    `done` with `stepId`, `attempt` and the skill's WHOLE answer as `output`. Its answer is the next
    action. A step already acted on before an interruption (a merge that landed) is reported with
@@ -249,11 +248,11 @@ command, and again after a compaction**: the commands, the answers, the stops an
    first forward of a run, or after a compaction**, and send each exactly as it says, unless
    `workflows` is `null`: then report nothing. A report never gates, delays or stops a step; a
    failed one: as that file says.
-5. **`stopped`**: say the reason in plain words and what can be done about that kind of stop. A
+5. **`stopped`**: say the reason plainly and what can be done about that kind of stop. A
    question (`needs-person`), attended → ask it and, once the person replies, `resume` with their
    reply as `answer`; unattended with `needsYou.label` set → `references/needs-you.md`. A red local
    check (`LOCAL CHECKS: FAIL`) is the build's to fix: fix the named check on the story branch as
-   the build step would, commit, then `resume` (the runner screens and checks the new commit).
+   the build would, commit, then `resume` (the runner checks it again).
    **Any other stop, and every answer carrying `mayHaveLanded`: read
    `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/run-stops.md` in full before acting on it**:
    a merge stop (landed or not), a train one-off moved off the train, and every other stop, which
