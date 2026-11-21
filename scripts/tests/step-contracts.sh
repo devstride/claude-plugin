@@ -320,7 +320,7 @@ for name in named:
             keys = entry["result"]["required"] + sorted(k for k in entry["result"]["types"] if k not in entry["result"]["required"]) + entry["proof"].get("required", [])
             if [k for k in keys if "`%s`" % k not in result]:
                 faults.append("%s: its Result section does not name every key" % ref)
-            if "Workflow" in re.sub(r"\(`delegates: true`\)[^.]*\.", "", body.replace("no subagent and no Workflow", "")) and not entry.get("delegates"):
+            if "Workflow" in re.sub(r"\(`delegates: true`\)[^.]*\.", "", body.replace("no subagent and no Workflow", "").replace("never rerun the whole Workflow", "")) and not entry.get("delegates"):
                 faults.append("%s: a non-delegating step tells the model to start a Workflow" % ref)
         if "Any other contract, or none → no verdict line" not in flat(text):
             faults.append("no answer for a contract it does not carry")
