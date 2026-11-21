@@ -329,13 +329,22 @@ def section_catalog():
         check("the shipped %s workflow names its pinned contracts, in order" % name, steps == contracts, steps)
     hotfix = json.load(open(os.path.join(ROOT, "workflows", "hotfix.json"), encoding="utf-8"))
     hotfix_contracts = [step["contract"] for phase in hotfix["phases"] for step in phase["steps"]]
+    release_contracts = set()
+    for name in ("release", "release-cut-to-deploy", "release-merge-and-deploy", "release-docs", "release-notes", "release-post-deploy"):
+        shipped = json.load(open(os.path.join(ROOT, "workflows", name + ".json"), encoding="utf-8"))
+        release_contracts |= set(step["contract"] for phase in shipped["phases"] for step in phase["steps"])
     standalone = {"custom@1", "splice@1"}
-    expected = set(c for contracts in pinned.values() for c in contracts) | set(hotfix_contracts) | standalone
-    check("the shipped catalog holds the Build, Plan, Rebalance and Hotfix contracts plus custom@1 and splice@1, and nothing else",
+    expected = set(c for contracts in pinned.values() for c in contracts) | set(hotfix_contracts) | release_contracts | standalone
+    check("the shipped catalog holds the Build, Plan, Rebalance, Hotfix and Release contracts plus custom@1 and splice@1, and nothing else",
           set(REAL_CATALOG["contracts"]) == expected, sorted(set(REAL_CATALOG["contracts"]) ^ expected))
+    skill = lambda n: REAL_CATALOG["contracts"][n]["builtinSkill"]
+    release_only = sorted(release_contracts - set(hotfix_contracts))
+    check("the Release contracts: 55, every one served by release-steps or an existing seam step",
+          len(release_only) == 55 and all(skill(n) in ("release-steps", "classify-release", "pre-ship", "pre-merge-check", "post-deploy") for n in release_only), release_only)
     satisfied = {name: entry["satisfiedBy"] for name, entry in REAL_CATALOG["contracts"].items() if "satisfiedBy" in entry}
-    check("only the Hotfix satisfiers and the rebalance rewire are shipped",
-          satisfied == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"], "plan-wire@1": ["rebalance-rewire@1"]}, satisfied)
+    check("the satisfiers shipped: the Hotfix and Rebalance ones, and the production merge and a found merged release for the hotfix merge",
+          satisfied == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"], "plan-wire@1": ["rebalance-rewire@1"],
+                        "hotfix-merge@1": ["production-merge@1", "merged-release@1"]}, satisfied)
     standin = module.check_catalog(stand_in_catalog())
     check("the fixture catalog, where stand-in@1 satisfies build@1, is sound", standin == [], standin)
 

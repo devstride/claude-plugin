@@ -577,11 +577,11 @@
           "id": "approve-deploy",
           "name": "Approve the deploy",
           "summary": "Approve the production deploy of the merge commit where approval is configured.",
-          "contract": "release-deploy-approval@1",
+          "contract": "deploy-approval@1",
           "kind": "step",
           "run": {
             "source": "builtin",
-            "ref": "release-steps",
+            "ref": "hotfix-steps",
             "version": null
           },
           "when": {
@@ -594,11 +594,11 @@
           "id": "confirm-deploy",
           "name": "Confirm the deploy",
           "summary": "Confirm the production deploy of the merge commit finished.",
-          "contract": "release-deploy-confirm@1",
+          "contract": "deploy-confirm@1",
           "kind": "step",
           "run": {
             "source": "builtin",
-            "ref": "release-steps",
+            "ref": "hotfix-steps",
             "version": null
           },
           "when": {
