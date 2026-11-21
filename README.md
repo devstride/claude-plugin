@@ -561,7 +561,8 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `review` | Runs every configured reviewer, settles findings, then releases CI — re-reviewing from the latest common cycle anchor and continuing P1/serious-P2 fixes until clear |
 | `pr` | Opens a pull request and runs the review-and-settle loop |
 | `push` | Stages, commits, type-checks, and pushes following the repo's commit conventions |
-| `branch-feature` / `branch-hotfix` | Cuts a working branch from the working base (`base: <branch>`) or from the production branch |
+| `branch-feature` | Cuts a working branch from the working base (`base: <branch>`) |
+| `branch-hotfix` | Runs the Hotfix workflow (`workflows/hotfix.json`) through the step runner: cuts the hotfix branch from the production branch, resets the local environment, then fixes, reviews, merges and confirms the deploy on your yes; never waits for a release |
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end; `create-story deferred <item>` / `create-defect deferred <item>` instead parks a follow-up or a bug in the plan's deferred container |
 | `release` | Promotes the release branch to production with a full gated review; with `release.clearance` set, claims one-release-at-a-time clearance first and hands it back last; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
 | `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it — including that the configured local review engine actually runs read-only; `setup agents` sets up the Active Agents board, tag and view after a typed yes; `setup drills` checks the sign-in token for a repository's throwaway drill sessions and tells you the one command that makes it |
