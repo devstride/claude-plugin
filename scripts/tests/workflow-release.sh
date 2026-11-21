@@ -104,6 +104,26 @@ json.dump(broken, open(os.path.join(copy, "scripts", "release-workflow-source.js
 rc, out, err = gen("--check", "--root", copy)
 check("(12) a definition naming an unknown step is an invalid source (exit 2, one line)", (rc, "no-such-step" in err, "Traceback" in err), (2, True, False))
 check("(13) a usage error exits 2", gen("--frobnicate")[0], 2)
+# selection: the definition a full release runs is chosen by release.clearance.scope
+def select(config):
+    path = os.path.join(tmp, "config.json")
+    with open(path, "w", encoding="utf-8") as out:
+        out.write(config if isinstance(config, str) else json.dumps(config))
+    return gen("--select", path)[:2]
+check("(14) no release block gives release", select({}), (0, "DEFINITION: workflows/release.json"))
+check("(15) no clearance block gives release", select({"release": {"releaseSource": "develop"}}), (0, "DEFINITION: workflows/release.json"))
+check("(16) a null clearance gives release", select({"release": {"clearance": None}}), (0, "DEFINITION: workflows/release.json"))
+check("(17) a clearance block with no scope gives release", select({"release": {"clearance": {"provider": "github"}}}), (0, "DEFINITION: workflows/release.json"))
+for scope, ident in (("release", "release"), ("cut-to-deploy", "release-cut-to-deploy"), ("merge-and-deploy", "release-merge-and-deploy")):
+    check("(18) scope %s gives %s (provider shape)" % (scope, ident),
+          select({"release": {"clearance": {"provider": "github", "scope": scope}}}), (0, "DEFINITION: workflows/%s.json" % ident))
+    check("(19) scope %s gives %s (commands shape)" % (scope, ident),
+          select({"release": {"clearance": {"commands": {"claim": "x claim"}, "scope": scope}}}), (0, "DEFINITION: workflows/%s.json" % ident))
+rc, out = select({"release": {"clearance": {"provider": "github", "scope": "everything"}}})
+check("(20) an unknown scope is a config error naming the key", (rc, out.startswith("CONFIG ERROR: release.clearance.scope"), "everything" in out), (2, True, True))
+check("(21) unreadable configuration is a config error", select("{not json")[0], 2)
+for scope, ident in (("release", "release"), ("cut-to-deploy", "release-cut-to-deploy"), ("merge-and-deploy", "release-merge-and-deploy")):
+    check("(22) the selected file for %s exists and is generated" % scope, ident in PINNED and os.path.isfile(os.path.join(root, "workflows", ident + ".json")))
 PY
 PRC=$?; OUT="$(cat "$T/cases.out")"
 echo "$OUT" | sed 's/^ok   /  ok   /; s/^FAIL /  FAIL /'

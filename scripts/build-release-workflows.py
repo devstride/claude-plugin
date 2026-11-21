@@ -3,13 +3,16 @@
 three clearance-scope orderings and the three partial entries never drift apart. Standard
 library only.
 
-Usage: build-release-workflows.py --write | --check [--root <dir>]
+Usage: build-release-workflows.py --write | --check | --select <ds-config.json> [--root <dir>]
   --write     write workflows/<id>.json for every definition in scripts/release-workflow-source.json
   --check     generate in memory; exit 1 naming each file that differs from its committed copy
+  --select    print the definition a full release runs for that configuration's
+              release.clearance.scope (read the same in the provider and commands shapes):
+              `DEFINITION: workflows/<id>.json`, or `CONFIG ERROR: ...` naming the key (exit 2)
 
 The source (scripts/release-workflow-source.json) holds every step once (name, summary, contract,
 skill) and each definition's phase list and order. A hand edit of a generated file fails --check.
-Exit 0 written or clean, 1 a generated file differs, 2 unreadable or invalid source.
+Exit 0 written, clean or selected, 1 a generated file differs, 2 unreadable or invalid input.
 """
 import json
 import os
@@ -21,8 +24,29 @@ DEFINITION_KEYS = ("schema", "id", "version", "name", "startsWhen", "endsBy", "a
 STEP_KEYS = ("id", "name", "summary", "contract", "kind", "run", "when", "onFail")
 
 
+# release.clearance.scope to the full-release definition it runs; absent (or no clearance block) is release.
+SCOPE_DEFINITIONS = {"release": "release", "cut-to-deploy": "release-cut-to-deploy",
+                     "merge-and-deploy": "release-merge-and-deploy"}
+
+
 class SourceError(Exception):
     pass
+
+
+def select_definition(config):
+    """The definition id a full release runs for one repository configuration, or a SourceError
+    naming the key. The clearance block's provider and commands shapes both carry scope."""
+    release = config.get("release") if isinstance(config, dict) else None
+    clearance = release.get("clearance") if isinstance(release, dict) else None
+    if clearance is None:
+        return SCOPE_DEFINITIONS["release"]
+    if not isinstance(clearance, dict):
+        raise SourceError("release.clearance must be an object or null")
+    scope = clearance.get("scope", "release")
+    if scope not in SCOPE_DEFINITIONS:
+        raise SourceError("release.clearance.scope is %s; it must be one of %s" % (
+            json.dumps(scope), ", ".join(SCOPE_DEFINITIONS)))
+    return SCOPE_DEFINITIONS[scope]
 
 
 def load_source(root):
@@ -100,6 +124,16 @@ def main(argv):
             return 2
         root = args[at + 1]
         del args[at:at + 2]
+    if len(args) == 2 and args[0] == "--select":
+        try:
+            with open(args[1], encoding="utf-8") as handle:
+                config = json.load(handle)
+            ident = select_definition(config)
+        except (OSError, ValueError, SourceError) as error:
+            print("CONFIG ERROR: %s" % error)
+            return 2
+        print("DEFINITION: workflows/%s.json" % ident)
+        return 0
     if args not in (["--write"], ["--check"]):
         print(__doc__.strip().splitlines()[4], file=sys.stderr)
         return 2
