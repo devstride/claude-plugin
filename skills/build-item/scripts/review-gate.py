@@ -136,7 +136,7 @@ def story_patch_id(merge_base, head, config, run=default_git):
     too) of `git diff <merge_base> <head>`, generated files left out; None when nothing is left.
     `run(*args, stdin=None)` runs git and returns its stdout bytes (train_receipts passes its own)."""
     generated = generated_paths(config)
-    names = [n for n in run("diff", "--name-only", "-z", "--no-renames", "--no-relative", merge_base, head).decode(
+    names = [n for n in run("diff", "--name-only", "-z", "--no-renames", "--no-relative", "--ignore-submodules=none", merge_base, head).decode(
         "utf-8", "surrogateescape").split("\0") if n and not is_generated(n, generated)]
     if not names:
         return None

@@ -144,4 +144,13 @@ land g2 "merge: I11 w into train" "$(receipt "$hw" | sed "s/merge base 000000000
 sync; run
 expect "(10) a review carried past a regeneration under an unchanged patch is receipted; a re-indent is not" 1 \
   "'I10' in [r['item'] for r in d['receipted']] and [(u['item'],u['why'].split(',')[0]) for u in d['unreviewed'] if u['item']]==[('I11','its receipt names '+'$hw'[:12])]"
+# (10b) the receipt line's merge base is only a label: a commit the lander made off the train, shaped so
+# the reviewed patch looks unchanged after part of it was removed, is never accepted as the reviewed base
+git checkout -q -b g3 train; mkdir -p src; echo keep > src/keep.py; echo auth > src/auth.py; git add -A; git commit -qm "story"
+h3="$(git rev-parse HEAD)"; prove "$h3"; git rm -q src/auth.py; git commit -qm "drop the auth check"
+git checkout -q -b forged train; mkdir -p src; echo auth > src/auth.py; git add -A; git commit -qm "forged base"; fx="$(git rev-parse HEAD)"
+land g3 "merge: I12 g3 into train" "$(receipt "$h3" | sed "s/merge base 000000000000/merge base ${fx:0:12}/")"
+sync; run
+expect "(10b) a forged merge base off the train never carries a review" 1 \
+  "'I12' in [u['item'] for u in d['unreviewed']] and 'I12' not in [r['item'] for r in d['receipted']]"
 exit $FAIL

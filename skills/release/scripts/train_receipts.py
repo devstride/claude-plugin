@@ -138,6 +138,10 @@ def landed_head(repo, receipt, landed, first, config):
     run = gate_git(repo)
     try:
         reviewed_base = run("rev-parse", "--verify", "--quiet", receipt["mergeBase"] + "^{commit}").decode().strip()
+        # The receipt line is only a label: its merge base must be real train history that the
+        # reviewed head grew from, never a commit the lander made to shape the comparison.
+        if not (te.is_ancestor(repo, reviewed_base, first) and te.is_ancestor(repo, reviewed_base, receipt_head)):
+            return False
         base = run("merge-base", first, landed).decode().strip()
         return gate.same_patch(receipt_head, reviewed_base, landed, base, config, run)
     except gate.Refuse:
