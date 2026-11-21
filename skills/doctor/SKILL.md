@@ -56,11 +56,8 @@ next action. For each failure symptom, read
   skill is unavailable, print exact id/scope bootstrap commands, then reload and check for errors.
 - **`python3` on PATH** — the session-start hook and the reviewer wait script need it. FAIL,
   a platform install hint.
-- **Learned reviewer latency** — from
-  `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/reviewer-latency.json`, report each reviewer's
-  samples, p50, p95 and derived bound under `pollTimeoutMinutes`; below the sample
-  minimum report `cold — the wait uses pollTimeoutMinutes`. INFO only; schema/format:
-  `${CLAUDE_PLUGIN_ROOT}/skills/review/references/reviewer-latency.md`.
+- **User cache** — saved library skills (WARN for one failing its fingerprint) and learned reviewer
+  latency (INFO): `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/skill-cache.md`.
 - **Session-start check** — read the per-repository record
   `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/repo-<first-12-hex sha1 of repo root>.json`; derive
   the root with `git rev-parse --show-toplevel` and use the schema in `version-currency.md`. On one
