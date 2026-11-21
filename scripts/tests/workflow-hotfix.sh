@@ -391,8 +391,8 @@ sent = json.dumps([a.get("reports") for a in run.answers])
 check("evidence lines that look like credentials are dropped from the built report",
       run.answer.get("action") == "run" and all(w not in sent for w in ("ghp_", "Bearer ", "AKIA", "BEGIN PRIVATE")) and "clean tree" in sent, sent[:400])
 
-# The deploy approval's RETRY re-issues it as the next attempt; on its third attempt the step
-# answers STOPPED (the bound its reference sets), which stops the run before the confirmation.
+# The deploy approval's RETRY re-issues it as the next attempt (the runner's own 50-attempt stop
+# bounds it); a STOPPED answer stops the run before the confirmation.
 run = Run()
 run.until("approve-deploy")
 run.done(answer_text("DEPLOY APPROVAL: RETRY", {"mergeSha": "abc1234", "approved": False}))
@@ -400,10 +400,8 @@ run.done(answer_text("DEPLOY APPROVAL: RETRY", {"mergeSha": "abc1234", "approved
 check("RETRY re-issues the approval as the next attempt", run.answer.get("action") == "run" and run.answer["step"]["id"] == "approve-deploy"
       and run.answer["step"]["attempt"] == 3, run.answer)
 run.done(answer_text("DEPLOY APPROVAL: STOPPED deploy not waiting", {"mergeSha": "abc1234", "approved": False}))
-check("... and STOPPED on the third attempt stops the run before the confirmation", run.answer.get("action") == "stopped"
+check("... and STOPPED stops the run before the confirmation", run.answer.get("action") == "stopped"
       and run.answer.get("stepId") == "approve-deploy" and "confirm-deploy" not in [s for s, _ in run.issued()], run.answer)
-check("... the bound is written in the step's reference", "on its third attempt the step answers `STOPPED deploy not waiting`"
-      in " ".join(open(os.path.join(ROOT, "skills/hotfix-steps/references/deploy-approval.md"), encoding="utf-8").read().split()))
 
 # A review gone stale (the patch changed after it) is run again before the merge is handed out.
 run = Run()
