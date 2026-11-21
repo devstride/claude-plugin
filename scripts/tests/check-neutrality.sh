@@ -110,4 +110,13 @@ if [ "$RC" -eq 1 ] && printf '%s\n' "$OUT" | grep -qF "NEUTRALITY: skills/ds-""r
   ok "(8) a repository-specific name in a shipped path is flagged as a path finding"
 else bad "(8) got (exit $RC): $OUT"; fi
 
+# (9) a workflow definition is scanned: a repository-specific word in workflows/ is found
+fresh "neutral"
+mkdir -p "$WORK/r/workflows"
+printf '{"name": "%s"}\n' "ds-""reset-db" > "$WORK/r/workflows/demo.json"
+run
+if [ "$RC" -eq 1 ] && printf '%s\n' "$OUT" | grep -qF "NEUTRALITY: workflows/demo.json:"; then
+  ok "(9) a repository-specific word in a workflow definition is flagged"
+else bad "(9) got (exit $RC): $OUT"; fi
+
 exit "$FAIL"
