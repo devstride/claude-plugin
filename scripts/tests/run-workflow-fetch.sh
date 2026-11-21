@@ -151,6 +151,11 @@ for command in ("next", "status", "resume"):
     else:
         pinned = pinned and answer["step"]["id"] == first["step"]["id"]
     check("%s ignores a fetched member and reads the pinned copy" % command, pinned, (rc, err))
+run("done", {"session": sid, "item": FIX["context"]["item"], "stepId": first["step"]["id"], "attempt": 1,
+             "output": "STEP: PASS", "fetched": {"match": None}})
+rc, after, _, err = sid_status(sid)
+check("done ignores a fetched member: the run keeps its pinned organization definition",
+      rc == 0 and after["definitionSource"] == "organization" and after["runId"] == first["runId"], (rc, err))
 sid = session()
 start(None, session_id=sid)
 rc, again, _, err = start(org, session_id=sid)

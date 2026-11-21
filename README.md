@@ -648,6 +648,17 @@ definition may hold and the proof each step leaves in `skills/run-workflow/refer
 and `workflow-fixtures.json` beside the script holds its canonical cases. A review whose result and proof
 name different paths is refused.
 
+**Your organization's workflow runs instead, when it has one.** At the start of each run, a
+session connected to DevStride asks once which workflow the organization published for the item
+(`get_workflow_for_item`) and runs that one; with nothing published, no connection or an older
+server it runs the built-in workflow silently. A workflow it cannot safely run (incomplete, a
+changed hash, a newer plugin needed, or a step list the runner refuses) falls back to the built-in
+one with one plain line. The chosen workflow is pinned for the whole run, so a later publish
+changes only the next run. A custom step may name a skill file in your own repository; it is read
+from the commit the checkout is on, never from an uncommitted edit, capped at 64 KB and never
+executed. The same switch that turns step reports off turns this off. The procedure is
+`skills/run-workflow/references/fetching-the-workflow.md`.
+
 ### Agents that do not run these skills
 
 Codex, a script or a person can follow the same routing without Claude. `skills/build-item/scripts/routing.py`
