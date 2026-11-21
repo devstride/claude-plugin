@@ -497,7 +497,7 @@ def section_lifecycle():
     wanted = ["claim", "start", "branch", "build", "risk-check", "local-checks", "review", "merge", "complete", "capture", "sync"]
     check("the eleven steps are issued in order, once each", order == wanted, order)
     check("the run finishes completed, with every step's result by contract",
-          final["action"] == "finished" and final["outcome"] == "completed" and set(final["results"]) == set(REAL_CATALOG["contracts"]) - {"custom@1"}
+          final["action"] == "finished" and final["outcome"] == "completed" and set(final["results"]) == set(n for n, e in REAL_CATALOG["contracts"].items() if e["builtinSkill"] not in (None, "hotfix-steps"))
           and final["results"]["sync@1"] == {"branch": "main", "clean": True}, final)
     check("the last report closes the run as completed", closes(final, "completed"), final["reports"])
     check("done says what it recorded", final["recorded"] == {"stepId": "sync", "attempt": 1, "verdict": "SYNC: CLEAN", "class": "continue", "status": "done"}, final["recorded"])
