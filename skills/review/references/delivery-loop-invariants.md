@@ -700,7 +700,7 @@ fi
 SELF="delivery-loop-invariants.md"
 ALL=$(cat skills/*/SKILL.md $(ls skills/*/references/*.md | grep -v "$SELF") \
           hooks/*.sh AGENTS.md CONTRIBUTING.md RELEASING.md \
-          $(ls skills/*/scripts/*.sh skills/*/scripts/*.py scripts/*.sh 2>/dev/null) \
+          $(ls skills/*/scripts/*.sh skills/*/scripts/*.py scripts/*.sh workflows/*.json 2>/dev/null) \
           "${EXTRA[@]}" | tr '\n' ' ')
 # The ls above is the null-match guard: bash 3.2 has no default nullglob, and an unmatched
 # glob handed straight to cat would be a literal (and fatal) file name.
@@ -709,7 +709,7 @@ ALL=$(cat skills/*/SKILL.md $(ls skills/*/references/*.md | grep -v "$SELF") \
 # the dead-reference loop below separately proves every reference is reachable from a root an
 # agent reads — an unreachable reference would not count as "somewhere".
 for needle in "pull_request_review_id" "suppressed due to low confidence" "graphqlBotId" \
-              "review_requested" "paginate" "blanket-resolve" "for MINUTES" "xhigh" \
+              "review_requested" "paginate" "blanket-resolve" "for MINUTES" "xhigh" "Cut the hotfix branch from production" \
               "materializ" "100-file cap" "gh pr checks --watch" "protectedBranches" \
               "CHANGED the patch" "untrusted tool data" "compose an item number" "EXPIRED" \
               "untracked-deferral" "KEEP THE CLOUD" "copilot-swe-agent" "databaseId" \
