@@ -25,7 +25,9 @@ Each FIRST-PARENT commit in the range is one of:
   - `receipted`: a landing on the train (a merge commit that `origin/<train>` contains) whose message
     carries a receipt line (`review-gate.py` `parse_receipt`) naming the commit that landed: the
     merge's second parent, or the head a clean refresh brought it to (each step a two-parent merge
-    of train work the landing's first parent already holds, adding nothing of its own). Its engines
+    of train work the landing's first parent already holds, adding nothing of its own), or an
+    ancestor of it whose story patch is unchanged (`review-gate.py` `same_patch`, the rule the
+    landing gate carried the review by; `generated.paths` left out). Its engines
     must show a Claude result and, with `review.localCommand` set, a result from another engine.
     And the line is only a label: the receipt counts only when the head it names carries a
     repository admin's `devstride/landing-reviewed` proof for landing onto the train
@@ -109,16 +111,41 @@ def auto_merge_tree(repo, parents):
     return tree
 
 
-def landed_head(repo, receipt_head, landed, first):
+def gate_git(repo):
+    """Git for the gate's `same_patch`: stdout bytes, the gate's Refuse on a non-zero exit."""
+    def run(*args, stdin=None):
+        p = subprocess.run(["git", "-C", repo] + list(args), capture_output=True, input=stdin,
+                           env=dict(os.environ, GIT_NO_REPLACE_OBJECTS="1"))
+        if p.returncode != 0:
+            raise gate.Refuse("git %s failed" % " ".join(args[:3]))
+        return p.stdout
+    return run
+
+
+def landed_head(repo, receipt, landed, first, config):
     """True when `landed` (a landing merge's second parent) is the receipt's head, or reaches it
-    through clean refresh merges of train work that `first` (the landing's first parent) holds."""
-    seen = 0
-    while landed != receipt_head and seen < 50:
-        ps = parents_of(repo, landed)
-        if len(ps) != 2 or not te.is_ancestor(repo, ps[1], first) or te.merge_only_changes(repo, landed, ps):
+    through clean refresh merges of train work that `first` (the landing's first parent) holds, or
+    carries the receipt's review under the gate's own rule (`review-gate.py` `same_patch`: the
+    reviewed head is an ancestor and the story's patch is unchanged, generated files left out)."""
+    receipt_head, at, seen = receipt["head"], landed, 0
+    while at != receipt_head and seen < 50:
+        ps = parents_of(repo, at)
+        if len(ps) != 2 or not te.is_ancestor(repo, ps[1], first) or te.merge_only_changes(repo, at, ps):
+            break
+        at, seen = ps[0], seen + 1
+    if at == receipt_head:
+        return True
+    run = gate_git(repo)
+    try:
+        reviewed_base = run("rev-parse", "--verify", "--quiet", receipt["mergeBase"] + "^{commit}").decode().strip()
+        # The receipt line is only a label: its merge base must be real train history that the
+        # reviewed head grew from, never a commit the lander made to shape the comparison.
+        if not (te.is_ancestor(repo, reviewed_base, first) and te.is_ancestor(repo, reviewed_base, receipt_head)):
             return False
-        landed, seen = ps[0], seen + 1
-    return landed == receipt_head
+        base = run("merge-base", first, landed).decode().strip()
+        return gate.same_patch(receipt_head, reviewed_base, landed, base, config, run)
+    except gate.Refuse:
+        return False
 
 
 def proof(repo, head, train):
@@ -184,7 +211,7 @@ def analyse(repo, config, source_before, head, train):
                 continue
             if te.is_ancestor(repo, c, origin_train):
                 receipt = gate.parse_receipt(message(repo, c))
-                matched = receipt is not None and landed_head(repo, receipt["head"], ps[1], ps[0])
+                matched = receipt is not None and landed_head(repo, receipt, ps[1], ps[0], config)
                 proved = proof(repo, receipt["head"], train) if matched and engines_ok(receipt, need_cli) else None
                 if proved and proved[0]:
                     out["receipted"].append({"commit": c, "item": item_of(subject), "head": receipt["head"],

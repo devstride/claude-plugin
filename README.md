@@ -665,8 +665,9 @@ caller applies the answer. `item-status-fixtures.json` holds its examples.
 
 `skills/build-item/scripts/review-gate.py check` is the landing gate for a one-off on the release
 train: it answers whether the change is a small fix, or was given a full local review
-(`/devstride:review local-full <base>`, recorded with `review-gate.py record`) at exactly this
-commit, and gives the text for the merge commit. Exit 2 means: do not merge yet; its one line names
+(`/devstride:review local-full <base>`, recorded with `review-gate.py record`) at this commit, or at
+an earlier one whose patch (generated files left out) is unchanged, and gives the text for the merge
+commit. Exit 2 means: do not merge yet; its one line names
 the review to run. `review-gate-fixtures.json` holds its examples.
 
 ```bash
@@ -681,7 +682,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **4.6.1** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **4.7.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

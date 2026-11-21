@@ -1,5 +1,5 @@
 {
- "_about": "Shared fixtures for skills/build-item/scripts/review-gate.py, git-free (numstat, tree, mergeBase and config supplied). For each case, write each `receipts` entry to <tmp>/<its head>.json under the CASE's head filename (the request's head), pass receiptsDir=<tmp>, run `check`; `expect` is the answer minus `reason`. An `errors` case must exit 2 with one review-gate: line containing `contains`. A `record` case runs `record` with receiptsDir=<tmp>; with `refuses` null it must exit 0 and `check` on the same head with the second `cases` entry's config and over-limit numstat (the record request's head, tree and merge base) must then answer reviewed with that case's mergeBody. Tooling that re-implements the gate, or calls it, should run these against the installed script. A `round` case pipes {engines} into `round`: `expect` is its answer, or with `refuses` it must exit 2 with that text. An `engine` case writes `output` (null: no file) to a file, adds outputFile, runs `engine` and compares `expect`.",
+ "_about": "Shared fixtures for skills/build-item/scripts/review-gate.py, git-free (numstat, tree, mergeBase and config supplied). For each case, write each `receipts` entry to <tmp>/<name>.json, the name its `_filedAs` (removed before writing) or else the CASE's head (the request's head), pass receiptsDir=<tmp>, run `check`; `expect` is the answer minus `reason`. An `errors` case must exit 2 with one review-gate: line containing `contains`. A `record` case runs `record` with receiptsDir=<tmp>; with `refuses` null it must exit 0 and `check` on the same head with the second `cases` entry's config and over-limit numstat (the record request's head, tree and merge base) must then answer reviewed with that case's mergeBody. Tooling that re-implements the gate, or calls it, should run these against the installed script. A `round` case pipes {engines} into `round`: `expect` is its answer, or with `refuses` it must exit 2 with that text. An `engine` case writes `output` (null: no file) to a file, adds outputFile, runs `engine` and compares `expect`.",
  "cases": [
   {
    "name": "a small fix lands",
@@ -436,6 +436,80 @@
     "lines": 4,
     "riskFiles": [],
     "mergeBody": "Review: small fix (1 file(s), 4 changed line(s)), covered by the train's release review"
+   }
+  },
+  {
+   "name": "every landing: the train merged in under an unchanged patch carries the review forward",
+   "request": {
+    "base": "origin/train/release",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tree": "dddddddddddddddddddddddddddddddddddddddd",
+    "mergeBase": "ffffffffffffffffffffffffffffffffffffffff",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000",
+    "patchId": "1111111111111111111111111111111111111111"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ],
+     "_filedAs": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "patchId": "1111111111111111111111111111111111111111"
+    }
+   ],
+   "expect": {
+    "verdict": "reviewed",
+    "files": 1,
+    "lines": 4,
+    "riskFiles": [],
+    "mergeBody": "Review: LOCAL-FULL at aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa over origin/train/release (merge base eeeeeeeeeeee), 2 cycle(s), engines: claude (findings), codex (no findings)\n- R001 P2 fixed: null check on the retry path\n- R002 P3 dismissed\nReview carried forward from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa to bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: the story's patch is unchanged since it was reviewed (git patch-id --verbatim, generated files left out)"
    }
   }
  ],
@@ -1457,6 +1531,480 @@
     }
    ],
    "contains": "releaseTrain.reviewEveryLanding must be true or false"
+  },
+  {
+   "name": "every landing: the train merged in and the patch changed",
+   "request": {
+    "base": "origin/train/release",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tree": "dddddddddddddddddddddddddddddddddddddddd",
+    "mergeBase": "ffffffffffffffffffffffffffffffffffffffff",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000",
+    "patchId": "1111111111111111111111111111111111111111"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ],
+     "_filedAs": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "patchId": "2222222222222222222222222222222222222222"
+    }
+   ],
+   "contains": "no LOCAL-FULL review settled at bbbbbbbbbbbb or on this same patch"
+  },
+  {
+   "name": "every landing: an earlier receipt with the same patch id that is not settled (an open finding)",
+   "request": {
+    "base": "origin/train/release",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tree": "dddddddddddddddddddddddddddddddddddddddd",
+    "mergeBase": "ffffffffffffffffffffffffffffffffffffffff",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000",
+    "patchId": "1111111111111111111111111111111111111111"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "open"
+      }
+     ],
+     "_filedAs": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "patchId": "1111111111111111111111111111111111111111"
+    }
+   ],
+   "contains": "no LOCAL-FULL review settled at bbbbbbbbbbbb or on this same patch"
+  },
+  {
+   "name": "every landing: an earlier receipt with the same patch id recorded before results were kept (schema 1)",
+   "request": {
+    "base": "origin/train/release",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tree": "dddddddddddddddddddddddddddddddddddddddd",
+    "mergeBase": "ffffffffffffffffffffffffffffffffffffffff",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000",
+    "patchId": "1111111111111111111111111111111111111111"
+   },
+   "receipts": [
+    {
+     "schema": 1,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ],
+     "_filedAs": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "patchId": "1111111111111111111111111111111111111111"
+    }
+   ],
+   "contains": "no LOCAL-FULL review settled at bbbbbbbbbbbb or on this same patch"
+  },
+  {
+   "name": "every landing: an earlier review over another base",
+   "request": {
+    "base": "origin/train/release",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tree": "dddddddddddddddddddddddddddddddddddddddd",
+    "mergeBase": "ffffffffffffffffffffffffffffffffffffffff",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000",
+    "patchId": "1111111111111111111111111111111111111111"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/develop",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ],
+     "_filedAs": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "patchId": "1111111111111111111111111111111111111111"
+    }
+   ],
+   "contains": "no LOCAL-FULL review settled at bbbbbbbbbbbb or on this same patch"
+  },
+  {
+   "name": "every landing: an earlier review with no patch id, and no git to compute one",
+   "request": {
+    "base": "origin/train/release",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tree": "dddddddddddddddddddddddddddddddddddddddd",
+    "mergeBase": "ffffffffffffffffffffffffffffffffffffffff",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000",
+    "patchId": "1111111111111111111111111111111111111111"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ],
+     "_filedAs": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+   ],
+   "contains": "no LOCAL-FULL review settled at bbbbbbbbbbbb or on this same patch"
+  },
+  {
+   "name": "every landing: no patch id for this head, and no git to compute one",
+   "request": {
+    "base": "origin/train/release",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tree": "dddddddddddddddddddddddddddddddddddddddd",
+    "mergeBase": "ffffffffffffffffffffffffffffffffffffffff",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ],
+     "_filedAs": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "patchId": "1111111111111111111111111111111111111111"
+    }
+   ],
+   "contains": "no LOCAL-FULL review settled at bbbbbbbbbbbb or on this same patch"
+  },
+  {
+   "name": "a patch id that is not one",
+   "request": {
+    "base": "origin/train/release",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tree": "dddddddddddddddddddddddddddddddddddddddd",
+    "mergeBase": "ffffffffffffffffffffffffffffffffffffffff",
+    "config": {
+     "releaseTrain": {
+      "branch": "train/release",
+      "smallFixes": {
+       "maxFiles": 5,
+       "maxChangedLines": 500
+      },
+      "reviewEveryLanding": true
+     },
+     "release": {
+      "productionReview": {
+       "highRiskPaths": [
+        "src/auth/**"
+       ]
+      },
+      "releaseBranchFixExclusions": [
+       "migrations/**"
+      ]
+     }
+    },
+    "numstat": "3\t1\tsrc/a.ts\u0000",
+    "patchId": "xyz"
+   },
+   "receipts": [
+    {
+     "schema": 2,
+     "mode": "LOCAL-FULL",
+     "base": "origin/train/release",
+     "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "tree": "cccccccccccccccccccccccccccccccccccccccc",
+     "mergeBase": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+     "cycles": 2,
+     "engines": [
+      {
+       "engine": "claude",
+       "result": "findings"
+      },
+      {
+       "engine": "codex",
+       "result": "no-findings"
+      }
+     ],
+     "findings": [
+      {
+       "id": "R001",
+       "severity": "P2",
+       "disposition": "fixed",
+       "note": "null check on the retry path"
+      },
+      {
+       "id": "R002",
+       "severity": "P3",
+       "disposition": "dismissed"
+      }
+     ],
+     "_filedAs": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "patchId": "1111111111111111111111111111111111111111"
+    }
+   ],
+   "contains": "patchId must be a full patch id"
   }
  ],
  "record": [

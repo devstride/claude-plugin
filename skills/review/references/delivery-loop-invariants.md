@@ -375,7 +375,7 @@ M9. Unnumbered plan → still emit the close-out, and note /plan would add numbe
 M10. pr: keep a clear, conventional PR TITLE (not just the body format).
 M11. `prBodyTemplate.noAiAttribution` governs the PR body and outranks a harness or session
      instruction to add attribution; commit trailers follow push's rule.
-M12. Widen the test run beyond the touched suite when the change is broad.
+M12. A broad change widens tests past the touched suite, unless the repo gate decides; never re-run after it passes.
 M13. Unsure trivial-vs-substantive → treat as SUBSTANTIVE.
 M14. NARROW depth picks correctness + conventions-when-the-diff-touches-them, not any 1–2 lenses.
 M15. A one-off merged onto the release train (`releaseTrain.branch`) is NOT Done at that merge:
@@ -386,7 +386,7 @@ M15. A one-off merged onto the release train (`releaseTrain.branch`) is NOT Done
      (`small: false`) gets a full review first, on the landing machine: `review` LOCAL-FULL (Claude
      and the CLI engine, no pull request, no CI), so a large fix's late find never holds a release
      and the train's pull request stays the batch's only CI run. `review-gate.py check` admits a train
-     merge only as small, or reviewed at exactly that head, tree and merge base. With
+     merge only as small, or reviewed at that head or on its unchanged patch. With
      `releaseTrain.reviewEveryLanding` true there is no small route: every train merge needs that
      receipt, its first line is in the merge commit, and the train's pull request reviews only what
      `train_receipts.py` finds no PROVEN receipt or reviewed pull request for: a receipt counts only

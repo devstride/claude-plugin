@@ -35,8 +35,8 @@ first git command**: the order, both merge paths and every refusal are spelled t
    pull-request merge, each exactly as the reference spells it, the consequence notices last
    before it.
 6. On the pull-request path a red check or an open thread goes back through `review`, never merged
-   red; the durable review proof follows the head (carried when the tree is the reviewed one,
-   else re-earned through `review`); anything the reference stops on → `BLOCKED`, said, with the
+   red; the durable review proof follows the head (carried to the reviewed tree, else settled at
+   this head through `review`); anything the reference stops on → `BLOCKED`, said, with the
    checkout restored to the story branch first.
 7. **Landed is landed**: once the push or the pull-request merge succeeded, answer `LANDED`, naming
    any clean-up left undone; never `BLOCKED`.

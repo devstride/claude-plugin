@@ -4,17 +4,18 @@
 The single implementation of the rule in `skills/review-story/references/review-routes.md` ("A
 larger or riskier fix gets its full review before it lands"): a train one-off lands when it is a
 small fix (`routing.py small`, never a second copy of that rule), or when a LOCAL-FULL review
-(`review` skill) settled at exactly this head. `merge-story` runs `check` before every fast merge
+(`review` skill) settled on this same patch. `merge-story` runs `check` before every fast merge
 onto the train; any other
 tool that lands one-offs (a repository's own CLI) runs this file, never a copy. No network.
 
   check   stdin {"base", "head"?, "targetKind"?, "config"?, "receiptsDir"?,
-                 "numstat"?, "tree"?, "mergeBase"?}
+                 "numstat"?, "tree"?, "mergeBase"?, "patchId"?}
           stdout {"verdict": "small"|"reviewed"|"not-applicable", "files", "lines", "riskFiles",
                   "reason", "mergeBody"}
   record  stdin {"base", "head"?, "cycles", "engines": [{"engine", "result", "reason"?}],
                  "findings": [{"id", "severity", "disposition", "note"?}], "config"?, "receiptsDir"?,
-                 "tree"?, "mergeBase"?} (tree, mergeBase and config together, with head, or all from git)
+                 "tree"?, "mergeBase"?, "patchId"?} (tree, mergeBase and config together, with head, or all
+                 from git)
           stdout {"receipt", "mergeBody"}
   round   stdin {"engines": [{"engine", "result", "reason"?}]}   (one review round, any path)
           stdout {"verdict": "ok", "returned": [...], "failed": [{"engine", "reason"}]}
@@ -25,7 +26,13 @@ tool that lands one-offs (a repository's own CLI) runs this file, never a copy. 
 Run in the repository: the config (`.claude/ds-config.json`), the diff
 (`git diff --numstat -z --no-renames <base>...<head>`), the head's tree and the merge base come
 from git unless the request supplies `config`, `numstat`, `tree` and `mergeBase` (all four
-together, with `head`: the fixtures' git-free mode).
+together, with `head`: the fixtures' git-free mode, which may add `patchId`, the story's patch id,
+since it has no git to compute one).
+
+The story's patch id is `git patch-id --verbatim` (every byte counts, white space too) of `git diff
+<mergeBase> <head>`, the files under `generated.paths` left out: a base merge rewrites generated
+files, never the story's own change. `same_patch` is the one rule that carries a review to a later
+head, and `train_receipts.py` applies the same function when the release reads the receipt back.
 
 `check`:
 - `targetKind` other than "train" (default "train") -> `not-applicable`: epic stories get their full
@@ -36,6 +43,10 @@ together, with `head`: the fixtures' git-free mode).
 - `small: true` -> `small`.
 - else a receipt for this head whose tree and merge base match, and which is itself settled (the
   same rules `record` applies) -> `reviewed`.
+- else, with no receipt for this head, a settled receipt over the same `base` for an earlier head
+  that is an ancestor of this one and whose story patch id equals this head's (the train moved and
+  was merged in, the change itself untouched) -> `reviewed`, carried forward: the `mergeBody` says
+  so. The receipt's stored `patchId`, or, for one recorded without it, its own from git.
 - else exit 2, one line naming the review to run. Never merge on a non-zero exit.
 
 The receipt's first `mergeBody` line is the review's record in git: the landing's merge commit
@@ -57,8 +68,9 @@ Claude-only follow-up cycle keeps the CLI engine's earlier result.
 defaults to `<git common dir>/devstride/reviews/local-full`, shared by every worktree of the
 repository on this machine and never committed. It refuses a finding still open, a round with no
 result, a `claude` review that did not return one (or, with `review.localCommand` set, no other
-engine that did), or fewer than one cycle. A receipt is evidence for exactly one head, tree and
-merge base: any new commit, or a train merged into the branch, needs a new review.
+engine that did), or fewer than one cycle. A receipt is evidence for one head, tree and merge base,
+and, through its `patchId`, for that same patch at a later head: a commit that changes the story's
+patch needs a new review; a train merged in under an unchanged patch does not.
 
 Exit 0 with an answer, 2 with one `review-gate: <reason>` line on stderr, 1 for anything else.
 """
@@ -90,13 +102,71 @@ def text(value):
     return isinstance(value, str) and value.strip() != ""
 
 
-def git(*args):
-    p = subprocess.run(["git"] + list(args), capture_output=True)
+def git(*args, stdin=None, raw=False):
+    p = subprocess.run(["git"] + list(args), capture_output=True, input=stdin)
     need(p.returncode == 0, "git %s failed: %s" % (" ".join(args[:3]), p.stderr.decode("utf-8", "replace").strip()[:200]))
-    return p.stdout.decode("utf-8", "surrogateescape")
+    return p.stdout if raw else p.stdout.decode("utf-8", "surrogateescape")
+
+
+def generated_paths(config):
+    generated = config.get("generated")
+    paths = generated.get("paths") if isinstance(generated, dict) else None
+    need(paths is None or (isinstance(paths, list) and all(text(x) for x in paths)),
+         "config: generated.paths must be a list of paths")
+    return [x.strip("/") for x in paths or []]
+
+
+def is_generated(path, patterns):
+    """A path under `generated.paths`: an entry with `*` is a pattern (`routing.py`'s), any other
+    entry the file itself or the folder holding it."""
+    return any(routing_module().pattern_regex(p).match(path) if "*" in p else path == p or path.startswith(p + "/")
+               for p in patterns)
+
+
+def default_git(*args, stdin=None):
+    return git(*args, stdin=stdin, raw=True)
+
+
+DIFF = ("diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative", "--no-renames", "--src-prefix=a/",
+        "--dst-prefix=b/", "--ignore-submodules=none", "--unified=3", "--diff-algorithm=myers", "--inter-hunk-context=0")
+
+
+def story_patch_id(merge_base, head, config, run=default_git):
+    """The story's own change as one id: `git patch-id --verbatim` (every byte counts, white space
+    too) of `git diff <merge_base> <head>`, generated files left out; None when nothing is left.
+    `run(*args, stdin=None)` runs git and returns its stdout bytes (train_receipts passes its own)."""
+    generated = generated_paths(config)
+    names = [n for n in run("diff", "--name-only", "-z", "--no-renames", "--no-relative", "--ignore-submodules=none", merge_base, head).decode(
+        "utf-8", "surrogateescape").split("\0") if n and not is_generated(n, generated)]
+    if not names:
+        return None
+    diff = run(*(DIFF + (merge_base, head, "--") + tuple(":(top,literal)" + n for n in names)))
+    try:
+        out = run("patch-id", "--verbatim", stdin=diff).decode("utf-8", "replace").split()
+    except Refuse:
+        raise Refuse("git patch-id --verbatim failed: a git too old to support --verbatim cannot carry a review")
+    return out[0] if out else None
+
+
+def same_patch(reviewed_head, reviewed_base, head, merge_base, config, run=default_git, reviewed_id=None):
+    """The one rule for a review carried to a later head, used by `check` and by the release's
+    `train_receipts.py`: the reviewed head is an ancestor of `head`, and the story's patch over each
+    one's merge base is the same, byte for byte, generated files left out. `reviewed_id`, when
+    given, is the reviewed side's id as `record` kept it."""
+    try:
+        run("merge-base", "--is-ancestor", reviewed_head, head)
+    except Refuse:
+        return False
+    mine = story_patch_id(merge_base, head, config, run)
+    return mine is not None and mine == (reviewed_id or story_patch_id(reviewed_base, reviewed_head, config, run))
+
+
+_ROUTING = []
 
 
 def routing_module():
+    if _ROUTING:
+        return _ROUTING[0]
     spec = importlib.util.spec_from_file_location("routing", ROUTING)
     routing = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(routing)
@@ -104,6 +174,7 @@ def routing_module():
     def refuse(msg):
         raise Refuse(msg.replace("small: ", "", 1))
     routing.fail = refuse
+    _ROUTING.append(routing)
     return routing
 
 
@@ -128,7 +199,9 @@ def subject(req, with_diff=True):
         for key in ("head", "tree", "mergeBase"):
             need(SHA.match(req[key] or ""), "%s must be a full commit or tree id" % key)
         need(not with_diff or isinstance(req["numstat"], str), "numstat must be the text of git diff --numstat -z")
+        need(req.get("patchId") is None or SHA.match(str(req["patchId"])), "patchId must be a full patch id")
         return req["head"], req["tree"], req["mergeBase"], req.get("numstat")
+    need("patchId" not in req, "patchId comes only with the git-free fields: with git it is computed")
     head = git("rev-parse", "--verify", "%s^{commit}" % (req.get("head") or "HEAD")).strip()
     tree = git("rev-parse", "%s^{tree}" % head).strip()
     base = git("rev-parse", "--verify", "%s^{commit}" % req["base"]).strip()
@@ -295,10 +368,18 @@ def check(req):
         raise Refuse("the receipt %s is not JSON: delete it and review again" % path)
     run = "run /devstride:review local-full %s" % req["base"]
     if receipt is None:
+        carried = carried_receipt(req, head, merge_base, config)
+        if carried is not None:
+            return dict(shape, verdict="reviewed",
+                        reason="%s; LOCAL-FULL settled at %s, carried forward: the patch is unchanged" % (
+                            size if every else small["reason"], carried["head"][:12]),
+                        mergeBody=body(carried) + "\nReview carried forward from %s to %s: the story's patch is "
+                        "unchanged since it was reviewed (git patch-id --verbatim, generated files left out)" % (
+                            carried["head"], head))
         if every:
             raise Refuse("every train landing is reviewed before it lands (releaseTrain.reviewEveryLanding), and no "
-                         "LOCAL-FULL review settled at %s; it is %s: %s" % (head[:12], size, run))
-        raise Refuse("%s and no LOCAL-FULL review settled at %s: %s" % (size, head[:12], run))
+                         "LOCAL-FULL review settled at %s or on this same patch; it is %s: %s" % (head[:12], size, run))
+        raise Refuse("%s and no LOCAL-FULL review settled at %s or on this same patch: %s" % (size, head[:12], run))
     need(isinstance(receipt, dict) and receipt.get("head") == head, "the receipt %s names another head: %s" % (path, run))
     need(receipt.get("tree") == tree and receipt.get("mergeBase") == merge_base,
          "the LOCAL-FULL review at %s covered another diff (tree or merge base changed): %s" % (head[:12], run))
@@ -310,11 +391,50 @@ def check(req):
                 mergeBody=body(receipt))
 
 
+def carried_receipt(req, head, merge_base, config):
+    """A settled receipt over the same base for an earlier head that `same_patch` carries to this
+    one, or None. The git-free mode, with no history to read, compares the stored ids alone."""
+    pure = "tree" in req
+    if pure and not req.get("patchId"):
+        return None
+    folder = receipts_dir(req)
+    try:
+        names = sorted(n for n in os.listdir(folder) if n.endswith(".json") and n != head + ".json")
+    except OSError:
+        return None
+    for name in names:
+        try:
+            with open(os.path.join(folder, name)) as f:
+                r = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if not (isinstance(r, dict) and r.get("base") == req["base"] and SHA.match(str(r.get("head")))
+                and SHA.match(str(r.get("mergeBase")))):
+            continue
+        stored = r.get("patchId") if SHA.match(str(r.get("patchId"))) else None
+        try:
+            settled(r, config)
+            carried = (stored == req["patchId"] if pure else
+                       same_patch(r["head"], r["mergeBase"], head, merge_base, config, reviewed_id=stored))
+        except Refuse:
+            continue
+        if carried:
+            return r
+    return None
+
+
 def record(req):
     head, tree, merge_base, _ = subject(req, with_diff=False)
+    config = config_of(req)
     receipt = {"schema": SCHEMA, "mode": "LOCAL-FULL", "base": req["base"], "head": head, "tree": tree, "mergeBase": merge_base,
                "cycles": req.get("cycles"), "engines": req.get("engines"), "findings": req.get("findings")}
-    receipt["findings"] = settled(receipt, config_of(req))
+    receipt["findings"] = settled(receipt, config)
+    try:  # a git without --verbatim keeps no id: `check` then carries nothing, it never admits more
+        patch = req.get("patchId") if "tree" in req else story_patch_id(merge_base, head, config)
+    except Refuse:
+        patch = None
+    if patch:
+        receipt["patchId"] = patch
     folder = receipts_dir(req)
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, head + ".json")

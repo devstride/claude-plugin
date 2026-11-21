@@ -29,7 +29,7 @@ move together; single knobs can still be tuned (see [Overrides](#overrides)).
 | `localCliEngine` — where a configured local CLI reviewer runs | Every direct-PR or release-PR merge boundary; never a fast story with no PR | Same | Same |
 | `maxLocalReviewRounds` — local-engine target inside the normal cycle target | **1** | **1** | **1** |
 | `targetAdversarialCycles` — fixed, non-overrideable target across every reviewer/recheck | **2** | **2** | **2** |
-| `storyVerify` — the local gate before a story merges | Type-checks + touched suites (`verify.testSingle`, widened when broad); full `verify.test` at release PR | Same; full `verify.test` at release PR | Same as standard |
+| `storyVerify` — the local gate before a story merges | Type-checks, touched suites (`verify.testSingle`; the repo gate decides breadth); full `verify.test` at release PR | Same; full `verify.test` at release PR | Same as standard |
 | `perStoryPullRequest` | Fast mode — no per-story PR — whenever `fastStoryMerges.enabled` is absent or `true`; the story risk check and green gate qualify its integration-branch merge, and the release-PR review holds the batch from the base branch. A present `false` wins and is reported | Per `fastStoryMerges.enabled` | Same as standard |
 | `fastStoryMerges.enabled` (default written by `setup`) | **true** whenever `verify.typecheck` is set | `true` when `verify.test` and `verify.typecheck` are set; else `false`, saying which precondition was missing | Same as standard |
 | `releaseCiOrdering` | Review first; CI starts only on the final review-settled release-PR SHA when the repo supports the draft hold | Same | Same |
