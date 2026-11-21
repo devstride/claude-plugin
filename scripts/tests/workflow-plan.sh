@@ -14,7 +14,7 @@ export PYTHONDONTWRITEBYTECODE=1
 unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID XDG_CACHE_HOME GIT_DIR GIT_WORK_TREE
 
 cat > "$WORK/cases.py" <<'PY'
-import copy, importlib.util, json, os, subprocess, sys
+import copy, importlib.util, json, os, re, subprocess, sys
 
 ROOT, WORK = sys.argv[1], sys.argv[2]
 RUNNER = os.path.join(ROOT, "skills/run-workflow/scripts/workflow.py")
@@ -74,6 +74,7 @@ PUBLISHED = {
     "rebalance-archive@1": ("plan-steps", "REBALANCE ARCHIVE: ARCHIVED=continue | FAILED=stop", ["rebalance-renumber@1"]),
     "rebalance-marker@1": ("plan-steps", "REBALANCE MARKER: REWRITTEN=continue | FAILED=stop", ["rebalance-archive@1"]),
     "rebalance-report@1": ("plan-steps", "REBALANCE REPORT: RE-SLICED=continue | FAILED=stop", ["rationalize-gantt@1"]),
+    "splice@1": ("insert-story", "SPLICE: INSERTED=continue | NEEDS ANSWER=ask | NEXT UNCHANGED=continue", []),
 }
 
 # --- the two definitions, as shipped -----------------------------------------------------------
@@ -111,6 +112,17 @@ check("the sign-off, the draft approval and the two wirings each carry their pro
 rule = " ".join(open(os.path.join(ROOT, "skills/release/references/step-skills.md"), encoding="utf-8").read().split())
 check("the step-skill rule carries the delegates and interactive amendments",
       "**`delegates: true`** (only `plan-draft@1`)" in rule and "**`interactive: true`**" in rule and "It still never asks a flow question." in rule)
+splice = [re.findall(r"`([^`]+)`", (re.search(r"^## Verdict\n(.*?)(?=^## |\Z)", open(os.path.join(ROOT, "skills", n, "SKILL.md"), encoding="utf-8").read(), re.S | re.M) or re.match("", "")).group(1) or "")
+          for n in ("insert-story", "insert-defect")]
+check("insert-story and insert-defect both carry the splice verdict", splice == [["SPLICE: INSERTED <placement> | NEEDS ANSWER <question> | NEXT UNCHANGED <reason>"]] * 2, splice)
+for contract, sample in (("plan-ground@1", "PLAN STATE: PARTIAL"), ("rationalize-gantt@1", "GANTT: DATED 12"), ("splice@1", "SPLICE: INSERTED I101 after I100 before I102 [3.1]")):
+    got = runner.parse_verdict(CATALOG[contract], sample + "\nthe summary")
+    check("%s: a sample first line is read as its verdict" % contract, got is not None and got[0] is not None, got)
+    try:
+        none = runner.parse_verdict(CATALOG[contract], "the summary\n" + sample)
+    except Exception as error:
+        none = None
+    check("%s: an answer that does not lead with the verdict is not read as one" % contract, not none or none[0] is None, none)
 
 # --- the floors: a copy that drops, reorders or switches off a required step is refused --------
 def start(definition):

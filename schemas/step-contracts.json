@@ -1603,6 +1603,54 @@
       ],
       "claimPhase": null,
       "shipIntentStage": null
+    },
+    "splice@1": {
+      "summary": "Splice one story or defect into a live plan, wired and dated for the build loop.",
+      "builtinSkill": "insert-story",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "splice {item}",
+      "verdict": {
+        "label": "SPLICE",
+        "values": [
+          {
+            "value": "INSERTED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "placement"
+          },
+          {
+            "value": "NEEDS ANSWER",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "question"
+          },
+          {
+            "value": "NEXT UNCHANGED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "inserted"
+        ],
+        "types": {
+          "inserted": "string|null",
+          "after": "string|null",
+          "before": "string|null",
+          "prefix": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
     }
   }
 }

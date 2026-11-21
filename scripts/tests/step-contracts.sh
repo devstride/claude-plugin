@@ -87,7 +87,8 @@ check("the catalog parses and passes the structural checks", faults == [], fault
 PLAN_FAMILY = ["session-model@1", "plan-orient@1", "plan-ground@1", "plan-discovery@1", "plan-sign-off-record@1", "plan-draft@1",
                "plan-draft-approval@1", "plan-create@1", "plan-wire@1", "rationalize-gantt@1", "plan-number@1", "plan-hand-off@1",
                "rebalance-gates@1", "rebalance-partition@1", "rebalance-proposal@1", "rebalance-probe@1", "rebalance-successors@1",
-               "rebalance-rewire@1", "rebalance-renumber@1", "rebalance-archive@1", "rebalance-marker@1", "rebalance-report@1"]
+               "rebalance-rewire@1", "rebalance-renumber@1", "rebalance-archive@1", "rebalance-marker@1", "rebalance-report@1",
+               "splice@1"]
 all_contracts = contracts
 contracts = dict((n, e) for n, e in all_contracts.items() if n not in PLAN_FAMILY)
 check("every Plan and Rebalance contract is in the catalog", all(n in all_contracts for n in PLAN_FAMILY), [n for n in PLAN_FAMILY if n not in all_contracts])
@@ -246,7 +247,7 @@ named = sorted(set(e["builtinSkill"] for e in contracts.values() if e["builtinSk
 check("every skill the catalog names exists or is pending", all(n in present or n in pending for n in named), [n for n in named if n not in present and n not in pending])
 check("nothing is pending: every skill the catalog names ships", pending == [], pending)
 flat = lambda s: re.sub(r"\s+", " ", s)
-PLAN_SKILLS = ["plan-steps", "comprehend-plan", "rationalize-gantt"]
+PLAN_SKILLS = ["plan-steps", "comprehend-plan", "rationalize-gantt", "insert-story"]
 BUILD_STEPS = ["claim-story", "story-lifecycle", "risk-check", "local-checks", "review-story", "merge-story", "capture-findings", "sync-base"]
 check("the eight Build step skills are the catalog's own skills, less the two engines", sorted(BUILD_STEPS) == sorted(set(named) - {"branch-feature", "ultracode-build"} - set(PLAN_SKILLS)), named)
 for name in named:
@@ -254,7 +255,7 @@ for name in named:
         continue
     serves = [(n, e) for n, e in contracts.items() if e["builtinSkill"] == name]
     text = open(os.path.join(root, "skills", name, "SKILL.md"), encoding="utf-8").read()
-    if name in ("comprehend-plan", "rationalize-gantt"):
+    if name in ("comprehend-plan", "rationalize-gantt", "insert-story"):
         # plan-family skills people also type: their verdict and the pointer; bodies and descriptions unchanged
         faults = skill_faults(root, name, [e for _, e in serves], 10 ** 6, 10 ** 9)
         check("%s carries its contract's verdict and the pointer once" % name, faults == [], faults)
