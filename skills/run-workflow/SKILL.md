@@ -18,7 +18,8 @@ runner says: it never chooses, reorders, skips or judges a step itself.
 first command, and again after a compaction**: the commands and their answers, the stop kinds and
 what a person does about each, and the reporting rule are there. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-contracts.md` in full before writing
-or changing a definition**: what `start` refuses, payloads and proofs.
+or changing a definition**: what `start` refuses, payloads and proofs. A `fetch-skill` answer, or a
+step run from the organization's skill library: `references/library-skills.md`.
 
 ## The loop
 
