@@ -3,7 +3,7 @@ load: contract
 ---
 # Library skills — a step run from the organization's skill library
 
-A step whose `run.source` is `library` runs one pinned version of a skill from the organization's
+A step whose run source is `library` runs one pinned version of a skill from the organization's
 skill library in DevStride. The plugin never makes a network call: the runner tells the agent which
 tool to call on the DevStride connection, the agent hands the answer to a local helper that checks and
 saves it, and the runner is asked again. Nothing else changes about the step: its contract, its

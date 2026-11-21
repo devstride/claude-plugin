@@ -13,3 +13,6 @@ heartbeat.phase       a field of the step runner's run answer (the story claim's
 heartbeat.stage       a field of the step runner's run answer (the ship-intent stage), not a ds-config key
 heartbeat.shipIntent  a field of the step runner's run answer (the ship-intent request), not a ds-config key
 instructions.text     a field of the step runner's run answer (a repository step's committed text), not a ds-config key
+put.command           a field of the step runner's fetch-skill answer (the library skill helper's command), not a ds-config key
+put.request           a field of the step runner's fetch-skill answer (the library skill save request), not a ds-config key
+skill.file            a field of the step runner's run answer (a library step's verified saved copy), not a ds-config key
