@@ -4,7 +4,7 @@ load: contract
 # Step skills — one seam each, runnable by name
 
 A step skill runs exactly ONE seam (a hook `.claude/ds-config.json` registers). The orchestrators
-(`release`, `build-item`, `pr`, `branch-hotfix`) call it by name instead of carrying its logic,
+(`release`, `build-item`, `pr`, and the hotfix's `hotfix-steps`) call it by name instead of carrying its logic,
 and anyone can run it alone as `/devstride:<name>` — for example to re-run one that failed.
 
 ## The rule
@@ -35,7 +35,9 @@ A step skill may carry several steps of ONE workflow, one per invocation, chosen
 reserved `contract` key (never the step id). Each step has its own verdict line under `## Verdict`
 and its own reference file, read in full only when that step runs. "One seam, nothing else" is read
 per invocation. A payload naming a contract the skill does not carry gets no verdict line, only a
-sentence saying which steps it carries; the runner then stops with `no-verdict`.
+sentence saying which steps it carries; the runner then stops with `no-verdict`. A step may run a
+seam step this file documents by name, one verb per call (the hotfix environment step runs
+`local-environment`); it still starts no subagent and decides no flow.
 
 ## The Build workflow's steps
 
@@ -81,7 +83,7 @@ above, and the runner passes both through unchanged:
 ## Cited by
 
 - Each of the ten `skills/<step>/SKILL.md` files — its opening pointer.
-- `skills/release/SKILL.md`, `skills/branch-hotfix/SKILL.md` — the step-skill floor and the
+- `skills/release/SKILL.md`, `skills/hotfix-steps/references/hotfix-environment.md` — the step-skill floor and the
   environment section; `build-item` and `pr` call the steps by name.
 - `skills/claim-story/SKILL.md`, `skills/story-lifecycle/SKILL.md`, `skills/branch-feature/SKILL.md`,
   `skills/risk-check/SKILL.md`, `skills/local-checks/SKILL.md`, `skills/review-story/SKILL.md`,

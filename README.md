@@ -570,7 +570,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `ci-audit` | Measures what CI actually costs: executed runs per workflow per pull request (the design is one each), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
 
 **Steps (run one hook by itself)** — each runs exactly one hook your config names and prints a
-fixed verdict first. `release`, `build-item`, `pr` and `branch-hotfix` call them; run one by name to
+fixed verdict first. `release`, `build-item`, `pr` and the hotfix's steps call them; run one by name to
 re-run a step that failed. Unset, each says `NOT CONFIGURED` (or its stated default) instead of
 failing; the four safety steps (`pre-ship`, `post-deploy`, `classify-release`, `pre-merge-check`)
 take the stricter path when their hook is missing or cannot answer. Shared rule:
@@ -603,6 +603,10 @@ after a fix.
 | `merge-story` | Lands exactly the commit that was checked and reviewed onto the working base, never production |
 | `capture-findings` | Files deferred findings as tracked items and splices discovered scope into the plan |
 | `sync-base` | Returns the checkout to the working base and proves the tree clean |
+
+**Hotfix steps** — `hotfix-steps` runs every step of the Hotfix workflow (`workflows/hotfix.json`),
+one reference per step, plus the production deploy's approval and confirmation, which other
+workflows reuse. `branch-hotfix` runs that workflow through the step runner.
 
 ### The step runner
 

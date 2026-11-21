@@ -74,8 +74,9 @@ SITES = [  # skill, the heading the section starts with, the call it must contai
     ("build-item", "## 8. ", "`update-docs update`"),
     ("pr", "## 2. ", "`pre-ship pr select`"),
     ("pr", "## 2b. ", "`pre-ship pr run`"),
-    ("branch-hotfix", "## The local environment", "`local-environment recreate`"),
-    ("branch-hotfix", "## The local environment", "`local-environment migrate`"),
+    # the hotfix's environment text moved into its step's reference (a path, not a skill name)
+    ("hotfix-steps/references/hotfix-environment.md", "# The local environment", "`local-environment recreate`"),
+    ("hotfix-steps/references/hotfix-environment.md", "# The local environment", "`local-environment migrate`"),
 ]
 def section(text, head):
     lines = text.splitlines(); level = len(head) - len(head.lstrip("#"))
@@ -91,7 +92,8 @@ def section(text, head):
     return " ".join(" ".join(out).split())
 missing = []
 for skill, head, call in SITES:
-    body = open("%s/skills/%s/SKILL.md" % (root, skill), encoding="utf-8").read()
+    rel = skill if skill.endswith(".md") else "%s/SKILL.md" % skill
+    body = open("%s/skills/%s" % (root, rel), encoding="utf-8").read()
     sec = section(body, head)
     if not sec:
         missing.append("%s has no section %r" % (skill, head.strip()))

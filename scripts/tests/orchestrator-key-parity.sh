@@ -36,7 +36,7 @@ POINTER = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([A-Za-z0-9_./-]+)")
 steps = ["update-docs", "sync-knowledge-base", "write-release-notes", "pre-ship", "post-deploy",
          "local-environment", "lease-checkout", "return-checkout", "classify-release", "pre-merge-check",
          "claim-story", "story-lifecycle", "risk-check", "local-checks", "review-story", "merge-story",
-         "capture-findings", "sync-base", "run-workflow", "branch-feature", "ultracode-build"]
+         "capture-findings", "sync-base", "run-workflow", "branch-feature", "ultracode-build", "hotfix-steps"]
 import json
 reg = json.load(open(os.path.join(root, "schemas/seam-registry.json"), encoding="utf-8"))
 TOP = {re.sub(r"\[\]$", "", e["key"].split(".")[0]) for e in reg["hooks"] + reg["settings"]}

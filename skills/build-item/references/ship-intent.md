@@ -45,7 +45,7 @@ declare nothing, say nothing. A session on an older plugin simply does not decla
 |---|---|---|---|
 | `build-item`'s run | `train` on the release train, `develop-pr` on the base branch, `epic-release` on an integration branch | the working base | each run answer's `heartbeat.stage`: `building` at the build step, `verifying` at the local checks, `reviewing` at the review, `landing` at the merge; released by the complete step, outcome `landed` |
 | `build-item` step 8 | `epic-release`, unit the release unit | the release target | `reviewing` when the release pull request opens, `verifying`, `landing`; released when it merges, outcome `landed` |
-| `branch-hotfix` | `hotfix` | the production branch | `building` once the branch is pushed |
+| `branch-hotfix` (its `hotfix-steps` branch step) | `hotfix` | the production branch | `building` once the branch is pushed |
 | `pr`, run outside `build-item` | `hotfix` for a branch `branch-hotfix` cut, else `develop-pr` | the pull request's base | `reviewing` when it opens, `verifying` at the pre-ship checks |
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/ship-plan.md` (The peer) when a
@@ -70,5 +70,5 @@ step releases a hotfix's or a standalone pull request's declaration: it lapses, 
 - `skills/build-item/SKILL.md` (The run: each answer's `heartbeat.shipIntent`) and
   `skills/story-lifecycle/references/complete.md` (the release, outcome `landed`)
 - `skills/build-item/references/epic-release-steps.md` (the release pull request)
-- `skills/branch-hotfix/SKILL.md`, `skills/pr/SKILL.md`
+- `skills/hotfix-steps/references/hotfix-branch.md`, `skills/pr/SKILL.md`
 - `skills/setup/references/config-defaults.md` (`release.coordination.enabled`)

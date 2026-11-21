@@ -1,0 +1,66 @@
+{
+  "definition": "workflows/hotfix.json",
+  "phases": [
+    "cut"
+  ],
+  "context": {
+    "branchArgument": "fix-login",
+    "profile": {
+      "name": "extended",
+      "source": "config"
+    },
+    "workingBase": "main",
+    "oneOff": true,
+    "route": "develop-pr",
+    "reviewMoment": "pr-boundary"
+  },
+  "script": [
+    {
+      "step": "preflight",
+      "output": "HOTFIX PREFLIGHT: READY test/hotfix/11-21-26/fix-login\nevidence line\n```json\n{\"branch\": \"test/hotfix/11-21-26/fix-login\", \"base\": \"main\", \"prefix\": \"test\", \"date\": \"11-21-26\", \"dateFormat\": \"MM-DD-YY\", \"configSource\": \"file\"}\n```\n"
+    },
+    {
+      "step": "cut-branch",
+      "output": "HOTFIX BRANCH: CUT test/hotfix/11-21-26/fix-login\nevidence line\n```json\n{\"branch\": \"test/hotfix/11-21-26/fix-login\", \"base\": \"main\", \"baseSha\": \"{head}\", \"pushed\": true, \"shipIntent\": \"not configured\"}\n```\n"
+    },
+    {
+      "step": "name-stage",
+      "output": "HOTFIX STAGE: NAMED local\nevidence line\n```json\n{\"stage\": \"local\", \"production\": false}\n```\n"
+    },
+    {
+      "step": "rewind-environment",
+      "output": "HOTFIX ENVIRONMENT: RECREATED\nevidence line\n```json\n{\"case\": 1, \"mode\": \"inPlace\", \"why\": \"recreate is set, recreateMode inPlace\", \"restartDevServer\": true}\n```\n"
+    },
+    {
+      "step": "report-cut",
+      "output": "HOTFIX CUT: DONE test/hotfix/11-21-26/fix-login\nevidence line\n```json\n{\"branch\": \"test/hotfix/11-21-26/fix-login\", \"case\": \"1\"}\n```\n"
+    }
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      [
+        "preflight",
+        1
+      ],
+      [
+        "cut-branch",
+        1
+      ],
+      [
+        "name-stage",
+        1
+      ],
+      [
+        "rewind-environment",
+        1
+      ],
+      [
+        "report-cut",
+        1
+      ]
+    ],
+    "outcome": "completed",
+    "stops": []
+  }
+}
