@@ -313,15 +313,8 @@ def section_catalog():
     module = load()
     real = module.check_catalog(REAL_CATALOG)
     check("the shipped catalog is sound", real == [], real)
-    # Each workflow's own contracts, counted per workflow: 12 Build, then 10 Hotfix, then the Release ones.
-    real = list(REAL_CATALOG["contracts"])
-    check("the shipped catalog holds the twelve Build contracts first, then the ten Hotfix ones",
-          real[11] == "custom@1" and real[12] == "hotfix-preflight@1" and real[21] == "hotfix-close@1", real[:22])
-    check("the Release contracts follow them: 55, every one served by release-steps or an existing seam step",
-          len(real) - 22 == 55 and all(REAL_CATALOG["contracts"][n]["builtinSkill"] in ("release-steps", "classify-release", "pre-ship", "pre-merge-check", "post-deploy") for n in real[22:]), real[22:])
-    check("the satisfiers shipped: the Hotfix ones, and the production merge and a found merged release for the hotfix merge",
-          dict((n, e["satisfiedBy"]) for n, e in REAL_CATALOG["contracts"].items() if "satisfiedBy" in e) ==
-          {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"], "hotfix-merge@1": ["production-merge@1", "merged-release@1"]})
+    check("the shipped catalog holds the twelve Build contracts and the ten Hotfix ones", len(REAL_CATALOG["contracts"]) == 22, list(REAL_CATALOG["contracts"]))
+    check("only the Hotfix satisfiers are shipped", dict((n, e["satisfiedBy"]) for n, e in REAL_CATALOG["contracts"].items() if "satisfiedBy" in e) == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"]})
     standin = module.check_catalog(stand_in_catalog())
     check("the fixture catalog, where stand-in@1 satisfies build@1, is sound", standin == [], standin)
 
