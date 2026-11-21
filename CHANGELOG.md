@@ -8,6 +8,26 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Planning runs as two named step lists.** The Plan workflow (twelve steps in five phases) and
+  the Rebalance workflow (thirteen steps in five phases) ship as built-in definitions the step
+  runner walks one step at a time, so the Agents module can show a planning session on a named
+  step. Nothing is created before the recorded sign-off and the approved drafts, each rebalance
+  write needs the previous write's proof, and dating needs a verified wiring. One new step skill,
+  `plan-steps`, carries the planning steps with one reference per step; `comprehend-plan` and
+  `rationalize-gantt` now print their verdict line first. The planning steps must be startable by
+  the runner through the Skill tool, so one short description joins every session's context.
+- **The step-skill rule gains two flags.** A step whose contract says `delegates: true` (only the
+  drafting step) may run one Workflow of drafting agents that never write; a step whose contract
+  says `interactive: true` may hold a conversation with the person inside the step.
+
+### Changed
+
+- **Running the Plan or Rebalance workflow counts as planning.** The session gate classes
+  `/devstride:run-workflow plan` and `/devstride:run-workflow rebalance` as authoring jobs, like
+  `/devstride:plan` and `/devstride:rebalance`.
+
 ## [4.7.0] — 2026-11-20
 
 ### Changed

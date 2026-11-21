@@ -108,6 +108,9 @@ check("the sign-off, the draft approval and the two wirings each carry their pro
       dict((n, CATALOG[n]["proof"]["values"]["kind"]) for n in ("plan-sign-off-record@1", "plan-draft-approval@1", "plan-wire@1", "rebalance-rewire@1"))
       == {"plan-sign-off-record@1": ["sign-off"], "plan-draft-approval@1": ["draft-approval"], "plan-wire@1": ["wired-plan"], "rebalance-rewire@1": ["wired-plan"]})
 
+rule = " ".join(open(os.path.join(ROOT, "skills/release/references/step-skills.md"), encoding="utf-8").read().split())
+check("the step-skill rule carries the delegates and interactive amendments",
+      "**`delegates: true`** (only `plan-draft@1`)" in rule and "**`interactive: true`**" in rule and "It still never asks a flow question." in rule)
 
 # --- the floors: a copy that drops, reorders or switches off a required step is refused --------
 def start(definition):
