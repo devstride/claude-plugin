@@ -36,7 +36,7 @@
     "return-checkout": 600,
     "classify-release": 500,
     "pre-merge-check": 600,
-    "run-workflow": 1043,
+    "run-workflow": 1092,
     "claim-story": 1000,
     "story-lifecycle": 900,
     "risk-check": 1200,
@@ -96,7 +96,7 @@
     "skills/setup/references/docs-skill-templates/update-release-notes.md": 1200,
     "skills/setup/references/interview-rationale.md": 1900,
     "skills/setup/references/review-engines.md": 2700,
-    "skills/setup/references/seam-registry.md": 17300,
+    "skills/setup/references/seam-registry.md": 17344,
     "skills/setup/references/statusline-segments.md": 3523,
     "skills/setup/references/validation-checklist.md": 6000,
     "skills/ultracode-build/references/engineering-economy.md": 1502,
@@ -149,7 +149,9 @@
     "skills/hotfix-steps/references/hotfix-stage.md": 300,
     "skills/story-lifecycle/references/complete.md": 1200,
     "skills/build-item/references/run-stops.md": 1574,
-    "skills/run-workflow/references/workflow-contracts.md": 3391
+    "skills/run-workflow/references/workflow-contracts.md": 3391,
+    "skills/doctor/references/workflows-checks.md": 355,
+    "skills/run-workflow/references/fetching-the-workflow.md": 1117
   },
   "paths": {
     "epicReleaseGate": {

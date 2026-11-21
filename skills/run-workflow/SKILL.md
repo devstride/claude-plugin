@@ -27,9 +27,10 @@ with one JSON object on stdin (a file or a here-document, never inside quotes) a
 stdout. Exit 2 is a refusal: say its one line in plain words and stop; nothing has changed. Exit 1
 means the runner itself failed: say its line and stop, without retrying.
 
-1. **Resolve the definition**: `${CLAUDE_PLUGIN_ROOT}/workflows/<workflow id>.json`. No such file:
-   say so and stop.
-2. **`start`** with that path as `definitionFile` and a `context` holding every key the
+1. **Resolve the definition**: `${CLAUDE_PLUGIN_ROOT}/workflows/<workflow id>.json`, and fetch the
+   organization's (`references/fetching-the-workflow.md`). Neither applies to the trigger: say
+   "No workflow applies to this work." and stop.
+2. **`start`** with that path as `definitionFile`, the answer as `fetched`, and a `context` holding `trigger` and every key the
    reference's Commands section lists (`mode` is a story-claim mode, `named` for a named item).
    This skill resolves none of them: the person starting the run supplies them, and a missing one is
    refused (`context-missing`).

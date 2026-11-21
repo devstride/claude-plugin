@@ -2,8 +2,10 @@
 """The step runner: it walks a workflow definition one step at a time and remembers where it is.
 
 It decides and records; it never acts. It has no network and no tracker access, runs no skill,
-and reads a repository only through three read-only git commands (`rev-parse`, `diff`,
-`patch-id`) plus the remote lookup of the reporting helper. A person, another agent or the
+and reads a repository only through read-only git commands (`rev-parse`, `diff`, `patch-id`,
+and `ls-tree` and `cat-file` for a committed repository skill file) plus the remote lookup of the
+reporting helper. A workflow the tracker answered for the item is handed to `start` as data
+(`fetched`); the runner checks it and falls back to the built-in definition it was also given. A person, another agent or the
 plugin's own loop asks it what is next, runs that step, hands the step's answer back, and gets
 the same answers every time, also after a restart or a cleared conversation. The rules are in
 `skills/run-workflow/references/workflow-runner.md` (driving a run) and
@@ -12,7 +14,7 @@ the same answers every time, also after a restart or a cleared conversation. The
 
   python3 -B workflow.py <command>     one JSON object on stdin, one JSON object on stdout
 
-  start   {"definition" | "definitionFile", "context", "session"?, "replace"?}
+  start   {"definition" | "definitionFile", "context", "fetched"?, "session"?, "replace"?}
   next    {"runId"?, "item"?}
   done    {"runId"?, "item"?, "stepId", "attempt", "output"}
   status  {"runId"?, "item"?, "includeDefinition"?}
@@ -20,6 +22,7 @@ the same answers every time, also after a restart or a cleared conversation. The
   reported {"runId"?, "item"?, "ok"}       what became of a run's reports; the first failure hands back one line to say
   unsent  {"cwd"?}                         this repository's runs whose reports failed, each shaped again in full
   judge   {"item", "answer"}               whether the newest tracked run of an item did every required step
+  repository                               (no stdin) {"repository": "host/owner/name" | null} for this checkout
 
 Every request may carry `session` (else the agent's own session id, else `manual-<pid of the
 calling shell>`) and `now` (an ISO time, for tests). `start`, `next`, `done` and `resume` answer
@@ -50,7 +53,7 @@ sys.dont_write_bytecode = True  # loading the helpers below must never write int
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 CATALOG_PATH = os.path.join(PLUGIN_ROOT, "schemas", "step-contracts.json")
-COMMANDS = ("start", "next", "done", "status", "resume", "reported", "unsent", "judge")
+COMMANDS = ("start", "next", "done", "status", "resume", "reported", "unsent", "judge", "repository")
 
 KEEP_SECONDS = 7 * 24 * 3600
 STATE_MAX_BYTES = 1048576
@@ -63,7 +66,7 @@ UNSENT_LINE = ("Step reports for this run are not reaching the tracker, so it wi
                "The run carries on; once it is over, a later session building in this repository sends them.")
 AUTO_REDO_LIMIT = 5  # a contract may raise it with maxAutoRedo, never above AUTO_REDO_MAX
 AUTO_REDO_MAX = 20
-GIT_READ_ONLY = ("rev-parse", "diff", "patch-id")
+GIT_READ_ONLY = ("rev-parse", "diff", "patch-id", "ls-tree", "cat-file")
 GIT_TIMEOUT, GIT_DIFF_TIMEOUT = 30, 120
 
 SESSION = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}$")
@@ -659,7 +662,7 @@ def validate_definition(definition, contracts, plugin_version, in_work_tree, roo
         if step["when"]["mode"] != "always":
             raise Refuse("unsupported-when", "step %s runs on %s, which this plugin does not support" % (step["id"], step["when"]["mode"]))
         source = step["run"]["source"]
-        if source in ("library", "repo") or (source == "builtin" and contracts[step["contract"]]["builtinSkill"] is None):
+        if source == "library" or (source == "builtin" and contracts[step["contract"]]["builtinSkill"] is None):
             raise Refuse("unsupported-source", "step %s: this plugin runs no %s skill for %s" % (step["id"], source, step["contract"]))
         if step["onFail"] != "stop":
             raise Refuse("unsupported-on-fail", "step %s carries on after a failure, which this plugin does not support" % step["id"])
@@ -674,6 +677,165 @@ def validate_definition(definition, contracts, plugin_version, in_work_tree, roo
         if step["run"]["source"] != "off" and binding != "none" and not in_work_tree:
             raise Refuse("repository-required", "step %s proves itself against a git %s; run inside a repository" % (step["id"], binding))
     return steps
+
+
+# --- the workflow the tracker answered for the item ----------------------------------------------
+
+FETCH_ERRORS = ("ABSENT", "FORBIDDEN", "UNREACHABLE", "ERROR")
+# Each fallback's notice, or None where the fallback is silent. One table, tested.
+NOTICES = {
+    "not-fetched": None,
+    "ABSENT": None, "FORBIDDEN": None, "UNREACHABLE": None, "ERROR": None,
+    "no-match": None,
+    "incomplete": "DevStride sent an incomplete workflow; running the built-in workflow.",
+    "integrity": "The workflow from DevStride failed its integrity check; running the built-in workflow.",
+    "plugin-too-old": "This workflow needs plugin {required} or newer (this is {running}); running the built-in workflow.",
+    "unrunnable": "The workflow from DevStride could not be run by this plugin ({reason}); running the built-in workflow.",
+    "organization": "Using your organization's workflow {name} (version {n}).",
+}
+SOURCE_LABELS = {
+    None: "your organization's", "not-fetched": "built-in", "no-match": "built-in",
+    "ABSENT": "built-in (DevStride unavailable)", "FORBIDDEN": "built-in (DevStride unavailable)",
+    "UNREACHABLE": "built-in (DevStride unavailable)", "ERROR": "built-in (DevStride unavailable)",
+    "incomplete": "built-in (incomplete workflow)", "integrity": "built-in (failed its integrity check)",
+    "plugin-too-old": "built-in (needs a newer plugin)", "unrunnable": "built-in (not runnable by this plugin)",
+}
+
+
+def check_context(steps, contracts, context):
+    for step in steps:
+        if step["run"]["source"] == "off":
+            continue
+        for key, path in contracts[step["contract"]]["payload"].items():
+            kind, _, keys, optional = parse_path(path)
+            if kind == "context" and not optional and dig(context, keys) is MISSING:
+                raise Refuse("context-missing", "step %s needs context.%s" % (step["id"], ".".join(keys)))
+
+
+def _one_line(text):
+    return re.sub(r"\s+", " ", CONTROL.sub(" ", str(text))).strip()
+
+
+def choose_definition(builtin, fetched, trigger, contracts, version, in_work_tree, context):
+    """Which definition a run pins: the organization's when the tracker's answer is whole, sound
+    and runnable here, else the built-in one. Never refuses: every fault is a fallback."""
+    def fallback(code, **fields):
+        notice = NOTICES[code]
+        return {"definition": builtin, "source": "builtin", "reason": code,
+                "notice": notice.format(**fields) if notice else None,
+                "workflow": {"id": builtin["id"], "name": builtin["name"], "version": builtin["version"],
+                             "hash": REPORT.definition_hash(builtin)}}
+    if fetched is MISSING:
+        return fallback("not-fetched")
+    if isinstance(fetched, dict) and isinstance(fetched.get("data"), dict) and "match" in fetched["data"]:
+        fetched = fetched["data"]  # the route's wrapped answer reads the same
+    if not isinstance(fetched, dict) or "error" in fetched or "match" not in fetched:
+        code = fetched.get("error") if isinstance(fetched, dict) else None
+        return fallback(code if code in FETCH_ERRORS else "ERROR")
+    match = fetched["match"]
+    if match is None:
+        return fallback("no-match")
+    definition = match.get("definition") if isinstance(match, dict) else None
+    if (not isinstance(definition, dict) or match.get("startsWhen") != trigger
+            or definition.get("startsWhen") != trigger):
+        return fallback("incomplete")
+    try:
+        digest = REPORT.definition_hash(definition)
+    except (ValueError, RecursionError, TypeError):
+        digest = None
+    if digest is None or match.get("hash") != digest:
+        return fallback("integrity")
+    for required in (definition.get("minPluginVersion"), match.get("minPluginVersion")):
+        if isinstance(required, str) and SEMVER.match(required) and (
+                not version or _version(required) > _version(version)):
+            return fallback("plugin-too-old", required=required, running=version or "unknown")
+    try:
+        steps = validate_definition(definition, contracts, version, in_work_tree)
+        check_context(steps, contracts, context)
+    except Refuse as refusal:
+        return fallback("unrunnable", reason=_one_line(shown(str(refusal))).rstrip("."))
+    name = match.get("name") if isinstance(match.get("name"), str) and match["name"] else definition["name"]
+    number = match.get("version") if _whole(match.get("version")) else definition["version"]
+    workflow_id = match.get("workflowId") if isinstance(match.get("workflowId"), str) and match["workflowId"] else definition["id"]
+    return {"definition": definition, "source": "organization", "reason": None,
+            "notice": NOTICES["organization"].format(name=_one_line(name), n=number),
+            "workflow": {"id": workflow_id, "name": name, "version": number, "hash": digest}}
+
+
+# --- a repository skill file ---------------------------------------------------------------------
+
+REPO_SKILL_MAX_BYTES = 65536
+REPO_PATH_MAX = 200
+# Why a repository skill file could not be used: the code is the verdict, the text the reason.
+REPO_FAILURES = {
+    "unsafe-path": "its path must be a repository-relative path to a .md file, with no .. and no backslash",
+    "no-repository": "this folder is not a git repository that has commits",
+    "missing": "no such file is committed at that path",
+    "symlink": "it is a symbolic link or a submodule, not a file",
+    "too-large": "it is larger than 64 KB",
+    "not-text": "it is not plain UTF-8 text",
+}
+
+
+def repo_skill_path(ref):
+    """The repository-relative path a step names, or None when it is not a safe one."""
+    if not isinstance(ref, str) or not ref or len(ref) > REPO_PATH_MAX:
+        return None
+    path = ref[2:] if ref.startswith("./") else ref
+    if (not path or path.startswith("/") or "\\" in path or "\x00" in path or CONTROL.search(path)
+            or not path.endswith(".md") or any(part in ("", ".", "..") for part in path.split("/"))):
+        return None
+    return path
+
+
+def read_repo_skill(world, cwd, ref):
+    """(None, found) for a committed regular file, else (code, None). Read from HEAD only, never
+    from the working tree; never executed."""
+    path = repo_skill_path(ref)
+    if path is None:
+        return "unsafe-path", None
+    try:
+        top = world.git(cwd, "rev-parse", "--show-toplevel").decode("utf-8", "replace").strip()
+        commit = world.head(cwd)
+    except GitFailed:
+        return "no-repository", None
+    if not top or not os.path.isdir(top):
+        return "no-repository", None
+    try:
+        listing = world.git(top, "ls-tree", "-z", commit, "--", path)
+    except GitFailed:
+        return "missing", None
+    entries = [entry for entry in listing.split(b"\x00") if entry]
+    if len(entries) != 1:
+        return "missing", None
+    meta, _, named = entries[0].partition(b"\t")
+    fields = meta.split()
+    if named.decode("utf-8", "replace") != path or len(fields) != 3:
+        return "missing", None
+    mode, blob = fields[0].decode("ascii", "replace"), fields[2].decode("ascii", "replace")
+    if mode in ("120000", "160000"):
+        return "symlink", None
+    if mode not in ("100644", "100755"):
+        return "missing", None
+    try:
+        size = int(world.git(top, "cat-file", "-s", blob).strip() or b"-1")
+    except (GitFailed, ValueError):
+        return "missing", None
+    if size > REPO_SKILL_MAX_BYTES:
+        return "too-large", None
+    try:
+        data = world.git(top, "cat-file", "blob", blob)
+    except GitFailed:
+        return "missing", None
+    if len(data) > REPO_SKILL_MAX_BYTES:
+        return "too-large", None
+    try:
+        text = data.decode("utf-8", "strict")
+    except UnicodeDecodeError:
+        return "not-text", None
+    if "\x00" in text:
+        return "not-text", None
+    return None, {"source": "repo", "ref": path, "version": commit, "hash": hashlib.sha256(data).hexdigest(), "text": text}
 
 
 # --- a step's answer ---------------------------------------------------------------------------
@@ -1162,13 +1324,31 @@ class Run:
             argument = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         else:
             argument = TEMPLATE_FIELD.sub(lambda m: "" if payload.get(m.group(1)) is None else str(payload[m.group(1)]), entry["argument"])
-        return {"action": "run", "runId": self.state["runId"],
-                "step": {"id": step["id"], "name": step["name"], "phase": step["phase"],
-                         "contract": step["contract"], "attempt": record["attempt"]},
-                "skill": {"source": "builtin", "ref": step["run"]["ref"]},
-                "payload": payload, "argument": argument,
-                "heartbeat": {"phase": entry["claimPhase"], "stage": entry["shipIntentStage"],
-                              "shipIntent": self.ship_intent(index, entry["shipIntentStage"])}}
+        answer = {"action": "run", "runId": self.state["runId"],
+                  "step": {"id": step["id"], "name": step["name"], "phase": step["phase"],
+                           "contract": step["contract"], "attempt": record["attempt"]},
+                  "skill": {"source": "builtin", "ref": step["run"]["ref"]},
+                  "payload": payload, "argument": argument,
+                  "heartbeat": {"phase": entry["claimPhase"], "stage": entry["shipIntentStage"],
+                                "shipIntent": self.ship_intent(index, entry["shipIntentStage"])}}
+        if step["run"]["source"] == "repo":
+            answer["skill"] = None
+            answer["instructions"] = self.repo_instructions(index)
+        return answer
+
+    def repo_instructions(self, index):
+        """The text handed out with this attempt: the blob at the commit recorded when it was
+        issued, so a commit made meanwhile never changes what this attempt was told."""
+        ran = self.record(index)["ran"] or {}
+        cwd = self.state["context"]["cwd"]
+        try:
+            top = self.world.git(cwd, "rev-parse", "--show-toplevel").decode("utf-8", "replace").strip()
+            data = self.world.git(top, "cat-file", "blob", "%s:%s" % (ran["version"], ran["ref"]))
+        except (GitFailed, KeyError, TypeError):
+            raise Refuse("skill-missing", "the repository skill file %s at %s cannot be read again" % (ran.get("ref"), ran.get("version")))
+        if hashlib.sha256(data).hexdigest() != ran.get("hash"):
+            raise Refuse("skill-missing", "the repository skill file %s no longer matches what was handed out" % ran.get("ref"))
+        return {"source": "repo", "ref": ran["ref"], "version": ran["version"], "hash": ran["hash"], "text": data.decode("utf-8")}
 
     # -- transitions --
 
@@ -1231,17 +1411,31 @@ class Run:
         except KeyError as error:
             return self.stop("failed", "step %s cannot be handed %s: an earlier step did not give it" % (step["id"], error.args[0]), index)
         ref = step["run"]["ref"]
-        try:
-            with open(os.path.join(PLUGIN_ROOT, "skills", ref, "SKILL.md"), "rb") as handle:
-                digest = hashlib.sha256(handle.read()).hexdigest()
-        except OSError:
-            raise Refuse("skill-missing", "step %s names the skill %s, which this plugin no longer has" % (step["id"], ref))
+        if step["run"]["source"] == "repo":
+            code, found = read_repo_skill(self.world, self.state["context"]["cwd"], ref)
+            if code:
+                # The step never ran, so its verdict is the runner's own, outside the contract's grammar.
+                moment = self.world.now()
+                record.update(attempt=record["attempt"] + 1, status="failed", verdict="STEP: FAIL repository skill file %s" % code,
+                              evidence=[], links={}, startedAt=moment, endedAt=moment, refresh=False, redo=None,
+                              issuedHead=self.commit, ran={"source": "repo", "ref": ref if isinstance(ref, str) else None})
+                record["class"] = None
+                self.report(index)
+                return self.stop("failed", "The skill file %s could not be used (%s); fix the file or the workflow, then resume." % (
+                    ref, REPO_FAILURES[code]), index)
+            ran = dict((key, found[key]) for key in ("source", "ref", "version", "hash"))
+        else:
+            try:
+                with open(os.path.join(PLUGIN_ROOT, "skills", ref, "SKILL.md"), "rb") as handle:
+                    digest = hashlib.sha256(handle.read()).hexdigest()
+            except OSError:
+                raise Refuse("skill-missing", "step %s names the skill %s, which this plugin no longer has" % (step["id"], ref))
+            ran = {"source": "builtin", "ref": ref, "version": self.state["pluginVersion"], "hash": digest}
         # A step re-issued only to refresh its own stale proof does not void the steps that rely
         # on it: they hold their own proofs (a rebase that leaves the patch alone keeps the review).
         refresh = cause == "stale" or (cause == "mismatch" and record.get("refresh", False))
         record.update(attempt=record["attempt"] + 1, status="issued", verdict=None, evidence=[], links={},
-                      startedAt=self.world.now(), endedAt=None, refresh=refresh, redo=None, issuedHead=self.commit,
-                      ran={"source": "builtin", "ref": ref, "version": self.state["pluginVersion"], "hash": digest})
+                      startedAt=self.world.now(), endedAt=None, refresh=refresh, redo=None, issuedHead=self.commit, ran=ran)
         record["class"] = None
         self.state["current"] = {"stepId": step["id"], "attempt": record["attempt"]}
         self.report(index)
@@ -1433,35 +1627,60 @@ def command_start(world, request, contracts):
     cwd = os.path.realpath(cwd)
     session = session_of(request, world)
     version = CLAIMS.plugin_version(PLUGIN_ROOT)
-    steps = validate_definition(definition, contracts, version, world.in_work_tree(cwd))
-    for step in steps:
-        if step["run"]["source"] == "off":
-            continue
-        for key, path in contracts[step["contract"]]["payload"].items():
-            kind, _, keys, optional = parse_path(path)
-            if kind == "context" and not optional and dig(context, keys) is MISSING:
-                raise Refuse("context-missing", "step %s needs context.%s" % (step["id"], ".".join(keys)))
+    in_work_tree = world.in_work_tree(cwd)
+    steps = validate_definition(definition, contracts, version, in_work_tree)
+    check_context(steps, contracts, context)
+    trigger = context.get("trigger", definition["startsWhen"])
     folder = state_dir(world, create=True)
     path = os.path.join(folder, state_name(session, item))
     replaced = []
     if os.path.lexists(path):
         old = read_state(path, world)
         if not old["outcome"]:
+            if request.get("replace") is not True and "fetched" in request:
+                # A run under way keeps the definition it pinned: the answer is where it is, and no notice again.
+                run = Run(old, contracts, world)
+                answer = run.advance()
+                answer.update(definitionHash=old["definitionHash"], definitionSource=old.get("definitionSource", "builtin"),
+                              workflow=pinned_workflow(old), notice=None, reports=run.reports())
+                write_state(folder, old)
+                return answer
             if request.get("replace") is not True:
                 raise Refuse("run-open", "this session already has an open run for %s; resume it, or start with replace" % (item or "no item"))
             replaced = close_replaced(old, world)
+    chosen = choose_definition(definition, request.get("fetched", MISSING), trigger, contracts, version, in_work_tree, context)
+    definition = chosen["definition"]
+    steps = flat_steps(definition)
     prune(folder, world)
     context.update(cwd=cwd, repository=REPORT.read_repository(cwd))
     state = {"stateVersion": 1, "runId": secrets.token_hex(16), "sessionId": session, "item": item,
              "startedAt": world.now(), "endedAt": None, "outcome": None, "pluginVersion": version,
              "definition": definition, "definitionHash": REPORT.definition_hash(definition), "context": context,
              "seq": 0, "current": None, "stopped": None, "definitionReported": False,
-             "steps": dict((step["id"], new_record()) for step in steps)}
+             "steps": dict((step["id"], new_record()) for step in steps),
+             "definitionSource": chosen["source"], "workflowId": chosen["workflow"]["id"],
+             "workflowName": chosen["workflow"]["name"], "workflowVersion": chosen["workflow"]["version"],
+             "workflowHash": chosen["workflow"]["hash"], "fallbackReason": chosen["reason"]}
     run = Run(state, contracts, world)
     answer = run.advance()
-    answer.update(definitionHash=state["definitionHash"], reports=replaced + run.reports())
+    answer.update(definitionHash=state["definitionHash"], definitionSource=chosen["source"], workflow=pinned_workflow(state),
+                  notice=chosen["notice"], reports=replaced + run.reports())
     write_state(folder, state)
     return answer
+
+
+def pinned_workflow(state):
+    """The identity of what a run pinned: {id, name, version, hash}."""
+    definition = state["definition"]
+    return {"id": state.get("workflowId", definition["id"]), "name": state.get("workflowName", definition["name"]),
+            "version": state.get("workflowVersion", definition["version"]), "hash": state.get("workflowHash", state["definitionHash"])}
+
+
+def workflow_line(state):
+    workflow = pinned_workflow(state)
+    if state.get("definitionSource") == "organization":
+        return "Workflow: %s v%s (your organization's)" % (workflow["name"], workflow["version"])
+    return "Workflow: built-in %s" % workflow["name"]
 
 
 def command_next(world, request, contracts):
@@ -1515,8 +1734,12 @@ def command_status(world, request, contracts):
             for cell in (row["phase"], row["name"], row["status"], row["verdict"], row["attempt"] or "")))
     if request.get("includeDefinition") is True:
         run.resend_definition = True
+    source = "organization" if state.get("definitionSource") == "organization" else "builtin"
     return {"runId": state["runId"], "state": "finished" if state["outcome"] else "stopped" if state["stopped"] else "running",
-            "position": position, "rows": rows, "table": "\n".join(table), "reports": run.reports()}
+            "position": position, "rows": rows, "table": "\n".join(table), "workflow": workflow_line(state),
+            "definitionSource": source,
+            "source": SOURCE_LABELS.get(None if source == "organization" else state.get("fallbackReason") or "not-fetched", "built-in"),
+            "reports": run.reports()}
 
 
 def replay_reports(state, contracts, world):
@@ -1788,7 +2011,12 @@ def write_adopted(folder, state, old_path):
         os.unlink(old_path)
 
 
-HANDLERS = {"start": command_start, "next": command_next, "done": command_done,
+def command_repository(world, request, contracts):
+    """This checkout's repository as the tracker names it; never the raw address, which can carry a credential."""
+    return {"repository": REPORT.read_repository(os.getcwd())}
+
+
+HANDLERS = {"repository": command_repository, "start": command_start, "next": command_next, "done": command_done,
             "status": command_status, "resume": command_resume, "reported": command_reported,
             "unsent": command_unsent, "judge": command_judge}
 
@@ -1819,7 +2047,7 @@ def main(argv):
         if len(argv) != 2:
             raise Refuse("bad-request", "usage: workflow.py %s   (one JSON object on stdin)" % "|".join(COMMANDS))
         try:
-            request = json.loads(sys.stdin.read(REQUEST_MAX_BYTES + 1)[:REQUEST_MAX_BYTES])
+            request = {} if argv[1] == "repository" else json.loads(sys.stdin.read(REQUEST_MAX_BYTES + 1)[:REQUEST_MAX_BYTES])
         except (ValueError, RecursionError):
             raise Refuse("bad-request", "the request on stdin is not JSON")
         answer = run_command(argv[1], request)

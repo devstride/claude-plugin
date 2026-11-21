@@ -1423,9 +1423,9 @@ def section_static():
     calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "git"]
     named = [n.args[1].value if len(n.args) > 1 and isinstance(n.args[1], ast.Constant) else None for n in calls]
     check("every git command the runner runs is read-only (%s)" % " ".join(sorted(set(str(n) for n in named))),
-          len(calls) >= 4 and set(named) <= {"rev-parse", "diff", "patch-id"}, named)
+          len(calls) >= 4 and set(named) <= {"rev-parse", "diff", "patch-id", "ls-tree", "cat-file"}, named)
     module = load()
-    check("... and the one place refuses any other", module.GIT_READ_ONLY == ("rev-parse", "diff", "patch-id"))
+    check("... and the one place refuses any other", module.GIT_READ_ONLY == ("rev-parse", "diff", "patch-id", "ls-tree", "cat-file"))
     for command in (("commit", "-m", "x"), ("push",), ("fetch",), ("checkout", "main"), ("reset", "--hard"), ()):
         try:
             module.run_git(WORK, *command)
