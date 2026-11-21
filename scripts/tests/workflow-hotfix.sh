@@ -419,6 +419,26 @@ while run.answer and run.answer.get("action") == "run" and run.answer["step"]["i
 check("... and the merge is handed out again only once every proof is fresh",
       run.answer.get("action") == "run" and run.answer["step"]["id"] == "merge" and ("review", 2) in run.issued(), (run.issued(), run.answer))
 
+# Reporting fails open: every report failing to reach the tracker leaves the run's outcome unchanged.
+run = Run()
+said = []
+while run.answer and run.answer["action"] == "run":
+    rid = run.answer["runId"]
+    run.done()
+    rc, back, _ = run.call("reported", {"ok": False, "runId": rid})
+    said.append(rc == 0 and back is not None)
+    if back is not None:
+        run.answers.pop()
+check("every report failing leaves the run completed, its steps issued once each", all(said) and run.answer.get("action") == "finished"
+      and run.answer.get("outcome") == "completed" and run.issued() == [(s, 1) for s in PINNED], (said, run.answer))
+
+# A refused production merge stops the run before the deploy is approved.
+run = Run()
+run.until("merge")
+run.done(answer_text("HOTFIX MERGE: REFUSED merge-gate answered REFUSE", {"sha": "", "pullRequest": 7}))
+check("REFUSED at the merge stops the run before the deploy approval", run.answer.get("action") == "stopped" and run.answer.get("stepId") == "merge"
+      and "approve-deploy" not in [s for s, _ in run.issued()], run.answer)
+
 # A clearance provider configured in the repository is never called by a hotfix run, not even status.
 run = Run()
 LOG = os.path.join(run.repo, "provider.log")
