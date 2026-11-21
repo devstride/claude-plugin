@@ -336,4 +336,16 @@ while IFS= read -r line; do
   case "$line" in "ok   "*) ok "${line#ok   }" ;; "FAIL "*) bad "${line#FAIL }" ;; *) echo "       $line" ;; esac
 done <<< "$OUT"
 [ "$RC" -eq 0 ] || bad "a case failed or the script did not finish (exit $RC)"
+
+# No runner: with python3 hidden, each definition's step order is still readable from the file alone
+# (a step's id is the "id" line directly above its "name" and "summary"), and equals the pinned list.
+NOPY="$WORK/nopy"; mkdir -p "$NOPY"
+for t in grep sed tr cat; do ln -s "$(command -v "$t")" "$NOPY/$t"; done
+order() { PATH="$NOPY" grep -A2 '"id":' "$1" | PATH="$NOPY" grep -B2 '"summary":' | PATH="$NOPY" sed -n 's/^ *"id": "\([a-z-]*\)",$/\1/p' | PATH="$NOPY" tr '\n' ' '; }
+WANT_PLAN="session-check orient ground discover record-sign-off draft-specs confirm-drafts create-items wire-edges rationalize-dates number-titles hand-off "
+WANT_REB="session-check gates ground partition propose scheduler-probe create-successors rewire renumber archive-originals rewrite-marker redate report "
+[ "$(order "$ROOT/workflows/plan.json")" = "$WANT_PLAN" ] && [ "$(order "$ROOT/workflows/rebalance.json")" = "$WANT_REB" ] \
+  && ! PATH="$NOPY" command -v python3 >/dev/null 2>&1 \
+  && ok "with no python3 each definition's step order is readable from the file and equals the pinned list" \
+  || bad "no-runner step order: $(order "$ROOT/workflows/plan.json") | $(order "$ROOT/workflows/rebalance.json")"
 exit $FAIL
