@@ -20,6 +20,17 @@ for what each version component means here and how a release is cut.
 - **A step's contract may allow more automatic re-runs.** A contract can raise the runner's cap of
   five automatic re-issues for its own step (`maxAutoRedo`, at most twenty), for long steps such
   as a release review that may restart several times.
+- **A hotfix is a workflow the step runner can walk.** `workflows/hotfix.json` lists the hotfix as
+  thirteen named steps in two phases (cut the branch, then fix and ship), so someone watching sees
+  which step a hotfix session is on and what each finished step produced. It reuses the Build risk
+  check, local checks and review, and adds a merge into the production branch and the approval and
+  confirmation of the production deploy, each answered by the person in the session. Nothing in it
+  waits on a release. The new step skill `hotfix-steps` runs every hotfix step and the two deploy
+  steps, one reference per step; `hotfix-name.py` turns the hotfix branch-name rule into code with
+  fixtures; and ten step contracts join the catalog, with `hotfix-fix@1` standing in for the Build
+  step and `hotfix-branch@1` for the branch step. The always-on context budget rises from 2,100 to
+  2,200 tokens: the hotfix steps must be startable by the runner through the Skill tool, so one
+  short description joins every session's context.
 
 ## [4.7.0] — 2026-11-20
 

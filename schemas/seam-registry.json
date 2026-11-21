@@ -160,7 +160,8 @@
       "calledBy": [
         "release 4",
         "release 5a",
-        "doctor 7"
+        "doctor 7",
+        "hotfix-steps deploy-approval"
       ],
       "unset": "the deploy runs without an approval step",
       "contract": "skills/release/references/docs-hooks.md",
@@ -175,7 +176,8 @@
       "verdict": "exit 0 only when production serves RELEASE_COMMIT",
       "calledBy": [
         "release 5a",
-        "doctor 7"
+        "doctor 7",
+        "hotfix-steps deploy-confirm"
       ],
       "unset": "the owner confirms the deploy by hand",
       "contract": "skills/release/references/docs-hooks.md",
@@ -576,7 +578,8 @@
       "calledBy": [
         "doctor 4",
         "release 4",
-        "setup E3"
+        "setup E3",
+        "hotfix-steps hotfix-stage"
       ],
       "unset": "no per-environment infrastructure: no stage renders and doctor reports N/A",
       "contract": "skills/setup/references/config-defaults.md",

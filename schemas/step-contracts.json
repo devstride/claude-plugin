@@ -96,7 +96,8 @@
       },
       "requires": [],
       "claimPhase": "Branch",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "satisfiedBy": ["hotfix-branch@1"]
     },
     "build@1": {
       "summary": "Build the item on its branch and hand back what was deferred, changed or dismissed.",
@@ -134,13 +135,14 @@
       },
       "requires": ["branch@1"],
       "claimPhase": "Build",
-      "shipIntentStage": "building"
+      "shipIntentStage": "building",
+      "satisfiedBy": ["hotfix-fix@1"]
     },
     "risk-check@1": {
       "summary": "Check the finished build for the risks its changes carry, and fix or raise what it finds.",
       "builtinSkill": "risk-check",
       "payload": {
-        "item": "context.item",
+        "item": "context.item?",
         "profile": "context.profile.name",
         "reviewMoment": "context.reviewMoment",
         "workingBase": "context.workingBase",
@@ -192,7 +194,7 @@
       "summary": "Run the repository's local checks on the final tree and leave a receipt.",
       "builtinSkill": "local-checks",
       "payload": {
-        "item": "context.item",
+        "item": "context.item?",
         "profile": "context.profile.name",
         "workingBase": "context.workingBase",
         "route": "context.route",
@@ -242,7 +244,7 @@
       "summary": "Review the change with the configured reviewers and settle every finding.",
       "builtinSkill": "review-story",
       "payload": {
-        "item": "context.item",
+        "item": "context.item?",
         "profile": "context.profile.name",
         "reviewMoment": "context.reviewMoment",
         "workingBase": "context.workingBase",
@@ -464,6 +466,331 @@
         "binding": "none"
       },
       "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-preflight@1": {
+      "summary": "Check the working tree and name the hotfix branch from the repository's config.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branchArgument": "context.branchArgument",
+        "itemNumber": "context.itemNumber?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX PREFLIGHT",
+        "values": [
+          { "value": "READY", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "DIRTY", "detail": "none", "class": "ask" },
+          { "value": "NEEDS INPUT", "detail": "required", "class": "ask", "detailName": "what" },
+          { "value": "FAILED", "detail": "required", "class": "stop", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["branch", "base", "prefix", "date", "dateFormat", "configSource"],
+        "types": {
+          "branch": "string",
+          "base": "string",
+          "prefix": "string",
+          "date": "string",
+          "dateFormat": "string",
+          "configSource": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-branch@1": {
+      "summary": "Cut the hotfix branch from the production branch and push it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-preflight@1.branch",
+        "base": "result:hotfix-preflight@1.base",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX BRANCH",
+        "values": [
+          { "value": "CUT", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "FAILED", "detail": "required", "class": "stop", "detailName": "step" }
+        ]
+      },
+      "result": {
+        "required": ["branch", "base", "baseSha", "pushed", "shipIntent"],
+        "types": {
+          "branch": "string",
+          "base": "string",
+          "baseSha": "string",
+          "pushed": "boolean",
+          "shipIntent": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-preflight@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-stage@1": {
+      "summary": "Name the environment this checkout deploys to, and stop before touching a production one.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX STAGE",
+        "values": [
+          { "value": "NAMED", "detail": "required", "class": "continue", "detailName": "stage" },
+          { "value": "NONE", "detail": "none", "class": "continue" },
+          { "value": "PRODUCTION", "detail": "required", "class": "ask", "detailName": "stage" },
+          { "value": "DECLINED", "detail": "required", "class": "end:environment-declined", "detailName": "stage" }
+        ]
+      },
+      "result": {
+        "required": ["stage", "production"],
+        "types": {
+          "stage": "string|null",
+          "production": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-branch@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-environment@1": {
+      "summary": "Bring the local environment back to production code: a backward transition.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "stage": "result:hotfix-stage@1.stage",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX ENVIRONMENT",
+        "values": [
+          { "value": "RECREATED", "detail": "none", "class": "continue" },
+          { "value": "MIGRATED", "detail": "none", "class": "continue" },
+          { "value": "UNCHANGED", "detail": "none", "class": "continue" },
+          { "value": "NEEDS ANSWER", "detail": "required", "class": "ask", "detailName": "why" },
+          { "value": "FAILED", "detail": "required", "class": "stop", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["case", "mode", "why", "restartDevServer"],
+        "types": {
+          "case": "number|null",
+          "mode": "string|null",
+          "why": "string",
+          "restartDevServer": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-stage@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-report@1": {
+      "summary": "Report the cut in one line and say what comes next.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "environment": "result:hotfix-environment@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX CUT",
+        "values": [
+          { "value": "DONE", "detail": "required", "class": "continue", "detailName": "branch" }
+        ]
+      },
+      "result": {
+        "required": ["branch", "case"],
+        "types": {
+          "branch": "string",
+          "case": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-environment@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-fix@1": {
+      "summary": "Make the smallest change that fixes the production problem, then commit and push it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "base": "result:hotfix-branch@1.base",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX FIX",
+        "values": [
+          { "value": "COMMITTED", "detail": "required", "class": "continue", "detailName": "sha" },
+          { "value": "NEEDS DIRECTION", "detail": "required", "class": "ask", "detailName": "what" },
+          { "value": "ABANDONED", "detail": "none", "class": "end:abandoned" }
+        ]
+      },
+      "result": {
+        "required": ["commit", "deferrals", "deviations", "untrackedDeferrals", "dismissed", "scopeLine", "head"],
+        "types": {
+          "commit": "string",
+          "deferrals": "array",
+          "deviations": "array",
+          "untrackedDeferrals": "array",
+          "dismissed": "array",
+          "scopeLine": "string",
+          "head": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-report@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-merge@1": {
+      "summary": "Merge the reviewed hotfix pull request into the production branch, only on the person's yes.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch?",
+        "base": "result:hotfix-branch@1.base?",
+        "review": "result:review@1",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX MERGE",
+        "values": [
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "sha" },
+          { "value": "WAITING FOR YES", "detail": "none", "class": "ask" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["sha", "pullRequest"],
+        "types": {
+          "sha": "string",
+          "pullRequest": "number|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["review@1", "local-checks@1", "risk-check@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "deploy-approval@1": {
+      "summary": "Approve the production deploy of one merge, only on the person's yes for that merge.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "mergeSha": "result:hotfix-merge@1.sha",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "DEPLOY APPROVAL",
+        "values": [
+          { "value": "APPROVED", "detail": "none", "class": "continue" },
+          { "value": "WAITING FOR YES", "detail": "none", "class": "ask" },
+          { "value": "RETRY", "detail": "none", "class": "redo:self" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "STOPPED", "detail": "required", "class": "stop", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["mergeSha", "approved"],
+        "types": {
+          "mergeSha": "string",
+          "approved": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-merge@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "deploy-confirm@1": {
+      "summary": "Confirm production serves the merge, or ask the person to confirm it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "mergeSha": "result:hotfix-merge@1.sha",
+        "needed": "context.deployConfirmNeeded?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "DEPLOY",
+        "values": [
+          { "value": "CONFIRMED", "detail": "required", "class": "continue", "detailName": "sha" },
+          { "value": "UNCONFIRMED", "detail": "none", "class": "stop" },
+          { "value": "OWNER TO CONFIRM", "detail": "none", "class": "ask" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["mergeCommit", "confirmedAt"],
+        "types": {
+          "mergeCommit": "string",
+          "confirmedAt": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-merge@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-close@1": {
+      "summary": "Close out the hotfix and say whether an open release branch must take it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "mergeSha": "result:hotfix-merge@1.sha",
+        "base": "result:hotfix-branch@1.base?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX CLOSED",
+        "values": [
+          { "value": "CLOSED", "detail": "required", "class": "continue", "detailName": "sha" },
+          { "value": "OPEN RELEASE", "detail": "required", "class": "continue", "detailName": "branch" }
+        ]
+      },
+      "result": {
+        "required": ["mergeSha", "openRelease"],
+        "types": {
+          "mergeSha": "string",
+          "openRelease": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-merge@1"],
       "claimPhase": null,
       "shipIntentStage": null
     }
