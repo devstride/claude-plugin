@@ -36,7 +36,7 @@
     "return-checkout": 600,
     "classify-release": 500,
     "pre-merge-check": 600,
-    "run-workflow": 1092,
+    "run-workflow": 1111,
     "claim-story": 1000,
     "story-lifecycle": 900,
     "risk-check": 1200,
@@ -132,7 +132,7 @@
     "skills/release/references/migration-approval.md": 1530,
     "skills/release/references/ship-plan.md": 1861,
     "skills/build-item/references/workflow-reports.md": 1938,
-    "skills/run-workflow/references/workflow-runner.md": 4234,
+    "skills/run-workflow/references/workflow-runner.md": 4271,
     "skills/risk-check/references/story-risk-check.md": 2873,
     "skills/review-story/references/review-routes.md": 2967,
     "skills/merge-story/references/merge-paths.md": 3448,
@@ -199,7 +199,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 105146,
+      "budget": 105167,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",

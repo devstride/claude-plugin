@@ -236,9 +236,9 @@ command, and again after a compaction**: the commands, the answers, the stops an
 3. **For each `run` answer**: send the story claim heartbeat with `heartbeat.phase` and the
    ship-intent update from `heartbeat.shipIntent` (each only when configured and not null, each
    failing open, `references/story-claims.md` and `references/ship-intent.md`; a heartbeat's own
-   stop stops the run); invoke the named skill (`claim-story`, `story-lifecycle`, `branch-feature`,
-   `ultracode-build`, `risk-check`, `local-checks`, `review-story`, `merge-story`,
-   `capture-findings`, `sync-base`) through the Skill tool with `argument` unchanged — plus, when the
+   stop stops the run); invoke the named skill through the Skill tool with `argument` unchanged (`skill`
+   null: follow `instructions.text` as that step's skill, run-workflow's
+   `references/fetching-the-workflow.md`) — plus, when the
    payload carries a person's `answer` and the argument does not, ` answer: <it>` after it; then
    `done` with `stepId`, `attempt` and the skill's WHOLE answer as `output`. Its answer is the next
    action. A step already acted on before an interruption (a merge that landed) is reported with
