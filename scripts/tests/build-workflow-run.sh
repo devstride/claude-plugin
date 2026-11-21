@@ -180,7 +180,8 @@ check("every step's contract is in the catalog", [s["contract"] for s in STEPS i
 check("every step's claim phase is at most 64 characters",
       [s["contract"] for s in STEPS if len(CATALOG[s["contract"]]["claimPhase"] or "") > 64] == [])
 check("every step runs its contract's own built-in skill", [s["run"]["ref"] for s in STEPS] == [CATALOG[s["contract"]]["builtinSkill"] for s in STEPS])
-required = [name for name, entry in CATALOG.items() if entry["builtinSkill"] and entry["builtinSkill"] != "hotfix-steps"]
+# The Build workflow's own contracts are the catalog's first twelve (Hotfix and Release append after them).
+required = [name for name in list(CATALOG)[:12] if CATALOG[name]["builtinSkill"]]
 check("the definition's step order is the catalog's order", [s["contract"] for s in STEPS] == required, [s["contract"] for s in STEPS])
 check("each requirement comes earlier in the definition",
       all(ORDER.index(next(t["id"] for t in STEPS if t["contract"] == need)) < ORDER.index(s["id"]) for s in STEPS for need in CATALOG[s["contract"]]["requires"]))

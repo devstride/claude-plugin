@@ -699,7 +699,8 @@
       },
       "requires": ["review@1", "local-checks@1", "risk-check@1"],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "satisfiedBy": ["production-merge@1", "merged-release@1"]
     },
     "deploy-approval@1": {
       "summary": "Approve the production deploy of one merge, only on the person's yes for that merge.",
@@ -792,6 +793,1762 @@
       },
       "requires": ["hotfix-merge@1"],
       "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "release-shape@1": {
+      "summary": "Say whether this release is new, an open release to adopt, or a merged one to close out.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE SHAPE",
+        "values": [
+          { "value": "NEW", "detail": "none", "class": "continue" },
+          { "value": "ADOPTED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "CONFLICT", "detail": "required", "class": "stop", "detailName": "prs" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "files" }
+        ]
+      },
+      "result": {
+        "required": ["shape"],
+        "types": {
+          "shape": "string",
+          "pullRequest": "number|null",
+          "branch": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Read the release shape",
+      "shipIntentStage": null
+    },
+    "tower-claim@1": {
+      "summary": "Claim release clearance from the tower, waiting while another release holds it.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TOWER CLAIM",
+        "values": [
+          { "value": "CLEARED", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" },
+          { "value": "BUSY", "detail": "required", "class": "stop", "detailName": "holder" },
+          { "value": "STALE", "detail": "required", "class": "ask", "detailName": "pr" },
+          { "value": "STUCK", "detail": "required", "class": "ask", "detailName": "holder" },
+          { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string",
+          "adopted": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Claim the tower",
+      "shipIntentStage": null
+    },
+    "merged-release@1": {
+      "summary": "Find the newest merged release and recompute its delta.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "MERGED RELEASE",
+        "values": [
+          { "value": "FOUND", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "NONE", "detail": "none", "class": "stop" }
+        ]
+      },
+      "result": {
+        "required": ["sha", "pullRequest"],
+        "types": {
+          "sha": "string",
+          "pullRequest": "number|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Find the merged release",
+      "shipIntentStage": null
+    },
+    "train-claim@1": {
+      "summary": "Claim the release train so only one session runs it.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN CLAIM",
+        "values": [
+          { "value": "WON", "detail": "none", "class": "continue" },
+          { "value": "LOST", "detail": "required", "class": "end:lost-train-claim", "detailName": "holder" },
+          { "value": "DEGRADED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Claim the release train",
+      "shipIntentStage": null
+    },
+    "ground-truth@1": {
+      "summary": "Fetch both branches and read what other sessions landed.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "GROUND TRUTH",
+        "values": [
+          { "value": "READ", "detail": "none", "class": "continue" },
+          { "value": "ANOTHER SESSION ACTIVE", "detail": "required", "class": "continue", "detailName": "what" },
+          { "value": "FAILED", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Read ground truth",
+      "shipIntentStage": null
+    },
+    "ci-hold-proof@1": {
+      "summary": "Prove pull-request CI waits for the ready flip before a release opens.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "CI HOLD",
+        "values": [
+          { "value": "PROVEN", "detail": "none", "class": "continue" },
+          { "value": "NO PULL-REQUEST CI", "detail": "none", "class": "continue" },
+          { "value": "NOT PROVEN", "detail": "required", "class": "stop", "detailName": "facts" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Prove the CI hold",
+      "shipIntentStage": null
+    },
+    "train-finish@1": {
+      "summary": "Finish the items an earlier merged release train carried.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "EARLIER TRAIN",
+        "values": [
+          { "value": "FINISHED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "NONE", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Finish the earlier train",
+      "shipIntentStage": null
+    },
+    "ship-plan@1": {
+      "summary": "Wait a bounded time for work a peer says is nearly ready for the train.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "SHIP PLAN",
+        "values": [
+          { "value": "GO", "detail": "none", "class": "continue" },
+          { "value": "WAITED", "detail": "required", "class": "continue", "detailName": "minutes" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Gather the ship plan",
+      "shipIntentStage": null
+    },
+    "train-snapshot@1": {
+      "summary": "Cut a snapshot of the release train merged with the release source.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN SNAPSHOT",
+        "values": [
+          { "value": "CUT", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "ADOPTED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "NOTHING TO SHIP", "detail": "none", "class": "skipped" },
+          { "value": "HELD", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "files" },
+          { "value": "OTHER HOLDER", "detail": "required", "class": "ask", "detailName": "pr" },
+          { "value": "CONFLICT", "detail": "required", "class": "stop", "detailName": "files" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Snapshot the train",
+      "shipIntentStage": null
+    },
+    "train-pr@1": {
+      "summary": "Open the release train's pull request into the release source.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN PR",
+        "values": [
+          { "value": "OPENED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "ADOPTED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Open the train pull request",
+      "shipIntentStage": null
+    },
+    "train-review@1": {
+      "summary": "Review what no landing receipt covers on the train pull request.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN REVIEW",
+        "values": [
+          { "value": "RECEIPTED", "detail": "none", "class": "continue" },
+          { "value": "SETTLED", "detail": "required", "class": "continue", "detailName": "head" },
+          { "value": "LATE ARRIVAL", "detail": "required", "class": "redo:self", "detailName": "count" },
+          { "value": "BLOCKED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Review the train",
+      "shipIntentStage": null,
+      "maxAutoRedo": 8
+    },
+    "train-pre-ship@1": {
+      "summary": "Run the local pre-ship checks the train needs.",
+      "builtinSkill": "pre-ship",
+      "payload": {
+        "base": "context.productionBranch",
+        "head": "context.releaseHead?"
+      },
+      "argument": "train run {base} {head}",
+      "verdict": {
+        "label": "PRE-SHIP",
+        "values": [
+          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
+          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
+          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Pre-ship checks on the train",
+      "shipIntentStage": null
+    },
+    "train-merge@1": {
+      "summary": "Merge the train pull request through the merge gate, never a push.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN MERGE",
+        "values": [
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Merge the train",
+      "shipIntentStage": null
+    },
+    "train-close-out@1": {
+      "summary": "Mark the one-offs the train carried as reached.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN CLOSE-OUT",
+        "values": [
+          { "value": "CLOSED", "detail": "required", "class": "continue", "detailName": "count" },
+          { "value": "NONE", "detail": "none", "class": "continue" },
+          { "value": "PARTIAL", "detail": "required", "class": "continue", "detailName": "skipped" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Close out the train",
+      "shipIntentStage": null
+    },
+    "train-level@1": {
+      "summary": "Bring the release train level with the release source.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN LEVEL",
+        "values": [
+          { "value": "FAST-FORWARDED", "detail": "none", "class": "continue" },
+          { "value": "MERGED SOURCE", "detail": "none", "class": "continue" },
+          { "value": "ALREADY LEVEL", "detail": "none", "class": "continue" },
+          { "value": "CONFLICT", "detail": "required", "class": "stop", "detailName": "files" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Level the train",
+      "shipIntentStage": null
+    },
+    "release-delta@1": {
+      "summary": "Work out what the release carries and check its holds.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE DELTA",
+        "values": [
+          { "value": "ITEMS", "detail": "required", "class": "continue", "detailName": "count" },
+          { "value": "NOTHING TO RELEASE", "detail": "none", "class": "end:nothing-to-release" },
+          { "value": "HELD", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Work out the release delta",
+      "shipIntentStage": null
+    },
+    "classify-release@1": {
+      "summary": "Say whether the release is light or full; anything unclear is full.",
+      "builtinSkill": "classify-release",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE CLASS",
+        "values": [
+          { "value": "LIGHT", "detail": "none", "class": "continue" },
+          { "value": "FULL", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Classify the release",
+      "shipIntentStage": null
+    },
+    "classify-at-checks@1": {
+      "summary": "Classify the release again at the head the checks test.",
+      "builtinSkill": "classify-release",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE CLASS",
+        "values": [
+          { "value": "LIGHT", "detail": "none", "class": "continue" },
+          { "value": "FULL", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Classify at the checks",
+      "shipIntentStage": null
+    },
+    "classify-at-pre-ship@1": {
+      "summary": "Classify the release again at the reviewed head before the pre-ship checks.",
+      "builtinSkill": "classify-release",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE CLASS",
+        "values": [
+          { "value": "LIGHT", "detail": "none", "class": "continue" },
+          { "value": "FULL", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Classify before pre-ship",
+      "shipIntentStage": null
+    },
+    "tower-queue@1": {
+      "summary": "Wait in the release queue behind any older release pull request.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "QUEUE",
+        "values": [
+          { "value": "CLEAR", "detail": "none", "class": "continue" },
+          { "value": "WAIT", "detail": "required", "class": "stop", "detailName": "pr" },
+          { "value": "ASK", "detail": "required", "class": "ask", "detailName": "pr" },
+          { "value": "TIMED OUT", "detail": "required", "class": "stop", "detailName": "pr" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Wait in the release queue",
+      "shipIntentStage": null
+    },
+    "release-branch@1": {
+      "summary": "Cut the protected release branch from the release source.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE BRANCH",
+        "values": [
+          { "value": "CUT", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "ADOPTED", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "NAME TAKEN", "detail": "required", "class": "stop", "detailName": "branch" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "files" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Cut the release branch",
+      "shipIntentStage": null
+    },
+    "production-in-branch@1": {
+      "summary": "Merge production into the release branch when it is behind.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRODUCTION IN BRANCH",
+        "values": [
+          { "value": "CONTAINS", "detail": "none", "class": "continue" },
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "sha" },
+          { "value": "CONFLICT", "detail": "required", "class": "stop", "detailName": "files" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Bring production in",
+      "shipIntentStage": null,
+      "maxAutoRedo": 6
+    },
+    "release-pr@1": {
+      "summary": "Open the release pull request into production as a draft.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE PR",
+        "values": [
+          { "value": "OPENED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "ADOPTED", "detail": "required", "class": "continue", "detailName": "pr" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Open the release pull request",
+      "shipIntentStage": null
+    },
+    "train-claim-hand-on@1": {
+      "summary": "Hand the train claim on once the cut exists so the next release can start.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN CLAIM",
+        "values": [
+          { "value": "HANDED ON", "detail": "none", "class": "continue" },
+          { "value": "HELD", "detail": "required", "class": "continue", "detailName": "why" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Hand on the train claim",
+      "shipIntentStage": null
+    },
+    "release-tip@1": {
+      "summary": "Record the production tip the checks run against.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRODUCTION TIP",
+        "values": [
+          { "value": "AT", "detail": "required", "class": "continue", "detailName": "sha" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Read the production tip",
+      "shipIntentStage": null
+    },
+    "pre-ship-at-checks@1": {
+      "summary": "Run the release's pre-ship checks before claiming the tower.",
+      "builtinSkill": "pre-ship",
+      "payload": {
+        "base": "context.productionBranch",
+        "head": "context.releaseHead?",
+        "releaseClass": "context.releaseClass?"
+      },
+      "argument": "release run {base} {head} {releaseClass}",
+      "verdict": {
+        "label": "PRE-SHIP",
+        "values": [
+          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
+          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
+          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Pre-ship before the tower",
+      "shipIntentStage": null
+    },
+    "dev-deploy-wait@1": {
+      "summary": "Wait for the staging deploy of the release commit to be serving.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "DEV DEPLOY",
+        "values": [
+          { "value": "SERVING", "detail": "none", "class": "continue" },
+          { "value": "FAILED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "TIMED OUT", "detail": "none", "class": "stop" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Wait for the staging deploy",
+      "shipIntentStage": null
+    },
+    "pre-merge-at-checks@1": {
+      "summary": "Ask whether production needs anything before the merge, at the checks head.",
+      "builtinSkill": "pre-merge-check",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?",
+        "pullRequest": "context.pullRequest?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRE-MERGE",
+        "values": [
+          { "value": "CLEAR", "detail": "none", "class": "continue" },
+          { "value": "HOLD", "detail": "none", "class": "stop" },
+          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Pre-merge check at the checks",
+      "shipIntentStage": null
+    },
+    "release-stamp@1": {
+      "summary": "Stamp the head, tree and production tip the checks passed on.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "CHECKS STAMP",
+        "values": [
+          { "value": "STAMPED", "detail": "required", "class": "continue", "detailName": "stamp" },
+          { "value": "CHANGED", "detail": "required", "class": "redo:self", "detailName": "range" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Stamp the checks",
+      "shipIntentStage": null
+    },
+    "release-review@1": {
+      "summary": "Run the full production-release review and settle it.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE REVIEW",
+        "values": [
+          { "value": "SETTLED", "detail": "required", "class": "continue", "detailName": "head" },
+          { "value": "HEAD MOVED", "detail": "none", "class": "redo:self" },
+          { "value": "BLOCKED", "detail": "required", "class": "stop", "detailName": "findings" }
+        ]
+      },
+      "result": {
+        "required": ["state", "reviewedHead"],
+        "types": {
+          "state": "string",
+          "reviewedHead": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Review the release",
+      "shipIntentStage": null,
+      "maxAutoRedo": 8
+    },
+    "pre-ship-release@1": {
+      "summary": "Run the release's pre-ship checks at the reviewed head.",
+      "builtinSkill": "pre-ship",
+      "payload": {
+        "base": "context.productionBranch",
+        "head": "context.releaseHead?",
+        "releaseClass": "context.releaseClass?",
+        "ranAtTrain": "context.ranAtTrain?",
+        "releaseReview": "result:release-review@1"
+      },
+      "argument": "release run {base} {head} {releaseClass} {ranAtTrain}",
+      "verdict": {
+        "label": "PRE-SHIP",
+        "values": [
+          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
+          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["release-review@1"],
+      "claimPhase": "Pre-ship checks",
+      "shipIntentStage": null,
+      "maxAutoRedo": 6
+    },
+    "pre-ship-resume@1": {
+      "summary": "Discharge the review's pre-ship hold, which flips the pull request ready once.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRE-SHIP HOLD",
+        "values": [
+          { "value": "DISCHARGED", "detail": "none", "class": "continue" },
+          { "value": "NO HOLD", "detail": "none", "class": "skipped" },
+          { "value": "STILL HELD", "detail": "required", "class": "stop", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Discharge the pre-ship hold",
+      "shipIntentStage": null
+    },
+    "release-docs-plan@1": {
+      "summary": "Plan which documentation hooks run after the deploy is confirmed.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "DOCS PLAN",
+        "values": [
+          { "value": "HOOKS", "detail": "required", "class": "continue", "detailName": "hooks" },
+          { "value": "NONE REGISTERED", "detail": "none", "class": "continue" },
+          { "value": "SUPPRESSED", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Plan the documentation",
+      "shipIntentStage": null
+    },
+    "hotfix-catch-up@1": {
+      "summary": "Merge a hotfix that reached production into the release branch.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX CATCH-UP",
+        "values": [
+          { "value": "NONE", "detail": "none", "class": "continue" },
+          { "value": "MERGED", "detail": "required", "class": "stop", "detailName": "pr" },
+          { "value": "SAME TREE", "detail": "required", "class": "continue", "detailName": "sha" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Catch up with a hotfix",
+      "shipIntentStage": null,
+      "maxAutoRedo": 6
+    },
+    "previous-release@1": {
+      "summary": "Check the previous release's post-deploy status before merging.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PREVIOUS RELEASE",
+        "values": [
+          { "value": "SUCCESS", "detail": "none", "class": "continue" },
+          { "value": "PENDING", "detail": "none", "class": "stop" },
+          { "value": "FAILED", "detail": "required", "class": "ask", "detailName": "release" },
+          { "value": "NOT GATED", "detail": "none", "class": "continue" },
+          { "value": "UNREADABLE", "detail": "none", "class": "ask" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Check the previous release",
+      "shipIntentStage": null
+    },
+    "pre-merge-check@1": {
+      "summary": "Ask whether production needs anything before the merge.",
+      "builtinSkill": "pre-merge-check",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?",
+        "pullRequest": "context.pullRequest?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRE-MERGE",
+        "values": [
+          { "value": "CLEAR", "detail": "none", "class": "continue" },
+          { "value": "HOLD", "detail": "none", "class": "stop" },
+          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Pre-merge check",
+      "shipIntentStage": null
+    },
+    "pre-merge-recheck@1": {
+      "summary": "Ask the pre-merge question again once the tower is claimed.",
+      "builtinSkill": "pre-merge-check",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?",
+        "pullRequest": "context.pullRequest?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRE-MERGE",
+        "values": [
+          { "value": "CLEAR", "detail": "none", "class": "continue" },
+          { "value": "HOLD", "detail": "none", "class": "stop" },
+          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Pre-merge recheck",
+      "shipIntentStage": null
+    },
+    "owner-go-ahead@1": {
+      "summary": "Show the recap and take the owner's yes or the standing yes before the production merge.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "answer": "step.answer?",
+        "releaseReview": "result:release-review@1",
+        "preShipRelease": "result:pre-ship-release@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "GO-AHEAD",
+        "values": [
+          { "value": "YES", "detail": "required", "class": "continue", "detailName": "source" },
+          { "value": "NOT YET", "detail": "none", "class": "ask" },
+          { "value": "NO", "detail": "none", "class": "end:declined" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string",
+          "answer": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["release-review@1", "pre-ship-release@1"],
+      "claimPhase": "Wait for the go-ahead",
+      "shipIntentStage": null
+    },
+    "release-stamp-verify@1": {
+      "summary": "Verify the checks stamp still matches the branch and production.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "CHECKS STAMP",
+        "values": [
+          { "value": "UNCHANGED", "detail": "none", "class": "continue" },
+          { "value": "CHANGED", "detail": "none", "class": "stop" },
+          { "value": "BEHIND", "detail": "none", "class": "stop" },
+          { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Verify the checks stamp",
+      "shipIntentStage": null
+    },
+    "rerun-at-merge@1": {
+      "summary": "Re-run the pre-ship entries marked to run again at the merge.",
+      "builtinSkill": "pre-ship",
+      "payload": {
+        "base": "context.productionBranch",
+        "head": "context.releaseHead?",
+        "releaseClass": "context.releaseClass?",
+        "rerunNames": "context.rerunAtMerge?"
+      },
+      "argument": "release run {base} {head} {releaseClass} --only {rerunNames}",
+      "verdict": {
+        "label": "PRE-SHIP",
+        "values": [
+          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
+          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
+          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Re-run checks at the merge",
+      "shipIntentStage": null
+    },
+    "merge-confirmations@1": {
+      "summary": "Confirm the head, CI, pre-ship results, threads and tower before the merge.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "releaseReview": "result:release-review@1",
+        "preShipRelease": "result:pre-ship-release@1",
+        "ownerGoAhead": "result:owner-go-ahead@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "MERGE CONFIRMED",
+        "values": [
+          { "value": "HEAD", "detail": "required", "class": "continue", "detailName": "head" },
+          { "value": "NOT CONFIRMED", "detail": "required", "class": "stop", "detailName": "which" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["release-review@1", "pre-ship-release@1", "owner-go-ahead@1"],
+      "claimPhase": "Confirm the merge",
+      "shipIntentStage": null
+    },
+    "production-merge@1": {
+      "summary": "Merge the release into production through the merge gate, never a push.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "releaseReview": "result:release-review@1",
+        "preShipRelease": "result:pre-ship-release@1",
+        "ownerGoAhead": "result:owner-go-ahead@1",
+        "mergeConfirmations": "result:merge-confirmations@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRODUCTION MERGE",
+        "values": [
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["sha", "pullRequest"],
+        "types": {
+          "sha": "string",
+          "pullRequest": "number|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["release-review@1", "pre-ship-release@1", "owner-go-ahead@1", "merge-confirmations@1"],
+      "claimPhase": "Merge to production",
+      "shipIntentStage": null
+    },
+    "post-deploy-pending@1": {
+      "summary": "Post the pending post-deploy status on the merge commit.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "POST-DEPLOY STATUS",
+        "values": [
+          { "value": "PENDING POSTED", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Post the pending status",
+      "shipIntentStage": null
+    },
+    "estimates-score@1": {
+      "summary": "Score the estimates the shipped items carried.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "ESTIMATES",
+        "values": [
+          { "value": "SCORED", "detail": "required", "class": "continue", "detailName": "count" },
+          { "value": "NONE", "detail": "none", "class": "continue" },
+          { "value": "NOTED FAILURE", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Score estimates",
+      "shipIntentStage": null
+    },
+    "tower-hand-back@1": {
+      "summary": "Hand release clearance back to the tower, naming what is still owed.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TOWER",
+        "values": [
+          { "value": "HANDED BACK", "detail": "required", "class": "continue", "detailName": "owed" },
+          { "value": "KEPT", "detail": "required", "class": "stop", "detailName": "why" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Hand back the tower",
+      "shipIntentStage": null
+    },
+    "post-deploy-check@1": {
+      "summary": "Run the post-deploy health check.",
+      "builtinSkill": "post-deploy",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "merge": "result:production-merge@1?",
+        "mergedRelease": "result:merged-release@1?",
+        "deploy": "result:deploy-confirm@1?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "POST-DEPLOY HEALTH",
+        "values": [
+          { "value": "PASS", "detail": "none", "class": "continue" },
+          { "value": "FAIL", "detail": "none", "class": "stop" },
+          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Post-deploy health check",
+      "shipIntentStage": null
+    },
+    "post-deploy-result@1": {
+      "summary": "Post the health check's result as the release/post-deploy status.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "POST-DEPLOY STATUS",
+        "values": [
+          { "value": "SUCCESS POSTED", "detail": "none", "class": "continue" },
+          { "value": "FAILURE POSTED", "detail": "none", "class": "stop" },
+          { "value": "ERROR POSTED", "detail": "none", "class": "stop" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Post the health result",
+      "shipIntentStage": null
+    },
+    "release-sync@1": {
+      "summary": "Sync production back into the release source.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "SYNC",
+        "values": [
+          { "value": "DONE", "detail": "none", "class": "continue" },
+          { "value": "ALREADY SYNCED", "detail": "none", "class": "continue" },
+          { "value": "STOPPED", "detail": "required", "class": "stop", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Sync production back",
+      "shipIntentStage": null
+    },
+    "release-branch-delete@1": {
+      "summary": "Delete the release branch once both branches contain it.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE BRANCH DELETE",
+        "values": [
+          { "value": "DELETED", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "KEPT", "detail": "required", "class": "continue", "detailName": "why" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Delete the release branch",
+      "shipIntentStage": null
+    },
+    "release-docs@1": {
+      "summary": "Publish documentation for the shipped release and settle the docs owed item.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "UPDATE DOCS",
+        "values": [
+          { "value": "PUBLISHED", "detail": "none", "class": "continue" },
+          { "value": "STAGED", "detail": "none", "class": "continue" },
+          { "value": "CURRENT", "detail": "none", "class": "continue" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "FAILED", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Update documentation",
+      "shipIntentStage": null
+    },
+    "release-kb-sync@1": {
+      "summary": "Refresh the knowledge base after documentation was published.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "KNOWLEDGE BASE SYNC",
+        "values": [
+          { "value": "DONE", "detail": "none", "class": "continue" },
+          { "value": "CURRENT", "detail": "none", "class": "continue" },
+          { "value": "FAILED", "detail": "none", "class": "continue" },
+          { "value": "NOT RUN", "detail": "none", "class": "continue" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Sync the knowledge base",
+      "shipIntentStage": null
+    },
+    "release-close-out@1": {
+      "summary": "Run the post-deploy close-out when the health check said one is owed.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "POST-DEPLOY CLOSE-OUT",
+        "values": [
+          { "value": "DONE", "detail": "none", "class": "continue" },
+          { "value": "PARTIAL", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Close out the release",
+      "shipIntentStage": null
+    },
+    "release-notes@1": {
+      "summary": "Write release notes, only when they were asked for.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE NOTES",
+        "values": [
+          { "value": "PUBLISHED", "detail": "none", "class": "continue" },
+          { "value": "DRAFTED", "detail": "none", "class": "continue" },
+          { "value": "NOT REQUESTED", "detail": "none", "class": "skipped" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "stop" },
+          { "value": "FAILED", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Write release notes",
+      "shipIntentStage": null
+    },
+    "release-recap@1": {
+      "summary": "Write the plain-language recap of the release.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE RECAP",
+        "values": [
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "STOPPED AT", "detail": "required", "class": "continue", "detailName": "step" },
+          { "value": "NOTHING TO RELEASE", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Recap the release",
+      "shipIntentStage": null
+    },
+    "auto-start@1": {
+      "summary": "Decide whether the next release starts now.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "AUTO START",
+        "values": [
+          { "value": "START", "detail": "none", "class": "continue" },
+          { "value": "SKIP", "detail": "required", "class": "continue", "detailName": "reason" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "ERROR", "detail": "required", "class": "continue", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Decide the next release",
       "shipIntentStage": null
     }
   }
