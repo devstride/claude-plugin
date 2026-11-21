@@ -2,7 +2,8 @@
 # Tests for skills/build-item/scripts/review-gate.py: every case in review-gate-fixtures.json
 # (check, record, round and engine) through the helper's own command line (git-free), then a real repository: record a review, check
 # it, prove a merged-in train or a change only to generated files carries it forward under an unchanged
-# patch, and that a commit changing the patch voids it. No network.
+# patch (a `gen/**` pattern too), and that a commit changing the patch voids it: a re-indent included, and
+# the same patch on a branch that does not hold the reviewed head. No network.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 HELPER="$ROOT/skills/build-item/scripts/review-gate.py"; FIX="$ROOT/skills/build-item/scripts/review-gate-fixtures.json"
@@ -66,6 +67,11 @@ for label, args, body in (("not JSON", ["check"], "{"), ("no subcommand", [], "{
     p = subprocess.run([sys.executable, helper] + args, input=body, capture_output=True, text=True)
     say(p.returncode == 2 and p.stderr.startswith("review-gate: ") and "Traceback" not in p.stderr, "refuses: " + label, repr(p.stderr))
 
+d = tempfile.mkdtemp(dir=work); rec = fx["record"][0]["request"]
+p = run("record", dict(rec, receiptsDir=d, patchId="2" * 40))
+say(p.returncode == 0 and json.load(open(json.loads(p.stdout)["receipt"])).get("patchId") == "2" * 40,
+    "record (git-free) keeps the patch id it is given", p.stdout + p.stderr)
+
 # A real repository: the defaults (config file, git diff, receipts under the git common dir).
 g = lambda *a, **k: subprocess.run(["git", "-C", repo] + list(a), check=True, capture_output=True, text=True, **k).stdout.strip()
 repo = os.path.join(work, "repo"); os.makedirs(os.path.join(repo, ".claude"))
@@ -111,6 +117,26 @@ say(p.returncode == 2 and "computed" in p.stderr, "git: a patch id passed in is 
 open(os.path.join(repo, "f0.ts"), "w").write("y\n"); g("commit", "-qam", "fix")
 p = run("check", {"base": "train/release"}, cwd=repo)
 say(p.returncode == 2 and "or on this same patch" in p.stderr, "git: a commit that changes the patch voids the review", p.stderr)
+engines = [{"engine": "claude", "result": "no-findings"}, {"engine": "codex", "result": "no-findings"}]
+review = lambda: run("record", {"base": "train/release", "cycles": 1, "engines": engines, "findings": []}, cwd=repo)
+every = lambda paths: json.dump({"releaseTrain": {"branch": "train/release", "reviewEveryLanding": True}, "generated": {"paths": paths}},
+                                open(os.path.join(repo, ".claude/ds-config.json"), "w"))
+every(["gen/"]); g("checkout", "-q", "-b", "I2-ws", "train/release")
+open(os.path.join(repo, "w.py"), "w").write("if x:\n    pass\ny = 1\n"); g("add", "w.py"); g("commit", "-qm", "story")
+say(review().returncode == 0, "git: a second story is reviewed")
+open(os.path.join(repo, "w.py"), "w").write("if x:\n    pass\n    y = 1\n"); g("add", "w.py"); g("commit", "-qm", "indent")
+p = run("check", {"base": "train/release"}, cwd=repo)
+say(p.returncode == 2 and "or on this same patch" in p.stderr, "git: a change only to indentation after the review is a changed patch", p.stdout + p.stderr)
+g("checkout", "-q", "-b", "I2-copy", "train/release")
+open(os.path.join(repo, "w.py"), "w").write("if x:\n    pass\ny = 1\n"); g("add", "w.py"); g("commit", "-qm", "the same story, written again")
+p = run("check", {"base": "train/release"}, cwd=repo)
+say(p.returncode == 2, "git: the same patch on a branch that does not hold the reviewed head is not carried", p.stdout + p.stderr)
+every(["gen/**"]); g("checkout", "-q", "-b", "I3-glob", "train/release")
+open(os.path.join(repo, "s.ts"), "w").write("s\n" * 3); g("add", "s.ts"); g("commit", "-qm", "story")
+say(review().returncode == 0, "git: a third story is reviewed")
+os.makedirs(os.path.join(repo, "gen", "v2")); open(os.path.join(repo, "gen", "v2", "api.json"), "w").write("again\n"); g("add", "gen"); g("commit", "-qm", "regenerate")
+p = run("check", {"base": "train/release"}, cwd=repo)
+say(p.returncode == 0 and json.loads(p.stdout)["verdict"] == "reviewed", "git: a generated.paths pattern (gen/**) leaves those files out too", p.stdout + p.stderr)
 PY
 )"
 echo "$OUT" | sed 's/^/  /'

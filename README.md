@@ -665,8 +665,9 @@ caller applies the answer. `item-status-fixtures.json` holds its examples.
 
 `skills/build-item/scripts/review-gate.py check` is the landing gate for a one-off on the release
 train: it answers whether the change is a small fix, or was given a full local review
-(`/devstride:review local-full <base>`, recorded with `review-gate.py record`) at exactly this
-commit, and gives the text for the merge commit. Exit 2 means: do not merge yet; its one line names
+(`/devstride:review local-full <base>`, recorded with `review-gate.py record`) at this commit, or at
+an earlier one whose patch (generated files left out) is unchanged, and gives the text for the merge
+commit. Exit 2 means: do not merge yet; its one line names
 the review to run. `review-gate-fixtures.json` holds its examples.
 
 ```bash

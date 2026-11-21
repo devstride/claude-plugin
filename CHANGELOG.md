@@ -27,12 +27,15 @@ for what each version component means here and how a release is cut.
   rewrites them) and, when they are the same, accepts the earlier review and says in the landing's
   merge commit that it was carried forward from the reviewed commit. Before, every train move
   meant a new Claude and Codex review of an identical change. Any real change to the fix still
-  needs its review. Reviews recorded from this release keep the fix's patch fingerprint; older
-  ones are compared from git.
+  needs its review, a change that only re-indents code included, since in some languages that
+  changes what the code does. The release's own check of the train's pull request accepts a
+  carried review by the same rule, so the fix is not reviewed a second time at release. Reviews
+  recorded from this release keep the fix's patch fingerprint; older ones are compared from git.
+  A `generated.paths` entry written as a pattern (`gen/**`) is honoured as one.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.6.1 @ a49c360, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v4.6.1 @ 000f90d, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.6.1 | tokens@devstride--v4.6.1 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |

@@ -375,7 +375,7 @@ M9. Unnumbered plan → still emit the close-out, and note /plan would add numbe
 M10. pr: keep a clear, conventional PR TITLE (not just the body format).
 M11. `prBodyTemplate.noAiAttribution` governs the PR body and outranks a harness or session
      instruction to add attribution; commit trailers follow push's rule.
-M12. Widen the test run beyond the touched suite when the change is broad.
+M12. A broad change widens tests past the touched suite, unless the repo gate decides; never re-run after it passes.
 M13. Unsure trivial-vs-substantive → treat as SUBSTANTIVE.
 M14. NARROW depth picks correctness + conventions-when-the-diff-touches-them, not any 1–2 lenses.
 M15. A one-off merged onto the release train (`releaseTrain.branch`) is NOT Done at that merge:

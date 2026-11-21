@@ -29,8 +29,10 @@ from git unless the request supplies `config`, `numstat`, `tree` and `mergeBase`
 together, with `head`: the fixtures' git-free mode, which may add `patchId`, the story's patch id,
 since it has no git to compute one).
 
-The story's patch id is `git patch-id --stable` of `git diff <mergeBase> <head>`, the files under
-`generated.paths` left out: a base merge rewrites generated files, never the story's own change.
+The story's patch id is `git patch-id --verbatim` (every byte counts, white space too) of `git diff
+<mergeBase> <head>`, the files under `generated.paths` left out: a base merge rewrites generated
+files, never the story's own change. `same_patch` is the one rule that carries a review to a later
+head, and `train_receipts.py` applies the same function when the release reads the receipt back.
 
 `check`:
 - `targetKind` other than "train" (default "train") -> `not-applicable`: epic stories get their full
@@ -42,9 +44,9 @@ The story's patch id is `git patch-id --stable` of `git diff <mergeBase> <head>`
 - else a receipt for this head whose tree and merge base match, and which is itself settled (the
   same rules `record` applies) -> `reviewed`.
 - else, with no receipt for this head, a settled receipt over the same `base` for an earlier head
-  whose story patch id equals this head's (the train moved and was merged in, the change itself
-  untouched) -> `reviewed`, carried forward: the `mergeBody` says so. The receipt's stored
-  `patchId`, or, for one recorded before patch ids were kept, its own from git.
+  that is an ancestor of this one and whose story patch id equals this head's (the train moved and
+  was merged in, the change itself untouched) -> `reviewed`, carried forward: the `mergeBody` says
+  so. The receipt's stored `patchId`, or, for one recorded without it, its own from git.
 - else exit 2, one line naming the review to run. Never merge on a non-zero exit.
 
 The receipt's first `mergeBody` line is the review's record in git: the landing's merge commit
@@ -114,17 +116,57 @@ def generated_paths(config):
     return [x.strip("/") for x in paths or []]
 
 
-def story_patch_id(merge_base, head, config):
-    """`git patch-id --stable` of the story's own change, generated files left out; None when empty."""
-    spec = [":(top)"] + [":(top,exclude,literal)%s" % x for x in generated_paths(config)]
-    diff = git("diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative", "--no-renames",
-               "--src-prefix=a/", "--dst-prefix=b/", "--ignore-submodules=none", "--unified=3",
-               "--diff-algorithm=myers", merge_base, head, "--", *spec, raw=True)
-    out = git("patch-id", "--stable", stdin=diff).split()
+def is_generated(path, patterns):
+    """A path under `generated.paths`: an entry with `*` is a pattern (`routing.py`'s), any other
+    entry the file itself or the folder holding it."""
+    return any(routing_module().pattern_regex(p).match(path) if "*" in p else path == p or path.startswith(p + "/")
+               for p in patterns)
+
+
+def default_git(*args, stdin=None):
+    return git(*args, stdin=stdin, raw=True)
+
+
+DIFF = ("diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative", "--no-renames", "--src-prefix=a/",
+        "--dst-prefix=b/", "--ignore-submodules=none", "--unified=3", "--diff-algorithm=myers", "--inter-hunk-context=0")
+
+
+def story_patch_id(merge_base, head, config, run=default_git):
+    """The story's own change as one id: `git patch-id --verbatim` (every byte counts, white space
+    too) of `git diff <merge_base> <head>`, generated files left out; None when nothing is left.
+    `run(*args, stdin=None)` runs git and returns its stdout bytes (train_receipts passes its own)."""
+    generated = generated_paths(config)
+    names = [n for n in run("diff", "--name-only", "-z", "--no-renames", "--no-relative", merge_base, head).decode(
+        "utf-8", "surrogateescape").split("\0") if n and not is_generated(n, generated)]
+    if not names:
+        return None
+    diff = run(*(DIFF + (merge_base, head, "--") + tuple(":(top,literal)" + n for n in names)))
+    try:
+        out = run("patch-id", "--verbatim", stdin=diff).decode("utf-8", "replace").split()
+    except Refuse:
+        raise Refuse("git patch-id --verbatim failed: a git too old to support --verbatim cannot carry a review")
     return out[0] if out else None
 
 
+def same_patch(reviewed_head, reviewed_base, head, merge_base, config, run=default_git, reviewed_id=None):
+    """The one rule for a review carried to a later head, used by `check` and by the release's
+    `train_receipts.py`: the reviewed head is an ancestor of `head`, and the story's patch over each
+    one's merge base is the same, byte for byte, generated files left out. `reviewed_id`, when
+    given, is the reviewed side's id as `record` kept it."""
+    try:
+        run("merge-base", "--is-ancestor", reviewed_head, head)
+    except Refuse:
+        return False
+    mine = story_patch_id(merge_base, head, config, run)
+    return mine is not None and mine == (reviewed_id or story_patch_id(reviewed_base, reviewed_head, config, run))
+
+
+_ROUTING = []
+
+
 def routing_module():
+    if _ROUTING:
+        return _ROUTING[0]
     spec = importlib.util.spec_from_file_location("routing", ROUTING)
     routing = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(routing)
@@ -132,6 +174,7 @@ def routing_module():
     def refuse(msg):
         raise Refuse(msg.replace("small: ", "", 1))
     routing.fail = refuse
+    _ROUTING.append(routing)
     return routing
 
 
@@ -331,7 +374,7 @@ def check(req):
                         reason="%s; LOCAL-FULL settled at %s, carried forward: the patch is unchanged" % (
                             size if every else small["reason"], carried["head"][:12]),
                         mergeBody=body(carried) + "\nReview carried forward from %s to %s: the story's patch is "
-                        "unchanged since it was reviewed (git patch-id --stable, generated files left out)" % (
+                        "unchanged since it was reviewed (git patch-id --verbatim, generated files left out)" % (
                             carried["head"], head))
         if every:
             raise Refuse("every train landing is reviewed before it lands (releaseTrain.reviewEveryLanding), and no "
@@ -349,10 +392,10 @@ def check(req):
 
 
 def carried_receipt(req, head, merge_base, config):
-    """A settled receipt over the same base for an earlier head with this head's story patch id, or None."""
+    """A settled receipt over the same base for an earlier head that `same_patch` carries to this
+    one, or None. The git-free mode, with no history to read, compares the stored ids alone."""
     pure = "tree" in req
-    current = req.get("patchId") if pure else story_patch_id(merge_base, head, config)
-    if not current:
+    if pure and not req.get("patchId"):
         return None
     folder = receipts_dir(req)
     try:
@@ -368,12 +411,14 @@ def carried_receipt(req, head, merge_base, config):
         if not (isinstance(r, dict) and r.get("base") == req["base"] and SHA.match(str(r.get("head")))
                 and SHA.match(str(r.get("mergeBase")))):
             continue
+        stored = r.get("patchId") if SHA.match(str(r.get("patchId"))) else None
         try:
             settled(r, config)
-            theirs = r.get("patchId") or (None if pure else story_patch_id(r["mergeBase"], r["head"], config))
+            carried = (stored == req["patchId"] if pure else
+                       same_patch(r["head"], r["mergeBase"], head, merge_base, config, reviewed_id=stored))
         except Refuse:
             continue
-        if theirs == current:
+        if carried:
             return r
     return None
 
@@ -384,7 +429,10 @@ def record(req):
     receipt = {"schema": SCHEMA, "mode": "LOCAL-FULL", "base": req["base"], "head": head, "tree": tree, "mergeBase": merge_base,
                "cycles": req.get("cycles"), "engines": req.get("engines"), "findings": req.get("findings")}
     receipt["findings"] = settled(receipt, config)
-    patch = req.get("patchId") if "tree" in req else story_patch_id(merge_base, head, config)
+    try:  # a git without --verbatim keeps no id: `check` then carries nothing, it never admits more
+        patch = req.get("patchId") if "tree" in req else story_patch_id(merge_base, head, config)
+    except Refuse:
+        patch = None
     if patch:
         receipt["patchId"] = patch
     folder = receipts_dir(req)

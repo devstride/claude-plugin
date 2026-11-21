@@ -125,4 +125,23 @@ SB=0000000000000000000000000000000000000000 run
 [ "$RC" = 2 ] && printf '%s' "$OUT" | grep -q '^train_receipts: ' && ok "(8) a wrong range exits 2 with one line" || bad "(8) a wrong range — exit $RC: $OUT"
 OUT="$(python3 "$TOOL" --config "$CFG" 2>&1)"; RC=$?
 [ "$RC" = 2 ] && printf '%s' "$OUT" | grep -q '^train_receipts: missing' && ok "(9) a missing argument exits 2" || bad "(9) missing argument — exit $RC: $OUT"
+
+# (10) a review the landing gate carried forward (review-gate.py same_patch): the receipt names an earlier
+# head whose story patch is unchanged, generated files left out; a change to the patch, white space
+# alone included, is not carried
+R="$WORK/r3"; mkdir "$R"; cd "$R" || exit 2
+CFG="$WORK/config-generated.json"
+python3 -c "import json; c=json.load(open('$WORK/config.json')); c['generated']={'paths':['gen/']}; json.dump(c, open('$CFG','w'))"
+git init -q -b develop; mkdir gen; echo base > a.txt; echo v1 > gen/api.json; git add -A; git commit -qm base; SB="$(git rev-parse HEAD)"
+git checkout -q -b train
+work g1 src/g.py; hg="$(git rev-parse HEAD)"; mbg="$(git merge-base train g1)"; prove "$hg"
+git checkout -q train; echo moved > t.txt; echo v2 > gen/api.json; git add -A; git commit -qm "train moved"
+git checkout -q g1; git merge -q --no-ff -m "merge: origin/train into g1" train; echo v3 > gen/api.json; git add -A; git commit -qm regenerate
+land g1 "merge: I10 g into train" "$(receipt "$hg" | sed "s/merge base 000000000000/merge base ${mbg:0:12}/")"
+git checkout -q -b g2 train; printf 'if x:\n    pass\ny = 1\n' > src/w.py; git add -A; git commit -qm "story"; hw="$(git rev-parse HEAD)"
+mbw="$(git merge-base train g2)"; prove "$hw"; printf 'if x:\n    pass\n    y = 1\n' > src/w.py; git commit -qam "indent"
+land g2 "merge: I11 w into train" "$(receipt "$hw" | sed "s/merge base 000000000000/merge base ${mbw:0:12}/")"
+sync; run
+expect "(10) a review carried past a regeneration under an unchanged patch is receipted; a re-indent is not" 1 \
+  "'I10' in [r['item'] for r in d['receipted']] and [(u['item'],u['why'].split(',')[0]) for u in d['unreviewed'] if u['item']]==[('I11','its receipt names '+'$hw'[:12])]"
 exit $FAIL
