@@ -37,6 +37,43 @@
         "risk-check": "risk-check@1"
       }
     },
+    "plan": {
+      "version": 1,
+      "sha256": "442a8e4eb394cd1fad2a5863a44497159cf6316222065990fc0931a659432af9",
+      "steps": {
+        "confirm-drafts": "plan-draft-approval@1",
+        "create-items": "plan-create@1",
+        "discover": "plan-discovery@1",
+        "draft-specs": "plan-draft@1",
+        "ground": "plan-ground@1",
+        "hand-off": "plan-hand-off@1",
+        "number-titles": "plan-number@1",
+        "orient": "plan-orient@1",
+        "rationalize-dates": "rationalize-gantt@1",
+        "record-sign-off": "plan-sign-off-record@1",
+        "session-check": "session-model@1",
+        "wire-edges": "plan-wire@1"
+      }
+    },
+    "rebalance": {
+      "version": 1,
+      "sha256": "8d989274efeac16efe506cd77b84512d770aa8aae80df6ae0acfc6cc5a683e45",
+      "steps": {
+        "archive-originals": "rebalance-archive@1",
+        "create-successors": "rebalance-successors@1",
+        "gates": "rebalance-gates@1",
+        "ground": "plan-ground@1",
+        "partition": "rebalance-partition@1",
+        "propose": "rebalance-proposal@1",
+        "redate": "rationalize-gantt@1",
+        "renumber": "rebalance-renumber@1",
+        "report": "rebalance-report@1",
+        "rewire": "rebalance-rewire@1",
+        "rewrite-marker": "rebalance-marker@1",
+        "scheduler-probe": "rebalance-probe@1",
+        "session-check": "session-model@1"
+      }
+    },
     "release": {
       "version": 1,
       "sha256": "f008b570eacead397b57391999ec806ab6093becc8eca28588f0c705668c9ae3",
