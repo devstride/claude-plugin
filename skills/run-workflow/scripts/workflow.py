@@ -61,7 +61,8 @@ ANSWER_MAX_CHARS = 8000
 UNSENT_MAX_RUNS = 10
 UNSENT_LINE = ("Step reports for this run are not reaching the tracker, so it will not show there yet. "
                "The run carries on; once it is over, a later session building in this repository sends them.")
-AUTO_REDO_LIMIT = 5
+AUTO_REDO_LIMIT = 5  # a contract may raise it with maxAutoRedo, never above AUTO_REDO_MAX
+AUTO_REDO_MAX = 20
 GIT_READ_ONLY = ("rev-parse", "diff", "patch-id")
 GIT_TIMEOUT, GIT_DIFF_TIMEOUT = 30, 120
 
@@ -86,7 +87,7 @@ ENTRY_FIELDS = ("summary", "builtinSkill", "payload", "argument", "verdict", "re
 # Optional entry fields: a contract a satisfier may stand in for, and the two step-skill rule flags
 # (delegates: the step may run one Workflow of drafting agents; interactive: it may hold a
 # conversation with the person inside the step). The runner passes the flags through unchanged.
-OPTIONAL_FIELDS = ("satisfiedBy", "delegates", "interactive")
+OPTIONAL_FIELDS = ("satisfiedBy", "maxAutoRedo", "delegates", "interactive")
 CLASSES = ("continue", "skipped", "redo:self", "stop", "ask")
 END_CLASS = re.compile(r"^end:([a-z][a-z-]*)$")
 DETAILS = ("none", "optional", "required")
@@ -363,6 +364,8 @@ def _entry_shape(entry):
         return "satisfiedBy is a list of contract names"
     if any(flag in entry and not isinstance(entry[flag], bool) for flag in ("delegates", "interactive")):
         return "delegates and interactive are true or false"
+    if "maxAutoRedo" in entry and not (_whole(entry["maxAutoRedo"]) and AUTO_REDO_LIMIT < entry["maxAutoRedo"] <= AUTO_REDO_MAX):
+        return "maxAutoRedo is a whole number above %d and at most %d" % (AUTO_REDO_LIMIT, AUTO_REDO_MAX)
     return None
 
 
@@ -1209,7 +1212,8 @@ class Run:
 
     def issue(self, index, cause):
         """Hand out a step. `cause` names the runner's own reason for a re-issue (None when a
-        person or the plain order asked): those are counted, and the fifth stops the run."""
+        person or the plain order asked): those are counted, and the fifth (or the contract's
+        maxAutoRedo) stops the run."""
         step, record = self.steps[index], self.record(index)
         self.branch_fault(index)
         refused = self.merge_refused(index)
@@ -1222,9 +1226,10 @@ class Run:
                 return self.stop("proof", "the commit step %s would merge cannot be read: %s" % (step["id"], error), index)
         if cause and cause != "redo":  # a step's own verdict asking for another go is not the runner's re-issue
             record["autoRedo"] += 1
-            if record["autoRedo"] >= AUTO_REDO_LIMIT:
+            limit = self.contracts[step["contract"]].get("maxAutoRedo", AUTO_REDO_LIMIT)
+            if record["autoRedo"] >= limit:
                 return self.stop("attempts-exhausted", "step %s was re-issued %d times without its proof holding" % (
-                    step["id"], AUTO_REDO_LIMIT - 1), index)
+                    step["id"], limit - 1), index)
         if record["attempt"] >= REPORT.MAX_ATTEMPT:
             return self.stop("attempts-exhausted", "step %s has run %d times" % (step["id"], record["attempt"]), index)
         try:

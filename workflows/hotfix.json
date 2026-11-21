@@ -1,0 +1,249 @@
+{
+  "schema": 1,
+  "id": "hotfix",
+  "version": 1,
+  "name": "Hotfix",
+  "startsWhen": "on-demand",
+  "endsBy": null,
+  "appliesTo": {
+    "workTypes": [],
+    "tags": [],
+    "repositories": []
+  },
+  "minPluginVersion": "4.7.0",
+  "phases": [
+    {
+      "id": "cut",
+      "name": "Cut the branch",
+      "steps": [
+        {
+          "id": "preflight",
+          "name": "Check the working tree and name the branch",
+          "summary": "The tree is clean and the hotfix branch name comes from the repository's config.",
+          "contract": "hotfix-preflight@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "cut-branch",
+          "name": "Cut the hotfix branch from production",
+          "summary": "The hotfix branch is cut from a fresh copy of the production branch and pushed.",
+          "contract": "hotfix-branch@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "name-stage",
+          "name": "Name the environment this checkout deploys to",
+          "summary": "The stage this checkout deploys to is named before any environment command runs.",
+          "contract": "hotfix-stage@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "rewind-environment",
+          "name": "Bring the local environment back to production code",
+          "summary": "The local environment moves backward to production code, by the repository's own commands.",
+          "contract": "hotfix-environment@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "report-cut",
+          "name": "Report the cut",
+          "summary": "One line says which branch was cut and which environment case was taken.",
+          "contract": "hotfix-report@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "ship",
+      "name": "Fix and ship",
+      "steps": [
+        {
+          "id": "fix",
+          "name": "Make the smallest fix",
+          "summary": "The smallest change that fixes the problem is committed and pushed.",
+          "contract": "hotfix-fix@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "risk-check",
+          "name": "Risk check",
+          "summary": "The fix is checked for the risks its change carries.",
+          "contract": "risk-check@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "risk-check",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "local-checks",
+          "name": "Local checks",
+          "summary": "The repository's local checks run on the final tree.",
+          "contract": "local-checks@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "local-checks",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "review",
+          "name": "Open the pull request and review it",
+          "summary": "The pull request into the production branch gets its full review before CI.",
+          "contract": "review@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "review-story",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "merge",
+          "name": "Merge to production on your yes",
+          "summary": "The reviewed pull request merges into the production branch only on the person's yes.",
+          "contract": "hotfix-merge@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "approve-deploy",
+          "name": "Approve the production deploy on your yes",
+          "summary": "The production deploy of this merge is approved only on the person's yes.",
+          "contract": "deploy-approval@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "confirm-deploy",
+          "name": "Confirm production serves the fix",
+          "summary": "Production is confirmed to serve the merge, or the person confirms it.",
+          "contract": "deploy-confirm@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "close",
+          "name": "Close out the hotfix",
+          "summary": "The hotfix is closed and an open release branch that must take it is named.",
+          "contract": "hotfix-close@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    }
+  ]
+}

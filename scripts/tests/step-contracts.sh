@@ -107,15 +107,25 @@ PUBLISHED = {
     "capture@1": ("capture-findings", "FINDINGS: FILED=continue | NONE=continue", "none", ["complete@1"], None, None),
     "sync@1": ("sync-base", "SYNC: CLEAN=continue | DIRTY=stop", "none", ["complete@1"], None, None),
     "custom@1": (None, "STEP: PASS=continue | FAIL=stop | HOLD=end:held", "none", [], None, None),
+    "hotfix-preflight@1": ("hotfix-steps", "HOTFIX PREFLIGHT: READY=continue | DIRTY=ask | NEEDS INPUT=ask | FAILED=stop", "none", [], None, None),
+    "hotfix-branch@1": ("hotfix-steps", "HOTFIX BRANCH: CUT=continue | FAILED=stop", "none", ["hotfix-preflight@1"], None, None),
+    "hotfix-stage@1": ("hotfix-steps", "HOTFIX STAGE: NAMED=continue | NONE=continue | PRODUCTION=ask | DECLINED=end:environment-declined", "none", ["hotfix-branch@1"], None, None),
+    "hotfix-environment@1": ("hotfix-steps", "HOTFIX ENVIRONMENT: RECREATED=continue | MIGRATED=continue | UNCHANGED=continue | NEEDS ANSWER=ask | FAILED=stop", "none", ["hotfix-stage@1"], None, None),
+    "hotfix-report@1": ("hotfix-steps", "HOTFIX CUT: DONE=continue", "none", ["hotfix-environment@1"], None, None),
+    "hotfix-fix@1": ("hotfix-steps", "HOTFIX FIX: COMMITTED=continue | NEEDS DIRECTION=ask | ABANDONED=end:abandoned", "none", ["hotfix-report@1"], None, None),
+    "hotfix-merge@1": ("hotfix-steps", "HOTFIX MERGE: MERGED=continue | WAITING FOR YES=ask | REFUSED=stop | ERROR=stop", "none", ["review@1", "local-checks@1", "risk-check@1"], None, None),
+    "deploy-approval@1": ("hotfix-steps", "DEPLOY APPROVAL: APPROVED=continue | WAITING FOR YES=ask | RETRY=redo:self | NOT CONFIGURED=skipped | STOPPED=stop", "none", ["hotfix-merge@1"], None, None),
+    "deploy-confirm@1": ("hotfix-steps", "DEPLOY: CONFIRMED=continue | UNCONFIRMED=stop | OWNER TO CONFIRM=ask | NOT CONFIGURED=skipped", "none", ["hotfix-merge@1"], None, None),
+    "hotfix-close@1": ("hotfix-steps", "HOTFIX CLOSED: CLOSED=continue | OPEN RELEASE=continue", "none", ["hotfix-merge@1"], None, None),
 }
-check("the catalog holds exactly the twelve published contracts, in order", list(contracts) == list(PUBLISHED), list(contracts))
+check("the catalog holds exactly the published contracts (the twelve Build ones, then the Hotfix ten), in order", list(contracts) == list(PUBLISHED), list(contracts))
 for name, entry in contracts.items():
     said = (entry["builtinSkill"], "%s: %s" % (entry["verdict"]["label"], " | ".join("%s=%s" % (v["value"], v["class"]) for v in entry["verdict"]["values"])),
             entry["proof"]["binding"], entry["requires"], entry["claimPhase"], entry["shipIntentStage"])
     check("%s is as published: skill, verdicts and classes, binding, requirements, phase, stage" % name, said == PUBLISHED.get(name), said)
 needs = dict((name, [v["value"] for v in entry["verdict"]["values"] if v["detail"] == "required"]) for name, entry in contracts.items())
 check("the values that must carry a detail: a held claim's holder and the two questions",
-      dict((k, v) for k, v in needs.items() if v) == {"claim@1": ["HELD"], "build@1": ["NEEDS DECISION"], "risk-check@1": ["NEEDS DECISION"]}, needs)
+      dict((k, v) for k, v in needs.items() if v and not contracts[k]["builtinSkill"] == "hotfix-steps") == {"claim@1": ["HELD"], "build@1": ["NEEDS DECISION"], "risk-check@1": ["NEEDS DECISION"]}, needs)
 # Every value's detail, as the step skills a later release writes must repeat it: <name> must, [<name>] may.
 LINES = {
     "claim@1": "CLAIM: WON | RENEWED | TOOK OVER | HELD <holder> | NOT CONFIGURED | DEGRADED [<reason>]",
@@ -130,6 +140,16 @@ LINES = {
     "capture@1": "FINDINGS: FILED [<items>] | NONE",
     "sync@1": "SYNC: CLEAN | DIRTY [<paths>]",
     "custom@1": "STEP: PASS | FAIL | HOLD",
+    "hotfix-preflight@1": "HOTFIX PREFLIGHT: READY <branch> | DIRTY | NEEDS INPUT <what> | FAILED <why>",
+    "hotfix-branch@1": "HOTFIX BRANCH: CUT <branch> | FAILED <step>",
+    "hotfix-stage@1": "HOTFIX STAGE: NAMED <stage> | NONE | PRODUCTION <stage> | DECLINED <stage>",
+    "hotfix-environment@1": "HOTFIX ENVIRONMENT: RECREATED | MIGRATED | UNCHANGED | NEEDS ANSWER <why> | FAILED <why>",
+    "hotfix-report@1": "HOTFIX CUT: DONE <branch>",
+    "hotfix-fix@1": "HOTFIX FIX: COMMITTED <sha> | NEEDS DIRECTION <what> | ABANDONED",
+    "hotfix-merge@1": "HOTFIX MERGE: MERGED <sha> | WAITING FOR YES | REFUSED <reason> | ERROR <reason>",
+    "deploy-approval@1": "DEPLOY APPROVAL: APPROVED | WAITING FOR YES | RETRY | NOT CONFIGURED | STOPPED <why>",
+    "deploy-confirm@1": "DEPLOY: CONFIRMED <sha> | UNCONFIRMED | OWNER TO CONFIRM | NOT CONFIGURED",
+    "hotfix-close@1": "HOTFIX CLOSED: CLOSED <sha> | OPEN RELEASE <branch>",
 }
 for name, entry in contracts.items():
     check("%s: every value's detail mode and name are as published" % name, verdict_line(entry) == LINES.get(name), verdict_line(entry))
@@ -155,19 +175,29 @@ RESULTS = {
     "capture@1": (["filed", "inserted"], {"filed": "array", "inserted": "array"}),
     "sync@1": (["branch", "clean"], {"branch": "string", "clean": "boolean"}),
     "custom@1": ([], {}),
+    "hotfix-preflight@1": (["branch", "base", "prefix", "date", "dateFormat", "configSource"], {"branch": "string", "base": "string", "prefix": "string", "date": "string", "dateFormat": "string", "configSource": "string"}),
+    "hotfix-branch@1": (["branch", "base", "baseSha", "pushed", "shipIntent"], {"branch": "string", "base": "string", "baseSha": "string", "pushed": "boolean", "shipIntent": "string"}),
+    "hotfix-stage@1": (["stage", "production"], {"stage": "string|null", "production": "boolean"}),
+    "hotfix-environment@1": (["case", "mode", "why", "restartDevServer"], {"case": "number|null", "mode": "string|null", "why": "string", "restartDevServer": "boolean"}),
+    "hotfix-report@1": (["branch", "case"], {"branch": "string", "case": "string"}),
+    "hotfix-fix@1": (["commit", "deferrals", "deviations", "untrackedDeferrals", "dismissed", "scopeLine", "head"], {"commit": "string", "deferrals": "array", "deviations": "array", "untrackedDeferrals": "array", "dismissed": "array", "scopeLine": "string", "head": "string"}),
+    "hotfix-merge@1": (["sha", "pullRequest"], {"sha": "string", "pullRequest": "number|null"}),
+    "deploy-approval@1": (["mergeSha", "approved"], {"mergeSha": "string", "approved": "boolean"}),
+    "deploy-confirm@1": (["mergeCommit", "confirmedAt"], {"mergeCommit": "string", "confirmedAt": "string|null"}),
+    "hotfix-close@1": (["mergeSha", "openRelease"], {"mergeSha": "string", "openRelease": "string|null"}),
 }
 for name, entry in contracts.items():
     check("%s: its result keys and their types are as published" % name, (entry["result"]["required"], entry["result"]["types"]) == RESULTS.get(name), entry["result"])
 # Every contract's payload, key by key: a key is only ever added, never renamed or dropped.
 PAYLOADS = {
-    "risk-check@1": {"item": "context.item", "profile": "context.profile.name", "reviewMoment": "context.reviewMoment",
+    "risk-check@1": {"item": "context.item?", "profile": "context.profile.name", "reviewMoment": "context.reviewMoment",
                      "workingBase": "context.workingBase", "build": "result:build@1", "answer": "step.answer?",
                      "previousProof": "step.passedProof?", "previousResult": "step.passedResult?",
                      "baselineUnreadable": "step.passedUnreadable?"},
-    "review@1": {"item": "context.item", "profile": "context.profile.name", "reviewMoment": "context.reviewMoment",
+    "review@1": {"item": "context.item?", "profile": "context.profile.name", "reviewMoment": "context.reviewMoment",
                  "workingBase": "context.workingBase", "route": "context.route", "riskCheck": "result:risk-check@1",
                  "build": "result:build@1", "localChecks": "result:local-checks@1", "localChecksProof": "proof:local-checks@1"},
-    "local-checks@1": {"item": "context.item", "profile": "context.profile.name", "workingBase": "context.workingBase", "route": "context.route",
+    "local-checks@1": {"item": "context.item?", "profile": "context.profile.name", "workingBase": "context.workingBase", "route": "context.route",
                        "oneOff": "context.oneOff", "branch": "result:branch@1.branch", "previousProof": "step.proof?", "reviewMoment": "context.reviewMoment"},
     "merge@1": {"item": "context.item", "profile": "context.profile.name", "workingBase": "context.workingBase", "route": "context.route",
                 "branch": "result:branch@1.branch", "review": "result:review@1", "build": "result:build@1", "riskCheck": "result:risk-check@1",
@@ -193,7 +223,8 @@ check("the proof values each kind of local check and review may give, and the ve
       and not any("proof" in v for n, e in contracts.items() if n != "local-checks@1" for v in e["verdict"]["values"]))
 check("a count is a count: the risk check's verifiers and the review's cycles",
       contracts["risk-check@1"]["proof"]["types"]["verifiers"] == "count" and contracts["review@1"]["result"]["types"]["cycles"] == "count")
-check("no shipped contract carries satisfiedBy", not any("satisfiedBy" in e for e in contracts.values()))
+check("only the Hotfix satisfiers are shipped: hotfix-branch for branch, hotfix-fix for build",
+      dict((n, e["satisfiedBy"]) for n, e in contracts.items() if "satisfiedBy" in e) == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"]})
 
 # run-workflow: the entry skill and its reference
 faults = skill_faults(root, "run-workflow", None, 15, 1200)
@@ -249,7 +280,7 @@ check("nothing is pending: every skill the catalog names ships", pending == [], 
 flat = lambda s: re.sub(r"\s+", " ", s)
 PLAN_SKILLS = ["plan-steps", "comprehend-plan", "rationalize-gantt", "insert-story"]
 BUILD_STEPS = ["claim-story", "story-lifecycle", "risk-check", "local-checks", "review-story", "merge-story", "capture-findings", "sync-base"]
-check("the eight Build step skills are the catalog's own skills, less the two engines", sorted(BUILD_STEPS) == sorted(set(named) - {"branch-feature", "ultracode-build"} - set(PLAN_SKILLS)), named)
+check("the eight Build step skills are the catalog's own skills, less the two engines", sorted(BUILD_STEPS) == sorted(set(named) - {"branch-feature", "ultracode-build", "hotfix-steps"} - set(PLAN_SKILLS)), named)
 for name in named:
     if name in pending:
         continue

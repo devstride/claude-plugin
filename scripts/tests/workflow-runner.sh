@@ -73,9 +73,17 @@ def plugin_copy(name, catalog=None):
     return root
 
 
+def raised_redo_catalog():
+    catalog = copy.deepcopy(REAL_CATALOG)
+    catalog["contracts"]["local-checks@1"]["maxAutoRedo"] = 8
+    return catalog
+
+
 def roots(which):
     if which == "real":
         return ROOT
+    if which == "raisedRedo":
+        return plugin_copy("plugin-raised-redo", raised_redo_catalog())
     return plugin_copy("plugin-stand-in", stand_in_catalog()) if which == "standIn" else plugin_copy("plugin")
 
 
@@ -319,13 +327,15 @@ def section_catalog():
         shipped = json.load(open(os.path.join(ROOT, "workflows", name + ".json"), encoding="utf-8"))
         steps = [step["contract"] for phase in shipped["phases"] for step in phase["steps"]]
         check("the shipped %s workflow names its pinned contracts, in order" % name, steps == contracts, steps)
+    hotfix = json.load(open(os.path.join(ROOT, "workflows", "hotfix.json"), encoding="utf-8"))
+    hotfix_contracts = [step["contract"] for phase in hotfix["phases"] for step in phase["steps"]]
     standalone = {"custom@1", "splice@1"}
-    expected = set(c for contracts in pinned.values() for c in contracts) | standalone
-    check("the shipped catalog holds the workflows' contracts plus custom@1 and splice@1, and nothing else",
+    expected = set(c for contracts in pinned.values() for c in contracts) | set(hotfix_contracts) | standalone
+    check("the shipped catalog holds the Build, Plan, Rebalance and Hotfix contracts plus custom@1 and splice@1, and nothing else",
           set(REAL_CATALOG["contracts"]) == expected, sorted(set(REAL_CATALOG["contracts"]) ^ expected))
     satisfied = {name: entry["satisfiedBy"] for name, entry in REAL_CATALOG["contracts"].items() if "satisfiedBy" in entry}
-    check("only plan-wire@1 carries satisfiedBy, satisfied by rebalance-rewire@1",
-          satisfied == {"plan-wire@1": ["rebalance-rewire@1"]}, satisfied)
+    check("only the Hotfix satisfiers and the rebalance rewire are shipped",
+          satisfied == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"], "plan-wire@1": ["rebalance-rewire@1"]}, satisfied)
     standin = module.check_catalog(stand_in_catalog())
     check("the fixture catalog, where stand-in@1 satisfies build@1, is sound", standin == [], standin)
 
@@ -815,6 +825,22 @@ def section_proofs():
     check("... and a resume continues it", is_run(answer, "local-checks", 6), answer)
     run.answer = answer
     check("... to the next step once the proof is right", is_run(run.done(), "review", 1))
+
+    # a contract's maxAutoRedo raises the cap for its own step only
+    raised = Driver("raisedRedo")
+    raised.until("local-checks")
+    for attempt_no in range(1, 8):
+        answer = raised.done(**{"proof.tree": "1" * 40})
+        check("maxAutoRedo 8: automatic re-issue %d" % attempt_no, is_run(answer, "local-checks", attempt_no + 1), answer)
+    answer = raised.done(**{"proof.tree": "1" * 40})
+    check("maxAutoRedo 8: the eighth automatic re-issue stops the run", is_stopped(answer, "attempts-exhausted", "local-checks")
+          and "re-issued 7 times" in answer["reason"], answer)
+    runner = load()
+    for bad in (5, 0, 21, True, "8"):
+        catalog = raised_redo_catalog()
+        catalog["contracts"]["local-checks@1"]["maxAutoRedo"] = bad
+        check("a maxAutoRedo of %r is refused by the catalog check" % (bad,), any("maxAutoRedo" in f for f in runner.check_catalog(catalog)), runner.check_catalog(catalog))
+    check("a maxAutoRedo of 8 is a sound catalog", runner.check_catalog(raised_redo_catalog()) == [], runner.check_catalog(raised_redo_catalog()))
 
     # a review proof that names another patch
     answer = run.done(**{"proof.patchId": "2" * 40})

@@ -86,12 +86,20 @@ if [ $RC -eq 0 ] && [ -z "$OUT" ] && marker "$R" s7 | grep -q '"skill": "run-wor
    && [ $RC2 -eq 2 ] && printf '%s' "$OUT2" | grep -q 'already ran /devstride:run-workflow, an execution job' \
    && [ $RC3 -eq 2 ] && printf '%s' "$OUT3" | grep -q '/devstride:run-workflow is an execution job'; then
   ok "(13) run-workflow is an execution job, both ways round"; else bad "(13) rc=$RC/$RC2/$RC3 $OUT|$OUT2|$OUT3"; fi
-# (14) run-workflow plan and rebalance are authoring jobs; build stays execution
+# (14) run-workflow is classified by its workflow: a hotfix is neutral (never blocked), a release is execution
+run "$R" s9 '/devstride:plan I1' >/dev/null; OUT="$(run "$R" s9 '/devstride:run-workflow hotfix fix-login')"; RC=$?
+run "$R" s10 '/devstride:plan I1' >/dev/null; OUT2="$(run "$R" s10 '/devstride:run-workflow release')"; RC2=$?
+run "$R" s11 '/devstride:plan I1' >/dev/null; OUT3="$(run "$R" s11 '/devstride:branch-hotfix x')"; RC3=$?
+OUT4="$(run "$R" s12 'please run-workflow hotfix later')"; RC4=$?
+if [ $RC -eq 0 ] && [ -z "$OUT" ] && marker "$R" s9 | grep -q '"skill": "run-workflow", "class": "neutral"' \
+   && [ $RC2 -eq 2 ] && [ $RC3 -eq 0 ] && [ -z "$OUT3" ] && [ $RC4 -eq 0 ] && [ -z "$OUT4" ] && [ ! -f "$R/.git/devstride/session/s12.json" ]; then
+  ok "(14) run-workflow hotfix is neutral, run-workflow release is execution, branch-hotfix stays neutral"; else bad "(14) rc=$RC/$RC2/$RC3/$RC4 $OUT|$OUT2|$OUT3|$OUT4"; fi
+# (15) run-workflow plan and rebalance are authoring jobs; build stays execution
 run "$R" s20 '/devstride:build-item I123' >/dev/null; OUT="$(run "$R" s20 '/devstride:run-workflow plan I1')"; RC=$?
 run "$R" s21 '/devstride:plan I1' >/dev/null; OUT2="$(run "$R" s21 '/devstride:run-workflow rebalance I1 standard')"; RC2=$?
 OUT3="$(run "$R" s21 '/devstride:rebalance I1 standard')"; RC3=$?
 OUT4="$(run "$R" s21 '/devstride:run-workflow build I123')"; RC4=$?
 if [ $RC -eq 2 ] && printf '%s' "$OUT" | grep -q 'authoring' && [ $RC2 -eq 0 ] && [ -z "$OUT2" ] && [ $RC3 -eq 0 ] \
    && [ $RC4 -eq 2 ]; then
-  ok "(14) run-workflow plan and rebalance are authoring, build stays execution"; else bad "(14) rc=$RC/$RC2/$RC3/$RC4 $OUT|$OUT2|$OUT4"; fi
+  ok "(15) run-workflow plan and rebalance are authoring, build stays execution"; else bad "(15) rc=$RC/$RC2/$RC3/$RC4 $OUT|$OUT2|$OUT4"; fi
 exit $FAIL

@@ -6,7 +6,7 @@
 # the repository the plugin grew up in are that repository's own and creep in one paragraph at a
 # time. Each one reads as an instruction to a stranger whose repository has none of them.
 #
-# What it scans: skills/, hooks/, schemas/, .claude-plugin/, README.md, CONTRIBUTING.md and
+# What it scans: skills/, hooks/, schemas/, workflows/, .claude-plugin/, README.md, CONTRIBUTING.md and
 # RELEASING.md under the root (not CHANGELOG.md, whose history may name retired things) — each
 # file's relative path, then its contents one line at a time, against scripts/neutrality-denylist.txt (`<label><TAB><pattern>`, Python regular
 # expressions). Item numbers are checked separately: an `I` and four to six digits is a finding
@@ -76,7 +76,7 @@ for _, line in rows(env["NT_ITEMS"]):
     if len(parts) >= 2 and parts[0] == "item":
         items.add(parts[1])
 ITEM = re.compile(r"\bI[0-9]{4,6}\b")
-TARGETS = ["skills", "hooks", "schemas", ".claude-plugin", "README.md", "CONTRIBUTING.md", "RELEASING.md"]
+TARGETS = ["skills", "hooks", "schemas", "workflows", ".claude-plugin", "README.md", "CONTRIBUTING.md", "RELEASING.md"]
 files = []
 for t in TARGETS:
     p = os.path.join(root, t)

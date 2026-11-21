@@ -12,16 +12,44 @@
       "verdict": {
         "label": "CLAIM",
         "values": [
-          { "value": "WON", "detail": "none", "class": "continue" },
-          { "value": "RENEWED", "detail": "none", "class": "continue" },
-          { "value": "TOOK OVER", "detail": "none", "class": "continue" },
-          { "value": "HELD", "detail": "required", "class": "end:held", "detailName": "holder" },
-          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
-          { "value": "DEGRADED", "detail": "optional", "class": "skipped", "detailName": "reason" }
+          {
+            "value": "WON",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "RENEWED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "TOOK OVER",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "HELD",
+            "detail": "required",
+            "class": "end:held",
+            "detailName": "holder"
+          },
+          {
+            "value": "NOT CONFIGURED",
+            "detail": "none",
+            "class": "skipped"
+          },
+          {
+            "value": "DEGRADED",
+            "detail": "optional",
+            "class": "skipped",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["state"],
+        "required": [
+          "state"
+        ],
         "types": {
           "state": "string",
           "heldBy": "string",
@@ -47,13 +75,31 @@
       "verdict": {
         "label": "START",
         "values": [
-          { "value": "MOVED", "detail": "optional", "class": "continue", "detailName": "status" },
-          { "value": "UNCHANGED", "detail": "none", "class": "continue" },
-          { "value": "FAILED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "MOVED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "status"
+          },
+          {
+            "value": "UNCHANGED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["statusBefore", "statusAfter", "boardPlaced"],
+        "required": [
+          "statusBefore",
+          "statusAfter",
+          "boardPlaced"
+        ],
         "types": {
           "statusBefore": "string",
           "statusAfter": "string",
@@ -78,13 +124,32 @@
       "verdict": {
         "label": "BRANCH",
         "values": [
-          { "value": "CREATED", "detail": "optional", "class": "continue", "detailName": "branch" },
-          { "value": "EXISTS", "detail": "optional", "class": "continue", "detailName": "branch" },
-          { "value": "REFUSED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "CREATED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "branch"
+          },
+          {
+            "value": "EXISTS",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "branch"
+          },
+          {
+            "value": "REFUSED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["branch", "base", "created"],
+        "required": [
+          "branch",
+          "base",
+          "created"
+        ],
         "types": {
           "branch": "string",
           "base": "string",
@@ -96,7 +161,10 @@
       },
       "requires": [],
       "claimPhase": "Branch",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "satisfiedBy": [
+        "hotfix-branch@1"
+      ]
     },
     "build@1": {
       "summary": "Build the item on its branch and hand back what was deferred, changed or dismissed.",
@@ -113,13 +181,34 @@
       "verdict": {
         "label": "BUILD",
         "values": [
-          { "value": "READY", "detail": "none", "class": "continue" },
-          { "value": "NEEDS DECISION", "detail": "required", "class": "ask", "detailName": "question" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "READY",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "NEEDS DECISION",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "question"
+          },
+          {
+            "value": "BLOCKED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["deferrals", "deviations", "untrackedDeferrals", "dismissed", "scopeLine", "head"],
+        "required": [
+          "deferrals",
+          "deviations",
+          "untrackedDeferrals",
+          "dismissed",
+          "scopeLine",
+          "head"
+        ],
         "types": {
           "deferrals": "array",
           "deviations": "array",
@@ -132,15 +221,20 @@
       "proof": {
         "binding": "none"
       },
-      "requires": ["branch@1"],
+      "requires": [
+        "branch@1"
+      ],
       "claimPhase": "Build",
-      "shipIntentStage": "building"
+      "shipIntentStage": "building",
+      "satisfiedBy": [
+        "hotfix-fix@1"
+      ]
     },
     "risk-check@1": {
       "summary": "Check the finished build for the risks its changes carry, and fix or raise what it finds.",
       "builtinSkill": "risk-check",
       "payload": {
-        "item": "context.item",
+        "item": "context.item?",
         "profile": "context.profile.name",
         "reviewMoment": "context.reviewMoment",
         "workingBase": "context.workingBase",
@@ -154,14 +248,39 @@
       "verdict": {
         "label": "RISK CHECK",
         "values": [
-          { "value": "CLEAR", "detail": "none", "class": "continue" },
-          { "value": "FIXED", "detail": "optional", "class": "continue", "detailName": "count" },
-          { "value": "NEEDS DECISION", "detail": "required", "class": "ask", "detailName": "question" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "CLEAR",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FIXED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "count"
+          },
+          {
+            "value": "NEEDS DECISION",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "question"
+          },
+          {
+            "value": "BLOCKED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["ledger", "report", "counts", "untrackedDeferrals", "dismissed"],
+        "required": [
+          "ledger",
+          "report",
+          "counts",
+          "untrackedDeferrals",
+          "dismissed"
+        ],
         "types": {
           "ledger": "string",
           "report": "string",
@@ -175,7 +294,13 @@
       },
       "proof": {
         "binding": "story",
-        "required": ["base", "head", "triggers", "verifiers", "lenses"],
+        "required": [
+          "base",
+          "head",
+          "triggers",
+          "verifiers",
+          "lenses"
+        ],
         "types": {
           "base": "string",
           "head": "string",
@@ -184,7 +309,9 @@
           "lenses": "array"
         }
       },
-      "requires": ["build@1"],
+      "requires": [
+        "build@1"
+      ],
       "claimPhase": "STORY RISK CHECK",
       "shipIntentStage": null
     },
@@ -192,7 +319,7 @@
       "summary": "Run the repository's local checks on the final tree and leave a receipt.",
       "builtinSkill": "local-checks",
       "payload": {
-        "item": "context.item",
+        "item": "context.item?",
         "profile": "context.profile.name",
         "workingBase": "context.workingBase",
         "route": "context.route",
@@ -205,13 +332,40 @@
       "verdict": {
         "label": "LOCAL CHECKS",
         "values": [
-          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "count", "proof": { "kind": "receipt" } },
-          { "value": "NOT CONFIGURED", "detail": "none", "class": "continue", "proof": { "kind": "none-configured" } },
-          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "checks" }
+          {
+            "value": "PASS",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "count",
+            "proof": {
+              "kind": "receipt"
+            }
+          },
+          {
+            "value": "NOT CONFIGURED",
+            "detail": "none",
+            "class": "continue",
+            "proof": {
+              "kind": "none-configured"
+            }
+          },
+          {
+            "value": "FAIL",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "checks"
+          }
         ]
       },
       "result": {
-        "required": ["commands", "results", "receipt", "tree", "head", "skippedSuites"],
+        "required": [
+          "commands",
+          "results",
+          "receipt",
+          "tree",
+          "head",
+          "skippedSuites"
+        ],
         "types": {
           "commands": "array",
           "results": "array",
@@ -223,7 +377,12 @@
       },
       "proof": {
         "binding": "tree",
-        "required": ["kind", "tree", "head", "receipt"],
+        "required": [
+          "kind",
+          "tree",
+          "head",
+          "receipt"
+        ],
         "types": {
           "kind": "string",
           "tree": "string",
@@ -231,10 +390,15 @@
           "receipt": "string|null"
         },
         "values": {
-          "kind": ["receipt", "none-configured"]
+          "kind": [
+            "receipt",
+            "none-configured"
+          ]
         }
       },
-      "requires": ["risk-check@1"],
+      "requires": [
+        "risk-check@1"
+      ],
       "claimPhase": "Verify",
       "shipIntentStage": "verifying"
     },
@@ -242,7 +406,7 @@
       "summary": "Review the change with the configured reviewers and settle every finding.",
       "builtinSkill": "review-story",
       "payload": {
-        "item": "context.item",
+        "item": "context.item?",
         "profile": "context.profile.name",
         "reviewMoment": "context.reviewMoment",
         "workingBase": "context.workingBase",
@@ -256,13 +420,34 @@
       "verdict": {
         "label": "REVIEW",
         "values": [
-          { "value": "SETTLED", "detail": "none", "class": "continue" },
-          { "value": "COVERED", "detail": "optional", "class": "continue", "detailName": "reason" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "SETTLED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "COVERED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "reason"
+          },
+          {
+            "value": "BLOCKED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["path", "cycles", "untrackedDeferrals", "dismissed", "pullRequest", "mergeBody"],
+        "required": [
+          "path",
+          "cycles",
+          "untrackedDeferrals",
+          "dismissed",
+          "pullRequest",
+          "mergeBody"
+        ],
         "types": {
           "path": "string",
           "cycles": "count",
@@ -276,7 +461,12 @@
       },
       "proof": {
         "binding": "patch",
-        "required": ["path", "head", "base", "patchId"],
+        "required": [
+          "path",
+          "head",
+          "base",
+          "patchId"
+        ],
         "types": {
           "path": "string",
           "head": "string",
@@ -285,10 +475,16 @@
           "pullRequest": "count|null"
         },
         "values": {
-          "path": ["fast-local", "pull-request"]
+          "path": [
+            "fast-local",
+            "pull-request"
+          ]
         }
       },
-      "requires": ["risk-check@1", "local-checks@1"],
+      "requires": [
+        "risk-check@1",
+        "local-checks@1"
+      ],
       "claimPhase": "Review",
       "shipIntentStage": "reviewing"
     },
@@ -312,14 +508,38 @@
       "verdict": {
         "label": "MERGE",
         "values": [
-          { "value": "LANDED", "detail": "optional", "class": "continue", "detailName": "target" },
-          { "value": "REFRESHED", "detail": "none", "class": "redo:self" },
-          { "value": "HELD", "detail": "optional", "class": "end:held", "detailName": "reason" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "LANDED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "target"
+          },
+          {
+            "value": "REFRESHED",
+            "detail": "none",
+            "class": "redo:self"
+          },
+          {
+            "value": "HELD",
+            "detail": "optional",
+            "class": "end:held",
+            "detailName": "reason"
+          },
+          {
+            "value": "BLOCKED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["target", "sha", "pullRequest", "deletedBranch"],
+        "required": [
+          "target",
+          "sha",
+          "pullRequest",
+          "deletedBranch"
+        ],
         "types": {
           "target": "string",
           "sha": "string",
@@ -329,12 +549,18 @@
       },
       "proof": {
         "binding": "none",
-        "required": ["head"],
+        "required": [
+          "head"
+        ],
         "types": {
           "head": "string"
         }
       },
-      "requires": ["review@1", "local-checks@1", "risk-check@1"],
+      "requires": [
+        "review@1",
+        "local-checks@1",
+        "risk-check@1"
+      ],
       "claimPhase": "Merge",
       "shipIntentStage": "landing"
     },
@@ -358,13 +584,35 @@
       "verdict": {
         "label": "COMPLETE",
         "values": [
-          { "value": "DONE", "detail": "none", "class": "continue" },
-          { "value": "LANDED", "detail": "none", "class": "continue" },
-          { "value": "FAILED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "DONE",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "LANDED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["status", "statusName", "startDate", "dueDate", "pullRequest", "asBuilt", "claimReleased", "shipIntentReleased"],
+        "required": [
+          "status",
+          "statusName",
+          "startDate",
+          "dueDate",
+          "pullRequest",
+          "asBuilt",
+          "claimReleased",
+          "shipIntentReleased"
+        ],
         "types": {
           "status": "string",
           "statusName": "string|null",
@@ -379,7 +627,9 @@
       "proof": {
         "binding": "none"
       },
-      "requires": ["merge@1"],
+      "requires": [
+        "merge@1"
+      ],
       "claimPhase": "Completion ritual",
       "shipIntentStage": null
     },
@@ -397,12 +647,24 @@
       "verdict": {
         "label": "FINDINGS",
         "values": [
-          { "value": "FILED", "detail": "optional", "class": "continue", "detailName": "items" },
-          { "value": "NONE", "detail": "none", "class": "continue" }
+          {
+            "value": "FILED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "items"
+          },
+          {
+            "value": "NONE",
+            "detail": "none",
+            "class": "continue"
+          }
         ]
       },
       "result": {
-        "required": ["filed", "inserted"],
+        "required": [
+          "filed",
+          "inserted"
+        ],
         "types": {
           "filed": "array",
           "inserted": "array"
@@ -411,7 +673,9 @@
       "proof": {
         "binding": "none"
       },
-      "requires": ["complete@1"],
+      "requires": [
+        "complete@1"
+      ],
       "claimPhase": null,
       "shipIntentStage": null
     },
@@ -425,12 +689,24 @@
       "verdict": {
         "label": "SYNC",
         "values": [
-          { "value": "CLEAN", "detail": "none", "class": "continue" },
-          { "value": "DIRTY", "detail": "optional", "class": "stop", "detailName": "paths" }
+          {
+            "value": "CLEAN",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "DIRTY",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "paths"
+          }
         ]
       },
       "result": {
-        "required": ["branch", "clean"],
+        "required": [
+          "branch",
+          "clean"
+        ],
         "types": {
           "branch": "string",
           "clean": "boolean"
@@ -439,7 +715,9 @@
       "proof": {
         "binding": "none"
       },
-      "requires": ["complete@1"],
+      "requires": [
+        "complete@1"
+      ],
       "claimPhase": null,
       "shipIntentStage": null
     },
@@ -451,9 +729,21 @@
       "verdict": {
         "label": "STEP",
         "values": [
-          { "value": "PASS", "detail": "none", "class": "continue" },
-          { "value": "FAIL", "detail": "none", "class": "stop" },
-          { "value": "HOLD", "detail": "none", "class": "end:held" }
+          {
+            "value": "PASS",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAIL",
+            "detail": "none",
+            "class": "stop"
+          },
+          {
+            "value": "HOLD",
+            "detail": "none",
+            "class": "end:held"
+          }
         ]
       },
       "result": {
@@ -1651,6 +1941,551 @@
         "binding": "none"
       },
       "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-preflight@1": {
+      "summary": "Check the working tree and name the hotfix branch from the repository's config.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branchArgument": "context.branchArgument",
+        "itemNumber": "context.itemNumber?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX PREFLIGHT",
+        "values": [
+          {
+            "value": "READY",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "branch"
+          },
+          {
+            "value": "DIRTY",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "NEEDS INPUT",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "what"
+          },
+          {
+            "value": "FAILED",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "why"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "branch",
+          "base",
+          "prefix",
+          "date",
+          "dateFormat",
+          "configSource"
+        ],
+        "types": {
+          "branch": "string",
+          "base": "string",
+          "prefix": "string",
+          "date": "string",
+          "dateFormat": "string",
+          "configSource": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-branch@1": {
+      "summary": "Cut the hotfix branch from the production branch and push it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-preflight@1.branch",
+        "base": "result:hotfix-preflight@1.base",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX BRANCH",
+        "values": [
+          {
+            "value": "CUT",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "branch"
+          },
+          {
+            "value": "FAILED",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "step"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "branch",
+          "base",
+          "baseSha",
+          "pushed",
+          "shipIntent"
+        ],
+        "types": {
+          "branch": "string",
+          "base": "string",
+          "baseSha": "string",
+          "pushed": "boolean",
+          "shipIntent": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "hotfix-preflight@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-stage@1": {
+      "summary": "Name the environment this checkout deploys to, and stop before touching a production one.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX STAGE",
+        "values": [
+          {
+            "value": "NAMED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "stage"
+          },
+          {
+            "value": "NONE",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "PRODUCTION",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "stage"
+          },
+          {
+            "value": "DECLINED",
+            "detail": "required",
+            "class": "end:environment-declined",
+            "detailName": "stage"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "stage",
+          "production"
+        ],
+        "types": {
+          "stage": "string|null",
+          "production": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "hotfix-branch@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-environment@1": {
+      "summary": "Bring the local environment back to production code: a backward transition.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "stage": "result:hotfix-stage@1.stage",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX ENVIRONMENT",
+        "values": [
+          {
+            "value": "RECREATED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "MIGRATED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "UNCHANGED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "NEEDS ANSWER",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "why"
+          },
+          {
+            "value": "FAILED",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "why"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "case",
+          "mode",
+          "why",
+          "restartDevServer"
+        ],
+        "types": {
+          "case": "number|null",
+          "mode": "string|null",
+          "why": "string",
+          "restartDevServer": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "hotfix-stage@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-report@1": {
+      "summary": "Report the cut in one line and say what comes next.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "environment": "result:hotfix-environment@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX CUT",
+        "values": [
+          {
+            "value": "DONE",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "branch"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "branch",
+          "case"
+        ],
+        "types": {
+          "branch": "string",
+          "case": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "hotfix-environment@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-fix@1": {
+      "summary": "Make the smallest change that fixes the production problem, then commit and push it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "base": "result:hotfix-branch@1.base",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX FIX",
+        "values": [
+          {
+            "value": "COMMITTED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "sha"
+          },
+          {
+            "value": "NEEDS DIRECTION",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "what"
+          },
+          {
+            "value": "ABANDONED",
+            "detail": "none",
+            "class": "end:abandoned"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "commit",
+          "deferrals",
+          "deviations",
+          "untrackedDeferrals",
+          "dismissed",
+          "scopeLine",
+          "head"
+        ],
+        "types": {
+          "commit": "string",
+          "deferrals": "array",
+          "deviations": "array",
+          "untrackedDeferrals": "array",
+          "dismissed": "array",
+          "scopeLine": "string",
+          "head": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "hotfix-report@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-merge@1": {
+      "summary": "Merge the reviewed hotfix pull request into the production branch, only on the person's yes.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch?",
+        "base": "result:hotfix-branch@1.base?",
+        "review": "result:review@1",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX MERGE",
+        "values": [
+          {
+            "value": "MERGED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "sha"
+          },
+          {
+            "value": "WAITING FOR YES",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "REFUSED",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "reason"
+          },
+          {
+            "value": "ERROR",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "sha",
+          "pullRequest"
+        ],
+        "types": {
+          "sha": "string",
+          "pullRequest": "number|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "review@1",
+        "local-checks@1",
+        "risk-check@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "deploy-approval@1": {
+      "summary": "Approve the production deploy of one merge, only on the person's yes for that merge.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "mergeSha": "result:hotfix-merge@1.sha",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "DEPLOY APPROVAL",
+        "values": [
+          {
+            "value": "APPROVED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "WAITING FOR YES",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "RETRY",
+            "detail": "none",
+            "class": "redo:self"
+          },
+          {
+            "value": "NOT CONFIGURED",
+            "detail": "none",
+            "class": "skipped"
+          },
+          {
+            "value": "STOPPED",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "why"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "mergeSha",
+          "approved"
+        ],
+        "types": {
+          "mergeSha": "string",
+          "approved": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "hotfix-merge@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "deploy-confirm@1": {
+      "summary": "Confirm production serves the merge, or ask the person to confirm it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "mergeSha": "result:hotfix-merge@1.sha",
+        "needed": "context.deployConfirmNeeded?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "DEPLOY",
+        "values": [
+          {
+            "value": "CONFIRMED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "sha"
+          },
+          {
+            "value": "UNCONFIRMED",
+            "detail": "none",
+            "class": "stop"
+          },
+          {
+            "value": "OWNER TO CONFIRM",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "NOT CONFIGURED",
+            "detail": "none",
+            "class": "skipped"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "mergeCommit",
+          "confirmedAt"
+        ],
+        "types": {
+          "mergeCommit": "string",
+          "confirmedAt": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "hotfix-merge@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-close@1": {
+      "summary": "Close out the hotfix and say whether an open release branch must take it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "mergeSha": "result:hotfix-merge@1.sha",
+        "base": "result:hotfix-branch@1.base?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX CLOSED",
+        "values": [
+          {
+            "value": "CLOSED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "sha"
+          },
+          {
+            "value": "OPEN RELEASE",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "branch"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "mergeSha",
+          "openRelease"
+        ],
+        "types": {
+          "mergeSha": "string",
+          "openRelease": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "hotfix-merge@1"
+      ],
       "claimPhase": null,
       "shipIntentStage": null
     }
