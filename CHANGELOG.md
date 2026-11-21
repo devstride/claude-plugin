@@ -10,6 +10,16 @@ for what each version component means here and how a release is cut.
 
 ### Added
 
+- **An organization's own workflow now runs for its items.** At the start of each run the loop
+  asks DevStride once which workflow applies to the item and runs it instead of the built-in one,
+  on by default with nothing to set up. Nothing published, no connection or an older server means
+  the built-in workflow, silently; a workflow this plugin cannot safely run (incomplete, a failed
+  integrity check, a newer plugin needed, or a step list the runner refuses) means the built-in
+  workflow with one plain line. The chosen workflow is pinned for the run. A custom step can run a
+  skill file kept in the repository, read from the committed version only, never executed, and
+  refused when it is a link, a submodule, an unsafe path, over 64 KB or not text. `workflow.py
+  repository` prints the repository's name without any credential, and doctor reports whether
+  the connected server offers workflows. The one off switch is the existing `workflows` setting.
 - **The release's step list exists as data, ready for the step runner (in progress).** Six built-in
   release workflow definitions now ship: one full release per clearance scope (`release`,
   `cut-to-deploy`, `merge-and-deploy`) and three partial entries (post-deploy only, documentation

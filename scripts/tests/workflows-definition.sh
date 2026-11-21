@@ -70,6 +70,18 @@ def bloat(d): d["notes"] = "x" * 70000
 def no_condition(d): first(d)["when"] = {"mode": "condition", "condition": None}
 def condition_on_always(d): first(d)["when"] = {"mode": "always", "condition": "review-path:fast"}
 def duplicate(d): d["phases"][3]["steps"][0]["id"] = "claim"
+def steps_in_all(total):
+    def apply(d):
+        template = copy.deepcopy(first(d))
+        template.update(summary="", run={"source": "off", "ref": None, "version": None})
+        steps = []
+        for k in range(total):
+            step = copy.deepcopy(template)
+            step.update(id="s%d" % k, name="Step %d" % k, contract="custom@1")
+            steps.append(step)
+        d["phases"] = [{"id": "p%d" % i, "name": "Phase %d" % i, "steps": steps[i * 25:(i + 1) * 25]}
+                       for i in range((total + 24) // 25)]
+    return apply
 def schema_drift(s): s["properties"]["phases"]["items"]["properties"]["steps"]["items"]["properties"]["kind"]["enum"].append("hook")
 
 CASES = [("a duplicate step id", dict(change=duplicate), "duplicate step id claim"),
@@ -95,6 +107,9 @@ for index, (label, kwargs, reason) in enumerate(CASES):
     rc, out, err = scratch("case-%d" % index, **kwargs)
     check("(8) %s fails with its reason" % label, (rc, reason in out, out.startswith("INVALID ")), (1, True, True))
 check("(9) an unchanged scratch copy passes", scratch("clean")[:2], (0, "WORKFLOWS: ok (1 files, 11 steps)"))
+check("(9b) a definition with 250 steps passes", scratch("steps-250", change=steps_in_all(250))[:2], (0, "WORKFLOWS: ok (1 files, 250 steps)"))
+rc, out, err = scratch("steps-251", change=steps_in_all(251))
+check("(9c) one with 251 steps fails with at most 250 steps in all", (rc, "at most 250 steps in all" in out), (1, True))
 empty = os.path.join(tmp, "empty"); os.makedirs(empty)
 rc, out, err = run(empty)
 check("(10) unreadable input exits 2 with one line on stderr", (rc, out, err.startswith("check-workflows: "), "Traceback" in err), (2, "", True, False))

@@ -134,6 +134,31 @@ for case in FIX["answers"]:
         rc, _, _, err = start(definition=case["answer"]["match"]["definition"])
         check("started directly, %s is refused as %s" % (case["name"], code), rc == 2 and err.startswith("workflow: %s:" % code), err)
 
+# the step limit, 250 across all phases, the same number the tracker accepts
+def with_steps(total):
+    """The organization fixture padded with short switched-off steps to `total` steps, 25 a phase."""
+    answer = copy.deepcopy([c for c in FIX["answers"] if c["expect"]["fallbackReason"] is None][0]["answer"])
+    definition = answer["match"]["definition"]
+    steps = definition["phases"][0]["steps"]
+    for k in range(total - len(steps)):
+        extra = copy.deepcopy(steps[-1])
+        extra.update(id="extra-%d" % k, name="Extra %d" % k, summary="", run={"source": "off", "ref": None, "version": None})
+        steps.append(extra)
+    definition["phases"] = [{"id": "p%d" % i, "name": "Phase %d" % i, "steps": steps[i * 25:(i + 1) * 25]}
+                            for i in range((len(steps) + 24) // 25)]
+    answer["match"]["hash"] = definition_hash(definition)
+    return answer
+widest = with_steps(250)
+check("a 250-step definition fits the 64 KB size limit both sides apply",
+      len(_report.canonical_json(widest["match"]["definition"])) <= 65536)
+rc, answer, _, err = start(widest)
+check("an organization definition with 250 steps runs", rc == 0 and answer["definitionSource"] == "organization", (rc, err, answer and answer["notice"]))
+rc, answer, _, err = start(with_steps(251))
+check("one with 251 steps falls back to the built-in workflow, saying at most 250 steps",
+      rc == 0 and answer["definitionSource"] == "builtin" and "at most 250 steps" in (answer["notice"] or ""), (rc, err, answer and answer["notice"]))
+rc, _, _, err = start(definition=with_steps(251)["match"]["definition"])
+check("... and started directly it is refused as bad-schema", rc == 2 and err.startswith("workflow: bad-schema:") and "at most 250 steps" in err, err)
+
 # --- pinning ------------------------------------------------------------------------------------
 print("pinning")
 org = [c for c in FIX["answers"] if c["expect"]["fallbackReason"] is None][0]["answer"]
@@ -151,6 +176,11 @@ for command in ("next", "status", "resume"):
     else:
         pinned = pinned and answer["step"]["id"] == first["step"]["id"]
     check("%s ignores a fetched member and reads the pinned copy" % command, pinned, (rc, err))
+run("done", {"session": sid, "item": FIX["context"]["item"], "stepId": first["step"]["id"], "attempt": 1,
+             "output": "STEP: PASS", "fetched": {"match": None}})
+rc, after, _, err = sid_status(sid)
+check("done ignores a fetched member: the run keeps its pinned organization definition",
+      rc == 0 and after["definitionSource"] == "organization" and after["runId"] == first["runId"], (rc, err))
 sid = session()
 start(None, session_id=sid)
 rc, again, _, err = start(org, session_id=sid)
