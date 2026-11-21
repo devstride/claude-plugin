@@ -335,6 +335,22 @@ run.until("rewind-environment")
 run.done(answer_text("HOTFIX ENVIRONMENT: NEEDS ANSWER no localEnvironment commands are set", {"case": 3, "mode": None, "why": "no commands", "restartDevServer": True}))
 check("NEEDS ANSWER stops the run before the report", run.answer.get("action") == "stopped" and "report-cut" not in [s for s, _ in run.issued()], run.answer)
 
+# Case 1 under newInstance, and case 2 (migrate, then seed), both continue to the report.
+for verdict, result in (("HOTFIX ENVIRONMENT: RECREATED", {"case": 1, "mode": "newInstance", "why": "recreate is set", "restartDevServer": True}),
+                        ("HOTFIX ENVIRONMENT: MIGRATED", {"case": 2, "mode": None, "why": "schema not diverged: migrate then seed", "restartDevServer": True})):
+    run = Run()
+    run.until("rewind-environment")
+    run.done(answer_text(verdict, result))
+    check("%s (case %d) continues to the report" % (verdict, result["case"]), run.answer.get("action") == "run" and run.answer["step"]["id"] == "report-cut", run.answer)
+
+# A recreate with no recreateMode (or case 3) asks; after the answer the step is re-issued as attempt 2.
+run = Run()
+run.until("rewind-environment")
+run.done(answer_text("HOTFIX ENVIRONMENT: NEEDS ANSWER recreate names <name> but recreateMode is unset", {"case": 1, "mode": None, "why": "no recreateMode", "restartDevServer": True}))
+run.resume(answer="newInstance")
+check("... the answer re-issues rewind-environment as attempt 2", run.answer.get("action") == "run" and run.answer["step"]["id"] == "rewind-environment"
+      and run.answer["step"]["attempt"] == 2, run.answer)
+
 # The merge waits for a yes; the deploy approval can be not configured and is then skipped.
 run = Run()
 run.until("merge")
@@ -400,8 +416,23 @@ check("a stale proof re-issues a required step first, not the merge", first in (
       and run.answer["step"]["attempt"] == 2, run.answer)
 while run.answer and run.answer.get("action") == "run" and run.answer["step"]["id"] != "merge":
     run.done()
-check("... and the merge is handed out again only once every proof is fresh", run.answer.get("action") == "run" and run.answer["step"]["id"] == "merge"
-      and ("review", 2) in run.issued(), (run.issued(), run.answer))
+check("... and the merge is handed out again only once every proof is fresh",
+      run.answer.get("action") == "run" and run.answer["step"]["id"] == "merge" and ("review", 2) in run.issued(), (run.issued(), run.answer))
+
+# A clearance provider configured in the repository is never called by a hotfix run, not even status.
+run = Run()
+LOG = os.path.join(run.repo, "provider.log")
+FAKE = os.path.join(run.repo, "provider.sh")
+with open(FAKE, "w") as out:
+    out.write("#!/bin/sh\necho \"$0 $*\" >> '%s'\n" % LOG)
+os.chmod(FAKE, 0o755)
+os.makedirs(os.path.join(run.repo, ".claude"))
+with open(os.path.join(run.repo, ".claude", "ds-config.json"), "w") as out:
+    json.dump({"release": {"clearance": {"commands": dict((v, FAKE + " " + v) for v in ("claim", "status", "heartbeat", "release", "adopt"))}}}, out)
+while run.answer and run.answer["action"] == "run":
+    run.done()
+check("a full run with a clearance provider configured finishes and calls no provider verb",
+      run.answer.get("action") == "finished" and run.answer.get("outcome") == "completed" and not os.path.exists(LOG), (run.answer, os.path.exists(LOG)))
 PY
 
 python3 "$WORK/cases.py" "$ROOT" "$WORK" > "$WORK/out.txt" 2>&1 || { cat "$WORK/out.txt"; echo "FAIL the cases did not run to the end"; exit 1; }
