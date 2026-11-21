@@ -103,7 +103,7 @@
     "skills/ultracode-build/references/engineering-economy.md": 1502,
     "skills/ultracode-build/references/mandatory-lenses.md": 1800,
     "skills/ultracode-build/references/review-fanout.md": 2200,
-    "skills/release/references/step-skills.md": 1958,
+    "skills/release/references/step-skills.md": 2031,
     "skills/release/references/release-safety-hooks.md": 1200,
     "skills/build-item/references/checkout-pool-commands.md": 1463,
     "skills/build-item/references/story-claims.md": 1944,
@@ -174,7 +174,7 @@
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 97587,
+      "budget": 97677,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -218,7 +218,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 104178,
+      "budget": 104268,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -279,7 +279,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 98572,
+      "budget": 98662,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",
@@ -322,7 +322,7 @@
       ]
     },
     "hotfixRun": {
-      "budget": 11100,
+      "budget": 11328,
       "files": [
         "skills/branch-hotfix/SKILL.md",
         "skills/hotfix-steps/SKILL.md",
