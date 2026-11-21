@@ -439,6 +439,16 @@ run.done(answer_text("HOTFIX MERGE: REFUSED merge-gate answered REFUSE", {"sha":
 check("REFUSED at the merge stops the run before the deploy approval", run.answer.get("action") == "stopped" and run.answer.get("stepId") == "merge"
       and "approve-deploy" not in [s for s, _ in run.issued()], run.answer)
 
+# Claims on: the cut's one ship-intent declaration (route hotfix, target the production branch,
+# stage building) is one the shared script records; claims off: the reference declares none.
+done = subprocess.run([sys.executable, "-B", os.path.join(ROOT, "skills/build-item/scripts/ship-intent.py"), "record"], capture_output=True, text=True,
+                      input=json.dumps({"route": "hotfix", "unit": BRANCH, "branch": BRANCH, "target": "main", "stage": "building", "now": "2026-11-21T19:00:00Z"}))
+claim = json.loads(done.stdout) if done.returncode == 0 else {}
+check("claims on: the hotfix's ship-intent declaration is recorded as one claim on its branch", claim.get("kind") == "ship-intent" and claim.get("key") == BRANCH
+      and claim.get("payload", {}).get("route") == "hotfix" and claim["payload"].get("target") == "main" and claim.get("phase") == "building", done.stdout + done.stderr)
+BRANCH_REF = " ".join(open(os.path.join(ROOT, "skills/hotfix-steps/references/hotfix-branch.md"), encoding="utf-8").read().split())
+check("... and claims off declares none", "route hotfix, target the production branch, stage building. Without a `claims` block: none" in BRANCH_REF)
+
 # A clearance provider configured in the repository is never called by a hotfix run, not even status.
 run = Run()
 LOG = os.path.join(run.repo, "provider.log")
