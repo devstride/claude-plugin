@@ -294,7 +294,7 @@ for name in named:
     if name == "plan-steps":
         # the grouped Plan and Rebalance step skill: each mode's verdict and result keys live in its reference
         faults = skill_faults(root, name, None, 15, 1200)
-        if flat(text).count(STEP_POINTER) != 1 or "disable-model-invocation" in text or "$ARGUMENTS" not in text or "one JSON object" not in text:
+        if flat(text).count(STEP_POINTER) != 1 or "disable-model-invocation" in text or "$ARGUMENTS" not in text or "`<mode> <item>`" not in flat(text) or "one JSON object" in text:
             faults.append("the step-skill shape")
         if not fields_ok(text):
             faults.append("the description does not start with Step:")
@@ -307,7 +307,7 @@ for name in named:
             if not (entry["argument"] or "").startswith(mode + " "):
                 faults.append("%s: the argument does not begin with its mode" % contract)
             ref = "skills/%s/references/%s.md" % (name, mode)
-            if "`%s` → read `${CLAUDE_PLUGIN_ROOT}/%s`" % (contract, ref) not in flat(text):
+            if "`%s` → read `${CLAUDE_PLUGIN_ROOT}/%s`" % (mode, ref) not in flat(text):
                 faults.append("no dispatch line for %s" % contract)
             body = open(os.path.join(root, ref), encoding="utf-8").read() if os.path.isfile(os.path.join(root, ref)) else ""
             section = re.search(r"^## Verdict\n(.*?)(?=^## |\Z)", body, re.S | re.M)
@@ -322,7 +322,7 @@ for name in named:
                 faults.append("%s: its Result section does not name every key" % ref)
             if "Workflow" in re.sub(r"\(`delegates: true`\)[^.]*\.", "", body.replace("no subagent and no Workflow", "").replace("never rerun the whole Workflow", "")) and not entry.get("delegates"):
                 faults.append("%s: a non-delegating step tells the model to start a Workflow" % ref)
-        if "Any other contract, or none → no verdict line" not in flat(text):
+        if "Any other first word, or none → no verdict line" not in flat(text):
             faults.append("no answer for a contract it does not carry")
         check("step skill plan-steps keeps the grouped shape: a reference per mode with the catalog's verdict and result keys", faults == [], faults)
         continue

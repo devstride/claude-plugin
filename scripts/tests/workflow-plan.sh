@@ -321,6 +321,25 @@ for _ in range(40):
 check("the ground step gets the bare item, and the dating step the sign-off's start and item-days",
       (args.get("ground"), args.get("rationalize-dates")) == ("I100", "I100 start: 2026-12-01 item-days: 2"), args)
 
+SKILL_TEXT = open(os.path.join(ROOT, "skills/plan-steps/SKILL.md"), encoding="utf-8").read()
+SKILL_MODES = set(re.findall(r"^   - `([a-z-]+)` → read ", SKILL_TEXT, re.M))
+rendered = {}
+for definition in (plan, reb):
+    run = Run(definition)
+    for _ in range(40):
+        if not run.answer or run.answer.get("action") != "run":
+            break
+        step = run.answer["step"]
+        if CATALOG[step["contract"]]["builtinSkill"] == "plan-steps":
+            rendered[step["contract"]] = run.answer.get("argument")
+        run.done(CLEAN[step["contract"]], {"start": "2026-12-01", "itemDays": 2} if step["id"] == "record-sign-off" else None)
+check("every plan-steps run answer is the '<mode> <item>' text the skill dispatches on, never a payload",
+      len(rendered) == 20 and all(isinstance(a, str) and a == n.split("@")[0] + " I100" and a.split(" ")[0] in SKILL_MODES
+                                  for n, a in rendered.items()), rendered)
+check("the skill documents a text argument and dispatches on its first word, not a payload's contract key",
+      "`<mode> <item>`" in SKILL_TEXT and "first word of the arguments" in SKILL_TEXT and "JSON object" not in SKILL_TEXT
+      and SKILL_MODES == set(n.split("@")[0] for n, e in CATALOG.items() if e["builtinSkill"] == "plan-steps"), sorted(SKILL_MODES))
+
 run = Run(reb)
 end = walk(run)
 check("a clean rebalance issues the thirteen steps in the pinned order and finishes",
