@@ -84,6 +84,10 @@ PAYLOAD_PATH = re.compile(
 # The catalog's vocabulary (schemas/step-contracts.json).
 ENTRY_FIELDS = ("summary", "builtinSkill", "payload", "argument", "verdict", "result", "proof",
                 "requires", "claimPhase", "shipIntentStage")
+# Optional entry fields: a contract a satisfier may stand in for, and the two step-skill rule flags
+# (delegates: the step may run one Workflow of drafting agents; interactive: it may hold a
+# conversation with the person inside the step). The runner passes the flags through unchanged.
+OPTIONAL_FIELDS = ("satisfiedBy", "maxAutoRedo", "delegates", "interactive")
 CLASSES = ("continue", "skipped", "redo:self", "stop", "ask")
 END_CLASS = re.compile(r"^end:([a-z][a-z-]*)$")
 DETAILS = ("none", "optional", "required")
@@ -310,7 +314,7 @@ def _entry_shape(entry):
     """Why one catalog entry is not shaped as an entry, or None."""
     if not isinstance(entry, dict):
         return "an entry is an object"
-    extra = sorted(k for k in entry if k not in ENTRY_FIELDS + ("satisfiedBy", "maxAutoRedo"))
+    extra = sorted(k for k in entry if k not in ENTRY_FIELDS + OPTIONAL_FIELDS)
     lacking = [k for k in ENTRY_FIELDS if k not in entry]
     if extra or lacking:
         return "fields: unknown %s, missing %s" % (extra, lacking)
@@ -360,6 +364,8 @@ def _entry_shape(entry):
         return "satisfiedBy is a list of contract names"
     if "maxAutoRedo" in entry and not (_whole(entry["maxAutoRedo"]) and AUTO_REDO_LIMIT < entry["maxAutoRedo"] <= AUTO_REDO_MAX):
         return "maxAutoRedo is a whole number above %d and at most %d" % (AUTO_REDO_LIMIT, AUTO_REDO_MAX)
+    if any(flag in entry and not isinstance(entry[flag], bool) for flag in ("delegates", "interactive")):
+        return "delegates and interactive are true or false"
     return None
 
 

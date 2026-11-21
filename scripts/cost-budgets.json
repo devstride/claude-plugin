@@ -10,16 +10,16 @@
     "hotfix-steps": 1200,
     "build-item": 8000,
     "ci-audit": 2600,
-    "comprehend-plan": 1874,
+    "comprehend-plan": 2100,
     "create-defect": 2500,
     "create-story": 2108,
     "doctor": 8000,
-    "insert-defect": 1753,
-    "insert-story": 1527,
+    "insert-defect": 1869,
+    "insert-story": 1643,
     "plan": 8514,
     "pr": 3846,
     "push": 1100,
-    "rationalize-gantt": 3988,
+    "rationalize-gantt": 4200,
     "rebalance": 6023,
     "release": 6265,
     "review": 7999,
@@ -44,7 +44,8 @@
     "review-story": 1007,
     "merge-story": 1081,
     "capture-findings": 900,
-    "sync-base": 500
+    "sync-base": 500,
+    "plan-steps": 1200
   },
   "references": {
     "skills/build-item/references/epic-release.md": 3200,
@@ -102,7 +103,7 @@
     "skills/ultracode-build/references/engineering-economy.md": 1502,
     "skills/ultracode-build/references/mandatory-lenses.md": 1800,
     "skills/ultracode-build/references/review-fanout.md": 2200,
-    "skills/release/references/step-skills.md": 1672,
+    "skills/release/references/step-skills.md": 1958,
     "skills/release/references/release-safety-hooks.md": 1200,
     "skills/build-item/references/checkout-pool-commands.md": 1463,
     "skills/build-item/references/story-claims.md": 1944,
@@ -149,11 +150,31 @@
     "skills/hotfix-steps/references/hotfix-stage.md": 300,
     "skills/story-lifecycle/references/complete.md": 1200,
     "skills/build-item/references/run-stops.md": 1574,
-    "skills/run-workflow/references/workflow-contracts.md": 3391
+    "skills/run-workflow/references/workflow-contracts.md": 3391,
+    "skills/plan-steps/references/plan-create.md": 400,
+    "skills/plan-steps/references/plan-discovery.md": 500,
+    "skills/plan-steps/references/plan-draft-approval.md": 400,
+    "skills/plan-steps/references/plan-draft.md": 400,
+    "skills/plan-steps/references/plan-hand-off.md": 300,
+    "skills/plan-steps/references/plan-number.md": 400,
+    "skills/plan-steps/references/plan-orient.md": 400,
+    "skills/plan-steps/references/plan-sign-off-record.md": 400,
+    "skills/plan-steps/references/plan-wire.md": 400,
+    "skills/plan-steps/references/rebalance-archive.md": 300,
+    "skills/plan-steps/references/rebalance-gates.md": 400,
+    "skills/plan-steps/references/rebalance-marker.md": 300,
+    "skills/plan-steps/references/rebalance-partition.md": 400,
+    "skills/plan-steps/references/rebalance-probe.md": 300,
+    "skills/plan-steps/references/rebalance-proposal.md": 400,
+    "skills/plan-steps/references/rebalance-renumber.md": 300,
+    "skills/plan-steps/references/rebalance-report.md": 300,
+    "skills/plan-steps/references/rebalance-rewire.md": 400,
+    "skills/plan-steps/references/rebalance-successors.md": 300,
+    "skills/plan-steps/references/session-model.md": 400
   },
   "paths": {
     "epicReleaseGate": {
-      "budget": 97301,
+      "budget": 97587,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/epic-release.md",
@@ -197,7 +218,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 103916,
+      "budget": 104178,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
@@ -258,7 +279,7 @@
       ]
     },
     "productionReleaseGate": {
-      "budget": 98286,
+      "budget": 98572,
       "files": [
         "skills/release/SKILL.md",
         "skills/build-item/references/plain-language-output.md",

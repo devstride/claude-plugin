@@ -50,6 +50,19 @@ consists of (`risk-check`'s focused verifiers; `review-story` through `review` o
 `merge-story` through `review` for a red check or an open thread); it starts no other subagent. The
 build step, `ultracode-build`, is an engine with floors of its own, not a step skill.
 
+## The Plan and Rebalance workflows' steps
+
+`plan-steps` carries every step of `${CLAUDE_PLUGIN_ROOT}/workflows/plan.json` and
+`${CLAUDE_PLUGIN_ROOT}/workflows/rebalance.json` that `comprehend-plan` and `rationalize-gantt` do
+not, one reference per mode, each with its contract's verdict. Two catalog flags amend the rule
+above, and the runner passes both through unchanged:
+
+- **`delegates: true`** (only `plan-draft@1`): the step may run ONE Workflow of drafting agents,
+  which draft only and never call an MCP write tool. Every other step still starts no subagent.
+- **`interactive: true`** (`plan-discovery@1`, `plan-draft-approval@1`, `rebalance-proposal@1`):
+  the step may hold a multi-turn conversation with the person inside the step, asking product and
+  shape questions, and reports waiting while it waits. It still never asks a flow question.
+
 ## The ten steps
 
 | Step | Seam | Unset | Configured but broken |

@@ -1,0 +1,250 @@
+{
+  "schema": 1,
+  "id": "plan",
+  "version": 1,
+  "name": "Plan",
+  "startsWhen": "on-demand",
+  "endsBy": null,
+  "appliesTo": {
+    "workTypes": [],
+    "tags": [],
+    "repositories": []
+  },
+  "minPluginVersion": "4.7.0",
+  "phases": [
+    {
+      "id": "orient",
+      "name": "Orient",
+      "steps": [
+        {
+          "id": "session-check",
+          "name": "Check the session's model",
+          "summary": "Check the session's model against the role this workflow wants, and only report it.",
+          "contract": "session-model@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "orient",
+          "name": "Find the plan root and profile",
+          "summary": "Resolve the plan root, its delivery profile and the organization's shape.",
+          "contract": "plan-orient@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "ground",
+          "name": "Read the plan as it stands",
+          "summary": "Read what the plan already holds, read-only.",
+          "contract": "plan-ground@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "comprehend-plan",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "discover",
+      "name": "Discover and sign off",
+      "steps": [
+        {
+          "id": "discover",
+          "name": "Agree the shape",
+          "summary": "Ask the questions that change the shape, until the person says 'yes, build this'.",
+          "contract": "plan-discovery@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "record-sign-off",
+          "name": "Record the sign-off",
+          "summary": "Record the sign-off, and nothing else, in DevStride.",
+          "contract": "plan-sign-off-record@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "draft",
+      "name": "Draft the specs",
+      "steps": [
+        {
+          "id": "draft-specs",
+          "name": "Draft the specs",
+          "summary": "Draft the specs for the signed-off shape; the drafting agents never write to DevStride.",
+          "contract": "plan-draft@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "confirm-drafts",
+          "name": "Approve the drafts",
+          "summary": "Walk the person through the drafts until they approve them.",
+          "contract": "plan-draft-approval@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "build",
+      "name": "Create and wire",
+      "steps": [
+        {
+          "id": "create-items",
+          "name": "Create the items",
+          "summary": "Create the approved tree top-down, only the items that are missing.",
+          "contract": "plan-create@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "wire-edges",
+          "name": "Wire the dependencies",
+          "summary": "Wire the dependency edges and prove no new leaf is left without one.",
+          "contract": "plan-wire@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "rationalize-dates",
+          "name": "Date the plan",
+          "summary": "Date the plan from its dependency graph, with the auto-scheduler off.",
+          "contract": "rationalize-gantt@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "rationalize-gantt",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "number-titles",
+          "name": "Number the titles",
+          "summary": "Number the leaves in the order the build loop will pick them.",
+          "contract": "plan-number@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "hand-off",
+      "name": "Hand off",
+      "steps": [
+        {
+          "id": "hand-off",
+          "name": "Hand off the plan",
+          "summary": "Report the finished plan and where the build loop starts.",
+          "contract": "plan-hand-off@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    }
+  ]
+}

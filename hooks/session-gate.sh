@@ -38,8 +38,9 @@ AUTHORING = {"setup", "plan", "ci-audit", "rebalance", "rationalize-gantt", "com
 EXECUTION = {"build-item", "pr", "review", "release", "push", "create-story", "create-defect",
              "insert-story", "insert-defect", "run-workflow"}
 # run-workflow is classified by the workflow it runs (its first argument, `<workflow id> [<item>]`):
-# a hotfix is never blocked, a release is execution, any other or no id keeps run-workflow execution.
-WORKFLOW_CLASS = {"hotfix": "neutral", "release": "execution"}
+# a hotfix is never blocked, a release is execution, a plan or rebalance is authoring, any other or
+# no id keeps run-workflow execution.
+WORKFLOW_CLASS = {"hotfix": "neutral", "release": "execution", "plan": "authoring", "rebalance": "authoring"}
 TTL = 7 * 24 * 3600
 
 def main():
