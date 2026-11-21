@@ -19,7 +19,8 @@ import re
 import subprocess
 import sys
 
-ROUTING = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "build-item", "scripts", "routing.py")
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROUTING = os.path.join(os.path.dirname(os.path.dirname(HERE)), "build-item/scripts/routing.py")  # the skill beside this one
 DEFAULT_FORMAT = "MM-DD-YY"
 DEFAULT_HOTFIX_PATTERN = "*/hotfix/**"
 TOKENS = {"YYYY": "%Y", "YY": "%y", "MM": "%m", "DD": "%d"}
