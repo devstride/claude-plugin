@@ -12,3 +12,4 @@ record.pluginVersion  a field of the clearance provider's `status --json` record
 heartbeat.phase       a field of the step runner's run answer (the story claim's phase), not a ds-config key
 heartbeat.stage       a field of the step runner's run answer (the ship-intent stage), not a ds-config key
 heartbeat.shipIntent  a field of the step runner's run answer (the ship-intent request), not a ds-config key
+instructions.text     a field of the step runner's run answer (a repository step's committed text), not a ds-config key
