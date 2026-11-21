@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "id": "release-notes",
+  "version": 1,
+  "name": "Release: release notes only",
+  "startsWhen": "on-demand",
+  "endsBy": null,
+  "appliesTo": {
+    "workTypes": [],
+    "tags": [],
+    "repositories": []
+  },
+  "minPluginVersion": "4.7.0",
+  "phases": [
+    {
+      "id": "find",
+      "name": "Find the merged release",
+      "steps": [
+        {
+          "id": "merged-release",
+          "name": "Find the merged release",
+          "summary": "Find the newest merged release and recompute its delta.",
+          "contract": "merged-release@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "confirm-deploy",
+          "name": "Confirm the deploy",
+          "summary": "Confirm the production deploy of the merge commit finished.",
+          "contract": "release-deploy-confirm@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "notes",
+      "name": "Release notes",
+      "steps": [
+        {
+          "id": "write-release-notes",
+          "name": "Write release notes",
+          "summary": "Write release notes, only when they were asked for.",
+          "contract": "release-notes@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    }
+  ]
+}

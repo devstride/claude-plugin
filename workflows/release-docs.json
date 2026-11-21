@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "id": "release-docs",
+  "version": 1,
+  "name": "Release: documentation only",
+  "startsWhen": "on-demand",
+  "endsBy": null,
+  "appliesTo": {
+    "workTypes": [],
+    "tags": [],
+    "repositories": []
+  },
+  "minPluginVersion": "4.7.0",
+  "phases": [
+    {
+      "id": "find",
+      "name": "Find the merged release",
+      "steps": [
+        {
+          "id": "merged-release",
+          "name": "Find the merged release",
+          "summary": "Find the newest merged release and recompute its delta.",
+          "contract": "merged-release@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "confirm-deploy",
+          "name": "Confirm the deploy",
+          "summary": "Confirm the production deploy of the merge commit finished.",
+          "contract": "release-deploy-confirm@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "docs",
+      "name": "Documentation",
+      "steps": [
+        {
+          "id": "update-docs",
+          "name": "Update documentation",
+          "summary": "Publish documentation for the shipped release and settle the docs owed item.",
+          "contract": "release-docs@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "sync-knowledge-base",
+          "name": "Sync the knowledge base",
+          "summary": "Refresh the knowledge base after documentation was published.",
+          "contract": "release-kb-sync@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    }
+  ]
+}
