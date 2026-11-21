@@ -23,7 +23,7 @@ PENDING = ["claim-story", "story-lifecycle", "risk-check", "local-checks", "revi
            "capture-findings", "sync-base"]
 CODES = ["bad-schema", "duplicate-step-id", "unknown-contract", "unknown-contract-major", "requires-missing",
          "requires-not-earlier", "required-not-always", "required-not-stop", "required-off", "skill-missing",
-         "plugin-too-old", "repository-required", "unsupported-gate", "unsupported-when", "unsupported-source",
+         "plugin-too-old", "repository-required", "unsupported-gate", "unsupported-when", "unsupported-source", "library-version",
          "unsupported-on-fail", "credential-in-definition"]
 OFF = {"source": "off", "ref": None, "version": None}
 counter, made = [0], [0]
@@ -1416,7 +1416,9 @@ def section_static():
     check("the runner imports no network module", not set(imported) & {"socket", "http", "urllib", "ssl", "ftplib", "smtplib", "xmlrpc", "asyncio", "requests"}
           and not re.search(r"\b(socket|urllib|http\.client|ssl|requests)\b", source))
     helpers = re.findall(r'for name in \(([^)]*)\):\n\s+spec = importlib\.util\.spec_from_file_location', source)
-    check("the two helpers are loaded by file path, and nothing else is", helpers == ['"workflow_report", "claim_record"'] and source.count("spec_from_file_location") == 1 and "__import__" not in source, helpers)
+    check("the two helpers and the library skill cache are loaded by file path, and nothing else is",
+          helpers == ['"workflow_report", "claim_record"'] and source.count("spec_from_file_location") == 2
+          and 'spec_from_file_location("library_skill", LIBRARY_PATH)' in source and "__import__" not in source, helpers)
     started = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name) and n.func.value.id == "subprocess"]
     check("one place starts a process, and it starts git", len(started) == 1 and started[0].func.attr == "run" and ast.get_source_segment(source, started[0].args[0]).startswith('["git", "-C", cwd]')
           and "os.system" not in source and "os.popen" not in source and "os.exec" not in source and "os.spawn" not in source, len(started))

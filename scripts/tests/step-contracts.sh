@@ -257,7 +257,7 @@ check("the skill names the five commands' loop and the reference names all five"
       all("`%s`" % c in text for c in runner.COMMANDS) and all("`%s`" % c in skill for c in ("start", "done", "status", "resume")))
 codes = ["bad-schema", "duplicate-step-id", "unknown-contract", "unknown-contract-major", "requires-missing", "requires-not-earlier",
          "required-not-always", "required-not-stop", "required-off", "skill-missing", "plugin-too-old", "repository-required",
-         "unsupported-gate", "unsupported-when", "unsupported-source", "unsupported-on-fail", "credential-in-definition"]
+         "unsupported-gate", "unsupported-when", "unsupported-source", "library-version", "unsupported-on-fail", "credential-in-definition"]
 source = open(os.path.join(root, "skills/run-workflow/scripts/workflow.py"), encoding="utf-8").read()
 check("every validation code is in the runner and in the contracts half", all('"%s"' % c in source and "`%s`" % c in rules for c in codes),
       [c for c in codes if '"%s"' % c not in source or "`%s`" % c not in rules])
