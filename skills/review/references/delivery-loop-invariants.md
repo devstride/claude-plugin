@@ -386,7 +386,7 @@ M15. A one-off merged onto the release train (`releaseTrain.branch`) is NOT Done
      (`small: false`) gets a full review first, on the landing machine: `review` LOCAL-FULL (Claude
      and the CLI engine, no pull request, no CI), so a large fix's late find never holds a release
      and the train's pull request stays the batch's only CI run. `review-gate.py check` admits a train
-     merge only as small, or reviewed at exactly that head, tree and merge base. With
+     merge only as small, or reviewed at that head or on its unchanged patch. With
      `releaseTrain.reviewEveryLanding` true there is no small route: every train merge needs that
      receipt, its first line is in the merge commit, and the train's pull request reviews only what
      `train_receipts.py` finds no PROVEN receipt or reviewed pull request for: a receipt counts only

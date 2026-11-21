@@ -1,7 +1,8 @@
 #!/bin/bash
 # Tests for skills/build-item/scripts/review-gate.py: every case in review-gate-fixtures.json
 # (check, record, round and engine) through the helper's own command line (git-free), then a real repository: record a review, check
-# it, and prove a new commit or a merged-in train voids it. No network.
+# it, prove a merged-in train or a change only to generated files carries it forward under an unchanged
+# patch, and that a commit changing the patch voids it. No network.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 HELPER="$ROOT/skills/build-item/scripts/review-gate.py"; FIX="$ROOT/skills/build-item/scripts/review-gate-fixtures.json"
@@ -16,7 +17,8 @@ def run(cmd, req, cwd=None):
 def receipts(entries, head):
     d = tempfile.mkdtemp(dir=work)
     for r in entries:
-        json.dump(r, open(os.path.join(d, head + ".json"), "w"))
+        r = dict(r); name = r.pop("_filedAs", head)
+        json.dump(r, open(os.path.join(d, name + ".json"), "w"))
     return d
 
 def say(good, label, extra=""):
@@ -68,7 +70,8 @@ for label, args, body in (("not JSON", ["check"], "{"), ("no subcommand", [], "{
 g = lambda *a, **k: subprocess.run(["git", "-C", repo] + list(a), check=True, capture_output=True, text=True, **k).stdout.strip()
 repo = os.path.join(work, "repo"); os.makedirs(os.path.join(repo, ".claude"))
 g("init", "-q", "-b", "train/release"); g("config", "user.email", "t@example.com"); g("config", "user.name", "t")
-json.dump({"releaseTrain": {"branch": "train/release", "smallFixes": {"maxFiles": 2, "maxChangedLines": 500}}}, open(os.path.join(repo, ".claude/ds-config.json"), "w"))
+json.dump({"releaseTrain": {"branch": "train/release", "smallFixes": {"maxFiles": 2, "maxChangedLines": 500}},
+           "generated": {"paths": ["gen/"]}}, open(os.path.join(repo, ".claude/ds-config.json"), "w"))
 g("add", "-A"); g("commit", "-qm", "base")
 g("checkout", "-qb", "I1-big")
 for i in range(3):
@@ -87,12 +90,27 @@ say(p.returncode == 0 and json.loads(p.stdout)["verdict"] == "reviewed", "git: a
 g("checkout", "-q", "train/release"); open(os.path.join(repo, "t.ts"), "w").write("t\n"); g("add", "-A"); g("commit", "-qm", "train moved")
 p = run("check", {"base": "train/release", "head": "I1-big"}, cwd=repo)
 say(p.returncode == 0 and json.loads(p.stdout)["verdict"] == "reviewed", "git: the train moving on alone leaves the reviewed diff as it was", p.stdout + p.stderr)
+reviewed = g("rev-parse", "I1-big")
+receipt_file = os.path.join(common, "devstride", "reviews", "local-full", reviewed + ".json")
+say(len(json.load(open(receipt_file)).get("patchId") or "") == 40, "git: record keeps the story's patch id", open(receipt_file).read())
 g("checkout", "-q", "I1-big"); g("merge", "-q", "--no-edit", "train/release")
 p = run("check", {"base": "train/release"}, cwd=repo)
-say(p.returncode == 2 and "LOCAL-FULL review settled" in p.stderr, "git: merging the train in is a new head: review again", p.stderr)
+out = json.loads(p.stdout) if p.returncode == 0 else {}
+say(out.get("verdict") == "reviewed" and ("Review carried forward from %s" % reviewed) in out.get("mergeBody", "")
+    and out["mergeBody"].startswith("Review: LOCAL-FULL at %s" % reviewed),
+    "git: the train merged in under an unchanged patch carries the review forward", p.stdout + p.stderr)
+os.makedirs(os.path.join(repo, "gen")); open(os.path.join(repo, "gen", "api.json"), "w").write("regenerated\n")
+g("add", "-A"); g("commit", "-qm", "regenerate")
+p = run("check", {"base": "train/release"}, cwd=repo)
+say(p.returncode == 0 and json.loads(p.stdout)["verdict"] == "reviewed", "git: a change only to generated files keeps the review", p.stdout + p.stderr)
+stored = json.load(open(receipt_file)); stored.pop("patchId"); json.dump(stored, open(receipt_file, "w"))
+p = run("check", {"base": "train/release"}, cwd=repo)
+say(p.returncode == 0 and json.loads(p.stdout)["verdict"] == "reviewed", "git: a receipt kept before patch ids is matched from git", p.stdout + p.stderr)
+p = run("check", {"base": "train/release", "patchId": "1" * 40}, cwd=repo)
+say(p.returncode == 2 and "computed" in p.stderr, "git: a patch id passed in is refused where git computes it", p.stderr)
 open(os.path.join(repo, "f0.ts"), "w").write("y\n"); g("commit", "-qam", "fix")
 p = run("check", {"base": "train/release"}, cwd=repo)
-say(p.returncode == 2, "git: a new commit voids the review", p.stderr)
+say(p.returncode == 2 and "or on this same patch" in p.stderr, "git: a commit that changes the patch voids the review", p.stderr)
 PY
 )"
 echo "$OUT" | sed 's/^/  /'

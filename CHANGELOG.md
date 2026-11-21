@@ -8,6 +8,26 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+### Changed
+
+- **A small fix on the release train lands after its landing check, not after a whole-suite run.**
+  A one-off headed for the release train now runs the same local gate as every other story, at the
+  width the delivery profile sets, and then lands. Before, every one-off with a full local review
+  ran the repository's gate and then the entire test suite on top of it, which in a large
+  repository added over an hour to an 18-file fix and repeated that hour every time the train
+  moved. The full suite still runs where it is needed: when the repository's own gate decides a
+  change is broad, when `profileOverrides.storyVerify` asks for it, and once in CI on the pull
+  request that carries the train to the release source. After the train moves and is merged into
+  the story, the local gate runs again at the same width, never wider.
+- **The train moving no longer forces a new review when the fix itself is unchanged.** When other
+  work lands on the release train and the train is merged into a reviewed one-off, the landing gate
+  now compares the fix's own changes before and after (generated files left out, since a merge
+  rewrites them) and, when they are the same, accepts the earlier review and says in the landing's
+  merge commit that it was carried forward from the reviewed commit. Before, every train move
+  meant a new Claude and Codex review of an identical change. Any real change to the fix still
+  needs its review. Reviews recorded from this release keep the fix's patch fingerprint; older
+  ones are compared from git.
+
 ## [4.6.1] — 2026-11-20
 
 ### Fixed

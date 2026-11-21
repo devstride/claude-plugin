@@ -52,7 +52,7 @@ repo holds CI on drafts (`prototype` too), requests every in-scope cloud reviewe
 and settles through `review`. Deferrals, deviations and dismissals (with rationale) go in the PR
 body (the build's and the risk check's, from the payload). The push/ready-flip race is `review` step 7's; the merge step never reads `skipping` as green.
 
-**Asked again** (the runner found the patch changed, or the merge refreshed it): a pull request
+**Asked again** (the runner found the patch changed: a fix, or a refreshed base): a pull request
 already open for the branch is never opened twice. Re-enter through `pr` driven, naming that pull
 request (its re-entry: no second open, no new reviewer requests), never `review` directly: `pr`
 selects the pre-ship checks again on the new diff and declares the hold, invokes `review` on it
@@ -91,7 +91,8 @@ calls for:
 - **Every one-off reviewed before it lands** (`releaseTrain.reviewEveryLanding` true). The
   small-fix skip never applies: every train one-off runs LOCAL-FULL, sized to the change
   (`local-full.md`: a small fix gets one cycle, anything else the full target), and the landing
-  gate answers `reviewed` only with a receipt at exactly that head, whatever the size; its refusal
+  gate answers `reviewed` only with a receipt at exactly that head, or carried to it under
+  an unchanged patch, whatever the size; its refusal
   names the size. Its receipt's first line rides in the landing's merge-commit body, and, with the repository admin's landing proof
   `local-full.md` step 3 posts on the reviewed head, it is the train pull request's review
   evidence: that pull request then reviews only what no receipt covers
@@ -102,7 +103,8 @@ calls for:
   ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/review-gate.py check` with `{"base":
   "origin/<train>", "head": "<HEAD>"}` must answer `small`, `reviewed` or `not-applicable`; its
   `mergeBody` joins this step's `mergeBody`. Exit 2 → LOCAL-FULL (or its follow-up), which records
-  the review, then check again. `merge-story` checks again at the exact head it merges.
+  the review, then check again. Asked again, check FIRST: `reviewed` settles it, no engine run.
+  `merge-story` checks again at the exact head it merges.
 
 ## The proof
 
@@ -126,6 +128,4 @@ before computing it.
 
 - `skills/review-story/SKILL.md` — the pointer before choosing the path ("Read … in full before
   choosing the path").
-- `skills/local-checks/SKILL.md` — the size command, in "The train's landing review", for the
-  gate's width.
 - `skills/build-item/references/release-train.md` — the train's delivery path.

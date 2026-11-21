@@ -46,9 +46,9 @@ sizing narrows how wide the Claude pass looks, never who reviews or whether the 
 4. **Return:** the triaged findings, the untracked-deferral list, the lessons tally, the cycle
    count, the reviewed head, and the gate's `mergeBody`.
 
-**A later change to the patch** (a fix, or merging a moved train into the story) is a new head. Run
-step 5's contextual follow-up on the delta with the ledger carried. A clean merge whose scope is
-`none` spends nothing. Then **record again**: the gate admits only the head it recorded.
+**A later change to the patch** (a fix, or a merged train that changed it) is a new head. Run
+step 5's contextual follow-up on the delta with the ledger carried. Then **record again**. An
+unchanged patch is not one: `check` carries the review forward.
 
 ## Cited by
 

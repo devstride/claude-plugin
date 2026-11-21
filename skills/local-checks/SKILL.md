@@ -23,19 +23,18 @@ in full before the first command**: the receipt rules.
    (the review then takes the pull-request path, CI its gate).
 2. **The width**, decided here before anything runs. The profile's complete `storyVerify` gate
    runs once on the final story SHA, at the profile's width (`delivery-profiles.md`) unless
-   `profileOverrides.storyVerify` (`touched` | `full`) pins it. A train one-off reviewed LOCAL-FULL
-   (`route` `train`, `reviewMoment` `release-deferred`, and `releaseTrain.reviewEveryLanding` true
-   or, with `releaseTrain.smallFixes` set, `routing.py small` answering `small: false`, run as `review-routes.md`'s "The train's landing
-   review" spells it) runs at `full`: that review is its whole pre-landing review, so a touched-suite
-   receipt never counts. **Local suites are the gate** (`fastStoryMerges.requireLocalVerifyGreen`).
+   `profileOverrides.storyVerify` (`touched` | `full`) pins it, a train one-off too. **The full suite
+   runs only where it is needed**: when a change is broad (the repository's own gate decides, where it
+   does), and once in CI on the pull request that carries the work to the release source; never as a
+   second pass after a passing gate. **Local suites are the gate** (`fastStoryMerges.requireLocalVerifyGreen`).
 3. **Skipped suites.** `verify.skipDuringStoryBuilds` suites are skipped during story builds (gated
    where their entries say); an empty list skips nothing, and a full `verify.test` run still leaves
    listed suites out — except a touched spec of one of them, run directly. Name each in
    `skippedSuites`.
 4. **Reuse before running**: an unchanged tree + command set is REUSED (the receipt's validity
    rules); never repeat an unchanged command on an unchanged SHA. With `previousProof` set (the
-   tree changed since), the affected checks plus the required gate; else the gate once; then the
-   receipt.
+   tree changed since), the affected checks plus the required gate (after a base merge, the gate
+   alone, never wider); else the gate once; then the receipt.
 5. **Green means observed.** A red required check is stop-and-fix, never commit-anyway. Red is a
    STOP → `FAIL` naming each failed check; the proof is a receipt, never a remembered result.
    **Generated files**: a type error in a `generated.paths` file matching

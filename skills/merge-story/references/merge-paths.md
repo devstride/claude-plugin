@@ -59,12 +59,12 @@ and the `receipt` for this tree).
   asks again. A conflict that cannot be resolved → `MERGE: BLOCKED` for a person.
 - **The landing gate** (release train): in the story's checkout, before switching branches,
   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/review-gate.py check` with `{"base":
-  "origin/<train>", "head": "<commit>"}` must answer `small`, `reviewed` or `not-applicable`. Exit 2
+  "origin/<train>", "head": "<commit>"}` must answer `small`, `reviewed` (here, or carried forward
+  under an unchanged patch) or `not-applicable`. Exit 2
   → invoke `review` in LOCAL-FULL mode for its follow-up on this head
   (`${CLAUDE_PLUGIN_ROOT}/skills/review/references/local-full.md`, "A later change to the patch"),
   which records the review, then check again; a follow-up that changed the head answers
-  `REFRESHED`. A moved train merged into the story is a new head: check again. Never merge on a
-  non-zero exit.
+  `REFRESHED`. Never merge on a non-zero exit.
 - `git checkout <workingBase> && git pull --ff-only`, then `git rev-list --count
   origin/<workingBase>..<workingBase>` must print `0`: a local base ahead of its remote →
   `MERGE: BLOCKED local <workingBase> is ahead of origin`, nothing merged. Record the tip: `git rev-parse

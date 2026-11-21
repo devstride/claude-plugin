@@ -30,7 +30,8 @@ resolves `{owner}/{repo}`.
         which has no pull request: a `success` status with the context `devstride/landing-reviewed`
         (`Settled LOCAL-FULL review for landing onto <train>`) on <sha>, the reviewed head. It posts
         only when `review-gate.py check` in this checkout, for <sha> onto `origin/<train>`, answers
-        `reviewed` (a settled receipt for exactly that head is held here), and <sha> must already be
+        `reviewed` (a settled receipt for that head, or for the same patch at an earlier one, is held
+        here), and <sha> must already be
         on GitHub (push the branch first). `local-full.md` step 3 runs it after `record`. Without it
         the receipt line in the landing's merge commit is only text: `train_receipts.py` counts a
         landing as receipted only when this proof verifies.
