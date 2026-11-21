@@ -1,0 +1,41 @@
+{
+  "_readme": "Written by bash scripts/tests/workflow-definitions.sh --record after the release's prepare; never by hand.",
+  "workflows": {
+    "build": {
+      "version": 2,
+      "sha256": "2b39971f01a045cf97e1d9cb3ae368911419e2750193a0182a1e2bd8f102fb39",
+      "steps": {
+        "branch": "branch@1",
+        "build": "build@1",
+        "capture": "capture@1",
+        "claim": "claim@1",
+        "complete": "complete@1",
+        "local-checks": "local-checks@1",
+        "merge": "merge@1",
+        "review": "review@1",
+        "risk-check": "risk-check@1",
+        "start": "start@1",
+        "sync": "sync@1"
+      }
+    },
+    "hotfix": {
+      "version": 1,
+      "sha256": "77873c96968cc6e1190f014d33164c73be8e29239826aa471553e57627550f45",
+      "steps": {
+        "approve-deploy": "deploy-approval@1",
+        "close": "hotfix-close@1",
+        "confirm-deploy": "deploy-confirm@1",
+        "cut-branch": "hotfix-branch@1",
+        "fix": "hotfix-fix@1",
+        "local-checks": "local-checks@1",
+        "merge": "hotfix-merge@1",
+        "name-stage": "hotfix-stage@1",
+        "preflight": "hotfix-preflight@1",
+        "report-cut": "hotfix-report@1",
+        "review": "review@1",
+        "rewind-environment": "hotfix-environment@1",
+        "risk-check": "risk-check@1"
+      }
+    }
+  }
+}
