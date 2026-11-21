@@ -41,6 +41,11 @@ def verdict_line(entry):
         marks[v["detail"]] % ((v["value"],) if v["detail"] == "none" else (v["value"], v["detailName"])) for v in entry["verdict"]["values"]))
 
 
+def fields_ok(text):
+    fields = frontmatter(text) or {}
+    return fields.get("description", "").strip().strip('"').startswith("Step:")
+
+
 def skill_faults(root, name, contracts, words, body_tokens):
     """What is wrong with one skill that serves catalog contracts; an empty list when nothing is."""
     path = os.path.join(root, "skills", name, "SKILL.md")
@@ -77,6 +82,15 @@ runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
 faults = runner.check_catalog(catalog)
 check("the catalog parses and passes the structural checks", faults == [], faults)
+# The Plan and Rebalance contracts are pinned value by value in scripts/tests/workflow-plan.sh; the
+# checks below pin the Build ones, and the skill checks further down cover every contract.
+PLAN_FAMILY = ["session-model@1", "plan-orient@1", "plan-ground@1", "plan-discovery@1", "plan-sign-off-record@1", "plan-draft@1",
+               "plan-draft-approval@1", "plan-create@1", "plan-wire@1", "rationalize-gantt@1", "plan-number@1", "plan-hand-off@1",
+               "rebalance-gates@1", "rebalance-partition@1", "rebalance-proposal@1", "rebalance-probe@1", "rebalance-successors@1",
+               "rebalance-rewire@1", "rebalance-renumber@1", "rebalance-archive@1", "rebalance-marker@1", "rebalance-report@1"]
+all_contracts = contracts
+contracts = dict((n, e) for n, e in all_contracts.items() if n not in PLAN_FAMILY)
+check("every Plan and Rebalance contract is in the catalog", all(n in all_contracts for n in PLAN_FAMILY), [n for n in PLAN_FAMILY if n not in all_contracts])
 
 # What was published, value by value: a change here is a change to the contract.
 PUBLISHED = {
@@ -225,19 +239,61 @@ check("adoption's refusal across repositories is in the runner and the loop half
 check("an adopted run's story-branch refusal is in the runner and the loop half", '"wrong-branch"' in source and "`wrong-branch`" in text)
 check("every binding the runner knows is spelled in the contracts half", all("- **%s**:" % b in rules for b in runner.BINDINGS), runner.BINDINGS)
 
+contracts = all_contracts
 # the skills the catalog names
 present = sorted(n for n in os.listdir(os.path.join(root, "skills")) if os.path.isfile(os.path.join(root, "skills", n, "SKILL.md")))
 named = sorted(set(e["builtinSkill"] for e in contracts.values() if e["builtinSkill"]))
 check("every skill the catalog names exists or is pending", all(n in present or n in pending for n in named), [n for n in named if n not in present and n not in pending])
 check("nothing is pending: every skill the catalog names ships", pending == [], pending)
 flat = lambda s: re.sub(r"\s+", " ", s)
+PLAN_SKILLS = ["plan-steps", "comprehend-plan", "rationalize-gantt"]
 BUILD_STEPS = ["claim-story", "story-lifecycle", "risk-check", "local-checks", "review-story", "merge-story", "capture-findings", "sync-base"]
-check("the eight Build step skills are the catalog's own skills, less the two engines", sorted(BUILD_STEPS) == sorted(set(named) - {"branch-feature", "ultracode-build"}), named)
+check("the eight Build step skills are the catalog's own skills, less the two engines", sorted(BUILD_STEPS) == sorted(set(named) - {"branch-feature", "ultracode-build"} - set(PLAN_SKILLS)), named)
 for name in named:
     if name in pending:
         continue
     serves = [(n, e) for n, e in contracts.items() if e["builtinSkill"] == name]
     text = open(os.path.join(root, "skills", name, "SKILL.md"), encoding="utf-8").read()
+    if name in ("comprehend-plan", "rationalize-gantt"):
+        # plan-family skills people also type: their verdict and the pointer; bodies and descriptions unchanged
+        faults = skill_faults(root, name, [e for _, e in serves], 10 ** 6, 10 ** 9)
+        check("%s carries its contract's verdict and the pointer once" % name, faults == [], faults)
+        continue
+    if name == "plan-steps":
+        # the grouped Plan and Rebalance step skill: each mode's verdict and result keys live in its reference
+        faults = skill_faults(root, name, None, 15, 1200)
+        if flat(text).count(STEP_POINTER) != 1 or "disable-model-invocation" in text or "$ARGUMENTS" not in text or "one JSON object" not in text:
+            faults.append("the step-skill shape")
+        if not fields_ok(text):
+            faults.append("the description does not start with Step:")
+        modes = sorted(n.split("@")[0] for n, _ in serves)
+        own = sorted(f[:-3] for f in os.listdir(os.path.join(root, "skills", name, "references")))
+        if modes != own:
+            faults.append("references %r are not the modes %r" % (own, modes))
+        for contract, entry in serves:
+            mode = contract.split("@")[0]
+            if not (entry["argument"] or "").startswith(mode + " "):
+                faults.append("%s: the argument does not begin with its mode" % contract)
+            ref = "skills/%s/references/%s.md" % (name, mode)
+            if "`%s` → read `${CLAUDE_PLUGIN_ROOT}/%s`" % (contract, ref) not in flat(text):
+                faults.append("no dispatch line for %s" % contract)
+            body = open(os.path.join(root, ref), encoding="utf-8").read() if os.path.isfile(os.path.join(root, ref)) else ""
+            section = re.search(r"^## Verdict\n(.*?)(?=^## |\Z)", body, re.S | re.M)
+            if (re.findall(r"`([^`]+)`", section.group(1)) if section else None) != [verdict_line(entry)]:
+                faults.append("%s: its Verdict is not the catalog's" % ref)
+            if not body.startswith("---\nload: contract\n---\n") or re.findall(r"^## .*$", body, re.M)[-1:] != ["## Cited by"]:
+                faults.append("%s is not a contract ending with Cited by" % ref)
+            result = re.search(r"^## Result\n(.*?)(?=^## |\Z)", body, re.S | re.M)
+            result = flat(result.group(1)) if result else ""
+            keys = entry["result"]["required"] + sorted(k for k in entry["result"]["types"] if k not in entry["result"]["required"]) + entry["proof"].get("required", [])
+            if [k for k in keys if "`%s`" % k not in result]:
+                faults.append("%s: its Result section does not name every key" % ref)
+            if "Workflow" in re.sub(r"\(`delegates: true`\)[^.]*\.", "", body.replace("no subagent and no Workflow", "")) and not entry.get("delegates"):
+                faults.append("%s: a non-delegating step tells the model to start a Workflow" % ref)
+        if "Any other contract, or none → no verdict line" not in flat(text):
+            faults.append("no answer for a contract it does not carry")
+        check("step skill plan-steps keeps the grouped shape: a reference per mode with the catalog's verdict and result keys", faults == [], faults)
+        continue
     if name in ("branch-feature", "ultracode-build"):
         # engines with floors of their own: the verdict, the step pointer (branch-feature), a short description
         faults = skill_faults(root, name, [e for _, e in serves], 15, 10 ** 9)

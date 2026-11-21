@@ -21,6 +21,15 @@ optionally `start <YYYY-MM-DD>`, the day the earliest story this pass dates begi
 `item-days <N>`, the whole calendar days one story is assumed to take (step 0 settles both);
 empty → ask which plan to rationalize: $ARGUMENTS
 
+## Verdict
+
+`GANTT: DATED <count> | CYCLE <path> | SCHEDULER ON | FAILED [<reason>]`
+
+Print that line first, then the report. CYCLE means NO date was written and names the edges to
+fix; SCHEDULER ON means the auto-scheduler reads on and nothing was written. Run as the
+dating step of the Plan and Rebalance workflows, it ends with one fenced json block: dated,
+start.
+
 ## Rules that must hold
 
 - **The DevStride MCP targets PRODUCTION.** Every date and relationship change is a real,

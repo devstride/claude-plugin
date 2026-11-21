@@ -14,6 +14,15 @@ user asks "what's the state of X" / "what does X cover".
 Argument — the parent item number (e.g. `I20100`), optionally followed by a focus question
 (`I20100 what's left before webhook intake is done?`); empty → ask which item: $ARGUMENTS
 
+## Verdict
+
+`PLAN STATE: EMPTY | PARTIAL | SHALLOW | FAILED [<reason>]`
+
+Print that line first (EMPTY: nothing under the root yet; PARTIAL: a plan to extend, its
+items locked inputs; SHALLOW: placeholders a discovery step asks about first), then the three to
+six sentence summary. Run as the plan-ground step of the Plan and Rebalance workflows, it is read-only
+and ends with one fenced json block: state, doneOpenCounts, orphans, deferredContainer.
+
 ## Rules that must hold
 
 - **READ-ONLY.** Never call `create_item`, `update_item`, `add_relationship` or any other mutating

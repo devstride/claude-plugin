@@ -31,7 +31,9 @@ steps = [step for phase in build["phases"] for step in phase["steps"]]
 ids = [step["id"] for step in steps]
 
 rc, out, err = run()
-check("(1) the shipped definitions pass", (rc, out, err), (0, "WORKFLOWS: ok (1 files, 11 steps)", ""))
+shipped = sorted(f for f in os.listdir(os.path.join(root, "workflows")) if f.endswith(".json"))
+total = sum(len(s) for f in shipped for s in [[x for p in json.load(open(os.path.join(root, "workflows", f)))["phases"] for x in p["steps"]]])
+check("(1) the shipped definitions pass", (rc, out, err), (0, "WORKFLOWS: ok (%d files, %d steps)" % (len(shipped), total), ""))
 as_tuple = lambda v: tuple(int(p) for p in v.split("."))
 check("(2) minPluginVersion is not newer than this plugin", as_tuple(build["minPluginVersion"]) <= as_tuple(plugin))
 check("(3) the step ids are exactly the eleven published ones, in order", ids, STEPS)

@@ -466,6 +466,1143 @@
       "requires": [],
       "claimPhase": null,
       "shipIntentStage": null
+    },
+    "session-model@1": {
+      "summary": "Check the session's model against the role this workflow wants, and only report it.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "session-model {item}",
+      "verdict": {
+        "label": "SESSION MODEL",
+        "values": [
+          {
+            "value": "MATCH",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "UNKNOWN",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "OFF",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "MISMATCH",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "MISMATCH UNATTENDED",
+            "detail": "none",
+            "class": "continue"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "verdict",
+          "profileLine"
+        ],
+        "types": {
+          "verdict": "string",
+          "profileLine": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-orient@1": {
+      "summary": "Resolve the plan root, its delivery profile and the organization's shape.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-orient {item}",
+      "verdict": {
+        "label": "PLAN ORIENTATION",
+        "values": [
+          {
+            "value": "READY",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "root"
+          },
+          {
+            "value": "NEEDS ANSWER",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "question"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "root",
+          "workType",
+          "profile",
+          "profileSource",
+          "profileInherited",
+          "ticket",
+          "releaseUnitLevel",
+          "roles"
+        ],
+        "types": {
+          "root": "string",
+          "workType": "string",
+          "profile": "string",
+          "profileSource": "string",
+          "profileInherited": "boolean",
+          "ticket": "string|null",
+          "releaseUnitLevel": "string",
+          "roles": "object"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-ground@1": {
+      "summary": "Read what the plan already holds, read-only.",
+      "builtinSkill": "comprehend-plan",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-ground {item}",
+      "verdict": {
+        "label": "PLAN STATE",
+        "values": [
+          {
+            "value": "EMPTY",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "PARTIAL",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "SHALLOW",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "state",
+          "doneOpenCounts",
+          "orphans",
+          "deferredContainer"
+        ],
+        "types": {
+          "state": "string",
+          "doneOpenCounts": "object",
+          "orphans": "array",
+          "deferredContainer": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-discovery@1": {
+      "summary": "Ask the questions that change the shape, until the person says 'yes, build this'.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-discovery {item}",
+      "verdict": {
+        "label": "PLAN SHAPE",
+        "values": [
+          {
+            "value": "SIGNED OFF",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "SIGNED OFF WITH ASSUMPTIONS",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "NOT SIGNED OFF",
+            "detail": "optional",
+            "class": "ask",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "tree",
+          "sequencing",
+          "assumptions",
+          "deferredContainer"
+        ],
+        "types": {
+          "tree": "object",
+          "sequencing": "string",
+          "assumptions": "array",
+          "deferredContainer": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "plan-orient@1",
+        "plan-ground@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null,
+      "interactive": true
+    },
+    "plan-sign-off-record@1": {
+      "summary": "Record the sign-off, and nothing else, in DevStride.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-sign-off-record {item}",
+      "verdict": {
+        "label": "SIGN-OFF RECORDED",
+        "values": [
+          {
+            "value": "RECORDED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "profile",
+            "proof": {
+              "kind": "sign-off"
+            }
+          },
+          {
+            "value": "LINK MODE ON",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "root",
+          "profile",
+          "start",
+          "itemDays",
+          "linkMode"
+        ],
+        "types": {
+          "root": "string",
+          "profile": "string",
+          "start": "string",
+          "itemDays": "count",
+          "linkMode": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": [
+          "kind"
+        ],
+        "types": {
+          "kind": "string"
+        },
+        "values": {
+          "kind": [
+            "sign-off"
+          ]
+        }
+      },
+      "requires": [
+        "plan-discovery@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-draft@1": {
+      "summary": "Draft the specs for the signed-off shape; the drafting agents never write to DevStride.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-draft {item}",
+      "verdict": {
+        "label": "PLAN DRAFTED",
+        "values": [
+          {
+            "value": "DRAFTED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "counts"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "draftRef",
+          "counts"
+        ],
+        "types": {
+          "draftRef": "string",
+          "counts": "object"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "plan-sign-off-record@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null,
+      "delegates": true
+    },
+    "plan-draft-approval@1": {
+      "summary": "Walk the person through the drafts until they approve them.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-draft-approval {item}",
+      "verdict": {
+        "label": "PLAN DRAFT REVIEW",
+        "values": [
+          {
+            "value": "APPROVED",
+            "detail": "none",
+            "class": "continue",
+            "proof": {
+              "kind": "draft-approval"
+            }
+          },
+          {
+            "value": "NOT APPROVED",
+            "detail": "optional",
+            "class": "ask",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "approved"
+        ],
+        "types": {
+          "approved": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": [
+          "kind"
+        ],
+        "types": {
+          "kind": "string"
+        },
+        "values": {
+          "kind": [
+            "draft-approval"
+          ]
+        }
+      },
+      "requires": [
+        "plan-draft@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null,
+      "interactive": true
+    },
+    "plan-create@1": {
+      "summary": "Create the approved tree top-down, only the items that are missing.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-create {item}",
+      "verdict": {
+        "label": "PLAN CREATED",
+        "values": [
+          {
+            "value": "CREATED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "count"
+          },
+          {
+            "value": "PARTIAL",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "progress"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "created"
+        ],
+        "types": {
+          "created": "array"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "plan-sign-off-record@1",
+        "plan-draft-approval@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-wire@1": {
+      "summary": "Wire the dependency edges and prove no new leaf is left without one.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-wire {item}",
+      "verdict": {
+        "label": "PLAN WIRED",
+        "values": [
+          {
+            "value": "WIRED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "edges",
+            "proof": {
+              "kind": "wired-plan"
+            }
+          },
+          {
+            "value": "ORPHANS",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "numbers"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "orphans"
+        ],
+        "types": {
+          "orphans": "count"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": [
+          "kind",
+          "orphans"
+        ],
+        "types": {
+          "kind": "string",
+          "orphans": "count"
+        },
+        "values": {
+          "kind": [
+            "wired-plan"
+          ]
+        }
+      },
+      "requires": [
+        "plan-create@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null,
+      "satisfiedBy": [
+        "rebalance-rewire@1"
+      ]
+    },
+    "rationalize-gantt@1": {
+      "summary": "Date the plan from its dependency graph, with the auto-scheduler off.",
+      "builtinSkill": "rationalize-gantt",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rationalize-gantt {item}",
+      "verdict": {
+        "label": "GANTT",
+        "values": [
+          {
+            "value": "DATED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "count"
+          },
+          {
+            "value": "CYCLE",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "path"
+          },
+          {
+            "value": "SCHEDULER ON",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "dated",
+          "start"
+        ],
+        "types": {
+          "dated": "count",
+          "start": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "plan-wire@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-number@1": {
+      "summary": "Number the leaves in the order the build loop will pick them.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-number {item}",
+      "verdict": {
+        "label": "PLAN NUMBERED",
+        "values": [
+          {
+            "value": "NUMBERED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "range"
+          },
+          {
+            "value": "EXTENDED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "range"
+          },
+          {
+            "value": "ALREADY NUMBERED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "UNNUMBERED PLAN KEPT",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "range"
+        ],
+        "types": {
+          "range": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rationalize-gantt@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-hand-off@1": {
+      "summary": "Report the finished plan and where the build loop starts.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-hand-off {item}",
+      "verdict": {
+        "label": "PLAN HANDED OFF",
+        "values": [
+          {
+            "value": "HANDED OFF",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "root"
+          },
+          {
+            "value": "ANOTHER ROUND WANTED",
+            "detail": "none",
+            "class": "end:another-round"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "root",
+          "newCount",
+          "existingCount"
+        ],
+        "types": {
+          "root": "string",
+          "newCount": "count",
+          "existingCount": "count"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "plan-number@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-gates@1": {
+      "summary": "Check that nothing else is writing to the plan and the arguments are whole.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-gates {item}",
+      "verdict": {
+        "label": "REBALANCE GATES",
+        "values": [
+          {
+            "value": "CLEAR",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "BUILD LOOP ACTIVE",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "item"
+          },
+          {
+            "value": "SCHEDULER ON",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "BAD ARGUMENTS",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "what"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "root",
+          "target",
+          "dryRun"
+        ],
+        "types": {
+          "root": "string",
+          "target": "string",
+          "dryRun": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-partition@1": {
+      "summary": "Separate the leaves that may be re-sliced from the ones that are untouchable.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-partition {item}",
+      "verdict": {
+        "label": "REBALANCE PARTITION",
+        "values": [
+          {
+            "value": "PARTITIONED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "counts"
+          },
+          {
+            "value": "NO CHANGE NEEDED",
+            "detail": "none",
+            "class": "ask"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "notStarted",
+          "untouchable",
+          "current",
+          "target"
+        ],
+        "types": {
+          "notStarted": "array",
+          "untouchable": "array",
+          "current": "string",
+          "target": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-gates@1",
+        "plan-ground@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-proposal@1": {
+      "summary": "Propose the merges or splits and wait for 'yes, rebalance'.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-proposal {item}",
+      "verdict": {
+        "label": "REBALANCE PROPOSAL",
+        "values": [
+          {
+            "value": "SIGNED OFF",
+            "detail": "none",
+            "class": "continue",
+            "proof": {
+              "kind": "rebalance-sign-off"
+            }
+          },
+          {
+            "value": "DRY RUN",
+            "detail": "none",
+            "class": "end:dry-run"
+          },
+          {
+            "value": "DECLINED",
+            "detail": "none",
+            "class": "end:declined"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "proposal"
+        ],
+        "types": {
+          "proposal": "array"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": [
+          "kind"
+        ],
+        "types": {
+          "kind": "string"
+        },
+        "values": {
+          "kind": [
+            "rebalance-sign-off"
+          ]
+        }
+      },
+      "requires": [
+        "rebalance-partition@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null,
+      "interactive": true
+    },
+    "rebalance-probe@1": {
+      "summary": "Prove the auto-scheduler will not overwrite what the rebalance writes.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-probe {item}",
+      "verdict": {
+        "label": "SCHEDULER PROBE",
+        "values": [
+          {
+            "value": "HELD",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "OVERWRITTEN",
+            "detail": "none",
+            "class": "stop"
+          },
+          {
+            "value": "LOOP ACTIVE",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "item"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "probe"
+        ],
+        "types": {
+          "probe": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-proposal@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-successors@1": {
+      "summary": "Create each merged story with the original specs preserved.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-successors {item}",
+      "verdict": {
+        "label": "REBALANCE SUCCESSORS",
+        "values": [
+          {
+            "value": "CREATED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "count"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "map"
+        ],
+        "types": {
+          "map": "object"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-probe@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-rewire@1": {
+      "summary": "Move every absorbed item's edges to its successor, adding before removing.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-rewire {item}",
+      "verdict": {
+        "label": "REBALANCE REWIRE",
+        "values": [
+          {
+            "value": "DONE",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "edges",
+            "proof": {
+              "kind": "wired-plan"
+            }
+          },
+          {
+            "value": "ORPHANS",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "numbers"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "orphans"
+        ],
+        "types": {
+          "orphans": "count"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": [
+          "kind",
+          "orphans"
+        ],
+        "types": {
+          "kind": "string",
+          "orphans": "count"
+        },
+        "values": {
+          "kind": [
+            "wired-plan"
+          ]
+        }
+      },
+      "requires": [
+        "rebalance-successors@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-renumber@1": {
+      "summary": "Give each successor the number slot of its first absorbed item.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-renumber {item}",
+      "verdict": {
+        "label": "REBALANCE RENUMBER",
+        "values": [
+          {
+            "value": "DONE",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "range"
+          },
+          {
+            "value": "UNNUMBERED PLAN KEPT",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "range"
+        ],
+        "types": {
+          "range": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-rewire@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-archive@1": {
+      "summary": "Archive the originals only after their successors have edges.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-archive {item}",
+      "verdict": {
+        "label": "REBALANCE ARCHIVE",
+        "values": [
+          {
+            "value": "ARCHIVED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "count"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "archived"
+        ],
+        "types": {
+          "archived": "array"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-renumber@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-marker@1": {
+      "summary": "Rewrite the plan root's delivery profile line, and only that line.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-marker {item}",
+      "verdict": {
+        "label": "REBALANCE MARKER",
+        "values": [
+          {
+            "value": "REWRITTEN",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "profile"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "profile"
+        ],
+        "types": {
+          "profile": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-archive@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-report@1": {
+      "summary": "Report the re-sliced plan and the next item the build loop will pick.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-report {item}",
+      "verdict": {
+        "label": "REBALANCE REPORT",
+        "values": [
+          {
+            "value": "RE-SLICED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "counts"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "before",
+          "after",
+          "next"
+        ],
+        "types": {
+          "before": "count",
+          "after": "count",
+          "next": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rationalize-gantt@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
     }
   }
 }
