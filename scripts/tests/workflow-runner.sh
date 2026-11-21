@@ -313,8 +313,29 @@ def section_catalog():
     module = load()
     real = module.check_catalog(REAL_CATALOG)
     check("the shipped catalog is sound", real == [], real)
-    check("the shipped catalog holds the twelve Build contracts, the ten Hotfix ones and the twenty-three Plan and Rebalance ones", len(REAL_CATALOG["contracts"]) == 45, list(REAL_CATALOG["contracts"]))
-    check("only the Hotfix and Rebalance satisfiers are shipped", dict((n, e["satisfiedBy"]) for n, e in REAL_CATALOG["contracts"].items() if "satisfiedBy" in e) == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"], "plan-wire@1": ["rebalance-rewire@1"]})
+    pinned = {
+        "build": ["claim@1", "start@1", "branch@1", "build@1", "risk-check@1", "local-checks@1", "review@1", "merge@1",
+                  "complete@1", "capture@1", "sync@1"],
+        "plan": ["session-model@1", "plan-orient@1", "plan-ground@1", "plan-discovery@1", "plan-sign-off-record@1",
+                 "plan-draft@1", "plan-draft-approval@1", "plan-create@1", "plan-wire@1", "rationalize-gantt@1",
+                 "plan-number@1", "plan-hand-off@1"],
+        "rebalance": ["session-model@1", "rebalance-gates@1", "plan-ground@1", "rebalance-partition@1", "rebalance-proposal@1",
+                      "rebalance-probe@1", "rebalance-successors@1", "rebalance-rewire@1", "rebalance-renumber@1",
+                      "rebalance-archive@1", "rebalance-marker@1", "rationalize-gantt@1", "rebalance-report@1"],
+    }
+    for name, contracts in pinned.items():
+        shipped = json.load(open(os.path.join(ROOT, "workflows", name + ".json"), encoding="utf-8"))
+        steps = [step["contract"] for phase in shipped["phases"] for step in phase["steps"]]
+        check("the shipped %s workflow names its pinned contracts, in order" % name, steps == contracts, steps)
+    hotfix = json.load(open(os.path.join(ROOT, "workflows", "hotfix.json"), encoding="utf-8"))
+    hotfix_contracts = [step["contract"] for phase in hotfix["phases"] for step in phase["steps"]]
+    standalone = {"custom@1", "splice@1"}
+    expected = set(c for contracts in pinned.values() for c in contracts) | set(hotfix_contracts) | standalone
+    check("the shipped catalog holds the Build, Plan, Rebalance and Hotfix contracts plus custom@1 and splice@1, and nothing else",
+          set(REAL_CATALOG["contracts"]) == expected, sorted(set(REAL_CATALOG["contracts"]) ^ expected))
+    satisfied = {name: entry["satisfiedBy"] for name, entry in REAL_CATALOG["contracts"].items() if "satisfiedBy" in entry}
+    check("only the Hotfix satisfiers and the rebalance rewire are shipped",
+          satisfied == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"], "plan-wire@1": ["rebalance-rewire@1"]}, satisfied)
     standin = module.check_catalog(stand_in_catalog())
     check("the fixture catalog, where stand-in@1 satisfies build@1, is sound", standin == [], standin)
 
@@ -505,7 +526,7 @@ def section_lifecycle():
     wanted = ["claim", "start", "branch", "build", "risk-check", "local-checks", "review", "merge", "complete", "capture", "sync"]
     check("the eleven steps are issued in order, once each", order == wanted, order)
     check("the run finishes completed, with every step's result by contract",
-          final["action"] == "finished" and final["outcome"] == "completed" and set(final["results"]) == set(step + "@1" for step in wanted)
+          final["action"] == "finished" and final["outcome"] == "completed" and set(final["results"]) == set(answer["step"]["contract"] for answer in seen.values())
           and final["results"]["sync@1"] == {"branch": "main", "clean": True}, final)
     check("the last report closes the run as completed", closes(final, "completed"), final["reports"])
     check("done says what it recorded", final["recorded"] == {"stepId": "sync", "attempt": 1, "verdict": "SYNC: CLEAN", "class": "continue", "status": "done"}, final["recorded"])

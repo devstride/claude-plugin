@@ -120,7 +120,7 @@ else
 fi
 
 if has_normalized_once "$REFERENCE" 'number at most three related decisions' &&
-   has skills/plan/SKILL.md 'no more than three' &&
+   has skills/plan-steps/references/plan-discovery.md 'no more than three' &&
    has skills/setup/SKILL.md 'asked in dependency order'; then
   ok "(10) planning and setup questions follow the short, plain decision contract"
 else

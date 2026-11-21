@@ -792,12 +792,12 @@ skills/review/SKILL.md|cloud-reviewers.md
 skills/review/references/cloud-reviewers.md|review_requested
 skills/review/references/cloud-reviewers.md|reviewerRegistrationWindowMinutes
 skills/pr/SKILL.md|reviewerRegistrationWindowMinutes
-skills/plan/SKILL.md|Delivery profile:
+skills/plan-steps/references/plan-sign-off-record.md|Delivery profile:
 skills/rebalance/SKILL.md|archive
 skills/setup/SKILL.md|profile
 skills/doctor/SKILL.md|profile
 skills/doctor/SKILL.md|key absent, shipped default
-skills/plan/SKILL.md|shape against target
+skills/plan-steps/references/plan-hand-off.md|shape against target
 skills/rebalance/SKILL.md|shape against target
 skills/doctor/SKILL.md|local > shared
 skills/doctor/references/repairs.md|ask outside the batch
@@ -836,7 +836,7 @@ skills/build-item/SKILL.md|"non-applicable" with its reason
 skills/build-item/references/epic-release-steps.md|FULL diff
 skills/build-item/references/epic-release-steps.md|live: false
 skills/build-item/references/progress-table.md|not configured
-skills/plan/SKILL.md|yes, build this
+skills/plan-steps/references/plan-discovery.md|yes, build this
 skills/pr/SKILL.md|cannot guarantee CI-last
 skills/plan/references/delivery-profiles.md|review-settled
 skills/release/SKILL.md|reviewedHead
@@ -1010,7 +1010,7 @@ skills/release/SKILL.md|create-story deferred
 skills/build-item/references/next-unblocked.md|deferredContainerLegacyTitles
 skills/create-defect/SKILL.md|deferred-container.md
 skills/create-story/SKILL.md|deferred-container.md
-skills/plan/SKILL.md|deferred-container.md
+skills/plan-steps/references/plan-discovery.md|deferred-container.md
 skills/rebalance/SKILL.md|deferred-container.md
 skills/comprehend-plan/SKILL.md|deferred-container.md
 skills/rationalize-gantt/SKILL.md|deferred-container.md
@@ -1026,8 +1026,8 @@ skills/setup/references/agents-mode.md|typed yes
 skills/setup/references/agents-mode.md|never moves, edits or removes an item
 skills/doctor/references/agents.md|never executed
 skills/build-item/references/active-agents.md|never a leaf
-skills/plan/SKILL.md|takes a board from its parent
-skills/plan/SKILL.md|else an explicit `null`
+skills/plan-steps/references/plan-create.md|takes a board from its parent
+skills/plan-steps/references/plan-create.md|else an explicit `null`
 skills/plan/references/splice-mechanics.md|No board from the parent
 skills/plan/references/splice-mechanics.md|else an explicit `null`
 skills/plan/references/splice-mechanics.md|Step 3's board rule applies to each

@@ -31,6 +31,10 @@ for what each version component means here and how a release is cut.
   step and `hotfix-branch@1` for the branch step. The always-on context budget rises from 2,100 to
   2,200 tokens: the hotfix steps must be startable by the runner through the Skill tool, so one
   short description joins every session's context.
+- **`/devstride:plan` runs the Plan workflow.** The command, its arguments and its questions are
+  unchanged; it now walks the Plan workflow one step at a time through the step runner (or, with
+  no runner, reads the step list and runs each step by name), and each step's instructions live
+  once, in that step's reference. The plan body drops from about 8,500 tokens to under 3,000.
 - **Planning runs as two named step lists.** The Plan workflow (twelve steps in five phases) and
   the Rebalance workflow (thirteen steps in five phases) ship as built-in definitions the step
   runner walks one step at a time, so the Agents module can show a planning session on a named
