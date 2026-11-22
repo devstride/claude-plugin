@@ -848,7 +848,7 @@ skills/rebalance/SKILL.md|NEVER `delete_item`
 skills/review/references/cloud-reviewers.md|wait-for-reviewers.sh
 skills/review/references/cloud-reviewers.md|adaptiveReviewerWait
 skills/review/references/reviewer-latency.md|nearest-rank
-skills/doctor/SKILL.md|reviewer-latency
+skills/doctor/references/skill-cache.md|reviewer-latency
 skills/review/scripts/wait-for-reviewers.sh|submitted_at
 skills/pr/SKILL.md|created_at
 skills/review/references/review-ledger.md|one cumulative handoff

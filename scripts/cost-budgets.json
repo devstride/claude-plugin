@@ -36,7 +36,7 @@
     "return-checkout": 600,
     "classify-release": 500,
     "pre-merge-check": 600,
-    "run-workflow": 1148,
+    "run-workflow": 1162,
     "claim-story": 1000,
     "story-lifecycle": 900,
     "risk-check": 1200,
