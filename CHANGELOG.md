@@ -103,7 +103,7 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.7.0 @ e3dc94b, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v4.7.0 @ 114565d, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.7.0 | tokens@devstride--v4.7.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |

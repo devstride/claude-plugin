@@ -17,11 +17,9 @@ the procedure below, whole and in its order. It starts no subagent and no Workfl
 The DevStride MCP writes PRODUCTION immediately; item numbers are LOOKED UP, never composed; name
 the fields you read. Print the verdict line first, then the evidence.
 
-**Only what was approved, from this conversation.** This step writes the plan tree and the drafts the person approved, exactly as this
-conversation holds them. When it no longer holds them word for word (a run picked up in a new
-session, or a compaction that summarised them), answer `FAILED approval not in this conversation`
-and write nothing: never rebuild them from DevStride, memory or a summary. The person then starts
-the command again, and the approval is asked for again.
+**Approved text only.** Write the plan exactly as this conversation holds it approved; if it no
+longer does (a new session, a compaction), answer `FAILED approval not in this conversation`
+and write nothing, never rebuilding it.
 
 ### 5. Wire the full dependency graph — no orphans
 

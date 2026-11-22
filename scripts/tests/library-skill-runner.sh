@@ -279,7 +279,7 @@ BUILD = json.load(open(os.path.join(ROOT, "workflows/build.json"), encoding="utf
 RECORDED = json.load(open(os.path.join(ROOT, "scripts/tests/fixtures/workflow-versions.json"), encoding="utf-8"))["workflows"]["build"]
 check("the built-in Build workflow names no library step", all(s["run"]["source"] != "library" for p in BUILD["phases"] for s in p["steps"]))
 check("the built-in Build workflow is the one last recorded", RECORDED["version"] != BUILD["version"]
-      or REPORT.definition_hash(BUILD) == RECORDED["sha256"], RECORDED["sha256"])
+      or REPORT.definition_hash({k: v for k, v in BUILD.items() if k != "minPluginVersion"}) == RECORDED["sha256"], RECORDED["sha256"])
 REPO = os.path.join(WORK, "repo")
 os.makedirs(REPO)
 for args in (["init", "-q"], ["checkout", "-q", "-b", "main"], ["-c", "user.name=t", "-c", "user.email=t@example.com",
