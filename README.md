@@ -549,7 +549,8 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `comprehend-plan` | Recursively reads a plan — descriptions and comment threads, every level — before any edit |
 | `insert-story` / `insert-defect` | Splices new work into a live plan's dependency chain, dated and ordered |
 | `rationalize-gantt` | Backfills dates and rationalizes the dependency graph so the timeline reads as a clean cascade |
-| `rebalance` | Re-slices a live plan's not-started leaves to a different delivery profile — merging or splitting stories, preserving every absorbed spec, archiving originals with a pointer |
+| `rebalance` | Re-slices a live plan's not-started leaves to a different delivery profile — merging or splitting stories, preserving every absorbed spec, archiving originals with a pointer; runs the Rebalance workflow (`workflows/rebalance.json`) through the step runner |
+| `plan-steps` | Runs one step of the Plan or Rebalance workflow (`workflows/plan.json`, `workflows/rebalance.json`), one reference per step; `plan` and `rebalance` start it through the step runner, and a step can be re-run by name |
 
 **Delivery** — walk the plan one item at a time:
 
