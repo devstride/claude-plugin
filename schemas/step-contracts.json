@@ -1087,7 +1087,8 @@
       "summary": "Check the session's model against the role this workflow wants, and only report it.",
       "builtinSkill": "plan-steps",
       "payload": {
-        "item": "context.item"
+        "item": "context.item",
+        "answer": "step.answer?"
       },
       "argument": "session-model {item}",
       "verdict": {
@@ -1115,6 +1116,11 @@
           },
           {
             "value": "MISMATCH UNATTENDED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "MISMATCH ANSWERED",
             "detail": "none",
             "class": "continue"
           }

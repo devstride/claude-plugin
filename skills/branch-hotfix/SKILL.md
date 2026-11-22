@@ -53,8 +53,10 @@ command, and again after a compaction.**
 5. **On `finished`**: say the outcome in plain words (`completed`, `abandoned` or
    `environment-declined`), with the branch, the merge commit and the deploy as they stand.
 
-After a restart or a compaction: `status`, then `resume`. A step that already acted (a merge that
-landed) is reported with `done`, never run again.
+After a compaction: `status`, then `resume`. After a restart (a new session), `resume` with the
+item, or for a hotfix started with no item the `runId` the first `start` answered with, so say
+that id to the person once, when the run starts. A step that already acted (a merge that landed)
+is reported with `done`, never run again.
 
 ## No runner
 

@@ -92,6 +92,10 @@ ENTRY_FIELDS = ("summary", "builtinSkill", "payload", "argument", "verdict", "re
 # conversation with the person inside the step). The runner passes the flags through unchanged.
 OPTIONAL_FIELDS = ("satisfiedBy", "maxAutoRedo", "delegates", "interactive")
 CLASSES = ("continue", "skipped", "redo:self", "stop", "ask")
+# The steps that cut a run's branch and merge it: Build's, and the Hotfix steps that stand in for them
+# (`satisfiedBy`). An adopted run is carried on only on the branch the first cut, until the second ended.
+BRANCH_CONTRACTS = ("branch@1", "hotfix-branch@1")
+MERGE_CONTRACTS = ("merge@1", "hotfix-merge@1")
 END_CLASS = re.compile(r"^end:([a-z][a-z-]*)$")
 DETAILS = ("none", "optional", "required")
 BINDINGS = ("none", "tree", "patch", "story")
@@ -1323,9 +1327,9 @@ class Run:
         branch, merged = None, False
         for index, step in enumerate(self.steps):
             record = self.record(index)
-            if step["contract"] == "branch@1" and ended_well(record):
+            if step["contract"] in BRANCH_CONTRACTS and ended_well(record):
                 branch = record["result"].get("branch")
-            if step["contract"] == "merge@1" and ended_well(record):
+            if step["contract"] in MERGE_CONTRACTS and ended_well(record):
                 merged = True
         return None if merged or not isinstance(branch, str) else branch
 
@@ -1334,7 +1338,7 @@ class Run:
         story branch. One exception: a merge handed back as it was issued, which may already have
         landed (and deleted the branch); its landing is checked first."""
         branch = self.story_branch()
-        if branch is None or (handed_back and self.steps[index]["contract"] == "merge@1"):
+        if branch is None or (handed_back and self.steps[index]["contract"] in MERGE_CONTRACTS):
             return
         here = self.world.branch(self.state["context"]["cwd"])
         if here != branch:

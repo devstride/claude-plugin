@@ -45,15 +45,14 @@ into `main` here is its own release), with a clean tree and that branch up to da
    key table carry the new version). `python3 scripts/build-config-schema.py --check --release --base origin/main`
    must print `SCHEMA: ok`: an `UNRELEASED` or `DRIFT` line blocks the commit, exactly as the
    release guard would block the pull request.
-6a. **The workflow definitions.** Every definition in `workflows/` that is new or changed since the
-   previous tag (`git diff --name-only devstride--v<previous> -- workflows/`) carries
-   `"minPluginVersion": "<version>"`: the first release that can run it. The six release
-   definitions are generated, so set it in `scripts/release-workflow-source.json` and run
-   `python3 scripts/build-release-workflows.py --write`; set the others in their own file. An
-   unchanged definition keeps its value. Then `bash scripts/tests/workflow-definitions.sh --record`
-   (a definition the previous tag did not ship re-records without a version bump; a shipped one
-   that changed needs its `version` raised first) and `bash scripts/tests/workflow-definitions.sh`
-   must print `PASS`.
+6a. **The workflow definitions.** Every definition in `workflows/` carries
+   `"minPluginVersion": "<version>"`, this release's own version (the build-loop tests hold
+   `workflows/build.json` to it). The six release definitions are generated, so set it in
+   `scripts/release-workflow-source.json` and run `python3 scripts/build-release-workflows.py
+   --write`; set the others in their own file. Then `bash scripts/tests/workflow-definitions.sh
+   --record` and `bash scripts/tests/workflow-definitions.sh` must print `PASS`. The ratchet's
+   hash leaves `minPluginVersion` out, so the stamp alone needs no definition `version` bump; any
+   other change to a recorded definition does, and `--record` refuses it until then.
 7. **The status-line launcher's marker** is not raised here. Check only: if
    `skills/setup/references/statusline-launcher.sh` changed since the previous tag, its
    `# ds-statusline-launcher: managed v<n>` line must be higher than at that tag (a new file starts at 1); if

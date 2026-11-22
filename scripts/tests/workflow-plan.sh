@@ -56,7 +56,7 @@ CONTRACTS = {
 }
 # What was published, value by value: the skill, each verdict and its class, and the requirements.
 PUBLISHED = {
-    "session-model@1": ("plan-steps", "SESSION MODEL: MATCH=continue | UNKNOWN=continue | OFF=continue | MISMATCH=ask | MISMATCH UNATTENDED=continue", []),
+    "session-model@1": ("plan-steps", "SESSION MODEL: MATCH=continue | UNKNOWN=continue | OFF=continue | MISMATCH=ask | MISMATCH UNATTENDED=continue | MISMATCH ANSWERED=continue", []),
     "plan-orient@1": ("plan-steps", "PLAN ORIENTATION: READY=continue | NEEDS ANSWER=ask | FAILED=stop", []),
     "plan-ground@1": ("comprehend-plan", "PLAN STATE: EMPTY=continue | PARTIAL=continue | SHALLOW=continue | FAILED=stop", []),
     "plan-discovery@1": ("plan-steps", "PLAN SHAPE: SIGNED OFF=continue | SIGNED OFF WITH ASSUMPTIONS=continue | NOT SIGNED OFF=ask", ["plan-orient@1", "plan-ground@1"]),
@@ -313,6 +313,12 @@ for verdict in ("SESSION MODEL: UNKNOWN", "SESSION MODEL: OFF", "SESSION MODEL: 
     check("%s carries on without asking" % verdict.split(": ")[1], walk(run, {"session-check": [verdict]}).get("outcome") == "completed")
 run = Run(plan)
 check("a model mismatch asks once", walk(run, {"session-check": ["SESSION MODEL: MISMATCH"]}).get("stepId") == "session-check")
+again = run.resume(answer="carry on")
+check("the person's reply to the mismatch reaches the re-issued session check",
+      again.get("action") == "run" and again["step"]["id"] == "session-check" and "carry on" in json.dumps(again), again)
+end = walk(run, {"session-check": ["SESSION MODEL: MISMATCH ANSWERED"]})
+check("an answered mismatch carries on and the plan finishes, asking only once",
+      end.get("outcome") == "completed" and run.issued.count("session-check") == 2, (run.issued, end))
 
 run = Run(plan)
 args = {}

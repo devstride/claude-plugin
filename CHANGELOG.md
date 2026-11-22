@@ -103,7 +103,7 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.7.0 @ db5edca, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v4.7.0 @ e3dc94b, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.7.0 | tokens@devstride--v4.7.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
@@ -122,7 +122,7 @@ for what each version component means here and how a release is cut.
 | skills/comprehend-plan/SKILL.md | 5,622 | 1,874 | 6,073 | 2,025 | +151 | 2,100 |
 | skills/insert-defect/SKILL.md | 5,255 | 1,752 | 5,605 | 1,869 | +117 | 1,869 |
 | skills/insert-story/SKILL.md | 4,578 | 1,526 | 4,928 | 1,643 | +117 | 1,643 |
-| skills/branch-hotfix/SKILL.md | 6,649 | 2,217 | 4,570 | 1,524 | -693 | 1,600 |
+| skills/branch-hotfix/SKILL.md | 6,649 | 2,217 | 4,752 | 1,584 | -633 | 1,600 |
 | skills/branch-feature/SKILL.md | 3,707 | 1,236 | 3,707 | 1,236 | +0 | 1,236 |
 | skills/risk-check/SKILL.md | 3,598 | 1,200 | 3,598 | 1,200 | +0 | 1,200 |
 | skills/hotfix-steps/SKILL.md (added) | — | — | 3,591 | 1,197 | +1197 | 1,200 |
@@ -148,7 +148,7 @@ for what each version component means here and how a release is cut.
 | skills/sync-base/SKILL.md | 1,471 | 491 | 1,471 | 491 | +0 | 500 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 6,277 | 2,093 | 6,474 | 2,158 | +65 | 2,200 |
-| **total (bodies)** | 299,545 | 99,861 | 279,512 | 93,185 | -6676 | |
+| **total (bodies)** | 299,545 | 99,861 | 279,694 | 93,245 | -6616 | |
 
 ## [4.7.0] — 2026-11-20
 

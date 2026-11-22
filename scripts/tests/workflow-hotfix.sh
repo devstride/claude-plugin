@@ -369,6 +369,26 @@ run.done()
 run.done(answer_text("HOTFIX CLOSED: OPEN RELEASE release/26-11-21", {"mergeSha": "abc1234", "openRelease": "release/26-11-21"}))
 check("... confirmed, and the close names an open release branch and still finishes", run.answer.get("action") == "finished" and run.answer.get("outcome") == "completed", run.answer)
 
+# An adopted hotfix run is carried on only on its hotfix branch, as an adopted Build run is on its story branch.
+run = Run(context={"item": "I123"})
+git(run.repo, "remote", "add", "origin", "https://example.com/acme/app.git")
+run.rc, run.answer, run.err = run.call("start", {"definitionFile": HOTFIX_FILE, "replace": True, "context": dict(CONTEXT, cwd=run.repo, item="I123")})
+run.until("fix")
+second = fresh("second")
+git(run.repo, "worktree", "add", "-q", "--detach", second, "main")
+env = dict(os.environ, XDG_CACHE_HOME=run.cache)
+done = subprocess.run([sys.executable, "-B", RUNNER, "resume"], input=json.dumps({"item": "I123", "session": "s2"}),
+                      capture_output=True, text=True, env=env, cwd=second)
+check("an adopted hotfix run is refused in a checkout that is not on its hotfix branch (wrong-branch)",
+      done.returncode == 2 and "wrong-branch" in done.stderr and BRANCH in done.stderr, (done.returncode, done.stderr))
+git(run.repo, "checkout", "-q", "--detach")
+git(second, "checkout", "-q", BRANCH)
+done = subprocess.run([sys.executable, "-B", RUNNER, "resume"], input=json.dumps({"item": "I123", "session": "s2"}),
+                      capture_output=True, text=True, env=env, cwd=second)
+answer = json.loads(done.stdout) if done.returncode == 0 else {}
+check("... and adopted once that checkout is on it", answer.get("action") == "run" and answer["step"]["id"] == "fix" and "adoptedFrom" in answer,
+      (done.stderr, answer))
+
 # The fix step can be abandoned, which ends the run cleanly.
 run = Run()
 run.until("fix")
