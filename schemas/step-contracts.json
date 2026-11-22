@@ -2851,14 +2851,15 @@
         "values": [
           { "value": "CLEAR", "detail": "none", "class": "continue" },
           { "value": "HOLD", "detail": "none", "class": "stop" },
-          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT RUN", "detail": "none", "class": "confirm" },
           { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
         ]
       },
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "answer": "string"
         }
       },
       "proof": {
@@ -3107,14 +3108,15 @@
         "values": [
           { "value": "CLEAR", "detail": "none", "class": "continue" },
           { "value": "HOLD", "detail": "none", "class": "stop" },
-          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT RUN", "detail": "none", "class": "confirm" },
           { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
         ]
       },
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "answer": "string"
         }
       },
       "proof": {
@@ -3140,14 +3142,15 @@
         "values": [
           { "value": "CLEAR", "detail": "none", "class": "continue" },
           { "value": "HOLD", "detail": "none", "class": "stop" },
-          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT RUN", "detail": "none", "class": "confirm" },
           { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
         ]
       },
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "answer": "string"
         }
       },
       "proof": {
@@ -3432,14 +3435,15 @@
         "values": [
           { "value": "PASS", "detail": "none", "class": "continue" },
           { "value": "FAIL", "detail": "none", "class": "stop" },
-          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT RUN", "detail": "none", "class": "confirm" },
           { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
         ]
       },
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "answer": "string"
         }
       },
       "proof": {

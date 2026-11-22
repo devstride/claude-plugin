@@ -37,9 +37,10 @@ command, and again after a compaction.**
    the person passed one, or the branch argument carries one), `profile` (resolved as
    `/devstride:build-item` resolves it), `workingBase` (the production branch, `hotfixBaseBranch`),
    `oneOff` `true`, `route` `develop-pr` (a one-off pull request into a protected branch, never a
-   release route) and `reviewMoment` `pr-boundary` (the full review before CI). A start refused
-   `run-open` means this session already has a hotfix open: `resume` it, or finish or abandon it
-   first.
+   release route) and `reviewMoment` `pr-boundary` (the full review before CI). Before it, ask
+   `status` with `all` `true`: a listed run whose `workflowId` is `hotfix` means this session already
+   has a hotfix open, so `resume` it (by `runId`), or finish or abandon it first; a start refused
+   `run-open` (a hotfix for an item) means the same.
 2. **For each `run` answer**: invoke the named skill through the Skill tool with `argument`
    unchanged (plus ` answer: <it>` when the payload carries a person's `answer` and the argument
    does not), then `done` with `stepId`, `attempt` and the skill's WHOLE answer as `output`.

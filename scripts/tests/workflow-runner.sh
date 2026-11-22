@@ -673,7 +673,7 @@ def section_lifecycle():
     run = Driver(edits=[{"op": "set", "step": "claim", "path": ["run"], "value": OFF}], context={"item": None})
     check("a switched-off step is reported skipped and the next one issued",
           is_run(run.answer, "start", 1) and [(r["stepId"], r["status"]) for r in run.step_reports()] == [("claim", "skipped"), ("start", "running")]
-          and "itemNumber" not in run.answer["reports"][0] and os.path.isfile(run.state_path(item="run")), run.answer)
+          and "itemNumber" not in run.answer["reports"][0] and os.path.isfile(run.state_path(item=run.answer["runId"])), run.answer)
     check("a session's only open run is found without naming it", is_run(run.call("next", {})[1], "start", 1))
     check("a run with no item declares no ship intent", run.call("next", {})[1]["heartbeat"]["shipIntent"] is None)
 
@@ -1465,10 +1465,228 @@ def section_static():
     check("a git that cannot do --verbatim stops the check with a reason that says so", "--verbatim" in said, said)
 
 
+def confirm_catalog():
+    """The real catalog plus three test contracts: a check a person may confirm, a step that reads
+    what was confirmed, and nothing else."""
+    def entry(label, values, payload, requires=()):
+        return {"summary": "A test-only step.", "builtinSkill": "stand-in", "payload": payload, "argument": None,
+                "verdict": {"label": label, "values": [{"value": v, "detail": "none", "class": c} for v, c in values]},
+                "result": {"required": [], "types": {"state": "string", "answer": "string"}}, "proof": {"binding": "none"},
+                "requires": list(requires), "claimPhase": None, "shipIntentStage": None}
+    catalog = copy.deepcopy(REAL_CATALOG)
+    catalog["contracts"]["confirm-check@1"] = entry("CHECK", [("CLEAR", "continue"), ("NOT RUN", "confirm"), ("HOLD", "stop")], {"answer": "step.answer?"})
+    catalog["contracts"]["after-check@1"] = entry("AFTER", [("DONE", "continue")], {"said": "result:confirm-check@1.answer?", "state": "result:confirm-check@1.state?"},
+                                                  ["confirm-check@1"])
+    return catalog
+
+
+def confirm_definition():
+    definition = copy.deepcopy(FIX["definitions"]["claim-only"])
+    definition.update(id="confirm-then-read", name="Confirm, then read", startsWhen="on-demand")
+    step = definition["phases"][0]["steps"][0]
+    steps = []
+    for step_id, contract in (("check", "confirm-check@1"), ("after", "after-check@1")):
+        steps.append(dict(copy.deepcopy(step), id=step_id, name=step_id.capitalize(), contract=contract,
+                          run={"source": "builtin", "ref": "stand-in", "version": None}))
+    definition["phases"][0]["steps"] = steps
+    return definition
+
+
+def section_additions():
+    module = load()
+    root = plugin_copy("plugin-confirm", confirm_catalog())
+    definition = confirm_definition()
+
+    def start(cache, item="I123", session="s1", cwd=None):
+        cwd = cwd or fresh("plain")
+        return cli(root, "start", {"definition": definition, "context": dict(FIX["context"], cwd=cwd, item=item)}, cache, cwd=cwd, session=session)[1]
+
+    def state_of(cache, name):
+        with open(os.path.join(cache, "devstride-plugin", "workflows", name)) as handle:
+            return json.load(handle)
+
+    def reports_of(answer):
+        return [report for call in answer.get("reports", []) for report in call.get("reports", [])]
+
+    # --- the confirm class ---
+    check("the test catalog with a confirm verdict is sound, and so is the shipped one",
+          module.check_catalog(confirm_catalog()) == [] and module.check_catalog(REAL_CATALOG) == [], module.check_catalog(confirm_catalog()))
+    check("the shipped NOT RUN verdicts a person may accept are confirm, and no other verdict is",
+          sorted((name, value["value"]) for name, entry in REAL_CATALOG["contracts"].items() for value in entry["verdict"]["values"] if value["class"] == "confirm")
+          == [("post-deploy-check@1", "NOT RUN"), ("pre-merge-at-checks@1", "NOT RUN"), ("pre-merge-check@1", "NOT RUN"), ("pre-merge-recheck@1", "NOT RUN")])
+    broken = confirm_catalog()
+    broken["contracts"]["confirm-check@1"]["proof"] = {"binding": "tree", "required": ["tree"], "types": {"tree": "string"}}
+    check("a confirm verdict in a contract that takes a proof is refused by the catalog check", any(f.startswith("confirm-proof: confirm-check@1") for f in module.check_catalog(broken)), module.check_catalog(broken))
+    for label, types, required in (("no answer key", {"state": "string"}, []), ("an answer that is not text", {"answer": "count"}, []), ("a required answer", {"answer": "string"}, ["answer"])):
+        broken = confirm_catalog()
+        broken["contracts"]["confirm-check@1"]["result"] = {"required": required, "types": types}
+        broken["contracts"]["after-check@1"]["payload"] = {}
+        check("a confirm verdict whose result has %s is refused by the catalog check" % label,
+              any(f.startswith("confirm-result: confirm-check@1") for f in module.check_catalog(broken)), module.check_catalog(broken))
+
+    cache = fresh("cache")
+    answer = start(cache)
+    check("(the confirm run starts at the check)", is_run(answer, "check", 1), answer)
+    rc, answer, _, _ = cli(root, "done", {"item": "I123", "stepId": "check", "attempt": 1, "output": "CHECK: NOT RUN\nthe hook's file is missing\n```json\n{\"state\": \"not run\"}\n```\n"}, cache)
+    check("a confirm verdict stops the run waiting for the person, and says the stop is a confirmation",
+          is_stopped(answer, "needs-person", "check") and answer.get("confirm") is True and answer["reason"] == "CHECK: NOT RUN"
+          and answer["recorded"] == {"stepId": "check", "attempt": 1, "verdict": "CHECK: NOT RUN", "class": "confirm", "status": "waiting"}
+          and reports_of(answer)[-1]["status"] == "waiting" and closes(answer, "interrupted"), answer)
+    before = open(os.path.join(cache, "devstride-plugin", "workflows", "s1.I123.json")).read()
+    for words in ("maybe later", "yesterday it ran", "", "nothing to add"):
+        check("an answer of %r is neither yes nor no: refused, nothing changed" % words,
+              refused(cli(root, "resume", {"item": "I123", "answer": words}, cache), "confirm-answer")
+              and open(os.path.join(cache, "devstride-plugin", "workflows", "s1.I123.json")).read() == before)
+    rc, answer, _, _ = cli(root, "resume", {"item": "I123", "answer": "Yes, go on without it"}, cache)
+    check_state = state_of(cache, "s1.I123.json")["steps"]["check"]
+    check("a yes records the verdict as accepted without running the step again",
+          is_run(answer, "after", 1) and check_state["attempt"] == 1 and check_state["status"] == "done" and check_state["accepted"] is True
+          and check_state["verdict"] == "CHECK: NOT RUN (accepted)"
+          and [(r["stepId"], r["attempt"], r["status"], r.get("verdict")) for r in reports_of(answer)]
+          == [("check", 1, "done", "CHECK: NOT RUN (accepted)"), ("after", 1, "running", None)], (answer, check_state))
+    check("the accepted answer's text reaches a later step through the result, beside what the step gave",
+          answer["payload"]["said"] == "Yes, go on without it" and answer["payload"]["state"] == "not run", answer["payload"])
+    rc, answer, _, _ = cli(root, "done", {"item": "I123", "stepId": "after", "attempt": 1, "output": "AFTER: DONE\n"}, cache)
+    check("the run then finishes, and the accepted step's result carries the answer",
+          answer["action"] == "finished" and answer["outcome"] == "completed"
+          and answer["results"]["confirm-check@1"] == {"state": "not run", "answer": "Yes, go on without it"}, answer)
+
+    cache = fresh("cache")
+    start(cache)
+    cli(root, "done", {"item": "I123", "stepId": "check", "attempt": 1, "output": "CHECK: NOT RUN\n"}, cache)
+    rc, answer, _, _ = cli(root, "resume", {"item": "I123", "answer": "no"}, cache)
+    ended = state_of(cache, "s1.I123.json")
+    check("a no ends the run as declined: the step is not run again and the next one is never issued",
+          rc == 0 and answer["action"] == "finished" and answer["outcome"] == "declined" and closes(answer, "interrupted")
+          and ended["outcome"] == "declined" and ended["steps"]["check"]["attempt"] == 1 and ended["steps"]["check"]["verdict"] == "CHECK: NOT RUN (declined)"
+          and ended["steps"]["check"]["accepted"] is False and ended["steps"]["after"]["status"] == "pending"
+          and "answer" not in ended["steps"]["check"]["result"], answer)
+    check("a declined run is over", refused(cli(root, "resume", {"item": "I123", "answer": "yes"}, cache), "no-run"))
+
+    cache = fresh("cache")
+    start(cache)
+    cli(root, "done", {"item": "I123", "stepId": "check", "attempt": 1, "output": "CHECK: NOT RUN\n"}, cache)
+    rc, answer, _, _ = cli(root, "resume", {"item": "I123"}, cache)
+    check("a resume with no answer runs the check again instead", is_run(answer, "check", 2), answer)
+    rc, answer, _, _ = cli(root, "done", {"item": "I123", "stepId": "check", "attempt": 2, "output": "CHECK: CLEAR\n"}, cache)
+    check("... and a check that then passes hands no answer on", is_run(answer, "after", 1) and answer["payload"]["said"] is None, answer)
+
+    # --- runs with no item are keyed by their run id ---
+    cache = fresh("cache")
+    folder = os.path.join(cache, "devstride-plugin", "workflows")
+    first, second = start(cache, item=None), start(cache, item=None)
+    a, b = first["runId"], second["runId"]
+    check("a second run with no item starts beside the first: two runs, one file each, named by run id",
+          is_run(first, "check", 1) and is_run(second, "check", 1) and a != b
+          and sorted(os.listdir(folder)) == sorted(["s1.%s.json" % a, "s1.%s.json" % b]), os.listdir(folder))
+    check("with two open runs, a command that names neither is refused", refused(cli(root, "next", {}, cache), "ambiguous-run"))
+    rc, listed, _, _ = cli(root, "status", {"all": True}, cache)
+    check("status with all lists both unfinished runs, oldest first, each with where it is",
+          rc == 0 and [run["runId"] for run in listed["runs"]] == sorted([a, b], key=lambda r: (state_of(cache, "s1.%s.json" % r)["startedAt"], r))
+          and all(run["item"] is None and run["state"] == "running" and run["workflowId"] == "confirm-then-read"
+                  and run["position"] == {"stepId": "check", "index": 1, "of": 2} for run in listed["runs"]), listed)
+    rc, answer, _, _ = cli(root, "done", {"runId": a, "stepId": "check", "attempt": 1, "output": "CHECK: CLEAR\n"}, cache)
+    check("the first run is driven by its run id", is_run(answer, "after", 1) and answer["runId"] == a, answer)
+    rc, answer, _, _ = cli(root, "done", {"runId": b, "stepId": "check", "attempt": 1, "output": "CHECK: NOT RUN\n"}, cache)
+    check("... then the second, which stops for its person", is_stopped(answer, "needs-person", "check") and answer["runId"] == b, answer)
+    rc, status, _, _ = cli(root, "status", {"runId": a}, cache)
+    check("status takes a run id", rc == 0 and status["runId"] == a and status["position"]["stepId"] == "after", status)
+    rc, listed, _, _ = cli(root, "status", {"all": True}, cache)
+    check("the list shows one run running and the other stopped, with its stop",
+          dict((run["runId"], (run["state"], (run["stopped"] or {}).get("kind"), run["position"]["stepId"])) for run in listed["runs"])
+          == {a: ("running", None, "after"), b: ("stopped", "needs-person", "check")}, listed)
+    rc, answer, _, _ = cli(root, "resume", {"runId": b, "answer": "yes"}, cache)
+    check("resume takes a run id and the answer reaches that run only",
+          is_run(answer, "after", 1) and answer["runId"] == b and state_of(cache, "s1.%s.json" % a)["steps"]["check"]["answer"] is None, answer)
+    rc, answer, _, _ = cli(root, "done", {"runId": a, "stepId": "after", "attempt": 1, "output": "AFTER: DONE\n"}, cache)
+    check("the first run finishes while the second is still open", answer["action"] == "finished" and answer["runId"] == a, answer)
+    check("... which leaves the second as the session's only open run", is_run(cli(root, "next", {}, cache)[1], "after", 1)
+          and [run["runId"] for run in cli(root, "status", {"all": True}, cache)[1]["runs"]] == [b])
+    third = start(cache, item="I123")
+    check("a run for an item is listed beside the one with none",
+          sorted((run["item"] or "", run["runId"]) for run in cli(root, "status", {"all": True}, cache)[1]["runs"]) == sorted([("", b), ("I123", third["runId"])]))
+    check("another session's list does not show them", cli(root, "status", {"all": True}, cache, session="s2")[1] == {"runs": []})
+    cli(root, "done", {"runId": b, "stepId": "after", "attempt": 1, "output": "AFTER: DONE\n"}, cache)
+    cli(root, "resume", {"item": "I123", "close": True}, cache)
+    check("a session with nothing unfinished lists nothing, also before any run exists",
+          cli(root, "status", {"all": True}, cache)[1] == {"runs": []} and cli(root, "status", {"all": True}, fresh("cache"))[1] == {"runs": []})
+    for label, request in (("all: false", {"all": False}), ("all with an item", {"all": True, "item": "I123"}), ("all with a run id", {"all": True, "runId": a})):
+        check("status with %s is refused" % label, refused(cli(root, "status", request, cache), "bad-request"))
+
+    # a run with no item that an earlier plugin wrote (<session>.run.json) is carried on under its run id
+    cache = fresh("cache")
+    folder = os.path.join(cache, "devstride-plugin", "workflows")
+    here = fresh("plain")
+    old = start(cache, item=None, cwd=here)["runId"]
+    os.rename(os.path.join(folder, "s1.%s.json" % old), os.path.join(folder, "s1.run.json"))
+    check("the list shows a run kept under the earlier name", [run["runId"] for run in cli(root, "status", {"all": True}, cache)[1]["runs"]] == [old])
+    rc, answer, _, _ = cli(root, "next", {}, cache)
+    check("... and the next command carries it on in one file named by its run id",
+          is_run(answer, "check", 1) and answer["runId"] == old and os.listdir(folder) == ["s1.%s.json" % old], os.listdir(folder))
+    os.rename(os.path.join(folder, "s1.%s.json" % old), os.path.join(folder, "s1.run.json"))
+    rc, answer, _, err = cli(root, "resume", {"runId": old, "cwd": here}, cache, cwd=here, session="s2")
+    check("... and another session adopts it by its run id", rc == 0 and answer["runId"] == old and os.listdir(folder) == ["s2.%s.json" % old], (err, os.listdir(folder)))
+
+    # --- a person's answers never count against the cap on automatic re-issues ---
+    run = Driver()
+    run.until("build")
+    for attempt in range(1, 8):
+        answer = run.done("BUILD: NEEDS DECISION question %d?\n" % attempt)
+        rc, answer, _, _ = run.call("resume", {"item": "I123", "answer": "answer %d" % attempt})
+        run.answer = answer
+    check("seven answers to a step's questions re-issue it seven times: none is counted as an automatic re-issue",
+          is_run(answer, "build", 8) and answer["payload"]["answer"] == "answer 7" and run.state()["steps"]["build"]["autoRedo"] == 0, answer)
+    run.until("local-checks")
+    for attempt in range(1, 5):
+        answer = run.done(**{"proof.tree": "1" * 40})
+    check("... while the default still stops at the fifth automatic re-issue",
+          is_run(answer, "local-checks", 5) and is_stopped(run.done(**{"proof.tree": "1" * 40}), "attempts-exhausted", "local-checks"), run.answer)
+    raised = dict((name, entry["maxAutoRedo"]) for name, entry in REAL_CATALOG["contracts"].items() if "maxAutoRedo" in entry)
+    check("every raised cap in the shipped catalog is above the default of %d" % module.AUTO_REDO_LIMIT,
+          raised and all(module.AUTO_REDO_LIMIT < cap <= module.AUTO_REDO_MAX for cap in raised.values()), raised)
+
+    # --- wait: a step that waits inside itself ---
+    run = Driver(definition="claim-only", plain=True)
+    reason = "waiting for the release ahead to finish deploying"
+    rc, answer, _, _ = run.call("wait", {"item": "I123", "stepId": "claim", "attempt": 1, "reason": reason})
+    check("wait reports the issued step as waiting, with the reason, on the same attempt",
+          rc == 0 and answer["waiting"] == {"stepId": "claim", "attempt": 1, "reason": reason}
+          and [(r["stepId"], r["attempt"], r["status"], r["verdict"]) for r in run.step_reports([answer])] == [("claim", 1, "waiting", reason)]
+          and "endedAt" not in run.step_reports([answer])[0] and "run" not in answer["reports"][-1], answer)
+    status = run.call("status", {"item": "I123"})[1]
+    check("status shows the step waiting while the run is still running",
+          status["state"] == "running" and status["rows"][0]["status"] == "waiting" and run.state()["current"] == {"stepId": "claim", "attempt": 1}, status)
+    check("the list of runs carries what it waits for", run.call("status", {"all": True})[1]["runs"][0]["waiting"] == reason)
+    answer = run.next()
+    check("the step asked for again is handed back as it was, still reported waiting",
+          is_run(answer, "claim", 1) and run.step_reports([answer])[0]["status"] == "waiting", answer)
+    rc, answer, _, _ = run.call("wait", {"item": "I123", "stepId": "claim", "attempt": 1})
+    check("a wait with no reason says Waiting", rc == 0 and answer["waiting"]["reason"] == "Waiting", answer)
+    rc, answer, _, _ = run.call("wait", {"item": "I123", "stepId": "claim", "attempt": 1, "reason": "waiting with gh" + "p_abcdefghijklmnop"})
+    check("a reason that holds what looks like a credential is withheld", rc == 0 and answer["waiting"]["reason"] == "[withheld]"
+          and "abcdefghijklmnop" not in json.dumps(answer) + open(run.state_path()).read(), answer)
+    for label, request in (("another attempt", {"stepId": "claim", "attempt": 2}), ("another step", {"stepId": "start", "attempt": 1})):
+        check("wait for %s is refused" % label, refused(run.call("wait", dict(request, item="I123")), "not-current-step"))
+    for label, request in (("no step", {"attempt": 1}), ("an attempt that is not a number", {"stepId": "claim", "attempt": "1"}),
+                           ("a reason that is not text", {"stepId": "claim", "attempt": 1, "reason": 7}), ("an empty reason", {"stepId": "claim", "attempt": 1, "reason": " \n"})):
+        check("wait with %s is refused" % label, refused(run.call("wait", dict(request, item="I123")), "bad-request"))
+    answer = run.done()
+    check("the step's answer ends the wait: it is reported done and the run goes on to its end",
+          answer["action"] == "finished" and run.step_reports([answer])[0]["status"] == "done" and run.state()["steps"]["claim"]["waiting"] is None, answer)
+    check("a run that is over takes no wait", refused(run.call("wait", {"item": "I123", "stepId": "claim", "attempt": 1}), "not-current-step")
+          or refused(run.call("wait", {"item": "I123", "stepId": "claim", "attempt": 1}), "no-run"))
+    run = Driver()
+    run.until("build")
+    run.done("BUILD: BLOCKED cannot build\n")
+    check("a stopped run takes no wait", refused(run.call("wait", {"item": "I123", "stepId": "build", "attempt": 1}), "not-current-step"))
+    check("wait is a command the runner names", "wait" in module.COMMANDS)
+
+
 SECTIONS = {"catalog": section_catalog, "validation": section_validation, "verdicts": section_verdicts,
             "proof-fixtures": section_proof_fixtures, "lifecycle": section_lifecycle, "proofs": section_proofs,
             "stand-in": section_stand_in, "evidence": section_evidence, "state": section_state,
-            "reporting": section_reporting, "records": section_records, "repository": section_repository, "static": section_static}
+            "reporting": section_reporting, "records": section_records, "repository": section_repository, "static": section_static,
+            "additions": section_additions}
 SECTIONS[SECTION]()
 print("ran %d" % counter[0])
 PY
@@ -1496,4 +1714,5 @@ section reporting 4
 section records 24
 section repository 7
 section static 18
+section additions 57
 exit $FAIL

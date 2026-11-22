@@ -90,9 +90,17 @@ nothing before a finished merge is re-opened. `next` issues the first step, in o
 finished with a valid proof: a stale proof re-issues the step that produced it before anything that
 relies on it. A proof that does not match the
 repository when the step answers counts as a failed attempt and the step is issued again. The
-runner counts its own re-issues per step (not a step's own `redo:self`), starts again from 0 when
-the step finishes with a proof that holds, and stops at the fifth in a row (kind
-`attempts-exhausted`). A local-checks pass names at least one command and carries a receipt.
+runner counts its own re-issues per step (not a step's own `redo:self`, and never a person's
+answer or resume), starts again from 0 when the step finishes with a proof that holds, and stops
+at the fifth in a row, or at the contract's `maxAutoRedo` where the catalog raises it (a whole
+number from 6 to 20) (kind `attempts-exhausted`). A local-checks pass names at least one command and carries a receipt.
+
+**A `confirm` verdict** (a person's yes records it as accepted, without the step running again:
+`workflow-runner.md`, "A step's answer") is allowed only in a contract that takes no proof (binding
+`none`, no proof keys; `confirm-proof`) and whose result lists `answer` as optional text, where the
+accepted answer is kept (`confirm-result`). The catalog check refuses any other. An accepted
+verdict's result is what the step gave plus `answer`, so a later step reads any other key of it
+with a `?`.
 
 Five named rules, a closed list:
 
