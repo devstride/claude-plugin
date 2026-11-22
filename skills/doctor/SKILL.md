@@ -75,7 +75,7 @@ next action. For each failure symptom, read
 - **A server exists and is CONNECTED** — `claude mcp list`. The bundled one is
   `plugin:devstride:devstride`; a plain `devstride` is yours or your project's.
 - **Ready for agents** — report the connection and `PRESENCE` lines of
-  `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" check`; `NOT READY` → FAIL (`claims-checks.md`, `workflows-checks.md`).
+  `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" check`; `NOT READY` → FAIL (`claims-checks.md`, `skills/doctor/references/workflows-checks.md`).
 - **Not connected** (missing tools, not an auth error) or `NOT READY` → Fix: `/devstride:setup connect`.
 - **More than one connected** — FAIL: calls can reach either organization. OAuth:
   `claude mcp logout <name>`; API-key headers: `claude mcp remove <name>`; never `claude mcp get` (it prints the key).

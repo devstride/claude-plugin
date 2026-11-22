@@ -15,8 +15,8 @@ All read-only. It lists tools; it never calls one.
   (ToolSearch), **never by calling one**. Both offered → PASS. One missing → INFO, not FAIL:
   "this DevStride server does not offer workflows yet, or the key's user cannot read the item;
   runs use the built-in workflow". That is a normal state.
-- **`get_agent_skill`** (a skill from the organization's library): offered → PASS; missing → WARN,
-  never FAIL: "needed only to run library skills".
+- **`get_agent_skill`** (a skill from the organization's library): offered → PASS; missing → INFO,
+  never WARN or FAIL: "needed only when your organization's workflow uses library skills".
 - **No DevStride connection at all** → N/A.
 - A run that fell back says why in `workflow.py status` (`source`, for example
   `built-in (DevStride unavailable)`); doctor names that one line when asked about a run.

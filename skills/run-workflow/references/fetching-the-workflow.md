@@ -13,9 +13,11 @@ one switch that turns it off is the one that turns step reporting off: `workflow
 in `.claude/ds-config.json`, or the machine variable `DEVSTRIDE_WORKFLOWS=0`. With it off, skip
 steps 1 to 4 and start with the built-in definition alone.
 
-1. **Once per run, at its start.** One attempt; never a retry, never a message per step. Do not
-   list the server's tools first: the call itself answers. A connection that does not offer the
-   tool, an older server and an unreachable server all count as one failed attempt.
+1. **Once per run, at its start.** One attempt; never a retry, never a message per step. Where
+   the server's tools load on demand, one tool search for `get_workflow_for_item` is the only
+   lookup. A tool that is not in the tool list, or that one search does not find, is `ABSENT`:
+   never try another tool or route in its place (no `invoke_api_operation`), and never retry. An
+   older server and an unreachable server also count as the one failed attempt.
 2. **The repository**: `python3 -B "${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py" repository`
    (no input) prints `{"repository": "host/owner/name"}`, or `null` outside a repository or with
    no usable remote. Never send the raw remote address, which can carry a credential.

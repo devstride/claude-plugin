@@ -19,7 +19,9 @@ for what each version component means here and how a release is cut.
   skill file kept in the repository, read from the committed version only, never executed, and
   refused when it is a link, a submodule, an unsafe path, over 64 KB or not text. `workflow.py
   repository` prints the repository's name without any credential, and doctor reports whether
-  the connected server offers workflows. The one off switch is the existing `workflows` setting.
+  the connected server offers workflows and library skills, as information, never a warning.
+  Where a server's tools load on demand, the loop looks the fetch up once and never tries another
+  route in its place. The one off switch is the existing `workflows` setting.
 - **The release's step list exists as data, ready for the step runner (in progress).** Six built-in
   release workflow definitions now ship: one full release per clearance scope (`release`,
   `cut-to-deploy`, `merge-and-deploy`) and three partial entries (post-deploy only, documentation

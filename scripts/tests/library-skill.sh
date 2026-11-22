@@ -192,6 +192,14 @@ banned = {"urllib", "http", "socket", "ssl", "requests", "ftplib", "smtplib", "x
 allowed = {"hashlib", "json", "os", "re", "sys", "time"}
 check("static: no network module and nothing outside the standard library", not (names & banned) and names <= allowed, repr(sorted(names)))
 
+# doctor stays quiet on a server that offers neither the workflow fetch nor library skills yet
+root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(helper))))
+doctor = open(os.path.join(root, "skills/doctor/references/workflows-checks.md"), encoding="utf-8").read()
+section = doctor.split("## Workflows", 1)[1]
+library = [line for line in section.split("\n- ") if "`get_agent_skill`" in line]
+check("doctor: a missing get_agent_skill is INFO, and the workflows section names no WARN",
+      "WARN" not in section.replace("never WARN or FAIL", "") and len(library) == 1 and "missing → INFO" in library[0], section)
+
 sys.exit(FAIL[0])
 PY
 STATUS=$?
