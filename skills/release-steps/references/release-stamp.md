@@ -31,9 +31,15 @@ and the pre-merge check did not hold: either one stops the run with the pull req
    verb per call: `classify-release` at that head, `pre-ship release run <class>`, the dev deploy
    wait (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/dev-deploy-wait.md`; the same cut,
    so it passes the first round's exit through) and `pre-merge-check`; then step 3 with the new tip
-   and class. A conflict, `PRE-SHIP: FAIL` or a pre-merge `HOLD` → no verdict line, naming it: the
-   run stops with the pull request open, and the owner decides. At most three rounds: a fourth
-   `CHANGED` stops the same way, said so; the stamp verify under the tower is the floor.
+   and class. An attempt knows it follows a `CHANGED` from the runner's `status` row for
+   `checks-stamp` (its earlier attempt's verdict). A conflict, `PRE-SHIP: FAIL` or a pre-merge
+   `HOLD` → no verdict line, naming it: the run stops with the pull request open, and the owner
+   decides. At most three rounds: a fourth `CHANGED` stops the same way, said so; the stamp
+   verify under the tower is the floor.
+5. **The round's evidence.** The runner records none of a round's verdicts, so its `STAMPED`
+   carries them (class, `PRE-SHIP`, `DEV DEPLOY`, pre-merge) as evidence lines, and every later
+   reader of the checks' lines (the "passed at" report, the standing yes's `--pre-ship` and
+   `--dev-deploy`) takes them from there when the last stamp had a round.
 
 ## Verdict
 

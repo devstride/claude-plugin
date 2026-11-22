@@ -8,11 +8,16 @@ load: contract
 release-flavored body and its markers, cited, not copied.
 
 1. **Shape** (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/resume-rules.md`): `ADOPTED`
-   or `MERGED` → `ADOPTED <pr>`, the shape's `pullRequest` (or the one the tower claim adopted).
-   Nothing is opened.
-2. **Safe to re-run.** An open pull request into `release.productionBranch` headed by this run's
-   release branch, opened by an earlier attempt of this run (its holder marker this session's, or
-   this run's recorded verdict for this step) → `OPENED <pr>` again; never a second.
+   or `MERGED` → `ADOPTED <pr>`, the shape's `pullRequest`. The payload's `tower` with
+   `adopted: true` wins over the shape, whatever it said (`resume-rules.md` "What the payload
+   carries"): `ADOPTED <pr>`, the provider's local record's `pr` (`clearance.md` "The local
+   record"), open or merged. Nothing is opened.
+2. **Safe to re-run.** An open pull request into `release.productionBranch` whose head is this
+   run's release branch (the name in `cut-branch`'s recorded `CUT <name>`, from the runner's
+   `status`) is this run's, opened by an earlier attempt cut off before its `done` →
+   `OPENED <pr>` again; never a second, and never a `gh pr create` GitHub would refuse. With no
+   release branch pattern (headed by the source), only one whose holder marker is this session's
+   or this run's recorded verdict for this step counts.
 3. **Draft or not** is the CI hold's reading
    (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/ci-hold-proof.md` step 1): pull-request
    workflows exist → `--draft` (the draft holds CI until the review's ready flip); none → no
