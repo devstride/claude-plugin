@@ -21,8 +21,10 @@ unfinished run never replaces them, so a skill published after the run began nev
 - **`fetch-skill`**: no verified copy is saved on this machine. Call `tool` (`get_agent_skill`) with
   `arguments` (the name and version). Then run `put.command` with a here-document whose delimiter is
   quoted (`<<'SKILL'`), so the shell expands nothing: first one JSON line, `put.request` plus an
-  `answer` object holding the answer's `name`, `version`, `implements` and `hash`; then the answer's
-  body exactly as it came. Call `next` again. If the tool fails (the connection is down, the skill is
+  `answer` object holding `name`, `version`, `implements` and `hash`; then the body exactly as it came.
+  The tool's answer nests the published text under `version`: take `version` (the number inside
+  it), `implements`, `hash` and `body` from that `version` object, never from the answer's top
+  level, and `name` from `arguments`. Call `next` again. If the tool fails (the connection is down, the skill is
   not found, the connection offers no such tool), call `next` again without the put. The runner allows
   two tries.
 - **`run`**: `skill.file` is a saved copy whose fingerprint was checked again just now. Read it and
