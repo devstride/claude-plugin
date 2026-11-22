@@ -1,5 +1,5 @@
 {
-  "about": "The planning rehearsal, as a replay: a throwaway parent, one capability, one epic and three stories. The draft review is declined once, the creation stops PARTIAL after three of five items and is run again, and the wiring is verified with no orphans. It proves the runner's sequence, stops and re-issues for these answers; what a model does inside a step is not replayed.",
+  "about": "The planning rehearsal, as a replay: a throwaway parent, one capability, one epic and three stories. The draft review is declined once, the creation stops PARTIAL after three of five items and is run again, and the wiring is verified with no orphans. It proves the runner's sequence, stops and re-issues for these answers; what a model does inside a step is not replayed. This is replay evidence only: it is not the live rehearsal in a scratch organization, which is still owed.",
   "definition": "workflows/plan.json",
   "context": {
     "item": "I100"

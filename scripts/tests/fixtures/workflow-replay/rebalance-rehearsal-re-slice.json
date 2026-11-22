@@ -1,5 +1,5 @@
 {
-  "about": "The rebalance rehearsal's real re-slice, as a replay: the same three-story plan signed off and re-sliced to extended, three stories becoming two. Every write step is issued once, in the recoverable order, and the rewire is verified with no orphans before anything is archived.",
+  "about": "The rebalance rehearsal's real re-slice, as a replay: the same three-story plan signed off and re-sliced to extended, three stories becoming two. Every write step is issued once, in the recoverable order, and the rewire is verified with no orphans before anything is archived. This is replay evidence only: it is not the live rehearsal in a scratch organization, which is still owed.",
   "definition": "workflows/rebalance.json",
   "context": {
     "item": "I100"
@@ -39,7 +39,7 @@
     },
     {
       "step": "renumber",
-      "output": "REBALANCE RENUMBER: DONE 4-5\nThe successors carry the next free numbers; no existing item was renumbered.\n```json\n{\"range\": \"4-5\"}\n```\n"
+      "output": "REBALANCE RENUMBER: DONE 0.1-0.2\nEach successor took a dotted number in the slot of its first absorbed item; no existing item was renumbered. With all of [1] to [3] absorbed there is no live item before or after them, so both take the front-of-plan form.\n```json\n{\"range\": \"0.1-0.2\"}\n```\n"
     },
     {
       "step": "archive-originals",

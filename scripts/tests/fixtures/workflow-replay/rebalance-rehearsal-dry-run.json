@@ -1,5 +1,5 @@
 {
-  "about": "The rebalance rehearsal's dry run, as a replay: the three-story rehearsal plan, re-sliced to extended with --dry-run. The run ends at the proposal and no write step is ever issued.",
+  "about": "The rebalance rehearsal's dry run, as a replay: the three-story rehearsal plan, re-sliced to extended with --dry-run. The run ends at the proposal and no write step is ever issued. This is replay evidence only: it is not the live rehearsal in a scratch organization, which is still owed.",
   "definition": "workflows/rebalance.json",
   "context": {
     "item": "I100"
