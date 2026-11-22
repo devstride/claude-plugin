@@ -80,10 +80,10 @@ def skill_faults(root, name, contracts, words, body_tokens):
 # A mode listed here must have NO reference file; every other mode must have one. No release of the
 # plugin is cut while this list is not empty: scripts/check-version-bump.sh rule 5 refuses the bump.
 RELEASE_PENDING_MODES = [
-    "merged-release", "train-finish", "ship-plan", "train-snapshot", "train-pr", "train-review", "train-merge", "train-close-out",
+    "train-finish", "ship-plan", "train-snapshot", "train-pr", "train-review", "train-merge", "train-close-out",
     "train-level", "release-delta", "tower-queue", "release-branch", "production-in-branch", "release-pr", "train-claim-hand-on",
-    "release-tip", "dev-deploy-wait", "release-stamp", "release-review", "pre-ship-resume", "release-docs-plan", "hotfix-catch-up",
-    "previous-release", "owner-go-ahead", "release-stamp-verify", "merge-confirmations", "production-merge", "post-deploy-pending",
+    "release-tip", "dev-deploy-wait", "release-stamp",
+    "post-deploy-pending",
     "estimates-score", "tower-hand-back", "post-deploy-result", "release-sync", "release-branch-delete", "release-docs",
     "release-kb-sync", "release-close-out", "release-notes", "release-recap", "auto-start"]
 # The one list of phases a tower heartbeat may name (the clearance contract's), less the claim itself.
