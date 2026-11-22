@@ -90,6 +90,21 @@ check("an unknown error code is ERROR, silently", rc == 0 and answer["notice"] i
 rc, answer, _, _ = start("not an object")
 check("an answer that is not an object is a silent built-in run", rc == 0 and answer["notice"] is None and answer["definitionSource"] == "builtin")
 
+# a replay of a server with no get_workflow_for_item tool: the SHIPPED build.json starts, silently
+SHIPPED = json.load(open(os.path.join(ROOT, "workflows/build.json"), encoding="utf-8"))
+replay = os.path.join(WORK, "replay")
+os.makedirs(replay)
+git(replay, "init", "-q")
+sid = session()
+rc, answer, out, err = start({"error": "ABSENT"}, session_id=sid, definition=SHIPPED, cwd=replay, context=dict(
+    FIX["context"], cwd=replay, goal="Add the export button", profile={"name": "extended", "source": "config"}, workingBase="main",
+    oneOff=False, route="epic-release", releaseUnit="I120", reviewMoment="release-deferred", branchSlug="export-button"))
+check("replay: ABSENT starts the shipped build.json with notice null", rc == 0 and answer["definitionSource"] == "builtin"
+      and answer["notice"] is None and answer["action"] == "run" and err == "" and answer["workflow"] == {
+          "id": SHIPPED["id"], "name": SHIPPED["name"], "version": SHIPPED["version"], "hash": definition_hash(SHIPPED)}, (rc, err, answer and answer.get("notice")))
+rc, status, _, _ = sid_status(sid, cwd=replay)
+check("... and only status names the fallback", rc == 0 and status["source"] == "built-in (DevStride unavailable)", status)
+
 NOTICE_START = {
     "incomplete": "DevStride sent an incomplete workflow; running the built-in workflow.",
     "integrity": "The workflow from DevStride failed its integrity check; running the built-in workflow.",

@@ -36,7 +36,7 @@
     "return-checkout": 600,
     "classify-release": 500,
     "pre-merge-check": 600,
-    "run-workflow": 1148,
+    "run-workflow": 1162,
     "claim-story": 1000,
     "story-lifecycle": 900,
     "risk-check": 1200,
@@ -171,8 +171,8 @@
     "skills/plan-steps/references/rebalance-rewire.md": 400,
     "skills/plan-steps/references/rebalance-successors.md": 300,
     "skills/plan-steps/references/session-model.md": 400,
-    "skills/doctor/references/workflows-checks.md": 406,
-    "skills/run-workflow/references/fetching-the-workflow.md": 1117,
+    "skills/doctor/references/workflows-checks.md": 419,
+    "skills/run-workflow/references/fetching-the-workflow.md": 1179,
     "skills/run-workflow/references/library-skills.md": 1347,
     "skills/doctor/references/skill-cache.md": 413
   },
@@ -222,7 +222,7 @@
       ]
     },
     "fastStoryLoop": {
-      "budget": 105543,
+      "budget": 105605,
       "files": [
         "skills/build-item/SKILL.md",
         "skills/build-item/references/next-unblocked.md",
