@@ -79,7 +79,9 @@ full before the first command, and again after a compaction.**
 3. **For each `run` answer**: invoke the named skill through the Skill tool with `argument`
    unchanged (plus ` answer: <it>` when the payload carries the person's `answer` and the argument
    does not); the steps read this command's arguments (the target profile word, `--dry-run`) from
-   the conversation. Then `done` with `stepId`, `attempt` and the skill's WHOLE answer as `output`.
+   the conversation. **Except `redate`:** its argument from the runner holds only the run's item,
+   so build it from "3f" below instead (the enclosing plan root, `item-days`, `start`). Then
+   `done` with `stepId`, `attempt` and the skill's WHOLE answer as `output`.
    Its answer is the next action.
 4. **Reports.** Forward every `reports` object in order as
    `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` says (on by default,
@@ -105,3 +107,7 @@ sibling units' leaves dated against a moved predecessor — red lines under a su
 Progress dates move with the cascade; nothing else of theirs does. Let it own the math, its own
 probe and the red-line review. A STOP on a cycle means it wrote no dates — almost certainly a
 non-convex merge set; fix the edge it names and re-invoke before reporting.
+
+**The two values** are the `partition` step's evidence line `Open-leaf dates: item-days <N>,
+earliest start <date>`. Not in the conversation (a resumed session) → read them from the originals
+3d archived, which keep their dates; never from the successors.

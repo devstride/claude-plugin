@@ -20,7 +20,7 @@
     "pr": 3846,
     "push": 1100,
     "rationalize-gantt": 4200,
-    "rebalance": 2669,
+    "rebalance": 2811,
     "release": 6265,
     "review": 7999,
     "setup": 10700,
@@ -163,7 +163,7 @@
     "skills/plan-steps/references/rebalance-archive.md": 500,
     "skills/plan-steps/references/rebalance-gates.md": 1100,
     "skills/plan-steps/references/rebalance-marker.md": 500,
-    "skills/plan-steps/references/rebalance-partition.md": 1100,
+    "skills/plan-steps/references/rebalance-partition.md": 1226,
     "skills/plan-steps/references/rebalance-probe.md": 600,
     "skills/plan-steps/references/rebalance-proposal.md": 1200,
     "skills/plan-steps/references/rebalance-renumber.md": 600,
@@ -365,7 +365,7 @@
       ]
     },
     "rebalanceRun": {
-      "budget": 16105,
+      "budget": 16461,
       "files": [
         "skills/rebalance/SKILL.md",
         "skills/plan-steps/SKILL.md",
