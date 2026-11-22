@@ -793,12 +793,12 @@ skills/review/references/cloud-reviewers.md|review_requested
 skills/review/references/cloud-reviewers.md|reviewerRegistrationWindowMinutes
 skills/pr/SKILL.md|reviewerRegistrationWindowMinutes
 skills/plan-steps/references/plan-sign-off-record.md|Delivery profile:
-skills/rebalance/SKILL.md|archive
+skills/plan-steps/references/rebalance-archive.md|archive
 skills/setup/SKILL.md|profile
 skills/doctor/SKILL.md|profile
 skills/doctor/SKILL.md|key absent, shipped default
 skills/plan-steps/references/plan-hand-off.md|shape against target
-skills/rebalance/SKILL.md|shape against target
+skills/plan-steps/references/rebalance-report.md|shape against target
 skills/doctor/SKILL.md|local > shared
 skills/doctor/references/repairs.md|ask outside the batch
 skills/doctor/scripts/statusline-override.py|require_clean_committed_shared
@@ -843,7 +843,7 @@ skills/release/SKILL.md|reviewedHead
 skills/release/SKILL.md|release-notes
 skills/doctor/SKILL.md|text to PRINT
 skills/doctor/SKILL.md|ready_for_review
-skills/rebalance/SKILL.md|convex
+skills/plan-steps/references/rebalance-proposal.md|convex
 skills/rebalance/SKILL.md|NEVER `delete_item`
 skills/review/references/cloud-reviewers.md|wait-for-reviewers.sh
 skills/review/references/cloud-reviewers.md|adaptiveReviewerWait
@@ -1011,7 +1011,7 @@ skills/build-item/references/next-unblocked.md|deferredContainerLegacyTitles
 skills/create-defect/SKILL.md|deferred-container.md
 skills/create-story/SKILL.md|deferred-container.md
 skills/plan-steps/references/plan-discovery.md|deferred-container.md
-skills/rebalance/SKILL.md|deferred-container.md
+skills/plan-steps/references/rebalance-partition.md|deferred-container.md
 skills/comprehend-plan/SKILL.md|deferred-container.md
 skills/rationalize-gantt/SKILL.md|deferred-container.md
 skills/build-item/SKILL.md|deferred-container.md
@@ -1031,7 +1031,7 @@ skills/plan-steps/references/plan-create.md|else an explicit `null`
 skills/plan/references/splice-mechanics.md|No board from the parent
 skills/plan/references/splice-mechanics.md|else an explicit `null`
 skills/plan/references/splice-mechanics.md|Step 3's board rule applies to each
-skills/rebalance/SKILL.md|by that step's board rule
+skills/plan-steps/references/rebalance-successors.md|by that step's board rule
 skills/create-story/references/one-off-handoff.md|leave it out of the list
 skills/story-lifecycle/references/start.md|its step 0 places the item first
 skills/build-item/references/item-status.md|board-placement.md

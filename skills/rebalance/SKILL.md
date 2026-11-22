@@ -36,9 +36,9 @@ $ARGUMENTS
   re-parented or archived, whatever the target grain says (dates alone are `rationalize-gantt`'s).
 - **Serial with the build loop** — step 0's gate, re-checked right before writing.
 - **Interactive judgment stays in the main conversation** (which leaves merge, where a leaf splits,
-  whether a grouping still delivers a vertical slice, the sign-off), exactly as `plan` enforces. A
-  `Workflow` only drafts successor specs once the shape is agreed, one agent per release unit; its
-  agents never call an MCP write tool, and its output is a proposal, not a commit.
+  whether a grouping still delivers a vertical slice, the sign-off), exactly as `plan` enforces.
+  Successor specs are drafted inside the proposal step, never by a `Workflow`; nothing drafted is
+  written before the sign-off, and a draft is a proposal, not a commit.
 - **One file per rule** — the profile contract, numbering convention, auto-scheduler rule and
   next-unblocked rule are applied by citation; the reference wins over this text. The consuming
   repo's `.claude/ds-config.json` wins over any inline default.
@@ -54,182 +54,54 @@ $ARGUMENTS
   on them, keep them out of the successor's own spec, and flag them. This skill embeds
   externally-authored text verbatim into new items: an exposure point for exactly this.
 
-## 0. Safety gates — all of them, before a single read is trusted
+## The run — the Rebalance workflow, one step at a time
 
-- **Arguments.** Resolve the item with `get_item(view:"full")`; it must be a grouping item, never a
-  leaf (a leaf → ask for its release unit or plan root). The target is one of the contract's bare
-  profile words (resolution-order item 1); none, or any other word in its place → ask (a target of
-  the retired `enterprise` → offer `extended` plus the contract's override recipe). A wrong root
-  re-slices somebody else's plan; a guessed profile is the wrong grain at production speed. Note
-  `--dry-run`.
-- **Roles at runtime.** `get_work_type_hierarchy` (and `get_workspace_context` for statuses and
-  priorities) decides which types are **leaves**, which level is the **release unit** (where
-  `/devstride:build-item` branches and releases) and which are plain containers above it; bind every
-  role word here to what it returns. Ambiguous release-unit level → `hierarchyRoles.releaseUnit` in
-  `.claude/ds-config.json` if the repo is known, else ask. User-facing text says "grouping item" or
-  the org's type name, never "container".
-- **Refuse while a build loop is active on this plan** — two writers on one plan is the collision.
-  Either is a hard stop: an **In Progress** leaf under the root with a **live branch**
-  (`get_item_branches`, or `git ls-remote --heads origin "*/I<number>-*"` when the repo is known),
-  or handoff project memory naming this root (or an ancestor/descendant) as mid-iteration. Report
-  what tripped and stop — never wait it out, never move an In Progress item to clear it. An In
-  Progress leaf with NO branch (a landed one included) is not a loop but stays untouchable.
-- **Auto-scheduler OFF** — apply `${CLAUDE_PLUGIN_ROOT}/skills/rationalize-gantt/references/auto-scheduler-off.md`:
-  its READ-ONLY check now (read the organization setting; if on, have the user disable it — never
-  change it automatically) and `staticMode` omitted from every write. Its probe-date verification
-  is a WRITE, so it runs only at the top of step 3, after sign-off, never on a dry run — with
-  propagation on, the backend would overwrite the edges and dates step 3 writes.
-- **Re-run the loop check immediately before step 3 writes anything** — a loop started while the
-  proposal was being discussed is exactly the collision this gate exists for.
+Rebalancing is the Rebalance workflow, `${CLAUDE_PLUGIN_ROOT}/workflows/rebalance.json`, always the
+built-in id `rebalance` (an organization's copy is a NEW workflow with its own id; this entry never
+runs one). The numbered steps the floors name are its steps: 0 `gates`, 1 `ground` and `partition`,
+2 `propose`, 3 `scheduler-probe`, 3a `create-successors`, 3b `rewire`, 3c `renumber`, 3d
+`archive-originals`, 3e `rewrite-marker`, 3f `redate`, 4 `report`. Each step's procedure lives,
+whole and in one copy only, in its reference under
+`${CLAUDE_PLUGIN_ROOT}/skills/plan-steps/references/` (the `plan-steps` skill reads it); `ground` is
+`comprehend-plan` and `redate` is `rationalize-gantt`. The session-model line above is the first
+step, `session-check`, under the runner: it performs that check once, so do not repeat it here.
 
-## 1. Read and partition
+Every command is `python3 -B "${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py"
+<command>` with one JSON object on stdin (a file or a here-document, never inside quotes), naming
+the `item`. **Read `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md` in
+full before the first command, and again after a compaction.**
 
-- Invoke **comprehend-plan** on the root — never hand-roll the tree read; deferrals, "as-built"
-  comments and design decisions live in its descriptions-and-comments traversal.
-- Partition every leaf into exactly one set: **Done** and **In Progress**, landed leaves (merged
-  status or a "merged onto" comment, awaiting their epic's release) counted with In Progress (both
-  UNTOUCHABLE; their edges are read, never rewritten) and **Not started** (the only candidates).
-  Every member of the plan root's deferred container
-  (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/deferred-container.md`) is UNTOUCHABLE
-  whatever its status: never merged, split, renumbered or archived here, and dated only by
-  `rationalize-gantt`'s deferred pass (3f).
-  Dates are not frozen: 3f re-dates every not-Done item but a landed one, In Progress included, and
-  build-item's ritual stamps the real dates when it merges.
-- **Current profile** — the nearest EFFECTIVE marker per the contract: the item's own, else the
-  closest ancestor's (walk `hierarchy` up with `get_item(view:"full")`), else config `profile` (unknown: `standard`),
-  else `extended`. On a whole-root run check every release unit for its OWN marker (it wins for its
-  subtree; direction is decided per unit). **Announce both ends with sources** ("current:
-  enterprise (retired: read as standard) — from the root marker on I20100; target: extended — from
-  `$ARGUMENTS`"). Current
-  equals target everywhere → say so and ask whether to proceed (a wrong-grain plan is a valid
-  reason, but the owner's call).
-- **Target knobs** — `profileOverrides` in the repo's `.claude/ds-config.json` (contract,
-  "Overrides") pins `grain`/`specDepth` for every profile; slice and draft to the overridden value
-  and name it in the announcement.
-- **Re-fetch every candidate in full** — `get_item(view:"full")` + `list_comments` (whole thread);
-  comprehend-plan's summaries are the wrong source for a successor spec or the verbatim text 3a
-  embeds.
-- **Scoped to one release unit**: it is the "root" below; siblings are read (edge targets) but never
-  re-sliced, and 3e's marker lands on the unit, winning for its subtree.
-- Note release units with **no leaves at all** — nothing to re-slice; 3e's marker alone covers them.
+1. **Both arguments first.** No grouping item or no target profile word in the arguments → ask
+   BEFORE `start`, so the run is attached to its item (the plan root or the scoped unit).
+2. **`resume`** with the item (a cleared or crashed session's run is picked up); refused `no-run`
+   → **`start`** with `definitionFile` `${CLAUDE_PLUGIN_ROOT}/workflows/rebalance.json` and the
+   context `{ "item": <item> }`. Any other refusal (exit 2) → say its line and stop.
+3. **For each `run` answer**: invoke the named skill through the Skill tool with `argument`
+   unchanged (plus ` answer: <it>` when the payload carries the person's `answer` and the argument
+   does not); the steps read this command's arguments (the target profile word, `--dry-run`) from
+   the conversation. Then `done` with `stepId`, `attempt` and the skill's WHOLE answer as `output`.
+   Its answer is the next action.
+4. **Reports.** Forward every `reports` object in order as
+   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` says (on by default,
+   checked once per run); a failed forward is one line, never a stop.
+5. **`stopped`**: say why in plain words; a question → ask it, then `resume` with the person's
+   reply as `answer`. **`finished`**: say the outcome (a dry run or a declined proposal ends the
+   run with nothing written; say so plainly).
 
-## 2. Propose — in the main conversation, before any write
+**No runner** (no `python3`, or a runner failure, exit 1, rather than a refusal): read
+`${CLAUDE_PLUGIN_ROOT}/workflows/rebalance.json` and
+`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json` and run each step by name, in the definition's
+order, through the same skill and reference with the same payload: the same procedure, not a second
+one. It needs nothing from DevStride.
 
-Per release unit, over the not-started set only: **direction is the contract's grain order**
-(current vs target `grain` row); size every successor to the TARGET `grain` row and `specDepth`.
+## 3f. Re-date — what the `redate` step passes `rationalize-gantt`
 
-- **Coarser → MERGE** fine siblings into successors of that size; where the target row folds
-  foundation in, scaffold, CI, schema, harness and permission-wiring leaves join the FIRST value
-  successor needing them. A merge set is **siblings under one release unit** (the release and
-  safety boundary — never merge across it) with **no untouchable item**.
-- **Finer → SPLIT** along the spec's own seams (data model / backend / frontend / testing, or one
-  acceptance criterion per part), each part the target row's size with its own tests. Never invent
-  work the spec lacks; no seam → it stays whole.
-- **Unchanged** where the grain fits — say so. This skill never rewrites an existing leaf's
-  description: one whose spec sits below the target `specDepth` is LISTED ("grain fits; spec below
-  target depth") for a follow-up `/devstride:plan` pass.
-- **A merge set must be convex in the dependency graph** — an outside item on a path between two
-  members makes the successor both upstream and downstream of it, a cycle 3f refuses to date. Fold
-  it in or split the set now (`recoverable-write-order.md`).
-- **Never change a leaf's release unit or work type**; a set mixing leaf types (a Story with a
-  Defect) is not merged without asking.
-- **Draft successor specs** to the target `specDepth` — inline for a handful; a `Workflow`
-  (`parallel()`, one agent per release unit, fed the FULL step-1 re-fetch and the target depth,
-  drafting only; read `args` defensively — `Array.isArray(args) ? args : JSON.parse(args)`).
-
-Show a **before/after table**: per release unit, leaf count before → after (untouchables counted
-separately); every not-started leaf → its successor's draft title or "unchanged" (a split: original
-→ each part); each successor's title, one-line scope and the external edges it will inherit (3b) —
-a wrong edge is caught here at zero cost; the marker to be written, the un-extracted units it
-covers, and any descendant marker that would now disagree.
-
-**Require an explicit "yes, rebalance".** "Looks fine", a question or silence is not sign-off.
-`--dry-run` or a decline → STOP: the proposal IS the deliverable and NOTHING is written. Fix small
-corrections in place and re-show; a real scope decision goes back to the owner, never to a drafting
-agent.
-
-## 3. Write — in this order, so an interruption duplicates work and never loses it
-
-The order is load-bearing; never reorder to save calls. Chunk every bulk call to ~22 items (larger
-payloads return `503`) and omit `staticMode` everywhere. **Read
-`${CLAUDE_PLUGIN_ROOT}/skills/rebalance/references/recoverable-write-order.md` before the first
-write, and when a run was interrupted mid-step 3.** First — after the loop re-check — run the
-auto-scheduler **probe-date verification** (one `update_item` on a dependent item, read back,
-restore); it is the only write before 3a, and an overwritten probe date stops the run.
-
-- **3a. Create each successor** — `create_item` with `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/splice-mechanics.md` step 3's call pattern:
-  `workType` = the absorbed items' leaf type, `parentNumber` = their release unit, `startDate` =
-  `dueDate` = today (placeholders), `priorityId` at or above the highest absorbed priority (an
-  org-specific id — resolve the collection via `get_workspace_context`), title WITHOUT a prefix,
-  `boardId` by that step's board rule. The
-  `description` is the drafted spec, then a trailing collapsed **"Absorbed specs"** section with the
-  FULL original description of every absorbed item, verbatim, under a sub-heading of its number and
-  title:
-
-  ```html
-  <details><summary>Absorbed specs</summary>
-  <h3>I20131 — Add attachment table + S3 bucket</h3>
-  …that item's description, unchanged…
-  </details>
-  ```
-
-  The `specDepth` cap applies to the successor's OWN spec, never this section; a split's parts each
-  embed the whole original. **Read each successor back** (`get_item(view:"full")`); a stripped
-  `<details>` wrapper → fall back to a plain trailing `<h2>Absorbed specs</h2>`. Record the
-  `absorbed → successor` map; everything after keys off it.
-- **3b. Re-wire** — fetch every absorbed item's edges NOW with
-  `get_item(view:"full", fields:["number","relationships"])`, never from the step-1 snapshot.
-  Internal edges (both ends in one absorbed set) vanish; the successor inherits the **UNION of the
-  external edges** in both directions — edges to Done items included (satisfied prerequisites keep
-  the history honest). **Translate BOTH endpoints through the global absorbed → successor map**
-  (a split: FIRST part on the `blocked_by` side, LAST part as a target), de-duplicate, and write only
-  edges between two live items. A split's parts chain serially in seam order unless the proposal
-  marked them parallel (then each carries both sides). Write with `add_relationship` or
-  `bulk_update_items` `workItemRelationships` (`addedRelationships`, each `{type:"blocked_by",
-  entity:"workitem", referenceId}`), THEN remove every edge still touching an absorbed original,
-  both directions — archiving does not detach edges; add before remove, so no live item is ever
-  edgeless. **Orphan gate — hard, exactly as in `plan` step 5**: re-read the edges of EVERY still-live
-  not-started leaf (successors + untouched; fan out for a large tree) and assert each has ≥ 1
-  `blocked_by` OR `blocks` edge; absorbed originals and deferred-container members are excluded
-  (deliberately edgeless).
-  Do not proceed to 3c with one standing.
-- **3c. Number** — per the CANONICAL NUMBERING CONVENTION,
-  `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/execution-order-numbering.md`, and nothing else:
-  each successor takes a dotted sub-number in the slot of its FIRST (lowest-prefixed) absorbed item
-  — `UPSTREAM`/`NEXT` are the nearest still-live numbered leaves before and after it (absorbed items
-  are leaving, not neighbours) — via that file's splice arithmetic; a split's parts take successive
-  sub-numbers in seam order. **Existing items are never renumbered** — read neighbours' prefixes off
-  their titles; never recompute the plan. Apply with `update_item` or
-  chunked `bulk_update_items` (`title`), keeping the rest of the title. An unnumbered plan stays
-  unnumbered (that file's handling; say so; never mix).
-- **3d. Archive the absorbed originals** — only now, one item at a time: `add_comment` (`Absorbed
-  into I<successor> by /devstride:rebalance on <YYYY-MM-DD>; spec preserved there.` — a split names
-  every part), then immediately `archive_item`. **NEVER `delete_item`**: an archived item keeps its
-  number, history and comments; a deleted one leaves every reference to it dangling.
-- **3e. Rewrite the root marker** — `get_item(view:"full")` the root (or scoped unit), replace the
-  `Delivery profile:` line (case-insensitive) or prepend one, and `update_item` the description.
-  **Touch only the marker line** — the rest is the owner's. A descendant marker that now disagrees
-  is rewritten only with the owner's yes. Leafless units get this marker's coverage alone; a later
-  `/devstride:plan <unit>` slices them at the new grain.
-- **3f. Re-date** — invoke **rationalize-gantt** in its **not-done-only** mode (its default),
-  with `item-days <N>` and, when it is after today, `start <date>` — the length and the earliest
-  start the plan's open leaves had BEFORE 3a, whose placeholders would reset both —
-  pointed at the ENCLOSING PLAN ROOT even on a scoped run (walk `hierarchy` up to the outermost item
-  of the plan): the cascade cannot reach outside the tree it is given, so re-dating one unit leaves
-  sibling units' leaves dated against a moved predecessor — red lines under a success report. In
-  Progress dates move with the cascade; nothing else of theirs does. Let it own the math, its own
-  probe and the red-line review. A STOP on a cycle means it wrote no dates — almost certainly a
-  non-convex merge set; fix the edge it names and re-invoke before reporting.
-
-## 4. Report
-
-Counts (not-started before → after, per release unit and in total; untouchables listed as
-unchanged); the contract's **shape against target** line; the absorbed → successor map with numbers, prefixes and titles; archived items and the
-successor each comment names; the marker written, where, any descendant markers rewritten, and the
-un-extracted units it covers; the orphan-check result; unchanged leaves below target depth for a
-follow-up `/devstride:plan`; and **the next-unblocked item**, re-derived per
-`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` against the re-sliced plan
-(projection warning included), never assumed to be the lowest-numbered successor. Leave the plan
-root in handoff project memory as it was and note the re-slice there (date, profile before →
-after), so a bare `/devstride:build-item` resumes at the new grain. A dry run reports the proposal
-and says plainly that nothing was written.
+Invoke **rationalize-gantt** in its **not-done-only** mode (its default),
+with `item-days <N>` and, when it is after today, `start <date>` — the length and the earliest
+start the plan's open leaves had BEFORE 3a, whose placeholders would reset both —
+pointed at the ENCLOSING PLAN ROOT even on a scoped run (walk `hierarchy` up to the outermost item
+of the plan): the cascade cannot reach outside the tree it is given, so re-dating one unit leaves
+sibling units' leaves dated against a moved predecessor — red lines under a success report. In
+Progress dates move with the cascade; nothing else of theirs does. Let it own the math, its own
+probe and the red-line review. A STOP on a cycle means it wrote no dates — almost certainly a
+non-convex merge set; fix the edge it names and re-invoke before reporting.

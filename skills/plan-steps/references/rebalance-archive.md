@@ -12,10 +12,15 @@ load: contract
 ## Procedure
 
 Requires `rebalance-renumber@1` (the runner refuses the step without a fresh proof of each). Follow
-`${CLAUDE_PLUGIN_ROOT}/skills/rebalance/SKILL.md`, step 3d, whole and in its order. It starts no subagent and no Workflow.
+the procedure below and `${CLAUDE_PLUGIN_ROOT}/skills/rebalance/references/recoverable-write-order.md`, whole and in its order. It starts no subagent and no Workflow.
 
 The DevStride MCP writes PRODUCTION immediately; item numbers are LOOKED UP, never composed; name
 the fields you read. Print the verdict line first, then the evidence.
+
+- **3d. Archive the absorbed originals** — only now, one item at a time: `add_comment` (`Absorbed
+  into I<successor> by /devstride:rebalance on <YYYY-MM-DD>; spec preserved there.` — a split names
+  every part), then immediately `archive_item`. **NEVER `delete_item`**: an archived item keeps its
+  number, history and comments; a deleted one leaves every reference to it dangling.
 
 ## Result
 

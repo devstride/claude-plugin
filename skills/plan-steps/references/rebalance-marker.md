@@ -12,10 +12,16 @@ load: contract
 ## Procedure
 
 Requires `rebalance-archive@1` (the runner refuses the step without a fresh proof of each). Follow
-`${CLAUDE_PLUGIN_ROOT}/skills/rebalance/SKILL.md`, step 3e, whole and in its order. It starts no subagent and no Workflow.
+the procedure below and `${CLAUDE_PLUGIN_ROOT}/skills/rebalance/references/recoverable-write-order.md`, whole and in its order. It starts no subagent and no Workflow.
 
 The DevStride MCP writes PRODUCTION immediately; item numbers are LOOKED UP, never composed; name
 the fields you read. Print the verdict line first, then the evidence.
+
+- **3e. Rewrite the root marker** — `get_item(view:"full")` the root (or scoped unit), replace the
+  `Delivery profile:` line (case-insensitive) or prepend one, and `update_item` the description.
+  **Touch only the marker line** — the rest is the owner's. A descendant marker that now disagrees
+  is rewritten only with the owner's yes. Leafless units get this marker's coverage alone; a later
+  `/devstride:plan <unit>` slices them at the new grain.
 
 ## Result
 

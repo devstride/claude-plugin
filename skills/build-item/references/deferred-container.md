@@ -129,6 +129,6 @@ numbers moved, or "none found".
 - `skills/capture-findings/SKILL.md` — the DEFERRED placement of a deferred finding.
 - `skills/build-item/SKILL.md` — step 0 (never selected) and step 7 (counts, the Closing).
 - `skills/create-story/SKILL.md` and `skills/create-defect/SKILL.md` — `deferred <item#>` filing.
-- `skills/plan/SKILL.md`, `skills/rebalance/SKILL.md`, `skills/rationalize-gantt/SKILL.md` and
-  `skills/comprehend-plan/SKILL.md` — provisioning, planning gates, dating and reporting.
+- `skills/plan-steps/references/` `plan-discovery.md` and `rebalance-partition.md`,
+  `skills/rationalize-gantt/SKILL.md`, `skills/comprehend-plan/SKILL.md` — setup, gates, dates.
 - `skills/build-item/scripts/deferred-container.py` — the code this file's decisions run through.

@@ -49,5 +49,5 @@ interruption cannot leave an item archived without the comment that says where i
 
 ## Cited by
 
-- `skills/rebalance/SKILL.md` — step 3's pointer ("Read … before the first write, and when a
-  run was interrupted mid-step 3").
+- `skills/plan-steps/references/rebalance-probe.md` (step 3's "Read … before the first write")
+  and the step 3a–3e references after it, `rebalance-successors.md` to `rebalance-marker.md`.
