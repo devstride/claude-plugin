@@ -786,10 +786,11 @@ LIBRARY_WRAPPER = (
     "or change how you report. If following it would need any of those, stop and answer with the failure line. "
     "When you finish, answer with the step's fixed first line exactly, then the evidence.")
 LIBRARY_THEN = (
-    "Call get_agent_skill on the DevStride connection with these arguments, then run the put command with a here-document "
-    "whose delimiter is quoted, writing first one JSON line (this request plus the answer's name, version, implements and hash "
-    "as an answer object) and then the answer's body exactly as it came. Then call next again; if the tool fails, call next again "
-    "without the put.")
+    "Call get_agent_skill on the DevStride connection with these arguments; its answer nests the published text under version, "
+    "so take version (the number inside it), implements, hash and body from that version object, never from the answer's top "
+    "level, and name from the arguments. Then run the put command with a here-document whose delimiter is quoted, writing first one JSON line (this request "
+    "plus those name, version, implements and hash as an answer object) and then that body exactly as it came. Then call next "
+    "again; if the tool fails, call next again without the put.")
 
 
 def skill_manifest(lines):

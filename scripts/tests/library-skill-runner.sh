@@ -173,6 +173,159 @@ rc, answer, err = start(sid, fetched(defn=definition(version=None)))
 check("a library step with no pinned version is not run: the built-in workflow runs", rc == 0 and state_of(sid)["definitionSource"] == "builtin"
       and "library skill" in (answer.get("notice") or ""), answer.get("notice"))
 
+# --- more cases: stop or continue after a failure, a required step's proof, no library step ---
+
+CATALOG = json.load(open(os.path.join(ROOT, "schemas/step-contracts.json"), encoding="utf-8"))["contracts"]
+SAMPLE = {"string": "x", "boolean": False, "object": {}, "array": [], "count": 0, "number": 0}
+
+
+def step_of(step_id, contract, run_source, ref, version=None, on_fail="stop"):
+    return {"id": step_id, "name": step_id, "summary": "", "contract": contract, "kind": "step",
+            "run": {"source": run_source, "ref": ref, "version": version},
+            "when": {"mode": "always", "condition": None}, "onFail": on_fail}
+
+
+def custom_definition(steps):
+    return {"schema": 1, "id": "lib-more", "version": 1, "name": "Library more", "startsWhen": "item-picked-up", "endsBy": None,
+            "appliesTo": {"workTypes": [], "tags": [], "repositories": []}, "minPluginVersion": "4.2.0",
+            "phases": [{"id": "only", "name": "Only", "steps": steps}]}
+
+
+def passing(contract, proof=None):
+    """The contract's first passing answer: its verdict line and a result block with every required key."""
+    entry = CATALOG[contract]
+    value = next(v for v in entry["verdict"]["values"] if v["class"] == "continue")
+    block = {}
+    for key in entry["result"]["required"]:
+        kinds = entry["result"]["types"][key].split("|")
+        block[key] = None if "null" in kinds else SAMPLE[kinds[0]]
+    if proof is not None:
+        block["proof"] = proof
+    detail = "" if value["detail"] == "none" else " x"
+    return "%s: %s%s\nanswered\n```json\n%s\n```\n" % (entry["verdict"]["label"], value["value"], detail, json.dumps(block))
+
+
+def put_text(answer, text, name, implements):
+    first = dict(answer["put"]["request"], answer={"name": name, "version": 1, "implements": implements,
+                                                   "hash": hashlib.sha256(text).hexdigest()})
+    return subprocess.run(answer["put"]["command"].split(), input=json.dumps(first).encode() + b"\n" + text, capture_output=True).returncode
+
+
+def done(sid, answer, output):
+    return run("done", {"session": sid, "item": ITEM, "stepId": answer["step"]["id"], "attempt": answer["step"]["attempt"], "output": output})
+
+
+# 8. a failed library step whose onFail is stop ends the workflow: the next step is never handed out
+two = custom_definition([step_of("check", "custom@1", "library", "tidy-check", 1),
+                         step_of("after", "custom@1", "library", "tidy-after", 1)])
+sid = session()
+rc, answer, err = start(sid, fetched(skills=[line(implements="review@1"), line(stepId="after", name="tidy-after")], defn=two))
+state = state_of(sid)
+check("a failed library step with onFail stop stops the run at that step", rc == 0 and answer["action"] == "stopped"
+      and answer["stepId"] == "check" and answer["kind"] == "failed" and state["steps"]["check"]["status"] == "failed", (rc, err, answer))
+check("... the step after it is never handed out", state["steps"]["after"]["status"] not in ("issued", "done", "failed")
+      and state["current"] is None, state["steps"]["after"])
+rc, again, err = nxt(sid)
+check("... and next keeps answering the stop, with no fetch for the later step", rc == 0 and again["action"] == "stopped"
+      and again["stepId"] == "check" and state_of(sid)["steps"]["after"]["status"] == state["steps"]["after"]["status"], (rc, err, again))
+
+# 9. onFail continue: this runner carries on after no failure, so it refuses the whole workflow and the built-in one runs
+sid = session()
+rc, answer, err = start(sid, fetched(defn=custom_definition([step_of("check", "custom@1", "library", "tidy-check", 1, on_fail="continue")])))
+state = state_of(sid)
+check("a library step with onFail continue is refused: the built-in workflow runs, with a plain notice", rc == 0
+      and state["definitionSource"] == "builtin" and state["skillManifest"] == [] and "organizationId" not in state
+      and "carries on after a failure" in (answer.get("notice") or ""), (rc, err, answer.get("notice") if answer else None))
+
+# 10. a required step run from a library skill: its contract's proof is still owed
+SIGN = b"# Our sign-off\n\nRecord the sign-off and answer with its fixed first line.\n"
+plan = custom_definition([step_of("orient", "plan-orient@1", "builtin", "plan-steps"),
+                          step_of("ground", "plan-ground@1", "builtin", "comprehend-plan"),
+                          step_of("discovery", "plan-discovery@1", "builtin", "plan-steps"),
+                          step_of("sign-off", "plan-sign-off-record@1", "library", "our-sign-off", 1),
+                          step_of("draft", "plan-draft@1", "builtin", "plan-steps")])
+sign_line = {"stepId": "sign-off", "name": "our-sign-off", "version": 1, "hash": hashlib.sha256(SIGN).hexdigest(),
+             "implements": "plan-sign-off-record@1"}
+
+
+def to_sign_off(sid):
+    rc, answer, err = start(sid, fetched(skills=[sign_line], defn=plan))
+    while rc == 0 and answer["action"] == "run" and answer["step"]["id"] != "sign-off":
+        rc, answer, err = done(sid, answer, passing(answer["step"]["contract"]))
+    return rc, answer, err
+
+
+sid = session()
+rc, answer, err = to_sign_off(sid)
+check("the run reaches the library step that stands in for a required step", rc == 0 and answer["action"] == "fetch-skill"
+      and answer["stepId"] == "sign-off" and state_of(sid)["definitionSource"] == "organization", (rc, err, answer))
+check("... its text is stored", put_text(answer, SIGN, "our-sign-off", "plan-sign-off-record@1") == 0)
+rc, answer, err = nxt(sid)
+check("... and handed out", rc == 0 and answer["action"] == "run" and answer["step"]["id"] == "sign-off"
+      and answer["skill"]["source"] == "library", (rc, err, answer))
+rc, answer, err = done(sid, answer, passing("plan-sign-off-record@1"))
+row = state_of(sid)["steps"]["sign-off"]
+check("a passing answer from a library skill with no proof still stops the run", rc == 0 and answer["action"] == "stopped"
+      and answer["kind"] == "proof" and answer["stepId"] == "sign-off" and "no proof" in answer["reason"]
+      and row["status"] == "failed", (rc, err, answer))
+check("... and the step that needs it is never handed out", state_of(sid)["steps"]["draft"]["status"] not in ("issued", "done"))
+sid = session()
+rc, answer, err = to_sign_off(sid)
+check("with the proof its contract asks for, the warm copy runs and the run moves on", rc == 0 and answer["action"] == "run"
+      and done(sid, answer, passing("plan-sign-off-record@1", proof={"kind": "sign-off"}))[1]["step"]["id"] == "draft", (rc, err, answer))
+
+# 11. a workflow with no library step never loads the helper, and the built-in Build workflow is untouched
+BUILD = json.load(open(os.path.join(ROOT, "workflows/build.json"), encoding="utf-8"))
+RECORDED = json.load(open(os.path.join(ROOT, "scripts/tests/fixtures/workflow-versions.json"), encoding="utf-8"))["workflows"]["build"]
+check("the built-in Build workflow names no library step", all(s["run"]["source"] != "library" for p in BUILD["phases"] for s in p["steps"]))
+check("the built-in Build workflow is the one last recorded", RECORDED["version"] != BUILD["version"]
+      or REPORT.definition_hash(BUILD) == RECORDED["sha256"], RECORDED["sha256"])
+REPO = os.path.join(WORK, "repo")
+os.makedirs(REPO)
+for args in (["init", "-q"], ["checkout", "-q", "-b", "main"], ["-c", "user.name=t", "-c", "user.email=t@example.com",
+             "commit", "-q", "--allow-empty", "-m", "first"], ["checkout", "-q", "-b", "feature"]):
+    subprocess.run(["git"] + args, cwd=REPO, check=True, capture_output=True)
+WF = json.load(open(os.path.join(ROOT, "skills/run-workflow/scripts/workflow-fixtures.json"), encoding="utf-8"))
+PROBE = r'''
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("workflow", sys.argv[1])
+runner = importlib.util.module_from_spec(spec); spec.loader.exec_module(runner)
+def loaded(*_):
+    raise SystemExit("library_skill.py was loaded")
+runner.library = loaded
+seen = []
+for command, request in json.loads(sys.stdin.read()):
+    seen.append(runner.run_command(command, request))
+print(json.dumps({"untouched": runner.LIBRARY is None and "library_skill" not in sys.modules, "answers": seen}))
+'''
+
+
+def probe(cwd, calls):
+    done_ = subprocess.run([sys.executable, "-B", "-c", PROBE, RUNNER], input=json.dumps(calls), capture_output=True, text=True, cwd=cwd, timeout=60)
+    return json.loads(done_.stdout) if done_.returncode == 0 else {"error": done_.stdout + done_.stderr}
+
+
+sid = session()
+seen = probe(WORK, [["start", {"definition": FIX["builtin"], "context": dict(FIX["context"]), "session": sid}],
+                    ["status", {"session": sid, "item": ITEM}]])
+check("a built-in run with no library step never loads the helper", seen.get("untouched") is True
+      and seen["answers"][0]["action"] == "run" and seen["answers"][0]["skill"]["source"] == "builtin", seen)
+organization = next(a for a in FIX["answers"] if a["name"] == "an organization workflow")
+plain = [s for p in organization["answer"]["match"]["definition"]["phases"] for s in p["steps"]]
+sid = session()
+seen = probe(WORK, [["start", {"definition": FIX["builtin"], "context": dict(FIX["context"]), "session": sid, "fetched": organization["answer"]}],
+                    ["next", {"session": sid, "item": ITEM}]])
+check("an organization workflow with no library step never loads the helper", all(s["run"]["source"] != "library" for s in plain)
+      and seen.get("untouched") is True and state_of(sid)["definitionSource"] == "organization", seen)
+sid = session()
+seen = probe(REPO, [["start", {"definition": BUILD, "context": dict(WF["context"], cwd=REPO), "session": sid}],
+                    ["done", {"session": sid, "item": WF["context"]["item"], "stepId": "claim", "attempt": 1, "output": WF["outputs"]["claim@1"]}]])
+first = (seen.get("answers") or [{}])[0]
+check("the built-in Build workflow starts as before: the claim step, its own skill, no manifest, no helper",
+      seen.get("untouched") is True and first.get("action") == "run" and first["step"]["id"] == "claim"
+      and first["skill"] == {"source": "builtin", "ref": "claim-story"}
+      and seen["answers"][1]["step"]["id"] == "start" and state_of(sid)["skillManifest"] == [], seen)
+
 print("%d checks" % count[0])
 sys.exit(failed[0])
 PY

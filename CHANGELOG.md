@@ -20,6 +20,17 @@ for what each version component means here and how a release is cut.
   refused when it is a link, a submodule, an unsafe path, over 64 KB or not text. `workflow.py
   repository` prints the repository's name without any credential, and doctor reports whether
   the connected server offers workflows. The one off switch is the existing `workflows` setting.
+- **A workflow step can run a skill from the organization's skill library.** When a step names a
+  library skill, the plugin has the agent fetch that exact pinned version through the DevStride
+  connection, checks it against the fingerprint the workflow named, keeps a copy on the machine
+  and hands it out for that one step only. Later runs use the saved copy, offline too, after
+  checking its fingerprint again; a copy that fails is deleted and fetched once more. Text that
+  cannot be fetched, is too large, is written for another kind of step or does not match its
+  fingerprint fails the step with a plain reason, and no built-in skill ever runs in its place. A
+  step that stands in for a required step still has to leave that step's proof. The step report
+  names the library skill, its version and fingerprint, and doctor reports the saved copies: how
+  many, how large, and any that fail their fingerprint. A workflow with no library step runs
+  exactly as before.
 - **The release's step list exists as data, ready for the step runner (in progress).** Six built-in
   release workflow definitions now ship: one full release per clearance scope (`release`,
   `cut-to-deploy`, `merge-and-deploy`) and three partial entries (post-deploy only, documentation
