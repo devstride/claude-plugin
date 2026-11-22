@@ -335,6 +335,22 @@ run.until("rewind-environment")
 run.done(answer_text("HOTFIX ENVIRONMENT: NEEDS ANSWER no localEnvironment commands are set", {"case": 3, "mode": None, "why": "no commands", "restartDevServer": True}))
 check("NEEDS ANSWER stops the run before the report", run.answer.get("action") == "stopped" and "report-cut" not in [s for s, _ in run.issued()], run.answer)
 
+# Case 1 under newInstance, and case 2 (migrate, then seed), both continue to the report.
+for verdict, result in (("HOTFIX ENVIRONMENT: RECREATED", {"case": 1, "mode": "newInstance", "why": "recreate is set", "restartDevServer": True}),
+                        ("HOTFIX ENVIRONMENT: MIGRATED", {"case": 2, "mode": None, "why": "schema not diverged: migrate then seed", "restartDevServer": True})):
+    run = Run()
+    run.until("rewind-environment")
+    run.done(answer_text(verdict, result))
+    check("%s (case %d) continues to the report" % (verdict, result["case"]), run.answer.get("action") == "run" and run.answer["step"]["id"] == "report-cut", run.answer)
+
+# A recreate with no recreateMode (or case 3) asks; after the answer the step is re-issued as attempt 2.
+run = Run()
+run.until("rewind-environment")
+run.done(answer_text("HOTFIX ENVIRONMENT: NEEDS ANSWER recreate names <name> but recreateMode is unset", {"case": 1, "mode": None, "why": "no recreateMode", "restartDevServer": True}))
+run.resume(answer="newInstance")
+check("... the answer re-issues rewind-environment as attempt 2", run.answer.get("action") == "run" and run.answer["step"]["id"] == "rewind-environment"
+      and run.answer["step"]["attempt"] == 2, run.answer)
+
 # The merge waits for a yes; the deploy approval can be not configured and is then skipped.
 run = Run()
 run.until("merge")
@@ -358,6 +374,93 @@ run = Run()
 run.until("fix")
 run.done(answer_text("HOTFIX FIX: ABANDONED", {"commit": "", "deferrals": [], "deviations": [], "untrackedDeferrals": [], "dismissed": [], "scopeLine": "", "head": ""}))
 check("ABANDONED ends the run with outcome abandoned", run.answer.get("action") == "finished" and run.answer.get("outcome") == "abandoned", run.answer)
+
+# A rejected push stops at the cut, naming the branch the checkout is on.
+run = Run()
+run.done()
+run.done(answer_text("HOTFIX BRANCH: FAILED push", {"branch": "main", "base": "main", "baseSha": "", "pushed": False, "shipIntent": "not configured"}))
+check("FAILED at the cut stops the run there, before the stage is named", run.answer.get("action") == "stopped" and run.answer.get("stepId") == "cut-branch"
+      and "name-stage" not in [s for s, _ in run.issued()], run.answer)
+
+# Credentials in a step's evidence never reach a report.
+run = Run()
+SECRETS = ["token ghp_abcdefghijklmnop", "Authorization: Bearer abcdefghijklmnopqrstuvwx", "key AKIAABCDEFGHIJKLMNOP", "-----BEGIN PRIVATE KEY-----"]
+run.done("HOTFIX PREFLIGHT: READY %s\n%s\nclean tree\n```json\n%s\n```\n" % (BRANCH, "\n".join(SECRETS), json.dumps(
+    {"branch": BRANCH, "base": "main", "prefix": "test", "date": "11-21-26", "dateFormat": "MM-DD-YY", "configSource": "file"})))
+sent = json.dumps([a.get("reports") for a in run.answers])
+check("evidence lines that look like credentials are dropped from the built report",
+      run.answer.get("action") == "run" and all(w not in sent for w in ("ghp_", "Bearer ", "AKIA", "BEGIN PRIVATE")) and "clean tree" in sent, sent[:400])
+
+# The deploy approval's RETRY re-issues it as the next attempt (the runner's own 50-attempt stop
+# bounds it); a STOPPED answer stops the run before the confirmation.
+run = Run()
+run.until("approve-deploy")
+run.done(answer_text("DEPLOY APPROVAL: RETRY", {"mergeSha": "abc1234", "approved": False}))
+run.done(answer_text("DEPLOY APPROVAL: RETRY", {"mergeSha": "abc1234", "approved": False}))
+check("RETRY re-issues the approval as the next attempt", run.answer.get("action") == "run" and run.answer["step"]["id"] == "approve-deploy"
+      and run.answer["step"]["attempt"] == 3, run.answer)
+run.done(answer_text("DEPLOY APPROVAL: STOPPED deploy not waiting", {"mergeSha": "abc1234", "approved": False}))
+check("... and STOPPED stops the run before the confirmation", run.answer.get("action") == "stopped"
+      and run.answer.get("stepId") == "approve-deploy" and "confirm-deploy" not in [s for s, _ in run.issued()], run.answer)
+
+# A review gone stale (the patch changed after it) is run again before the merge is handed out.
+run = Run()
+run.until("merge")
+run.done(answer_text("HOTFIX MERGE: WAITING FOR YES", {"sha": "", "pullRequest": 7}))
+commit(run.repo, "fix.txt", "fixed again\n", "a later change")
+run.resume(answer="yes, merge pull request 7")
+first = run.answer["step"]["id"] if run.answer and run.answer.get("action") == "run" else None
+check("a stale proof re-issues a required step first, not the merge", first in ("risk-check", "local-checks", "review")
+      and run.answer["step"]["attempt"] == 2, run.answer)
+while run.answer and run.answer.get("action") == "run" and run.answer["step"]["id"] != "merge":
+    run.done()
+check("... and the merge is handed out again only once every proof is fresh",
+      run.answer.get("action") == "run" and run.answer["step"]["id"] == "merge" and ("review", 2) in run.issued(), (run.issued(), run.answer))
+
+# Reporting fails open: every report failing to reach the tracker leaves the run's outcome unchanged.
+run = Run()
+said = []
+while run.answer and run.answer["action"] == "run":
+    rid = run.answer["runId"]
+    run.done()
+    rc, back, _ = run.call("reported", {"ok": False, "runId": rid})
+    said.append(rc == 0 and back is not None)
+    if back is not None:
+        run.answers.pop()
+check("every report failing leaves the run completed, its steps issued once each", all(said) and run.answer.get("action") == "finished"
+      and run.answer.get("outcome") == "completed" and run.issued() == [(s, 1) for s in PINNED], (said, run.answer))
+
+# A refused production merge stops the run before the deploy is approved.
+run = Run()
+run.until("merge")
+run.done(answer_text("HOTFIX MERGE: REFUSED merge-gate answered REFUSE", {"sha": "", "pullRequest": 7}))
+check("REFUSED at the merge stops the run before the deploy approval", run.answer.get("action") == "stopped" and run.answer.get("stepId") == "merge"
+      and "approve-deploy" not in [s for s, _ in run.issued()], run.answer)
+
+# Claims on: the cut's one ship-intent declaration (route hotfix, target the production branch,
+# stage building) is one the shared script records; claims off: the reference declares none.
+done = subprocess.run([sys.executable, "-B", os.path.join(ROOT, "skills/build-item/scripts/ship-intent.py"), "record"], capture_output=True, text=True,
+                      input=json.dumps({"route": "hotfix", "unit": BRANCH, "branch": BRANCH, "target": "main", "stage": "building", "now": "2026-11-21T19:00:00Z"}))
+claim = json.loads(done.stdout) if done.returncode == 0 else {}
+check("claims on: the hotfix's ship-intent declaration is recorded as one claim on its branch", claim.get("kind") == "ship-intent" and claim.get("key") == BRANCH
+      and claim.get("payload", {}).get("route") == "hotfix" and claim["payload"].get("target") == "main" and claim.get("phase") == "building", done.stdout + done.stderr)
+BRANCH_REF = " ".join(open(os.path.join(ROOT, "skills/hotfix-steps/references/hotfix-branch.md"), encoding="utf-8").read().split())
+check("... and claims off declares none", "route hotfix, target the production branch, stage building. Without a `claims` block: none" in BRANCH_REF)
+
+# A clearance provider configured in the repository is never called by a hotfix run, not even status.
+run = Run()
+LOG = os.path.join(run.repo, "provider.log")
+FAKE = os.path.join(run.repo, "provider.sh")
+with open(FAKE, "w") as out:
+    out.write("#!/bin/sh\necho \"$0 $*\" >> '%s'\n" % LOG)
+os.chmod(FAKE, 0o755)
+os.makedirs(os.path.join(run.repo, ".claude"))
+with open(os.path.join(run.repo, ".claude", "ds-config.json"), "w") as out:
+    json.dump({"release": {"clearance": {"commands": dict((v, FAKE + " " + v) for v in ("claim", "status", "heartbeat", "release", "adopt"))}}}, out)
+while run.answer and run.answer["action"] == "run":
+    run.done()
+check("a full run with a clearance provider configured finishes and calls no provider verb",
+      run.answer.get("action") == "finished" and run.answer.get("outcome") == "completed" and not os.path.exists(LOG), (run.answer, os.path.exists(LOG)))
 PY
 
 python3 "$WORK/cases.py" "$ROOT" "$WORK" > "$WORK/out.txt" 2>&1 || { cat "$WORK/out.txt"; echo "FAIL the cases did not run to the end"; exit 1; }
