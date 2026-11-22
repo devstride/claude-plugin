@@ -28,7 +28,8 @@ lives in that step's reference, `${CLAUDE_PLUGIN_ROOT}/skills/hotfix-steps/SKILL
 ## Run it
 
 Every command is `python3 -B "${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py"
-<command>` with one JSON object on stdin (a file or a here-document, never inside quotes). **Read
+<command>` with one JSON object on stdin (a file or a here-document, never inside quotes); every
+`resume` carries `"workflow": "hotfix"`. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md` in full before the first
 command, and again after a compaction.**
 

@@ -208,7 +208,7 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
 
 Every command is `python3 -B "${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py"
 <command>` with one JSON object on stdin (a file or here-document, never quoted), and every `next`, `done`, `status` and `resume` names the `item`: a session holding two open runs is
-refused one that does not. **Read
+refused one that does not. Every `resume` also carries `"workflow": "build"`. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md` in full before the first
 command, and again after a compaction**: the commands, the answers, the stops and resuming.
 

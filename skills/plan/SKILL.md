@@ -73,7 +73,7 @@ runner: it performs that check once, so do not repeat it here.
 
 Every command is `python3 -B "${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py"
 <command>` with one JSON object on stdin (a file or a here-document, never inside quotes), naming
-the `item`. **Read `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md` in
+the `item`; every `resume` carries `"workflow": "plan"`. **Read `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md` in
 full before the first command, and again after a compaction.**
 
 1. **The parent first.** No parent item in the arguments → ask which one to plan under BEFORE
