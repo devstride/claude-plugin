@@ -1,0 +1,120 @@
+{
+  "about": "The rebalance rehearsal's real re-slice, as a replay: the same three-story plan signed off and re-sliced to extended, three stories becoming two. Every write step is issued once, in the recoverable order, and the rewire is verified with no orphans before anything is archived.",
+  "definition": "workflows/rebalance.json",
+  "context": {
+    "item": "I100"
+  },
+  "script": [
+    {
+      "step": "session-check",
+      "output": "SESSION MODEL: MATCH\nThe session runs the planning model the profile names.\n```json\n{\"verdict\": \"MATCH\", \"profileLine\": \"standard: planning on the configured model\"}\n```\n"
+    },
+    {
+      "step": "gates",
+      "output": "REBALANCE GATES: CLEAR\nNo build loop holds the plan and the auto-scheduler is off.\n```json\n{\"root\": \"I100\", \"target\": \"extended\", \"dryRun\": false}\n```\n"
+    },
+    {
+      "step": "ground",
+      "output": "PLAN STATE: PARTIAL\nRead every level under I100, descriptions and comments.\n```json\n{\"state\": \"PARTIAL\", \"doneOpenCounts\": {\"done\": 0, \"open\": 3}, \"orphans\": [], \"deferredContainer\": null}\n```\n"
+    },
+    {
+      "step": "partition",
+      "output": "REBALANCE PARTITION: PARTITIONED 3-0\nThree stories not started; none done, in progress or landed.\n```json\n{\"notStarted\": [\"I103\", \"I104\", \"I105\"], \"untouchable\": [], \"current\": \"standard\", \"target\": \"extended\"}\n```\n"
+    },
+    {
+      "step": "propose",
+      "output": "REBALANCE PROPOSAL: SIGNED OFF\nThe person answered yes, rebalance.\n```json\n{\"proposal\": [{\"successor\": \"Stories one and two, merged\", \"absorbs\": [\"I103\", \"I104\"]}, {\"successor\": \"Story three, kept as it is\", \"absorbs\": [\"I105\"]}], \"proof\": {\"kind\": \"rebalance-sign-off\"}}\n```\n"
+    },
+    {
+      "step": "scheduler-probe",
+      "output": "SCHEDULER PROBE: HELD\nThe probe date read back unchanged and was restored.\n```json\n{\"probe\": \"I104 held 2026-12-03\"}\n```\n"
+    },
+    {
+      "step": "create-successors",
+      "output": "REBALANCE SUCCESSORS: CREATED 2\nTwo successors created, each carrying its absorbed specs word for word.\n```json\n{\"map\": {\"I106\": [\"I103\", \"I104\"], \"I107\": [\"I105\"]}}\n```\n"
+    },
+    {
+      "step": "rewire",
+      "output": "REBALANCE REWIRE: DONE 1\nThe second successor is blocked by the first; both were read back with an edge.\n```json\n{\"orphans\": 0, \"proof\": {\"kind\": \"wired-plan\", \"orphans\": 0}}\n```\n"
+    },
+    {
+      "step": "renumber",
+      "output": "REBALANCE RENUMBER: DONE 4-5\nThe successors carry the next free numbers; no existing item was renumbered.\n```json\n{\"range\": \"4-5\"}\n```\n"
+    },
+    {
+      "step": "archive-originals",
+      "output": "REBALANCE ARCHIVE: ARCHIVED 3\nThe three originals are archived, never deleted.\n```json\n{\"archived\": [\"I103\", \"I104\", \"I105\"]}\n```\n"
+    },
+    {
+      "step": "rewrite-marker",
+      "output": "REBALANCE MARKER: REWRITTEN extended\nThe root's profile marker now reads extended.\n```json\n{\"profile\": \"extended\"}\n```\n"
+    },
+    {
+      "step": "redate",
+      "output": "GANTT: DATED 2\nTwo open stories dated from the start the plan had before the re-slice.\n```json\n{\"dated\": 2, \"start\": \"2026-12-01\"}\n```\n"
+    },
+    {
+      "step": "report",
+      "output": "REBALANCE REPORT: RE-SLICED 3-2\nThree stories became two.\n```json\n{\"before\": 3, \"after\": 2, \"next\": \"I106\"}\n```\n"
+    }
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      [
+        "session-check",
+        1
+      ],
+      [
+        "gates",
+        1
+      ],
+      [
+        "ground",
+        1
+      ],
+      [
+        "partition",
+        1
+      ],
+      [
+        "propose",
+        1
+      ],
+      [
+        "scheduler-probe",
+        1
+      ],
+      [
+        "create-successors",
+        1
+      ],
+      [
+        "rewire",
+        1
+      ],
+      [
+        "renumber",
+        1
+      ],
+      [
+        "archive-originals",
+        1
+      ],
+      [
+        "rewrite-marker",
+        1
+      ],
+      [
+        "redate",
+        1
+      ],
+      [
+        "report",
+        1
+      ]
+    ],
+    "outcome": "completed",
+    "stops": []
+  }
+}

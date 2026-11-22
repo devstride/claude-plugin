@@ -1,0 +1,134 @@
+{
+  "about": "The planning rehearsal, as a replay: a throwaway parent, one capability, one epic and three stories. The draft review is declined once, the creation stops PARTIAL after three of five items and is run again, and the wiring is verified with no orphans. It proves the runner's sequence, stops and re-issues for these answers; what a model does inside a step is not replayed.",
+  "definition": "workflows/plan.json",
+  "context": {
+    "item": "I100"
+  },
+  "script": [
+    {
+      "step": "session-check",
+      "output": "SESSION MODEL: MATCH\nThe session runs the planning model the profile names.\n```json\n{\"verdict\": \"MATCH\", \"profileLine\": \"standard: planning on the configured model\"}\n```\n"
+    },
+    {
+      "step": "orient",
+      "output": "PLAN ORIENTATION: READY I100\nThe parent is an empty plan root; the profile comes from the argument.\n```json\n{\"root\": \"I100\", \"workType\": \"Plan\", \"profile\": \"standard\", \"profileSource\": \"argument\", \"profileInherited\": false, \"ticket\": null, \"releaseUnitLevel\": \"Epic\", \"roles\": {\"capability\": \"Capability\", \"releaseUnit\": \"Epic\", \"leaf\": \"Story\"}}\n```\n"
+    },
+    {
+      "step": "ground",
+      "output": "PLAN STATE: EMPTY\nRead every level under I100, descriptions and comments.\n```json\n{\"state\": \"EMPTY\", \"doneOpenCounts\": {\"done\": 0, \"open\": 0}, \"orphans\": [], \"deferredContainer\": null}\n```\n"
+    },
+    {
+      "step": "discover",
+      "output": "PLAN SHAPE: SIGNED OFF\nThe person signed off one capability, one epic and three stories, built in order.\n```json\n{\"tree\": {\"capabilities\": 1, \"epics\": 1, \"stories\": 3}, \"sequencing\": \"serial\", \"assumptions\": [], \"deferredContainer\": null}\n```\n"
+    },
+    {
+      "step": "record-sign-off",
+      "output": "SIGN-OFF RECORDED: RECORDED standard\nThe profile marker is on the root; Link Mode is off.\n```json\n{\"root\": \"I100\", \"profile\": \"standard\", \"start\": \"2026-12-01\", \"itemDays\": 2, \"linkMode\": false, \"proof\": {\"kind\": \"sign-off\"}}\n```\n"
+    },
+    {
+      "step": "draft-specs",
+      "output": "PLAN DRAFTED: DRAFTED 1-1-3\nFive specs drafted; nothing written to DevStride.\n```json\n{\"draftRef\": \"drafts/I100\", \"counts\": {\"capabilities\": 1, \"epics\": 1, \"stories\": 3}}\n```\n"
+    },
+    {
+      "step": "confirm-drafts",
+      "output": "PLAN DRAFT REVIEW: NOT APPROVED the second story's acceptance checks are too thin\nThe person asked for a change; nothing is created.\n```json\n{\"approved\": false}\n```\n"
+    },
+    {
+      "step": "confirm-drafts",
+      "output": "PLAN DRAFT REVIEW: APPROVED\nThe person approved the revised drafts.\n```json\n{\"approved\": true, \"proof\": {\"kind\": \"draft-approval\"}}\n```\n"
+    },
+    {
+      "step": "create-items",
+      "output": "PLAN CREATED: PARTIAL 3/5\nThe capability, the epic and the first story exist; the fourth create failed.\n```json\n{\"created\": [\"I101\", \"I102\", \"I103\"]}\n```\n"
+    },
+    {
+      "step": "create-items",
+      "output": "PLAN CREATED: CREATED 5\nRe-run: the three existing items were found by title and kept; the two missing stories were created.\n```json\n{\"created\": [\"I101\", \"I102\", \"I103\", \"I104\", \"I105\"]}\n```\n"
+    },
+    {
+      "step": "wire-edges",
+      "output": "PLAN WIRED: WIRED 2\nEach story is blocked by the one before it; every leaf was read back with an edge.\n```json\n{\"orphans\": 0, \"proof\": {\"kind\": \"wired-plan\", \"orphans\": 0}}\n```\n"
+    },
+    {
+      "step": "rationalize-dates",
+      "output": "GANTT: DATED 3\nThree stories dated in a cascade from the sign-off's start.\n```json\n{\"dated\": 3, \"start\": \"2026-12-01\"}\n```\n"
+    },
+    {
+      "step": "number-titles",
+      "output": "PLAN NUMBERED: NUMBERED 1-3\nThe three stories carry [1] to [3].\n```json\n{\"range\": \"1-3\"}\n```\n"
+    },
+    {
+      "step": "hand-off",
+      "output": "PLAN HANDED OFF: HANDED OFF I100\nFive new items under the parent.\n```json\n{\"root\": \"I100\", \"newCount\": 5, \"existingCount\": 0}\n```\n"
+    }
+  ],
+  "answers": [
+    "revise the second story's acceptance checks, then show me again",
+    "the failed create was a timeout; run the creation again"
+  ],
+  "expect": {
+    "order": [
+      [
+        "session-check",
+        1
+      ],
+      [
+        "orient",
+        1
+      ],
+      [
+        "ground",
+        1
+      ],
+      [
+        "discover",
+        1
+      ],
+      [
+        "record-sign-off",
+        1
+      ],
+      [
+        "draft-specs",
+        1
+      ],
+      [
+        "confirm-drafts",
+        1
+      ],
+      [
+        "confirm-drafts",
+        2
+      ],
+      [
+        "create-items",
+        1
+      ],
+      [
+        "create-items",
+        2
+      ],
+      [
+        "wire-edges",
+        1
+      ],
+      [
+        "rationalize-dates",
+        1
+      ],
+      [
+        "number-titles",
+        1
+      ],
+      [
+        "hand-off",
+        1
+      ]
+    ],
+    "outcome": "completed",
+    "stops": [
+      "confirm-drafts",
+      "create-items"
+    ]
+  }
+}

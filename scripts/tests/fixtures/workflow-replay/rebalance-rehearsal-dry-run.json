@@ -1,0 +1,56 @@
+{
+  "about": "The rebalance rehearsal's dry run, as a replay: the three-story rehearsal plan, re-sliced to extended with --dry-run. The run ends at the proposal and no write step is ever issued.",
+  "definition": "workflows/rebalance.json",
+  "context": {
+    "item": "I100"
+  },
+  "script": [
+    {
+      "step": "session-check",
+      "output": "SESSION MODEL: MATCH\nThe session runs the planning model the profile names.\n```json\n{\"verdict\": \"MATCH\", \"profileLine\": \"standard: planning on the configured model\"}\n```\n"
+    },
+    {
+      "step": "gates",
+      "output": "REBALANCE GATES: CLEAR\nNo build loop holds the plan and the auto-scheduler is off.\n```json\n{\"root\": \"I100\", \"target\": \"extended\", \"dryRun\": true}\n```\n"
+    },
+    {
+      "step": "ground",
+      "output": "PLAN STATE: PARTIAL\nRead every level under I100, descriptions and comments.\n```json\n{\"state\": \"PARTIAL\", \"doneOpenCounts\": {\"done\": 0, \"open\": 3}, \"orphans\": [], \"deferredContainer\": null}\n```\n"
+    },
+    {
+      "step": "partition",
+      "output": "REBALANCE PARTITION: PARTITIONED 3-0\nThree stories not started; none done, in progress or landed.\n```json\n{\"notStarted\": [\"I103\", \"I104\", \"I105\"], \"untouchable\": [], \"current\": \"standard\", \"target\": \"extended\"}\n```\n"
+    },
+    {
+      "step": "propose",
+      "output": "REBALANCE PROPOSAL: DRY RUN\nThe proposal was shown; a dry run writes nothing.\n```json\n{\"proposal\": [{\"successor\": \"Stories one and two, merged\", \"absorbs\": [\"I103\", \"I104\"]}, {\"successor\": \"Story three, kept as it is\", \"absorbs\": [\"I105\"]}]}\n```\n"
+    }
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      [
+        "session-check",
+        1
+      ],
+      [
+        "gates",
+        1
+      ],
+      [
+        "ground",
+        1
+      ],
+      [
+        "partition",
+        1
+      ],
+      [
+        "propose",
+        1
+      ]
+    ],
+    "outcome": "dry-run",
+    "stops": []
+  }
+}
