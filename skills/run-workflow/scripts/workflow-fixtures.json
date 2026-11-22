@@ -3457,6 +3457,13 @@
    "detail": ""
   },
   {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MISMATCH ANSWERED\n",
+   "class": "continue",
+   "value": "MISMATCH ANSWERED",
+   "detail": ""
+  },
+  {
    "contract": "plan-orient@1",
    "output": "PLAN ORIENTATION: READY for the plan root\n",
    "class": "continue",
@@ -4168,6 +4175,13 @@
    "output": "SESSION MODEL: MISMATCH UNATTENDED\n",
    "class": "continue",
    "value": "MISMATCH UNATTENDED",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MISMATCH ANSWERED\n",
+   "class": "continue",
+   "value": "MISMATCH ANSWERED",
    "detail": ""
   },
   {

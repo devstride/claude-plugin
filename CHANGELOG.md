@@ -103,26 +103,26 @@ for what each version component means here and how a release is cut.
 
 ### Cost
 
-<!-- scripts/measure-cost.sh --table --since devstride--v4.7.0 @ 202bf13, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+<!-- scripts/measure-cost.sh --table --since devstride--v4.7.0 @ c066c4a, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
 | File | bytes@devstride--v4.7.0 | tokens@devstride--v4.7.0 | bytes now | tokens now | Δ tokens | budget |
 |---|---:|---:|---:|---:|---:|---:|
 | skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/build-item/SKILL.md | 23,997 | 7,999 | 24,000 | 8,000 | +1 | 8,000 |
 | skills/review/SKILL.md | 23,986 | 7,996 | 23,986 | 7,996 | +0 | 7,999 |
-| skills/build-item/SKILL.md | 23,997 | 7,999 | 23,949 | 7,983 | -16 | 8,000 |
 | skills/doctor/SKILL.md | 23,994 | 7,998 | 23,847 | 7,949 | -49 | 8,000 |
 | skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
 | skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 12,332 | 4,111 | +123 | 4,200 |
 | skills/pr/SKILL.md | 11,538 | 3,846 | 11,538 | 3,846 | +0 | 3,846 |
 | skills/ultracode-build/SKILL.md | 10,327 | 3,443 | 10,327 | 3,443 | +0 | 3,443 |
-| skills/rebalance/SKILL.md | 18,067 | 6,023 | 8,432 | 2,811 | -3212 | 2,811 |
-| skills/plan/SKILL.md | 25,542 | 8,514 | 8,340 | 2,780 | -5734 | 2,780 |
+| skills/rebalance/SKILL.md | 18,067 | 6,023 | 8,482 | 2,828 | -3195 | 2,828 |
+| skills/plan/SKILL.md | 25,542 | 8,514 | 8,385 | 2,795 | -5719 | 2,795 |
 | skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
 | skills/create-defect/SKILL.md | 6,730 | 2,244 | 6,730 | 2,244 | +0 | 2,500 |
 | skills/create-story/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,108 |
 | skills/comprehend-plan/SKILL.md | 5,622 | 1,874 | 6,073 | 2,025 | +151 | 2,100 |
 | skills/insert-defect/SKILL.md | 5,255 | 1,752 | 5,605 | 1,869 | +117 | 1,869 |
 | skills/insert-story/SKILL.md | 4,578 | 1,526 | 4,928 | 1,643 | +117 | 1,643 |
-| skills/branch-hotfix/SKILL.md | 6,649 | 2,217 | 4,752 | 1,584 | -633 | 1,600 |
+| skills/branch-hotfix/SKILL.md | 6,649 | 2,217 | 4,799 | 1,600 | -617 | 1,600 |
 | skills/branch-feature/SKILL.md | 3,707 | 1,236 | 3,707 | 1,236 | +0 | 1,236 |
 | skills/risk-check/SKILL.md | 3,598 | 1,200 | 3,598 | 1,200 | +0 | 1,200 |
 | skills/hotfix-steps/SKILL.md (added) | — | — | 3,591 | 1,197 | +1197 | 1,200 |
@@ -148,7 +148,7 @@ for what each version component means here and how a release is cut.
 | skills/sync-base/SKILL.md | 1,471 | 491 | 1,471 | 491 | +0 | 500 |
 | skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
 | alwaysOn.context (skill listing) | 6,277 | 2,093 | 6,474 | 2,158 | +65 | 2,200 |
-| **total (bodies)** | 299,545 | 99,861 | 279,694 | 93,245 | -6616 | |
+| **total (bodies)** | 299,545 | 99,861 | 279,887 | 93,310 | -6551 | |
 
 ## [4.7.0] — 2026-11-20
 
