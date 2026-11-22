@@ -17,8 +17,9 @@ the same answers every time, also after a restart or a cleared conversation. The
   start   {"definition" | "definitionFile", "context", "fetched"?, "session"?, "replace"?}
   next    {"runId"?, "item"?}
   done    {"runId"?, "item"?, "stepId", "attempt", "output"}
-  status  {"runId"?, "item"?, "includeDefinition"?}
+  status  {"runId"?, "item"?, "includeDefinition"?} | {"all": true}
   resume  {"runId"?, "item"?, "answer"?, "session"?}
+  wait    {"runId"?, "item"?, "stepId", "attempt", "reason"?}   the issued step is waiting inside itself
   reported {"runId"?, "item"?, "ok"}       what became of a run's reports; the first failure hands back one line to say
   unsent  {"cwd"?}                         this repository's runs whose reports failed, each shaped again in full
   judge   {"item", "answer"}               whether the newest tracked run of an item did every required step
@@ -33,8 +34,9 @@ tracker's step-recording tool. Sending them is the caller's job and may fail wit
 Exit 0 with an answer; 2 with exactly one `workflow: <code>: <message>` line on stderr and nothing
 on stdout for a refusal; 1 (also one `workflow:` line) for anything else. Never a traceback.
 
-State: one file per session and item under ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/workflows,
-owner-only, written atomically, pruned after seven days.
+State: one file per session and item (a run with no item: per session and run id) under
+${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/workflows, owner-only, written atomically, pruned
+after seven days.
 """
 import hashlib
 import importlib.util
@@ -53,7 +55,7 @@ sys.dont_write_bytecode = True  # loading the helpers below must never write int
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 CATALOG_PATH = os.path.join(PLUGIN_ROOT, "schemas", "step-contracts.json")
-COMMANDS = ("start", "next", "done", "status", "resume", "reported", "unsent", "judge", "repository")
+COMMANDS = ("start", "next", "done", "wait", "status", "resume", "reported", "unsent", "judge", "repository")
 
 KEEP_SECONDS = 7 * 24 * 3600
 STATE_MAX_BYTES = 1048576
@@ -91,7 +93,10 @@ ENTRY_FIELDS = ("summary", "builtinSkill", "payload", "argument", "verdict", "re
 # (delegates: the step may run one Workflow of drafting agents; interactive: it may hold a
 # conversation with the person inside the step). The runner passes the flags through unchanged.
 OPTIONAL_FIELDS = ("satisfiedBy", "maxAutoRedo", "delegates", "interactive")
-CLASSES = ("continue", "skipped", "redo:self", "stop", "ask")
+CLASSES = ("continue", "skipped", "redo:self", "stop", "ask", "confirm")
+# A confirm verdict waits for a person's yes or no: the answer's first word, whatever follows it.
+CONFIRM_ANSWER = re.compile(r"^\s*(yes|no)\b", re.I)
+CONFIRM_DECLINED = "declined"  # the outcome a no ends the run with
 END_CLASS = re.compile(r"^end:([a-z][a-z-]*)$")
 DETAILS = ("none", "optional", "required")
 BINDINGS = ("none", "tree", "patch", "story")
@@ -433,6 +438,13 @@ def check_catalog(catalog):
                 fault("class", name, "%s has the unknown class %s" % (value["value"], value["class"]))
             if value["class"] == "skipped" and name in relied:
                 fault("required-skippable", name, "%s skips a step another contract requires" % value["value"])
+            if value["class"] == "confirm":
+                # An accepted verdict is recorded without the step running again, so nothing can
+                # be asked of a proof, and the accepted answer has a place in the result.
+                if proof["binding"] != "none" or "required" in proof:
+                    fault("confirm-proof", name, "%s is confirmed by a person, so the contract takes no proof" % value["value"])
+                if entry["result"]["types"].get("answer") != "string" or "answer" in entry["result"]["required"]:
+                    fault("confirm-result", name, "%s is confirmed by a person, so the result lists answer as optional text" % value["value"])
         phase = entry["claimPhase"]
         if phase is not None and (not phase or len(phase) > CLAIM_PHASE_MAX or CONTROL.search(phase)):
             fault("claim-phase", name, "a claim phase is 1 to %d characters with no control character" % CLAIM_PHASE_MAX)
@@ -1049,8 +1061,34 @@ def state_dir(world, create):
     return path
 
 
-def state_name(session, item):
-    return "%s.%s.json" % (session, item or "run")
+def state_name(session, item, run_id):
+    """One file per session and item; a run with no item is keyed by its run id, so a session
+    may hold several."""
+    return "%s.%s.json" % (session, item or run_id)
+
+
+def legacy_name(session):
+    """Where an earlier plugin kept a session's one run with no item."""
+    return "%s.run.json" % session
+
+
+def state_names(state):
+    names = [state_name(state["sessionId"], state["item"], state["runId"])]
+    return names if state["item"] else names + [legacy_name(state["sessionId"])]
+
+
+def settle_legacy(folder, session, world):
+    """A run with no item that an earlier plugin wrote takes the name this one writes, so it is
+    carried on in one file."""
+    old = os.path.join(folder, legacy_name(session))
+    if not os.path.lexists(old):
+        return
+    try:
+        state = read_state(old, world)
+    except Refuse:
+        return
+    if state.get("sessionId") == session and state["item"] is None:
+        os.replace(old, os.path.join(folder, state_name(session, None, state["runId"])))
 
 
 def read_state(path, world):
@@ -1083,7 +1121,7 @@ def read_state(path, world):
 def write_state(folder, state):
     """Atomic and owner-only: a new file beside the final name, then moved over it."""
     state["seq"] += 1
-    name = state_name(state["sessionId"], state["item"])
+    name = state_name(state["sessionId"], state["item"], state["runId"])
     data = (json.dumps(state, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
     if len(data) > STATE_MAX_BYTES:
         raise Refuse("state-unusable", "the run's state has grown past %d bytes" % STATE_MAX_BYTES)
@@ -1133,8 +1171,9 @@ def find_run(world, request, session):
     if folder is None:
         raise Refuse("no-run", "this session has no run")
     if item:
-        names = [state_name(session, item)] if os.path.lexists(os.path.join(folder, state_name(session, item))) else []
+        names = [state_name(session, item, None)] if os.path.lexists(os.path.join(folder, state_name(session, item, None))) else []
     else:
+        settle_legacy(folder, session, world)
         names = sorted(name for name in os.listdir(folder) if name.startswith(session + ".") and name.endswith(".json"))
     states = [read_state(os.path.join(folder, name), world) for name in names]
     states = [state for state in states if state.get("sessionId") == session]
@@ -1360,12 +1399,13 @@ class Run:
 
     def report(self, index):
         step, record = self.steps[index], self.record(index)
-        status = "running" if record["status"] == "issued" else record["status"]
+        waiting = record.get("waiting") if record["status"] == "issued" else None
+        status = "waiting" if waiting else "running" if record["status"] == "issued" else record["status"]
         # A step repaired by hand is reported as a later attempt: the tracker never changes an
         # attempt it holds as finished, so the repair would otherwise stay recorded as the failure.
         attempt = min(max(record["attempt"], 1) + record.get("repairs", 0), REPORT.MAX_ATTEMPT)
         self.events.append({"step": step["id"], "attempt": attempt, "status": status,
-                            "verdict": record["verdict"], "evidence": record["evidence"], "links": record["links"],
+                            "verdict": waiting or record["verdict"], "evidence": record["evidence"], "links": record["links"],
                             "startedAt": record["startedAt"], "endedAt": record["endedAt"], "ran": record["ran"]})
 
     def stop(self, kind, reason, index):
@@ -1441,7 +1481,8 @@ class Run:
         # on it: they hold their own proofs (a rebase that leaves the patch alone keeps the review).
         refresh = cause == "stale" or (cause == "mismatch" and record.get("refresh", False))
         record.update(attempt=record["attempt"] + 1, status="issued", verdict=None, evidence=[], links={},
-                      startedAt=self.world.now(), endedAt=None, refresh=refresh, redo=None, issuedHead=self.commit, ran=ran)
+                      startedAt=self.world.now(), endedAt=None, refresh=refresh, redo=None, issuedHead=self.commit, ran=ran,
+                      waiting=None)
         record["class"] = None
         self.state["current"] = {"stepId": step["id"], "attempt": record["attempt"]}
         self.report(index)
@@ -1490,7 +1531,7 @@ class Run:
         for the step and the run. Whatever cannot be read as a pass is recorded as a failure."""
         state, step, record, entry = self.state, self.steps[index], self.record(index), self.entry(index)
         state["current"], state["stopped"] = None, None
-        record.update(endedAt=self.world.now(), answer=None, evidence=[], links={}, redo=None)
+        record.update(endedAt=self.world.now(), answer=None, evidence=[], links={}, redo=None, waiting=None)
         parsed = parse_verdict(entry, output) if isinstance(output, str) else None
         if parsed is None:
             record.update(status="failed", verdict="No verdict")
@@ -1537,17 +1578,35 @@ class Run:
         elif kind == "stop":
             record["status"] = "failed"
             after = ("failed", line)
-        elif kind == "ask":
+        elif kind in ("ask", "confirm"):
             record["status"] = "waiting"
-            after = ("needs-person", detail)
+            after = ("needs-person", detail if kind == "ask" else line)
         else:  # redo:self, or end:<outcome>
             record["status"] = "done"
         self.report(index)
         if after:
             self.stop(after[0], after[1], index)
+            if kind == "confirm":
+                self.state["stopped"]["confirm"] = True  # a yes accepts the verdict, a no ends the run
             self.may_have_landed(index)
         elif END_CLASS.match(kind):
             self.finish(END_CLASS.match(kind).group(1))
+
+    def confirm(self, index, text, yes):
+        """A person's answer to a confirm verdict. A yes records the verdict as accepted: the step
+        is done as it answered, never run again, and its result carries the answer. A no ends the
+        run as declined."""
+        state, record = self.state, self.record(index)
+        state["stopped"] = None
+        record.update(status="done", endedAt=self.world.now(), answer=text, accepted=yes,
+                      verdict=REPORT.clean_verdict("%s (%s)" % (record["verdict"], "accepted" if yes else "declined")))
+        if yes:
+            record["class"] = "continue"
+            record["result"] = dict(record["result"], answer=text)
+            record["passed"] = {"proof": record["proof"], "result": record["result"]}
+            record.update(doneSeq=state["seq"] + 1, refresh=False, autoRedo=0)
+        self.report(index)
+        return self.advance() if yes else self.finish(CONFIRM_DECLINED)
 
     def may_have_landed(self, index):
         """merge-may-have-landed: a merge that answered and then stopped may have landed first, so
@@ -1638,9 +1697,11 @@ def command_start(world, request, contracts):
     check_context(steps, contracts, context)
     trigger = context.get("trigger", definition["startsWhen"])
     folder = state_dir(world, create=True)
-    path = os.path.join(folder, state_name(session, item))
+    # A run with no item is keyed by its own id, so a start never meets an open one: a session
+    # may hold several, each named by its run id.
+    path = os.path.join(folder, state_name(session, item, None)) if item else None
     replaced = []
-    if os.path.lexists(path):
+    if path and os.path.lexists(path):
         old = read_state(path, world)
         if not old["outcome"]:
             if request.get("replace") is not True and "fetched" in request:
@@ -1652,7 +1713,7 @@ def command_start(world, request, contracts):
                 write_state(folder, old)
                 return answer
             if request.get("replace") is not True:
-                raise Refuse("run-open", "this session already has an open run for %s; resume it, or start with replace" % (item or "no item"))
+                raise Refuse("run-open", "this session already has an open run for %s; resume it, or start with replace" % item)
             replaced = close_replaced(old, world)
     chosen = choose_definition(definition, request.get("fetched", MISSING), trigger, contracts, version, in_work_tree, context)
     definition = chosen["definition"]
@@ -1723,16 +1784,61 @@ def command_done(world, request, contracts):
     return answer
 
 
+def command_wait(world, request, contracts):
+    """The issued step says it is waiting inside itself (a queue, a deploy, another release): it
+    is reported `waiting` with the reason until its `done`. Nothing else about the run changes."""
+    folder, state = find_run(world, request, session_of(request, world))
+    run = Run(state, contracts, world)
+    step_id, attempt, reason = request.get("stepId"), request.get("attempt"), request.get("reason", "Waiting")
+    if isinstance(attempt, bool) or not isinstance(attempt, int) or not isinstance(step_id, str):
+        raise Refuse("bad-request", "wait names the step (stepId) and its attempt (a whole number)")
+    if not isinstance(reason, str) or not REPORT.clean_verdict(reason):
+        raise Refuse("bad-request", "reason is one line saying what the step waits for")
+    if state["current"] != {"stepId": step_id, "attempt": attempt}:
+        raise Refuse("not-current-step", "the run has not issued attempt %s of step %s" % (attempt, step_id))
+    index = run.index_of(step_id)
+    reason = WITHHELD if has_secret(reason) else REPORT.clean_verdict(reason)
+    run.record(index)["waiting"] = reason
+    run.report(index)
+    answer = {"runId": state["runId"], "waiting": {"stepId": step_id, "attempt": attempt, "reason": reason}, "reports": run.reports()}
+    write_state(folder, state)
+    return answer
+
+
+def position_of(state):
+    """Where an unfinished run is: {stepId, index, of}, or None."""
+    at = (state["current"] or state["stopped"] or {}).get("stepId")
+    ids = [step["id"] for step in flat_steps(state["definition"])]
+    return {"stepId": at, "index": ids.index(at) + 1, "of": len(ids)} if at in ids and not state["outcome"] else None
+
+
+def command_status_all(world, request):
+    """This session's unfinished runs, oldest first. Read-only."""
+    session, folder = session_of(request, world), state_dir(world, create=False)
+    runs = []
+    for state in (own_states(world, folder) if folder else []):
+        if state["sessionId"] == session and not state["outcome"]:
+            waiting = state["steps"][state["current"]["stepId"]].get("waiting") if state["current"] else None
+            runs.append({"runId": state["runId"], "item": state["item"], "workflowId": pinned_workflow(state)["id"],
+                         "workflow": workflow_line(state), "startedAt": state["startedAt"],
+                         "state": "stopped" if state["stopped"] else "running", "position": position_of(state),
+                         "stopped": state["stopped"], "waiting": waiting})
+    runs.sort(key=lambda run: (str(run["startedAt"]), run["runId"]))
+    return {"runs": runs}
+
+
 def command_status(world, request, contracts):
+    if "all" in request:
+        if request["all"] is not True or request.get("item") is not None or request.get("runId") is not None:
+            raise Refuse("bad-request", "all is only ever true, and it names no run")
+        return command_status_all(world, request)
     _, state = find_run(world, request, session_of(request, world))
     run = Run(state, contracts, world)
-    rows = [{"stepId": step["id"], "phase": step["phase"], "name": step["name"], "status": run.record(index)["status"],
+    rows = [{"stepId": step["id"], "phase": step["phase"], "name": step["name"],
+             "status": "waiting" if run.record(index)["status"] == "issued" and run.record(index).get("waiting") else run.record(index)["status"],
              "verdict": run.record(index)["verdict"], "attempt": run.record(index)["attempt"]}
             for index, step in enumerate(run.steps)]
-    at = (state["current"] or state["stopped"] or {}).get("stepId")
-    position = None
-    if at and not state["outcome"]:
-        position = {"stepId": at, "index": run.index_of(at) + 1, "of": len(rows)}
+    position = position_of(state)
     table = ["| Phase | Step | Status | Verdict | Attempt |", "|---|---|---|---|---|"]
     for row in rows:
         table.append("| %s | %s | %s | %s | %s |" % tuple(
@@ -1771,7 +1877,7 @@ def own_states(world, folder):
             continue
         try:
             state = read_state(os.path.join(folder, name), world)
-            named = state_name(state["sessionId"], state["item"]) == name and "outcome" in state and "stopped" in state
+            named = name in state_names(state) and "outcome" in state and "stopped" in state
         except (Refuse, OSError, KeyError, TypeError):
             continue  # not this user's, not a state file, or gone
         if named:
@@ -1936,7 +2042,7 @@ def adopt(world, request, session, cwd):
         except (Refuse, OSError):
             continue  # not this user's, not a state file, or gone: never adopted
         if (not state["outcome"] and state["sessionId"] != session and (item is None or state["item"] == item)
-                and (not run_id or state["runId"] == run_id) and state_name(state["sessionId"], state["item"]) == name):
+                and (not run_id or state["runId"] == run_id) and name in state_names(state)):
             if same_repository(world, state, cwd):
                 found.append((modified, path, state))
             else:
@@ -1947,10 +2053,10 @@ def adopt(world, request, session, cwd):
     if not found:
         raise Refuse("no-run", "there is no unfinished run to resume")
     _, old_path, state = max(found, key=lambda entry: entry[0])
-    mine = os.path.join(folder, state_name(session, state["item"]))
+    mine = os.path.join(folder, state_name(session, state["item"], state["runId"]))
     if os.path.lexists(mine) and not read_state(mine, world)["outcome"]:
         # As start: an open run of this session's own is never overwritten.
-        raise Refuse("run-open", "this session already has an open run for %s; finish it, or start with replace" % (state["item"] or "no item"))
+        raise Refuse("run-open", "this session already has an open run for %s; finish it, or start with replace" % state["item"])
     adopted_from = {"sessionId": state["sessionId"], "cwd": state["context"].get("cwd")}
     state["sessionId"] = session
     state["context"]["cwd"] = cwd  # proofs are read in the checkout that carries the run on
@@ -1995,6 +2101,17 @@ def command_resume(world, request, contracts):
         write_adopted(folder, state, old_path)
         return answer
     at = (state["stopped"] or state["current"] or {}).get("stepId")
+    if at and state["stopped"] and answer_text is not None and state["steps"][at]["class"] == "confirm" and state["steps"][at]["status"] == "waiting":
+        # A confirm verdict is answered, never run again: without an answer the step is issued again below.
+        said = CONFIRM_ANSWER.match(answer_text)
+        if said is None:
+            raise Refuse("confirm-answer", "step %s waits for an answer that starts with yes or no" % at)
+        answer = run.confirm(run.index_of(at), answer_text, said.group(1).lower() == "yes")
+        if adopted_from:
+            answer["adoptedFrom"] = adopted_from
+        answer["reports"] = run.reports()
+        write_adopted(folder, state, old_path)
+        return answer
     if at:
         record = state["steps"][at]
         if state["stopped"]:
@@ -2023,6 +2140,7 @@ def command_repository(world, request, contracts):
 
 
 HANDLERS = {"repository": command_repository, "start": command_start, "next": command_next, "done": command_done,
+            "wait": command_wait,
             "status": command_status, "resume": command_resume, "reported": command_reported,
             "unsent": command_unsent, "judge": command_judge}
 

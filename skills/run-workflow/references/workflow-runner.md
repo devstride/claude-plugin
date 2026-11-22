@@ -19,15 +19,17 @@ reported.
 Exit 2 is a refusal: exactly one `workflow: <code>: <message>` line on stderr, nothing on stdout,
 nothing changed. Exit 1 is anything else, also one line: the runner or its install is broken, so
 say the line and stop; never retry it. Every request may carry `session` (else the agent's own
-session id) and names its run by `item`, by `runId`, or by being the session's only open run.
+session id) and names its run by `item`, by `runId`, or by being the session's only open run. A
+run with no item is named only by its `runId`, and a session may hold several of them at once.
 
 | Command | Request | What it does |
 |---|---|---|
-| `start` | `definition` or `definitionFile` (a file of at most 256 KB), `context`, `fetched`?, `replace`? | Validates everything before writing anything, then issues the first step. An open run for the same session and item is refused (`run-open`) unless `replace` is true, which ends the old run as interrupted; with `fetched`, its current position comes back instead. `fetched` is the tracker's answer for the item (`fetching-the-workflow.md`): `start` pins the organization's definition or the built-in one and adds `definitionSource`, `workflow` and `notice` |
+| `start` | `definition` or `definitionFile` (a file of at most 256 KB), `context`, `fetched`?, `replace`? | Validates everything before writing anything, then issues the first step. An open run for the same session and item is refused (`run-open`) unless `replace` is true, which ends the old run as interrupted; with `fetched`, its current position comes back instead. A run with no item is never refused this way: every such `start` begins another run, so ask `status` with `all` first and `resume` the one it lists instead of starting a second. `fetched` is the tracker's answer for the item (`fetching-the-workflow.md`): `start` pins the organization's definition or the built-in one and adds `definitionSource`, `workflow` and `notice` |
 | `next` | | The next action. Asked again before `done`, it hands back the issued step and attempt as they were: the step may already have acted, so only its `done` moves the run on |
 | `done` | `stepId`, `attempt`, `output` (the step's whole final answer, as text) | Records the issued step's answer and returns the next action plus `recorded`. Any other step or attempt is refused (`not-current-step`), except the step a stopped run stopped on, repaired by hand |
-| `status` | `includeDefinition`? | Read-only: `state` (running, stopped or finished), `position`, one row per step and a ready Markdown `table`. With `includeDefinition`, one report object carrying the definition |
-| `resume` | `answer`?, `cwd`?, `landed`?, `close`? | Continues after a restart or a stop: an issued step comes back as it was, otherwise as `next`. `answer`, a person's reply to a question, reaches that step's payload for that attempt only. A merge stop comes back as the stop until `landed` is `false`. `close` `true` ends the run as interrupted |
+| `wait` | `stepId`, `attempt`, `reason`? (one line) | For a step that waits inside itself (a queue, a deploy, another release): the issued step is reported `waiting` with the reason, on the same attempt, until its `done`. Nothing else changes: the step still ends with its verdict, and any other step or attempt is refused (`not-current-step`) |
+| `status` | `includeDefinition`? | Read-only: `state` (running, stopped or finished), `position`, one row per step and a ready Markdown `table`. With `includeDefinition`, one report object carrying the definition. With `all` `true` and no run named: `runs`, this session's unfinished runs, oldest first, each with `runId`, `item`, `workflowId`, `state`, `position`, `stopped` and `waiting` |
+| `resume` | `answer`?, `cwd`?, `landed`?, `close`? | Continues after a restart or a stop: an issued step comes back as it was, otherwise as `next`. `answer`, a person's reply to a question, reaches that step's payload for that attempt only; at a `confirm` stop it must start with yes or no (the table below). A merge stop comes back as the stop until `landed` is `false`. `close` `true` ends the run as interrupted |
 
 The context: `item` (an item number or null), `goal`, `profile` (`name` and `source`),
 `workingBase`, `oneOff`, `route` (`train`, `develop-pr` or `epic-release`), `releaseUnit`,
@@ -41,10 +43,12 @@ An action is one of:
 - **`run`**: `step` (`id`, `name`, `phase`, `contract`, `attempt`), `skill` (the built-in skill to
   invoke), `payload`, `argument` (the contract's template rendered from the payload, else the
   payload as one compact JSON string: pass it to the skill unchanged) and `heartbeat`.
-- **`finished`**: `outcome` (`completed`, or the outcome a step ended the run with, such as `held`)
+- **`finished`**: `outcome` (`completed`, the outcome a step ended the run with, such as `held`, or
+  `declined` after a no at a `confirm` stop)
   and `results`, each finished step's result by contract.
-- **`stopped`**: `kind`, `reason`, `stepId`; a stop of a merge that answered adds `mayHaveLanded`
-  (true), its `attempt` and the `commit` it was handed.
+- **`stopped`**: `kind`, `reason`, `stepId`; a stop that waits for a yes or no adds `confirm`
+  (true); a stop of a merge that answered adds `mayHaveLanded` (true), its `attempt` and the
+  `commit` it was handed.
 
 Every answer also carries `runId` and `reports`; `start` adds the definition's hash. A `run` answer for a repository step (its source is `repo`) has `skill: null` and `instructions` (the committed file's text, path, commit and hash). Follow `instructions.text` as that step's skill, then answer `done` with the verdict line its contract names.
 
@@ -76,7 +80,17 @@ passing answer per contract. The value's class decides what happens:
 | `redo:self` | done | issues the same step again, after whatever went stale |
 | `stop` | failed | stops, kind `failed` |
 | `ask` | waiting | stops, kind `needs-person`; the detail is the question |
+| `confirm` | waiting | stops, kind `needs-person`, with `confirm` true; the reason is the verdict line |
 | `end:<outcome>` | done | ends with that outcome |
+
+**A `confirm` stop is answered, never re-run.** Show the step's evidence and ask the person;
+`resume` with their own words as `answer`. An answer whose first word is yes records the verdict
+as accepted: the step is done as it answered, on the same attempt, its verdict gains `(accepted)`,
+its result gains `answer` (the answer's whole text, which later steps read as
+`result:<contract>.answer`), and the run goes on. One whose first word is no ends the run with the
+outcome `declined`. Any other answer is refused (`confirm-answer`, nothing changed). A `resume`
+with no answer issues the step again, for a cause that was fixed meanwhile. Never write a yes for
+the person.
 
 A missing, unlisted or malformed verdict is a stop of kind `no-verdict`; a `continue` verdict whose
 result lacks a required key is a stop of kind `failed`. Neither is ever read as a pass. Result keys
@@ -89,10 +103,10 @@ What is reported, and what is never reported: `workflow-contracts.md`.
 | Kind | What happened | What a person does |
 |---|---|---|
 | `failed` | The step answered with a stopping verdict, or its result was incomplete | Fix the cause, then `resume`; or do the step by hand and report it with `done` |
-| `needs-person` | The step asked a question | `resume` with the `answer` |
+| `needs-person` | The step asked a question, or (`confirm`) waits for a yes or no | `resume` with the `answer` |
 | `no-verdict` | The answer did not open with a verdict the contract lists | Run the step again (`resume`), or report its real verdict with `done` |
 | `proof` | A proof was refused by a value or a named rule, or could not be checked | Fix what the reason names, then `resume` |
-| `attempts-exhausted` | The same step was re-issued until the limit, or has run 50 times | Find why its proof never holds, then `resume`, which resets the re-issue count but never the 50 |
+| `attempts-exhausted` | The runner re-issued the same step up to its limit (five, or the contract's `maxAutoRedo`; a person's answers and resumes are never counted), or it has run 50 times | Find why its proof never holds, then `resume`, which resets the re-issue count but never the 50 |
 
 **A merge stop** (`mayHaveLanded`, any kind): the merge answered, so it may have landed before it
 stopped. Check its `commit` with the landing test
@@ -143,7 +157,8 @@ describes; null means no heartbeat. `shipIntent`, when not null, is the ready re
 
 ## Resuming
 
-State is one owner-only file per session and item under the user's cache folder
+State is one owner-only file per session and item (for a run with no item, per session and run
+id; one an earlier plugin wrote is carried on under its run id) under the user's cache folder
 (`$XDG_CACHE_HOME`, else `~/.cache`), refused when that folder is under a `.git` folder or inside
 the plugin, pruned after seven days. After a compaction: `status`, then `resume`. A cleared
 conversation is a new session: `resume` with the item (or the run id) adopts the newest unfinished

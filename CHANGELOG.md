@@ -28,6 +28,15 @@ for what each version component means here and how a release is cut.
 - **A step's contract may allow more automatic re-runs.** A contract can raise the runner's cap of
   five automatic re-issues for its own step (`maxAutoRedo`, at most twenty), for long steps such
   as a release review that may restart several times.
+- **The step runner can take a yes or no, hold several runs with no item, and show a step that is
+  waiting.** A step's verdict may now be one a person confirms (the new `confirm` class): the run
+  stops and asks, a yes records the verdict as accepted without running the step again and hands
+  the person's words to later steps, and a no ends the run as declined. The pre-merge check and
+  the post-deploy health check answer `NOT RUN` this way. A run with no item is kept under its own
+  run id, so one session can hold two at once (a finished release's owed steps and the next
+  release), `status` with `all` lists a session's unfinished runs, and a run an earlier version
+  kept under the old name is carried on. The new `wait` command lets a step that waits inside
+  itself (a queue, a deploy) be reported as waiting, with what it waits for, until it answers.
 - **A hotfix is a workflow the step runner can walk.** `workflows/hotfix.json` lists the hotfix as
   thirteen named steps in two phases (cut the branch, then fix and ship), so someone watching sees
   which step a hotfix session is on and what each finished step produced. It reuses the Build risk

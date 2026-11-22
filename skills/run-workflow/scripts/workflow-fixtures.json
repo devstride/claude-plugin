@@ -4814,7 +4814,7 @@
   {
    "contract": "pre-merge-at-checks@1",
    "output": "PRE-MERGE: NOT RUN\n",
-   "class": "ask",
+   "class": "confirm",
    "value": "NOT RUN",
    "detail": ""
   },
@@ -4989,7 +4989,7 @@
   {
    "contract": "pre-merge-check@1",
    "output": "PRE-MERGE: NOT RUN\n",
-   "class": "ask",
+   "class": "confirm",
    "value": "NOT RUN",
    "detail": ""
   },
@@ -5017,7 +5017,7 @@
   {
    "contract": "pre-merge-recheck@1",
    "output": "PRE-MERGE: NOT RUN\n",
-   "class": "ask",
+   "class": "confirm",
    "value": "NOT RUN",
    "detail": ""
   },
@@ -5206,7 +5206,7 @@
   {
    "contract": "post-deploy-check@1",
    "output": "POST-DEPLOY HEALTH: NOT RUN\n",
-   "class": "ask",
+   "class": "confirm",
    "value": "NOT RUN",
    "detail": ""
   },
