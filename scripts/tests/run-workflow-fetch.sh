@@ -125,7 +125,33 @@ for case in FIX["answers"]:
             good = good and notice.endswith("); running the built-in workflow.") and len(notice) > len(NOTICE_START[reason]) + 40
     state = json.load(open(os.path.join(WORK, "cache/devstride-plugin/workflows", "%s.%s.json" % (sid, FIX["context"]["item"]))))
     good = good and state["fallbackReason"] == reason
+    if reason is None:
+        good = good and state.get("organizationId") == answer_in["organizationId"]
     check("answer: %s -> %s%s" % (case["name"], expect["definitionSource"], "" if reason is None else " (%s)" % reason), good, (answer.get("notice"), state.get("fallbackReason")))
+
+# the samples agree with the tracker's own rules, so its cross-check of this file can pass
+import re
+WORKFLOW_ID = re.compile(r"^[a-z][a-z0-9-]{0,99}$")
+known_types = set(t["id"] for t in FIX["server"]["workTypes"] if not t["archived"])
+for case in FIX["answers"]:
+    answer_in = case["answer"]
+    check("fixture %s: carries the organizationId the tracker sends" % case["name"],
+          isinstance(answer_in.get("organizationId"), str) and re.match(r"^[A-Za-z0-9_-]{1,64}$", answer_in["organizationId"]))
+    match = answer_in["match"]
+    if match is None:
+        continue
+    check("fixture %s: the workflowId is a workflow id" % case["name"], WORKFLOW_ID.match(match["workflowId"]), match["workflowId"])
+    if "definition" not in match:
+        continue
+    definition = match["definition"]
+    check("fixture %s: the definition id is the workflowId" % case["name"], definition["id"] == match["workflowId"], definition["id"])
+    applies = definition["appliesTo"]
+    check("fixture %s: tags and repositories narrow a known item type" % case["name"],
+          not (applies["tags"] or applies["repositories"]) or (applies["workTypes"] and set(applies["workTypes"]) <= known_types), applies)
+used = set(c["expect"]["invalidCode"] for c in FIX["answers"] if c["expect"]["invalidCode"])
+check("every invalidCode maps to the tracker's code, and the map names no unused code",
+      used == set(FIX["server"]["invalidCodes"]) and all(isinstance(v, str) and v for v in FIX["server"]["invalidCodes"].values()),
+      (sorted(used), sorted(FIX["server"]["invalidCodes"])))
 
 # deliberately invalid definitions fail validation with the named code when started directly
 for case in FIX["answers"]:

@@ -1,5 +1,5 @@
 {
- "_readme": "Shared cases for the plugin's handling of the tracker's answer to get_workflow_for_item, run by scripts/tests/run-workflow-fetch.sh. builtin is the definition the entry skill supplies; context is the start context; answers are sample answers in the tracker's response shape (match, ignoredOverride, skills), each with the definition the runner must pin (definitionSource), the short fallback code it keeps (fallbackReason, null for an organization run) and, for a definition the plugin deliberately refuses, the validation code (invalidCode). Every sample's hash is the canonical hash of its definition except the one changed after hashing. Example hosts and names only.",
+ "_readme": "Shared cases for the plugin's handling of the tracker's answer to get_workflow_for_item, run by scripts/tests/run-workflow-fetch.sh. builtin is the definition the entry skill supplies; context is the start context; server is what the tracker's own checks need to agree with them; answers are sample answers in the tracker's response shape (match, ignoredOverride, skills, organizationId), each with the definition the runner must pin (definitionSource), the short fallback code it keeps (fallbackReason, null for an organization run) and, for a definition the plugin deliberately refuses, the validation code (invalidCode). Every sample's definition id is its workflowId, and every sample's hash is the canonical hash of its definition except the one changed after hashing, which keeps the hash it had before the change. Example hosts and names only.",
  "builtin": {
   "schema": 1,
   "id": "claim-only",
@@ -44,6 +44,22 @@
   "mode": "named",
   "trigger": "item-picked-up"
  },
+ "server": {
+  "_readme": "What the tracker's own checks need to agree with these samples. workTypes is the item type every sample's appliesTo names, as it exists in the organization (the tracker refuses tags or repositories without an item type, narrower-without-work-type, and an item type it does not know). invalidCodes maps each invalidCode the runner gives to the code the tracker's definition check gives for the same definition: the tracker folds the runner's finer required-step codes into requires-weakened, and it refuses library skill steps and gate steps by name (deferred-librarySource, deferred-gates) until it supports them; once it accepts library skills, its library reference check refuses a step that names no published version instead. Every sample answer carries the organizationId the tracker sends, which the runner keeps for its library skill cache.",
+  "workTypes": [
+   {
+    "id": "wt-acme-story",
+    "archived": false
+   }
+  ],
+  "invalidCodes": {
+   "unknown-contract": "unknown-contract",
+   "requires-missing": "requires-missing",
+   "required-off": "requires-weakened",
+   "library-version": "deferred-librarySource",
+   "unsupported-gate": "deferred-gates"
+  }
+ },
  "errors": [
   "ABSENT",
   "FORBIDDEN",
@@ -56,7 +72,8 @@
    "answer": {
     "match": null,
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "builtin",
@@ -72,20 +89,22 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "66a2d83d427191085b2ebc2637b03d47c4fe2d22c1e1a84aba91a9aaddd72cd1",
+     "hash": "3fc24ab42e1e9bd7a5609ae257de98bbc76defdfecf47f0cf43189968d7a768a",
      "minPluginVersion": "4.2.0",
      "startsWhen": "item-picked-up",
-     "matchedBy": "type",
+     "matchedBy": "type+repository",
      "alsoMatched": [],
      "definition": {
       "schema": 1,
-      "id": "acme-claim",
+      "id": "wf-acme-claim",
       "version": 3,
       "name": "Acme claim and check",
       "startsWhen": "item-picked-up",
       "endsBy": null,
       "appliesTo": {
-       "workTypes": [],
+       "workTypes": [
+        "wt-acme-story"
+       ],
        "tags": [],
        "repositories": [
         "example.com/acme/widgets"
@@ -137,7 +156,8 @@
      }
     },
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "organization",
@@ -153,14 +173,15 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "66a2d83d427191085b2ebc2637b03d47c4fe2d22c1e1a84aba91a9aaddd72cd1",
+     "hash": "3fc24ab42e1e9bd7a5609ae257de98bbc76defdfecf47f0cf43189968d7a768a",
      "minPluginVersion": "4.2.0",
      "startsWhen": "item-picked-up",
-     "matchedBy": "type",
+     "matchedBy": "type+repository",
      "alsoMatched": []
     },
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "builtin",
@@ -176,20 +197,22 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "66a2d83d427191085b2ebc2637b03d47c4fe2d22c1e1a84aba91a9aaddd72cd1",
+     "hash": "3fc24ab42e1e9bd7a5609ae257de98bbc76defdfecf47f0cf43189968d7a768a",
      "minPluginVersion": "4.2.0",
      "startsWhen": "on-demand",
-     "matchedBy": "type",
+     "matchedBy": "type+repository",
      "alsoMatched": [],
      "definition": {
       "schema": 1,
-      "id": "acme-claim",
+      "id": "wf-acme-claim",
       "version": 3,
       "name": "Acme claim and check",
       "startsWhen": "item-picked-up",
       "endsBy": null,
       "appliesTo": {
-       "workTypes": [],
+       "workTypes": [
+        "wt-acme-story"
+       ],
        "tags": [],
        "repositories": [
         "example.com/acme/widgets"
@@ -241,7 +264,8 @@
      }
     },
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "builtin",
@@ -257,20 +281,22 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "a884596df027dfdd00be40bc2590a45b868b02a08142c5127c83a02cef897a50",
+     "hash": "8a9700210465bf339b19c89494db6a7beefc6bc8ab7aa93eaf1949a9d49dee46",
      "minPluginVersion": "4.2.0",
      "startsWhen": "item-picked-up",
-     "matchedBy": "type",
+     "matchedBy": "type+repository",
      "alsoMatched": [],
      "definition": {
       "schema": 1,
-      "id": "acme-claim",
+      "id": "wf-acme-claim",
       "version": 3,
       "name": "Acme claim and check",
       "startsWhen": "on-demand",
       "endsBy": null,
       "appliesTo": {
-       "workTypes": [],
+       "workTypes": [
+        "wt-acme-story"
+       ],
        "tags": [],
        "repositories": [
         "example.com/acme/widgets"
@@ -322,7 +348,8 @@
      }
     },
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "builtin",
@@ -338,20 +365,22 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "66a2d83d427191085b2ebc2637b03d47c4fe2d22c1e1a84aba91a9aaddd72cd1",
+     "hash": "3fc24ab42e1e9bd7a5609ae257de98bbc76defdfecf47f0cf43189968d7a768a",
      "minPluginVersion": "4.2.0",
      "startsWhen": "item-picked-up",
-     "matchedBy": "type",
+     "matchedBy": "type+repository",
      "alsoMatched": [],
      "definition": {
       "schema": 1,
-      "id": "acme-claim",
+      "id": "wf-acme-claim",
       "version": 3,
       "name": "Acme claim and checl",
       "startsWhen": "item-picked-up",
       "endsBy": null,
       "appliesTo": {
-       "workTypes": [],
+       "workTypes": [
+        "wt-acme-story"
+       ],
        "tags": [],
        "repositories": [
         "example.com/acme/widgets"
@@ -403,7 +432,8 @@
      }
     },
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "builtin",
@@ -419,20 +449,22 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "0fd5aafa26947260e4a021f667113cc10c48df49fe23066b9e6e77e055244c85",
+     "hash": "5af9bdeb0861b44d94db7d9c88e21e091cb62e3adf7f419513573cbe041b36b1",
      "minPluginVersion": "4.10.0",
      "startsWhen": "item-picked-up",
-     "matchedBy": "type",
+     "matchedBy": "type+repository",
      "alsoMatched": [],
      "definition": {
       "schema": 1,
-      "id": "acme-claim",
+      "id": "wf-acme-claim",
       "version": 3,
       "name": "Acme claim and check",
       "startsWhen": "item-picked-up",
       "endsBy": null,
       "appliesTo": {
-       "workTypes": [],
+       "workTypes": [
+        "wt-acme-story"
+       ],
        "tags": [],
        "repositories": [
         "example.com/acme/widgets"
@@ -484,7 +516,8 @@
      }
     },
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "builtin",
@@ -500,20 +533,22 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "905f8d360db7b9e7e089896fab77a2b4176f82732a06f11185a3ce63094932dd",
+     "hash": "a35b178a8205a1cc85b962d8ed5ee144db85be306d97465c2368a55aee76cc0a",
      "minPluginVersion": "4.2.0",
      "startsWhen": "item-picked-up",
-     "matchedBy": "type",
+     "matchedBy": "type+repository",
      "alsoMatched": [],
      "definition": {
       "schema": 1,
-      "id": "acme-claim",
+      "id": "wf-acme-claim",
       "version": 3,
       "name": "Acme claim and check",
       "startsWhen": "item-picked-up",
       "endsBy": null,
       "appliesTo": {
-       "workTypes": [],
+       "workTypes": [
+        "wt-acme-story"
+       ],
        "tags": [],
        "repositories": [
         "example.com/acme/widgets"
@@ -565,7 +600,8 @@
      }
     },
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "builtin",
@@ -581,20 +617,22 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "e7ed86580738188df259e85883e04760ffc982c7d1a7f0899a160849be590db0",
+     "hash": "b92494a510f68d34fb33bddcef4cbd70690fa0bcc711d8bfb06f1d0b1dca1c4f",
      "minPluginVersion": "4.2.0",
      "startsWhen": "item-picked-up",
-     "matchedBy": "type",
+     "matchedBy": "type+repository",
      "alsoMatched": [],
      "definition": {
       "schema": 1,
-      "id": "acme-claim",
+      "id": "wf-acme-claim",
       "version": 3,
       "name": "Acme claim and check",
       "startsWhen": "item-picked-up",
       "endsBy": null,
       "appliesTo": {
-       "workTypes": [],
+       "workTypes": [
+        "wt-acme-story"
+       ],
        "tags": [],
        "repositories": [
         "example.com/acme/widgets"
@@ -663,7 +701,8 @@
      }
     },
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "builtin",
@@ -679,20 +718,22 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "ed3773ff2eb7f8225cd577407d7072fde04a593c8d7dda0e48e814ca60990bf7",
+     "hash": "90c10f96daf538df5ef857ce85d5e6343164198b69af91f6174042fe9afb8c40",
      "minPluginVersion": "4.2.0",
      "startsWhen": "item-picked-up",
-     "matchedBy": "type",
+     "matchedBy": "type+repository",
      "alsoMatched": [],
      "definition": {
       "schema": 1,
-      "id": "acme-claim",
+      "id": "wf-acme-claim",
       "version": 3,
       "name": "Acme claim and check",
       "startsWhen": "item-picked-up",
       "endsBy": null,
       "appliesTo": {
-       "workTypes": [],
+       "workTypes": [
+        "wt-acme-story"
+       ],
        "tags": [],
        "repositories": [
         "example.com/acme/widgets"
@@ -778,7 +819,8 @@
      }
     },
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "builtin",
@@ -794,20 +836,22 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "8d10cbafdf008549248178ea8d610e8753d84c3d24cde7b2199ca87c4d433f0a",
+     "hash": "121b5add43be707f01e47eb359e4f8d26d28cf8b1ea04a6cb5fda899e1006728",
      "minPluginVersion": "4.2.0",
      "startsWhen": "item-picked-up",
-     "matchedBy": "type",
+     "matchedBy": "type+repository",
      "alsoMatched": [],
      "definition": {
       "schema": 1,
-      "id": "acme-claim",
+      "id": "wf-acme-claim",
       "version": 3,
       "name": "Acme claim and check",
       "startsWhen": "item-picked-up",
       "endsBy": null,
       "appliesTo": {
-       "workTypes": [],
+       "workTypes": [
+        "wt-acme-story"
+       ],
        "tags": [],
        "repositories": [
         "example.com/acme/widgets"
@@ -859,7 +903,8 @@
      }
     },
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "builtin",
@@ -875,20 +920,22 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "c14e4aad62af86cda0280223ac52693743cb069ac1eb53c2d34eac6af7b32c08",
+     "hash": "ed07bf4209381fede9c76e39c09873896608e4441cb0b686fcba9b39848b73af",
      "minPluginVersion": "4.2.0",
      "startsWhen": "item-picked-up",
-     "matchedBy": "type",
+     "matchedBy": "type+repository",
      "alsoMatched": [],
      "definition": {
       "schema": 1,
-      "id": "acme-claim",
+      "id": "wf-acme-claim",
       "version": 3,
       "name": "Acme claim and check",
       "startsWhen": "item-picked-up",
       "endsBy": null,
       "appliesTo": {
-       "workTypes": [],
+       "workTypes": [
+        "wt-acme-story"
+       ],
        "tags": [],
        "repositories": [
         "example.com/acme/widgets"
@@ -940,7 +987,8 @@
      }
     },
     "ignoredOverride": null,
-    "skills": []
+    "skills": [],
+    "organizationId": "org-acme"
    },
    "expect": {
     "definitionSource": "builtin",
