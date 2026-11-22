@@ -76,14 +76,14 @@
     },
     "release": {
       "version": 1,
-      "sha256": "f008b570eacead397b57391999ec806ab6093becc8eca28588f0c705668c9ae3",
+      "sha256": "3725bae12c558e1975b8203be78ecc87c9d39e74f5815f28fd7e6cdcfbdf9d2e",
       "steps": {
-        "approve-deploy": "release-deploy-approval@1",
+        "approve-deploy": "deploy-approval@1",
         "auto-start-next": "auto-start@1",
         "ci-hold-proof": "ci-hold-proof@1",
         "classify-at-pre-ship": "classify-at-pre-ship@1",
         "classify-release": "classify-release@1",
-        "confirm-deploy": "release-deploy-confirm@1",
+        "confirm-deploy": "deploy-confirm@1",
         "cut-branch": "release-branch@1",
         "delete-release-branch": "release-branch-delete@1",
         "dev-deploy-after-yes": "dev-deploy-wait@1",
@@ -127,14 +127,14 @@
     },
     "release-cut-to-deploy": {
       "version": 1,
-      "sha256": "1e1580777f7bea39e1a7acce10e5c2e32827c661519a09e4e200602a84bfb414",
+      "sha256": "436e7ebc3bd9d40dbd3b4f0561c916fed8efe8650b53cdef2b79101f1e3304fb",
       "steps": {
-        "approve-deploy": "release-deploy-approval@1",
+        "approve-deploy": "deploy-approval@1",
         "auto-start-next": "auto-start@1",
         "ci-hold-proof": "ci-hold-proof@1",
         "classify-at-pre-ship": "classify-at-pre-ship@1",
         "classify-release": "classify-release@1",
-        "confirm-deploy": "release-deploy-confirm@1",
+        "confirm-deploy": "deploy-confirm@1",
         "cut-branch": "release-branch@1",
         "delete-release-branch": "release-branch-delete@1",
         "dev-deploy-after-yes": "dev-deploy-wait@1",
@@ -182,9 +182,9 @@
     },
     "release-docs": {
       "version": 1,
-      "sha256": "ca80fa76332eabc963d787250eb3e9c8972f73b61588acd158f5034c0830d4fd",
+      "sha256": "cd7048b622ff2fa1d11954f10659384c7382ffe45b88e0a3f31ecd3c2252b1fe",
       "steps": {
-        "confirm-deploy": "release-deploy-confirm@1",
+        "confirm-deploy": "deploy-confirm@1",
         "merged-release": "merged-release@1",
         "sync-knowledge-base": "release-kb-sync@1",
         "update-docs": "release-docs@1"
@@ -192,9 +192,9 @@
     },
     "release-merge-and-deploy": {
       "version": 1,
-      "sha256": "100ecd3b2f5d691f8a75a9c4501c274ff0a8aed4a8d82f9827fe16a6f272f4f9",
+      "sha256": "4b82b57095cb6a7d23726b1bfaad24aec678f4d20ba3987d6b123fe9299bfd7b",
       "steps": {
-        "approve-deploy": "release-deploy-approval@1",
+        "approve-deploy": "deploy-approval@1",
         "auto-start-next": "auto-start@1",
         "checks-stamp": "release-stamp@1",
         "checks-tip": "release-tip@1",
@@ -202,7 +202,7 @@
         "classify-at-checks": "classify-at-checks@1",
         "classify-at-pre-ship": "classify-at-pre-ship@1",
         "classify-release": "classify-release@1",
-        "confirm-deploy": "release-deploy-confirm@1",
+        "confirm-deploy": "deploy-confirm@1",
         "cut-branch": "release-branch@1",
         "delete-release-branch": "release-branch-delete@1",
         "dev-deploy-wait": "dev-deploy-wait@1",
@@ -260,18 +260,18 @@
     },
     "release-notes": {
       "version": 1,
-      "sha256": "314515b7564944ebf420153bb976d9d6ab93a652dec168a71b66f51bb7e779de",
+      "sha256": "b9fe47fe1367050e8131d9422f849e9b2e1e46cf6796014305707de30e076920",
       "steps": {
-        "confirm-deploy": "release-deploy-confirm@1",
+        "confirm-deploy": "deploy-confirm@1",
         "merged-release": "merged-release@1",
         "write-release-notes": "release-notes@1"
       }
     },
     "release-post-deploy": {
       "version": 1,
-      "sha256": "d161c13d6dbe0968964ca86366bbcb559db45147fcdcda8f7c90a3de78ea29b4",
+      "sha256": "8d0ac060da407400d257ae17138bc0a8e600cc3c78290d86ec393b79cda901dd",
       "steps": {
-        "confirm-deploy": "release-deploy-confirm@1",
+        "confirm-deploy": "deploy-confirm@1",
         "merged-release": "merged-release@1",
         "post-deploy-check": "post-deploy-check@1",
         "post-deploy-status": "post-deploy-result@1"
