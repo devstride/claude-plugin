@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "id": "release-post-deploy",
+  "version": 1,
+  "name": "Release: post-deploy only",
+  "startsWhen": "on-demand",
+  "endsBy": null,
+  "appliesTo": {
+    "workTypes": [],
+    "tags": [],
+    "repositories": []
+  },
+  "minPluginVersion": "4.8.0",
+  "phases": [
+    {
+      "id": "find",
+      "name": "Find the merged release",
+      "steps": [
+        {
+          "id": "merged-release",
+          "name": "Find the merged release",
+          "summary": "Find the newest merged release and recompute its delta.",
+          "contract": "merged-release@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "confirm-deploy",
+          "name": "Confirm the deploy",
+          "summary": "Confirm the production deploy of the merge commit finished.",
+          "contract": "deploy-confirm@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "close-out",
+      "name": "Health check and close-out",
+      "steps": [
+        {
+          "id": "post-deploy-check",
+          "name": "Post-deploy health check",
+          "summary": "Run the post-deploy health check.",
+          "contract": "post-deploy-check@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "post-deploy",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "post-deploy-status",
+          "name": "Post the health result",
+          "summary": "Post the health check's result as the release/post-deploy status.",
+          "contract": "post-deploy-result@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    }
+  ]
+}

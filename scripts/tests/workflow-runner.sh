@@ -23,7 +23,7 @@ PENDING = ["claim-story", "story-lifecycle", "risk-check", "local-checks", "revi
            "capture-findings", "sync-base"]
 CODES = ["bad-schema", "duplicate-step-id", "unknown-contract", "unknown-contract-major", "requires-missing",
          "requires-not-earlier", "required-not-always", "required-not-stop", "required-off", "skill-missing",
-         "plugin-too-old", "repository-required", "unsupported-gate", "unsupported-when", "unsupported-source",
+         "plugin-too-old", "repository-required", "unsupported-gate", "unsupported-when", "unsupported-source", "library-version",
          "unsupported-on-fail", "credential-in-definition"]
 OFF = {"source": "off", "ref": None, "version": None}
 counter, made = [0], [0]
@@ -73,9 +73,17 @@ def plugin_copy(name, catalog=None):
     return root
 
 
+def raised_redo_catalog():
+    catalog = copy.deepcopy(REAL_CATALOG)
+    catalog["contracts"]["local-checks@1"]["maxAutoRedo"] = 8
+    return catalog
+
+
 def roots(which):
     if which == "real":
         return ROOT
+    if which == "raisedRedo":
+        return plugin_copy("plugin-raised-redo", raised_redo_catalog())
     return plugin_copy("plugin-stand-in", stand_in_catalog()) if which == "standIn" else plugin_copy("plugin")
 
 
@@ -305,8 +313,38 @@ def section_catalog():
     module = load()
     real = module.check_catalog(REAL_CATALOG)
     check("the shipped catalog is sound", real == [], real)
-    check("the shipped catalog holds twelve contracts", len(REAL_CATALOG["contracts"]) == 12, list(REAL_CATALOG["contracts"]))
-    check("no shipped contract carries satisfiedBy yet", not any("satisfiedBy" in entry for entry in REAL_CATALOG["contracts"].values()))
+    pinned = {
+        "build": ["claim@1", "start@1", "branch@1", "build@1", "risk-check@1", "local-checks@1", "review@1", "merge@1",
+                  "complete@1", "capture@1", "sync@1"],
+        "plan": ["session-model@1", "plan-orient@1", "plan-ground@1", "plan-discovery@1", "plan-sign-off-record@1",
+                 "plan-draft@1", "plan-draft-approval@1", "plan-create@1", "plan-wire@1", "rationalize-gantt@1",
+                 "plan-number@1", "plan-hand-off@1"],
+        "rebalance": ["session-model@1", "rebalance-gates@1", "plan-ground@1", "rebalance-partition@1", "rebalance-proposal@1",
+                      "rebalance-probe@1", "rebalance-successors@1", "rebalance-rewire@1", "rebalance-renumber@1",
+                      "rebalance-archive@1", "rebalance-marker@1", "rationalize-gantt@1", "rebalance-report@1"],
+    }
+    for name, contracts in pinned.items():
+        shipped = json.load(open(os.path.join(ROOT, "workflows", name + ".json"), encoding="utf-8"))
+        steps = [step["contract"] for phase in shipped["phases"] for step in phase["steps"]]
+        check("the shipped %s workflow names its pinned contracts, in order" % name, steps == contracts, steps)
+    hotfix = json.load(open(os.path.join(ROOT, "workflows", "hotfix.json"), encoding="utf-8"))
+    hotfix_contracts = [step["contract"] for phase in hotfix["phases"] for step in phase["steps"]]
+    release_contracts = set()
+    for name in ("release", "release-cut-to-deploy", "release-merge-and-deploy", "release-docs", "release-notes", "release-post-deploy"):
+        shipped = json.load(open(os.path.join(ROOT, "workflows", name + ".json"), encoding="utf-8"))
+        release_contracts |= set(step["contract"] for phase in shipped["phases"] for step in phase["steps"])
+    standalone = {"custom@1", "splice@1"}
+    expected = set(c for contracts in pinned.values() for c in contracts) | set(hotfix_contracts) | release_contracts | standalone
+    check("the shipped catalog holds the Build, Plan, Rebalance, Hotfix and Release contracts plus custom@1 and splice@1, and nothing else",
+          set(REAL_CATALOG["contracts"]) == expected, sorted(set(REAL_CATALOG["contracts"]) ^ expected))
+    skill = lambda n: REAL_CATALOG["contracts"][n]["builtinSkill"]
+    release_only = sorted(release_contracts - set(hotfix_contracts))
+    check("the Release contracts: 55, every one served by release-steps or an existing seam step",
+          len(release_only) == 55 and all(skill(n) in ("release-steps", "classify-release", "pre-ship", "pre-merge-check", "post-deploy") for n in release_only), release_only)
+    satisfied = {name: entry["satisfiedBy"] for name, entry in REAL_CATALOG["contracts"].items() if "satisfiedBy" in entry}
+    check("the satisfiers shipped: the Hotfix and Rebalance ones, and the production merge and a found merged release for the hotfix merge",
+          satisfied == {"branch@1": ["hotfix-branch@1"], "build@1": ["hotfix-fix@1"], "plan-wire@1": ["rebalance-rewire@1"],
+                        "hotfix-merge@1": ["production-merge@1", "merged-release@1"]}, satisfied)
     standin = module.check_catalog(stand_in_catalog())
     check("the fixture catalog, where stand-in@1 satisfies build@1, is sound", standin == [], standin)
 
@@ -497,7 +535,7 @@ def section_lifecycle():
     wanted = ["claim", "start", "branch", "build", "risk-check", "local-checks", "review", "merge", "complete", "capture", "sync"]
     check("the eleven steps are issued in order, once each", order == wanted, order)
     check("the run finishes completed, with every step's result by contract",
-          final["action"] == "finished" and final["outcome"] == "completed" and set(final["results"]) == set(REAL_CATALOG["contracts"]) - {"custom@1"}
+          final["action"] == "finished" and final["outcome"] == "completed" and set(final["results"]) == set(answer["step"]["contract"] for answer in seen.values())
           and final["results"]["sync@1"] == {"branch": "main", "clean": True}, final)
     check("the last report closes the run as completed", closes(final, "completed"), final["reports"])
     check("done says what it recorded", final["recorded"] == {"stepId": "sync", "attempt": 1, "verdict": "SYNC: CLEAN", "class": "continue", "status": "done"}, final["recorded"])
@@ -796,6 +834,22 @@ def section_proofs():
     check("... and a resume continues it", is_run(answer, "local-checks", 6), answer)
     run.answer = answer
     check("... to the next step once the proof is right", is_run(run.done(), "review", 1))
+
+    # a contract's maxAutoRedo raises the cap for its own step only
+    raised = Driver("raisedRedo")
+    raised.until("local-checks")
+    for attempt_no in range(1, 8):
+        answer = raised.done(**{"proof.tree": "1" * 40})
+        check("maxAutoRedo 8: automatic re-issue %d" % attempt_no, is_run(answer, "local-checks", attempt_no + 1), answer)
+    answer = raised.done(**{"proof.tree": "1" * 40})
+    check("maxAutoRedo 8: the eighth automatic re-issue stops the run", is_stopped(answer, "attempts-exhausted", "local-checks")
+          and "re-issued 7 times" in answer["reason"], answer)
+    runner = load()
+    for bad in (5, 0, 21, True, "8"):
+        catalog = raised_redo_catalog()
+        catalog["contracts"]["local-checks@1"]["maxAutoRedo"] = bad
+        check("a maxAutoRedo of %r is refused by the catalog check" % (bad,), any("maxAutoRedo" in f for f in runner.check_catalog(catalog)), runner.check_catalog(catalog))
+    check("a maxAutoRedo of 8 is a sound catalog", runner.check_catalog(raised_redo_catalog()) == [], runner.check_catalog(raised_redo_catalog()))
 
     # a review proof that names another patch
     answer = run.done(**{"proof.patchId": "2" * 40})
@@ -1392,16 +1446,18 @@ def section_static():
     check("the runner imports no network module", not set(imported) & {"socket", "http", "urllib", "ssl", "ftplib", "smtplib", "xmlrpc", "asyncio", "requests"}
           and not re.search(r"\b(socket|urllib|http\.client|ssl|requests)\b", source))
     helpers = re.findall(r'for name in \(([^)]*)\):\n\s+spec = importlib\.util\.spec_from_file_location', source)
-    check("the two helpers are loaded by file path, and nothing else is", helpers == ['"workflow_report", "claim_record"'] and source.count("spec_from_file_location") == 1 and "__import__" not in source, helpers)
+    check("the two helpers and the library skill cache are loaded by file path, and nothing else is",
+          helpers == ['"workflow_report", "claim_record"'] and source.count("spec_from_file_location") == 2
+          and 'spec_from_file_location("library_skill", LIBRARY_PATH)' in source and "__import__" not in source, helpers)
     started = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name) and n.func.value.id == "subprocess"]
     check("one place starts a process, and it starts git", len(started) == 1 and started[0].func.attr == "run" and ast.get_source_segment(source, started[0].args[0]).startswith('["git", "-C", cwd]')
           and "os.system" not in source and "os.popen" not in source and "os.exec" not in source and "os.spawn" not in source, len(started))
     calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "git"]
     named = [n.args[1].value if len(n.args) > 1 and isinstance(n.args[1], ast.Constant) else None for n in calls]
     check("every git command the runner runs is read-only (%s)" % " ".join(sorted(set(str(n) for n in named))),
-          len(calls) >= 4 and set(named) <= {"rev-parse", "diff", "patch-id"}, named)
+          len(calls) >= 4 and set(named) <= {"rev-parse", "diff", "patch-id", "ls-tree", "cat-file"}, named)
     module = load()
-    check("... and the one place refuses any other", module.GIT_READ_ONLY == ("rev-parse", "diff", "patch-id"))
+    check("... and the one place refuses any other", module.GIT_READ_ONLY == ("rev-parse", "diff", "patch-id", "ls-tree", "cat-file"))
     for command in (("commit", "-m", "x"), ("push",), ("fetch",), ("checkout", "main"), ("reset", "--hard"), ()):
         try:
             module.run_git(WORK, *command)

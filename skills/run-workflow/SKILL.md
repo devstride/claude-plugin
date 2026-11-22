@@ -18,7 +18,9 @@ runner says: it never chooses, reorders, skips or judges a step itself.
 first command, and again after a compaction**: the commands and their answers, the stop kinds and
 what a person does about each, and the reporting rule are there. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-contracts.md` in full before writing
-or changing a definition**: what `start` refuses, payloads and proofs.
+or changing a definition**: what `start` refuses, payloads and proofs. A `fetch-skill` answer, or a
+step run from the organization's skill library:
+`${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/library-skills.md`.
 
 ## The loop
 
@@ -27,15 +29,16 @@ with one JSON object on stdin (a file or a here-document, never inside quotes) a
 stdout. Exit 2 is a refusal: say its one line in plain words and stop; nothing has changed. Exit 1
 means the runner itself failed: say its line and stop, without retrying.
 
-1. **Resolve the definition**: `${CLAUDE_PLUGIN_ROOT}/workflows/<workflow id>.json`. No such file:
-   say so and stop.
-2. **`start`** with that path as `definitionFile` and a `context` holding every key the
+1. **Resolve the definition**: `${CLAUDE_PLUGIN_ROOT}/workflows/<workflow id>.json`, and fetch the
+   organization's (`references/fetching-the-workflow.md`). Neither applies to the trigger: say
+   "No workflow applies to this work." and stop.
+2. **`start`** with that path as `definitionFile`, the answer as `fetched`, and a `context` holding `trigger` and every key the
    reference's Commands section lists (`mode` is a story-claim mode, `named` for a named item).
    This skill resolves none of them: the person starting the run supplies them, and a missing one is
    refused (`context-missing`).
 3. **For each `run` answer**: send its heartbeat (the phase to the story claim, the ship-intent
    request to the ship-intent helper; skip whichever is null), invoke the named skill through the
-   Skill tool with `argument` unchanged (plus ` answer: <it>` when the payload carries a person's
+   Skill tool with `argument` unchanged (`skill` null: follow `instructions.text` as that skill) (plus ` answer: <it>` when the payload carries a person's
    `answer` and the argument does not), then call `done` with `stepId` (the step's `id`),
    `attempt` and `output` (that skill's WHOLE final answer). Its answer is the next action.
 4. **Send `reports`** in order exactly as

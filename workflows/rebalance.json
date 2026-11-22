@@ -1,0 +1,267 @@
+{
+  "schema": 1,
+  "id": "rebalance",
+  "version": 1,
+  "name": "Rebalance",
+  "startsWhen": "on-demand",
+  "endsBy": null,
+  "appliesTo": {
+    "workTypes": [],
+    "tags": [],
+    "repositories": []
+  },
+  "minPluginVersion": "4.8.0",
+  "phases": [
+    {
+      "id": "safety",
+      "name": "Safety gates",
+      "steps": [
+        {
+          "id": "session-check",
+          "name": "Check the session's model",
+          "summary": "Check the session's model against the role this workflow wants, and only report it.",
+          "contract": "session-model@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "gates",
+          "name": "Check nothing else is writing",
+          "summary": "Check that nothing else is writing to the plan and the arguments are whole.",
+          "contract": "rebalance-gates@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "read",
+      "name": "Read and partition",
+      "steps": [
+        {
+          "id": "ground",
+          "name": "Read the plan as it stands",
+          "summary": "Read what the plan already holds, read-only.",
+          "contract": "plan-ground@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "comprehend-plan",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "partition",
+          "name": "Find what may be re-sliced",
+          "summary": "Separate the leaves that may be re-sliced from the ones that are untouchable.",
+          "contract": "rebalance-partition@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "propose",
+      "name": "Propose",
+      "steps": [
+        {
+          "id": "propose",
+          "name": "Agree the re-slice",
+          "summary": "Propose the merges or splits and wait for 'yes, rebalance'.",
+          "contract": "rebalance-proposal@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "write",
+      "name": "Write in the safe order",
+      "steps": [
+        {
+          "id": "scheduler-probe",
+          "name": "Probe the auto-scheduler",
+          "summary": "Prove the auto-scheduler will not overwrite what the rebalance writes.",
+          "contract": "rebalance-probe@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "create-successors",
+          "name": "Create the successors",
+          "summary": "Create each merged story with the original specs preserved.",
+          "contract": "rebalance-successors@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "rewire",
+          "name": "Move the edges",
+          "summary": "Move every absorbed item's edges to its successor, adding before removing.",
+          "contract": "rebalance-rewire@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "renumber",
+          "name": "Number the successors",
+          "summary": "Give each successor the number slot of its first absorbed item.",
+          "contract": "rebalance-renumber@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "archive-originals",
+          "name": "Archive the originals",
+          "summary": "Archive the originals only after their successors have edges.",
+          "contract": "rebalance-archive@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "rewrite-marker",
+          "name": "Rewrite the profile line",
+          "summary": "Rewrite the plan root's delivery profile line, and only that line.",
+          "contract": "rebalance-marker@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "redate",
+          "name": "Date the plan again",
+          "summary": "Date the plan from its dependency graph, with the auto-scheduler off.",
+          "contract": "rationalize-gantt@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "rationalize-gantt",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "report",
+      "name": "Report",
+      "steps": [
+        {
+          "id": "report",
+          "name": "Report the re-slice",
+          "summary": "Report the re-sliced plan and the next item the build loop will pick.",
+          "contract": "rebalance-report@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "plan-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    }
+  ]
+}

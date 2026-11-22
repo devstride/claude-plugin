@@ -12,7 +12,7 @@ each step's answer to, for whoever writes or changes a definition
 ## What `start` refuses
 
 `bad-schema` (a field the definition schema requires is missing, of the wrong type or past its
-limit: at most 12 phases, 40 steps in a phase, 100 in all), `credential-in-definition` (a string
+limit: at most 12 phases, 40 steps in a phase, 250 in all), `credential-in-definition` (a string
 that looks like a credential, anywhere in it, named by where it is, never echoed),
 `duplicate-step-id`, `plugin-too-old` (the definition needs a newer plugin), `unknown-contract`,
 `unknown-contract-major`, `requires-missing` and `requires-not-earlier` (a contract's required step
@@ -21,7 +21,8 @@ changes then nothing would check), `required-not-always`, `required-not-stop` an
 (the step that provides a required contract must always run, must stop the run when it fails and
 cannot be switched off), `unsupported-gate`, `unsupported-when`, `unsupported-source` and
 `unsupported-on-fail` (features this plugin does not run: a gate, a conditional or manual step, a
-library or repository skill, a step that carries on after a failure), `skill-missing` (a step names
+built-in source for a contract with no built-in skill, a step that carries on after a failure),
+`library-version` (a library skill step must pin a version), `skill-missing` (a step names
 a skill this plugin does not have) and `repository-required` (a contract bound to the tree, the patch or the
 story, outside a git work tree). Required steps come only from each contract's `requires` list in
 the catalog, so a renamed or re-sourced step is covered whatever skill runs it: a workflow can

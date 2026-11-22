@@ -1,0 +1,891 @@
+{
+  "schema": 1,
+  "id": "release-cut-to-deploy",
+  "version": 1,
+  "name": "Release (clearance from cut to deploy)",
+  "startsWhen": "on-demand",
+  "endsBy": null,
+  "appliesTo": {
+    "workTypes": [],
+    "tags": [],
+    "repositories": []
+  },
+  "minPluginVersion": "4.8.0",
+  "phases": [
+    {
+      "id": "start",
+      "name": "Claim and orient",
+      "steps": [
+        {
+          "id": "train-claim",
+          "name": "Claim the release train",
+          "summary": "Claim the release train so only one session runs it.",
+          "contract": "train-claim@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "ground-truth",
+          "name": "Read ground truth",
+          "summary": "Fetch both branches and read what other sessions landed.",
+          "contract": "ground-truth@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "release-shape",
+          "name": "Read the release shape",
+          "summary": "Say whether this release is new, an open release to adopt, or a merged one to close out.",
+          "contract": "release-shape@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "ci-hold-proof",
+          "name": "Prove the CI hold",
+          "summary": "Prove pull-request CI waits for the ready flip before a release opens.",
+          "contract": "ci-hold-proof@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "train",
+      "name": "Merge the release train",
+      "steps": [
+        {
+          "id": "train-finish-earlier",
+          "name": "Finish the earlier train",
+          "summary": "Finish the items an earlier merged release train carried.",
+          "contract": "train-finish@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "ship-plan",
+          "name": "Gather the ship plan",
+          "summary": "Wait a bounded time for work a peer says is nearly ready for the train.",
+          "contract": "ship-plan@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "train-snapshot",
+          "name": "Snapshot the release train",
+          "summary": "Cut a snapshot of the release train merged with the release source.",
+          "contract": "train-snapshot@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "train-pr",
+          "name": "Open the train pull request",
+          "summary": "Open the release train's pull request into the release source.",
+          "contract": "train-pr@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "train-review",
+          "name": "Review the train",
+          "summary": "Review what no landing receipt covers on the train pull request.",
+          "contract": "train-review@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "train-pre-ship",
+          "name": "Pre-ship checks on the train",
+          "summary": "Run the local pre-ship checks the train needs.",
+          "contract": "train-pre-ship@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "pre-ship",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "train-merge",
+          "name": "Merge the train",
+          "summary": "Merge the train pull request through the merge gate, never a push.",
+          "contract": "train-merge@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "train-close-out",
+          "name": "Close out the train",
+          "summary": "Mark the one-offs the train carried as reached.",
+          "contract": "train-close-out@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "train-level",
+          "name": "Level the train",
+          "summary": "Bring the release train level with the release source.",
+          "contract": "train-level@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "cut",
+      "name": "Cut the release branch",
+      "steps": [
+        {
+          "id": "release-delta",
+          "name": "Work out the release delta",
+          "summary": "Work out what the release carries and check its holds.",
+          "contract": "release-delta@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "classify-release",
+          "name": "Classify the release",
+          "summary": "Say whether the release is light or full; anything unclear is full.",
+          "contract": "classify-release@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "classify-release",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "tower-claim",
+          "name": "Claim release clearance",
+          "summary": "Claim release clearance from the tower, waiting while another release holds it.",
+          "contract": "tower-claim@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "cut-branch",
+          "name": "Cut the release branch",
+          "summary": "Cut the protected release branch from the release source.",
+          "contract": "release-branch@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "train-claim-hand-on",
+          "name": "Hand on the train claim",
+          "summary": "Hand the train claim on once the cut exists so the next release can start.",
+          "contract": "train-claim-hand-on@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "open-release-pr",
+          "name": "Open the release pull request",
+          "summary": "Open the release pull request into production as a draft.",
+          "contract": "release-pr@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "name": "Review and settle",
+      "steps": [
+        {
+          "id": "release-review",
+          "name": "Review the release",
+          "summary": "Run the full production-release review and settle it.",
+          "contract": "release-review@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "classify-at-pre-ship",
+          "name": "Classify before the pre-ship checks",
+          "summary": "Classify the release again at the reviewed head before the pre-ship checks.",
+          "contract": "classify-at-pre-ship@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "classify-release",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "pre-ship-release",
+          "name": "Run the pre-ship checks",
+          "summary": "Run the release's pre-ship checks at the reviewed head.",
+          "contract": "pre-ship-release@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "pre-ship",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "discharge-hold",
+          "name": "Discharge the pre-ship hold",
+          "summary": "Discharge the review's pre-ship hold, which flips the pull request ready once.",
+          "contract": "pre-ship-resume@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "docs-plan",
+          "name": "Plan the documentation",
+          "summary": "Plan which documentation hooks run after the deploy is confirmed.",
+          "contract": "release-docs-plan@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "go-ahead",
+      "name": "Owner go-ahead",
+      "steps": [
+        {
+          "id": "hotfix-catch-up",
+          "name": "Catch up with any hotfix",
+          "summary": "Merge a hotfix that reached production into the release branch.",
+          "contract": "hotfix-catch-up@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "previous-release-gate",
+          "name": "Check the previous release",
+          "summary": "Check the previous release's post-deploy status before merging.",
+          "contract": "previous-release@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "pre-merge-check",
+          "name": "Pre-merge check",
+          "summary": "Ask whether production needs anything before the merge.",
+          "contract": "pre-merge-check@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "pre-merge-check",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "dev-deploy-before-decision",
+          "name": "Wait for the staging deploy before the decision",
+          "summary": "Wait for the staging deploy of the release commit to be serving.",
+          "contract": "dev-deploy-wait@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "go-ahead",
+          "name": "Owner go-ahead",
+          "summary": "Show the recap and take the owner's yes or the standing yes before the production merge.",
+          "contract": "owner-go-ahead@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "previous-release-recheck",
+          "name": "Check the previous release again",
+          "summary": "Check the previous release's post-deploy status before merging.",
+          "contract": "previous-release@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "dev-deploy-after-yes",
+          "name": "Wait for the staging deploy after the yes",
+          "summary": "Wait for the staging deploy of the release commit to be serving.",
+          "contract": "dev-deploy-wait@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "merge-confirmations",
+          "name": "Confirm before the merge",
+          "summary": "Confirm the head, CI, pre-ship results, threads and tower before the merge.",
+          "contract": "merge-confirmations@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "production-merge",
+          "name": "Merge to production",
+          "summary": "Merge the release into production through the merge gate, never a push.",
+          "contract": "production-merge@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "deploy",
+      "name": "Deploy and hand back",
+      "steps": [
+        {
+          "id": "approve-deploy",
+          "name": "Approve the deploy",
+          "summary": "Approve the production deploy of the merge commit where approval is configured.",
+          "contract": "deploy-approval@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "confirm-deploy",
+          "name": "Confirm the deploy",
+          "summary": "Confirm the production deploy of the merge commit finished.",
+          "contract": "deploy-confirm@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "hotfix-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "score-estimates",
+          "name": "Score estimates",
+          "summary": "Score the estimates the shipped items carried.",
+          "contract": "estimates-score@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    },
+    {
+      "id": "close-out",
+      "name": "Health check and close-out",
+      "steps": [
+        {
+          "id": "sync-production",
+          "name": "Sync production back",
+          "summary": "Sync production back into the release source.",
+          "contract": "release-sync@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "delete-release-branch",
+          "name": "Delete the release branch",
+          "summary": "Delete the release branch once both branches contain it.",
+          "contract": "release-branch-delete@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "train-level-final",
+          "name": "Level the train at the end",
+          "summary": "Bring the release train level with the release source.",
+          "contract": "train-level@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "post-pending-status",
+          "name": "Post the pending status",
+          "summary": "Post the pending post-deploy status on the merge commit.",
+          "contract": "post-deploy-pending@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "tower-hand-back",
+          "name": "Hand back the tower",
+          "summary": "Hand release clearance back to the tower, naming what is still owed.",
+          "contract": "tower-hand-back@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "post-deploy-check",
+          "name": "Post-deploy health check",
+          "summary": "Run the post-deploy health check.",
+          "contract": "post-deploy-check@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "post-deploy",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "post-deploy-status",
+          "name": "Post the health result",
+          "summary": "Post the health check's result as the release/post-deploy status.",
+          "contract": "post-deploy-result@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "update-docs",
+          "name": "Update documentation",
+          "summary": "Publish documentation for the shipped release and settle the docs owed item.",
+          "contract": "release-docs@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "sync-knowledge-base",
+          "name": "Sync the knowledge base",
+          "summary": "Refresh the knowledge base after documentation was published.",
+          "contract": "release-kb-sync@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "post-deploy-close-out",
+          "name": "Close out the release",
+          "summary": "Run the post-deploy close-out when the health check said one is owed.",
+          "contract": "release-close-out@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "write-release-notes",
+          "name": "Write release notes",
+          "summary": "Write release notes, only when they were asked for.",
+          "contract": "release-notes@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "release-recap",
+          "name": "Recap the release",
+          "summary": "Write the plain-language recap of the release.",
+          "contract": "release-recap@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        },
+        {
+          "id": "auto-start-next",
+          "name": "Decide the next release",
+          "summary": "Decide whether the next release starts now.",
+          "contract": "auto-start@1",
+          "kind": "step",
+          "run": {
+            "source": "builtin",
+            "ref": "release-steps",
+            "version": null
+          },
+          "when": {
+            "mode": "always",
+            "condition": null
+          },
+          "onFail": "stop"
+        }
+      ]
+    }
+  ]
+}

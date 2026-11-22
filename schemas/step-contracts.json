@@ -12,16 +12,44 @@
       "verdict": {
         "label": "CLAIM",
         "values": [
-          { "value": "WON", "detail": "none", "class": "continue" },
-          { "value": "RENEWED", "detail": "none", "class": "continue" },
-          { "value": "TOOK OVER", "detail": "none", "class": "continue" },
-          { "value": "HELD", "detail": "required", "class": "end:held", "detailName": "holder" },
-          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
-          { "value": "DEGRADED", "detail": "optional", "class": "skipped", "detailName": "reason" }
+          {
+            "value": "WON",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "RENEWED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "TOOK OVER",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "HELD",
+            "detail": "required",
+            "class": "end:held",
+            "detailName": "holder"
+          },
+          {
+            "value": "NOT CONFIGURED",
+            "detail": "none",
+            "class": "skipped"
+          },
+          {
+            "value": "DEGRADED",
+            "detail": "optional",
+            "class": "skipped",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["state"],
+        "required": [
+          "state"
+        ],
         "types": {
           "state": "string",
           "heldBy": "string",
@@ -47,13 +75,31 @@
       "verdict": {
         "label": "START",
         "values": [
-          { "value": "MOVED", "detail": "optional", "class": "continue", "detailName": "status" },
-          { "value": "UNCHANGED", "detail": "none", "class": "continue" },
-          { "value": "FAILED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "MOVED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "status"
+          },
+          {
+            "value": "UNCHANGED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["statusBefore", "statusAfter", "boardPlaced"],
+        "required": [
+          "statusBefore",
+          "statusAfter",
+          "boardPlaced"
+        ],
         "types": {
           "statusBefore": "string",
           "statusAfter": "string",
@@ -78,13 +124,32 @@
       "verdict": {
         "label": "BRANCH",
         "values": [
-          { "value": "CREATED", "detail": "optional", "class": "continue", "detailName": "branch" },
-          { "value": "EXISTS", "detail": "optional", "class": "continue", "detailName": "branch" },
-          { "value": "REFUSED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "CREATED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "branch"
+          },
+          {
+            "value": "EXISTS",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "branch"
+          },
+          {
+            "value": "REFUSED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["branch", "base", "created"],
+        "required": [
+          "branch",
+          "base",
+          "created"
+        ],
         "types": {
           "branch": "string",
           "base": "string",
@@ -96,7 +161,10 @@
       },
       "requires": [],
       "claimPhase": "Branch",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "satisfiedBy": [
+        "hotfix-branch@1"
+      ]
     },
     "build@1": {
       "summary": "Build the item on its branch and hand back what was deferred, changed or dismissed.",
@@ -113,13 +181,34 @@
       "verdict": {
         "label": "BUILD",
         "values": [
-          { "value": "READY", "detail": "none", "class": "continue" },
-          { "value": "NEEDS DECISION", "detail": "required", "class": "ask", "detailName": "question" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "READY",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "NEEDS DECISION",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "question"
+          },
+          {
+            "value": "BLOCKED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["deferrals", "deviations", "untrackedDeferrals", "dismissed", "scopeLine", "head"],
+        "required": [
+          "deferrals",
+          "deviations",
+          "untrackedDeferrals",
+          "dismissed",
+          "scopeLine",
+          "head"
+        ],
         "types": {
           "deferrals": "array",
           "deviations": "array",
@@ -132,15 +221,20 @@
       "proof": {
         "binding": "none"
       },
-      "requires": ["branch@1"],
+      "requires": [
+        "branch@1"
+      ],
       "claimPhase": "Build",
-      "shipIntentStage": "building"
+      "shipIntentStage": "building",
+      "satisfiedBy": [
+        "hotfix-fix@1"
+      ]
     },
     "risk-check@1": {
       "summary": "Check the finished build for the risks its changes carry, and fix or raise what it finds.",
       "builtinSkill": "risk-check",
       "payload": {
-        "item": "context.item",
+        "item": "context.item?",
         "profile": "context.profile.name",
         "reviewMoment": "context.reviewMoment",
         "workingBase": "context.workingBase",
@@ -154,14 +248,39 @@
       "verdict": {
         "label": "RISK CHECK",
         "values": [
-          { "value": "CLEAR", "detail": "none", "class": "continue" },
-          { "value": "FIXED", "detail": "optional", "class": "continue", "detailName": "count" },
-          { "value": "NEEDS DECISION", "detail": "required", "class": "ask", "detailName": "question" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "CLEAR",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FIXED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "count"
+          },
+          {
+            "value": "NEEDS DECISION",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "question"
+          },
+          {
+            "value": "BLOCKED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["ledger", "report", "counts", "untrackedDeferrals", "dismissed"],
+        "required": [
+          "ledger",
+          "report",
+          "counts",
+          "untrackedDeferrals",
+          "dismissed"
+        ],
         "types": {
           "ledger": "string",
           "report": "string",
@@ -175,7 +294,13 @@
       },
       "proof": {
         "binding": "story",
-        "required": ["base", "head", "triggers", "verifiers", "lenses"],
+        "required": [
+          "base",
+          "head",
+          "triggers",
+          "verifiers",
+          "lenses"
+        ],
         "types": {
           "base": "string",
           "head": "string",
@@ -184,7 +309,9 @@
           "lenses": "array"
         }
       },
-      "requires": ["build@1"],
+      "requires": [
+        "build@1"
+      ],
       "claimPhase": "STORY RISK CHECK",
       "shipIntentStage": null
     },
@@ -192,7 +319,7 @@
       "summary": "Run the repository's local checks on the final tree and leave a receipt.",
       "builtinSkill": "local-checks",
       "payload": {
-        "item": "context.item",
+        "item": "context.item?",
         "profile": "context.profile.name",
         "workingBase": "context.workingBase",
         "route": "context.route",
@@ -205,13 +332,40 @@
       "verdict": {
         "label": "LOCAL CHECKS",
         "values": [
-          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "count", "proof": { "kind": "receipt" } },
-          { "value": "NOT CONFIGURED", "detail": "none", "class": "continue", "proof": { "kind": "none-configured" } },
-          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "checks" }
+          {
+            "value": "PASS",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "count",
+            "proof": {
+              "kind": "receipt"
+            }
+          },
+          {
+            "value": "NOT CONFIGURED",
+            "detail": "none",
+            "class": "continue",
+            "proof": {
+              "kind": "none-configured"
+            }
+          },
+          {
+            "value": "FAIL",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "checks"
+          }
         ]
       },
       "result": {
-        "required": ["commands", "results", "receipt", "tree", "head", "skippedSuites"],
+        "required": [
+          "commands",
+          "results",
+          "receipt",
+          "tree",
+          "head",
+          "skippedSuites"
+        ],
         "types": {
           "commands": "array",
           "results": "array",
@@ -223,7 +377,12 @@
       },
       "proof": {
         "binding": "tree",
-        "required": ["kind", "tree", "head", "receipt"],
+        "required": [
+          "kind",
+          "tree",
+          "head",
+          "receipt"
+        ],
         "types": {
           "kind": "string",
           "tree": "string",
@@ -231,10 +390,15 @@
           "receipt": "string|null"
         },
         "values": {
-          "kind": ["receipt", "none-configured"]
+          "kind": [
+            "receipt",
+            "none-configured"
+          ]
         }
       },
-      "requires": ["risk-check@1"],
+      "requires": [
+        "risk-check@1"
+      ],
       "claimPhase": "Verify",
       "shipIntentStage": "verifying"
     },
@@ -242,7 +406,7 @@
       "summary": "Review the change with the configured reviewers and settle every finding.",
       "builtinSkill": "review-story",
       "payload": {
-        "item": "context.item",
+        "item": "context.item?",
         "profile": "context.profile.name",
         "reviewMoment": "context.reviewMoment",
         "workingBase": "context.workingBase",
@@ -256,13 +420,34 @@
       "verdict": {
         "label": "REVIEW",
         "values": [
-          { "value": "SETTLED", "detail": "none", "class": "continue" },
-          { "value": "COVERED", "detail": "optional", "class": "continue", "detailName": "reason" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "SETTLED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "COVERED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "reason"
+          },
+          {
+            "value": "BLOCKED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["path", "cycles", "untrackedDeferrals", "dismissed", "pullRequest", "mergeBody"],
+        "required": [
+          "path",
+          "cycles",
+          "untrackedDeferrals",
+          "dismissed",
+          "pullRequest",
+          "mergeBody"
+        ],
         "types": {
           "path": "string",
           "cycles": "count",
@@ -276,7 +461,12 @@
       },
       "proof": {
         "binding": "patch",
-        "required": ["path", "head", "base", "patchId"],
+        "required": [
+          "path",
+          "head",
+          "base",
+          "patchId"
+        ],
         "types": {
           "path": "string",
           "head": "string",
@@ -285,10 +475,16 @@
           "pullRequest": "count|null"
         },
         "values": {
-          "path": ["fast-local", "pull-request"]
+          "path": [
+            "fast-local",
+            "pull-request"
+          ]
         }
       },
-      "requires": ["risk-check@1", "local-checks@1"],
+      "requires": [
+        "risk-check@1",
+        "local-checks@1"
+      ],
       "claimPhase": "Review",
       "shipIntentStage": "reviewing"
     },
@@ -312,14 +508,38 @@
       "verdict": {
         "label": "MERGE",
         "values": [
-          { "value": "LANDED", "detail": "optional", "class": "continue", "detailName": "target" },
-          { "value": "REFRESHED", "detail": "none", "class": "redo:self" },
-          { "value": "HELD", "detail": "optional", "class": "end:held", "detailName": "reason" },
-          { "value": "BLOCKED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "LANDED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "target"
+          },
+          {
+            "value": "REFRESHED",
+            "detail": "none",
+            "class": "redo:self"
+          },
+          {
+            "value": "HELD",
+            "detail": "optional",
+            "class": "end:held",
+            "detailName": "reason"
+          },
+          {
+            "value": "BLOCKED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["target", "sha", "pullRequest", "deletedBranch"],
+        "required": [
+          "target",
+          "sha",
+          "pullRequest",
+          "deletedBranch"
+        ],
         "types": {
           "target": "string",
           "sha": "string",
@@ -329,12 +549,18 @@
       },
       "proof": {
         "binding": "none",
-        "required": ["head"],
+        "required": [
+          "head"
+        ],
         "types": {
           "head": "string"
         }
       },
-      "requires": ["review@1", "local-checks@1", "risk-check@1"],
+      "requires": [
+        "review@1",
+        "local-checks@1",
+        "risk-check@1"
+      ],
       "claimPhase": "Merge",
       "shipIntentStage": "landing"
     },
@@ -358,13 +584,35 @@
       "verdict": {
         "label": "COMPLETE",
         "values": [
-          { "value": "DONE", "detail": "none", "class": "continue" },
-          { "value": "LANDED", "detail": "none", "class": "continue" },
-          { "value": "FAILED", "detail": "optional", "class": "stop", "detailName": "reason" }
+          {
+            "value": "DONE",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "LANDED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
         ]
       },
       "result": {
-        "required": ["status", "statusName", "startDate", "dueDate", "pullRequest", "asBuilt", "claimReleased", "shipIntentReleased"],
+        "required": [
+          "status",
+          "statusName",
+          "startDate",
+          "dueDate",
+          "pullRequest",
+          "asBuilt",
+          "claimReleased",
+          "shipIntentReleased"
+        ],
         "types": {
           "status": "string",
           "statusName": "string|null",
@@ -379,7 +627,9 @@
       "proof": {
         "binding": "none"
       },
-      "requires": ["merge@1"],
+      "requires": [
+        "merge@1"
+      ],
       "claimPhase": "Completion ritual",
       "shipIntentStage": null
     },
@@ -397,12 +647,24 @@
       "verdict": {
         "label": "FINDINGS",
         "values": [
-          { "value": "FILED", "detail": "optional", "class": "continue", "detailName": "items" },
-          { "value": "NONE", "detail": "none", "class": "continue" }
+          {
+            "value": "FILED",
+            "detail": "optional",
+            "class": "continue",
+            "detailName": "items"
+          },
+          {
+            "value": "NONE",
+            "detail": "none",
+            "class": "continue"
+          }
         ]
       },
       "result": {
-        "required": ["filed", "inserted"],
+        "required": [
+          "filed",
+          "inserted"
+        ],
         "types": {
           "filed": "array",
           "inserted": "array"
@@ -411,7 +673,9 @@
       "proof": {
         "binding": "none"
       },
-      "requires": ["complete@1"],
+      "requires": [
+        "complete@1"
+      ],
       "claimPhase": null,
       "shipIntentStage": null
     },
@@ -425,12 +689,24 @@
       "verdict": {
         "label": "SYNC",
         "values": [
-          { "value": "CLEAN", "detail": "none", "class": "continue" },
-          { "value": "DIRTY", "detail": "optional", "class": "stop", "detailName": "paths" }
+          {
+            "value": "CLEAN",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "DIRTY",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "paths"
+          }
         ]
       },
       "result": {
-        "required": ["branch", "clean"],
+        "required": [
+          "branch",
+          "clean"
+        ],
         "types": {
           "branch": "string",
           "clean": "boolean"
@@ -439,7 +715,9 @@
       "proof": {
         "binding": "none"
       },
-      "requires": ["complete@1"],
+      "requires": [
+        "complete@1"
+      ],
       "claimPhase": null,
       "shipIntentStage": null
     },
@@ -451,9 +729,21 @@
       "verdict": {
         "label": "STEP",
         "values": [
-          { "value": "PASS", "detail": "none", "class": "continue" },
-          { "value": "FAIL", "detail": "none", "class": "stop" },
-          { "value": "HOLD", "detail": "none", "class": "end:held" }
+          {
+            "value": "PASS",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAIL",
+            "detail": "none",
+            "class": "stop"
+          },
+          {
+            "value": "HOLD",
+            "detail": "none",
+            "class": "end:held"
+          }
         ]
       },
       "result": {
@@ -465,6 +755,3281 @@
       },
       "requires": [],
       "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-preflight@1": {
+      "summary": "Check the working tree and name the hotfix branch from the repository's config.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branchArgument": "context.branchArgument",
+        "itemNumber": "context.itemNumber?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX PREFLIGHT",
+        "values": [
+          { "value": "READY", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "DIRTY", "detail": "none", "class": "ask" },
+          { "value": "NEEDS INPUT", "detail": "required", "class": "ask", "detailName": "what" },
+          { "value": "FAILED", "detail": "required", "class": "stop", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["branch", "base", "prefix", "date", "dateFormat", "configSource"],
+        "types": {
+          "branch": "string",
+          "base": "string",
+          "prefix": "string",
+          "date": "string",
+          "dateFormat": "string",
+          "configSource": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-branch@1": {
+      "summary": "Cut the hotfix branch from the production branch and push it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-preflight@1.branch",
+        "base": "result:hotfix-preflight@1.base",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX BRANCH",
+        "values": [
+          { "value": "CUT", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "FAILED", "detail": "required", "class": "stop", "detailName": "step" }
+        ]
+      },
+      "result": {
+        "required": ["branch", "base", "baseSha", "pushed", "shipIntent"],
+        "types": {
+          "branch": "string",
+          "base": "string",
+          "baseSha": "string",
+          "pushed": "boolean",
+          "shipIntent": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-preflight@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-stage@1": {
+      "summary": "Name the environment this checkout deploys to, and stop before touching a production one.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX STAGE",
+        "values": [
+          { "value": "NAMED", "detail": "required", "class": "continue", "detailName": "stage" },
+          { "value": "NONE", "detail": "none", "class": "continue" },
+          { "value": "PRODUCTION", "detail": "required", "class": "ask", "detailName": "stage" },
+          { "value": "DECLINED", "detail": "required", "class": "end:environment-declined", "detailName": "stage" }
+        ]
+      },
+      "result": {
+        "required": ["stage", "production"],
+        "types": {
+          "stage": "string|null",
+          "production": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-branch@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-environment@1": {
+      "summary": "Bring the local environment back to production code: a backward transition.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "stage": "result:hotfix-stage@1.stage",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX ENVIRONMENT",
+        "values": [
+          { "value": "RECREATED", "detail": "none", "class": "continue" },
+          { "value": "MIGRATED", "detail": "none", "class": "continue" },
+          { "value": "UNCHANGED", "detail": "none", "class": "continue" },
+          { "value": "NEEDS ANSWER", "detail": "required", "class": "ask", "detailName": "why" },
+          { "value": "FAILED", "detail": "required", "class": "stop", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["case", "mode", "why", "restartDevServer"],
+        "types": {
+          "case": "number|null",
+          "mode": "string|null",
+          "why": "string",
+          "restartDevServer": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-stage@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-report@1": {
+      "summary": "Report the cut in one line and say what comes next.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "environment": "result:hotfix-environment@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX CUT",
+        "values": [
+          { "value": "DONE", "detail": "required", "class": "continue", "detailName": "branch" }
+        ]
+      },
+      "result": {
+        "required": ["branch", "case"],
+        "types": {
+          "branch": "string",
+          "case": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-environment@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-fix@1": {
+      "summary": "Make the smallest change that fixes the production problem, then commit and push it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch",
+        "base": "result:hotfix-branch@1.base",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX FIX",
+        "values": [
+          { "value": "COMMITTED", "detail": "required", "class": "continue", "detailName": "sha" },
+          { "value": "NEEDS DIRECTION", "detail": "required", "class": "ask", "detailName": "what" },
+          { "value": "ABANDONED", "detail": "none", "class": "end:abandoned" }
+        ]
+      },
+      "result": {
+        "required": ["commit", "deferrals", "deviations", "untrackedDeferrals", "dismissed", "scopeLine", "head"],
+        "types": {
+          "commit": "string",
+          "deferrals": "array",
+          "deviations": "array",
+          "untrackedDeferrals": "array",
+          "dismissed": "array",
+          "scopeLine": "string",
+          "head": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-report@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-merge@1": {
+      "summary": "Merge the reviewed hotfix pull request into the production branch, only on the person's yes.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "branch": "result:hotfix-branch@1.branch?",
+        "base": "result:hotfix-branch@1.base?",
+        "review": "result:review@1",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX MERGE",
+        "values": [
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "sha" },
+          { "value": "WAITING FOR YES", "detail": "none", "class": "ask" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["sha", "pullRequest"],
+        "types": {
+          "sha": "string",
+          "pullRequest": "number|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["review@1", "local-checks@1", "risk-check@1"],
+      "claimPhase": null,
+      "shipIntentStage": null,
+      "satisfiedBy": ["production-merge@1", "merged-release@1"]
+    },
+    "deploy-approval@1": {
+      "summary": "Approve the production deploy of one merge, only on the person's yes for that merge.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "mergeSha": "result:hotfix-merge@1.sha",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "DEPLOY APPROVAL",
+        "values": [
+          { "value": "APPROVED", "detail": "none", "class": "continue" },
+          { "value": "WAITING FOR YES", "detail": "none", "class": "ask" },
+          { "value": "RETRY", "detail": "none", "class": "redo:self" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "STOPPED", "detail": "required", "class": "stop", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["mergeSha", "approved"],
+        "types": {
+          "mergeSha": "string",
+          "approved": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-merge@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "deploy-confirm@1": {
+      "summary": "Confirm production serves the merge, or ask the person to confirm it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "mergeSha": "result:hotfix-merge@1.sha",
+        "needed": "context.deployConfirmNeeded?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "DEPLOY",
+        "values": [
+          { "value": "CONFIRMED", "detail": "required", "class": "continue", "detailName": "sha" },
+          { "value": "UNCONFIRMED", "detail": "none", "class": "stop" },
+          { "value": "OWNER TO CONFIRM", "detail": "none", "class": "ask" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["mergeCommit", "confirmedAt"],
+        "types": {
+          "mergeCommit": "string",
+          "confirmedAt": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-merge@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "hotfix-close@1": {
+      "summary": "Close out the hotfix and say whether an open release branch must take it.",
+      "builtinSkill": "hotfix-steps",
+      "payload": {
+        "mergeSha": "result:hotfix-merge@1.sha",
+        "base": "result:hotfix-branch@1.base?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX CLOSED",
+        "values": [
+          { "value": "CLOSED", "detail": "required", "class": "continue", "detailName": "sha" },
+          { "value": "OPEN RELEASE", "detail": "required", "class": "continue", "detailName": "branch" }
+        ]
+      },
+      "result": {
+        "required": ["mergeSha", "openRelease"],
+        "types": {
+          "mergeSha": "string",
+          "openRelease": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["hotfix-merge@1"],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "session-model@1": {
+      "summary": "Check the session's model against the role this workflow wants, and only report it.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item",
+        "answer": "step.answer?"
+      },
+      "argument": "session-model {item}",
+      "verdict": {
+        "label": "SESSION MODEL",
+        "values": [
+          {
+            "value": "MATCH",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "UNKNOWN",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "OFF",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "MISMATCH",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "MISMATCH UNATTENDED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "MISMATCH ANSWERED",
+            "detail": "none",
+            "class": "continue"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "verdict",
+          "profileLine"
+        ],
+        "types": {
+          "verdict": "string",
+          "profileLine": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-orient@1": {
+      "summary": "Resolve the plan root, its delivery profile and the organization's shape.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-orient {item}",
+      "verdict": {
+        "label": "PLAN ORIENTATION",
+        "values": [
+          {
+            "value": "READY",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "root"
+          },
+          {
+            "value": "NEEDS ANSWER",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "question"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "root",
+          "workType",
+          "profile",
+          "profileSource",
+          "profileInherited",
+          "ticket",
+          "releaseUnitLevel",
+          "roles"
+        ],
+        "types": {
+          "root": "string",
+          "workType": "string",
+          "profile": "string",
+          "profileSource": "string",
+          "profileInherited": "boolean",
+          "ticket": "string|null",
+          "releaseUnitLevel": "string",
+          "roles": "object"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-ground@1": {
+      "summary": "Read what the plan already holds, read-only.",
+      "builtinSkill": "comprehend-plan",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "{item}",
+      "verdict": {
+        "label": "PLAN STATE",
+        "values": [
+          {
+            "value": "EMPTY",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "PARTIAL",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "SHALLOW",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "state",
+          "doneOpenCounts",
+          "orphans",
+          "deferredContainer"
+        ],
+        "types": {
+          "state": "string",
+          "doneOpenCounts": "object",
+          "orphans": "array",
+          "deferredContainer": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-discovery@1": {
+      "summary": "Ask the questions that change the shape, until the person says 'yes, build this'.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-discovery {item}",
+      "verdict": {
+        "label": "PLAN SHAPE",
+        "values": [
+          {
+            "value": "SIGNED OFF",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "SIGNED OFF WITH ASSUMPTIONS",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "NOT SIGNED OFF",
+            "detail": "optional",
+            "class": "ask",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "tree",
+          "sequencing",
+          "assumptions",
+          "deferredContainer"
+        ],
+        "types": {
+          "tree": "object",
+          "sequencing": "string",
+          "assumptions": "array",
+          "deferredContainer": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "plan-orient@1",
+        "plan-ground@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null,
+      "interactive": true
+    },
+    "plan-sign-off-record@1": {
+      "summary": "Record the sign-off, and nothing else, in DevStride.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-sign-off-record {item}",
+      "verdict": {
+        "label": "SIGN-OFF RECORDED",
+        "values": [
+          {
+            "value": "RECORDED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "profile",
+            "proof": {
+              "kind": "sign-off"
+            }
+          },
+          {
+            "value": "LINK MODE ON",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "root",
+          "profile",
+          "start",
+          "itemDays",
+          "linkMode"
+        ],
+        "types": {
+          "root": "string",
+          "profile": "string",
+          "start": "string",
+          "itemDays": "count",
+          "linkMode": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": [
+          "kind"
+        ],
+        "types": {
+          "kind": "string"
+        },
+        "values": {
+          "kind": [
+            "sign-off"
+          ]
+        }
+      },
+      "requires": [
+        "plan-discovery@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-draft@1": {
+      "summary": "Draft the specs for the signed-off shape; the drafting agents never write to DevStride.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-draft {item}",
+      "verdict": {
+        "label": "PLAN DRAFTED",
+        "values": [
+          {
+            "value": "DRAFTED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "counts"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "draftRef",
+          "counts"
+        ],
+        "types": {
+          "draftRef": "string",
+          "counts": "object"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "plan-sign-off-record@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null,
+      "delegates": true
+    },
+    "plan-draft-approval@1": {
+      "summary": "Walk the person through the drafts until they approve them.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-draft-approval {item}",
+      "verdict": {
+        "label": "PLAN DRAFT REVIEW",
+        "values": [
+          {
+            "value": "APPROVED",
+            "detail": "none",
+            "class": "continue",
+            "proof": {
+              "kind": "draft-approval"
+            }
+          },
+          {
+            "value": "NOT APPROVED",
+            "detail": "optional",
+            "class": "ask",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "approved"
+        ],
+        "types": {
+          "approved": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": [
+          "kind"
+        ],
+        "types": {
+          "kind": "string"
+        },
+        "values": {
+          "kind": [
+            "draft-approval"
+          ]
+        }
+      },
+      "requires": [
+        "plan-draft@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null,
+      "interactive": true
+    },
+    "plan-create@1": {
+      "summary": "Create the approved tree top-down, only the items that are missing.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-create {item}",
+      "verdict": {
+        "label": "PLAN CREATED",
+        "values": [
+          {
+            "value": "CREATED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "count"
+          },
+          {
+            "value": "PARTIAL",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "progress"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "created"
+        ],
+        "types": {
+          "created": "array"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "plan-sign-off-record@1",
+        "plan-draft-approval@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-wire@1": {
+      "summary": "Wire the dependency edges and prove no new leaf is left without one.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-wire {item}",
+      "verdict": {
+        "label": "PLAN WIRED",
+        "values": [
+          {
+            "value": "WIRED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "edges",
+            "proof": {
+              "kind": "wired-plan"
+            }
+          },
+          {
+            "value": "ORPHANS",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "numbers"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "orphans"
+        ],
+        "types": {
+          "orphans": "count"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": [
+          "kind",
+          "orphans"
+        ],
+        "types": {
+          "kind": "string",
+          "orphans": "count"
+        },
+        "values": {
+          "kind": [
+            "wired-plan"
+          ]
+        }
+      },
+      "requires": [
+        "plan-create@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null,
+      "satisfiedBy": [
+        "rebalance-rewire@1"
+      ]
+    },
+    "rationalize-gantt@1": {
+      "summary": "Date the plan from its dependency graph, with the auto-scheduler off.",
+      "builtinSkill": "rationalize-gantt",
+      "payload": {
+        "item": "context.item",
+        "start": "result:plan-sign-off-record@1.start?",
+        "itemDays": "result:plan-sign-off-record@1.itemDays?"
+      },
+      "argument": "{item} start: {start} item-days: {itemDays}",
+      "verdict": {
+        "label": "GANTT",
+        "values": [
+          {
+            "value": "DATED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "count"
+          },
+          {
+            "value": "CYCLE",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "path"
+          },
+          {
+            "value": "SCHEDULER ON",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "dated",
+          "start"
+        ],
+        "types": {
+          "dated": "count",
+          "start": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "plan-wire@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-number@1": {
+      "summary": "Number the leaves in the order the build loop will pick them.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-number {item}",
+      "verdict": {
+        "label": "PLAN NUMBERED",
+        "values": [
+          {
+            "value": "NUMBERED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "range"
+          },
+          {
+            "value": "EXTENDED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "range"
+          },
+          {
+            "value": "ALREADY NUMBERED",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "UNNUMBERED PLAN KEPT",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "range"
+        ],
+        "types": {
+          "range": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rationalize-gantt@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "plan-hand-off@1": {
+      "summary": "Report the finished plan and where the build loop starts.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "plan-hand-off {item}",
+      "verdict": {
+        "label": "PLAN HANDED OFF",
+        "values": [
+          {
+            "value": "HANDED OFF",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "root"
+          },
+          {
+            "value": "ANOTHER ROUND WANTED",
+            "detail": "none",
+            "class": "end:another-round"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "root",
+          "newCount",
+          "existingCount"
+        ],
+        "types": {
+          "root": "string",
+          "newCount": "count",
+          "existingCount": "count"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "plan-number@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-gates@1": {
+      "summary": "Check that nothing else is writing to the plan and the arguments are whole.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-gates {item}",
+      "verdict": {
+        "label": "REBALANCE GATES",
+        "values": [
+          {
+            "value": "CLEAR",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "BUILD LOOP ACTIVE",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "item"
+          },
+          {
+            "value": "SCHEDULER ON",
+            "detail": "none",
+            "class": "ask"
+          },
+          {
+            "value": "BAD ARGUMENTS",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "what"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "root",
+          "target",
+          "dryRun"
+        ],
+        "types": {
+          "root": "string",
+          "target": "string",
+          "dryRun": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-partition@1": {
+      "summary": "Separate the leaves that may be re-sliced from the ones that are untouchable.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-partition {item}",
+      "verdict": {
+        "label": "REBALANCE PARTITION",
+        "values": [
+          {
+            "value": "PARTITIONED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "counts"
+          },
+          {
+            "value": "NO CHANGE NEEDED",
+            "detail": "none",
+            "class": "ask"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "notStarted",
+          "untouchable",
+          "current",
+          "target"
+        ],
+        "types": {
+          "notStarted": "array",
+          "untouchable": "array",
+          "current": "string",
+          "target": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-gates@1",
+        "plan-ground@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-proposal@1": {
+      "summary": "Propose the merges or splits and wait for 'yes, rebalance'.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-proposal {item}",
+      "verdict": {
+        "label": "REBALANCE PROPOSAL",
+        "values": [
+          {
+            "value": "SIGNED OFF",
+            "detail": "none",
+            "class": "continue",
+            "proof": {
+              "kind": "rebalance-sign-off"
+            }
+          },
+          {
+            "value": "DRY RUN",
+            "detail": "none",
+            "class": "end:dry-run"
+          },
+          {
+            "value": "DECLINED",
+            "detail": "none",
+            "class": "end:declined"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "proposal"
+        ],
+        "types": {
+          "proposal": "array"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": [
+          "kind"
+        ],
+        "types": {
+          "kind": "string"
+        },
+        "values": {
+          "kind": [
+            "rebalance-sign-off"
+          ]
+        }
+      },
+      "requires": [
+        "rebalance-partition@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null,
+      "interactive": true
+    },
+    "rebalance-probe@1": {
+      "summary": "Prove the auto-scheduler will not overwrite what the rebalance writes.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-probe {item}",
+      "verdict": {
+        "label": "SCHEDULER PROBE",
+        "values": [
+          {
+            "value": "HELD",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "OVERWRITTEN",
+            "detail": "none",
+            "class": "stop"
+          },
+          {
+            "value": "LOOP ACTIVE",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "item"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "probe"
+        ],
+        "types": {
+          "probe": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-proposal@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-successors@1": {
+      "summary": "Create each merged story with the original specs preserved.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-successors {item}",
+      "verdict": {
+        "label": "REBALANCE SUCCESSORS",
+        "values": [
+          {
+            "value": "CREATED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "count"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "map"
+        ],
+        "types": {
+          "map": "object"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-probe@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-rewire@1": {
+      "summary": "Move every absorbed item's edges to its successor, adding before removing.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-rewire {item}",
+      "verdict": {
+        "label": "REBALANCE REWIRE",
+        "values": [
+          {
+            "value": "DONE",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "edges",
+            "proof": {
+              "kind": "wired-plan"
+            }
+          },
+          {
+            "value": "ORPHANS",
+            "detail": "required",
+            "class": "stop",
+            "detailName": "numbers"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "orphans"
+        ],
+        "types": {
+          "orphans": "count"
+        }
+      },
+      "proof": {
+        "binding": "none",
+        "required": [
+          "kind",
+          "orphans"
+        ],
+        "types": {
+          "kind": "string",
+          "orphans": "count"
+        },
+        "values": {
+          "kind": [
+            "wired-plan"
+          ]
+        }
+      },
+      "requires": [
+        "rebalance-successors@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-renumber@1": {
+      "summary": "Give each successor the number slot of its first absorbed item.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-renumber {item}",
+      "verdict": {
+        "label": "REBALANCE RENUMBER",
+        "values": [
+          {
+            "value": "DONE",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "range"
+          },
+          {
+            "value": "UNNUMBERED PLAN KEPT",
+            "detail": "none",
+            "class": "continue"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "range"
+        ],
+        "types": {
+          "range": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-rewire@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-archive@1": {
+      "summary": "Archive the originals only after their successors have edges.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-archive {item}",
+      "verdict": {
+        "label": "REBALANCE ARCHIVE",
+        "values": [
+          {
+            "value": "ARCHIVED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "count"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "archived"
+        ],
+        "types": {
+          "archived": "array"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-renumber@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-marker@1": {
+      "summary": "Rewrite the plan root's delivery profile line, and only that line.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-marker {item}",
+      "verdict": {
+        "label": "REBALANCE MARKER",
+        "values": [
+          {
+            "value": "REWRITTEN",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "profile"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "profile"
+        ],
+        "types": {
+          "profile": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rebalance-archive@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "rebalance-report@1": {
+      "summary": "Report the re-sliced plan and the next item the build loop will pick.",
+      "builtinSkill": "plan-steps",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "rebalance-report {item}",
+      "verdict": {
+        "label": "REBALANCE REPORT",
+        "values": [
+          {
+            "value": "RE-SLICED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "counts"
+          },
+          {
+            "value": "FAILED",
+            "detail": "optional",
+            "class": "stop",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "before",
+          "after",
+          "next"
+        ],
+        "types": {
+          "before": "count",
+          "after": "count",
+          "next": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [
+        "rationalize-gantt@1"
+      ],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "splice@1": {
+      "summary": "Splice one story or defect into a live plan, wired and dated for the build loop.",
+      "builtinSkill": "insert-story",
+      "payload": {
+        "item": "context.item"
+      },
+      "argument": "splice {item}",
+      "verdict": {
+        "label": "SPLICE",
+        "values": [
+          {
+            "value": "INSERTED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "placement"
+          },
+          {
+            "value": "NEEDS ANSWER",
+            "detail": "required",
+            "class": "ask",
+            "detailName": "question"
+          },
+          {
+            "value": "NEXT UNCHANGED",
+            "detail": "required",
+            "class": "continue",
+            "detailName": "reason"
+          }
+        ]
+      },
+      "result": {
+        "required": [
+          "inserted"
+        ],
+        "types": {
+          "inserted": "string|null",
+          "after": "string|null",
+          "before": "string|null",
+          "prefix": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": null,
+      "shipIntentStage": null
+    },
+    "release-shape@1": {
+      "summary": "Say whether this release is new, an open release to adopt, or a merged one to close out.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE SHAPE",
+        "values": [
+          { "value": "NEW", "detail": "none", "class": "continue" },
+          { "value": "ADOPTED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "CONFLICT", "detail": "required", "class": "stop", "detailName": "prs" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "files" }
+        ]
+      },
+      "result": {
+        "required": ["shape"],
+        "types": {
+          "shape": "string",
+          "pullRequest": "number|null",
+          "branch": "string|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Read the release shape",
+      "shipIntentStage": null
+    },
+    "tower-claim@1": {
+      "summary": "Claim release clearance from the tower, waiting while another release holds it.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TOWER CLAIM",
+        "values": [
+          { "value": "CLEARED", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" },
+          { "value": "BUSY", "detail": "required", "class": "stop", "detailName": "holder" },
+          { "value": "STALE", "detail": "required", "class": "ask", "detailName": "pr" },
+          { "value": "STUCK", "detail": "required", "class": "ask", "detailName": "holder" },
+          { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string",
+          "adopted": "boolean"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Claim the tower",
+      "shipIntentStage": null
+    },
+    "merged-release@1": {
+      "summary": "Find the newest merged release and recompute its delta.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "MERGED RELEASE",
+        "values": [
+          { "value": "FOUND", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "NONE", "detail": "none", "class": "stop" }
+        ]
+      },
+      "result": {
+        "required": ["sha", "pullRequest"],
+        "types": {
+          "sha": "string",
+          "pullRequest": "number|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Find the merged release",
+      "shipIntentStage": null
+    },
+    "train-claim@1": {
+      "summary": "Claim the release train so only one session runs it.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN CLAIM",
+        "values": [
+          { "value": "WON", "detail": "none", "class": "continue" },
+          { "value": "LOST", "detail": "required", "class": "end:lost-train-claim", "detailName": "holder" },
+          { "value": "DEGRADED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Claim the release train",
+      "shipIntentStage": null
+    },
+    "ground-truth@1": {
+      "summary": "Fetch both branches and read what other sessions landed.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "GROUND TRUTH",
+        "values": [
+          { "value": "READ", "detail": "none", "class": "continue" },
+          { "value": "ANOTHER SESSION ACTIVE", "detail": "required", "class": "continue", "detailName": "what" },
+          { "value": "FAILED", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Read ground truth",
+      "shipIntentStage": null
+    },
+    "ci-hold-proof@1": {
+      "summary": "Prove pull-request CI waits for the ready flip before a release opens.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "CI HOLD",
+        "values": [
+          { "value": "PROVEN", "detail": "none", "class": "continue" },
+          { "value": "NO PULL-REQUEST CI", "detail": "none", "class": "continue" },
+          { "value": "NOT PROVEN", "detail": "required", "class": "stop", "detailName": "facts" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Prove the CI hold",
+      "shipIntentStage": null
+    },
+    "train-finish@1": {
+      "summary": "Finish the items an earlier merged release train carried.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "EARLIER TRAIN",
+        "values": [
+          { "value": "FINISHED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "NONE", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Finish the earlier train",
+      "shipIntentStage": null
+    },
+    "ship-plan@1": {
+      "summary": "Wait a bounded time for work a peer says is nearly ready for the train.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "SHIP PLAN",
+        "values": [
+          { "value": "GO", "detail": "none", "class": "continue" },
+          { "value": "WAITED", "detail": "required", "class": "continue", "detailName": "minutes" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Gather the ship plan",
+      "shipIntentStage": null
+    },
+    "train-snapshot@1": {
+      "summary": "Cut a snapshot of the release train merged with the release source.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN SNAPSHOT",
+        "values": [
+          { "value": "CUT", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "ADOPTED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "NOTHING TO SHIP", "detail": "none", "class": "skipped" },
+          { "value": "HELD", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "files" },
+          { "value": "OTHER HOLDER", "detail": "required", "class": "ask", "detailName": "pr" },
+          { "value": "CONFLICT", "detail": "required", "class": "stop", "detailName": "files" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Snapshot the train",
+      "shipIntentStage": null
+    },
+    "train-pr@1": {
+      "summary": "Open the release train's pull request into the release source.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN PR",
+        "values": [
+          { "value": "OPENED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "ADOPTED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Open the train pull request",
+      "shipIntentStage": null
+    },
+    "train-review@1": {
+      "summary": "Review what no landing receipt covers on the train pull request.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN REVIEW",
+        "values": [
+          { "value": "RECEIPTED", "detail": "none", "class": "continue" },
+          { "value": "SETTLED", "detail": "required", "class": "continue", "detailName": "head" },
+          { "value": "LATE ARRIVAL", "detail": "required", "class": "redo:self", "detailName": "count" },
+          { "value": "BLOCKED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Review the train",
+      "shipIntentStage": null,
+      "maxAutoRedo": 8
+    },
+    "train-pre-ship@1": {
+      "summary": "Run the local pre-ship checks the train needs.",
+      "builtinSkill": "pre-ship",
+      "payload": {
+        "base": "context.productionBranch",
+        "head": "context.releaseHead?"
+      },
+      "argument": "train run {base} {head}",
+      "verdict": {
+        "label": "PRE-SHIP",
+        "values": [
+          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
+          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
+          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Pre-ship checks on the train",
+      "shipIntentStage": null
+    },
+    "train-merge@1": {
+      "summary": "Merge the train pull request through the merge gate, never a push.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN MERGE",
+        "values": [
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Merge the train",
+      "shipIntentStage": null
+    },
+    "train-close-out@1": {
+      "summary": "Mark the one-offs the train carried as reached.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN CLOSE-OUT",
+        "values": [
+          { "value": "CLOSED", "detail": "required", "class": "continue", "detailName": "count" },
+          { "value": "NONE", "detail": "none", "class": "continue" },
+          { "value": "PARTIAL", "detail": "required", "class": "continue", "detailName": "skipped" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Close out the train",
+      "shipIntentStage": null
+    },
+    "train-level@1": {
+      "summary": "Bring the release train level with the release source.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN LEVEL",
+        "values": [
+          { "value": "FAST-FORWARDED", "detail": "none", "class": "continue" },
+          { "value": "MERGED SOURCE", "detail": "none", "class": "continue" },
+          { "value": "ALREADY LEVEL", "detail": "none", "class": "continue" },
+          { "value": "CONFLICT", "detail": "required", "class": "stop", "detailName": "files" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Level the train",
+      "shipIntentStage": null
+    },
+    "release-delta@1": {
+      "summary": "Work out what the release carries and check its holds.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE DELTA",
+        "values": [
+          { "value": "ITEMS", "detail": "required", "class": "continue", "detailName": "count" },
+          { "value": "NOTHING TO RELEASE", "detail": "none", "class": "end:nothing-to-release" },
+          { "value": "HELD", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Work out the release delta",
+      "shipIntentStage": null
+    },
+    "classify-release@1": {
+      "summary": "Say whether the release is light or full; anything unclear is full.",
+      "builtinSkill": "classify-release",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE CLASS",
+        "values": [
+          { "value": "LIGHT", "detail": "none", "class": "continue" },
+          { "value": "FULL", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Classify the release",
+      "shipIntentStage": null
+    },
+    "classify-at-checks@1": {
+      "summary": "Classify the release again at the head the checks test.",
+      "builtinSkill": "classify-release",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE CLASS",
+        "values": [
+          { "value": "LIGHT", "detail": "none", "class": "continue" },
+          { "value": "FULL", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Classify at the checks",
+      "shipIntentStage": null
+    },
+    "classify-at-pre-ship@1": {
+      "summary": "Classify the release again at the reviewed head before the pre-ship checks.",
+      "builtinSkill": "classify-release",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE CLASS",
+        "values": [
+          { "value": "LIGHT", "detail": "none", "class": "continue" },
+          { "value": "FULL", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Classify before pre-ship",
+      "shipIntentStage": null
+    },
+    "tower-queue@1": {
+      "summary": "Wait in the release queue behind any older release pull request.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "QUEUE",
+        "values": [
+          { "value": "CLEAR", "detail": "none", "class": "continue" },
+          { "value": "WAIT", "detail": "required", "class": "stop", "detailName": "pr" },
+          { "value": "ASK", "detail": "required", "class": "ask", "detailName": "pr" },
+          { "value": "TIMED OUT", "detail": "required", "class": "stop", "detailName": "pr" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Wait in the release queue",
+      "shipIntentStage": null
+    },
+    "release-branch@1": {
+      "summary": "Cut the protected release branch from the release source.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE BRANCH",
+        "values": [
+          { "value": "CUT", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "ADOPTED", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "NAME TAKEN", "detail": "required", "class": "stop", "detailName": "branch" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "files" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Cut the release branch",
+      "shipIntentStage": null
+    },
+    "production-in-branch@1": {
+      "summary": "Merge production into the release branch when it is behind.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRODUCTION IN BRANCH",
+        "values": [
+          { "value": "CONTAINS", "detail": "none", "class": "continue" },
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "sha" },
+          { "value": "CONFLICT", "detail": "required", "class": "stop", "detailName": "files" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Bring production in",
+      "shipIntentStage": null,
+      "maxAutoRedo": 6
+    },
+    "release-pr@1": {
+      "summary": "Open the release pull request into production as a draft.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE PR",
+        "values": [
+          { "value": "OPENED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "ADOPTED", "detail": "required", "class": "continue", "detailName": "pr" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Open the release pull request",
+      "shipIntentStage": null
+    },
+    "train-claim-hand-on@1": {
+      "summary": "Hand the train claim on once the cut exists so the next release can start.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TRAIN CLAIM",
+        "values": [
+          { "value": "HANDED ON", "detail": "none", "class": "continue" },
+          { "value": "HELD", "detail": "required", "class": "continue", "detailName": "why" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Hand on the train claim",
+      "shipIntentStage": null
+    },
+    "release-tip@1": {
+      "summary": "Record the production tip the checks run against.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRODUCTION TIP",
+        "values": [
+          { "value": "AT", "detail": "required", "class": "continue", "detailName": "sha" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Read the production tip",
+      "shipIntentStage": null
+    },
+    "pre-ship-at-checks@1": {
+      "summary": "Run the release's pre-ship checks before claiming the tower.",
+      "builtinSkill": "pre-ship",
+      "payload": {
+        "base": "context.productionBranch",
+        "head": "context.releaseHead?",
+        "releaseClass": "context.releaseClass?"
+      },
+      "argument": "release run {base} {head} {releaseClass}",
+      "verdict": {
+        "label": "PRE-SHIP",
+        "values": [
+          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
+          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
+          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Pre-ship before the tower",
+      "shipIntentStage": null
+    },
+    "dev-deploy-wait@1": {
+      "summary": "Wait for the staging deploy of the release commit to be serving.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "DEV DEPLOY",
+        "values": [
+          { "value": "SERVING", "detail": "none", "class": "continue" },
+          { "value": "FAILED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "TIMED OUT", "detail": "none", "class": "stop" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Wait for the staging deploy",
+      "shipIntentStage": null
+    },
+    "pre-merge-at-checks@1": {
+      "summary": "Ask whether production needs anything before the merge, at the checks head.",
+      "builtinSkill": "pre-merge-check",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?",
+        "pullRequest": "context.pullRequest?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRE-MERGE",
+        "values": [
+          { "value": "CLEAR", "detail": "none", "class": "continue" },
+          { "value": "HOLD", "detail": "none", "class": "stop" },
+          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Pre-merge check at the checks",
+      "shipIntentStage": null
+    },
+    "release-stamp@1": {
+      "summary": "Stamp the head, tree and production tip the checks passed on.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "CHECKS STAMP",
+        "values": [
+          { "value": "STAMPED", "detail": "required", "class": "continue", "detailName": "stamp" },
+          { "value": "CHANGED", "detail": "required", "class": "redo:self", "detailName": "range" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Stamp the checks",
+      "shipIntentStage": null
+    },
+    "release-review@1": {
+      "summary": "Run the full production-release review and settle it.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE REVIEW",
+        "values": [
+          { "value": "SETTLED", "detail": "required", "class": "continue", "detailName": "head" },
+          { "value": "HEAD MOVED", "detail": "none", "class": "redo:self" },
+          { "value": "BLOCKED", "detail": "required", "class": "stop", "detailName": "findings" }
+        ]
+      },
+      "result": {
+        "required": ["state", "reviewedHead"],
+        "types": {
+          "state": "string",
+          "reviewedHead": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Review the release",
+      "shipIntentStage": null,
+      "maxAutoRedo": 8
+    },
+    "pre-ship-release@1": {
+      "summary": "Run the release's pre-ship checks at the reviewed head.",
+      "builtinSkill": "pre-ship",
+      "payload": {
+        "base": "context.productionBranch",
+        "head": "context.releaseHead?",
+        "releaseClass": "context.releaseClass?",
+        "ranAtTrain": "context.ranAtTrain?",
+        "releaseReview": "result:release-review@1"
+      },
+      "argument": "release run {base} {head} {releaseClass} {ranAtTrain}",
+      "verdict": {
+        "label": "PRE-SHIP",
+        "values": [
+          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
+          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["release-review@1"],
+      "claimPhase": "Pre-ship checks",
+      "shipIntentStage": null,
+      "maxAutoRedo": 6
+    },
+    "pre-ship-resume@1": {
+      "summary": "Discharge the review's pre-ship hold, which flips the pull request ready once.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRE-SHIP HOLD",
+        "values": [
+          { "value": "DISCHARGED", "detail": "none", "class": "continue" },
+          { "value": "NO HOLD", "detail": "none", "class": "skipped" },
+          { "value": "STILL HELD", "detail": "required", "class": "stop", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Discharge the pre-ship hold",
+      "shipIntentStage": null
+    },
+    "release-docs-plan@1": {
+      "summary": "Plan which documentation hooks run after the deploy is confirmed.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "DOCS PLAN",
+        "values": [
+          { "value": "HOOKS", "detail": "required", "class": "continue", "detailName": "hooks" },
+          { "value": "NONE REGISTERED", "detail": "none", "class": "continue" },
+          { "value": "SUPPRESSED", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Plan the documentation",
+      "shipIntentStage": null
+    },
+    "hotfix-catch-up@1": {
+      "summary": "Merge a hotfix that reached production into the release branch.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "HOTFIX CATCH-UP",
+        "values": [
+          { "value": "NONE", "detail": "none", "class": "continue" },
+          { "value": "MERGED", "detail": "required", "class": "stop", "detailName": "pr" },
+          { "value": "SAME TREE", "detail": "required", "class": "continue", "detailName": "sha" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Catch up with a hotfix",
+      "shipIntentStage": null,
+      "maxAutoRedo": 6
+    },
+    "previous-release@1": {
+      "summary": "Check the previous release's post-deploy status before merging.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PREVIOUS RELEASE",
+        "values": [
+          { "value": "SUCCESS", "detail": "none", "class": "continue" },
+          { "value": "PENDING", "detail": "none", "class": "stop" },
+          { "value": "FAILED", "detail": "required", "class": "ask", "detailName": "release" },
+          { "value": "NOT GATED", "detail": "none", "class": "continue" },
+          { "value": "UNREADABLE", "detail": "none", "class": "ask" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Check the previous release",
+      "shipIntentStage": null
+    },
+    "pre-merge-check@1": {
+      "summary": "Ask whether production needs anything before the merge.",
+      "builtinSkill": "pre-merge-check",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?",
+        "pullRequest": "context.pullRequest?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRE-MERGE",
+        "values": [
+          { "value": "CLEAR", "detail": "none", "class": "continue" },
+          { "value": "HOLD", "detail": "none", "class": "stop" },
+          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Pre-merge check",
+      "shipIntentStage": null
+    },
+    "pre-merge-recheck@1": {
+      "summary": "Ask the pre-merge question again once the tower is claimed.",
+      "builtinSkill": "pre-merge-check",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "context.releaseHead?",
+        "pullRequest": "context.pullRequest?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRE-MERGE",
+        "values": [
+          { "value": "CLEAR", "detail": "none", "class": "continue" },
+          { "value": "HOLD", "detail": "none", "class": "stop" },
+          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Pre-merge recheck",
+      "shipIntentStage": null
+    },
+    "owner-go-ahead@1": {
+      "summary": "Show the recap and take the owner's yes or the standing yes before the production merge.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "answer": "step.answer?",
+        "releaseReview": "result:release-review@1",
+        "preShipRelease": "result:pre-ship-release@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "GO-AHEAD",
+        "values": [
+          { "value": "YES", "detail": "required", "class": "continue", "detailName": "source" },
+          { "value": "NOT YET", "detail": "none", "class": "ask" },
+          { "value": "NO", "detail": "none", "class": "end:declined" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string",
+          "answer": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["release-review@1", "pre-ship-release@1"],
+      "claimPhase": "Wait for the go-ahead",
+      "shipIntentStage": null
+    },
+    "release-stamp-verify@1": {
+      "summary": "Verify the checks stamp still matches the branch and production.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "CHECKS STAMP",
+        "values": [
+          { "value": "UNCHANGED", "detail": "none", "class": "continue" },
+          { "value": "CHANGED", "detail": "none", "class": "stop" },
+          { "value": "BEHIND", "detail": "none", "class": "stop" },
+          { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Verify the checks stamp",
+      "shipIntentStage": null
+    },
+    "rerun-at-merge@1": {
+      "summary": "Re-run the pre-ship entries marked to run again at the merge.",
+      "builtinSkill": "pre-ship",
+      "payload": {
+        "base": "context.productionBranch",
+        "head": "context.releaseHead?",
+        "releaseClass": "context.releaseClass?",
+        "rerunNames": "context.rerunAtMerge?"
+      },
+      "argument": "release run {base} {head} {releaseClass} --only {rerunNames}",
+      "verdict": {
+        "label": "PRE-SHIP",
+        "values": [
+          { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
+          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
+          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Re-run checks at the merge",
+      "shipIntentStage": null
+    },
+    "merge-confirmations@1": {
+      "summary": "Confirm the head, CI, pre-ship results, threads and tower before the merge.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "releaseReview": "result:release-review@1",
+        "preShipRelease": "result:pre-ship-release@1",
+        "ownerGoAhead": "result:owner-go-ahead@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "MERGE CONFIRMED",
+        "values": [
+          { "value": "HEAD", "detail": "required", "class": "continue", "detailName": "head" },
+          { "value": "NOT CONFIRMED", "detail": "required", "class": "stop", "detailName": "which" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["release-review@1", "pre-ship-release@1", "owner-go-ahead@1"],
+      "claimPhase": "Confirm the merge",
+      "shipIntentStage": null
+    },
+    "production-merge@1": {
+      "summary": "Merge the release into production through the merge gate, never a push.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "releaseReview": "result:release-review@1",
+        "preShipRelease": "result:pre-ship-release@1",
+        "ownerGoAhead": "result:owner-go-ahead@1",
+        "mergeConfirmations": "result:merge-confirmations@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "PRODUCTION MERGE",
+        "values": [
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "reason" },
+          { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": ["sha", "pullRequest"],
+        "types": {
+          "sha": "string",
+          "pullRequest": "number|null"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["release-review@1", "pre-ship-release@1", "owner-go-ahead@1", "merge-confirmations@1"],
+      "claimPhase": "Merge to production",
+      "shipIntentStage": null
+    },
+    "post-deploy-pending@1": {
+      "summary": "Post the pending post-deploy status on the merge commit.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "POST-DEPLOY STATUS",
+        "values": [
+          { "value": "PENDING POSTED", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Post the pending status",
+      "shipIntentStage": null
+    },
+    "estimates-score@1": {
+      "summary": "Score the estimates the shipped items carried.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "ESTIMATES",
+        "values": [
+          { "value": "SCORED", "detail": "required", "class": "continue", "detailName": "count" },
+          { "value": "NONE", "detail": "none", "class": "continue" },
+          { "value": "NOTED FAILURE", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Score estimates",
+      "shipIntentStage": null
+    },
+    "tower-hand-back@1": {
+      "summary": "Hand release clearance back to the tower, naming what is still owed.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "TOWER",
+        "values": [
+          { "value": "HANDED BACK", "detail": "required", "class": "continue", "detailName": "owed" },
+          { "value": "KEPT", "detail": "required", "class": "stop", "detailName": "why" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Hand back the tower",
+      "shipIntentStage": null
+    },
+    "post-deploy-check@1": {
+      "summary": "Run the post-deploy health check.",
+      "builtinSkill": "post-deploy",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "merge": "result:production-merge@1?",
+        "mergedRelease": "result:merged-release@1?",
+        "deploy": "result:deploy-confirm@1?",
+        "answer": "step.answer?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "POST-DEPLOY HEALTH",
+        "values": [
+          { "value": "PASS", "detail": "none", "class": "continue" },
+          { "value": "FAIL", "detail": "none", "class": "stop" },
+          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Post-deploy health check",
+      "shipIntentStage": null
+    },
+    "post-deploy-result@1": {
+      "summary": "Post the health check's result as the release/post-deploy status.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "POST-DEPLOY STATUS",
+        "values": [
+          { "value": "SUCCESS POSTED", "detail": "none", "class": "continue" },
+          { "value": "FAILURE POSTED", "detail": "none", "class": "stop" },
+          { "value": "ERROR POSTED", "detail": "none", "class": "stop" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Post the health result",
+      "shipIntentStage": null
+    },
+    "release-sync@1": {
+      "summary": "Sync production back into the release source.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "SYNC",
+        "values": [
+          { "value": "DONE", "detail": "none", "class": "continue" },
+          { "value": "ALREADY SYNCED", "detail": "none", "class": "continue" },
+          { "value": "STOPPED", "detail": "required", "class": "stop", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Sync production back",
+      "shipIntentStage": null
+    },
+    "release-branch-delete@1": {
+      "summary": "Delete the release branch once both branches contain it.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE BRANCH DELETE",
+        "values": [
+          { "value": "DELETED", "detail": "required", "class": "continue", "detailName": "branch" },
+          { "value": "KEPT", "detail": "required", "class": "continue", "detailName": "why" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Delete the release branch",
+      "shipIntentStage": null
+    },
+    "release-docs@1": {
+      "summary": "Publish documentation for the shipped release and settle the docs owed item.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "UPDATE DOCS",
+        "values": [
+          { "value": "PUBLISHED", "detail": "none", "class": "continue" },
+          { "value": "STAGED", "detail": "none", "class": "continue" },
+          { "value": "CURRENT", "detail": "none", "class": "continue" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "FAILED", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Update documentation",
+      "shipIntentStage": null
+    },
+    "release-kb-sync@1": {
+      "summary": "Refresh the knowledge base after documentation was published.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "KNOWLEDGE BASE SYNC",
+        "values": [
+          { "value": "DONE", "detail": "none", "class": "continue" },
+          { "value": "CURRENT", "detail": "none", "class": "continue" },
+          { "value": "FAILED", "detail": "none", "class": "continue" },
+          { "value": "NOT RUN", "detail": "none", "class": "continue" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Sync the knowledge base",
+      "shipIntentStage": null
+    },
+    "release-close-out@1": {
+      "summary": "Run the post-deploy close-out when the health check said one is owed.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "POST-DEPLOY CLOSE-OUT",
+        "values": [
+          { "value": "DONE", "detail": "none", "class": "continue" },
+          { "value": "PARTIAL", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Close out the release",
+      "shipIntentStage": null
+    },
+    "release-notes@1": {
+      "summary": "Write release notes, only when they were asked for.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE NOTES",
+        "values": [
+          { "value": "PUBLISHED", "detail": "none", "class": "continue" },
+          { "value": "DRAFTED", "detail": "none", "class": "continue" },
+          { "value": "NOT REQUESTED", "detail": "none", "class": "skipped" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "stop" },
+          { "value": "FAILED", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Write release notes",
+      "shipIntentStage": null
+    },
+    "release-recap@1": {
+      "summary": "Write the plain-language recap of the release.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE RECAP",
+        "values": [
+          { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "STOPPED AT", "detail": "required", "class": "continue", "detailName": "step" },
+          { "value": "NOTHING TO RELEASE", "detail": "none", "class": "continue" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Recap the release",
+      "shipIntentStage": null
+    },
+    "auto-start@1": {
+      "summary": "Decide whether the next release starts now.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "AUTO START",
+        "values": [
+          { "value": "START", "detail": "none", "class": "continue" },
+          { "value": "SKIP", "detail": "required", "class": "continue", "detailName": "reason" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "ERROR", "detail": "required", "class": "continue", "detailName": "why" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Decide the next release",
       "shipIntentStage": null
     }
   }

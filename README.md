@@ -549,7 +549,8 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `comprehend-plan` | Recursively reads a plan — descriptions and comment threads, every level — before any edit |
 | `insert-story` / `insert-defect` | Splices new work into a live plan's dependency chain, dated and ordered |
 | `rationalize-gantt` | Backfills dates and rationalizes the dependency graph so the timeline reads as a clean cascade |
-| `rebalance` | Re-slices a live plan's not-started leaves to a different delivery profile — merging or splitting stories, preserving every absorbed spec, archiving originals with a pointer |
+| `rebalance` | Re-slices a live plan's not-started leaves to a different delivery profile — merging or splitting stories, preserving every absorbed spec, archiving originals with a pointer; runs the Rebalance workflow (`workflows/rebalance.json`) through the step runner |
+| `plan-steps` | Runs one step of the Plan or Rebalance workflow (`workflows/plan.json`, `workflows/rebalance.json`), one reference per step; `plan` and `rebalance` start it through the step runner, and a step can be re-run by name |
 
 **Delivery** — walk the plan one item at a time:
 
@@ -561,7 +562,8 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `review` | Runs every configured reviewer, settles findings, then releases CI — re-reviewing from the latest common cycle anchor and continuing P1/serious-P2 fixes until clear |
 | `pr` | Opens a pull request and runs the review-and-settle loop |
 | `push` | Stages, commits, type-checks, and pushes following the repo's commit conventions |
-| `branch-feature` / `branch-hotfix` | Cuts a working branch from the working base (`base: <branch>`) or from the production branch |
+| `branch-feature` | Cuts a working branch from the working base (`base: <branch>`) |
+| `branch-hotfix` | Runs the Hotfix workflow (`workflows/hotfix.json`) through the step runner: cuts the hotfix branch from the production branch, resets the local environment, then fixes, reviews, merges and confirms the deploy on your yes; never waits for a release |
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end; `create-story deferred <item>` / `create-defect deferred <item>` instead parks a follow-up or a bug in the plan's deferred container |
 | `release` | Promotes the release branch to production with a full gated review; with `release.clearance` set, claims one-release-at-a-time clearance first and hands it back last; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
 | `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it — including that the configured local review engine actually runs read-only; `setup agents` sets up the Active Agents board, tag and view after a typed yes; `setup drills` checks the sign-in token for a repository's throwaway drill sessions and tells you the one command that makes it |
@@ -570,7 +572,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `ci-audit` | Measures what CI actually costs: executed runs per workflow per pull request (the design is one each), post-merge push minutes, release pull requests re-run by a moving base — and names the offenders. Read-only |
 
 **Steps (run one hook by itself)** — each runs exactly one hook your config names and prints a
-fixed verdict first. `release`, `build-item`, `pr` and `branch-hotfix` call them; run one by name to
+fixed verdict first. `release`, `build-item`, `pr` and the hotfix's steps call them; run one by name to
 re-run a step that failed. Unset, each says `NOT CONFIGURED` (or its stated default) instead of
 failing; the four safety steps (`pre-ship`, `post-deploy`, `classify-release`, `pre-merge-check`)
 take the stricter path when their hook is missing or cannot answer. Shared rule:
@@ -603,6 +605,10 @@ after a fix.
 | `merge-story` | Lands exactly the commit that was checked and reviewed onto the working base, never production |
 | `capture-findings` | Files deferred findings as tracked items and splices discovered scope into the plan |
 | `sync-base` | Returns the checkout to the working base and proves the tree clean |
+
+**Hotfix steps** — `hotfix-steps` runs every step of the Hotfix workflow (`workflows/hotfix.json`),
+one reference per step, plus the production deploy's approval and confirmation, which other
+workflows reuse. `branch-hotfix` runs that workflow through the step runner.
 
 ### The step runner
 
@@ -644,6 +650,17 @@ definition may hold and the proof each step leaves in `skills/run-workflow/refer
 and `workflow-fixtures.json` beside the script holds its canonical cases. A review whose result and proof
 name different paths is refused.
 
+**Your organization's workflow runs instead, when it has one.** At the start of each run, a
+session connected to DevStride asks once which workflow the organization published for the item
+(`get_workflow_for_item`) and runs that one; with nothing published, no connection or an older
+server it runs the built-in workflow silently. A workflow it cannot safely run (incomplete, a
+changed hash, a newer plugin needed, or a step list the runner refuses) falls back to the built-in
+one with one plain line. The chosen workflow is pinned for the whole run, so a later publish
+changes only the next run. A custom step may name a skill file in your own repository; it is read
+from the commit the checkout is on, never from an uncommitted edit, capped at 64 KB and never
+executed. The same switch that turns step reports off turns this off. The procedure is
+`skills/run-workflow/references/fetching-the-workflow.md`.
+
 ### Agents that do not run these skills
 
 Codex, a script or a person can follow the same routing without Claude. `skills/build-item/scripts/routing.py`
@@ -682,7 +699,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **4.7.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **4.8.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added

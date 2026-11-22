@@ -84,8 +84,8 @@ else bad "(8) setup's profile question does not lead with extended as the defaul
 #     standard by accident; now it would give extended, so the clause must be explicit.
 for pair in 'skills/build-item/SKILL.md|config `profile` → `extended`; an unknown word → `standard`' \
             'skills/release/SKILL.md|else config `profile` (unknown: `standard`), else `extended`' \
-            'skills/rebalance/SKILL.md|else config `profile` (unknown: `standard`),' \
-            'skills/rebalance/SKILL.md|else `extended`. On a whole-root run'; do
+            'skills/plan-steps/references/rebalance-partition.md|else config `profile` (unknown: `standard`),' \
+            'skills/plan-steps/references/rebalance-partition.md|else `extended`. On a whole-root run'; do
   f="${pair%%|*}"; n="${pair#*|}"
   if has "$f" "$n"; then ok "(9) $f: extended by default, unknown → standard"; else bad "(9) $f: missing '$n'"; fi
 done

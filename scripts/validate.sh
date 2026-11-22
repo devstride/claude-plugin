@@ -39,6 +39,9 @@ bash scripts/check-train-name.sh || fail 5b
 step "5c workflow definitions (scripts/check-workflows.py)"
 python3 scripts/check-workflows.py || fail 5c
 
+step "5d the release definitions match their source (scripts/build-release-workflows.py --check)"
+python3 scripts/build-release-workflows.py --check || fail 5d
+
 step "6/7 script tests (scripts/tests/run.sh)"
 bash scripts/tests/run.sh || fail 6
 

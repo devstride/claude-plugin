@@ -1,6 +1,6 @@
 #!/bin/bash
-# Tests for the built-in workflow definitions and scripts/check-workflows.py: the shipped Build
-# workflow passes, its eleven step ids are the published ones in order, each runs its step skill
+# Tests for the built-in workflow definitions and scripts/check-workflows.py: every shipped
+# definition passes, its eleven step ids are the published ones in order, each runs its step skill
 # always and stops on failure (the whole run with canned answers: build-workflow-run.sh), and each
 # rule the checker enforces fails a scratch copy with the right reason.
 set -u
@@ -10,7 +10,7 @@ T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 
 # The cases write to a file: a here-document inside $( ) breaks on an apostrophe under bash 3.2.
 python3 - "$ROOT" "$T" > "$T/cases.out" <<'PY'
-import copy, json, os, re, shutil, subprocess, sys
+import copy, glob, json, os, re, shutil, subprocess, sys
 root, tmp = sys.argv[1], sys.argv[2]
 checker = os.path.join(root, "scripts", "check-workflows.py")
 
@@ -31,7 +31,9 @@ steps = [step for phase in build["phases"] for step in phase["steps"]]
 ids = [step["id"] for step in steps]
 
 rc, out, err = run()
-check("(1) the shipped definitions pass", (rc, out, err), (0, "WORKFLOWS: ok (1 files, 11 steps)", ""))
+shipped = [json.load(open(path, encoding="utf-8")) for path in sorted(glob.glob(os.path.join(root, "workflows", "*.json")))]
+counted = "WORKFLOWS: ok (%d files, %d steps)" % (len(shipped), sum(len(p["steps"]) for d in shipped for p in d["phases"]))
+check("(1) the shipped definitions pass", (rc, out, err), (0, counted, ""))
 as_tuple = lambda v: tuple(int(p) for p in v.split("."))
 check("(2) minPluginVersion is not newer than this plugin", as_tuple(build["minPluginVersion"]) <= as_tuple(plugin))
 check("(3) the step ids are exactly the eleven published ones, in order", ids, STEPS)
@@ -68,6 +70,18 @@ def bloat(d): d["notes"] = "x" * 70000
 def no_condition(d): first(d)["when"] = {"mode": "condition", "condition": None}
 def condition_on_always(d): first(d)["when"] = {"mode": "always", "condition": "review-path:fast"}
 def duplicate(d): d["phases"][3]["steps"][0]["id"] = "claim"
+def steps_in_all(total):
+    def apply(d):
+        template = copy.deepcopy(first(d))
+        template.update(summary="", run={"source": "off", "ref": None, "version": None})
+        steps = []
+        for k in range(total):
+            step = copy.deepcopy(template)
+            step.update(id="s%d" % k, name="Step %d" % k, contract="custom@1")
+            steps.append(step)
+        d["phases"] = [{"id": "p%d" % i, "name": "Phase %d" % i, "steps": steps[i * 25:(i + 1) * 25]}
+                       for i in range((total + 24) // 25)]
+    return apply
 def schema_drift(s): s["properties"]["phases"]["items"]["properties"]["steps"]["items"]["properties"]["kind"]["enum"].append("hook")
 
 CASES = [("a duplicate step id", dict(change=duplicate), "duplicate step id claim"),
@@ -93,6 +107,9 @@ for index, (label, kwargs, reason) in enumerate(CASES):
     rc, out, err = scratch("case-%d" % index, **kwargs)
     check("(8) %s fails with its reason" % label, (rc, reason in out, out.startswith("INVALID ")), (1, True, True))
 check("(9) an unchanged scratch copy passes", scratch("clean")[:2], (0, "WORKFLOWS: ok (1 files, 11 steps)"))
+check("(9b) a definition with 250 steps passes", scratch("steps-250", change=steps_in_all(250))[:2], (0, "WORKFLOWS: ok (1 files, 250 steps)"))
+rc, out, err = scratch("steps-251", change=steps_in_all(251))
+check("(9c) one with 251 steps fails with at most 250 steps in all", (rc, "at most 250 steps in all" in out), (1, True))
 empty = os.path.join(tmp, "empty"); os.makedirs(empty)
 rc, out, err = run(empty)
 check("(10) unreadable input exits 2 with one line on stderr", (rc, out, err.startswith("check-workflows: "), "Traceback" in err), (2, "", True, False))

@@ -160,7 +160,8 @@
       "calledBy": [
         "release 4",
         "release 5a",
-        "doctor 7"
+        "doctor 7",
+        "hotfix-steps deploy-approval"
       ],
       "unset": "the deploy runs without an approval step",
       "contract": "skills/release/references/docs-hooks.md",
@@ -175,7 +176,8 @@
       "verdict": "exit 0 only when production serves RELEASE_COMMIT",
       "calledBy": [
         "release 5a",
-        "doctor 7"
+        "doctor 7",
+        "hotfix-steps deploy-confirm"
       ],
       "unset": "the owner confirms the deploy by hand",
       "contract": "skills/release/references/docs-hooks.md",
@@ -256,13 +258,14 @@
       "shape": "provider-or-commands",
       "valueType": "object",
       "nullable": true,
-      "payload": "the `record_workflow_step` arguments as one JSON object (the provider sends them to the DevStride tool; a commands report receives them on stdin)",
+      "payload": "the `record_workflow_step` arguments as one JSON object (the provider sends them to the DevStride tool; a commands report receives them on stdin); with the same switch on, each run first asks `get_workflow_for_item` through the agent's own connection which workflow applies to the item, as skills/run-workflow/references/fetching-the-workflow.md says, and a failed or empty answer runs the built-in workflow",
       "modes": [
         "report"
       ],
       "verdict": "stdout's first line (OK, ABSENT, FORBIDDEN, UNREACHABLE, ERROR), then the stored run as JSON; exit 0 ok, 1 anything else",
       "calledBy": [
-        "build-item run"
+        "build-item run",
+        "run-workflow start"
       ],
       "unset": "reports go to DevStride through the agent's own connection when the session has one, and with none, or a server refusing them, the run stops sending and says so once; set the key to null to switch reporting off (the machine variable DEVSTRIDE_WORKFLOWS=0 does the same)",
       "contract": "skills/build-item/references/workflow-reports.md",
@@ -422,7 +425,7 @@
       "verdict": "exit 0 made the instance",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment",
+        "hotfix-steps hotfix-environment",
         "build-item 0"
       ],
       "unset": "no isolated instances: the current checkout is the only environment",
@@ -442,9 +445,9 @@
       "verdict": "exit 0 returned the instance to <base>'s schema",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment"
+        "hotfix-steps hotfix-environment"
       ],
-      "unset": "branch-hotfix names the missing command and offers the manual path",
+      "unset": "the hotfix environment step names the missing command and offers the manual path",
       "contract": "skills/setup/references/config-defaults.md",
       "since": "pre-registry",
       "step": "local-environment",
@@ -461,7 +464,7 @@
       "verdict": "stdout is the name of this checkout's instance",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment"
+        "hotfix-steps hotfix-environment"
       ],
       "unset": "an in-place recreate with <name> stops and asks",
       "contract": "skills/setup/references/config-defaults.md",
@@ -480,7 +483,7 @@
       "verdict": "exit 0 seeded the instance",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment"
+        "hotfix-steps hotfix-environment"
       ],
       "unset": "nothing is seeded",
       "contract": "skills/setup/references/config-defaults.md",
@@ -499,7 +502,7 @@
       "verdict": "exit 0 migrated the instance forward",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment"
+        "hotfix-steps hotfix-environment"
       ],
       "unset": "nothing is migrated",
       "contract": "skills/setup/references/config-defaults.md",
@@ -518,7 +521,7 @@
       "verdict": "exit 0 removed the instance",
       "calledBy": [
         "local-environment",
-        "branch-hotfix local environment"
+        "hotfix-steps hotfix-environment"
       ],
       "unset": "instances are left for the owner to remove",
       "contract": "skills/setup/references/config-defaults.md",
@@ -576,7 +579,8 @@
       "calledBy": [
         "doctor 4",
         "release 4",
-        "setup E3"
+        "setup E3",
+        "hotfix-steps hotfix-stage"
       ],
       "unset": "no per-environment infrastructure: no stage renders and doctor reports N/A",
       "contract": "skills/setup/references/config-defaults.md",

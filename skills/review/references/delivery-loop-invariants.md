@@ -503,9 +503,9 @@ N11. Shape targets (stories per epic, epics per capability, per profile) are a s
      plan for missing one.
 
 ## O. Local environment and hotfixes (config: `localEnvironment`)
-O1. `branch-hotfix` reads `localEnvironment` — `recreate` first (see O3), else `migrate` then `seed`
-    in that order (a seed against a stale schema fails or lies) — and falls back to ASKING when the
-    block is absent or the commands it needs are null. It never invents a reset command.
+O1. The hotfix (`hotfix-steps`' environment step) reads `localEnvironment` — `recreate` first
+    (see O3), else `migrate` then `seed` in that order (a seed against a stale schema fails or
+    lies) — and falls back to ASKING when the block is absent or the commands it needs are null. It never invents a reset command.
 O2. `instanceBoundTo` is never `detected` by setup: no file says whether a second checkout gets its
     own database. Candidates for the commands come from compose/devcontainer/nix/scripts and are
     `ambiguous`, never `detected`; nothing found is `unknown`, not `null`.
@@ -700,7 +700,7 @@ fi
 SELF="delivery-loop-invariants.md"
 ALL=$(cat skills/*/SKILL.md $(ls skills/*/references/*.md | grep -v "$SELF") \
           hooks/*.sh AGENTS.md CONTRIBUTING.md RELEASING.md \
-          $(ls skills/*/scripts/*.sh skills/*/scripts/*.py scripts/*.sh 2>/dev/null) \
+          $(ls skills/*/scripts/*.sh skills/*/scripts/*.py scripts/*.sh workflows/*.json 2>/dev/null) \
           "${EXTRA[@]}" | tr '\n' ' ')
 # The ls above is the null-match guard: bash 3.2 has no default nullglob, and an unmatched
 # glob handed straight to cat would be a literal (and fatal) file name.
@@ -709,7 +709,7 @@ ALL=$(cat skills/*/SKILL.md $(ls skills/*/references/*.md | grep -v "$SELF") \
 # the dead-reference loop below separately proves every reference is reachable from a root an
 # agent reads — an unreachable reference would not count as "somewhere".
 for needle in "pull_request_review_id" "suppressed due to low confidence" "graphqlBotId" \
-              "review_requested" "paginate" "blanket-resolve" "for MINUTES" "xhigh" \
+              "review_requested" "paginate" "blanket-resolve" "for MINUTES" "xhigh" "Cut the hotfix branch from production" \
               "materializ" "100-file cap" "gh pr checks --watch" "protectedBranches" \
               "CHANGED the patch" "untrusted tool data" "compose an item number" "EXPIRED" \
               "untracked-deferral" "KEEP THE CLOUD" "copilot-swe-agent" "databaseId" \
@@ -792,13 +792,13 @@ skills/review/SKILL.md|cloud-reviewers.md
 skills/review/references/cloud-reviewers.md|review_requested
 skills/review/references/cloud-reviewers.md|reviewerRegistrationWindowMinutes
 skills/pr/SKILL.md|reviewerRegistrationWindowMinutes
-skills/plan/SKILL.md|Delivery profile:
-skills/rebalance/SKILL.md|archive
+skills/plan-steps/references/plan-sign-off-record.md|Delivery profile:
+skills/plan-steps/references/rebalance-archive.md|archive
 skills/setup/SKILL.md|profile
 skills/doctor/SKILL.md|profile
 skills/doctor/SKILL.md|key absent, shipped default
-skills/plan/SKILL.md|shape against target
-skills/rebalance/SKILL.md|shape against target
+skills/plan-steps/references/plan-hand-off.md|shape against target
+skills/plan-steps/references/rebalance-report.md|shape against target
 skills/doctor/SKILL.md|local > shared
 skills/doctor/references/repairs.md|ask outside the batch
 skills/doctor/scripts/statusline-override.py|require_clean_committed_shared
@@ -808,8 +808,8 @@ skills/doctor/SKILL.md|Changed:
 scripts/tests/plain-language-output.sh|every user-invocable skill
 skills/release/SKILL.md|delivery-profiles.md
 skills/build-item/SKILL.md|never makes the loop concurrent
-skills/branch-hotfix/SKILL.md|localEnvironment
-skills/branch-hotfix/SKILL.md|BACKWARD transition
+skills/hotfix-steps/references/hotfix-environment.md|localEnvironment
+skills/hotfix-steps/references/hotfix-environment.md|BACKWARD transition
 skills/doctor/SKILL.md|null **or absent**
 skills/setup/references/config-defaults.md|the tooling's way back
 skills/setup/SKILL.md|instanceBoundTo
@@ -836,19 +836,19 @@ skills/build-item/SKILL.md|"non-applicable" with its reason
 skills/build-item/references/epic-release-steps.md|FULL diff
 skills/build-item/references/epic-release-steps.md|live: false
 skills/build-item/references/progress-table.md|not configured
-skills/plan/SKILL.md|yes, build this
+skills/plan-steps/references/plan-discovery.md|yes, build this
 skills/pr/SKILL.md|cannot guarantee CI-last
 skills/plan/references/delivery-profiles.md|review-settled
 skills/release/SKILL.md|reviewedHead
 skills/release/SKILL.md|release-notes
 skills/doctor/SKILL.md|text to PRINT
 skills/doctor/SKILL.md|ready_for_review
-skills/rebalance/SKILL.md|convex
+skills/plan-steps/references/rebalance-proposal.md|convex
 skills/rebalance/SKILL.md|NEVER `delete_item`
 skills/review/references/cloud-reviewers.md|wait-for-reviewers.sh
 skills/review/references/cloud-reviewers.md|adaptiveReviewerWait
 skills/review/references/reviewer-latency.md|nearest-rank
-skills/doctor/SKILL.md|reviewer-latency
+skills/doctor/references/skill-cache.md|reviewer-latency
 skills/review/scripts/wait-for-reviewers.sh|submitted_at
 skills/pr/SKILL.md|created_at
 skills/review/references/review-ledger.md|one cumulative handoff
@@ -1010,8 +1010,8 @@ skills/release/SKILL.md|create-story deferred
 skills/build-item/references/next-unblocked.md|deferredContainerLegacyTitles
 skills/create-defect/SKILL.md|deferred-container.md
 skills/create-story/SKILL.md|deferred-container.md
-skills/plan/SKILL.md|deferred-container.md
-skills/rebalance/SKILL.md|deferred-container.md
+skills/plan-steps/references/plan-discovery.md|deferred-container.md
+skills/plan-steps/references/rebalance-partition.md|deferred-container.md
 skills/comprehend-plan/SKILL.md|deferred-container.md
 skills/rationalize-gantt/SKILL.md|deferred-container.md
 skills/build-item/SKILL.md|deferred-container.md
@@ -1026,12 +1026,12 @@ skills/setup/references/agents-mode.md|typed yes
 skills/setup/references/agents-mode.md|never moves, edits or removes an item
 skills/doctor/references/agents.md|never executed
 skills/build-item/references/active-agents.md|never a leaf
-skills/plan/SKILL.md|takes a board from its parent
-skills/plan/SKILL.md|else an explicit `null`
+skills/plan-steps/references/plan-create.md|takes a board from its parent
+skills/plan-steps/references/plan-create.md|else an explicit `null`
 skills/plan/references/splice-mechanics.md|No board from the parent
 skills/plan/references/splice-mechanics.md|else an explicit `null`
 skills/plan/references/splice-mechanics.md|Step 3's board rule applies to each
-skills/rebalance/SKILL.md|by that step's board rule
+skills/plan-steps/references/rebalance-successors.md|by that step's board rule
 skills/create-story/references/one-off-handoff.md|leave it out of the list
 skills/story-lifecycle/references/start.md|its step 0 places the item first
 skills/build-item/references/item-status.md|board-placement.md

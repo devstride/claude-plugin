@@ -31,4 +31,4 @@ Arguments: $ARGUMENTS — `<verb> [<name>] [--branch <b>] [--base <ref>]`; verbs
 4. Run the one command from the repository root. Exit 0 → `DONE` (for `name`, the name on the
    next line); anything else → `FAILED` with its last output lines.
 
-Which verbs run, in what order, and when to stop belong to the caller (`branch-hotfix`).
+Which verbs run, in what order, and when to stop belong to the caller (`hotfix-steps`' environment step).

@@ -1511,7 +1511,7 @@
    "expect": "bad-schema"
   },
   {
-   "name": "101 steps across the phases",
+   "name": "252 steps across the phases",
    "definition": "build",
    "edits": [
     {
@@ -1521,14 +1521,14 @@
       0,
       "steps"
      ],
-     "count": 34
+     "count": 21
     },
     {
      "op": "repeat",
      "path": [
       "phases"
      ],
-     "count": 3
+     "count": 12
     }
    ],
    "root": "fixture",
@@ -2335,7 +2335,24 @@
    "expect": "unsupported-when"
   },
   {
-   "name": "a library skill",
+   "name": "a built-in source for a contract with no built-in skill",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "contract"
+     ],
+     "value": "custom@1"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-source"
+  },
+  {
+   "name": "a library skill with no pinned version",
    "definition": "build",
    "edits": [
     {
@@ -2350,7 +2367,7 @@
    ],
    "root": "fixture",
    "git": true,
-   "expect": "unsupported-source"
+   "expect": "library-version"
   },
   {
    "name": "a repository skill file",
@@ -2368,7 +2385,7 @@
    ],
    "root": "fixture",
    "git": true,
-   "expect": "unsupported-source"
+   "expect": "ok"
   },
   {
    "name": "the custom contract, which no built-in skill carries",
@@ -3403,6 +3420,2568 @@
    "class": "ask",
    "value": "NEEDS DECISION",
    "detail": "keep the old column?"
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MATCH\n",
+   "class": "continue",
+   "value": "MATCH",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: UNKNOWN\n",
+   "class": "continue",
+   "value": "UNKNOWN",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: OFF\n",
+   "class": "continue",
+   "value": "OFF",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MISMATCH\n",
+   "class": "ask",
+   "value": "MISMATCH",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MISMATCH UNATTENDED\n",
+   "class": "continue",
+   "value": "MISMATCH UNATTENDED",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MISMATCH ANSWERED\n",
+   "class": "continue",
+   "value": "MISMATCH ANSWERED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-orient@1",
+   "output": "PLAN ORIENTATION: READY for the plan root\n",
+   "class": "continue",
+   "value": "READY",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "plan-orient@1",
+   "output": "PLAN ORIENTATION: NEEDS ANSWER for the plan root\n",
+   "class": "ask",
+   "value": "NEEDS ANSWER",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "plan-orient@1",
+   "output": "PLAN ORIENTATION: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: EMPTY\n",
+   "class": "continue",
+   "value": "EMPTY",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: PARTIAL\n",
+   "class": "continue",
+   "value": "PARTIAL",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: SHALLOW\n",
+   "class": "continue",
+   "value": "SHALLOW",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-discovery@1",
+   "output": "PLAN SHAPE: SIGNED OFF\n",
+   "class": "continue",
+   "value": "SIGNED OFF",
+   "detail": ""
+  },
+  {
+   "contract": "plan-discovery@1",
+   "output": "PLAN SHAPE: SIGNED OFF WITH ASSUMPTIONS\n",
+   "class": "continue",
+   "value": "SIGNED OFF WITH ASSUMPTIONS",
+   "detail": ""
+  },
+  {
+   "contract": "plan-discovery@1",
+   "output": "PLAN SHAPE: NOT SIGNED OFF\n",
+   "class": "ask",
+   "value": "NOT SIGNED OFF",
+   "detail": ""
+  },
+  {
+   "contract": "plan-sign-off-record@1",
+   "output": "SIGN-OFF RECORDED: RECORDED for the plan root\n",
+   "class": "continue",
+   "value": "RECORDED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "plan-sign-off-record@1",
+   "output": "SIGN-OFF RECORDED: LINK MODE ON\n",
+   "class": "ask",
+   "value": "LINK MODE ON",
+   "detail": ""
+  },
+  {
+   "contract": "plan-sign-off-record@1",
+   "output": "SIGN-OFF RECORDED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-draft@1",
+   "output": "PLAN DRAFTED: DRAFTED for the plan root\n",
+   "class": "continue",
+   "value": "DRAFTED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "plan-draft@1",
+   "output": "PLAN DRAFTED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-draft-approval@1",
+   "output": "PLAN DRAFT REVIEW: APPROVED\n",
+   "class": "continue",
+   "value": "APPROVED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-draft-approval@1",
+   "output": "PLAN DRAFT REVIEW: NOT APPROVED\n",
+   "class": "ask",
+   "value": "NOT APPROVED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-create@1",
+   "output": "PLAN CREATED: CREATED for the plan root\n",
+   "class": "continue",
+   "value": "CREATED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "plan-create@1",
+   "output": "PLAN CREATED: PARTIAL for the plan root\n",
+   "class": "stop",
+   "value": "PARTIAL",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "plan-create@1",
+   "output": "PLAN CREATED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-wire@1",
+   "output": "PLAN WIRED: WIRED for the plan root\n",
+   "class": "continue",
+   "value": "WIRED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "plan-wire@1",
+   "output": "PLAN WIRED: ORPHANS for the plan root\n",
+   "class": "stop",
+   "value": "ORPHANS",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "plan-wire@1",
+   "output": "PLAN WIRED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: DATED for the plan root\n",
+   "class": "continue",
+   "value": "DATED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: CYCLE for the plan root\n",
+   "class": "stop",
+   "value": "CYCLE",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: SCHEDULER ON\n",
+   "class": "ask",
+   "value": "SCHEDULER ON",
+   "detail": ""
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: NUMBERED for the plan root\n",
+   "class": "continue",
+   "value": "NUMBERED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: EXTENDED for the plan root\n",
+   "class": "continue",
+   "value": "EXTENDED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: ALREADY NUMBERED\n",
+   "class": "continue",
+   "value": "ALREADY NUMBERED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: UNNUMBERED PLAN KEPT\n",
+   "class": "continue",
+   "value": "UNNUMBERED PLAN KEPT",
+   "detail": ""
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-hand-off@1",
+   "output": "PLAN HANDED OFF: HANDED OFF for the plan root\n",
+   "class": "continue",
+   "value": "HANDED OFF",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "plan-hand-off@1",
+   "output": "PLAN HANDED OFF: ANOTHER ROUND WANTED\n",
+   "class": "end:another-round",
+   "value": "ANOTHER ROUND WANTED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: CLEAR\n",
+   "class": "continue",
+   "value": "CLEAR",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: BUILD LOOP ACTIVE for the plan root\n",
+   "class": "stop",
+   "value": "BUILD LOOP ACTIVE",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: SCHEDULER ON\n",
+   "class": "ask",
+   "value": "SCHEDULER ON",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: BAD ARGUMENTS for the plan root\n",
+   "class": "ask",
+   "value": "BAD ARGUMENTS",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rebalance-partition@1",
+   "output": "REBALANCE PARTITION: PARTITIONED for the plan root\n",
+   "class": "continue",
+   "value": "PARTITIONED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rebalance-partition@1",
+   "output": "REBALANCE PARTITION: NO CHANGE NEEDED\n",
+   "class": "ask",
+   "value": "NO CHANGE NEEDED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-proposal@1",
+   "output": "REBALANCE PROPOSAL: SIGNED OFF\n",
+   "class": "continue",
+   "value": "SIGNED OFF",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-proposal@1",
+   "output": "REBALANCE PROPOSAL: DRY RUN\n",
+   "class": "end:dry-run",
+   "value": "DRY RUN",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-proposal@1",
+   "output": "REBALANCE PROPOSAL: DECLINED\n",
+   "class": "end:declined",
+   "value": "DECLINED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-probe@1",
+   "output": "SCHEDULER PROBE: HELD\n",
+   "class": "continue",
+   "value": "HELD",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-probe@1",
+   "output": "SCHEDULER PROBE: OVERWRITTEN\n",
+   "class": "stop",
+   "value": "OVERWRITTEN",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-probe@1",
+   "output": "SCHEDULER PROBE: LOOP ACTIVE for the plan root\n",
+   "class": "stop",
+   "value": "LOOP ACTIVE",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rebalance-successors@1",
+   "output": "REBALANCE SUCCESSORS: CREATED for the plan root\n",
+   "class": "continue",
+   "value": "CREATED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rebalance-successors@1",
+   "output": "REBALANCE SUCCESSORS: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-rewire@1",
+   "output": "REBALANCE REWIRE: DONE for the plan root\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rebalance-rewire@1",
+   "output": "REBALANCE REWIRE: ORPHANS for the plan root\n",
+   "class": "stop",
+   "value": "ORPHANS",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rebalance-rewire@1",
+   "output": "REBALANCE REWIRE: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-renumber@1",
+   "output": "REBALANCE RENUMBER: DONE for the plan root\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rebalance-renumber@1",
+   "output": "REBALANCE RENUMBER: UNNUMBERED PLAN KEPT\n",
+   "class": "continue",
+   "value": "UNNUMBERED PLAN KEPT",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-renumber@1",
+   "output": "REBALANCE RENUMBER: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-archive@1",
+   "output": "REBALANCE ARCHIVE: ARCHIVED for the plan root\n",
+   "class": "continue",
+   "value": "ARCHIVED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rebalance-archive@1",
+   "output": "REBALANCE ARCHIVE: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-marker@1",
+   "output": "REBALANCE MARKER: REWRITTEN for the plan root\n",
+   "class": "continue",
+   "value": "REWRITTEN",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rebalance-marker@1",
+   "output": "REBALANCE MARKER: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-report@1",
+   "output": "REBALANCE REPORT: RE-SLICED for the plan root\n",
+   "class": "continue",
+   "value": "RE-SLICED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "rebalance-report@1",
+   "output": "REBALANCE REPORT: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "splice@1",
+   "output": "SPLICE: INSERTED for the plan root\n",
+   "class": "continue",
+   "value": "INSERTED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "splice@1",
+   "output": "SPLICE: NEEDS ANSWER for the plan root\n",
+   "class": "ask",
+   "value": "NEEDS ANSWER",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "splice@1",
+   "output": "SPLICE: NEXT UNCHANGED for the plan root\n",
+   "class": "continue",
+   "value": "NEXT UNCHANGED",
+   "detail": "for the plan root"
+  },
+  {
+   "contract": "hotfix-preflight@1",
+   "output": "HOTFIX PREFLIGHT: READY the detail\n",
+   "class": "continue",
+   "value": "READY",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-preflight@1",
+   "output": "HOTFIX PREFLIGHT: DIRTY\n",
+   "class": "ask",
+   "value": "DIRTY",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-preflight@1",
+   "output": "HOTFIX PREFLIGHT: NEEDS INPUT the detail\n",
+   "class": "ask",
+   "value": "NEEDS INPUT",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-preflight@1",
+   "output": "HOTFIX PREFLIGHT: FAILED the detail\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-branch@1",
+   "output": "HOTFIX BRANCH: CUT the detail\n",
+   "class": "continue",
+   "value": "CUT",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-branch@1",
+   "output": "HOTFIX BRANCH: FAILED the detail\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-stage@1",
+   "output": "HOTFIX STAGE: NAMED the detail\n",
+   "class": "continue",
+   "value": "NAMED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-stage@1",
+   "output": "HOTFIX STAGE: NONE\n",
+   "class": "continue",
+   "value": "NONE",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-stage@1",
+   "output": "HOTFIX STAGE: PRODUCTION the detail\n",
+   "class": "ask",
+   "value": "PRODUCTION",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-stage@1",
+   "output": "HOTFIX STAGE: DECLINED the detail\n",
+   "class": "end:environment-declined",
+   "value": "DECLINED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-environment@1",
+   "output": "HOTFIX ENVIRONMENT: RECREATED\n",
+   "class": "continue",
+   "value": "RECREATED",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-environment@1",
+   "output": "HOTFIX ENVIRONMENT: MIGRATED\n",
+   "class": "continue",
+   "value": "MIGRATED",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-environment@1",
+   "output": "HOTFIX ENVIRONMENT: UNCHANGED\n",
+   "class": "continue",
+   "value": "UNCHANGED",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-environment@1",
+   "output": "HOTFIX ENVIRONMENT: NEEDS ANSWER the detail\n",
+   "class": "ask",
+   "value": "NEEDS ANSWER",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-environment@1",
+   "output": "HOTFIX ENVIRONMENT: FAILED the detail\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-report@1",
+   "output": "HOTFIX CUT: DONE the detail\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-fix@1",
+   "output": "HOTFIX FIX: COMMITTED the detail\n",
+   "class": "continue",
+   "value": "COMMITTED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-fix@1",
+   "output": "HOTFIX FIX: NEEDS DIRECTION the detail\n",
+   "class": "ask",
+   "value": "NEEDS DIRECTION",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-fix@1",
+   "output": "HOTFIX FIX: ABANDONED\n",
+   "class": "end:abandoned",
+   "value": "ABANDONED",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-merge@1",
+   "output": "HOTFIX MERGE: MERGED the detail\n",
+   "class": "continue",
+   "value": "MERGED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-merge@1",
+   "output": "HOTFIX MERGE: WAITING FOR YES\n",
+   "class": "ask",
+   "value": "WAITING FOR YES",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-merge@1",
+   "output": "HOTFIX MERGE: REFUSED the detail\n",
+   "class": "stop",
+   "value": "REFUSED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-merge@1",
+   "output": "HOTFIX MERGE: ERROR the detail\n",
+   "class": "stop",
+   "value": "ERROR",
+   "detail": "the detail"
+  },
+  {
+   "contract": "deploy-approval@1",
+   "output": "DEPLOY APPROVAL: APPROVED\n",
+   "class": "continue",
+   "value": "APPROVED",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-approval@1",
+   "output": "DEPLOY APPROVAL: WAITING FOR YES\n",
+   "class": "ask",
+   "value": "WAITING FOR YES",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-approval@1",
+   "output": "DEPLOY APPROVAL: RETRY\n",
+   "class": "redo:self",
+   "value": "RETRY",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-approval@1",
+   "output": "DEPLOY APPROVAL: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-approval@1",
+   "output": "DEPLOY APPROVAL: STOPPED the detail\n",
+   "class": "stop",
+   "value": "STOPPED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "deploy-confirm@1",
+   "output": "DEPLOY: CONFIRMED the detail\n",
+   "class": "continue",
+   "value": "CONFIRMED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "deploy-confirm@1",
+   "output": "DEPLOY: UNCONFIRMED\n",
+   "class": "stop",
+   "value": "UNCONFIRMED",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-confirm@1",
+   "output": "DEPLOY: OWNER TO CONFIRM\n",
+   "class": "ask",
+   "value": "OWNER TO CONFIRM",
+   "detail": ""
+  },
+  {
+   "contract": "deploy-confirm@1",
+   "output": "DEPLOY: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-close@1",
+   "output": "HOTFIX CLOSED: CLOSED the detail\n",
+   "class": "continue",
+   "value": "CLOSED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "hotfix-close@1",
+   "output": "HOTFIX CLOSED: OPEN RELEASE the detail\n",
+   "class": "continue",
+   "value": "OPEN RELEASE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MATCH\n",
+   "class": "continue",
+   "value": "MATCH",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: UNKNOWN\n",
+   "class": "continue",
+   "value": "UNKNOWN",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: OFF\n",
+   "class": "continue",
+   "value": "OFF",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MISMATCH\n",
+   "class": "ask",
+   "value": "MISMATCH",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MISMATCH UNATTENDED\n",
+   "class": "continue",
+   "value": "MISMATCH UNATTENDED",
+   "detail": ""
+  },
+  {
+   "contract": "session-model@1",
+   "output": "SESSION MODEL: MISMATCH ANSWERED\n",
+   "class": "continue",
+   "value": "MISMATCH ANSWERED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-orient@1",
+   "output": "PLAN ORIENTATION: READY the detail\n",
+   "class": "continue",
+   "value": "READY",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-orient@1",
+   "output": "PLAN ORIENTATION: NEEDS ANSWER the detail\n",
+   "class": "ask",
+   "value": "NEEDS ANSWER",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-orient@1",
+   "output": "PLAN ORIENTATION: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: EMPTY\n",
+   "class": "continue",
+   "value": "EMPTY",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: PARTIAL\n",
+   "class": "continue",
+   "value": "PARTIAL",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: SHALLOW\n",
+   "class": "continue",
+   "value": "SHALLOW",
+   "detail": ""
+  },
+  {
+   "contract": "plan-ground@1",
+   "output": "PLAN STATE: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-discovery@1",
+   "output": "PLAN SHAPE: SIGNED OFF\n",
+   "class": "continue",
+   "value": "SIGNED OFF",
+   "detail": ""
+  },
+  {
+   "contract": "plan-discovery@1",
+   "output": "PLAN SHAPE: SIGNED OFF WITH ASSUMPTIONS\n",
+   "class": "continue",
+   "value": "SIGNED OFF WITH ASSUMPTIONS",
+   "detail": ""
+  },
+  {
+   "contract": "plan-discovery@1",
+   "output": "PLAN SHAPE: NOT SIGNED OFF\n",
+   "class": "ask",
+   "value": "NOT SIGNED OFF",
+   "detail": ""
+  },
+  {
+   "contract": "plan-sign-off-record@1",
+   "output": "SIGN-OFF RECORDED: RECORDED the detail\n",
+   "class": "continue",
+   "value": "RECORDED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-sign-off-record@1",
+   "output": "SIGN-OFF RECORDED: LINK MODE ON\n",
+   "class": "ask",
+   "value": "LINK MODE ON",
+   "detail": ""
+  },
+  {
+   "contract": "plan-sign-off-record@1",
+   "output": "SIGN-OFF RECORDED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-draft@1",
+   "output": "PLAN DRAFTED: DRAFTED the detail\n",
+   "class": "continue",
+   "value": "DRAFTED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-draft@1",
+   "output": "PLAN DRAFTED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-draft-approval@1",
+   "output": "PLAN DRAFT REVIEW: APPROVED\n",
+   "class": "continue",
+   "value": "APPROVED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-draft-approval@1",
+   "output": "PLAN DRAFT REVIEW: NOT APPROVED\n",
+   "class": "ask",
+   "value": "NOT APPROVED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-create@1",
+   "output": "PLAN CREATED: CREATED the detail\n",
+   "class": "continue",
+   "value": "CREATED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-create@1",
+   "output": "PLAN CREATED: PARTIAL the detail\n",
+   "class": "stop",
+   "value": "PARTIAL",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-create@1",
+   "output": "PLAN CREATED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-wire@1",
+   "output": "PLAN WIRED: WIRED the detail\n",
+   "class": "continue",
+   "value": "WIRED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-wire@1",
+   "output": "PLAN WIRED: ORPHANS the detail\n",
+   "class": "stop",
+   "value": "ORPHANS",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-wire@1",
+   "output": "PLAN WIRED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: DATED the detail\n",
+   "class": "continue",
+   "value": "DATED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: CYCLE the detail\n",
+   "class": "stop",
+   "value": "CYCLE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: SCHEDULER ON\n",
+   "class": "ask",
+   "value": "SCHEDULER ON",
+   "detail": ""
+  },
+  {
+   "contract": "rationalize-gantt@1",
+   "output": "GANTT: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: NUMBERED the detail\n",
+   "class": "continue",
+   "value": "NUMBERED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: EXTENDED the detail\n",
+   "class": "continue",
+   "value": "EXTENDED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: ALREADY NUMBERED\n",
+   "class": "continue",
+   "value": "ALREADY NUMBERED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: UNNUMBERED PLAN KEPT\n",
+   "class": "continue",
+   "value": "UNNUMBERED PLAN KEPT",
+   "detail": ""
+  },
+  {
+   "contract": "plan-number@1",
+   "output": "PLAN NUMBERED: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "plan-hand-off@1",
+   "output": "PLAN HANDED OFF: HANDED OFF the detail\n",
+   "class": "continue",
+   "value": "HANDED OFF",
+   "detail": "the detail"
+  },
+  {
+   "contract": "plan-hand-off@1",
+   "output": "PLAN HANDED OFF: ANOTHER ROUND WANTED\n",
+   "class": "end:another-round",
+   "value": "ANOTHER ROUND WANTED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: CLEAR\n",
+   "class": "continue",
+   "value": "CLEAR",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: BUILD LOOP ACTIVE the detail\n",
+   "class": "stop",
+   "value": "BUILD LOOP ACTIVE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: SCHEDULER ON\n",
+   "class": "ask",
+   "value": "SCHEDULER ON",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-gates@1",
+   "output": "REBALANCE GATES: BAD ARGUMENTS the detail\n",
+   "class": "ask",
+   "value": "BAD ARGUMENTS",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-partition@1",
+   "output": "REBALANCE PARTITION: PARTITIONED the detail\n",
+   "class": "continue",
+   "value": "PARTITIONED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-partition@1",
+   "output": "REBALANCE PARTITION: NO CHANGE NEEDED\n",
+   "class": "ask",
+   "value": "NO CHANGE NEEDED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-proposal@1",
+   "output": "REBALANCE PROPOSAL: SIGNED OFF\n",
+   "class": "continue",
+   "value": "SIGNED OFF",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-proposal@1",
+   "output": "REBALANCE PROPOSAL: DRY RUN\n",
+   "class": "end:dry-run",
+   "value": "DRY RUN",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-proposal@1",
+   "output": "REBALANCE PROPOSAL: DECLINED\n",
+   "class": "end:declined",
+   "value": "DECLINED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-probe@1",
+   "output": "SCHEDULER PROBE: HELD\n",
+   "class": "continue",
+   "value": "HELD",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-probe@1",
+   "output": "SCHEDULER PROBE: OVERWRITTEN\n",
+   "class": "stop",
+   "value": "OVERWRITTEN",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-probe@1",
+   "output": "SCHEDULER PROBE: LOOP ACTIVE the detail\n",
+   "class": "stop",
+   "value": "LOOP ACTIVE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-successors@1",
+   "output": "REBALANCE SUCCESSORS: CREATED the detail\n",
+   "class": "continue",
+   "value": "CREATED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-successors@1",
+   "output": "REBALANCE SUCCESSORS: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-rewire@1",
+   "output": "REBALANCE REWIRE: DONE the detail\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-rewire@1",
+   "output": "REBALANCE REWIRE: ORPHANS the detail\n",
+   "class": "stop",
+   "value": "ORPHANS",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-rewire@1",
+   "output": "REBALANCE REWIRE: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-renumber@1",
+   "output": "REBALANCE RENUMBER: DONE the detail\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-renumber@1",
+   "output": "REBALANCE RENUMBER: UNNUMBERED PLAN KEPT\n",
+   "class": "continue",
+   "value": "UNNUMBERED PLAN KEPT",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-renumber@1",
+   "output": "REBALANCE RENUMBER: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-archive@1",
+   "output": "REBALANCE ARCHIVE: ARCHIVED the detail\n",
+   "class": "continue",
+   "value": "ARCHIVED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-archive@1",
+   "output": "REBALANCE ARCHIVE: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-marker@1",
+   "output": "REBALANCE MARKER: REWRITTEN the detail\n",
+   "class": "continue",
+   "value": "REWRITTEN",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-marker@1",
+   "output": "REBALANCE MARKER: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "rebalance-report@1",
+   "output": "REBALANCE REPORT: RE-SLICED the detail\n",
+   "class": "continue",
+   "value": "RE-SLICED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "rebalance-report@1",
+   "output": "REBALANCE REPORT: FAILED\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "splice@1",
+   "output": "SPLICE: INSERTED the detail\n",
+   "class": "continue",
+   "value": "INSERTED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "splice@1",
+   "output": "SPLICE: NEEDS ANSWER the detail\n",
+   "class": "ask",
+   "value": "NEEDS ANSWER",
+   "detail": "the detail"
+  },
+  {
+   "contract": "splice@1",
+   "output": "SPLICE: NEXT UNCHANGED the detail\n",
+   "class": "continue",
+   "value": "NEXT UNCHANGED",
+   "detail": "the detail"
+  },
+  {
+   "contract": "release-shape@1",
+   "output": "RELEASE SHAPE: NEW\n",
+   "class": "continue",
+   "value": "NEW",
+   "detail": ""
+  },
+  {
+   "contract": "release-shape@1",
+   "output": "RELEASE SHAPE: ADOPTED some detail\n",
+   "class": "continue",
+   "value": "ADOPTED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-shape@1",
+   "output": "RELEASE SHAPE: MERGED some detail\n",
+   "class": "continue",
+   "value": "MERGED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-shape@1",
+   "output": "RELEASE SHAPE: CONFLICT some detail\n",
+   "class": "stop",
+   "value": "CONFLICT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-shape@1",
+   "output": "RELEASE SHAPE: REFUSED some detail\n",
+   "class": "stop",
+   "value": "REFUSED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "tower-claim@1",
+   "output": "TOWER CLAIM: CLEARED\n",
+   "class": "continue",
+   "value": "CLEARED",
+   "detail": ""
+  },
+  {
+   "contract": "tower-claim@1",
+   "output": "TOWER CLAIM: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "tower-claim@1",
+   "output": "TOWER CLAIM: BUSY some detail\n",
+   "class": "stop",
+   "value": "BUSY",
+   "detail": "some detail"
+  },
+  {
+   "contract": "tower-claim@1",
+   "output": "TOWER CLAIM: STALE some detail\n",
+   "class": "ask",
+   "value": "STALE",
+   "detail": "some detail"
+  },
+  {
+   "contract": "tower-claim@1",
+   "output": "TOWER CLAIM: STUCK some detail\n",
+   "class": "ask",
+   "value": "STUCK",
+   "detail": "some detail"
+  },
+  {
+   "contract": "tower-claim@1",
+   "output": "TOWER CLAIM: ERROR some detail\n",
+   "class": "stop",
+   "value": "ERROR",
+   "detail": "some detail"
+  },
+  {
+   "contract": "merged-release@1",
+   "output": "MERGED RELEASE: FOUND some detail\n",
+   "class": "continue",
+   "value": "FOUND",
+   "detail": "some detail"
+  },
+  {
+   "contract": "merged-release@1",
+   "output": "MERGED RELEASE: NONE\n",
+   "class": "stop",
+   "value": "NONE",
+   "detail": ""
+  },
+  {
+   "contract": "train-claim@1",
+   "output": "TRAIN CLAIM: WON\n",
+   "class": "continue",
+   "value": "WON",
+   "detail": ""
+  },
+  {
+   "contract": "train-claim@1",
+   "output": "TRAIN CLAIM: LOST some detail\n",
+   "class": "end:lost-train-claim",
+   "value": "LOST",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-claim@1",
+   "output": "TRAIN CLAIM: DEGRADED some detail\n",
+   "class": "stop",
+   "value": "DEGRADED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-claim@1",
+   "output": "TRAIN CLAIM: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "ground-truth@1",
+   "output": "GROUND TRUTH: READ\n",
+   "class": "continue",
+   "value": "READ",
+   "detail": ""
+  },
+  {
+   "contract": "ground-truth@1",
+   "output": "GROUND TRUTH: ANOTHER SESSION ACTIVE some detail\n",
+   "class": "continue",
+   "value": "ANOTHER SESSION ACTIVE",
+   "detail": "some detail"
+  },
+  {
+   "contract": "ground-truth@1",
+   "output": "GROUND TRUTH: FAILED some detail\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "ci-hold-proof@1",
+   "output": "CI HOLD: PROVEN\n",
+   "class": "continue",
+   "value": "PROVEN",
+   "detail": ""
+  },
+  {
+   "contract": "ci-hold-proof@1",
+   "output": "CI HOLD: NO PULL-REQUEST CI\n",
+   "class": "continue",
+   "value": "NO PULL-REQUEST CI",
+   "detail": ""
+  },
+  {
+   "contract": "ci-hold-proof@1",
+   "output": "CI HOLD: NOT PROVEN some detail\n",
+   "class": "stop",
+   "value": "NOT PROVEN",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-finish@1",
+   "output": "EARLIER TRAIN: FINISHED some detail\n",
+   "class": "continue",
+   "value": "FINISHED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-finish@1",
+   "output": "EARLIER TRAIN: NONE\n",
+   "class": "continue",
+   "value": "NONE",
+   "detail": ""
+  },
+  {
+   "contract": "train-finish@1",
+   "output": "EARLIER TRAIN: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "ship-plan@1",
+   "output": "SHIP PLAN: GO\n",
+   "class": "continue",
+   "value": "GO",
+   "detail": ""
+  },
+  {
+   "contract": "ship-plan@1",
+   "output": "SHIP PLAN: WAITED some detail\n",
+   "class": "continue",
+   "value": "WAITED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "ship-plan@1",
+   "output": "SHIP PLAN: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "train-snapshot@1",
+   "output": "TRAIN SNAPSHOT: CUT some detail\n",
+   "class": "continue",
+   "value": "CUT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-snapshot@1",
+   "output": "TRAIN SNAPSHOT: ADOPTED some detail\n",
+   "class": "continue",
+   "value": "ADOPTED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-snapshot@1",
+   "output": "TRAIN SNAPSHOT: NOTHING TO SHIP\n",
+   "class": "skipped",
+   "value": "NOTHING TO SHIP",
+   "detail": ""
+  },
+  {
+   "contract": "train-snapshot@1",
+   "output": "TRAIN SNAPSHOT: HELD some detail\n",
+   "class": "stop",
+   "value": "HELD",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-snapshot@1",
+   "output": "TRAIN SNAPSHOT: REFUSED some detail\n",
+   "class": "stop",
+   "value": "REFUSED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-snapshot@1",
+   "output": "TRAIN SNAPSHOT: OTHER HOLDER some detail\n",
+   "class": "ask",
+   "value": "OTHER HOLDER",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-snapshot@1",
+   "output": "TRAIN SNAPSHOT: CONFLICT some detail\n",
+   "class": "stop",
+   "value": "CONFLICT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-snapshot@1",
+   "output": "TRAIN SNAPSHOT: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "train-pr@1",
+   "output": "TRAIN PR: OPENED some detail\n",
+   "class": "continue",
+   "value": "OPENED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-pr@1",
+   "output": "TRAIN PR: ADOPTED some detail\n",
+   "class": "continue",
+   "value": "ADOPTED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-pr@1",
+   "output": "TRAIN PR: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "train-review@1",
+   "output": "TRAIN REVIEW: RECEIPTED\n",
+   "class": "continue",
+   "value": "RECEIPTED",
+   "detail": ""
+  },
+  {
+   "contract": "train-review@1",
+   "output": "TRAIN REVIEW: SETTLED some detail\n",
+   "class": "continue",
+   "value": "SETTLED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-review@1",
+   "output": "TRAIN REVIEW: LATE ARRIVAL some detail\n",
+   "class": "redo:self",
+   "value": "LATE ARRIVAL",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-review@1",
+   "output": "TRAIN REVIEW: BLOCKED some detail\n",
+   "class": "stop",
+   "value": "BLOCKED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-review@1",
+   "output": "TRAIN REVIEW: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "train-pre-ship@1",
+   "output": "PRE-SHIP: PASS\n",
+   "class": "continue",
+   "value": "PASS",
+   "detail": ""
+  },
+  {
+   "contract": "train-pre-ship@1",
+   "output": "PRE-SHIP: FAIL\n",
+   "class": "stop",
+   "value": "FAIL",
+   "detail": ""
+  },
+  {
+   "contract": "train-pre-ship@1",
+   "output": "PRE-SHIP: NOTHING TO RUN\n",
+   "class": "skipped",
+   "value": "NOTHING TO RUN",
+   "detail": ""
+  },
+  {
+   "contract": "train-merge@1",
+   "output": "TRAIN MERGE: MERGED some detail\n",
+   "class": "continue",
+   "value": "MERGED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-merge@1",
+   "output": "TRAIN MERGE: REFUSED some detail\n",
+   "class": "stop",
+   "value": "REFUSED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-merge@1",
+   "output": "TRAIN MERGE: ERROR some detail\n",
+   "class": "stop",
+   "value": "ERROR",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-merge@1",
+   "output": "TRAIN MERGE: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "train-close-out@1",
+   "output": "TRAIN CLOSE-OUT: CLOSED some detail\n",
+   "class": "continue",
+   "value": "CLOSED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-close-out@1",
+   "output": "TRAIN CLOSE-OUT: NONE\n",
+   "class": "continue",
+   "value": "NONE",
+   "detail": ""
+  },
+  {
+   "contract": "train-close-out@1",
+   "output": "TRAIN CLOSE-OUT: PARTIAL some detail\n",
+   "class": "continue",
+   "value": "PARTIAL",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-close-out@1",
+   "output": "TRAIN CLOSE-OUT: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "train-level@1",
+   "output": "TRAIN LEVEL: FAST-FORWARDED\n",
+   "class": "continue",
+   "value": "FAST-FORWARDED",
+   "detail": ""
+  },
+  {
+   "contract": "train-level@1",
+   "output": "TRAIN LEVEL: MERGED SOURCE\n",
+   "class": "continue",
+   "value": "MERGED SOURCE",
+   "detail": ""
+  },
+  {
+   "contract": "train-level@1",
+   "output": "TRAIN LEVEL: ALREADY LEVEL\n",
+   "class": "continue",
+   "value": "ALREADY LEVEL",
+   "detail": ""
+  },
+  {
+   "contract": "train-level@1",
+   "output": "TRAIN LEVEL: CONFLICT some detail\n",
+   "class": "stop",
+   "value": "CONFLICT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-level@1",
+   "output": "TRAIN LEVEL: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "release-delta@1",
+   "output": "RELEASE DELTA: ITEMS some detail\n",
+   "class": "continue",
+   "value": "ITEMS",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-delta@1",
+   "output": "RELEASE DELTA: NOTHING TO RELEASE\n",
+   "class": "end:nothing-to-release",
+   "value": "NOTHING TO RELEASE",
+   "detail": ""
+  },
+  {
+   "contract": "release-delta@1",
+   "output": "RELEASE DELTA: HELD some detail\n",
+   "class": "stop",
+   "value": "HELD",
+   "detail": "some detail"
+  },
+  {
+   "contract": "classify-release@1",
+   "output": "RELEASE CLASS: LIGHT\n",
+   "class": "continue",
+   "value": "LIGHT",
+   "detail": ""
+  },
+  {
+   "contract": "classify-release@1",
+   "output": "RELEASE CLASS: FULL\n",
+   "class": "continue",
+   "value": "FULL",
+   "detail": ""
+  },
+  {
+   "contract": "classify-at-checks@1",
+   "output": "RELEASE CLASS: LIGHT\n",
+   "class": "continue",
+   "value": "LIGHT",
+   "detail": ""
+  },
+  {
+   "contract": "classify-at-checks@1",
+   "output": "RELEASE CLASS: FULL\n",
+   "class": "continue",
+   "value": "FULL",
+   "detail": ""
+  },
+  {
+   "contract": "classify-at-pre-ship@1",
+   "output": "RELEASE CLASS: LIGHT\n",
+   "class": "continue",
+   "value": "LIGHT",
+   "detail": ""
+  },
+  {
+   "contract": "classify-at-pre-ship@1",
+   "output": "RELEASE CLASS: FULL\n",
+   "class": "continue",
+   "value": "FULL",
+   "detail": ""
+  },
+  {
+   "contract": "tower-queue@1",
+   "output": "QUEUE: CLEAR\n",
+   "class": "continue",
+   "value": "CLEAR",
+   "detail": ""
+  },
+  {
+   "contract": "tower-queue@1",
+   "output": "QUEUE: WAIT some detail\n",
+   "class": "stop",
+   "value": "WAIT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "tower-queue@1",
+   "output": "QUEUE: ASK some detail\n",
+   "class": "ask",
+   "value": "ASK",
+   "detail": "some detail"
+  },
+  {
+   "contract": "tower-queue@1",
+   "output": "QUEUE: TIMED OUT some detail\n",
+   "class": "stop",
+   "value": "TIMED OUT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "tower-queue@1",
+   "output": "QUEUE: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "release-branch@1",
+   "output": "RELEASE BRANCH: CUT some detail\n",
+   "class": "continue",
+   "value": "CUT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-branch@1",
+   "output": "RELEASE BRANCH: ADOPTED some detail\n",
+   "class": "continue",
+   "value": "ADOPTED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-branch@1",
+   "output": "RELEASE BRANCH: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "release-branch@1",
+   "output": "RELEASE BRANCH: NAME TAKEN some detail\n",
+   "class": "stop",
+   "value": "NAME TAKEN",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-branch@1",
+   "output": "RELEASE BRANCH: REFUSED some detail\n",
+   "class": "stop",
+   "value": "REFUSED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "production-in-branch@1",
+   "output": "PRODUCTION IN BRANCH: CONTAINS\n",
+   "class": "continue",
+   "value": "CONTAINS",
+   "detail": ""
+  },
+  {
+   "contract": "production-in-branch@1",
+   "output": "PRODUCTION IN BRANCH: MERGED some detail\n",
+   "class": "continue",
+   "value": "MERGED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "production-in-branch@1",
+   "output": "PRODUCTION IN BRANCH: CONFLICT some detail\n",
+   "class": "stop",
+   "value": "CONFLICT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "production-in-branch@1",
+   "output": "PRODUCTION IN BRANCH: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "release-pr@1",
+   "output": "RELEASE PR: OPENED some detail\n",
+   "class": "continue",
+   "value": "OPENED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-pr@1",
+   "output": "RELEASE PR: ADOPTED some detail\n",
+   "class": "continue",
+   "value": "ADOPTED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-claim-hand-on@1",
+   "output": "TRAIN CLAIM: HANDED ON\n",
+   "class": "continue",
+   "value": "HANDED ON",
+   "detail": ""
+  },
+  {
+   "contract": "train-claim-hand-on@1",
+   "output": "TRAIN CLAIM: HELD some detail\n",
+   "class": "continue",
+   "value": "HELD",
+   "detail": "some detail"
+  },
+  {
+   "contract": "train-claim-hand-on@1",
+   "output": "TRAIN CLAIM: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "release-tip@1",
+   "output": "PRODUCTION TIP: AT some detail\n",
+   "class": "continue",
+   "value": "AT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "pre-ship-at-checks@1",
+   "output": "PRE-SHIP: PASS\n",
+   "class": "continue",
+   "value": "PASS",
+   "detail": ""
+  },
+  {
+   "contract": "pre-ship-at-checks@1",
+   "output": "PRE-SHIP: FAIL\n",
+   "class": "stop",
+   "value": "FAIL",
+   "detail": ""
+  },
+  {
+   "contract": "pre-ship-at-checks@1",
+   "output": "PRE-SHIP: NOTHING TO RUN\n",
+   "class": "skipped",
+   "value": "NOTHING TO RUN",
+   "detail": ""
+  },
+  {
+   "contract": "dev-deploy-wait@1",
+   "output": "DEV DEPLOY: SERVING\n",
+   "class": "continue",
+   "value": "SERVING",
+   "detail": ""
+  },
+  {
+   "contract": "dev-deploy-wait@1",
+   "output": "DEV DEPLOY: FAILED some detail\n",
+   "class": "stop",
+   "value": "FAILED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "dev-deploy-wait@1",
+   "output": "DEV DEPLOY: TIMED OUT\n",
+   "class": "stop",
+   "value": "TIMED OUT",
+   "detail": ""
+  },
+  {
+   "contract": "dev-deploy-wait@1",
+   "output": "DEV DEPLOY: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-at-checks@1",
+   "output": "PRE-MERGE: CLEAR\n",
+   "class": "continue",
+   "value": "CLEAR",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-at-checks@1",
+   "output": "PRE-MERGE: HOLD\n",
+   "class": "stop",
+   "value": "HOLD",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-at-checks@1",
+   "output": "PRE-MERGE: NOT RUN\n",
+   "class": "ask",
+   "value": "NOT RUN",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-at-checks@1",
+   "output": "PRE-MERGE: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "release-stamp@1",
+   "output": "CHECKS STAMP: STAMPED some detail\n",
+   "class": "continue",
+   "value": "STAMPED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-stamp@1",
+   "output": "CHECKS STAMP: CHANGED some detail\n",
+   "class": "redo:self",
+   "value": "CHANGED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-review@1",
+   "output": "RELEASE REVIEW: SETTLED some detail\n",
+   "class": "continue",
+   "value": "SETTLED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-review@1",
+   "output": "RELEASE REVIEW: HEAD MOVED\n",
+   "class": "redo:self",
+   "value": "HEAD MOVED",
+   "detail": ""
+  },
+  {
+   "contract": "release-review@1",
+   "output": "RELEASE REVIEW: BLOCKED some detail\n",
+   "class": "stop",
+   "value": "BLOCKED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "pre-ship-release@1",
+   "output": "PRE-SHIP: PASS\n",
+   "class": "continue",
+   "value": "PASS",
+   "detail": ""
+  },
+  {
+   "contract": "pre-ship-release@1",
+   "output": "PRE-SHIP: FAIL\n",
+   "class": "stop",
+   "value": "FAIL",
+   "detail": ""
+  },
+  {
+   "contract": "pre-ship-resume@1",
+   "output": "PRE-SHIP HOLD: DISCHARGED\n",
+   "class": "continue",
+   "value": "DISCHARGED",
+   "detail": ""
+  },
+  {
+   "contract": "pre-ship-resume@1",
+   "output": "PRE-SHIP HOLD: NO HOLD\n",
+   "class": "skipped",
+   "value": "NO HOLD",
+   "detail": ""
+  },
+  {
+   "contract": "pre-ship-resume@1",
+   "output": "PRE-SHIP HOLD: STILL HELD some detail\n",
+   "class": "stop",
+   "value": "STILL HELD",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-docs-plan@1",
+   "output": "DOCS PLAN: HOOKS some detail\n",
+   "class": "continue",
+   "value": "HOOKS",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-docs-plan@1",
+   "output": "DOCS PLAN: NONE REGISTERED\n",
+   "class": "continue",
+   "value": "NONE REGISTERED",
+   "detail": ""
+  },
+  {
+   "contract": "release-docs-plan@1",
+   "output": "DOCS PLAN: SUPPRESSED\n",
+   "class": "continue",
+   "value": "SUPPRESSED",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-catch-up@1",
+   "output": "HOTFIX CATCH-UP: NONE\n",
+   "class": "continue",
+   "value": "NONE",
+   "detail": ""
+  },
+  {
+   "contract": "hotfix-catch-up@1",
+   "output": "HOTFIX CATCH-UP: MERGED some detail\n",
+   "class": "stop",
+   "value": "MERGED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "hotfix-catch-up@1",
+   "output": "HOTFIX CATCH-UP: SAME TREE some detail\n",
+   "class": "continue",
+   "value": "SAME TREE",
+   "detail": "some detail"
+  },
+  {
+   "contract": "previous-release@1",
+   "output": "PREVIOUS RELEASE: SUCCESS\n",
+   "class": "continue",
+   "value": "SUCCESS",
+   "detail": ""
+  },
+  {
+   "contract": "previous-release@1",
+   "output": "PREVIOUS RELEASE: PENDING\n",
+   "class": "stop",
+   "value": "PENDING",
+   "detail": ""
+  },
+  {
+   "contract": "previous-release@1",
+   "output": "PREVIOUS RELEASE: FAILED some detail\n",
+   "class": "ask",
+   "value": "FAILED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "previous-release@1",
+   "output": "PREVIOUS RELEASE: NOT GATED\n",
+   "class": "continue",
+   "value": "NOT GATED",
+   "detail": ""
+  },
+  {
+   "contract": "previous-release@1",
+   "output": "PREVIOUS RELEASE: UNREADABLE\n",
+   "class": "ask",
+   "value": "UNREADABLE",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-check@1",
+   "output": "PRE-MERGE: CLEAR\n",
+   "class": "continue",
+   "value": "CLEAR",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-check@1",
+   "output": "PRE-MERGE: HOLD\n",
+   "class": "stop",
+   "value": "HOLD",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-check@1",
+   "output": "PRE-MERGE: NOT RUN\n",
+   "class": "ask",
+   "value": "NOT RUN",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-check@1",
+   "output": "PRE-MERGE: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-recheck@1",
+   "output": "PRE-MERGE: CLEAR\n",
+   "class": "continue",
+   "value": "CLEAR",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-recheck@1",
+   "output": "PRE-MERGE: HOLD\n",
+   "class": "stop",
+   "value": "HOLD",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-recheck@1",
+   "output": "PRE-MERGE: NOT RUN\n",
+   "class": "ask",
+   "value": "NOT RUN",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-recheck@1",
+   "output": "PRE-MERGE: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "owner-go-ahead@1",
+   "output": "GO-AHEAD: YES some detail\n",
+   "class": "continue",
+   "value": "YES",
+   "detail": "some detail"
+  },
+  {
+   "contract": "owner-go-ahead@1",
+   "output": "GO-AHEAD: NOT YET\n",
+   "class": "ask",
+   "value": "NOT YET",
+   "detail": ""
+  },
+  {
+   "contract": "owner-go-ahead@1",
+   "output": "GO-AHEAD: NO\n",
+   "class": "end:declined",
+   "value": "NO",
+   "detail": ""
+  },
+  {
+   "contract": "release-stamp-verify@1",
+   "output": "CHECKS STAMP: UNCHANGED\n",
+   "class": "continue",
+   "value": "UNCHANGED",
+   "detail": ""
+  },
+  {
+   "contract": "release-stamp-verify@1",
+   "output": "CHECKS STAMP: CHANGED\n",
+   "class": "stop",
+   "value": "CHANGED",
+   "detail": ""
+  },
+  {
+   "contract": "release-stamp-verify@1",
+   "output": "CHECKS STAMP: BEHIND\n",
+   "class": "stop",
+   "value": "BEHIND",
+   "detail": ""
+  },
+  {
+   "contract": "release-stamp-verify@1",
+   "output": "CHECKS STAMP: ERROR some detail\n",
+   "class": "stop",
+   "value": "ERROR",
+   "detail": "some detail"
+  },
+  {
+   "contract": "rerun-at-merge@1",
+   "output": "PRE-SHIP: PASS\n",
+   "class": "continue",
+   "value": "PASS",
+   "detail": ""
+  },
+  {
+   "contract": "rerun-at-merge@1",
+   "output": "PRE-SHIP: FAIL\n",
+   "class": "stop",
+   "value": "FAIL",
+   "detail": ""
+  },
+  {
+   "contract": "rerun-at-merge@1",
+   "output": "PRE-SHIP: NOTHING TO RUN\n",
+   "class": "skipped",
+   "value": "NOTHING TO RUN",
+   "detail": ""
+  },
+  {
+   "contract": "merge-confirmations@1",
+   "output": "MERGE CONFIRMED: HEAD some detail\n",
+   "class": "continue",
+   "value": "HEAD",
+   "detail": "some detail"
+  },
+  {
+   "contract": "merge-confirmations@1",
+   "output": "MERGE CONFIRMED: NOT CONFIRMED some detail\n",
+   "class": "stop",
+   "value": "NOT CONFIRMED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "production-merge@1",
+   "output": "PRODUCTION MERGE: MERGED some detail\n",
+   "class": "continue",
+   "value": "MERGED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "production-merge@1",
+   "output": "PRODUCTION MERGE: REFUSED some detail\n",
+   "class": "stop",
+   "value": "REFUSED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "production-merge@1",
+   "output": "PRODUCTION MERGE: ERROR some detail\n",
+   "class": "stop",
+   "value": "ERROR",
+   "detail": "some detail"
+  },
+  {
+   "contract": "post-deploy-pending@1",
+   "output": "POST-DEPLOY STATUS: PENDING POSTED\n",
+   "class": "continue",
+   "value": "PENDING POSTED",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-pending@1",
+   "output": "POST-DEPLOY STATUS: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "estimates-score@1",
+   "output": "ESTIMATES: SCORED some detail\n",
+   "class": "continue",
+   "value": "SCORED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "estimates-score@1",
+   "output": "ESTIMATES: NONE\n",
+   "class": "continue",
+   "value": "NONE",
+   "detail": ""
+  },
+  {
+   "contract": "estimates-score@1",
+   "output": "ESTIMATES: NOTED FAILURE\n",
+   "class": "continue",
+   "value": "NOTED FAILURE",
+   "detail": ""
+  },
+  {
+   "contract": "tower-hand-back@1",
+   "output": "TOWER: HANDED BACK some detail\n",
+   "class": "continue",
+   "value": "HANDED BACK",
+   "detail": "some detail"
+  },
+  {
+   "contract": "tower-hand-back@1",
+   "output": "TOWER: KEPT some detail\n",
+   "class": "stop",
+   "value": "KEPT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "tower-hand-back@1",
+   "output": "TOWER: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-check@1",
+   "output": "POST-DEPLOY HEALTH: PASS\n",
+   "class": "continue",
+   "value": "PASS",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-check@1",
+   "output": "POST-DEPLOY HEALTH: FAIL\n",
+   "class": "stop",
+   "value": "FAIL",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-check@1",
+   "output": "POST-DEPLOY HEALTH: NOT RUN\n",
+   "class": "ask",
+   "value": "NOT RUN",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-check@1",
+   "output": "POST-DEPLOY HEALTH: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-result@1",
+   "output": "POST-DEPLOY STATUS: SUCCESS POSTED\n",
+   "class": "continue",
+   "value": "SUCCESS POSTED",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-result@1",
+   "output": "POST-DEPLOY STATUS: FAILURE POSTED\n",
+   "class": "stop",
+   "value": "FAILURE POSTED",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-result@1",
+   "output": "POST-DEPLOY STATUS: ERROR POSTED\n",
+   "class": "stop",
+   "value": "ERROR POSTED",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-result@1",
+   "output": "POST-DEPLOY STATUS: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "release-sync@1",
+   "output": "SYNC: DONE\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": ""
+  },
+  {
+   "contract": "release-sync@1",
+   "output": "SYNC: ALREADY SYNCED\n",
+   "class": "continue",
+   "value": "ALREADY SYNCED",
+   "detail": ""
+  },
+  {
+   "contract": "release-sync@1",
+   "output": "SYNC: STOPPED some detail\n",
+   "class": "stop",
+   "value": "STOPPED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-branch-delete@1",
+   "output": "RELEASE BRANCH DELETE: DELETED some detail\n",
+   "class": "continue",
+   "value": "DELETED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-branch-delete@1",
+   "output": "RELEASE BRANCH DELETE: KEPT some detail\n",
+   "class": "continue",
+   "value": "KEPT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-branch-delete@1",
+   "output": "RELEASE BRANCH DELETE: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "release-docs@1",
+   "output": "UPDATE DOCS: PUBLISHED\n",
+   "class": "continue",
+   "value": "PUBLISHED",
+   "detail": ""
+  },
+  {
+   "contract": "release-docs@1",
+   "output": "UPDATE DOCS: STAGED\n",
+   "class": "continue",
+   "value": "STAGED",
+   "detail": ""
+  },
+  {
+   "contract": "release-docs@1",
+   "output": "UPDATE DOCS: CURRENT\n",
+   "class": "continue",
+   "value": "CURRENT",
+   "detail": ""
+  },
+  {
+   "contract": "release-docs@1",
+   "output": "UPDATE DOCS: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "release-docs@1",
+   "output": "UPDATE DOCS: FAILED\n",
+   "class": "continue",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "release-docs@1",
+   "output": "UPDATE DOCS: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "release-kb-sync@1",
+   "output": "KNOWLEDGE BASE SYNC: DONE\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": ""
+  },
+  {
+   "contract": "release-kb-sync@1",
+   "output": "KNOWLEDGE BASE SYNC: CURRENT\n",
+   "class": "continue",
+   "value": "CURRENT",
+   "detail": ""
+  },
+  {
+   "contract": "release-kb-sync@1",
+   "output": "KNOWLEDGE BASE SYNC: FAILED\n",
+   "class": "continue",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "release-kb-sync@1",
+   "output": "KNOWLEDGE BASE SYNC: NOT RUN\n",
+   "class": "continue",
+   "value": "NOT RUN",
+   "detail": ""
+  },
+  {
+   "contract": "release-kb-sync@1",
+   "output": "KNOWLEDGE BASE SYNC: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "release-kb-sync@1",
+   "output": "KNOWLEDGE BASE SYNC: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "release-close-out@1",
+   "output": "POST-DEPLOY CLOSE-OUT: DONE\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": ""
+  },
+  {
+   "contract": "release-close-out@1",
+   "output": "POST-DEPLOY CLOSE-OUT: PARTIAL\n",
+   "class": "continue",
+   "value": "PARTIAL",
+   "detail": ""
+  },
+  {
+   "contract": "release-close-out@1",
+   "output": "POST-DEPLOY CLOSE-OUT: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "release-notes@1",
+   "output": "RELEASE NOTES: PUBLISHED\n",
+   "class": "continue",
+   "value": "PUBLISHED",
+   "detail": ""
+  },
+  {
+   "contract": "release-notes@1",
+   "output": "RELEASE NOTES: DRAFTED\n",
+   "class": "continue",
+   "value": "DRAFTED",
+   "detail": ""
+  },
+  {
+   "contract": "release-notes@1",
+   "output": "RELEASE NOTES: NOT REQUESTED\n",
+   "class": "skipped",
+   "value": "NOT REQUESTED",
+   "detail": ""
+  },
+  {
+   "contract": "release-notes@1",
+   "output": "RELEASE NOTES: NOT CONFIGURED\n",
+   "class": "stop",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "release-notes@1",
+   "output": "RELEASE NOTES: FAILED\n",
+   "class": "continue",
+   "value": "FAILED",
+   "detail": ""
+  },
+  {
+   "contract": "release-recap@1",
+   "output": "RELEASE RECAP: MERGED some detail\n",
+   "class": "continue",
+   "value": "MERGED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-recap@1",
+   "output": "RELEASE RECAP: STOPPED AT some detail\n",
+   "class": "continue",
+   "value": "STOPPED AT",
+   "detail": "some detail"
+  },
+  {
+   "contract": "release-recap@1",
+   "output": "RELEASE RECAP: NOTHING TO RELEASE\n",
+   "class": "continue",
+   "value": "NOTHING TO RELEASE",
+   "detail": ""
+  },
+  {
+   "contract": "auto-start@1",
+   "output": "AUTO START: START\n",
+   "class": "continue",
+   "value": "START",
+   "detail": ""
+  },
+  {
+   "contract": "auto-start@1",
+   "output": "AUTO START: SKIP some detail\n",
+   "class": "continue",
+   "value": "SKIP",
+   "detail": "some detail"
+  },
+  {
+   "contract": "auto-start@1",
+   "output": "AUTO START: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "auto-start@1",
+   "output": "AUTO START: ERROR some detail\n",
+   "class": "continue",
+   "value": "ERROR",
+   "detail": "some detail"
   }
  ],
  "proofs": [

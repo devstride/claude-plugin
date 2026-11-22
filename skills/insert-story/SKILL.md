@@ -11,6 +11,14 @@ description: Insert a new Story into a live DevStride roadmap, spliced into the 
 
 Argument — free text describing the story, optionally with a parent item number at any grouping level (this org: Module/Capability/Epic — e.g. `I20100 add rate limiting to webhook intake`, or just `add rate limiting to webhook intake`). **Take any `--ticket <ticket#>[,<ticket#>]` out FIRST**, before reading the parent or the description: it names an originating ticket, never the parent (**read `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/originating-ticket.md` in full before linking**): $ARGUMENTS
 
+## Verdict
+
+`SPLICE: INSERTED <placement> | NEEDS ANSWER <question> | NEXT UNCHANGED <reason>`
+
+Print that line first: INSERTED with the new item's number as the create result returned it, the
+upstream and next items and the prefix; NEEDS ANSWER with the one question; NEXT UNCHANGED with
+why the next item to build stays the same. Then the report.
+
 ## Rules that must hold
 
 - **The procedure is `${CLAUDE_PLUGIN_ROOT}/skills/plan/references/splice-mechanics.md`**, steps 0–5 in order, with `<leaf>` = Story. The steps below carry only what is Story-specific.

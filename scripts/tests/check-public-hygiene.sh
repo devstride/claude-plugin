@@ -150,4 +150,11 @@ expect "(28) merged hunks (diff.interHunkContext) cannot hide the next file's li
 OUT="$(cd "$ROOT" && bash "$CHECK" --base HEAD --head HEAD 2>&1)"; RC=$?
 expect "(13) this repository's allow list parses" 0 "CLEAN"
 
+# A workflow definition is read like every other file: a tracker number in workflows/ is found.
+new_case workflow; mkdir -p "$R/workflows"
+printf '{"id": "demo", "summary": "Fixed in I%s."}\n' "14321" > "$R/workflows/demo.json"
+commit "feat: a demo definition"; check
+expect "(14) a tracker number in a workflows/ definition → finding with file and line" 1 \
+  "^PUBLIC HYGIENE: 1 finding(s)$" "^HYGIENE: item-number in workflows/demo.json:1:"
+
 exit $FAIL

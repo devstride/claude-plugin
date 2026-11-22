@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v4.7.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v4.8.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -108,7 +108,7 @@
       ]
     },
     "workflows": {
-      "description": "provider-or-commands hook — the `record_workflow_step` arguments as one JSON object (the provider sends them to the DevStride tool; a commands report receives them on stdin)",
+      "description": "provider-or-commands hook — the `record_workflow_step` arguments as one JSON object (the provider sends them to the DevStride tool; a commands report receives them on stdin); with the same switch on, each run first asks `get_workflow_for_item` through the agent's own connection which workflow applies to the item, as skills/run-workflow/references/fetching-the-workflow.md says, and a failed or empty answer runs the built-in workflow",
       "oneOf": [
         {
           "type": "null"

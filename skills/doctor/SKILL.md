@@ -56,29 +56,26 @@ next action. For each failure symptom, read
   skill is unavailable, print exact id/scope bootstrap commands, then reload and check for errors.
 - **`python3` on PATH** — the session-start hook and the reviewer wait script need it. FAIL,
   a platform install hint.
-- **Learned reviewer latency** — from
-  `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/reviewer-latency.json`, report each reviewer's
-  samples, p50, p95 and derived bound under `pollTimeoutMinutes`; below the sample
-  minimum report `cold — the wait uses pollTimeoutMinutes`. INFO only; schema/format:
-  `${CLAUDE_PLUGIN_ROOT}/skills/review/references/reviewer-latency.md`.
+- **User cache** — saved library skills (WARN for one failing its fingerprint) and learned reviewer
+  latency (INFO): `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/skill-cache.md`.
 - **Session-start check** — read the per-repository record
   `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/repo-<first-12-hex sha1 of repo root>.json`; derive
   the root with `git rev-parse --show-toplevel` and use the schema in `version-currency.md`. On one
   line report `checkedAt`, `running`, `newest`, `mode`, `result`, `install`, `statusLine`. Absent:
   say never run here (pre-1.2.0 plugin, disabled hooks, or
   `DEVSTRIDE_PLUGIN_UPDATE_CHECK=0`). Modes and who each copy hands off to: `version-currency.md`.
-  A verified disk change needs plugin reload (restart only if reload fails).
+  A verified disk change needs plugin reload (else restart).
 - **Repo declaration** — `.claude/settings.json` enables but does not install. Print
   `version-currency.md`'s install line for this repository's rows (its `enabledPlugins` id). Always run both
   `git ls-files --error-unmatch .claude/settings.json` (tracked?) and
-  `git check-ignore -v .claude/settings.json` (ignored?); an untracked file reaches nobody.
+  `git check-ignore -v .claude/settings.json` (ignored?); untracked reaches nobody.
 
 ## 3. DevStride connection (`devstride`)
 
 - **A server exists and is CONNECTED** — `claude mcp list`. The bundled one is
   `plugin:devstride:devstride`; a plain `devstride` is yours or your project's.
 - **Ready for agents** — report the connection and `PRESENCE` lines of
-  `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" check`; `NOT READY` → FAIL (`claims-checks.md`).
+  `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" check`; `NOT READY` → FAIL (`claims-checks.md`, `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/workflows-checks.md`).
 - **Not connected** (missing tools, not an auth error) or `NOT READY` → Fix: `/devstride:setup connect`.
 - **More than one connected** — FAIL: calls can reach either organization. OAuth:
   `claude mcp logout <name>`; API-key headers: `claude mcp remove <name>`; never `claude mcp get` (it prints the key).

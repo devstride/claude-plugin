@@ -26,7 +26,7 @@ WORKFLOW_ID = re.compile(r"^[a-z][a-z0-9-]{0,99}$")
 SLUG = re.compile(r"^[a-z][a-z0-9-]{0,63}$")
 CONTRACT = re.compile(r"^[a-z][a-z0-9-]*@[0-9]+$")
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
-MAX_BYTES, MAX_PHASES, MAX_STEPS_PER_PHASE, MAX_STEPS, MAX_VERSION = 65536, 12, 40, 100, 1000000
+MAX_BYTES, MAX_PHASES, MAX_STEPS_PER_PHASE, MAX_STEPS, MAX_VERSION = 65536, 12, 40, 250, 1000000
 NAME_MAX, SUMMARY_MAX = 200, 500
 
 
