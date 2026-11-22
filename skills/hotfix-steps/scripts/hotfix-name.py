@@ -72,7 +72,14 @@ def answer(request):
         argument = argument.rstrip("/").split("/")[-1]
     if not argument:
         raise Refusal("no branch name was given; ask for one")
-    slug = routing("slug", {"title": argument, "words": 8})["slug"]
+    # A leading item number keeps its upper-case I, as feature branches do (`I<number>-<slug>`), so
+    # whatever reads an item from a branch name finds it; only the rest is slugged.
+    item = re.match(r"^[Ii](\d+)(?:[-_ ]+(.*))?$", argument)
+    if item:
+        rest = routing("slug", {"title": item.group(2), "words": 8})["slug"] if (item.group(2) or "").strip() else ""
+        slug = "I%s" % item.group(1) + ("-" + rest if rest else "")
+    else:
+        slug = routing("slug", {"title": argument, "words": 8})["slug"]
     date = render_date(section(config, "branchNaming").get("dateFormat") or DEFAULT_FORMAT, today)
     branch = "%s/hotfix/%s/%s" % (prefix, date, slug)
     if subprocess.run(["git", "check-ref-format", "--branch", branch], capture_output=True).returncode != 0:

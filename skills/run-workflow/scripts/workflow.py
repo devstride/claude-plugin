@@ -18,7 +18,7 @@ the same answers every time, also after a restart or a cleared conversation. The
   next    {"runId"?, "item"?}
   done    {"runId"?, "item"?, "stepId", "attempt", "output"}
   status  {"runId"?, "item"?, "includeDefinition"?}
-  resume  {"runId"?, "item"?, "answer"?, "session"?}
+  resume  {"runId"?, "item"?, "workflow"?, "answer"?, "session"?}
   reported {"runId"?, "item"?, "ok"}       what became of a run's reports; the first failure hands back one line to say
   unsent  {"cwd"?}                         this repository's runs whose reports failed, each shaped again in full
   judge   {"item", "answer"}               whether the newest tracked run of an item did every required step
@@ -1618,6 +1618,7 @@ class Run:
         for the step and the run. Whatever cannot be read as a pass is recorded as a failure."""
         state, step, record, entry = self.state, self.steps[index], self.record(index), self.entry(index)
         state["current"], state["stopped"] = None, None
+        kept = record.get("answer")  # a step that asks to run again keeps the person's reply (below)
         record.update(endedAt=self.world.now(), answer=None, evidence=[], links={}, redo=None)
         parsed = parse_verdict(entry, output) if isinstance(output, str) else None
         if parsed is None:
@@ -1637,6 +1638,8 @@ class Run:
         record.update(verdict=line, evidence=REPORT.clean_evidence([l for l in lines if not has_secret(l)]),
                       result=result, proof=proof, links=links)
         kind = record["class"] = value["class"]
+        if kind == "redo:self":
+            record["answer"] = kept  # e.g. a deploy approval retried while the deploy is not waiting yet
         after = None  # (stop kind, reason) once the report is queued
         if kind == "continue":
             # The merge rule is asked again here: a step repaired by hand was never issued past it.
@@ -2052,7 +2055,7 @@ def adopt(world, request, session, cwd):
     re-bound to the adopting checkout. Nothing is written here: the resume writes it once its answer
     is known, so a refused resume leaves the run where it was. Returns (folder, state, adoptedFrom,
     the old state file)."""
-    item, run_id = item_of(request.get("item")), request.get("runId")
+    item, run_id, wanted = item_of(request.get("item")), request.get("runId"), request.get("workflow")
     folder = state_dir(world, create=False)
     if folder is None or not (item or run_id):
         raise Refuse("no-run", "there is no unfinished run to resume")
@@ -2067,7 +2070,8 @@ def adopt(world, request, session, cwd):
         except (Refuse, OSError):
             continue  # not this user's, not a state file, or gone: never adopted
         if (not state["outcome"] and state["sessionId"] != session and (item is None or state["item"] == item)
-                and (not run_id or state["runId"] == run_id) and state_name(state["sessionId"], state["item"]) == name):
+                and (not run_id or state["runId"] == run_id) and state_name(state["sessionId"], state["item"]) == name
+                and (wanted is None or state["definition"].get("id") == wanted)):
             if same_repository(world, state, cwd):
                 found.append((modified, path, state))
             else:
@@ -2101,10 +2105,18 @@ def command_resume(world, request, contracts):
     if not isinstance(cwd, str) or not os.path.isdir(cwd):
         raise Refuse("bad-request", "cwd must be a directory")
     cwd, adopted_from, old_path = os.path.realpath(cwd), None, None
+    wanted = request.get("workflow")
+    if wanted is not None and not (isinstance(wanted, str) and WORKFLOW_ID.match(wanted)):
+        raise Refuse("bad-request", "workflow is a workflow id")
     try:
         folder, state = find_run(world, request, session)
         if state["outcome"]:
             raise Refuse("no-run", "that run has ended")
+        if wanted is not None and state["definition"].get("id") != wanted:
+            # Each entry resumes only its own workflow's run: a hotfix never walks a Build run's steps.
+            raise Refuse("other-workflow", "this session's open run for %s is the %s workflow, not %s; finish it with its own "
+                         "command, end it (resume with close), or start with replace" % (state["item"] or "no item",
+                                                                                         state["definition"].get("id"), wanted))
     except Refuse as refusal:
         if refusal.code != "no-run":
             raise

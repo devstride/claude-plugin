@@ -351,6 +351,14 @@ run.resume(answer="newInstance")
 check("... the answer re-issues rewind-environment as attempt 2", run.answer.get("action") == "run" and run.answer["step"]["id"] == "rewind-environment"
       and run.answer["step"]["attempt"] == 2, run.answer)
 
+# Case 3 (no recreate, schema diverged or unknown) asks; "proceed anyway" re-issues the step, which answers UNCHANGED and goes on.
+run = Run()
+run.until("rewind-environment")
+run.done(answer_text("HOTFIX ENVIRONMENT: NEEDS ANSWER no localEnvironment.recreate and the schema may have diverged", {"case": 3, "mode": None, "why": "cannot tell", "restartDevServer": True}))
+run.resume(answer="proceed anyway")
+run.done(answer_text("HOTFIX ENVIRONMENT: UNCHANGED", {"case": 3, "mode": None, "why": "the person said to proceed without a rebuild", "restartDevServer": True}))
+check("case 3's proceed anyway answers UNCHANGED and continues to the report", run.answer.get("action") == "run" and run.answer["step"]["id"] == "report-cut", run.answer)
+
 # The merge waits for a yes; the deploy approval can be not configured and is then skipped.
 run = Run()
 run.until("merge")
@@ -389,6 +397,19 @@ answer = json.loads(done.stdout) if done.returncode == 0 else {}
 check("... and adopted once that checkout is on it", answer.get("action") == "run" and answer["step"]["id"] == "fix" and "adoptedFrom" in answer,
       (done.stderr, answer))
 
+# Each entry resumes only its own workflow's run: a Build or Plan entry never walks a hotfix's steps.
+run = Run(context={"item": "I124"})
+run.until("fix")
+code, answer, err = run.call("resume", {"item": "I124", "workflow": "build"})
+check("this session's hotfix run is refused to a resume that names another workflow (other-workflow)",
+      code == 2 and "other-workflow" in err and "hotfix" in err, (code, err))
+done = subprocess.run([sys.executable, "-B", RUNNER, "resume"], input=json.dumps({"item": "I124", "session": "s3", "workflow": "plan"}),
+                      capture_output=True, text=True, env=dict(os.environ, XDG_CACHE_HOME=run.cache), cwd=run.repo)
+check("... another session's resume for another workflow never adopts it",
+      done.returncode == 2 and "no-run" in done.stderr, (done.returncode, done.stderr))
+code, answer, err = run.call("resume", {"item": "I124", "workflow": "hotfix"})
+check("... and a resume that names its own workflow carries it on", code == 0 and answer.get("action") == "run" and answer["step"]["id"] == "fix", (code, err))
+
 # The fix step can be abandoned, which ends the run cleanly.
 run = Run()
 run.until("fix")
@@ -422,6 +443,16 @@ check("RETRY re-issues the approval as the next attempt", run.answer.get("action
 run.done(answer_text("DEPLOY APPROVAL: STOPPED deploy not waiting", {"mergeSha": "abc1234", "approved": False}))
 check("... and STOPPED stops the run before the confirmation", run.answer.get("action") == "stopped"
       and run.answer.get("stepId") == "approve-deploy" and "confirm-deploy" not in [s for s, _ in run.issued()], run.answer)
+
+# A yes given for the deploy survives a RETRY: the next attempt still carries it, and nobody is asked again.
+run = Run()
+run.until("approve-deploy")
+run.done(answer_text("DEPLOY APPROVAL: WAITING FOR YES", {"mergeSha": "abc1234", "approved": False}))
+run.resume(answer="yes, approve the deploy of abc1234")
+run.done(answer_text("DEPLOY APPROVAL: RETRY", {"mergeSha": "abc1234", "approved": False}))
+check("a RETRY after the person's yes re-issues the approval with that yes still in its payload",
+      run.answer.get("action") == "run" and run.answer["step"]["id"] == "approve-deploy"
+      and run.answer["payload"].get("answer") == "yes, approve the deploy of abc1234", run.answer)
 
 # A review gone stale (the patch changed after it) is run again before the merge is handed out.
 run = Run()

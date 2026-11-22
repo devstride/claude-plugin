@@ -39,8 +39,8 @@ here. Three cases:
 **Say which case you took and why** — "the environment was reset" reads the same for all three and
 only two are sound. Then restart the dev server you asked the user to stop (`restartDevServer`).
 Block absent, or every command `null` → the procedure is repo-specific: say so and ask (`NEEDS
-ANSWER`); never invent a reset command. `UNCHANGED` only when the stage step answered `NONE` and the
-repository has no `localEnvironment` block and the person said to go on without one.
+ANSWER`); never invent a reset command. `UNCHANGED` only when the person said to go on without a
+rebuild (case 3's proceed anyway, or no block and they said go on), its `why` saying so.
 
 ## Verdict
 

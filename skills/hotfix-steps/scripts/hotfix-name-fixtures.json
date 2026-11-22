@@ -13,5 +13,9 @@
   {"name": "an overridden hotfix pattern the name does not match is refused", "in": {"config": {"releaseTower": {"hotfixPattern": "hotfix-*/**"}}, "userName": "Jane", "branchArgument": "x", "today": "2026-11-21"}, "exit": 2},
   {"name": "an argument that already holds the infix", "in": {"config": {}, "userName": "Jane", "branchArgument": "jane/hotfix/11-21-26/fix-it", "today": "2026-11-21"},
    "out": {"branch": "jane/hotfix/11-21-26/fix-it", "prefix": "jane", "date": "11-21-26", "slug": "fix-it", "matches": true, "pattern": "*/hotfix/**"}},
+  {"name": "a leading item number keeps its upper-case I", "in": {"config": {}, "userName": "Jane", "branchArgument": "i123-Fix Login", "today": "2026-11-21"},
+   "out": {"branch": "jane/hotfix/11-21-26/I123-fix-login", "prefix": "jane", "date": "11-21-26", "slug": "I123-fix-login", "matches": true, "pattern": "*/hotfix/**"}},
+  {"name": "a bare item number", "in": {"config": {}, "userName": "Jane", "branchArgument": "I123", "today": "2026-11-21"},
+   "out": {"branch": "jane/hotfix/11-21-26/I123", "prefix": "jane", "date": "11-21-26", "slug": "I123", "matches": true, "pattern": "*/hotfix/**"}},
   {"name": "a name matching the release branch pattern is refused", "in": {"config": {"release": {"releaseBranchPattern": "*/hotfix/**"}}, "userName": "Jane", "branchArgument": "x", "today": "2026-11-21"}, "exit": 2}
 ]
