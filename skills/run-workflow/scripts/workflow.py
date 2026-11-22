@@ -1182,6 +1182,12 @@ def item_of(value):
     return value
 
 
+def runs_workflow(state, wanted):
+    """Whether a run is one of the workflow an entry names (`resume`'s `workflow`): the definition it
+    pinned, or the built-in one an organization's workflow stands in for. None names any."""
+    return wanted is None or wanted in (state["definition"].get("id"), state.get("builtinId"))
+
+
 def find_run(world, request, session):
     """This session's run: the one for the item, else the one with the run id, else its only
     open run. Returns (folder, state)."""
@@ -1786,7 +1792,7 @@ def command_start(world, request, contracts):
                 raise Refuse("run-open", "this session already has an open run for %s; resume it, or start with replace" % (item or "no item"))
             replaced = close_replaced(old, world)
     chosen = choose_definition(definition, request.get("fetched", MISSING), trigger, contracts, version, in_work_tree, context)
-    definition = chosen["definition"]
+    builtin_id, definition = definition.get("id"), chosen["definition"]
     steps = flat_steps(definition)
     prune(folder, world)
     context.update(cwd=cwd, repository=REPORT.read_repository(cwd))
@@ -1798,7 +1804,7 @@ def command_start(world, request, contracts):
              "definitionSource": chosen["source"], "workflowId": chosen["workflow"]["id"],
              "workflowName": chosen["workflow"]["name"], "workflowVersion": chosen["workflow"]["version"],
              "workflowHash": chosen["workflow"]["hash"], "fallbackReason": chosen["reason"],
-             "skillManifest": chosen["skills"]}
+             "skillManifest": chosen["skills"], "builtinId": builtin_id}
     if chosen["organizationId"]:
         state["organizationId"] = chosen["organizationId"]
     run = Run(state, contracts, world)
@@ -2071,7 +2077,7 @@ def adopt(world, request, session, cwd):
             continue  # not this user's, not a state file, or gone: never adopted
         if (not state["outcome"] and state["sessionId"] != session and (item is None or state["item"] == item)
                 and (not run_id or state["runId"] == run_id) and state_name(state["sessionId"], state["item"]) == name
-                and (wanted is None or state["definition"].get("id") == wanted)):
+                and runs_workflow(state, wanted)):
             if same_repository(world, state, cwd):
                 found.append((modified, path, state))
             else:
@@ -2112,7 +2118,7 @@ def command_resume(world, request, contracts):
         folder, state = find_run(world, request, session)
         if state["outcome"]:
             raise Refuse("no-run", "that run has ended")
-        if wanted is not None and state["definition"].get("id") != wanted:
+        if not runs_workflow(state, wanted):
             # Each entry resumes only its own workflow's run: a hotfix never walks a Build run's steps.
             raise Refuse("other-workflow", "this session's open run for %s is the %s workflow, not %s; finish it with its own "
                          "command, end it (resume with close), or start with replace" % (state["item"] or "no item",

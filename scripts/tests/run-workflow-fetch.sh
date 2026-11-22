@@ -217,6 +217,11 @@ for command in ("next", "status", "resume"):
     else:
         pinned = pinned and answer["step"]["id"] == first["step"]["id"]
     check("%s ignores a fetched member and reads the pinned copy" % command, pinned, (rc, err))
+rc, answer, _, err = run("resume", {"session": sid, "item": FIX["context"]["item"], "workflow": FIX["builtin"]["id"]})
+check("a resume naming the built-in workflow carries on the organization's workflow that stands in for it",
+      rc == 0 and answer["runId"] == first["runId"], (rc, err))
+rc, answer, _, err = run("resume", {"session": sid, "item": FIX["context"]["item"], "workflow": "hotfix"})
+check("... and one naming another workflow is refused other-workflow", rc == 2 and "other-workflow" in err, (rc, err))
 run("done", {"session": sid, "item": FIX["context"]["item"], "stepId": first["step"]["id"], "attempt": 1,
              "output": "STEP: PASS", "fetched": {"match": None}})
 rc, after, _, err = sid_status(sid)
