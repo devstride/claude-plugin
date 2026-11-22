@@ -78,4 +78,26 @@ git -C "$R" commit -qam "base listing only scripts/"; BASE="$(git -C "$R" rev-pa
 mkdir -p "$R/.claude"; printf '{}\n' > "$R/.claude/ds-config.json"; check
 expect "(12) after a release listing only scripts/, a .claude/ change needs a bump — the widening ships first" 1 "without a version bump.*\.claude/ds-config.json"
 
+# release_steps MODE... — a workflow whose steps the grouped release-steps skill serves, and its body
+release_steps() {
+  mkdir -p "$R/workflows" "$R/skills/release-steps/references"; echo body > "$R/skills/release-steps/SKILL.md"
+  python3 - "$R/workflows/release.json" "$@" <<'PY'
+import json, sys
+steps = [{"id": m, "contract": m + "@1", "run": {"source": "builtin", "ref": "release-steps"}} for m in sys.argv[2:]]
+steps.append({"id": "other", "contract": "pre-ship@1", "run": {"source": "builtin", "ref": "pre-ship"}})
+json.dump({"id": "release", "phases": [{"id": "start", "steps": steps}]}, open(sys.argv[1], "w"))
+PY
+}
+new_case steps-unwritten; release_steps train-claim tower-claim; echo ref > "$R/skills/release-steps/references/train-claim.md"
+set_version 1.1.0; changelog_heading 1.1.0; check
+expect "(13) a bump while a release step has no reference → refused, names the mode" 1 "1 release step(s) have no reference yet.*(tower-claim)"
+
+new_case steps-written; release_steps train-claim tower-claim
+echo ref > "$R/skills/release-steps/references/train-claim.md"; echo ref > "$R/skills/release-steps/references/tower-claim.md"
+set_version 1.1.0; changelog_heading 1.1.0; check
+expect "(14) a bump with every release step's reference written → ok" 0 "bumped from 1.0.0"
+
+new_case steps-unwritten-no-bump; release_steps train-claim tower-claim; check
+expect "(15) the same gap without a bump is the ordinary rule's business, not this one's" 1 "without a version bump"
+
 exit $FAIL

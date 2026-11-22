@@ -77,7 +77,8 @@ def skill_faults(root, name, contracts, words, body_tokens):
 
 
 # The release-steps modes (a contract name without its major) whose reference is not written yet.
-# A mode listed here must have NO reference file; every other mode must have one.
+# A mode listed here must have NO reference file; every other mode must have one. No release of the
+# plugin is cut while this list is not empty: scripts/check-version-bump.sh rule 5 refuses the bump.
 RELEASE_PENDING_MODES = [
     "merged-release", "train-finish", "ship-plan", "train-snapshot", "train-pr", "train-review", "train-merge", "train-close-out",
     "train-level", "release-delta", "tower-queue", "release-branch", "production-in-branch", "release-pr", "train-claim-hand-on",

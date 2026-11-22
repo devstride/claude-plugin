@@ -13,14 +13,19 @@ its provider commands, exit codes and "Where the release skill calls it".
    `NOT APPLICABLE`, with nothing more said. A hotfix never claims.
 2. **Claim in the BACKGROUND with a long timeout**: a call a tool kills yields no verdict, and no
    verdict is exit `1`. The call is `claim --wait --purpose release`; at the final gate of
-   `merge-and-deploy` it is `claim --wait --branch <release branch> --pr <n>` (both from the
-   payload's `shape`), followed at once by `heartbeat final`.
+   `merge-and-deploy` it is `claim --wait --branch <release branch> --pr <n>`, followed at once
+   by `heartbeat final`. The branch and number: the payload's `shape` when it is `ADOPTED`; when
+   it is `NEW` (its `pullRequest` and `branch` are null: this run cut and opened them after the
+   shape was read), the open release pull request into the production branch whose
+   `devstride:release-holder` marker is this session's, and its head branch. None, or more than
+   one → `ERROR`, saying so.
 3. **While it waits** (the provider polls every 60 seconds, up to `waitMinutes`), say who holds the
    tower and heartbeat the train claim while this run holds it
    (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/resume-rules.md` "Heartbeats").
 4. **Act on the exit, exactly:**
-   - `0` → `CLEARED`; say who was waiting when stderr said so. Under `cut-to-deploy` the release
-     shape is read again before the cut, and with a `claims` block the train is levelled again
+   - `0` → `CLEARED`; say who was waiting when stderr said so. Nothing reads the shape again:
+     a release left stale meanwhile ends the wait with exit `3`. Under `cut-to-deploy` with a
+     `claims` block, the next step (the cut, `release-branch`) levels the train again first,
      under the train claim this run still holds.
    - `2` (still held when the wait ran out) → `BUSY`, naming the holder. The run stops; nothing
      is cut or merged uncleared.

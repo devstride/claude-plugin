@@ -83,8 +83,8 @@ restating it. The clearance contract itself is
 
 ## Whose release it is
 
-A release pull request whose holder marker names another session is never adopted silently, even
-with the tower clear: stop, name it, and adopt only on the owner's yes (`clearance.md`; with a
+A release pull request whose holder marker names another session (scope `merge-and-deploy`, the
+only one that writes it) is never adopted silently, even with the tower clear: stop, name it, and adopt only on the owner's yes (`clearance.md`; with a
 `claims` block the train claim decides which markers are adoptable,
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`). The same holds for a train pull
 request. A stopped release is adopted, never resumed or messaged so that a second copy starts.

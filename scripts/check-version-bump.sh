@@ -19,6 +19,11 @@
 #      README.md's `Current version:` line must name it.
 #   4. If the version changed, the head version must be greater than the newest devstride--v*
 #      tag known locally (a bump to a version older than the last release is a mistake).
+#   5. If the version changed, every step of every workflow in workflows/ that the grouped
+#      release-steps skill serves must have its reference (skills/release-steps/references/<mode>.md,
+#      the mode being the contract name without its major). The step runner starts a workflow as
+#      soon as its skill folder exists, so a release cut while references are still missing would
+#      ship a release workflow that claims the train and the tower and then stops with no verdict.
 #
 # Usage: check-version-bump.sh --base <ref> [--head <ref>]      exit 0 ok, 1 violation, 2 usage
 set -u
@@ -105,6 +110,27 @@ if bumped and semver(head_v):
     m = re.search(r"Current version:\s*\**\s*`?v?([0-9.]+)", readme)
     if not m or m.group(1) != head_v:
         problems.append("README.md `Current version:` says %s, plugin.json says %s (plugin-release prepare, RELEASING.md)" % (m.group(1) if m else "nothing", head_v))
+if bumped:
+    # rule 5: no release while a workflow step's release-steps reference is still unwritten
+    tree = set(sh("ls-tree", "-r", "--name-only", HEAD, "--", "workflows", "skills/release-steps").splitlines())
+    unwritten = {}
+    for path in sorted(p for p in tree if re.fullmatch(r"workflows/[^/]+\.json", p)):
+        try:
+            definition = json.loads(sh("show", "%s:%s" % (HEAD, path)))
+            steps = [s for ph in definition.get("phases", []) for s in ph.get("steps", [])]
+        except Exception:
+            continue  # an unreadable definition is check-workflows.py's business
+        for step in steps:
+            run = step.get("run") if isinstance(step, dict) else None
+            if isinstance(run, dict) and run.get("source") == "builtin" and run.get("ref") == "release-steps":
+                mode = str(step.get("contract", "")).split("@")[0]
+                if "skills/release-steps/references/%s.md" % mode not in tree:
+                    unwritten.setdefault(mode, path)
+    if unwritten:
+        modes = sorted(unwritten)
+        problems.append("%d release step(s) have no reference yet in skills/release-steps/references/ (%s%s) — the runner would start "
+                        "a release workflow it cannot finish; release only once every one is written"
+                        % (len(modes), ", ".join(modes[:6]), " …" if len(modes) > 6 else ""))
 if problems:
     for p in problems: print("VERSION-BUMP: " + p)
     sys.exit(1)
