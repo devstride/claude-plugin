@@ -45,7 +45,8 @@
     "merge-story": 1081,
     "capture-findings": 900,
     "sync-base": 500,
-    "plan-steps": 1200
+    "plan-steps": 1200,
+    "release-steps": 1200
   },
   "references": {
     "skills/build-item/references/epic-release.md": 3200,
@@ -108,7 +109,7 @@
     "skills/build-item/references/checkout-pool-commands.md": 1463,
     "skills/build-item/references/story-claims.md": 1944,
     "skills/build-item/references/needs-you.md": 3383,
-    "skills/doctor/references/claims-checks.md": 1199,
+    "skills/doctor/references/claims-checks.md": 1239,
     "skills/build-item/references/epic-release-steps.md": 2013,
     "skills/review/references/cloud-reviewers.md": 700,
     "skills/build-item/references/deferred-container.md": 3364,
@@ -172,7 +173,13 @@
     "skills/plan-steps/references/rebalance-successors.md": 300,
     "skills/plan-steps/references/session-model.md": 400,
     "skills/doctor/references/workflows-checks.md": 355,
-    "skills/run-workflow/references/fetching-the-workflow.md": 1117
+    "skills/run-workflow/references/fetching-the-workflow.md": 1117,
+    "skills/release-steps/references/ci-hold-proof.md": 500,
+    "skills/release-steps/references/ground-truth.md": 600,
+    "skills/release-steps/references/release-shape.md": 1100,
+    "skills/release-steps/references/resume-rules.md": 2700,
+    "skills/release-steps/references/tower-claim.md": 1200,
+    "skills/release-steps/references/train-claim.md": 800
   },
   "paths": {
     "epicReleaseGate": {

@@ -23,8 +23,22 @@ for what each version component means here and how a release is cut.
   review, the pre-ship checks, the owner's go-ahead and the merge confirmations, and it stands in
   for the hotfix merge so the release reuses the hotfix's deploy approval and confirmation steps
   unchanged. The four existing seam steps (classify, pre-ship, pre-merge, post-deploy) serve
-  release positions with their own verdict lines. The grouped `release-steps` skill that answers
-  the rest is not written yet, so the runner still refuses the release definitions.
+  release positions with their own verdict lines. The grouped `release-steps` skill answers the
+  rest, one reference per step; its references are still being written (next entry).
+- **The release's first steps can be run one at a time (in progress).** The new step skill
+  `release-steps` carries every release step the existing seam steps do not, one reference file
+  per step, read only when that step runs. This change writes the five that open a release:
+  claiming the release train, reading what is really on both branches, deciding whether the
+  release is new, an open one to adopt or a merged one to close out, proving CI waits for the
+  ready flip, and claiming the tower. A shared reference, `resume-rules.md`, says once what every
+  step is told about an adopted or merged release, whose release an open pull request is, and
+  when a step heartbeats the tower and the train claim. The rules themselves are unchanged and
+  still live in `clearance.md`, `auto-start.md`, `ground-truth-at-start.md` and
+  `branch-patterns.md`, which the new references cite. The remaining steps' references are not
+  written yet, nothing starts the release definitions, and the release still follows its
+  instructions page. The release steps must be startable by the runner through the Skill tool,
+  so one short description joins every session's context; it fits inside the existing always-on
+  budget of 2,200 tokens (2,191 measured), so that budget does not rise.
 - **A step's contract may allow more automatic re-runs.** A contract can raise the runner's cap of
   five automatic re-issues for its own step (`maxAutoRedo`, at most twenty), for long steps such
   as a release review that may restart several times.

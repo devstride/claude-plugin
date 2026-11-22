@@ -80,8 +80,9 @@ if MODE == "--record":
 
 done = subprocess.run([sys.executable, os.path.join(ROOT, "scripts/check-workflows.py")], capture_output=True, text=True)
 check("check-workflows.py passes every definition in workflows/ (%d files)" % len(defs), done.returncode == 0, done.stdout + done.stderr)
-# Definitions whose contracts and step skill land with a later story of the same integration: the
-# catalog and skill checks wait for them, and the entry must go the moment they are complete.
+# Definitions whose contracts, step skill or step references land with a later change of the same
+# integration: the catalog and skill checks wait for them, and the entry must go the moment they
+# are complete.
 PENDING = {"release.json", "release-cut-to-deploy.json", "release-merge-and-deploy.json", "release-docs.json",
            "release-notes.json", "release-post-deploy.json"}
 for name, d in defs.items():
@@ -90,9 +91,15 @@ for name, d in defs.items():
     missing = [s["contract"] for s in steps(d) if s["contract"] not in CATALOG]
     refs = [s["run"]["ref"] for s in steps(d) if s.get("run", {}).get("source") == "builtin"]
     absent = [r for r in refs if not os.path.isfile(os.path.join(ROOT, "skills", r, "SKILL.md"))]
+    # a grouped step skill serves a step only once the step's reference (its mode, the contract
+    # name without the major) is written: release-steps lands its references over several changes
+    unbuilt = sorted(set(s["contract"] for s in steps(d) if s.get("run", {}).get("ref") == "release-steps"
+                         and not os.path.isfile(os.path.join(ROOT, "skills/release-steps/references", s["contract"].split("@")[0] + ".md"))))
     if name in PENDING:
-        check("%s: still pending its contracts or step skill (else drop it from PENDING)" % name, bool(missing or absent), "complete")
+        check("%s: still pending its contracts, its step skill or a step's reference (else drop it from PENDING)" % name,
+              bool(missing or absent or unbuilt), "complete")
         continue
+    check("%s: every release-steps step has its reference" % name, unbuilt == [], unbuilt)
     check("%s: every contract is in the catalog" % name, missing == [], missing)
     check("%s: every built-in run.ref is a skill" % name, absent == [], absent)
     now, was = entry(d), recorded.get(d["id"])
