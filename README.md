@@ -608,6 +608,11 @@ after a fix.
 one reference per step, plus the production deploy's approval and confirmation, which other
 workflows reuse. `branch-hotfix` runs that workflow through the step runner.
 
+**Release steps (in progress)** — `release-steps` carries the release steps the existing seam
+steps do not, one reference per step. The steps that open a release are written (the train claim,
+ground truth, the release shape, the CI hold and the tower claim); the rest follow, and until
+then `release` still runs from its own instructions page.
+
 ### The step runner
 
 `skills/run-workflow/scripts/workflow.py` walks a workflow definition one step at a time, and

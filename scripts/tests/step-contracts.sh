@@ -8,12 +8,13 @@ FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 export PYTHONDONTWRITEBYTECODE=1
 
-# Step skills the catalog names that a later change on this branch adds: the grouped release-steps
-# skill, whose contracts the six release definitions already name. Every other step skill ships.
-PENDING_SKILLS="release-steps"
+# Step skills the catalog names that a later change on this branch adds: none now. The grouped
+# release-steps skill ships with a reference for some of its modes; the modes whose reference a
+# later change adds are RELEASE_PENDING_MODES below, and a mode leaves that list with its reference.
+PENDING_SKILLS=""
 
 cat > "$WORK/cases.py" <<'PY'
-import importlib.util, json, math, os, re, sys
+import importlib.util, json, math, os, re, shutil, sys
 
 root, work, pending = sys.argv[1], sys.argv[2], sys.argv[3:]
 STEP_POINTER = "Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows."
@@ -72,6 +73,116 @@ def skill_faults(root, name, contracts, words, body_tokens):
         want = [verdict_line(entry) for entry in contracts]
         if said != want:
             faults.append("its Verdict section says %r, the catalog %r" % (said, want))
+    return faults
+
+
+# The release-steps modes (a contract name without its major) whose reference is not written yet.
+# A mode listed here must have NO reference file; every other mode must have one.
+RELEASE_PENDING_MODES = [
+    "merged-release", "train-finish", "ship-plan", "train-snapshot", "train-pr", "train-review", "train-merge", "train-close-out",
+    "train-level", "release-delta", "tower-queue", "release-branch", "production-in-branch", "release-pr", "train-claim-hand-on",
+    "release-tip", "dev-deploy-wait", "release-stamp", "release-review", "pre-ship-resume", "release-docs-plan", "hotfix-catch-up",
+    "previous-release", "owner-go-ahead", "release-stamp-verify", "merge-confirmations", "production-merge", "post-deploy-pending",
+    "estimates-score", "tower-hand-back", "post-deploy-result", "release-sync", "release-branch-delete", "release-docs",
+    "release-kb-sync", "release-close-out", "release-notes", "release-recap", "auto-start"]
+# The one list of phases a tower heartbeat may name (the clearance contract's), less the claim itself.
+TOWER_PHASES = ["train", "cut", "pr", "review", "pre-ship", "final", "merging", "deploy", "close-out"]
+
+
+def release_steps_faults(root, serves, pending_modes):
+    """What is wrong with the grouped release-steps skill: its body, the shared resume-rules
+    reference, and one reference per mode that is not pending (and for no other name)."""
+    name, flat = "release-steps", lambda s: re.sub(r"\s+", " ", s)
+    faults = skill_faults(root, name, None, 15, 1200)
+    if faults == ["missing"]:
+        return faults
+    base = os.path.join(root, "skills", name)
+    text = open(os.path.join(base, "SKILL.md"), encoding="utf-8").read()
+    if flat(text).count(STEP_POINTER) != 1 or "disable-model-invocation" in text or "$ARGUMENTS" not in text or "one JSON object" not in text:
+        faults.append("the step-skill shape")
+    if not fields_ok(text):
+        faults.append("the description does not start with Step:")
+    prefix = "${CLAUDE_PLUGIN_ROOT}/skills/%s/references/" % name
+    if "Read `%s<mode>.md` in full" % prefix not in flat(text) or "contract name without `@1`" not in flat(text):
+        faults.append("no mode rule naming the reference to read in full")
+    if "Any other contract, or none" not in flat(text) or "no verdict line" not in flat(text):
+        faults.append("no answer for a contract it does not carry")
+    if "one fenced `json` block" not in flat(text):
+        faults.append("no result-block statement")
+    rules = re.search(r"\*\*Step rules\.\*\*(.*)", flat(text))
+    rules = rules.group(1) if rules else ""
+    for rule in ("verdict first", "safe to re-run", "config wins", "never decides what runs next", "subagent"):
+        if rule not in rules:
+            faults.append("its step rules lack %r" % rule)
+    modes = sorted(n.split("@")[0] for n, _ in serves)
+    unknown = sorted(set(pending_modes) - set(modes))
+    if unknown:
+        faults.append("pending modes %r are not release-steps contracts" % unknown)
+    refdir = os.path.join(base, "references")
+    own = sorted(f[:-3] for f in os.listdir(refdir)) if os.path.isdir(refdir) else []
+    if "resume-rules" not in own:
+        faults.append("no resume-rules.md")
+    own = [f for f in own if f != "resume-rules"]
+    want = sorted(set(modes) - set(pending_modes))
+    if own != want:
+        faults.append("references %r are not the modes that are not pending %r" % (own, want))
+    shared = os.path.join(refdir, "resume-rules.md")
+    rules_text = open(shared, encoding="utf-8").read() if os.path.isfile(shared) else ""
+    forward = rules_text.split("\n## Cited by", 1)[0]
+    if prefix + "resume-rules.md" not in text:
+        faults.append("the body does not point at resume-rules.md")
+    for heading in ("## What the payload carries", "## What each shape skips", "## Whose release it is", "## Heartbeats"):
+        if "\n%s\n" % heading not in rules_text:
+            faults.append("resume-rules.md lacks %r" % heading)
+    for word in ("`shape`", "`tower`", "`NEW`", "`ADOPTED`", "`MERGED`", "`adopted: true`", "never adopted silently"):
+        if word not in flat(forward):
+            faults.append("resume-rules.md does not state %s" % word)
+    beats = re.search(r"^## Heartbeats\n(.*?)(?=^## |\Z)", rules_text, re.S | re.M)
+    beats = flat(beats.group(1)) if beats else ""
+    if [p for p in TOWER_PHASES if not re.search(r"`%s[ `]" % re.escape(p), beats)]:
+        faults.append("the heartbeat map does not name every tower phase")
+    for rule in ("local clearance record", "Exit 4", "every step transition", "min(10, expiry ÷ 3)", "before anything else"):
+        if rule not in beats:
+            faults.append("the heartbeat rules lack %r" % rule)
+    for mode in modes:
+        if "`%s`" % mode not in flat(text):
+            faults.append("the body does not name the mode %s" % mode)
+        ref = "skills/%s/references/%s.md" % (name, mode)
+        if "${CLAUDE_PLUGIN_ROOT}/" + ref not in text and "${CLAUDE_PLUGIN_ROOT}/" + ref not in forward:
+            faults.append("%s is cited by neither the body nor resume-rules.md" % ref)
+    for path in [shared] + [os.path.join(refdir, m + ".md") for m in own]:
+        body = open(path, encoding="utf-8").read() if os.path.isfile(path) else ""
+        rel = os.path.relpath(path, root)
+        if not body.startswith("---\nload: contract\n---\n") or re.findall(r"^## .*$", body, re.M)[-1:] != ["## Cited by"]:
+            faults.append("%s is not a contract ending with Cited by" % rel)
+        if "`${CLAUDE_PLUGIN_ROOT}/skills/%s/SKILL.md`" % name not in body.split("\n## Cited by", 1)[-1]:
+            faults.append("%s: its Cited by list does not name the skill" % rel)
+        for cited in sorted(set(re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/(skills/[a-z-]+/references/[a-z0-9-]+\.md)", body))):
+            if cited.startswith("skills/%s/references/" % name) and cited.split("/")[-1][:-3] in pending_modes:
+                continue  # a pending mode's reference, cited before it is written
+            other = open(os.path.join(root, cited), encoding="utf-8").read() if os.path.isfile(os.path.join(root, cited)) else ""
+            if not other.startswith("---\nload: contract\n---\n"):
+                faults.append("%s cites %s, which is not a contract reference of this plugin" % (rel, cited))
+    for contract, entry in serves:
+        mode = contract.split("@")[0]
+        if mode not in own:
+            continue
+        ref = "skills/%s/references/%s.md" % (name, mode)
+        body = open(os.path.join(root, ref), encoding="utf-8").read()
+        section = re.search(r"^## Verdict\n(.*?)(?=^## |\Z)", body, re.S | re.M)
+        if (re.findall(r"`([^`]+)`", section.group(1)) if section else None) != [verdict_line(entry)]:
+            faults.append("%s: its Verdict is not the catalog's" % ref)
+        if "`%s`" % contract not in body.split("\n## ", 1)[0]:
+            faults.append("%s does not name its contract before its first section" % ref)
+        if not re.search(r"^1\. ", body, re.M):
+            faults.append("%s has no numbered procedure" % ref)
+        result = re.search(r"^## Result\n(.*?)(?=^## |\Z)", body, re.S | re.M)
+        result = flat(result.group(1)) if result else ""
+        keys = entry["result"]["required"] + sorted(k for k in entry["result"]["types"] if k not in entry["result"]["required"]) + entry["proof"].get("required", [])
+        if [k for k in keys if "`%s`" % k not in result]:
+            faults.append("%s: its Result section does not name every key" % ref)
+        if "Workflow" in body and not entry.get("delegates"):
+            faults.append("%s: a non-delegating step tells the model to start a Workflow" % ref)
     return faults
 
 
@@ -521,7 +632,7 @@ contracts = all_contracts
 present = sorted(n for n in os.listdir(os.path.join(root, "skills")) if os.path.isfile(os.path.join(root, "skills", n, "SKILL.md")))
 named = sorted(set(e["builtinSkill"] for e in contracts.values() if e["builtinSkill"]))
 check("every skill the catalog names exists or is pending", all(n in present or n in pending for n in named), [n for n in named if n not in present and n not in pending])
-check("only the grouped release-steps skill is pending", pending in ([], ["release-steps"]), pending)
+check("no step skill the catalog names is pending any more", pending == [], pending)
 flat = lambda s: re.sub(r"\s+", " ", s)
 PLAN_SKILLS = ["plan-steps", "comprehend-plan", "rationalize-gantt", "insert-story"]
 # The existing seam step skills the release uses unchanged at several positions: each keeps its own
@@ -538,6 +649,60 @@ for name in named:
         # plan-family skills people also type: their verdict and the pointer; bodies and descriptions unchanged
         faults = skill_faults(root, name, [e for _, e in serves], 10 ** 6, 10 ** 9)
         check("%s carries its contract's verdict and the pointer once" % name, faults == [], faults)
+        continue
+    if name == "release-steps":
+        # the grouped Release step skill: the body names every mode, each mode that is not pending has a reference
+        faults = release_steps_faults(root, serves, RELEASE_PENDING_MODES)
+        check("step skill release-steps keeps the grouped shape: a reference per mode that is not pending, and for no other name", faults == [], faults)
+        check("release-steps: the start-phase modes and the shared rules are written, not pending",
+              not set(["train-claim", "ground-truth", "release-shape", "ci-hold-proof", "tower-claim"]) & set(RELEASE_PENDING_MODES))
+        # the check itself, on a throwaway copy: a missing reference, a stray one and a stale verdict are each caught
+        def drop(d):
+            os.remove(os.path.join(d, "references/tower-claim.md"))
+
+        def stray(d):
+            shutil.copy(os.path.join(d, "references/tower-claim.md"), os.path.join(d, "references/tower-wave.md"))
+
+        def early(d):
+            shutil.copy(os.path.join(d, "references/tower-claim.md"), os.path.join(d, "references/a-pending-mode.md"))
+
+        def stale(d):
+            path = os.path.join(d, "references/train-claim.md")
+            body = open(path, encoding="utf-8").read()
+            with open(path, "w", encoding="utf-8") as out:
+                out.write(body.replace("| DEGRADED <reason> ", ""))
+
+        def wordy(d):
+            with open(os.path.join(d, "SKILL.md"), "a", encoding="utf-8") as out:
+                out.write("\n" + "word " * 800)
+
+        cited_elsewhere = set()
+        for f in os.listdir(os.path.join(root, "skills/release-steps/references")):
+            cited_elsewhere |= set(re.findall(r"\$\{CLAUDE_PLUGIN_ROOT\}/(skills/[a-z-]+/references/[a-z0-9-]+\.md)",
+                                              open(os.path.join(root, "skills/release-steps/references", f), encoding="utf-8").read()))
+        for number, (label, change, word, held) in enumerate((
+                ("a mode with no reference and not pending is caught", drop, "are not the modes", RELEASE_PENDING_MODES),
+                ("a reference for no mode is caught", stray, "are not the modes", RELEASE_PENDING_MODES),
+                ("a pending mode that has a reference is caught", early, "are not the modes", RELEASE_PENDING_MODES + ["a-pending-mode"]),
+                ("a reference whose verdict differs from the catalog is caught", stale, "Verdict is not the catalog's", RELEASE_PENDING_MODES),
+                ("a body over 1,200 tokens is caught", wordy, "body is", RELEASE_PENDING_MODES))):
+            copy = os.path.join(work, "release-copy-%d" % number)
+            shutil.copytree(os.path.join(root, "skills/release-steps"), os.path.join(copy, "skills/release-steps"))
+            for other in sorted(cited_elsewhere):
+                if not other.startswith("skills/release-steps/") and os.path.isfile(os.path.join(root, other)):
+                    os.makedirs(os.path.dirname(os.path.join(copy, other)), exist_ok=True)
+                    shutil.copy(os.path.join(root, other), os.path.join(copy, other))
+            change(os.path.join(copy, "skills/release-steps"))
+            found = release_steps_faults(copy, serves, held)
+            check("release-steps: " + label, any(word in f for f in found), found)
+        clean = os.path.join(work, "release-copy-clean")
+        shutil.copytree(os.path.join(root, "skills/release-steps"), os.path.join(clean, "skills/release-steps"))
+        for other in sorted(cited_elsewhere):
+            if not other.startswith("skills/release-steps/") and os.path.isfile(os.path.join(root, other)):
+                os.makedirs(os.path.dirname(os.path.join(clean, other)), exist_ok=True)
+                shutil.copy(os.path.join(root, other), os.path.join(clean, other))
+        check("release-steps: an untouched copy has no fault, so each fault above is the change's own", release_steps_faults(clean, serves, RELEASE_PENDING_MODES) == [],
+              release_steps_faults(clean, serves, RELEASE_PENDING_MODES))
         continue
     if name == "plan-steps":
         # the grouped Plan and Rebalance step skill: each mode's verdict and result keys live in its reference
