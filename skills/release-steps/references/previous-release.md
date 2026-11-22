@@ -25,7 +25,11 @@ the cut, the review or a hotfix.
    - `2` → `PENDING`, naming that release and `/devstride:release post-deploy only`. Holding the
      tower under `merge-and-deploy`, first run the provider's `release --step-aside`, which owes
      nothing: the release goes back to waiting on the gate, an owner yes already given is kept,
-     and no yes lifts a pending gate.
+     and no yes lifts a pending gate. It then holds nothing, so it must claim the tower again
+     before it can merge. A resumed run does not issue its tower claim again: once this gate reads
+     `0`, the merge confirmations answer `NOT CONFIRMED tower not held` and the run stops there
+     (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/merge-confirmations.md`), never a
+     merge uncleared.
    - `1` → `FAILED <release>`: "Production merge refused: release <name> (#<n>) failed its
      post-deploy check." Only the owner's own words in the payload's `answer` override it: record
      them as ONE comment on this pull request, then answer `NOT GATED` (state `overridden`).

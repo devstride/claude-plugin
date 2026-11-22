@@ -15,7 +15,10 @@ gate. The floor it keeps is
    already reads `MERGED` → `MERGED <pr>` with its merge commit. A release is never merged twice.
 3. **What must hold.** The payload carries the review (`releaseReview`, its `reviewedHead`), the
    pre-ship result, the go-ahead (a yes) and the confirmations (`confirmed`), all for the same
-   tree. One missing or not a pass → `REFUSED`, naming it. No yes is ever written for the owner.
+   tree. Under scope `merge-and-deploy`, also the run's last stamp verify (`stamp-verify-final`)
+   reads `CHECKS STAMP: UNCHANGED` for this head
+   (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/release-stamp-verify.md`). One missing
+   or not a pass → `REFUSED`, naming it. No yes is ever written for the owner.
 4. **A hotfix that landed meanwhile.** `git fetch origin <productionBranch>`: on a release
    branch, a production branch that is not an ancestor of the head → `REFUSED hotfix landed`. The
    catch-up, the review and the go-ahead run again first.

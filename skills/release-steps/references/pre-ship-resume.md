@@ -20,7 +20,13 @@ cited, not copied.
    `merge-and-deploy` a settled head whose tree equals the checks stamp's tree counts the checks'
    own `PRE-SHIP` line ("passed at <sha>"); any other tree needs that pre-ship step at the settled
    head first (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md` "Scope
-   `merge-and-deploy`").
+   `merge-and-deploy`"), and then a new stamp, since the old one names a tree that will not
+   merge: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/release_checks.py stamp --head
+   <settled head> --class <the class at pre-ship> --master <m>`, `<m>` read back from the checks
+   phase's `PRODUCTION TIP: AT <m>` row. Exit 0 → its printed `CHECKS STAMP head …` line is this
+   step's first evidence line, word for word. `CHANGED master` (production moved since the
+   checks) → `STILL HELD`, saying the release is rebuilt on what is now ahead
+   (`clearance.md` "Rebuilt when what is ahead changes"); `ERROR` → `STILL HELD`, saying why.
 5. **Re-invoke `review` in PRE-SHIP RESUME mode, naming that mode** — a plain re-invocation
    wrongly restarts cycle 1 — with the same ledger, target and safety triggers. It re-enters at
    its 7.1, re-checks the unresolved threads, marks the pull request ready and settles CI, once.

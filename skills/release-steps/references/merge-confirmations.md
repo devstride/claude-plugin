@@ -1,7 +1,7 @@
 ---
 load: contract
 ---
-# Confirm before the merge — five checks on the yes, in order
+# Confirm before the merge — six checks on the yes, in order
 
 `release-steps`' `merge-confirmations@1` step, run on the yes and before the merge. The list is
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/merge-and-deploy.md` "Step 4 — on the yes"
@@ -25,11 +25,19 @@ load: contract
       payload's `preShipRelease`, and under `merge-and-deploy` the entries run again at the merge).
    4. **Threads.** The paginated count of unresolved review threads is zero. A late comment is
       replied to and resolved through `review` first, never merged over.
-   5. **The tower.** With `release.clearance` set, this pull request is the one `On final` in the
-      provider's `status`.
-5. **All five hold** → send the tower `heartbeat merging`, only when this session holds the tower
-   (`resume-rules.md` "Heartbeats"; exit 4 → `NOT CONFIRMED`: another session owns this release
-   now). Then `HEAD <head>`, the head confirmed.
+   5. **The tower's order.** With `release.clearance` set, this pull request is the one
+      `On final` in the provider's `status`.
+   6. **The tower is held.** With `release.clearance` set, this session's local clearance record
+      (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md` "The local record") shows
+      it holds the tower. No record → `NOT CONFIRMED tower not held`: `On final` alone proves
+      nothing, since the oldest open release pull
+      request is always on final, and the `release-tower` check does not cover this under
+      `merge-and-deploy` (`clearance.md` "The floor"). A run resumed after a step-aside lands
+      here, because its tower claim is not issued again: it stops, never merges uncleared.
+5. **All six hold** → with `release.clearance` set, send the tower `heartbeat merging`. It is
+   required, never skipped: exit 4, or any other failure → `NOT CONFIRMED tower not held`
+   (another session owns this release now, or nothing is held). Then `HEAD <head>`, the head
+   confirmed.
 
 ## Verdict
 

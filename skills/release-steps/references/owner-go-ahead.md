@@ -25,8 +25,11 @@ answered in the session; it is never an approval gate somewhere else.
    the pre-merge verdict, the previous-release gate's exit, the dev deploy wait's exit, the
    documentation plan, and `<reviewedHead>` from the payload's `releaseReview`. Under scope
    `merge-and-deploy` the pre-ship result and the dev deploy wait's exit are the checks phase's
-   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`). A line that cannot
-   be read is never guessed: the standing yes is not tried, and the recap says what is missing.
+   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`). Under scope `release` (no
+   clearance block, or the default) the definition has no previous-release step and the gate's
+   exit is `0`: `previous-release-gate.sh` answers `NOT GATED` there. A line a step of this
+   definition should have produced and that cannot be read is never guessed: the standing yes
+   is not tried, and the recap says what is missing.
 5. **Show the recap.** Lead with `READY` or `BLOCKED`, then everything `merge-and-deploy.md`
    lists: each change in plain English, the class, the pre-merge verdict, each pre-ship entry as
    passed at the train, at the checks, skipped by path or waived (never "covered by CI"), the

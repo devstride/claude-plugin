@@ -13,9 +13,12 @@ moved in between. The stamp's meaning is
    `release.productionBranch`. Shape `MERGED`
    (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/resume-rules.md`) → `UNCHANGED`, saying
    nothing is left to verify.
-2. **The stamp** is the `CHECKS STAMP …` line this run's stamp step printed, word for word (the
-   run's status table keeps it). No such line, or another scope → `ERROR`, saying there is no
-   stamp. It is never rebuilt from memory.
+2. **The stamp** is the NEWEST printed stamp of this run, word for word, from the evidence the
+   run's status table keeps: the first evidence line of the stamp step, of a discharge that
+   stamped the settled head (`pre-ship-resume.md`), or of a `SAME TREE` hotfix catch-up, the
+   latest of them. It is the line that starts `CHECKS STAMP head …`, never the `CHECKS STAMP:
+   STAMPED` verdict line, which `verify` cannot parse. No such line, or another scope → `ERROR`,
+   saying there is no stamp. It is never rebuilt from memory.
 3. Run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/release_checks.py verify --stamp
    '<line>' --head <reviewedHead>`, the head being the one the review settled on.
 4. **Act on the answer, exactly:**

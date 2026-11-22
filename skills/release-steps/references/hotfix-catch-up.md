@@ -24,7 +24,12 @@ release is open", cited, not copied.
 5. **The merge left the tree unchanged** (history only: `git rev-parse <old>^{tree}` equals
    `<new>^{tree}`) → `SAME TREE <sha>`. No review is needed: say so, the new head stands in for
    `<reviewedHead>`, and invoke `review` in PRE-SHIP RESUME mode so it marks the pull request ready
-   and settles CI there with no review cycle.
+   and settles CI there with no review cycle. Under scope `merge-and-deploy` the newest stamp
+   names a production tip that has moved, so stamp the new head, whose tree the checks passed on:
+   `release_checks.py tip` (`<m>`), then `release_checks.py stamp --head <new head> --class <that
+   stamp's class> --master <m>`, and put its printed `CHECKS STAMP head …` line first in the
+   evidence (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/release-stamp-verify.md`).
+   Anything but exit 0 → no verdict line: say why and stop.
 6. **The tree changed** → `MERGED <pr>`, naming the hotfix pull request (the production commit
    when it has none). The run stops here because the review must run again: `review` driven as a
    contextual follow-up over the merge's range, carrying the ledger, the counters and the same
