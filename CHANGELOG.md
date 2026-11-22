@@ -8,6 +8,8 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.8.0] — 2026-11-22
+
 ### Added
 
 - **An organization's own workflow now runs for its items.** At the start of each run the loop
@@ -33,14 +35,14 @@ for what each version component means here and how a release is cut.
   names the library skill, its version and fingerprint, and doctor reports the saved copies: how
   many, how large, and any that fail their fingerprint. A workflow with no library step runs
   exactly as before.
-- **The release's step list exists as data, ready for the step runner (in progress).** Six built-in
+- **The release's step list exists as data, not used yet.** Six built-in
   release workflow definitions now ship: one full release per clearance scope (`release`,
   `cut-to-deploy`, `merge-and-deploy`) and three partial entries (post-deploy only, documentation
   only, release notes only). They are generated from one source by
   `scripts/build-release-workflows.py`, which also picks the definition a repository runs from
   `release.clearance.scope`, so the orderings never drift. Nothing runs them yet: the release
   still follows its instructions page, and every rule is unchanged.
-- **The release's steps have contracts in the catalog (in progress).** Fifty-five release step
+- **The release's steps have contracts in the catalog, not used yet.** Fifty-five release step
   contracts join `schemas/step-contracts.json`: each step's verdict line and what each answer
   means, what it hands on, and which earlier steps it needs. The production merge needs the
   review, the pre-ship checks, the owner's go-ahead and the merge confirmations, and it stands in
@@ -90,9 +92,6 @@ for what each version component means here and how a release is cut.
 - **Running the Plan or Rebalance workflow counts as planning.** The session gate classes
   `/devstride:run-workflow plan` and `/devstride:run-workflow rebalance` as authoring jobs, like
   `/devstride:plan` and `/devstride:rebalance`.
-
-### Changed
-
 - **`/devstride:branch-hotfix` runs the Hotfix workflow.** Typing the same command cuts the same
   branch, makes the same choice about the local environment and stops at the same questions, and
   then carries on through the fix, its review, the merge into production and the deploy, each on
@@ -101,6 +100,55 @@ for what each version component means here and how a release is cut.
   Every rule it used to carry now lives, word for word, in exactly one `hotfix-steps` reference,
   and a test proves it against the last release's page. A step skill may now run a seam step by
   name, one verb per call, as the hotfix environment step runs `local-environment`.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since devstride--v4.7.0 @ db5edca, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@devstride--v4.7.0 | tokens@devstride--v4.7.0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/review/SKILL.md | 23,986 | 7,996 | 23,986 | 7,996 | +0 | 7,999 |
+| skills/build-item/SKILL.md | 23,997 | 7,999 | 23,949 | 7,983 | -16 | 8,000 |
+| skills/doctor/SKILL.md | 23,994 | 7,998 | 23,847 | 7,949 | -49 | 8,000 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
+| skills/rationalize-gantt/SKILL.md | 11,963 | 3,988 | 12,332 | 4,111 | +123 | 4,200 |
+| skills/pr/SKILL.md | 11,538 | 3,846 | 11,538 | 3,846 | +0 | 3,846 |
+| skills/ultracode-build/SKILL.md | 10,327 | 3,443 | 10,327 | 3,443 | +0 | 3,443 |
+| skills/rebalance/SKILL.md | 18,067 | 6,023 | 8,432 | 2,811 | -3212 | 2,811 |
+| skills/plan/SKILL.md | 25,542 | 8,514 | 8,340 | 2,780 | -5734 | 2,780 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,730 | 2,244 | 6,730 | 2,244 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 5,622 | 1,874 | 6,073 | 2,025 | +151 | 2,100 |
+| skills/insert-defect/SKILL.md | 5,255 | 1,752 | 5,605 | 1,869 | +117 | 1,869 |
+| skills/insert-story/SKILL.md | 4,578 | 1,526 | 4,928 | 1,643 | +117 | 1,643 |
+| skills/branch-hotfix/SKILL.md | 6,649 | 2,217 | 4,570 | 1,524 | -693 | 1,600 |
+| skills/branch-feature/SKILL.md | 3,707 | 1,236 | 3,707 | 1,236 | +0 | 1,236 |
+| skills/risk-check/SKILL.md | 3,598 | 1,200 | 3,598 | 1,200 | +0 | 1,200 |
+| skills/hotfix-steps/SKILL.md (added) | — | — | 3,591 | 1,197 | +1197 | 1,200 |
+| skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
+| skills/plan-steps/SKILL.md (added) | — | — | 3,578 | 1,193 | +1193 | 1,200 |
+| skills/local-checks/SKILL.md | 3,523 | 1,175 | 3,523 | 1,175 | +0 | 1,200 |
+| skills/run-workflow/SKILL.md | 3,112 | 1,038 | 3,484 | 1,162 | +124 | 1,162 |
+| skills/merge-story/SKILL.md | 3,240 | 1,080 | 3,240 | 1,080 | +0 | 1,081 |
+| skills/review-story/SKILL.md | 3,020 | 1,007 | 3,020 | 1,007 | +0 | 1,007 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/claim-story/SKILL.md | 2,875 | 959 | 2,875 | 959 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/story-lifecycle/SKILL.md | 2,700 | 900 | 2,700 | 900 | +0 | 900 |
+| skills/capture-findings/SKILL.md | 2,696 | 899 | 2,696 | 899 | +0 | 900 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,066 | 689 | 2,083 | 695 | +6 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/sync-base/SKILL.md | 1,471 | 491 | 1,471 | 491 | +0 | 500 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 6,277 | 2,093 | 6,474 | 2,158 | +65 | 2,200 |
+| **total (bodies)** | 299,545 | 99,861 | 279,512 | 93,185 | -6676 | |
 
 ## [4.7.0] — 2026-11-20
 
@@ -6673,7 +6721,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.7.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.8.0...HEAD
+[4.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.7.0...devstride--v4.8.0
 [4.7.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.6.1...devstride--v4.7.0
 [4.6.1]: https://github.com/devstride/claude-plugin/compare/devstride--v4.6.0...devstride--v4.6.1
 [4.6.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.5.0...devstride--v4.6.0

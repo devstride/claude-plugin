@@ -1,7 +1,7 @@
 {
   "_readme": "Hand-edited source of the six built-in release workflow definitions. Run python3 scripts/build-release-workflows.py --write after editing; never edit workflows/release*.json by hand.",
   "schema": 1,
-  "minPluginVersion": "4.7.0",
+  "minPluginVersion": "4.8.0",
   "version": 1,
   "phaseNames": {
     "start": "Claim and orient",

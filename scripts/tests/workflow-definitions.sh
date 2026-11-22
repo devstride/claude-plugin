@@ -12,7 +12,9 @@
 #   bash scripts/tests/workflow-definitions.sh            check
 #   bash scripts/tests/workflow-definitions.sh --record   rewrite the fixture from workflows/ (run it
 #                                                         AFTER the release's prepare has stamped
-#                                                         minPluginVersion, never by hand)
+#                                                         minPluginVersion, never by hand; a
+#                                                         definition the newest tag did not ship
+#                                                         may re-record without a version bump)
 #
 # The replay cases at the end drive the REAL runner with scripted step answers through
 # scripts/tests/fixtures/workflow-replay.py, the driver the workflow tests share.
@@ -57,11 +59,35 @@ try:
 except (OSError, ValueError, KeyError):
     recorded = {}
 
+def shipped_ids():
+    """The ids of the definitions the newest release tag shipped, or None when that cannot be read
+    (then every recorded definition counts as shipped). A definition no release has shipped yet may
+    change without a version bump: the release's prepare stamps its minPluginVersion, and only a
+    shipped definition is a contract installed copies rely on. WORKFLOW_SHIPPED_IDS (comma-separated)
+    stands in for the tag in the ratchet's own cases."""
+    if "WORKFLOW_SHIPPED_IDS" in os.environ:
+        return set(i for i in os.environ["WORKFLOW_SHIPPED_IDS"].split(",") if i)
+    git = lambda *a: subprocess.run(["git", "-C", ROOT] + list(a), capture_output=True, text=True)
+    tag = git("describe", "--tags", "--match", "devstride--v*", "--abbrev=0", "HEAD")
+    listed = git("ls-tree", "--name-only", tag.stdout.strip() + ":workflows") if tag.returncode == 0 else tag
+    if listed.returncode != 0:
+        return None
+    ids = set()
+    for name in listed.stdout.split():
+        shown = git("show", "%s:workflows/%s" % (tag.stdout.strip(), name))
+        try:
+            ids.add(json.loads(shown.stdout)["id"])
+        except (ValueError, KeyError, TypeError):
+            return None
+    return ids
+
+
 if MODE == "--record":
-    out = {}
+    out, shipped = {}, shipped_ids()
     for name, d in defs.items():
         now, was = entry(d), recorded.get(d["id"], {})
-        if was and was.get("sha256") != now["sha256"] and was.get("version") == now["version"]:
+        unreleased = shipped is not None and d["id"] not in shipped
+        if was and not unreleased and was.get("sha256") != now["sha256"] and was.get("version") == now["version"]:
             print("workflow-definitions: %s changed but its version did not; bump it first" % name, file=sys.stderr)
             sys.exit(2)
         merged = dict(was.get("steps", {}))
@@ -138,8 +164,12 @@ def scratch(name):
         os.symlink(os.path.join(ROOT, "skills", skill), os.path.join(root, "skills", skill))
     return root
 
-def run(root, *args):
-    done = subprocess.run([sys.executable, SCRIPT, root] + list(args or ["check"]), capture_output=True, text=True)
+def run(root, *args, shipped=None):
+    env = dict(os.environ)
+    env.pop("WORKFLOW_SHIPPED_IDS", None)
+    if shipped is not None:
+        env["WORKFLOW_SHIPPED_IDS"] = ",".join(shipped)
+    done = subprocess.run([sys.executable, SCRIPT, root] + list(args or ["check"]), capture_output=True, text=True, env=env)
     return done.returncode, done.stdout + done.stderr
 
 def edit(root, fn):
@@ -153,6 +183,19 @@ rc, out = run(root)
 check("a definition changed without a version bump fails", "FAIL hotfix.json: unchanged since it was recorded" in out, out)
 rc, out = run(root, "--record")
 check("... and --record refuses to record it", rc == 2 and "changed but its version did not" in out, (rc, out))
+
+root = scratch("stamped-shipped")
+edit(root, lambda d: d.__setitem__("minPluginVersion", "0.0.1"))
+rc, out = run(root, "--record", shipped=["build", "hotfix"])
+check("a shipped definition restamped without a version bump is refused by --record",
+      rc == 2 and "changed but its version did not" in out, (rc, out))
+
+root = scratch("stamped-unreleased")
+edit(root, lambda d: d.__setitem__("minPluginVersion", "0.0.1"))
+rc, out = run(root, "--record", shipped=["build"])
+rc2, out2 = run(root)
+check("a definition no release shipped re-records after the release stamps it, and then passes",
+      rc == 0 and "FAIL hotfix.json" not in out2, (rc, out, out2))
 
 root = scratch("bumped-unrecorded")
 edit(root, lambda d: d.__setitem__("version", d["version"] + 1))

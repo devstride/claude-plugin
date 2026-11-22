@@ -20,7 +20,7 @@
     },
     "hotfix": {
       "version": 1,
-      "sha256": "77873c96968cc6e1190f014d33164c73be8e29239826aa471553e57627550f45",
+      "sha256": "16283faabd3d49b13bf97306be752177fb7f55da52ab60177ca6d88a576f6c8e",
       "steps": {
         "approve-deploy": "deploy-approval@1",
         "close": "hotfix-close@1",
@@ -39,7 +39,7 @@
     },
     "plan": {
       "version": 1,
-      "sha256": "442a8e4eb394cd1fad2a5863a44497159cf6316222065990fc0931a659432af9",
+      "sha256": "9f5c03d946d27a6ac6836e3d7407aca25481f8d62daf4521a36c3a0339eb2188",
       "steps": {
         "confirm-drafts": "plan-draft-approval@1",
         "create-items": "plan-create@1",
@@ -57,7 +57,7 @@
     },
     "rebalance": {
       "version": 1,
-      "sha256": "8d989274efeac16efe506cd77b84512d770aa8aae80df6ae0acfc6cc5a683e45",
+      "sha256": "73c886a8a4bf4a12eea63f433590c33aca0f88288978e225efbc5c1855ec1f1a",
       "steps": {
         "archive-originals": "rebalance-archive@1",
         "create-successors": "rebalance-successors@1",
@@ -76,7 +76,7 @@
     },
     "release": {
       "version": 1,
-      "sha256": "3725bae12c558e1975b8203be78ecc87c9d39e74f5815f28fd7e6cdcfbdf9d2e",
+      "sha256": "3b605a563ba5a09f81eb37127478aae5147df429587fb85af14027e9f38442e3",
       "steps": {
         "approve-deploy": "deploy-approval@1",
         "auto-start-next": "auto-start@1",
@@ -127,7 +127,7 @@
     },
     "release-cut-to-deploy": {
       "version": 1,
-      "sha256": "436e7ebc3bd9d40dbd3b4f0561c916fed8efe8650b53cdef2b79101f1e3304fb",
+      "sha256": "849e070608f3016ee4bbfc0074c45fd7c377c450d24aa915c5b3d1c1008e6800",
       "steps": {
         "approve-deploy": "deploy-approval@1",
         "auto-start-next": "auto-start@1",
@@ -182,7 +182,7 @@
     },
     "release-docs": {
       "version": 1,
-      "sha256": "cd7048b622ff2fa1d11954f10659384c7382ffe45b88e0a3f31ecd3c2252b1fe",
+      "sha256": "2efbe0c63e3e6a619feeb8dad4a355a88f9ffdea98e633bb2c6ff2be63057d57",
       "steps": {
         "confirm-deploy": "deploy-confirm@1",
         "merged-release": "merged-release@1",
@@ -192,7 +192,7 @@
     },
     "release-merge-and-deploy": {
       "version": 1,
-      "sha256": "4b82b57095cb6a7d23726b1bfaad24aec678f4d20ba3987d6b123fe9299bfd7b",
+      "sha256": "5d4b9c1f00e8b164dd724bb35ea81eb821d2e07e8da29ec3cbc98c56425ef765",
       "steps": {
         "approve-deploy": "deploy-approval@1",
         "auto-start-next": "auto-start@1",
@@ -260,7 +260,7 @@
     },
     "release-notes": {
       "version": 1,
-      "sha256": "b9fe47fe1367050e8131d9422f849e9b2e1e46cf6796014305707de30e076920",
+      "sha256": "3b1d0c4e748de35b9f32ec11d2bd7bc08a6956513ebb0553e875df4eb3db3406",
       "steps": {
         "confirm-deploy": "deploy-confirm@1",
         "merged-release": "merged-release@1",
@@ -269,7 +269,7 @@
     },
     "release-post-deploy": {
       "version": 1,
-      "sha256": "8d0ac060da407400d257ae17138bc0a8e600cc3c78290d86ec393b79cda901dd",
+      "sha256": "0095cfe7f4abec287a31d93ba352c7dc74fe542955d8514dd01bd3efa847c25c",
       "steps": {
         "confirm-deploy": "deploy-confirm@1",
         "merged-release": "merged-release@1",
