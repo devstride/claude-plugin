@@ -39,6 +39,19 @@ for what each version component means here and how a release is cut.
   instructions page. The release steps must be startable by the runner through the Skill tool,
   so one short description joins every session's context; it fits inside the existing always-on
   budget of 2,200 tokens (2,191 measured), so that budget does not rise.
+- **The steps that cut a release and check it before the tower can be run one at a time (in
+  progress).** Nine more `release-steps` references are written. Six cover the cut: working out
+  what the release carries and whether anything in it is held, waiting in the release queue,
+  cutting the protected release branch, bringing production into that branch when it is behind,
+  opening the release pull request as a draft, and handing the train claim on so the next
+  release can start. Three cover the checks a queued release runs before it claims the tower:
+  reading the production tip the checks start against, waiting for the staging deploy, and
+  stamping what the checks tested. The stamp step says what it does when production moved while
+  the checks ran: it brings production in, runs the checks again on the new head and only then
+  stamps, three rounds at most. The rules are unchanged and still live in `release-branch.md`,
+  `release-pr.md`, `clearance.md`, `auto-start.md` and `release_checks.py`, which the new
+  references cite. The remaining steps' references are not written yet, nothing starts the
+  release definitions, and the release still follows its instructions page.
 - **A step's contract may allow more automatic re-runs.** A contract can raise the runner's cap of
   five automatic re-issues for its own step (`maxAutoRedo`, at most twenty), for long steps such
   as a release review that may restart several times.

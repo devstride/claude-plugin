@@ -179,7 +179,16 @@
     "skills/release-steps/references/release-shape.md": 1100,
     "skills/release-steps/references/resume-rules.md": 2700,
     "skills/release-steps/references/tower-claim.md": 1200,
-    "skills/release-steps/references/train-claim.md": 800
+    "skills/release-steps/references/train-claim.md": 800,
+    "skills/release-steps/references/dev-deploy-wait.md": 1000,
+    "skills/release-steps/references/production-in-branch.md": 900,
+    "skills/release-steps/references/release-branch.md": 1100,
+    "skills/release-steps/references/release-delta.md": 1100,
+    "skills/release-steps/references/release-pr.md": 1000,
+    "skills/release-steps/references/release-stamp.md": 1300,
+    "skills/release-steps/references/release-tip.md": 600,
+    "skills/release-steps/references/tower-queue.md": 1000,
+    "skills/release-steps/references/train-claim-hand-on.md": 900
   },
   "paths": {
     "epicReleaseGate": {
