@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "The built-in workflow and step contract registry",
+  "description": "workflows/registry.json: one row per version of every built-in workflow and per published revision of every step contract, appended and never edited. scripts/workflow-registry.py check reads this schema (it understands type, const, enum, pattern, minimum, minLength, maxLength, required, properties, additionalProperties, patternProperties, items and minItems, and nothing else) and checks the rules a schema cannot say.",
+  "type": "object",
+  "required": ["_readme", "schema", "workflows", "contracts"],
+  "additionalProperties": false,
+  "properties": {
+    "_readme": { "type": "string", "minLength": 1 },
+    "schema": { "const": 1 },
+    "workflows": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9-]{0,99}$": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["version", "pluginVersion", "releasedAt", "sha256", "minPluginVersion", "steps", "note"],
+            "additionalProperties": false,
+            "properties": {
+              "version": { "type": "integer", "minimum": 1 },
+              "pluginVersion": { "type": "string", "pattern": "^(unreleased|(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*))$", "description": "The first plugin release that carried this version, or unreleased until the release's prepare step names it." },
+              "releasedAt": { "type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "description": "That release's date in US Central time; null while unreleased." },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "The sha256 of the definition's canonical form, without minPluginVersion." },
+              "minPluginVersion": { "type": "string", "pattern": "^(unreleased|(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*))$" },
+              "steps": {
+                "type": "object",
+                "additionalProperties": false,
+                "patternProperties": {
+                  "^[a-z][a-z0-9-]{0,63}$": { "type": "string", "pattern": "^[a-z][a-z0-9-]*@[0-9]+$" }
+                }
+              },
+              "note": { "type": "string", "maxLength": 400, "description": "One plain sentence on what changed, fit to publish." },
+              "dormant": { "const": true, "description": "No released plugin could run this version when it shipped." },
+              "slip": { "const": true, "description": "A historical row: the content changed without a version bump." }
+            }
+          }
+        }
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9-]*$": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["major", "pluginVersion", "releasedAt", "sha256", "note"],
+            "additionalProperties": false,
+            "properties": {
+              "major": { "type": "integer", "minimum": 1 },
+              "pluginVersion": { "type": "string", "pattern": "^(unreleased|(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*))$" },
+              "releasedAt": { "type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "The sha256 of the catalog entry's canonical form, without since." },
+              "note": { "type": "string", "maxLength": 400 },
+              "slip": { "const": true, "description": "A historical row: the content changed by more than an addition without a new major." }
+            }
+          }
+        }
+      }
+    }
+  }
+}

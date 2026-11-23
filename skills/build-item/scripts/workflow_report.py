@@ -590,7 +590,7 @@ def command_definition(argv):
         raise Usage(str(error))
     described = document if isinstance(document, dict) else {}
     out = {"id": described.get("id"), "version": described.get("version"),
-           "hash": hashlib.sha256(text).hexdigest(), "bytes": len(text)}
+           "hash": definition_hash(document), "bytes": len(text)}
     if canonical:
         out["canonical"] = text.decode("utf-8")
     return out

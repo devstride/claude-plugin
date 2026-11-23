@@ -118,33 +118,31 @@ esac
 
 # (4) text that really stood in an orchestrator before the split now lives in a step (whitespace and
 # line wraps collapsed before matching) and no longer in that orchestrator. The base is PINNED to the
-# last release before the split, never the moving main, which holds the split bodies once merged.
-BASE="${STEP_SPLIT_BASE:-devstride--v3.19.0}"
+# last release before the split, never the moving tree, which holds the split bodies: the three
+# orchestrator bodies as that release ($BASE) published them are kept as files under
+# scripts/tests/fixtures/step-split-base/, so the case reads no git history and needs no network.
+BASE="devstride--v3.19.0"
+BASE_DIR="$ROOT/scripts/tests/fixtures/step-split-base"
 flat() { tr -s ' \t\n' '   '; }
-if ! git -C "$ROOT" rev-parse --verify -q "$BASE^{commit}" >/dev/null; then
-  # a shallow or tagless clone: fetch just that tag, quietly, before deciding
-  git -C "$ROOT" fetch -q --depth=1 origin tag "$BASE" >/dev/null 2>&1 || :
-fi
-if ! git -C "$ROOT" rev-parse --verify -q "$BASE^{commit}" >/dev/null; then
-  bad "(4) the base $BASE is not in this clone and could not be fetched: run \`git fetch origin tag $BASE\` (or set STEP_SPLIT_BASE to a ref that holds the pre-split bodies) — never skipped, or this test proves nothing"
-else
-  moved=""
-  moved() {  # <needle> <new home> <orchestrator>
-    local n="$1" home="$2" orch="$3"
-    git -C "$ROOT" show "$BASE:skills/$orch/SKILL.md" 2>/dev/null | flat | grep -qF -- "$n" || moved="$moved [never in $orch at $BASE: $n]"
-    flat < "$ROOT/skills/$home/SKILL.md" | grep -qF -- "$n" || moved="$moved [absent from $home: $n]"
-    ! flat < "$ROOT/skills/$orch/SKILL.md" | grep -qF -- "$n" || moved="$moved [still in $orch: $n]"
-  }
-  moved "Run each selected entry UNCONDITIONALLY" pre-ship release
-  moved "SHA-pinned three-dot local diff" pre-ship pr
-  moved "renames on BOTH source and destination" pre-ship pr
-  moved "never \`gh pr view --json files\`" pre-ship pr
-  moved "a foreground kill looks like a clean pass" pre-ship pr
-  moved "a foreground kill looks like a clean pass" pre-ship release
-  moved "owns the pages" update-docs release
-  moved "no \`.claude/skills/<name>/SKILL.md\`" update-docs build-item
-  [ -z "$moved" ] && ok "(4) eight passages that stood in an orchestrator at $BASE live in their step and left it" || bad "(4)$moved"
-fi
+for orch in release pr build-item; do
+  [ -s "$BASE_DIR/$orch.md" ] || bad "(4) the copy of $orch at $BASE is missing or empty: $BASE_DIR/$orch.md — never skipped, or this test proves nothing"
+done
+moved=""
+moved() {  # <needle> <new home> <orchestrator>
+  local n="$1" home="$2" orch="$3"
+  flat < "$BASE_DIR/$orch.md" 2>/dev/null | grep -qF -- "$n" || moved="$moved [never in $orch at $BASE: $n]"
+  flat < "$ROOT/skills/$home/SKILL.md" | grep -qF -- "$n" || moved="$moved [absent from $home: $n]"
+  ! flat < "$ROOT/skills/$orch/SKILL.md" | grep -qF -- "$n" || moved="$moved [still in $orch: $n]"
+}
+moved "Run each selected entry UNCONDITIONALLY" pre-ship release
+moved "SHA-pinned three-dot local diff" pre-ship pr
+moved "renames on BOTH source and destination" pre-ship pr
+moved "never \`gh pr view --json files\`" pre-ship pr
+moved "a foreground kill looks like a clean pass" pre-ship pr
+moved "a foreground kill looks like a clean pass" pre-ship release
+moved "owns the pages" update-docs release
+moved "no \`.claude/skills/<name>/SKILL.md\`" update-docs build-item
+[ -z "$moved" ] && ok "(4) eight passages that stood in an orchestrator at $BASE live in their step and left it" || bad "(4)$moved"
 
 # (5) every new reference is a contract with a Cited by list
 refs=""

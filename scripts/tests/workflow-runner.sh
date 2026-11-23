@@ -1111,7 +1111,7 @@ def section_evidence():
               "STRIPE_SECRET_KEY sk_l" + "ive_51Habcdefghijklmnop", "api_key=sk-" + "ant-api03-abcdefghijklmnop", "apikey: abcdefgh", "private_key=abcdefgh",
               "glp" + "at-abcdefghijklmnop0123", "the key s" + "k-proj-abcdefghijklmnopqrstu", "AWS_ACCESS_KEY_ID=AK" + "IAEXAMPLEONLY",
               "a token e" + "yJabcdefg.e" + "yJhijklmn.sig9 in the log", "Bearer abcd1234efgh5678", "passwd=x1y2z3w4", "https://user:pw@example.com/x",
-              "secretKey=abcd1234efgh", "password: hunter2hunter", "bearer \t ABCDEFGHIJKLMNOPQRST", "AS" + "IAABCDEFGHIJKLMNOP",
+              "secretKey=" + "abcd1234efgh", "password: hunter2hunter", "bearer \t ABCDEFGHIJKLMNOPQRST", "AS" + "IAABCDEFGHIJKLMNOP",
               "np" + "m_abcdefghijklmnopqrstuvwxyz0123456789", "AI" + "zaSyA1234567890abcdefghijklmnopqrstu", "whs" + "ec_abcdefgh",
               "S" + "G.abcdefghijklmn.opqrstuvwxyz", "X-Api-Key: abc", "--password hunter2", "--token abcdef123", "client_secret hunter2",
               "Authorization: ApiKey abcdefghijklmnopqrstuvwxyz012345", "Authorization: Token " + "0123456789abcdef" * 2 + "01234567",

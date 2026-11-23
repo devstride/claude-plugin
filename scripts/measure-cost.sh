@@ -42,7 +42,9 @@
 #                          budgets; else summarize bodies, references and paths
 #   --json                 the same data as one JSON document
 #   --table --since <ref>  markdown before/after table for CHANGELOG; @ref
-#                          columns come from `git show <ref>:<path>`
+#                          columns come from `git show <ref>:./<path>`, read from
+#                          the plugin directory, so the plugin may be the
+#                          repository root or a subdirectory of a larger one
 #   --write-budgets        rewrite the budgets file from the current measurement
 #   --budgets <path>       use another budgets file (tests)
 #
@@ -293,12 +295,14 @@ if MODE == "table":
     if git("rev-parse", "--verify", SINCE + "^{commit}") is None:
         print("measure-cost: unknown git ref %r" % SINCE, file=sys.stderr); sys.exit(2)
     ref_bodies = {}
+    # git runs in the plugin directory (-C ROOT): ls-tree names paths from there, and `<ref>:./<path>`
+    # reads them from there too, wherever the plugin sits in its repository.
     ls = git("ls-tree", "-r", "--name-only", SINCE, "--", "skills") or b""
     ref_ctx = 0
     for path in ls.decode().splitlines():
         parts = path.split("/")
         if len(parts) == 3 and parts[2] == "SKILL.md":
-            blob = git("show", "%s:%s" % (SINCE, path)) or b""
+            blob = git("show", "%s:./%s" % (SINCE, path)) or b""
             ref_bodies[parts[1]] = {"bytes": len(blob), "tokens": tokens(len(blob)), "path": path}
             fm = frontmatter(blob.decode("utf-8", "replace"))
             if listed(fm): ref_ctx += len(listing_line(fm, parts[1]).encode("utf-8"))

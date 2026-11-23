@@ -31,7 +31,7 @@ steps = [step for phase in build["phases"] for step in phase["steps"]]
 ids = [step["id"] for step in steps]
 
 rc, out, err = run()
-shipped = [json.load(open(path, encoding="utf-8")) for path in sorted(glob.glob(os.path.join(root, "workflows", "*.json")))]
+shipped = [json.load(open(path, encoding="utf-8")) for path in sorted(glob.glob(os.path.join(root, "workflows", "*.json"))) if os.path.basename(path) != "registry.json"]
 counted = "WORKFLOWS: ok (%d files, %d steps)" % (len(shipped), sum(len(p["steps"]) for d in shipped for p in d["phases"]))
 check("(1) the shipped definitions pass", (rc, out, err), (0, counted, ""))
 as_tuple = lambda v: tuple(int(p) for p in v.split("."))
@@ -44,7 +44,10 @@ check("(6) every step always runs, stops on failure and is a built-in step skill
       [("step", {"mode": "always", "condition": None}, "stop", "builtin", None)] * 11)
 check("(7a) each step runs its step skill", [s["run"]["ref"] for s in steps], SKILLS)
 check("(7b) each step's skill exists", [r for r in SKILLS if not os.path.isfile(os.path.join(root, "skills", r, "SKILL.md"))], [])
-check("(7c) version 2, minPluginVersion this plugin's version", (build["version"], build["minPluginVersion"]), (2, plugin))
+# At most this plugin's version, never equal by rule: a later release that leaves the workflow alone
+# keeps the version that workflow first needed (check-workflows.py holds the same rule).
+check("(7c) version 2, minPluginVersion this plugin's version or an earlier one",
+      (build["version"], as_tuple(build["minPluginVersion"]) <= as_tuple(plugin)), (2, True))
 check("(7d) step 8, the epic release, is not a step of this workflow", [s for s in ids if "release" in s], [])
 
 # (8) each rule fails a scratch copy with the right reason

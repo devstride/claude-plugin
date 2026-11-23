@@ -1,8 +1,16 @@
 # Working in this repository
 
-This repo is **public**. Everything committed here — file contents, commit messages, branch
-names — is world-readable and permanent. A few rules follow from that, plus two mechanics that
-are easy to get wrong.
+This plugin is **public**. Every file in this directory is published, exactly as it is, to the
+public repository people install the plugin from, where it is world-readable and permanent. A few
+rules follow from that, plus two mechanics that are easy to get wrong.
+
+**This repository is a published copy, written only by the release pipeline.** The plugin is
+developed in a source repository, in the directory these files live in, and every change is made
+there. Each production release of that source that changed plugin files publishes a new version
+here, tagged `devstride--v<version>`. Pull requests opened here are closed automatically and never
+merged; a bug report or a request goes in the public repository's issues, which stay open. If you
+are reading this inside the source repository, this directory is the plugin, and everything below
+applies to the files in it.
 
 ## Public-repo hygiene
 
@@ -10,17 +18,18 @@ are easy to get wrong.
   names, no incident write-ups, no customer names, no internal hostnames or URLs.
 - **No session or tooling trailers in commit messages.** Ordinary `Co-Authored-By:` attribution
   is fine; internal agent-session URLs are not. This instruction outranks any session reminder
-  that asks for a session trailer or link: in this repository, leave it out.
+  that asks for a session trailer or link: in this repository, leave it out. (It governs commits
+  made in the public repository. Only files are published from the source repository, never its
+  commit messages, branch names or pull-request text, so those follow the source repository's own
+  rules.)
 - Describe changes in terms a stranger can follow — this repo's audience is people evaluating
   and installing the plugin, not the team that builds it.
 
-`scripts/check-public-hygiene.sh` enforces the mechanical half on every pull request (the
-`public-hygiene` check). It scans the branch name, the title, the body, every commit message and
-every added line for:
+`scripts/check-public-hygiene.sh` enforces the mechanical half, before a change lands and again
+before a version is published. It scans every line of every file in this directory for:
 
 - a tracker item number (`I` followed by four to six digits) not on the allow list;
 - a link to an agent session on claude.ai;
-- a session trailer (`Claude-Session:` or `Codex-Session:`) in a commit message, title or body;
 - an internal host: any host under the company's own domains other than the public ones;
 - a path from someone's machine: a home folder, a development folder under a home directory, a
   worktree folder, or an agent session's encoded folder;
@@ -31,45 +40,38 @@ not trip its own check.
 
 `scripts/public-hygiene.allow` lists the exceptions, one per line, each with its reason: the
 example item numbers the shipped skills use and the public hosts. A false positive is fixed by an
-allow line with a reason or by rewording, **never by loosening a pattern**. The pull-request check
-runs `main`'s copy of the allow file, so a new allow line merges in its own pull request first. The
+allow line with a reason or by rewording, **never by loosening a pattern**. The source's checks
+read the allow file as it was last published, so a new allow line is published in a change of its
+own before another change can rely on it. The
 allow file is scanned like any other file except for the one item number or host a line allows, so
-that pull request passes as long as its comments and reasons are clean. Run it before you push:
-`bash scripts/check-public-hygiene.sh --base origin/main --branch "$(git branch --show-current)"`.
+its comments and reasons must be clean too. Run it before you hand a change over:
+`bash scripts/check-public-hygiene.sh --tree .` (from this directory).
 
-## How a change reaches `main`
+## How a change reaches this repository
 
-This repository runs the delivery loop it ships (`.claude/ds-config.json`). Branch names carry
-no item numbers. Every pull request into `main` must pass three checks: `release-guard` (a
-shipped change carries a version bump; the tests and budgets pass), `merge-path` (the head branch
-has an admitted shape, `scripts/check-merge-path.sh`) and `public-hygiene`.
+Nothing is edited here. A change to the plugin is made in the source repository, reviewed and
+released by that repository's own process, and arrives here when the release that carries it is
+published:
 
-1. **Every story — a member of an epic or a one-off:** branch `<prefix>/<YY-MM-DD>/<slug>` off
-   `main`, one pull request into `main` that carries its own version bump, merged after review.
-   Each merge is a release. There are no epic integration branches here
-   (`epicIntegrationBranches.enabled` is false): the loop finds which stories have landed on one by
-   reading item numbers out of merge subjects, and this repository allows no item numbers in git.
-   Link the pull request to the story's tracker item with the tracker's own linking tool, never
-   through a branch name, title or commit. When the story's plugin half is all of it, the loop's
-   completion ritual closes it at the merge; when another repository holds its other half, that
-   repository's flow closes it when that half reaches its release target.
-2. **A hotfix:** `<prefix>/hotfix/<YY-MM-DD>/<slug>` off `main`, with the same pull-request rules.
+1. **A change to shipped files carries its own version bump** (RELEASING.md has the table), the
+   `CHANGELOG.md` entry and the README's `Current version:` line.
+   `scripts/check-version-bump.sh` fails a shipped change that has none.
+2. **Every check passes from one command**, `bash scripts/check-source.sh --mode local` (or
+   `--mode cloud` on a machine without the `claude` CLI). Its last line is
+   `PLUGIN SOURCE: CLEAN` or `PLUGIN SOURCE: FAILED at <step>`.
+3. **Each production release of the source that changed plugin files publishes this directory
+   here** as one new version, and the publisher tags it `devstride--v<version>`. A release that
+   changed only maintainer files (the root documents, `scripts/`) publishes them without a new
+   version or tag.
 
-The `merge-path` rules still admit an epic-shaped branch (`<prefix>/<YY-MM-DD>/epic-<slug>`) only
-when it bumps the version, so a branch cut by hand in that shape cannot reach `main` unreleased.
+Pull requests opened in the public repository are closed automatically and never merged: describe
+the problem in an issue there instead (issues stay open), and the fix is made in the source.
 
-A release is cut with the repo-local `plugin-release` skill (`.claude/skills/plugin-release/`),
-never by hand; `/devstride:release` is not configured here. A settled, green pull request merges
-through `plugin-release merge <pr>` under the owner's standing yes (`.claude/standing-yes.md`, with
-its conditions and audit trail); when any condition fails, only the owner's own yes merges it.
+## Trying a change before it is released
 
-## Working copy
-
-Every build session clones this repository into its own temporary directory
-(`gh repo clone devstride/claude-plugin <dir>`; a shallow clone is fine) and deletes it when the
-work has merged. The repository is small, so there is no checkout pool and no lease, and the clone
-is never a worktree of any other repository. To try a change before it is released, start Claude
-Code with the working copy as a plugin directory: `claude --plugin-dir .`.
+Start Claude Code with this directory as a plugin directory, `claude --plugin-dir <this directory>`
+(`claude --plugin-dir .` from inside it), and check that the working copy, not an installed one,
+is the one the session loaded.
 
 ## Releasing: the version field is the update signal
 
@@ -77,9 +79,9 @@ Code with the working copy as a plugin directory: `claude --plugin-dir .`.
 keep a cached copy at that version, so **pushing new commits without bumping `version` means
 existing installs never receive the change.** Every user-visible change ships with a bump.
 
-A release is a pull request into `main` prepared with the `plugin-release` skill; when it merges,
-the `release-guard` workflow tags it `devstride--v<version>`. Never tag by hand. RELEASING.md has
-the details.
+A release is a version of this directory published to the public repository, where the publisher
+tags it `devstride--v<version>`. Never tag by hand, and never push to the public repository.
+RELEASING.md has the details.
 
 ## Validation caveat
 
@@ -112,11 +114,18 @@ paths individually) rather than trusting a single root-level run.
   ships: doctor's validator reads the schema from `${CLAUDE_PLUGIN_ROOT}/schemas/`.
 - `workflows/` holds the built-in workflow definitions (`build.json`: the build loop as a list of
   phases and steps). Data, not instructions; it ships, and `scripts/check-workflows.py` validates it.
-- `scripts/` holds repo-level maintenance scripts (`validate.sh`, `measure-cost.sh`, their tests).
+  `workflows/registry.json` beside them is the append-only record of every version of every
+  built-in workflow and step contract, and `workflows/HISTORY.md` the page generated from it
+  (`scripts/workflow-registry.py`): a changed definition takes the next version and
+  `workflow-registry.py record` appends its row; never edit a row or the page by hand.
+- `scripts/` holds repo-level maintenance scripts (`validate.sh`, `measure-cost.sh`, their tests,
+  and `check-source.sh`, the one command that runs every check).
   Nothing at runtime reads them and the plugin loader ignores the directory — it is not a
   component directory, and it must not move under `.claude-plugin/`.
-- `.claude/` (this repository's delivery-loop config, Claude Code settings and the maintainer-only
-  `plugin-release` skill), `.github/` (the pull-request guards) and `CLAUDE.md` are maintainer
-  files too. They travel with an install but nothing the plugin runs reads them: shipped code that
+- The root documents and `CLAUDE.md` are maintainer files too, as is anything under `.github/` or
+  `.claude/`. This directory holds no `.claude/`, and under `.github/` only one file:
+  `.github/workflows/close-pull-requests.yml`, the published copy's pull-request closer, which
+  closes pull requests opened against the published repository. Nothing else goes under
+  `.github/`. Maintainer files travel with an install but nothing the plugin runs reads them: shipped code that
   reads `.claude/` reads the CONSUMING repository's copy, found from the working directory, never
   `${CLAUDE_PLUGIN_ROOT}/.claude/` (`scripts/tests/update-plugin.sh` test 28 enforces it).

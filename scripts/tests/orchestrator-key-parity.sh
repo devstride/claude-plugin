@@ -5,13 +5,16 @@
 # ultracode-build counts as an orchestrator too: its risk check and gate moved into two steps.
 #
 # Undotted top-level keys (`preShipChecks`, `baseBranch` …) count too when the registry registers
-# them. SEAM_BASE_REF names the base (default origin/main); without that ref the walk is skipped
+# them. SEAM_BASE_REF names the base (default origin/master); without that ref the walk is skipped
 # with a note locally, and FAILS when CI is set: a CI run that cannot see the base proves nothing.
+# The bodies are read from the plugin directory (`<ref>:./skills/...`), so the plugin may be the
+# repository root or a subdirectory. While the base does not hold the plugin yet, the walk reads
+# the newest commit whose subject starts `plugin import` instead, as scripts/check-version-bump.sh does.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
-BASE="${SEAM_BASE_REF:-origin/main}"
+BASE="${SEAM_BASE_REF:-origin/master}"
 
 if ! git -C "$ROOT" rev-parse --verify -q "$BASE^{commit}" >/dev/null; then
   if [ -n "${CI:-}" ]; then
@@ -22,8 +25,20 @@ if ! git -C "$ROOT" rev-parse --verify -q "$BASE^{commit}" >/dev/null; then
   exit "$FAIL"
 fi
 
+if ! git -C "$ROOT" cat-file -e "$BASE:./.claude-plugin/plugin.json" 2>/dev/null; then
+  IMPORT="$(git -C "$ROOT" log --format='%H %s' --grep='^plugin import' HEAD | awk '$2 == "plugin" && $3 ~ /^import/ { print $1; exit }')"
+  if [ -z "$IMPORT" ]; then
+    bad "(1) $BASE does not hold the plugin and no commit whose subject starts 'plugin import' is reachable from HEAD"
+    exit "$FAIL"
+  fi
+  BASE="$(git -C "$ROOT" rev-parse --short "$IMPORT") (the plugin import; ${SEAM_BASE_REF:-origin/master} does not hold the plugin yet)"
+  BASE_REF="$IMPORT"
+else
+  BASE_REF="$BASE"
+fi
+
 for n in release build-item ultracode-build pr branch-hotfix doctor; do
-  git -C "$ROOT" show "$BASE:skills/$n/SKILL.md" > "$WORK/$n.base" 2>/dev/null || : > "$WORK/$n.base"
+  git -C "$ROOT" show "$BASE_REF:./skills/$n/SKILL.md" > "$WORK/$n.base" 2>/dev/null || : > "$WORK/$n.base"
 done
 
 python3 - "$ROOT" "$WORK" release build-item ultracode-build pr branch-hotfix doctor > "$WORK/out.txt" 2>&1 <<'PY'

@@ -6,10 +6,10 @@
 # canned answers stops, asks and ends where each step's verdict says. A step skill is prose run by
 # a model; this proves the runner's sequence, stops and proofs, not what a model does in a step.
 # It also proves the split lost and duplicated nothing: every sentence of the old plan and rebalance
-# pages (read at a pinned base tag, PLAN_SPLIT_BASE) lives in exactly one entry or step reference,
+# pages (copies of a pinned release under scripts/tests/fixtures/plan-split-base/) lives in exactly one entry or step reference,
 # the hard floors stay in the entries, both bodies are within their size limits, the Release scope
 # clause has one home, and each of the twenty references carries the catalog's verdict.
-# Everything lives in a temporary directory. No network, unless the base tag has to be fetched.
+# Everything lives in a temporary directory. No network.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
@@ -372,23 +372,23 @@ end = walk(run, {"rewire": ["REBALANCE REWIRE: ORPHANS I103"]})
 check("rebalance orphans stop at the rewire; the originals are never archived", end.get("stepId") == "rewire" and "archive-originals" not in run.issued, (end, run.issued))
 # --- text parity: every sentence of the two old pages lives in exactly one place ---------------
 # The old plan and rebalance pages are read at a PINNED base, the last release before the split
-# (the moving main holds the moved text once merged); PLAN_SPLIT_BASE overrides it. Nothing is
+# (never the moving tree, which holds the moved text): both pages as that release (BASE) published
+# them are kept as files under scripts/tests/fixtures/plan-split-base/, so the case reads no git
+# history and needs no network. Nothing is
 # sampled: every sentence of both old bodies of 25 characters or more is a needle, and each must
 # appear exactly once across the two entries and the plan-steps references.
-BASE = os.environ.get("PLAN_SPLIT_BASE", "devstride--v4.7.0")
+BASE = "devstride--v4.7.0"
+BASE_DIR = os.path.join(ROOT, "scripts/tests/fixtures/plan-split-base")
 ENTRIES = {"plan": "skills/plan/SKILL.md", "rebalance": "skills/rebalance/SKILL.md"}
 REFDIR = "skills/plan-steps/references"
 MODES = sorted(name.split("@")[0] for name, e in CATALOG.items() if e["builtinSkill"] == "plan-steps")
 flat = lambda t: " ".join(t.split())
 
 
-def old_page(path):
-    show = lambda: subprocess.run(["git", "-C", ROOT, "show", "%s:%s" % (BASE, path)], capture_output=True, text=True)
-    old = show()
-    if old.returncode != 0:
-        subprocess.run(["git", "-C", ROOT, "fetch", "-q", "--depth=1", "origin", "tag", BASE], capture_output=True)
-        old = show()
-    return old
+def old_page(page):
+    """skills/<page>/SKILL.md as the release named BASE published it, kept as plan-split-base/<page>.md; "" when absent."""
+    path = os.path.join(BASE_DIR, page + ".md")
+    return open(path, encoding="utf-8").read() if os.path.isfile(path) else ""
 
 
 def sentences(page):
@@ -479,12 +479,11 @@ def rewrite(root, path, change):
     open(full, "w", encoding="utf-8").write(change(text))
 
 
-OLD = dict((page, old_page(path)) for page, path in ENTRIES.items())
-unread = [page for page, got in OLD.items() if got.returncode != 0]
+OLD = dict((page, old_page(page)) for page in ENTRIES)
+unread = [page for page, text in OLD.items() if not text]
 if unread:
-    check("text parity: the base %s is readable (git fetch origin tag %s, or set PLAN_SPLIT_BASE)" % (BASE, BASE), False, [OLD[p].stderr.strip() for p in unread])
+    check("text parity: the copy of each old page at %s is in %s — never skipped, or this test proves nothing" % (BASE, BASE_DIR), False, ["missing or empty: " + p for p in unread])
 else:
-    OLD = dict((page, got.stdout) for page, got in OLD.items())
     faults, needles = parity(ROOT, OLD)
     check("text parity: each of the %d sentences of the old plan and rebalance pages at %s lives in exactly one entry or reference" % (needles, BASE),
           faults == [] and needles >= 250, faults[:12] or needles)

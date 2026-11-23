@@ -140,6 +140,38 @@ edit .claude-plugin/plugin.json 'd["version"] = "99.0.0"'; gen --write >/dev/nul
 gen --check --release --base no-such-ref
 [ "$RC" = 2 ] && ok "(17) an unreadable base is exit 2" || bad "(17) exit $RC: $OUT"
 
+# (17b)-(17e) the plugin as a subdirectory of a larger repository: the base's plugin.json is read
+# from the plugin directory, and a base that does not hold the plugin yet falls back to the newest
+# commit whose subject starts `plugin import`
+subcopy() {
+  copy; rm -rf "$WORK/big"; mkdir -p "$WORK/big"; git -C "$WORK/big" init -q -b master
+  echo host > "$WORK/big/README.md"; git -C "$WORK/big" add -A
+  git -C "$WORK/big" -c user.name=t -c user.email=t@example.invalid commit -qm "before the plugin"
+  git -C "$WORK/big" checkout -q -b work; mkdir "$WORK/big/claude-plugin"
+  tar --exclude=.git -cf - -C "$WORK/r" . | tar -xf - -C "$WORK/big/claude-plugin"
+  git -C "$WORK/big" add -A; git -C "$WORK/big" -c user.name=t -c user.email=t@example.invalid commit -qm "$1"
+}
+subgen() { OUT="$(cd "$WORK" && python3 "$WORK/big/claude-plugin/$GEN" "$@" 2>&1)"; RC=$?; }
+subedit() { python3 - "$WORK/big/claude-plugin/$1" "$2" <<'PY'
+import json, sys
+path, expr = sys.argv[1], sys.argv[2]
+d = json.load(open(path)); exec(expr); open(path, "w").write(json.dumps(d, indent=2) + "\n")
+PY
+}
+subcopy "plugin import: test tree"
+subedit schemas/seam-registry.json 'd["settings"][0]["since"] = "unreleased"'; subgen --write >/dev/null
+subgen --check --release --base work
+[ "$RC" = 0 ] && ! printf '%s' "$OUT" | grep -q "^base: plugin import" \
+  && ok "(17b) in a subdirectory, same version as a base that holds the plugin: fine, read from the base itself" || bad "(17b) exit $RC: $OUT"
+subgen --check --release --base master
+[ "$RC" = 0 ] && printf '%s' "$OUT" | grep -q "^base: plugin import commit .* (master does not hold the plugin yet)" && printf '%s' "$OUT" | grep -q "^SCHEMA: ok " \
+  && ok "(17c) a base without the plugin falls back to the import commit and says so" || bad "(17c) exit $RC: $OUT"
+subedit .claude-plugin/plugin.json 'd["version"] = "99.0.0"'; subgen --write >/dev/null; subgen --check --release --base master
+[ "$RC" = 1 ] && printf '%s' "$OUT" | grep -q "^UNRELEASED .*: set since to 99.0.0" \
+  && ok "(17d) … and a version above the imported one with an unreleased entry is still refused" || bad "(17d) exit $RC: $OUT"
+subcopy "copied by hand"; subgen --check --release --base master
+[ "$RC" = 2 ] && ok "(17e) a base without the plugin and no import commit is exit 2" || bad "(17e) exit $RC: $OUT"
+
 # (19) every required field, hook or setting, is marked in the readable table
 MISSING="$(python3 - "$ROOT" <<'PYI'
 import json, sys

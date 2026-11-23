@@ -2266,7 +2266,7 @@
      "path": [
       "summary"
      ],
-     "value": "Sync with api_key=abc123def456"
+     "value": "Sync with api_key=fakefakefake"
     }
    ],
    "root": "fixture",

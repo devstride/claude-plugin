@@ -163,6 +163,11 @@ OUT="$(python3 - "$HELPER" "$WORK" <<'PY'
 import copy, json, os, re, shlex, subprocess, sys
 helper, work = sys.argv[1], sys.argv[2]
 H = "a" * 40
+# Every case runs in a checkout of its own with no config, so no case reads the config of the
+# repository the tests happen to run from (the train rule of the gate then does nothing unless a case
+# names a config), and the result is the same from any directory.
+CASES = os.path.join(work, "case-checkout"); os.makedirs(CASES, exist_ok=True)
+subprocess.run(["git", "init", "-q", CASES], check=True)
 def run(number, sha, scenario, *extra):
     path = os.path.join(work, "scenario.json"); json.dump(scenario, open(path, "w"))
     for counter in (".runs", ".mc", ".pr", ".order"):   # every case counts its own reads from zero
@@ -171,7 +176,7 @@ def run(number, sha, scenario, *extra):
         except FileNotFoundError:
             pass
     p = subprocess.run([sys.executable, helper, str(number), sha] + list(extra), capture_output=True, text=True,
-                       env=dict(os.environ, GH_SCENARIO=path))
+                       cwd=CASES, env=dict(os.environ, GH_SCENARIO=path))
     return p.returncode, p.stdout.strip().split("\n"), p.stderr
 def say(good, label, extra=""):
     print(("ok   " if good else "FAIL ") + label + ("" if good else " -> " + extra))

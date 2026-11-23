@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checks every built-in workflow definition (workflows/*.json): the rules a JSON Schema cannot
+"""Checks every built-in workflow definition (workflows/*.json but registry.json): the rules a JSON Schema cannot
 say, and that schemas/workflow.schema.json lists the same values this script does. Standard
 library only. Run by scripts/validate.sh.
 
@@ -191,7 +191,8 @@ def main(argv):
         with open(os.path.join(root, ".claude-plugin", "plugin.json"), encoding="utf-8") as handle:
             plugin_version = json.load(handle).get("version")
         lines = ["INVALID schemas/workflow.schema.json: %s: %s" % fault for fault in check_schema(root)]
-        files = sorted(glob.glob(os.path.join(root, "workflows", "*.json")))
+        # workflows/registry.json is the version record of these definitions, not one of them.
+        files = sorted(p for p in glob.glob(os.path.join(root, "workflows", "*.json")) if os.path.basename(p) != "registry.json")
         if not files:
             raise OSError("no workflows/*.json under %s" % root)
         steps = 0

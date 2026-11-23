@@ -1,7 +1,9 @@
 #!/bin/bash
 # Tests for skills/doctor/scripts/validate-config.py — the config shape check doctor and setup run —
 # against the committed schema, using the synthetic configs in scripts/tests/fixtures/config/
-# (none is a real repository's) and scratch configs written per case.
+# (synthetic ones, plus plugin-repo.json: the config the plugin's own published repository carried
+# when its source was imported here, kept as the maximal real-world case) and scratch configs
+# written per case.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; VAL="$ROOT/skills/doctor/scripts/validate-config.py"
 SCHEMA="$ROOT/schemas/ds-config.schema.json"; FIX="$ROOT/scripts/tests/fixtures/config"
@@ -19,7 +21,7 @@ CLEAN="^CONFIG: 0 error(s), 0 warning(s) against schema [0-9]*\.[0-9]*\.[0-9]*$"
 run "$FIX/minimal.json"; expect "(1) a minimal config is clean, and the first line names the schema version" 0 "$CLEAN"
 run "$FIX/full.json"; expect "(2) the full-coverage config is clean" 0 "$CLEAN"
 run "$FIX/commands-clearance.json"; expect "(3) the commands shapes of release.clearance and claims are clean" 0 "$CLEAN"
-run "$ROOT/.claude/ds-config.json"; expect "(4) this repository's own config is clean" 0 "$CLEAN"
+run "$FIX/plugin-repo.json"; expect "(4) the plugin repository's own config is clean" 0 "$CLEAN"
 # (4b) keys added since the committed fixtures were last regenerated, in a scratch fixture that
 # must itself be clean; (5) counts it as a full-coverage fixture
 printf '%s\n' '{"activeAgents": {"boardId": "board-1", "rootLevel": "Capability", "commands": {"start": "./tools/presence start <root>", "end": "./tools/presence end <root>"}}, "boardPlacement": {"rules": [{"name": "Stories", "match": {"workType": ["Story"]}, "place": {"cycleFolder": "folder-1"}}]}}' > "$WORK/added.json"

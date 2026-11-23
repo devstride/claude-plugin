@@ -8,6 +8,70 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.8.1] — 2026-11-22
+
+### Added
+
+- **Every version of every built-in workflow and step contract is on record, for good.**
+  `workflows/HISTORY.md` lists, newest first, each version of the Build, Hotfix, Plan, Rebalance
+  and Release workflows and each revision of every step contract: the plugin release that first
+  shipped it, its date, which steps it added, removed or moved to another contract, and one line
+  on what changed, back to 4.1.0. It is generated from `workflows/registry.json`, which only ever
+  grows: a new version is appended as a row and named when its release is prepared, and the
+  plugin's checks refuse a row edited or deleted after it shipped, a workflow changed without a
+  new version number, a version that goes backwards or skips, a note that is not fit to publish
+  and a page that is out of date. The registry replaces the test fixture that only remembered
+  the current version. Nothing the plugin does at run time reads either file.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since b64bbed8a7 @ 54f35cd114, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@b64bbed8a7 | tokens@b64bbed8a7 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/build-item/SKILL.md | 24,000 | 8,000 | 24,000 | 8,000 | +0 | 8,000 |
+| skills/review/SKILL.md | 23,986 | 7,996 | 23,986 | 7,996 | +0 | 7,999 |
+| skills/doctor/SKILL.md | 23,847 | 7,949 | 23,847 | 7,949 | +0 | 8,000 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
+| skills/rationalize-gantt/SKILL.md | 12,332 | 4,111 | 12,332 | 4,111 | +0 | 4,200 |
+| skills/pr/SKILL.md | 11,538 | 3,846 | 11,538 | 3,846 | +0 | 3,846 |
+| skills/ultracode-build/SKILL.md | 10,327 | 3,443 | 10,327 | 3,443 | +0 | 3,443 |
+| skills/rebalance/SKILL.md | 8,482 | 2,828 | 8,482 | 2,828 | +0 | 2,828 |
+| skills/plan/SKILL.md | 8,385 | 2,795 | 8,385 | 2,795 | +0 | 2,795 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,730 | 2,244 | 6,730 | 2,244 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 6,073 | 2,025 | 6,073 | 2,025 | +0 | 2,100 |
+| skills/insert-defect/SKILL.md | 5,605 | 1,869 | 5,605 | 1,869 | +0 | 1,869 |
+| skills/insert-story/SKILL.md | 4,928 | 1,643 | 4,928 | 1,643 | +0 | 1,643 |
+| skills/branch-hotfix/SKILL.md | 4,799 | 1,600 | 4,799 | 1,600 | +0 | 1,600 |
+| skills/branch-feature/SKILL.md | 3,707 | 1,236 | 3,707 | 1,236 | +0 | 1,236 |
+| skills/risk-check/SKILL.md | 3,598 | 1,200 | 3,598 | 1,200 | +0 | 1,200 |
+| skills/hotfix-steps/SKILL.md | 3,591 | 1,197 | 3,591 | 1,197 | +0 | 1,200 |
+| skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
+| skills/plan-steps/SKILL.md | 3,578 | 1,193 | 3,578 | 1,193 | +0 | 1,200 |
+| skills/local-checks/SKILL.md | 3,523 | 1,175 | 3,523 | 1,175 | +0 | 1,200 |
+| skills/run-workflow/SKILL.md | 3,484 | 1,162 | 3,484 | 1,162 | +0 | 1,162 |
+| skills/merge-story/SKILL.md | 3,240 | 1,080 | 3,240 | 1,080 | +0 | 1,081 |
+| skills/review-story/SKILL.md | 3,020 | 1,007 | 3,020 | 1,007 | +0 | 1,007 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/claim-story/SKILL.md | 2,875 | 959 | 2,875 | 959 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/story-lifecycle/SKILL.md | 2,700 | 900 | 2,700 | 900 | +0 | 900 |
+| skills/capture-findings/SKILL.md | 2,696 | 899 | 2,696 | 899 | +0 | 900 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,083 | 695 | 2,083 | 695 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/sync-base/SKILL.md | 1,471 | 491 | 1,471 | 491 | +0 | 500 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 6,474 | 2,158 | 6,474 | 2,158 | +0 | 2,200 |
+| **total (bodies)** | 279,887 | 93,310 | 279,887 | 93,310 | +0 | |
+
 ## [4.8.0] — 2026-11-22
 
 ### Added
@@ -6721,7 +6785,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.8.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.8.1...HEAD
+[4.8.1]: https://github.com/devstride/claude-plugin/compare/devstride--v4.8.0...devstride--v4.8.1
 [4.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.7.0...devstride--v4.8.0
 [4.7.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.6.1...devstride--v4.7.0
 [4.6.1]: https://github.com/devstride/claude-plugin/compare/devstride--v4.6.0...devstride--v4.6.1

@@ -3,7 +3,9 @@
 # 6.5, or in ultracode-build's gate bullets and risk-check phase, before the Build loop became a
 # step list, now lives in exactly one of the Build step skills or their references, and no longer
 # in either of those two bodies. The base is PINNED to the last release before the move (never the
-# moving main, which holds the moved bodies once merged); whitespace, line wraps and bold markers
+# moving tree, which holds the moved bodies): the two bodies as that release published them are
+# kept as files under scripts/tests/fixtures/build-workflow-base/, so the test reads no git history
+# and needs no network; whitespace, line wraps and bold markers
 # are collapsed before matching. A needle that named an old step number, or was reworded, has NEW
 # wording (one text or several, each required), checked in place of the old one. The needles are
 # copied from the old text, never retyped, and each carries its imperative, not only its heading:
@@ -11,16 +13,19 @@
 # its step: its step skill names it in a "read ... in full" instruction.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-BASE="${BUILD_SPLIT_BASE:-devstride--v4.2.0}"
-if ! git -C "$ROOT" rev-parse --verify -q "$BASE^{commit}" >/dev/null; then
-  echo "  FAIL the base $BASE is not in this clone: run \`git fetch origin tag $BASE\` (or set BUILD_SPLIT_BASE to a ref that holds the bodies before the move), then run this test again — never skipped, or it proves nothing"
-  exit 1
-fi
+BASE="devstride--v4.2.0"
+BASE_DIR="$ROOT/scripts/tests/fixtures/build-workflow-base"
+for name in build-item ultracode-build; do
+  if [ ! -s "$BASE_DIR/$name.md" ]; then
+    echo "  FAIL the copy of $name at $BASE is missing or empty: $BASE_DIR/$name.md — never skipped, or this test proves nothing"
+    exit 1
+  fi
+done
 export PYTHONDONTWRITEBYTECODE=1
-python3 - "$ROOT" "$BASE" <<'PY'
-import glob, os, re, subprocess, sys
+python3 - "$ROOT" "$BASE" "$BASE_DIR" <<'PY'
+import glob, os, re, sys
 
-ROOT, BASE = sys.argv[1], sys.argv[2]
+ROOT, BASE, BASE_DIR = sys.argv[1], sys.argv[2], sys.argv[3]
 BI, UB = "skills/build-item/SKILL.md", "skills/ultracode-build/SKILL.md"
 STEPS = ["claim-story", "story-lifecycle", "risk-check", "local-checks", "review-story", "merge-story",
          "capture-findings", "sync-base"]
@@ -35,8 +40,9 @@ def flat(text):
 
 
 def old(path):
-    done = subprocess.run(["git", "-C", ROOT, "show", "%s:%s" % (BASE, path)], capture_output=True, text=True)
-    return flat(done.stdout) if done.returncode == 0 else ""
+    # skills/<name>/SKILL.md as the release named BASE published it, kept as fixtures/build-workflow-base/<name>.md
+    with open(os.path.join(BASE_DIR, path.split("/")[1] + ".md"), encoding="utf-8") as handle:
+        return flat(handle.read())
 
 
 def now(path):

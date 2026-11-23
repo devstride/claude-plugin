@@ -1,15 +1,20 @@
 # Contributing
 
-Thanks for looking. Skill improvements are welcome here — this repo is where they live.
+Thanks for looking. Reports of what a skill did, and what you expected instead, are how these
+skills improve.
 
 ## Where skill changes land
 
-**This repo is canonical for the shared-loop skills.** Skill text is developed here and released
-from here; consumers — including DevStride's own monorepo, which installs the plugin like any other
-customer — receive it through a versioned release.
+**This repository is a published copy of the plugin directory in its source repository, written
+only by the release pipeline.** Skill text is changed in that source; each production release of
+the source that changed plugin files publishes a new version here, tagged `devstride--v<version>`,
+and every consumer receives it through that versioned release.
 
-- **Pull requests that improve the skills are welcome.** So are issues describing behaviour you hit
-  and which skill produced it.
+- **Issues stay open and are welcome**: describe the behaviour you hit and which skill produced it.
+  Bug reports and ideas both go there.
+- **Pull requests opened here are closed automatically and never merged**, with a note pointing
+  to the issues. The change is made in the source and arrives here with the next published
+  version, so an issue that describes it is the way in.
 - Read [RELEASING.md](RELEASING.md) before proposing a change that alters what a skill *does*: skill
   names and `.claude/ds-config.json` keys are a published contract, and breaking one costs a MAJOR
   version.
@@ -69,7 +74,7 @@ of the walk is now mechanical: every key lives in `schemas/seam-registry.json`, 
 registry does not hold (a token that only looks like a key goes in `scripts/config-key-scan.ignore`,
 with its reason). So a new or renamed key is a registry edit first, then
 `python3 scripts/build-config-schema.py --write` to regenerate the schema and the key table, both of
-which the release guard checks. The second half is still yours: after any change that touches
+which `scripts/check-source.sh` checks. The second half is still yours: after any change that touches
 configuration, check that every key in a real config still has an instruction honouring it.
 
 **Presence is not fidelity, and fidelity is not correctness.** Grepping for a rule proves only that
@@ -174,6 +179,24 @@ needle as a prompt to go and look, never as proof of loss: wording legitimately 
 check cannot tell a rewrite from a deletion. The file is candid about the four limits it
 cannot overcome.
 
+## Run every check with one command
+
+`bash scripts/check-source.sh --mode local` runs everything a change must pass and stops at the
+first failure, the quick checks first: the neutrality scan, the generated config schema, the
+config-key scan, the example config, the public-hygiene scan and the version-bump rule, then
+`validate.sh --needles` (the manifest passes, shell syntax, the script tests, the budgets and the
+needles above). On a
+machine without the `claude` CLI, `--mode cloud` runs every check that does not need it.
+`--base <ref>` names what was last published (default `origin/master`), and `--list` prints the
+steps without running them. The last line is `PLUGIN SOURCE: CLEAN` or
+`PLUGIN SOURCE: FAILED at <step>`.
+
+A key, a step contract or a built-in workflow that is new since the last release is written with
+the literal `unreleased` where its first version belongs (`"since": "unreleased"`,
+`"minPluginVersion": "unreleased"`). Preparing a release runs
+`python3 scripts/stamp-unreleased.py <version>`, which names the version in each; nothing else
+stamps them, so never write the coming version by hand.
+
 ## Scripts a skill runs instead of text it reads
 
 A check an agent can only eyeball in prose belongs in a script the skill runs: scripts are
@@ -189,4 +212,5 @@ executed-files tuple in `measure-cost.sh`.
 
 ## Repo conventions
 
-See [AGENTS.md](AGENTS.md) for public-repo hygiene, the release/versioning rule, and layout.
+See [AGENTS.md](AGENTS.md) for public-repo hygiene, how a change reaches this repository, the
+release/versioning rule, and layout.

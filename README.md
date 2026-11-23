@@ -699,8 +699,14 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **4.8.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **4.8.1** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
+
+The public repository, `devstride/claude-plugin`, is a published copy written only by the release
+pipeline: the plugin is developed in the plugin directory of its source repository, and each
+production release of that source that changed plugin files publishes a new version there, tagged
+`devstride--v<version>`. Pull requests opened there are closed automatically and never merged, so
+please report a problem or ask for a change in its issues, which stay open.
 
 **Getting a new release.** Claude's marketplace auto-update is off by default for a manually added
 marketplace. Separately, Setup defaults `plugin.autoUpdate` on only for a project/local install

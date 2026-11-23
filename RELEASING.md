@@ -1,8 +1,14 @@
 # Releasing
 
-A release is a pull request into `main` that carries a version bump. There is no package registry —
-the marketplace source is this git repository, so the release artifacts are a version, a changelog
-entry, and a tag, and the `release-guard` workflow pushes the tag when the release merges.
+A release is a version of the plugin published to this repository and tagged. There is no package
+registry — the marketplace source is this git repository, so the release artifacts are a version, a
+changelog entry, and a tag.
+
+**This repository is a published copy, written only by the release pipeline.** The plugin is
+developed in the plugin directory of its source repository, and changes are made there. Each
+production release of that source that changed plugin files publishes a new version here, tagged
+`devstride--v<version>`. Pull requests opened here are closed automatically and never merged;
+issues stay open for bug reports and ideas.
 
 ## Why the version matters more than usual
 
@@ -34,32 +40,37 @@ an existing `.claude/ds-config.json` key keep working, and keep meaning the same
 MAJOR bump. New skills and new keys can arrive in a MINOR — the promise protects what you already
 depend on, it does not freeze the surface.
 
-## Cutting a release
+## How a release is published
 
-The repo-local `plugin-release` skill (`.claude/skills/plugin-release/SKILL.md`) is the checklist;
-run it rather than these steps by hand.
+Nothing is released by hand in this repository. The work happens in the source, in two parts.
 
-- **`plugin-release prepare [major|minor|patch]`**, on the branch whose pull request carries the
-  release: `bash scripts/validate.sh --needles` (the three `claude plugin validate` passes, the
+- **The change that alters shipped files prepares the version**, in the source, as part of that
+  change: `bash scripts/validate.sh --needles` (the three `claude plugin validate` passes, the
   marketplace invariant, `bash -n` over every shipped script, the script tests, the load budgets and
   the rule-loss needles — a budget breach or a DEAD REFERENCE blocks exactly like a manifest error;
   a needle MISS is a prompt to read), then the CHANGELOG move with its comparison links and the
   generated `### Cost` table, the version in `plugin.json` and the README's `Current version:` line,
-  and one `release: v<version>` commit that
-  `scripts/check-version-bump.sh` accepts.
-- **The pull request merges**, after the delivery loop's review and the three required checks
-  (`release-guard`, `merge-path`, `public-hygiene`; AGENTS.md, "How a change reaches `main`"),
-  through `plugin-release merge <pr>` under the owner's standing yes (`.claude/standing-yes.md`)
-  when every one of its conditions holds, else on the owner's own yes.
-- **`release-guard` tags `devstride--v<version>`** on the merge commit. Never tag by hand and never
-  push to `main`: the tag is created only for a commit that is already on `main`, so a public
-  release tag can never name a commit nobody merged.
-- **`plugin-release verify`** waits for the tag and proves a scratch project installs the version.
+  `python3 scripts/stamp-unreleased.py <version>` (every key, step contract and built-in workflow
+  written as `unreleased` now names the version) followed by
+  `python3 scripts/build-config-schema.py --write`, and last
+  `bash scripts/check-source.sh --mode local`, which must end `PLUGIN SOURCE: CLEAN`. Several
+  changes that ship in one release add up to one version: the first bumps it, the later ones add
+  their entries under the same heading. `scripts/check-version-bump.sh` fails a shipped change
+  that carries no bump.
+- **The source's production release publishes it.** When a production release of the source
+  changed plugin files, the publisher checks the exported directory once more (the public-hygiene
+  scan, the version rule and its own fixed checks on the release commit's text; the full
+  `check-source.sh` list already ran before the change landed), publishes it here, and tags what
+  it published `devstride--v<version>`.
+  Never tag by hand and never push to this repository: only the publisher creates a tag, and only
+  for a commit it has already put on `main`, so a public release tag can never name a commit
+  nobody published. A release that changed only maintainer files publishes them with no new
+  version and no tag.
 - **Announce it**, including `/devstride:update` for installations on 3.5.1 or newer and the two
   native bootstrap commands below for everything older — on 3.1.0–3.5.0 `/devstride:update` can
   stop with `plugin-root-missing` (fixed in 3.5.1), and older copies do not contain the skill.
 
-Three rules the skill applies, and why:
+Three rules every release keeps, and why:
 
 - **An empty `Unreleased` is not a release.** Either nothing user-visible changed, or the entries
   were never written; write them from `git log <last tag>..HEAD`. Do not cut an empty version.
@@ -148,14 +159,14 @@ This is one reason to tag every release: **the tag is the pin**, and an untagged
 nobody can hold still on. Treat tagging as part of publishing rather than a bookkeeping extra —
 the update machinery resolves `<name>--v*` tags, so an untagged release is not merely unpinnable.
 
-## This repository is the source of truth
+## This repository is a published copy
 
-Skill text is developed **here** and released from here. An earlier arrangement developed the skills
-in a private upstream repository and ported them in, and this file used to warn that direct edits
-would be overwritten by the next port. That ended with the dogfood cutover: the upstream repository
-now installs this plugin and keeps no local copies of these skills. Edit skills directly, open a
-pull request, and cut a release — there is nothing upstream to re-port from.
+Skill text is developed in the plugin directory of its source repository and published **here**,
+one version at a time. Do not edit this repository directly: a direct edit is not part of the
+source, and the next published version replaces it. Open an issue instead (see
+[CONTRIBUTING.md](CONTRIBUTING.md)); issues stay open, and pull requests opened here are closed
+automatically and never merged.
 
-What survives from that era is the discipline, not the direction: keep skills repo-agnostic (see
+The discipline that outlived every arrangement so far still holds: keep skills repo-agnostic (see
 [CONTRIBUTING.md](CONTRIBUTING.md)), move a *diff* rather than a file when text travels between
 repositories, and run the invariants check whenever you edit skill text.

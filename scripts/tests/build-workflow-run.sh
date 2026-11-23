@@ -185,7 +185,10 @@ required = [name for name in list(CATALOG)[:12] if CATALOG[name]["builtinSkill"]
 check("the definition's step order is the catalog's order", [s["contract"] for s in STEPS] == required, [s["contract"] for s in STEPS])
 check("each requirement comes earlier in the definition",
       all(ORDER.index(next(t["id"] for t in STEPS if t["contract"] == need)) < ORDER.index(s["id"]) for s in STEPS for need in CATALOG[s["contract"]]["requires"]))
-check("the definition needs this plugin's version", BUILD["minPluginVersion"] == plugin, (BUILD["minPluginVersion"], plugin))
+# At most this plugin's version, never above it: a later release that leaves the workflow alone
+# keeps the version that workflow first needed (check-workflows.py holds the same rule).
+semver = lambda v: tuple(int(n) for n in v.split("."))
+check("the definition needs no newer plugin than this one", semver(BUILD["minPluginVersion"]) <= semver(plugin), (BUILD["minPluginVersion"], plugin))
 
 # --- the fast path: an epic story -------------------------------------------------------------
 run = Run()

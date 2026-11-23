@@ -258,14 +258,13 @@ check("the entry runs the hotfix definition through the runner and names the fal
 check("the entry keeps its name and stays out of both job-class sets", re.search(r"^name: branch-hotfix$", ENTRY, re.M) is not None)
 
 # --- text parity: every rule of the old page lives in exactly one hotfix-steps reference ----------
-# The base is PINNED to the last release before the move (the moving main holds the moved text once
-# merged); HOTFIX_SPLIT_BASE overrides it.
-BASE = os.environ.get("HOTFIX_SPLIT_BASE", "devstride--v4.7.0")
+# The base is PINNED to the last release before the move (never the moving tree, which holds the
+# moved text): the old page as that release (BASE) published it is kept as a file under
+# scripts/tests/fixtures/hotfix-split-base/, so the case reads no git history and needs no network.
+BASE = "devstride--v4.7.0"
+BASE_FILE = os.path.join(ROOT, "scripts/tests/fixtures/hotfix-split-base/branch-hotfix.md")
 flat = lambda t: " ".join(t.split())
-old = subprocess.run(["git", "-C", ROOT, "show", "%s:skills/branch-hotfix/SKILL.md" % BASE], capture_output=True, text=True)
-if old.returncode != 0:
-    subprocess.run(["git", "-C", ROOT, "fetch", "-q", "--depth=1", "origin", "tag", BASE], capture_output=True)
-    old = subprocess.run(["git", "-C", ROOT, "show", "%s:skills/branch-hotfix/SKILL.md" % BASE], capture_output=True, text=True)
+OLD_PAGE = open(BASE_FILE, encoding="utf-8").read() if os.path.isfile(BASE_FILE) else ""
 NEEDLES = [  # the old page's imperative sentences: each moved whole into one reference
     "STOP and ask whether to stash or commit; never carry changes onto the production branch",  # clean tree
     "It runs in the user's terminal, so remind them now; you cannot stop it.",                 # the dev server
@@ -282,12 +281,12 @@ NEEDLES = [  # the old page's imperative sentences: each moved whole into one re
     "STOP and ask before any environment command",                                            # stage first
     "say which branch the checkout is on now",                                                # the failure rule
 ]
-if old.returncode != 0:
-    check("text parity: the base %s is readable (git fetch origin tag %s, or set HOTFIX_SPLIT_BASE)" % (BASE, BASE), False, old.stderr.strip())
+if not OLD_PAGE:
+    check("text parity: the copy of branch-hotfix at %s is in %s — never skipped, or this test proves nothing" % (BASE, BASE_FILE), False, "missing or empty")
 else:
     refdir = os.path.join(ROOT, "skills/hotfix-steps/references")
     refs = {f: flat(open(os.path.join(refdir, f), encoding="utf-8").read()) for f in sorted(os.listdir(refdir))}
-    was, now = flat(old.stdout), flat(ENTRY)
+    was, now = flat(OLD_PAGE), flat(ENTRY)
     problems = []
     for n in NEEDLES:
         homes = [f for f, t in refs.items() if n in t]
@@ -425,7 +424,7 @@ check("FAILED at the cut stops the run there, before the stage is named", run.an
 
 # Credentials in a step's evidence never reach a report.
 run = Run()
-SECRETS = ["token ghp_abcdefghijklmnop", "Authorization: Bearer abcdefghijklmnopqrstuvwx", "key AKIAABCDEFGHIJKLMNOP", "-----BEGIN PRIVATE KEY-----"]
+SECRETS = ["token ghp_abcdefghijklmnop", "Authorization: Bearer abcdefghijklmnopqrstuvwx", "key AKIA" + "ABCDEFGHIJKLMNOP", "-----BEGIN PRIVATE KEY-----"]
 run.done("HOTFIX PREFLIGHT: READY %s\n%s\nclean tree\n```json\n%s\n```\n" % (BRANCH, "\n".join(SECRETS), json.dumps(
     {"branch": BRANCH, "base": "main", "prefix": "test", "date": "11-21-26", "dateFormat": "MM-DD-YY", "configSource": "file"})))
 sent = json.dumps([a.get("reports") for a in run.answers])

@@ -49,6 +49,11 @@ wait_sent() { # wait_sent N — until the log holds N lines (detached sends), at
   local i=0; while [ "$(sent)" -lt "$1" ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
   [ "$(sent)" -ge "$1" ]
 }
+own() { grep -c "\"PRESENCE_SESSION_ID\": \"$1\"" "$LOG" 2>/dev/null || true; }   # own SESSION — its reports in the log
+wait_own() { # wait_own SESSION N — until the log holds N of that session's reports, at most 10 s
+  local i=0; while [ "$(own "$1")" -lt "$2" ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done
+  [ "$(own "$1")" -ge "$2" ]
+}
 field() { sed -n "${1}p" "$LOG" | python3 -c 'import json,sys; print(json.load(sys.stdin).get(sys.argv[1],""))' "$2"; }
 age() { # age SESSION SECONDS — pretend the last send was SECONDS ago
   python3 - "$RECORDS/$1.json" "$2" <<'PY'
@@ -80,6 +85,35 @@ try:
     sys.exit(1)
 except OSError:
     sys.exit(0)
+PY
+}
+keeper_pid() { pgrep -f "hooks/presence.py keeper $1\$" | head -1; }
+wait_keeper() { # wait_keeper SESSION — until a keeper holds the session's lock, at most 5 s. A keeper takes its
+  #               lock once as it starts, and a probe (keeper_alive) holding the lock at that moment makes it
+  #               leave, so nothing probes until the keeper is visible AND has taken the lock: the lock file is
+  #               touched after the keeper was first seen, or it has been running for two seconds (one that
+  #               failed to take it has left by then). Only then does keeper_alive confirm it.
+  python3 - "$RECORDS/$1.keeper.lock" "hooks/presence.py keeper $1\$" <<'PY' && keeper_alive "$1"
+import os, subprocess, sys, time
+lock, pattern = sys.argv[1], sys.argv[2]
+end, seen, since = time.time() + 5, None, 0
+while time.time() < end:
+    run = subprocess.run(["pgrep", "-f", pattern], capture_output=True, text=True)
+    if run.returncode not in (0, 1):
+        sys.exit("pgrep failed: %s" % run.stderr.strip())
+    found = run.stdout.split()
+    pid = found[0] if found else None
+    if pid != seen:
+        seen, since = pid, time.time()
+    elif pid:
+        try:
+            touched = os.stat(lock).st_mtime >= since
+        except OSError:
+            touched = False
+        if touched or time.time() - since >= 2.0:
+            sys.exit(0)
+    time.sleep(0.05)
+sys.exit(1)
 PY
 }
 owner() { sleep 300 >/dev/null 2>&1 & echo "$!" >> "$WORK/owners"; echo "$!"; }  # a stand-in Claude Code process
@@ -170,7 +204,7 @@ else bad "(8) beats=$BEATS keeper=$KEEPER $(cat "$LOG")"; fi
 : > "$LOG"; K5="$(mkrepo keeper5 "$(config 5)")"
 O9="$(owner)"
 DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O9" fire SessionStart s9 "$K5" >/dev/null
-wait_sent 1; sleep 0.2; keeper_alive s9; KEEPER=$?
+wait_sent 1; wait_keeper s9; KEEPER=$?
 fire SessionEnd s9 "$K5" logout >/dev/null; wait_sent 2; sleep 0.3
 if [ "$KEEPER" = 0 ] && ! keeper_alive s9 && sleep 2.5 && [ "$(sent)" = 2 ] && [ "$(field 2 PRESENCE_EVENT)" = end ]; then
   ok "(9) SessionEnd → the keeper exits at its next check (well inside the interval) and sends nothing more"
@@ -224,14 +258,14 @@ else bad "(14) $(cat "$LOG")"; fi
 # (15) a session resumed in a new process right after a clean exit, while the old keeper still
 #      holds its lock: no false "gone", the new process is reported, and a keeper keeps running
 : > "$LOG"
-OA="$(owner)"; DEVSTRIDE_PRESENCE_MINUTE=3 CLAUDE_PID="$OA" fire SessionStart s15 "$K5" >/dev/null; wait_sent 1; sleep 0.2
+OA="$(owner)"; DEVSTRIDE_PRESENCE_MINUTE=3 CLAUDE_PID="$OA" fire SessionStart s15 "$K5" >/dev/null; wait_sent 1; wait_keeper s15; UP15=$?
 fire SessionEnd s15 "$K5" prompt_input_exit >/dev/null
 OB="$(owner)"; kill "$OA"; wait "$OA" 2>/dev/null
 DEVSTRIDE_PRESENCE_MINUTE=3 CLAUDE_PID="$OB" fire SessionStart s15 "$K5" resume >/dev/null; wait_sent 3; sleep 1.5
-if ! grep -q '"PRESENCE_END_REASON": "gone"' "$LOG" && [ "$(field 3 PRESENCE_EVENT)" = start ] \
-  && [ "$(field 3 CLAUDE_PID)" = "$OB" ] && keeper_alive s15; then
+if [ "$UP15" = 0 ] && ! grep -q '"PRESENCE_END_REASON": "gone"' "$LOG" && [ "$(field 3 PRESENCE_EVENT)" = start ] \
+  && [ "$(field 3 CLAUDE_PID)" = "$OB" ] && wait_keeper s15; then
   ok "(15) resume in a new process after a clean exit → start with the new process, no false end, keeper running"
-else bad "(15) $(cat "$LOG")"; fi
+else bad "(15) up=$UP15 $(cat "$LOG")"; fi
 stop_keeper s15   # its owner lives on: left running, it beats into the shared log of every later case
 
 # (16) reports run one at a time and in order: an end queued with a beat never ends up before it
@@ -250,8 +284,8 @@ CLAUDE_PID="$O17" fire SessionStart s17 "$K5" >/dev/null; wait_sent 1
 stop_keeper s17; KBEFORE=0; keeper_alive s17 && KBEFORE=1
 edit s17 'r["owner"] = 99998; r["ownerStarted"] = 1'
 CLAUDE_PID="$O17" fire SessionStart s17 "$K5" resume >/dev/null; wait_sent 2
-i=0; while ! keeper_alive s17 && [ $i -lt 30 ]; do sleep 0.1; i=$((i + 1)); done
-if [ "$KBEFORE" = 0 ] && keeper_alive s17 && [ "$(field 2 PRESENCE_EVENT)" = start ] && [ "$(field 2 CLAUDE_PID)" = "$O17" ]; then
+wait_keeper s17; UP17=$?
+if [ "$KBEFORE" = 0 ] && [ "$UP17" = 0 ] && [ "$(field 2 PRESENCE_EVENT)" = start ] && [ "$(field 2 CLAUDE_PID)" = "$O17" ]; then
   ok "(17) stale record → resume sends start with the live process and starts a keeper"
 else bad "(17) $(cat "$LOG")"; fi
 
@@ -303,8 +337,8 @@ else bad "(21) ownerStarted=$W"; fi
 : > "$LOG"; O22="$(owner)"; mkdir -p "$WORK/badps"; printf '#!/bin/sh\nexit 1\n' > "$WORK/badps/ps"; chmod +x "$WORK/badps/ps"
 CLAUDE_PID="$O22" fire SessionStart s22 "$K" >/dev/null; wait_sent 1; stop_keeper s22
 (DEVSTRIDE_PRESENCE_MINUTE=0.4 PATH="$WORK/badps:$PATH" python3 "$HOOK" keeper s22 >/dev/null 2>&1 &)
-wait_sent 3; sleep 0.2
-if [ "$(sent)" -ge 3 ] && ! grep -q '"PRESENCE_EVENT": "end"' "$LOG" && keeper_alive s22; then
+wait_own s22 3; sleep 0.2
+if [ "$(own s22)" -ge 3 ] && ! grep '"PRESENCE_SESSION_ID": "s22"' "$LOG" | grep -q '"PRESENCE_EVENT": "end"' && keeper_alive s22; then
   ok "(22) ps failing → the keeper keeps beating, no false end"
 else bad "(22) $(cat "$LOG")"; fi
 stop_keeper s22
@@ -320,10 +354,11 @@ else bad "(23) left=$LEFT $(ls -a "$RECORDS")"; fi
 
 # (24) Stop or SessionEnd from an older process of a resumed session does nothing
 : > "$LOG"; O24A="$(owner)"; O24B="$(owner)"
-CLAUDE_PID="$O24A" fire SessionStart s24 "$R" >/dev/null; wait_sent 1
-CLAUDE_PID="$O24B" fire SessionStart s24 "$R" resume >/dev/null; wait_sent 2
+CLAUDE_PID="$O24A" fire SessionStart s24 "$R" >/dev/null; wait_own s24 1
+CLAUDE_PID="$O24B" fire SessionStart s24 "$R" resume >/dev/null; wait_own s24 2
 age s24 61; CLAUDE_PID="$O24A" fire Stop s24 "$R" >/dev/null; CLAUDE_PID="$O24A" fire SessionEnd s24 "$R" other >/dev/null; sleep 0.5
-if [ "$(sent)" = 2 ] && [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["state"])' "$RECORDS/s24.json")" = starting ]; then
+# counts only this session's reports: a detached send from an earlier case may land after the log is emptied
+if [ "$(own s24)" = 2 ] && [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["state"])' "$RECORDS/s24.json")" = starting ]; then
   ok "(24) Stop / SessionEnd from the older process after a resume in a newer one → nothing"
 else bad "(24) $(cat "$LOG")"; fi
 
@@ -331,6 +366,7 @@ else bad "(24) $(cat "$LOG")"; fi
 #      accounted for, report times never go backwards, one keeper
 : > "$LOG"; O25="$(owner)"; K60B="$(mkrepo keeper60b "$(config 60)")"
 DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O25" fire SessionStart s25 "$K60" >/dev/null; wait_sent 1
+wait_keeper s25; UP25=$?   # the keeper holds its lock before the burst
 for n in $(seq 1 30); do
   if [ $((n % 2)) = 0 ]; then D="$K60"; else D="$K60B"; fi
   (age s25 61 2>/dev/null; CLAUDE_PID="$O25" fire UserPromptSubmit s25 "$D" >/dev/null) &
@@ -345,10 +381,11 @@ ORDER="$(python3 -c '
 import json,sys
 ats=[int(json.loads(l)["PRESENCE_AT"]) for l in open(sys.argv[1])]
 print("ok" if ats==sorted(ats) and len(ats)>=2 else "bad %s" % ats)' "$LOG")"
-KEEPERS="$(pgrep -f "presence.py keeper s25\$" | wc -l | tr -d ' ')"
-if [ "$i" -lt 100 ] && [ "$ORDER" = ok ] && [ "$KEEPERS" = 1 ]; then
+# a keeper the burst started beside it leaves once it finds the lock held
+j=0; while KEEPERS="$(pgrep -f "presence.py keeper s25\$" | wc -l | tr -d ' ')" && [ "$KEEPERS" != 1 ] && [ $j -lt 50 ]; do sleep 0.1; j=$((j + 1)); done
+if [ "$UP25" = 0 ] && [ "$i" -lt 100 ] && [ "$ORDER" = ok ] && [ "$KEEPERS" = 1 ]; then
   ok "(25) 30 prompts and Stops at once across two checkouts → queued = done, PRESENCE_AT never falls, one keeper"
-else bad "(25) i=$i order=$ORDER keepers=$KEEPERS $(cat "$RECORDS/s25.json")"; fi
+else bad "(25) up=$UP25 i=$i order=$ORDER keepers=$KEEPERS $(cat "$RECORDS/s25.json")"; fi
 stop_keeper s25
 
 # (26) a hook waits for the session's state lock: nothing in the record changes while another
@@ -692,7 +729,7 @@ PY
 : > "$LOG"; O38B="$(owner)"; T38B="$WORK/t38b.jsonl"; D38B=""
 entry "$T38B" prompt,assistant >/dev/null
 DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O38B" fire SessionStart s38b "$K60" "" "$(transcript "$T38B")" >/dev/null; upto s38b 1
-for _ in $(seq 50); do keeper_alive s38b && break; sleep 0.1; done   # its keeper (one check a second) holds the lock before any step
+wait_keeper s38b   # its keeper (one check a second) holds the lock before any step
 age s38b 61; DEVSTRIDE_PRESENCE_MINUTE=1 CLAUDE_PID="$O38B" fire UserPromptSubmit s38b "$K60" "" "$(transcript "$T38B")" >/dev/null; upto s38b 2
 entry "$T38B" prompt >/dev/null   # the transcript ends on the prompt, as it does mid-thought
 doubt38b() { settle; D38B="$D38B $1:$(rec s38b 'r["state"], r.get("interrupt")')"; }
@@ -733,11 +770,7 @@ fd = os.open(os.path.join(os.environ["XDG_CACHE_HOME"], "devstride-plugin", "pre
 fcntl.flock(fd, fcntl.LOCK_EX)
 time.sleep(300)
 PY
-keeper_pid() { pgrep -f "hooks/presence.py keeper $1\$" | head -1; }
 keeper_cmd() { local p; p="$(keeper_pid "$1")"; [ -n "$p" ] && ps -ww -o command= -p "$p"; }
-wait_keeper() { # wait_keeper SESSION — until a keeper holds the session's lock, at most 5 s
-  local i=0; while ! keeper_alive "$1" && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; keeper_alive "$1"
-}
 legacy() { # legacy SESSION — start a stand-in earlier-version keeper for SESSION and wait for its lock
   python3 "$LEGACY/hooks/presence.py" keeper "$1" >/dev/null 2>&1 &
   echo "$!" >> "$WORK/owners"; wait_keeper "$1"   # the EXIT trap stops it, however the case ends
@@ -763,11 +796,11 @@ DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O38" fire PreToolUse s48 "$K60" "" "$
 V1="$(rec s48 'r["version"]')"
 i=0; while keeper_alive s48 && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; LEFT38=$i
 DEVSTRIDE_PRESENCE_MINUTE=0.4 CLAUDE_PID="$O38" fire PostToolUse s48 "$K60" "" "$(tool Bash k38)" >/dev/null
-wait_keeper s48; NEWK="$(keeper_cmd s48)"
+wait_keeper s48; UP48=$?; NEWK="$(keeper_cmd s48)"
 if case "$OLDK" in *"$OLDP/hooks/presence.py keeper s48") true;; *) false;; esac && [ "$V0" = 1.0.0 ] && [ "$V1" = "$OWNV" ] \
-   && [ "$LEFT38" -lt 50 ] && [ -n "$NEWK" ] && case "$NEWK" in *"$OLDP"*) false;; *"/hooks/presence.py keeper s48") true;; *) false;; esac; then
+   && [ "$LEFT38" -lt 50 ] && [ "$UP48" = 0 ] && [ -n "$NEWK" ] && case "$NEWK" in *"$OLDP"*) false;; *"/hooks/presence.py keeper s48") true;; *) false;; esac; then
   ok "(40) the loaded version's tool call records its version → the old keeper leaves by itself; the call's end starts the loaded version's keeper"
-else bad "(40) old=$OLDK v=$V0/$V1 left=$LEFT38 new=$NEWK"; fi
+else bad "(40) old=$OLDK v=$V0/$V1 left=$LEFT38 up=$UP48 new=$NEWK"; fi
 stop_keeper s48
 
 # (41) after an update, a keeper an earlier version started (it never checks the version) is ended
@@ -788,12 +821,12 @@ fire PostToolUse s49 "$K" "" "$(tool Bash c39)" >/dev/null
 fire Stop s49 "$K" "" '{"background_tasks":[{"id":"b39","type":"shell","status":"running","command":"sleep 900"}]}' >/dev/null
 BG39="$(rec s49 'r["background"]')"; N39B="$(of s49 0)"; upto s49 $((N39B + 2))
 BGBUSY="$(of s49 "$((N39B + 2))" PRESENCE_BUSY_SINCE)"; BGVER="$(of s49 "$((N39B + 2))" PRESENCE_PLUGIN_VERSION)"
-if ! kill -0 "$LPID" 2>/dev/null && kill -0 "$XPID" 2>/dev/null && [ "$(keeper_pid s49y)" = "$YPID" ] && [ "$(rec s49y 'r.get("swept")')" = "$OWNV" ] \
+if [ -n "$LPID" ] && ! kill -0 "$LPID" 2>/dev/null && kill -0 "$XPID" 2>/dev/null && [ -n "$YPID" ] && [ "$(keeper_pid s49y)" = "$YPID" ] && [ "$(rec s49y 'r.get("swept")')" = "$OWNV" ] \
    && [ -n "$RPID" ] && [ "$RPID" != "$LPID" ] && case "$RCMD" in *"$LEGACY"*) false;; *"/hooks/presence.py keeper s49") true;; *) false;; esac \
    && [ "$(rec s49 'r["swept"]')" = "$OWNV" ] && [ "$C39" -ge "$T39" ] && [ "$CALLBUSY" = "$C39" ] \
    && [ -n "$BG39" ] && [ "$BG39" != 0 ] && [ "$BGBUSY" = "$BG39" ] && [ "$BGVER" = "$OWNV" ]; then
   ok "(41) an earlier version's keeper → ended at the next tool call and replaced; another session's untouched; the replacement beats busy (open call, then background work), with its own version"
-else bad "(41) legacy=$LPID other=$XPID y=$YPID/$(keeper_pid s49y) new=$RPID cmd=$RCMD swept=$(rec s49 'r.get("swept")') c=$C39 t=$T39 callbusy=$CALLBUSY bg=$BG39 bgbusy=$BGBUSY ver=$BGVER"; fi
+else bad "(41) legacy=$LPID other=$XPID y=$YPID/$(keeper_pid s49y) yalive=$(kill -0 "$YPID" 2>/dev/null && echo yes || echo no) yrec=$(python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print({k: r.get(k) for k in ("state","reason","version","swept","owner","ownerStarted","sent","mode")})' "$RECORDS/s49y.json" 2>&1) ownernow=$(LC_ALL=C TZ=UTC0 ps -o lstart= -p "$O39" 2>&1) new=$RPID cmd=$RCMD swept=$(rec s49 'r.get("swept")') c=$C39 t=$T39 callbusy=$CALLBUSY bg=$BG39 bgbusy=$BGBUSY ver=$BGVER"; fi
 kill "$XPID" "$LPID" 2>/dev/null; stop_keeper s49; stop_keeper s49y
 
 # (42) the hook that ends an earlier version's keeper sends a report from this version at once, busy
@@ -806,7 +839,7 @@ CLAUDE_PID="$O40" fire PreToolUse s50 "$K60" "" "$(tool Bash c40)" >/dev/null; u
 C40="$(rec s50 'r["tools"]["c40"]')"
 if ! kill -0 "$L40" 2>/dev/null && [ "$(of s50 0)" = 2 ] && [ "$(of s50 2 PRESENCE_EVENT)" = beat ] \
    && [ "$(of s50 2 PRESENCE_STATE)" = working ] && [ "$(of s50 2 PRESENCE_BUSY_SINCE)" = "$C40" ] \
-   && [ "$(of s50 2 PRESENCE_PLUGIN_VERSION)" = "$OWNV" ] && keeper_alive s50; then
+   && [ "$(of s50 2 PRESENCE_PLUGIN_VERSION)" = "$OWNV" ] && wait_keeper s50; then
   ok "(42) ending an earlier version's keeper → a beat from this version at once (busy since the open call), its own keeper running"
 else bad "(42) legacy=$L40 $(grep '"s50"' "$LOG")"; fi
 kill "$L40" 2>/dev/null; stop_keeper s50

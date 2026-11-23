@@ -144,8 +144,8 @@ rc, out, p = ask([row("I20130", stage="verifying", expiresAt=at(320))], now=at(3
 say(out.get("action") == "wait" and out["plan"]["startedAt"] == at(300), "a finished plan left on the claim by an earlier release is no plan: this release decides afresh", p.stdout)
 rc, out, p = ask([row("I20130"), row("I20131")], now=at(-30), plan=PLAN)
 say(out.get("action") == "go" and out["plan"]["minutesWaited"] == 0, "a clock behind the plan's start ends the wait", p.stdout)
-rc, out, p = ask([row("I20130"), row("I20131")], now=at(4), plan=dict(PLAN, holder="secret", holderDigest="abc", members=[dict(m, holderDigest="abc") for m in PLAN["members"]]))
-say("secret" not in p.stdout and "holderDigest" not in p.stdout and out.get("action") == "wait", "keys a plan does not carry are never passed on", p.stdout)
+rc, out, p = ask([row("I20130"), row("I20131")], now=at(4), plan=dict(PLAN, holder="stray-holder", holderDigest="abc", members=[dict(m, holderDigest="abc") for m in PLAN["members"]]))
+say("stray-holder" not in p.stdout and "holderDigest" not in p.stdout and out.get("action") == "wait", "keys a plan does not carry are never passed on", p.stdout)
 rc, out, p = ask([row("I20130", ready=5)], me={"holderDigests": "peer-and-more", "sessionIds": "other-x"})
 say(units(out) == ["I20130"], "a driver identity that is not a list excludes nothing by accident", p.stdout)
 

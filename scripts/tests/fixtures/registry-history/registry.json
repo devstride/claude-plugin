@@ -1,0 +1,125 @@
+{
+  "_readme": "A small registry the history page generator is tested on (scripts/tests/workflow-registry.sh).",
+  "schema": 1,
+  "workflows": {
+    "alpha": [
+      {
+        "version": 1,
+        "pluginVersion": "1.0.0",
+        "releasedAt": "2026-01-02",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "minPluginVersion": "1.0.0",
+        "steps": {
+          "one": "first@1",
+          "two": "second@1"
+        },
+        "note": "The first version, written down before anything ran it.",
+        "dormant": true
+      },
+      {
+        "version": 1,
+        "pluginVersion": "1.1.0",
+        "releasedAt": "2026-01-09",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "minPluginVersion": "1.0.0",
+        "steps": {
+          "one": "first@1",
+          "two": "second@1"
+        },
+        "note": "Content changed without a version bump.",
+        "slip": true
+      },
+      {
+        "version": 2,
+        "pluginVersion": "1.2.0",
+        "releasedAt": "2026-02-01",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "minPluginVersion": "1.2.0",
+        "steps": {
+          "one": "first@2",
+          "three": "third@1",
+          "four": "fourth@1"
+        },
+        "note": "A step | with a pipe in its note."
+      },
+      {
+        "version": 3,
+        "pluginVersion": "unreleased",
+        "releasedAt": null,
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "minPluginVersion": "unreleased",
+        "steps": {
+          "one": "first@2",
+          "three": "third@1",
+          "four": "fourth@1",
+          "five": "fifth@1"
+        },
+        "note": ""
+      }
+    ],
+    "beta": [
+      {
+        "version": 1,
+        "pluginVersion": "1.2.0",
+        "releasedAt": "2026-02-01",
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "minPluginVersion": "1.2.0",
+        "steps": {
+          "only": "first@1"
+        },
+        "note": "A second workflow."
+      }
+    ]
+  },
+  "contracts": {
+    "first": [
+      {
+        "major": 1,
+        "pluginVersion": "1.0.0",
+        "releasedAt": "2026-01-02",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "note": "Do the first thing (first published)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "1.1.0",
+        "releasedAt": "2026-01-09",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "note": "Additive revision: adds `extra`."
+      },
+      {
+        "major": 2,
+        "pluginVersion": "1.2.0",
+        "releasedAt": "2026-02-01",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "note": "A new major: the answer changed."
+      }
+    ],
+    "second": [
+      {
+        "major": 1,
+        "pluginVersion": "1.0.0",
+        "releasedAt": "2026-01-02",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "note": "Do the second thing."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "1.1.0",
+        "releasedAt": "2026-01-09",
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "note": "Content changed without a version bump: `item` changed.",
+        "slip": true
+      }
+    ],
+    "fifth": [
+      {
+        "major": 1,
+        "pluginVersion": "unreleased",
+        "releasedAt": null,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "note": ""
+      }
+    ]
+  }
+}

@@ -37,7 +37,9 @@ Usage: build-config-schema.py --write | --check [--release [--base <ref>]]
   --write     regenerate both files
   --check     regenerate in memory; exit 1 naming each file that differs from its committed copy
   --release   with --check: when .claude-plugin/plugin.json's version differs from the one at
-              <base> (default origin/main), also fail on any registry entry still `unreleased`
+              <base> (default origin/master), also fail on any registry entry still `unreleased`.
+              The plugin may be the repository root or a subdirectory; while <base> does not hold
+              it yet, the newest commit whose subject starts `plugin import` is the base instead
 Exit codes: 0 ok, 1 drift / registry fault / unreleased entry, 2 usage or unreadable input.
 """
 import json
@@ -302,8 +304,30 @@ def plugin_version(text):
         return None
 
 
+def git(*args):
+    """Run git in the plugin directory; stdout, or None when the command fails."""
+    done = subprocess.run(["git", "-C", ROOT] + list(args), capture_output=True, text=True)
+    return done.stdout if done.returncode == 0 else None
+
+
+def base_manifest(base):
+    """plugin.json at the base, read from the plugin directory (`<ref>:./<path>`, so the plugin may
+    be the repository root or a subdirectory). While the base does not hold the plugin yet, the
+    newest commit whose subject starts `plugin import` stands in, as in check-version-bump.sh."""
+    shown = git("show", "%s:./.claude-plugin/plugin.json" % base)
+    if shown is not None or git("rev-parse", "--verify", "-q", base + "^{commit}") is None:
+        return shown
+    # --grep matches any line of a message, so the subject is tested again
+    for line in (git("log", "--format=%H %s", "--grep=^plugin import", "HEAD") or "").splitlines():
+        sha, _, subject = line.partition(" ")
+        if subject.startswith("plugin import"):
+            print("base: plugin import commit %s (%s does not hold the plugin yet)" % (sha[:10], base))
+            return git("show", "%s:./.claude-plugin/plugin.json" % sha)
+    return None
+
+
 def main(argv):
-    mode, release, base = None, False, "origin/main"
+    mode, release, base = None, False, "origin/master"
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -357,11 +381,10 @@ def main(argv):
                   "scripts/build-config-schema.py --write" % rel)
             bad = 1
     if release:
-        shown = subprocess.run(["git", "-C", ROOT, "show", "%s:.claude-plugin/plugin.json" % base],
-                               capture_output=True, text=True)
-        if shown.returncode != 0:
+        shown = base_manifest(base)
+        if shown is None:
             fail(2, "cannot read .claude-plugin/plugin.json at %s" % base)
-        if plugin_version(shown.stdout) != version:
+        if plugin_version(shown) != version:
             for kind in ("hooks", "settings"):
                 for e in registry[kind]:
                     if e.get("since") == "unreleased":

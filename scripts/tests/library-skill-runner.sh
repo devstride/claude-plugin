@@ -276,7 +276,7 @@ check("with the proof its contract asks for, the warm copy runs and the run move
 
 # 11. a workflow with no library step never loads the helper, and the built-in Build workflow is untouched
 BUILD = json.load(open(os.path.join(ROOT, "workflows/build.json"), encoding="utf-8"))
-RECORDED = json.load(open(os.path.join(ROOT, "scripts/tests/fixtures/workflow-versions.json"), encoding="utf-8"))["workflows"]["build"]
+RECORDED = json.load(open(os.path.join(ROOT, "workflows/registry.json"), encoding="utf-8"))["workflows"]["build"][-1]
 check("the built-in Build workflow names no library step", all(s["run"]["source"] != "library" for p in BUILD["phases"] for s in p["steps"]))
 check("the built-in Build workflow is the one last recorded", RECORDED["version"] != BUILD["version"]
       or REPORT.definition_hash({k: v for k, v in BUILD.items() if k != "minPluginVersion"}) == RECORDED["sha256"], RECORDED["sha256"])

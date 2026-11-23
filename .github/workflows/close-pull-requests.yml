@@ -1,0 +1,36 @@
+name: Close pull requests
+
+# This repository is a published copy of the plugin, written only by the
+# release pipeline. A pull request opened here can never be merged, so it is
+# closed at once with a standard note pointing to the issues, which stay open.
+# No exception for members or bots: one writer, one path.
+#
+# Safe on pull_request_target by construction: nothing from the pull request
+# is checked out or run, no action is used, and the only values read are the
+# pull request's number and the repository's name, passed as environment
+# variables. Its title, body, branch and author text are never read.
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  close:
+    name: Close the pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Close with the standard note
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          NOTE: >-
+            Thanks for the contribution. This repository is a published copy written
+            only by the release pipeline from DevStride's source repository, so pull
+            requests here cannot be merged and this one was closed automatically.
+            Please open an issue describing the problem or the idea instead.
+        run: gh pr close "$NUMBER" --repo "$REPO" --comment "$NOTE"
