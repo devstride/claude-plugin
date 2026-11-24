@@ -54,7 +54,7 @@ def load_config():
         candidate = os.path.join(here, ".claude", "ds-config.json")
         if os.path.isfile(candidate):
             try:
-                with open(candidate) as handle:
+                with open(candidate, encoding="utf-8") as handle:
                     loaded = json.load(handle)
             except (OSError, ValueError) as error:
                 fail("%s cannot be read as JSON (%s)" % (candidate, error))
@@ -112,7 +112,7 @@ class GhError(Exception):
 
 def gh(args):
     try:
-        done = subprocess.run(["gh"] + args, capture_output=True, text=True, timeout=60)
+        done = subprocess.run(["gh"] + args, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     except (OSError, subprocess.TimeoutExpired) as error:
         raise GhError(str(error))
     if done.returncode != 0:

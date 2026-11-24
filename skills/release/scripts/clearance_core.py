@@ -10,6 +10,7 @@ sys.dont_write_bytecode = True  # never leave compiled files in the installed pl
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "build-item/scripts"))
 import claim_record  # noqa: E402  the one machine and session naming every claim uses
 import devstride_connection  # noqa: E402  the one place the machine's DevStride key is found, and the one caller
+import portable  # noqa: E402  the calls that differ on Windows
 
 RECORD_VERSION = 1
 DEFAULT_REF = "refs/clearance/release"
@@ -22,6 +23,7 @@ DEFAULT_PHASE_BUDGETS = {"pre-ship": 120, "deploy": 60, "close-out": 45}
 PR_LIMIT = 200  # a list this long is reported as truncated rather than trusted
 SHELLS = {"sh", "bash", "zsh", "dash", "fish", "ksh", "python3", "python", "perl", "env", "timeout",
           "nohup", "script", "sandbox-exec", "caffeinate", "sudo", "su", "login", "tmux", "screen"}
+WINDOWS_WRAPPERS = {"py", "cmd", "powershell", "pwsh", "winpty", "mintty"} if os.name == "nt" else set()
 
 
 def fail(message, code=1):
@@ -89,7 +91,7 @@ def load_config():
         candidate = os.path.join(here, ".claude", "ds-config.json")
         if os.path.isfile(candidate):
             try:
-                with open(candidate) as handle:
+                with open(candidate, encoding="utf-8") as handle:
                     loaded = json.load(handle)
             except (OSError, ValueError) as error:
                 fail("%s exists but cannot be read as JSON (%s) — fix it; the defaults would name a different ref" % (candidate, error))
@@ -216,11 +218,17 @@ class ToolError(Exception):
         self.rejected = rejected
 
 
+def text_of(raw):
+    """A tool's output as text, newlines as text mode reads them."""
+    return raw.decode("utf-8", "replace").replace("\r\n", "\n").replace("\r", "\n")
+
+
 def run(args, body=None):
-    proc = subprocess.run(args, input=body, capture_output=True, text=True)
+    # Bytes in, so a body is sent exactly: text mode would write each \n of it as \r\n on Windows.
+    proc = subprocess.run(args, input=None if body is None else body.encode("utf-8"), capture_output=True)
     if proc.returncode == 0:
-        return proc.stdout
-    text = (proc.stderr or proc.stdout or "").strip()
+        return text_of(proc.stdout)
+    text = (text_of(proc.stderr) or text_of(proc.stdout) or "").strip()
     raise ToolError(text or "%s failed" % args[0])
 
 
@@ -338,7 +346,8 @@ class GitHubStore(Store):
     def remote_sha(self):
         """The sha the remote holds for the ref, or None when it does not exist. Raises when the
         remote cannot be asked (not signed in, no network, no such remote): never read as clear."""
-        proc = subprocess.run(["git", "ls-remote", "--exit-code", self.remote, self.ref], capture_output=True, text=True)
+        proc = subprocess.run(["git", "ls-remote", "--exit-code", self.remote, self.ref], capture_output=True, text=True,
+                              encoding="utf-8", errors="replace")
         if proc.returncode == 2:
             return None
         if proc.returncode != 0:
@@ -391,7 +400,7 @@ class GitHubStore(Store):
         # --no-verify: the ref carries no code, and a repository's pre-push hook (type-checks, a
         # generator that amends HEAD) is for its branches — not for every heartbeat and keeper tick.
         proc = subprocess.run(["git", "push", "-q", "--no-verify", self.remote, spec, "--force-with-lease=%s:%s" % (self.ref, expected or "")],
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, encoding="utf-8", errors="replace")
         if proc.returncode == 0:
             return
         text = (proc.stderr or proc.stdout or "").strip()
@@ -471,6 +480,8 @@ class DevStrideStore(Store):
                             "release.clearance.credentialsFile names (mode 600)" % ", ".join(error.names))
         except devstride_connection.Problem as error:
             raise ToolError(error.text)
+        except OSError as error:
+            raise ToolError("DevStride credentials cannot be read (%s)" % (error.strerror or error))
         self.secrets += [creds["DEVSTRIDE_API_KEY"], creds["DEVSTRIDE_API_SECRET"]]
         self._creds = creds
         return self._creds
@@ -702,7 +713,7 @@ def read_owed():
     except (ToolError, SystemExit):
         return []
     try:
-        with open(path) as handle:
+        with open(path, encoding="utf-8") as handle:
             value = json.load(handle)
     except (OSError, ValueError):
         return []
@@ -732,8 +743,8 @@ def write_owed(entries):
             pass
         return
     tmp = "%s.%d.tmp" % (owed_path(), os.getpid())
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as handle:
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | portable.flags(), 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
         json.dump({"entries": entries}, handle)
     os.replace(tmp, owed_path())
 
@@ -749,7 +760,7 @@ def owed_line(entry, at):
 
 def read_local():
     try:
-        with open(record_path()) as handle:
+        with open(record_path(), encoding="utf-8") as handle:
             value = json.load(handle)
         return value if isinstance(value, dict) else None
     except (OSError, ValueError):
@@ -767,8 +778,8 @@ def write_local(record, me, keeper_pid=None):
         "keeperPid": keeper_pid if keeper_pid is not None else (current.get("keeperPid") if current.get("repo") == repo() else None),
     }
     tmp = record_path() + ".tmp"
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as handle:
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | portable.flags(), 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
         json.dump(payload, handle)
     os.chmod(tmp, 0o600)
     os.replace(tmp, record_path())
@@ -796,13 +807,44 @@ def lost_holding(me):
 
 # ── the keeper ──
 def alive(pid):
+    return portable.alive(pid)
+
+
+def parent_and_name(pid):
+    """A process's parent id and program name (without .exe), or None when it cannot be read."""
+    if not portable.IS_WINDOWS:
+        try:
+            out = subprocess.run(["ps", "-o", "ppid=,comm=", "-p", str(pid)], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.split()
+        except OSError:
+            return None
+        return (out[0], os.path.basename(out[1])) if len(out) >= 2 else None
+    # Windows: Git for Windows' ps has no -o, so the system is asked (this file's own small helper).
+    parent = portable.parent_of(pid)
+    if not parent:
+        return None
     try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.OpenProcess.restype = wintypes.HANDLE
+        k32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        k32.QueryFullProcessImageNameW.argtypes = (wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR,
+                                                   ctypes.POINTER(wintypes.DWORD))
+        k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        handle = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return None
+        try:
+            size = wintypes.DWORD(1024)
+            name = ctypes.create_unicode_buffer(size.value)
+            if not k32.QueryFullProcessImageNameW(handle, 0, name, ctypes.byref(size)):
+                return None
+        finally:
+            k32.CloseHandle(handle)
+    except Exception:
+        return None
+    base = os.path.basename(name.value.replace("\\", "/")).lower()
+    return str(parent), base[:-4] if base.endswith(".exe") else base
 
 
 def owner_pid():
@@ -815,14 +857,11 @@ def owner_pid():
     for _ in range(12):
         if pid <= 1:
             return None
-        try:
-            out = subprocess.run(["ps", "-o", "ppid=,comm=", "-p", str(pid)], capture_output=True, text=True).stdout.split()
-        except OSError:
+        found = parent_and_name(pid)
+        if found is None:
             return None
-        if len(out) < 2:
-            return None
-        parent, comm = out[0], os.path.basename(out[1])
-        if comm not in SHELLS:
+        parent, comm = found
+        if comm not in SHELLS and comm not in WINDOWS_WRAPPERS:
             return pid
         pid = int(parent) if parent.isdigit() else 0
     return None
@@ -840,9 +879,8 @@ def start_keeper(me):
     # for good on one transient failure, and the clearance would go stale during a long phase.
     env = dict(os.environ, CLEARANCE_KEEPER_HOLDER=me, CLEARANCE_KEEPER_OWNER=str(owner), CLEARANCE_REPO=repo())
     env.pop("CLEARANCE_NOW", None)
-    proc = subprocess.Popen(["bash", os.environ["CLEARANCE_SELF"], "keeper"], env=env, cwd=os.getcwd(),
-                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            start_new_session=True)
+    proc = portable.spawn_detached([portable.bash(), os.environ["CLEARANCE_SELF"], "keeper"], env=env, cwd=os.getcwd(),
+                                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return proc.pid
 
 
@@ -1368,6 +1406,9 @@ COMMANDS = {"claim": cmd_claim, "status": cmd_status, "heartbeat": cmd_heartbeat
 
 
 def main(argv):
+    if not argv:  # run by clearance-<provider>.sh, which names the provider first
+        print("usage: clearance-<provider>.sh <command> ... (this file is the shared core; run a provider's script)")
+        return 1
     provider, argv = argv[0], argv[1:]
     script = "clearance-%s.sh" % provider
     if not argv or argv[0] in ("-h", "--help"):

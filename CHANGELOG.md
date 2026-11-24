@@ -8,6 +8,90 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.9.0] — 2026-11-23
+
+### Fixed
+
+- **The plugin runs on Windows.** On a Windows machine (Claude Code with Git for Windows and
+  Python from python.org) the plugin's hooks and scripts used to stop at their first Unix-only
+  call: the connection check printed nothing or "mode too open", the live-status report never
+  started, and the update and release scripts failed outright. Now every hook starts Python 3
+  through one small launcher that finds it on Windows too (`py -3`, `python` or `python3`, never
+  the Microsoft Store placeholder), reads and writes UTF-8 whatever the system's code page, and
+  gives the session's own shell commands a working `python3`. File locks, ownership checks,
+  process starts and stops, shell commands and time zones go through one shared helper that does
+  the Windows equivalent, and a check with no Windows counterpart (a file's Unix mode bits)
+  passes instead of refusing. On macOS and Linux nothing changes.
+- **On Windows, a program in the project being worked on is never run in place of a real one.**
+  Looking up `claude` or `bash` on Windows never tries the current directory, so a file of that
+  name inside a checkout never receives a sign-in token or a prompt. The launcher keeps the
+  Python a virtual environment was made from, not the environment's own copy, because the kept
+  path serves every project afterwards. The version check drops the carriage return Windows adds
+  to the newest version it reads, so a current install is not reported as invalid.
+- **The status line works on Windows.** The status-line launcher a repository keeps in
+  `.claude/statusline.sh` now reads Windows paths and finds Python 3 there; its version marker
+  moves to v3, so each repository's copy is replaced at its next session start.
+- **Shell scripts keep LF line endings on every checkout.** A `.gitattributes` file stops Git for
+  Windows from converting them to CRLF, which bash cannot run.
+
+### Added
+
+- **A Windows check for maintainers.** `scripts/windows-check.sh`, run in Git for Windows' bash,
+  runs every hook command on a sample event, the connection check against a stand-in server,
+  every shipped script and the Windows half of the shared helper, with a Microsoft Store
+  placeholder first on the path as `python3`. `scripts/tests/fixtures/fake-windows.py` runs a
+  script on macOS or Linux with the Unix-only calls removed, so most regressions show up before
+  a Windows machine is involved.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since 536a4f4b9c @ 69be807794, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@536a4f4b9c | tokens@536a4f4b9c | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/build-item/SKILL.md | 24,000 | 8,000 | 24,000 | 8,000 | +0 | 8,000 |
+| skills/review/SKILL.md | 23,986 | 7,996 | 23,986 | 7,996 | +0 | 7,999 |
+| skills/doctor/SKILL.md | 23,847 | 7,949 | 23,847 | 7,949 | +0 | 8,000 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,265 |
+| skills/rationalize-gantt/SKILL.md | 12,332 | 4,111 | 12,332 | 4,111 | +0 | 4,200 |
+| skills/pr/SKILL.md | 11,538 | 3,846 | 11,538 | 3,846 | +0 | 3,846 |
+| skills/ultracode-build/SKILL.md | 10,327 | 3,443 | 10,327 | 3,443 | +0 | 3,443 |
+| skills/rebalance/SKILL.md | 8,482 | 2,828 | 8,482 | 2,828 | +0 | 2,828 |
+| skills/plan/SKILL.md | 8,385 | 2,795 | 8,385 | 2,795 | +0 | 2,795 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,730 | 2,244 | 6,730 | 2,244 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 6,073 | 2,025 | 6,073 | 2,025 | +0 | 2,100 |
+| skills/insert-defect/SKILL.md | 5,605 | 1,869 | 5,605 | 1,869 | +0 | 1,869 |
+| skills/insert-story/SKILL.md | 4,928 | 1,643 | 4,928 | 1,643 | +0 | 1,643 |
+| skills/branch-hotfix/SKILL.md | 4,799 | 1,600 | 4,799 | 1,600 | +0 | 1,600 |
+| skills/branch-feature/SKILL.md | 3,707 | 1,236 | 3,707 | 1,236 | +0 | 1,236 |
+| skills/risk-check/SKILL.md | 3,598 | 1,200 | 3,598 | 1,200 | +0 | 1,200 |
+| skills/hotfix-steps/SKILL.md | 3,591 | 1,197 | 3,591 | 1,197 | +0 | 1,200 |
+| skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,587 | 1,196 | +0 | 1,200 |
+| skills/plan-steps/SKILL.md | 3,578 | 1,193 | 3,578 | 1,193 | +0 | 1,200 |
+| skills/local-checks/SKILL.md | 3,523 | 1,175 | 3,523 | 1,175 | +0 | 1,200 |
+| skills/run-workflow/SKILL.md | 3,484 | 1,162 | 3,484 | 1,162 | +0 | 1,162 |
+| skills/merge-story/SKILL.md | 3,240 | 1,080 | 3,240 | 1,080 | +0 | 1,081 |
+| skills/review-story/SKILL.md | 3,020 | 1,007 | 3,020 | 1,007 | +0 | 1,007 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/claim-story/SKILL.md | 2,875 | 959 | 2,875 | 959 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/story-lifecycle/SKILL.md | 2,700 | 900 | 2,700 | 900 | +0 | 900 |
+| skills/capture-findings/SKILL.md | 2,696 | 899 | 2,696 | 899 | +0 | 900 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,083 | 695 | 2,083 | 695 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,536 | 512 | +0 | 600 |
+| skills/sync-base/SKILL.md | 1,471 | 491 | 1,471 | 491 | +0 | 500 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,397 | 466 | +0 | 500 |
+| alwaysOn.context (skill listing) | 6,474 | 2,158 | 6,474 | 2,158 | +0 | 2,200 |
+| **total (bodies)** | 279,887 | 93,310 | 279,887 | 93,310 | +0 | |
+
 ## [4.8.1] — 2026-11-22
 
 ### Added
@@ -6785,7 +6869,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.8.1...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.9.0...HEAD
+[4.9.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.8.1...devstride--v4.9.0
 [4.8.1]: https://github.com/devstride/claude-plugin/compare/devstride--v4.8.0...devstride--v4.8.1
 [4.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.7.0...devstride--v4.8.0
 [4.7.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.6.1...devstride--v4.7.0

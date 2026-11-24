@@ -84,7 +84,7 @@ def fail(message):
 
 def git(*args):
     try:
-        out = subprocess.run(["git"] + list(args), capture_output=True, text=True, timeout=10)
+        out = subprocess.run(["git"] + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
         if out.returncode == 0:
             return out.stdout.strip()
     except (OSError, subprocess.SubprocessError):
@@ -293,7 +293,7 @@ def cmd_validate(args):
 
 def read_stdin():
     try:
-        request = json.load(sys.stdin)
+        request = json.load(sys.stdin.buffer)  # bytes: UTF-8 whatever the code page
     except ValueError as error:
         fail("stdin is not JSON: %s" % error)
     if not isinstance(request, dict):

@@ -22,6 +22,7 @@ failure `{"error": "ABSENT"|"UNREACHABLE"|"FORBIDDEN"|"ERROR"}`. A claim row car
 """
 import hashlib
 import json
+import os
 import sys
 from datetime import datetime, timezone
 
@@ -49,13 +50,23 @@ def local(moment, tz):
     """A time a person reads: local zone, with its abbreviation."""
     if tz:
         try:
-            from zoneinfo import ZoneInfo
-            moment = moment.astimezone(ZoneInfo(tz))
+            moment = moment.astimezone(portable().zone(tz))
         except Exception:  # unknown zone name or no zone database: the machine's local zone
             moment = moment.astimezone()
     else:
         moment = moment.astimezone()
-    return moment.strftime("%-I:%M %p %Z on %b %-d")
+    # the hour and day without a leading zero, built by hand: Windows has no %-I or %-d
+    return "%d%s%d" % (int(moment.strftime("%I")), moment.strftime(":%M %p %Z on %b "), moment.day)
+
+
+def portable():
+    """The system-differences helper beside this file (this file is also loaded by path from elsewhere)."""
+    sys.dont_write_bytecode = True  # leave no compiled file in the plugin directory
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import portable as helper
+    return helper
 
 
 def who(claim, tz):

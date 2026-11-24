@@ -78,7 +78,7 @@ def names(value, what):
 
 def read():
     try:
-        request = json.load(sys.stdin)
+        request = json.load(sys.stdin.buffer)  # bytes: UTF-8 whatever the code page
     except ValueError as error:
         fail("stdin is not JSON: %s" % error)
     if not isinstance(request, dict):

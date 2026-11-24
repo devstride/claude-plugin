@@ -59,7 +59,7 @@ def load_config():
         candidate = os.path.join(here, ".claude", "ds-config.json")
         if os.path.isfile(candidate):
             try:
-                with open(candidate) as handle:
+                with open(candidate, encoding="utf-8") as handle:
                     loaded = json.load(handle)
             except (OSError, ValueError) as error:
                 out("ERROR %s cannot be read as JSON (%s)" % (candidate, error), 1)
@@ -76,7 +76,7 @@ def section(value, key):
 
 
 def git(root, *args):
-    return subprocess.run(["git", "-C", root] + list(args), capture_output=True, text=True)
+    return subprocess.run(["git", "-C", root] + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 def repo_key(root):

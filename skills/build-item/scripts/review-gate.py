@@ -217,7 +217,7 @@ def config_of(req):
     root = git("rev-parse", "--show-toplevel").strip()
     path = os.path.join(root, ".claude", "ds-config.json")
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             config = json.load(f)
     except (OSError, ValueError) as err:
         raise Refuse("cannot read %s: %s" % (path, err))
@@ -360,7 +360,7 @@ def check(req):
         size = "not a small fix (%s)" % small["reason"]
     path = os.path.join(receipts_dir(req), head + ".json")
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             receipt = json.load(f)
     except OSError:
         receipt = None
@@ -404,7 +404,7 @@ def carried_receipt(req, head, merge_base, config):
         return None
     for name in names:
         try:
-            with open(os.path.join(folder, name)) as f:
+            with open(os.path.join(folder, name), encoding="utf-8") as f:
                 r = json.load(f)
         except (OSError, ValueError):
             continue
@@ -438,7 +438,7 @@ def record(req):
     folder = receipts_dir(req)
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, head + ".json")
-    with open(path + ".tmp", "w") as f:
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
         json.dump(receipt, f, indent=1, ensure_ascii=False)
     os.replace(path + ".tmp", path)
     return {"receipt": path, "mergeBody": body(receipt)}

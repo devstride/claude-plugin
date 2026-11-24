@@ -101,7 +101,7 @@ def paths(folder, version):
 def atomic_write(path, data):
     folder = os.path.dirname(path)
     temporary = os.path.join(folder, ".%s.%d.%d.tmp" % (os.path.basename(path), os.getpid(), int(time.time() * 1e6)))
-    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)  # Windows: never text mode
     try:
         os.chmod(temporary, 0o600)
         with os.fdopen(fd, "wb") as handle:

@@ -209,7 +209,7 @@ for event, groups in hooks.items():
     for group in groups:
         for h in group["hooks"]:
             if "hooks/session-title.py" in h["command"]:
-                ok = h["command"].startswith("command -v python3 >/dev/null 2>&1 && ") and h["command"].endswith("; exit 0") \
+                ok = h["command"].startswith('. "${CLAUDE_PLUGIN_ROOT}/hooks/python.sh" && "$DEVSTRIDE_PY" ') and h["command"].endswith("; exit 0") \
                     and h.get("timeout") == 5
                 found.append("%s:%s:%s" % (event, group.get("matcher", "*"), ok))
 print(" ".join(sorted(found)))

@@ -135,7 +135,7 @@ def verdict(key, cmd):
 
 def codex_default():
     try:
-        with open(os.path.join(os.environ.get("CRE_HOME", ""), "config.toml")) as f:
+        with open(os.path.join(os.environ.get("CRE_HOME", ""), "config.toml"), encoding="utf-8") as f:
             m = re.search(r'^\s*sandbox_mode\s*=\s*"([^"]+)"', f.read(), re.M)
             return m.group(1) if m else None
     except Exception:
@@ -149,7 +149,7 @@ if cmds:
 else:
     path = os.environ["CRE_CONFIG"]
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             cfg = json.load(f)
     except FileNotFoundError:
         print("UNVERIFIABLE: no config at %s — run /devstride:setup first" % path); sys.exit(0)

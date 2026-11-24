@@ -32,7 +32,7 @@ class Refusal(Exception):
 
 def routing(command, request):
     done = subprocess.run([sys.executable, "-B", ROUTING, command], input=json.dumps(request),
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
     if done.returncode == 2:
         raise Refusal(done.stderr.strip().split("\n")[-1].replace("routing: ", "", 1))
     if done.returncode != 0:
@@ -99,7 +99,7 @@ def answer(request):
 
 def main():
     try:
-        request = json.load(sys.stdin)
+        request = json.load(sys.stdin.buffer)  # bytes: UTF-8 whatever the code page
         if not isinstance(request, dict):
             raise Refusal("stdin must be one JSON object")
         out = answer(request)

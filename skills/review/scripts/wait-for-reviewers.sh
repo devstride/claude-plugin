@@ -108,7 +108,7 @@ else:
     def now(): return time.time()
     def sleep(s): time.sleep(s)
     def gh(*args):
-        try: r = subprocess.run(["gh", "api"] + list(args), capture_output=True, text=True, timeout=60)
+        try: r = subprocess.run(["gh", "api"] + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         except (subprocess.TimeoutExpired, OSError): return None
         if r.returncode != 0: return None
         try: v = json.loads(r.stdout)

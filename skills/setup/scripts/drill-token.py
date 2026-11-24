@@ -69,19 +69,22 @@ def usage(message):
 def git_top(directory):
     try:
         return subprocess.run(["git", "-C", directory, "rev-parse", "--show-toplevel"],
-                              capture_output=True, text=True).stdout.strip()
+                              capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
     except OSError:
         return ""
 
 
 def resolve(raw):
     raw = raw.strip()
-    if not (raw.startswith("/") or raw.startswith("~")):
+    if not (raw.startswith("/") or raw.startswith("~") or (os.name == "nt" and os.path.isabs(raw))):
         usage("the token file must be an absolute or ~ path")
     path = os.path.abspath(os.path.expanduser(raw))
     folder = os.path.dirname(path)
     while folder and not os.path.isdir(folder):
-        folder = os.path.dirname(folder)
+        parent = os.path.dirname(folder)
+        if parent == folder:  # the root of a drive that is not there (Windows): nothing above it
+            usage("%s is on a drive or volume that is not available" % path)
+        folder = parent
     if folder and git_top(folder):
         usage("%s is inside a git repository, where it could be committed; keep it outside" % path)
     return path
@@ -102,7 +105,7 @@ def token_file(args):
     else:
         usage("unknown arguments")
     try:
-        with open(config) as f:
+        with open(config, encoding="utf-8") as f:
             document = json.load(f)
     except FileNotFoundError:
         return None
@@ -130,13 +133,30 @@ def isolated_env(folder):
     return env
 
 
+def which_claude():
+    """The claude command's full path, or None. On Windows the lookup never tries the current
+    directory, so a program named claude in the project being worked on never receives the token."""
+    sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
+    scripts = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "build-item/scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import portable
+
+    return portable.which("claude")
+
+
+def claude(args):
+    """args with claude resolved on Windows, where npm installs claude.cmd, which a bare name never finds."""
+    return [which_claude() or "claude"] + args[1:] if os.name == "nt" else args
+
+
 def run_claude(args, token, folder):
     env = isolated_env(folder)
     env["CLAUDE_CODE_OAUTH_TOKEN"] = token
     env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"
     env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1"
-    result = subprocess.run(args, env=env, cwd=folder, stdin=subprocess.DEVNULL,
-                            capture_output=True, text=True, timeout=120)
+    result = subprocess.run(claude(args), env=env, cwd=folder, stdin=subprocess.DEVNULL,
+                            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     try:
         answer = json.loads(result.stdout)
     except ValueError:
@@ -146,7 +166,7 @@ def run_claude(args, token, folder):
 
 def prove(token):
     """None when the token signs a fresh folder in, else (reason, fix line). Never echoes output."""
-    if not shutil.which("claude"):
+    if not which_claude():
         return "the claude command is not on PATH, so the token cannot be tried", PATH_FIX
     folder = tempfile.mkdtemp(prefix="drill-token-check-")
     try:
@@ -186,7 +206,7 @@ def check(path):
     if not stat.S_ISREG(info.st_mode):
         return not_ready("%s is not a file" % path, WRONG_FILE)
     fix = WRONG_FILE if holds_other(path) else FIX
-    if info.st_mode & 0o077:
+    if info.st_mode & 0o077 and os.name != "nt":  # Windows reports 0o666 for every file: no mode bits to check
         return not_ready("%s can be read by others (mode %o); it must be owner-only (chmod 600)" % (path, stat.S_IMODE(info.st_mode)), fix)
     try:
         token = read_token(path)
@@ -238,7 +258,7 @@ def save(path, token):
     for attempt in range(100):
         candidate = os.path.join(folder, ".%s.new-%d-%d" % (os.path.basename(path), os.getpid(), attempt))
         try:
-            fd = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            fd = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
             temp = candidate
             break
         except FileExistsError:
@@ -246,7 +266,8 @@ def save(path, token):
     if fd is None:
         raise OSError("could not create a new file beside %s" % path)
     try:
-        os.fchmod(fd, 0o600)
+        if hasattr(os, "fchmod"):  # Windows before Python 3.13 has none
+            os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w") as f:
             f.write(token + "\n")
         os.replace(temp, path)
@@ -265,7 +286,7 @@ def make(path):
         print("drill-token: refused. Run this in your own terminal, not through an agent's prompt, so the "
               "token never enters a transcript.", file=sys.stderr)
         return 2
-    if not shutil.which("claude"):
+    if not which_claude():
         print("drill-token: the claude command is not on PATH.", file=sys.stderr)
         return 2
     if holds_other(path):
@@ -277,7 +298,7 @@ def make(path):
     # them out of their everyday sessions.
     folder = tempfile.mkdtemp(prefix="drill-token-make-")
     try:
-        result = subprocess.run(["claude", "setup-token"], env=isolated_env(folder), cwd=folder)
+        result = subprocess.run(claude(["claude", "setup-token"]), env=isolated_env(folder), cwd=folder)
     finally:
         shutil.rmtree(folder, ignore_errors=True)
     if result.returncode:

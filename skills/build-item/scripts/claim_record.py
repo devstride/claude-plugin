@@ -61,7 +61,7 @@ def session_name(env, home=None):
         first = [pid + ".json"] if re.match(r"^[0-9]+$", pid) else []
         for entry in first + [e for e in entries if e not in first]:
             try:
-                with open(os.path.join(folder, entry)) as handle:
+                with open(os.path.join(folder, entry), encoding="utf-8") as handle:
                     record = json.load(handle)
             except (OSError, ValueError):
                 continue
@@ -74,7 +74,7 @@ def session_name(env, home=None):
 
 def git(folder, *args):
     try:
-        out = subprocess.run(["git", "-C", folder] + list(args), capture_output=True, text=True, timeout=5)
+        out = subprocess.run(["git", "-C", folder] + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5)
         return (out.stdout.strip() or None) if out.returncode == 0 else None
     except Exception:
         return None
@@ -82,7 +82,7 @@ def git(folder, *args):
 
 def plugin_version(root=PLUGIN_ROOT):
     try:
-        with open(os.path.join(root, ".claude-plugin", "plugin.json")) as handle:
+        with open(os.path.join(root, ".claude-plugin", "plugin.json"), encoding="utf-8") as handle:
             version = json.load(handle).get("version")
     except (OSError, ValueError, AttributeError):
         return None

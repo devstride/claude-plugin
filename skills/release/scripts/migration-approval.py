@@ -104,7 +104,7 @@ def committed_config(ref, name):
     mode, _ = tree_entry(ref, ".claude/ds-config.json")
     if not mode:
         return None
-    done = subprocess.run(["git", "show", "%s:.claude/ds-config.json" % ref], capture_output=True, text=True)
+    done = subprocess.run(["git", "show", "%s:.claude/ds-config.json" % ref], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if done.returncode != 0:
         raise Unanswerable(".claude/ds-config.json at %s cannot be read" % name)
     try:
@@ -147,7 +147,7 @@ def already_there(refs, base_sha, status, path, blob):
             continue
         if mode:
             continue
-        met = subprocess.run(["git", "merge-base", ref, base_sha], capture_output=True, text=True)
+        met = subprocess.run(["git", "merge-base", ref, base_sha], capture_output=True, text=True, encoding="utf-8", errors="replace")
         if met.returncode == 0 and tree_entry(met.stdout.strip(), path)[0]:
             return True
     return False
@@ -156,7 +156,7 @@ def already_there(refs, base_sha, status, path, blob):
 def given_rule(path):
     """A policy handed in by the caller (the merge gate's reading of the base branch): a dict."""
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             loaded = json.load(f)
     except (OSError, ValueError) as error:
         raise Unanswerable("the policy %s cannot be read (%s)" % (path, error))
@@ -191,7 +191,7 @@ def check(base, head, already=(), rule_file=None):
     quiet = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull, GIT_CONFIG_NOSYSTEM="1", GIT_ATTR_NOSYSTEM="1")
     merged = subprocess.run(["git", "-c", "merge.default=text", "-c", "merge.renames=true", "-c", "merge.directoryRenames=false",
                              "-c", "merge.renormalize=false", "-c", "core.attributesFile=%s" % os.devnull,
-                             "merge-tree", "--write-tree", base_sha, head_sha], capture_output=True, text=True, env=quiet)
+                             "merge-tree", "--write-tree", base_sha, head_sha], capture_output=True, text=True, encoding="utf-8", errors="replace", env=quiet)
     landing = merged.stdout.split("\n", 1)[0].strip()
     if merged.returncode == 1:
         raise Unanswerable("%s does not merge cleanly into %s: merge the base into the branch first" % (head, base))

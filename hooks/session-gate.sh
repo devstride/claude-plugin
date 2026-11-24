@@ -28,7 +28,9 @@
 #   - Silent on stdout when it allows; it adds no context to the turn.
 set -u
 [ "${DEVSTRIDE_SESSION_GATE:-1}" = "0" ] && exit 0
-command -v python3 >/dev/null 2>&1 || exit 0
+DEVSTRIDE_PY="${DEVSTRIDE_PY:-}"  # set, so the launcher reads it under `set -u`
+. "$(dirname "$0")/python.sh" || exit 0   # the Python 3 to run (on Windows not always `python3`)
+python3() { command "$DEVSTRIDE_PY" "$@"; }
 STDIN_JSON=$(cat 2>/dev/null | head -c 20000)
 export SG_STDIN="$STDIN_JSON"
 python3 - <<'PY'
@@ -65,14 +67,14 @@ def main():
         return 0
     cwd = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     try:
-        top = subprocess.run(["git", "-C", cwd, "rev-parse", "--show-toplevel"], capture_output=True, text=True, timeout=5).stdout.strip()
-        common = subprocess.run(["git", "-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"], capture_output=True, text=True, timeout=5).stdout.strip()
+        top = subprocess.run(["git", "-C", cwd, "rev-parse", "--show-toplevel"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5).stdout.strip()
+        common = subprocess.run(["git", "-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5).stdout.strip()
     except Exception:
         return 0
     if not top or not common or not os.path.isdir(common):
         return 0
     try:
-        with open(os.path.join(top, ".claude", "ds-config.json")) as f:
+        with open(os.path.join(top, ".claude", "ds-config.json"), encoding="utf-8") as f:
             session_cfg = (json.load(f).get("session") or {})
         if session_cfg.get("jobClassGate") is False:
             return 0
@@ -87,7 +89,7 @@ def main():
         return 0
     jobs = []
     try:
-        with open(marker) as f:
+        with open(marker, encoding="utf-8") as f:
             jobs = json.load(f).get("jobs") or []
     except Exception:
         jobs = []
@@ -107,7 +109,7 @@ def main():
     jobs.append({"skill": skill, "class": cls, "at": now})
     try:
         tmp = marker + ".%d.tmp" % os.getpid()
-        with open(tmp, "w") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump({"sessionId": sid, "jobs": jobs}, f)
         os.replace(tmp, marker)
         for name in os.listdir(marker_dir):

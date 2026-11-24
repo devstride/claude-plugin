@@ -23,6 +23,13 @@ SCRIPT_INSPECT_LIMIT = 4096
 RENDER_STREAM_LIMIT = 65536
 RENDER_TIMEOUT_SECONDS = 3
 KILL_WAIT_SECONDS = 1
+# Windows has no atomic exchange of two names, which removal needs, so there it is refused up front.
+NO_EXCHANGE = "this platform lacks the atomic file exchange required for safe cleanup"
+
+
+def euid() -> int:
+    """This process's user id; 0 on Windows, the owner every file reports there."""
+    return os.geteuid() if hasattr(os, "geteuid") else 0
 
 
 class Refusal(Exception):
@@ -101,12 +108,12 @@ def read_regular(
         raise Refusal(f"cannot inspect {label}: {exc}") from exc
     if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
         raise Refusal(f"{label} must be a regular non-symlink file")
-    if personal and before.st_uid != os.geteuid():
+    if personal and before.st_uid != euid():
         raise Refusal(f"{label} is not owned by the current user")
     if personal and before.st_nlink != 1:
         raise Refusal(f"{label} has {before.st_nlink} hard links; refusing an ambiguous rewrite")
 
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
     try:
         fd = os.open(str(path), flags)
     except OSError as exc:
@@ -135,6 +142,8 @@ def git_root(repository: Path) -> Path:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=3,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -162,7 +171,7 @@ def user_settings_path(repository: Path) -> Path:
     if configured:
         config_root = Path(configured).expanduser().resolve()
     else:
-        home = os.environ.get("HOME")
+        home = os.environ.get("HOME") or (os.environ.get("USERPROFILE") if os.name == "nt" else None)
         if not home:
             raise Refusal("HOME is not set and CLAUDE_CONFIG_DIR is absent")
         config_root = (Path(home).expanduser() / ".claude").resolve()
@@ -293,8 +302,8 @@ def bounded_script_prefix(path: Path) -> bytes:
 
 def stop_process_group(process: subprocess.Popen[bytes]) -> None:
     try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except (OSError, ProcessLookupError):
+        os.killpg(process.pid, signal.SIGKILL)  # none on Windows: AttributeError, then kill()
+    except (AttributeError, OSError, ProcessLookupError):
         try:
             process.kill()
         except OSError:
@@ -309,8 +318,8 @@ def stop_process_group(process: subprocess.Popen[bytes]) -> None:
         process.wait(timeout=KILL_WAIT_SECONDS)
     except subprocess.TimeoutExpired as exc:
         try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except (OSError, ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)  # none on Windows: AttributeError, then kill()
+        except (AttributeError, OSError, ProcessLookupError):
             try:
                 process.kill()
             except OSError:
@@ -319,6 +328,14 @@ def stop_process_group(process: subprocess.Popen[bytes]) -> None:
             process.wait(timeout=KILL_WAIT_SECONDS)
         except subprocess.TimeoutExpired as second_exc:
             raise Refusal("managed status-line process group could not be stopped safely") from second_exc
+
+
+def windows_bash() -> str:
+    """Git for Windows' bash: a bare "bash" there finds the system folder's copy, which starts WSL."""
+    sys.dont_write_bytecode = True
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "build-item/scripts"))
+    import portable
+    return portable.bash()
 
 
 def render_statusline(script: Path, repository: Path, which: bool = False) -> bytes:
@@ -332,7 +349,7 @@ def render_statusline(script: Path, repository: Path, which: bool = False) -> by
     payload = json.dumps(probe).encode("utf-8")
     try:
         process = subprocess.Popen(
-            ["bash", str(script)] + (["--which"] if which else []),
+            [windows_bash() if os.name == "nt" else "bash", str(script)] + (["--which"] if which else []),
             cwd=str(repository),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -477,7 +494,7 @@ def open_owned_directory(path: Path, label: str) -> int:
         raise Refusal(f"cannot inspect {label}: {exc}") from exc
     if stat.S_ISLNK(before.st_mode) or not stat.S_ISDIR(before.st_mode):
         raise Refusal(f"{label} must be a real directory, not a symlink")
-    if before.st_uid != os.geteuid():
+    if before.st_uid != euid():
         raise Refusal(f"{label} is not owned by the current user")
 
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
@@ -508,7 +525,7 @@ def open_private_child(parent_fd: int, name: str, label: str) -> int:
         raise Refusal(f"cannot inspect {label}: {exc}") from exc
     if stat.S_ISLNK(before.st_mode) or not stat.S_ISDIR(before.st_mode):
         raise Refusal(f"{label} must be a real directory, not a symlink")
-    if before.st_uid != os.geteuid():
+    if before.st_uid != euid():
         raise Refusal(f"{label} is not owned by the current user")
 
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
@@ -520,7 +537,7 @@ def open_private_child(parent_fd: int, name: str, label: str) -> int:
     if not same_identity(before, opened) or not stat.S_ISDIR(opened.st_mode):
         os.close(fd)
         raise Refusal(f"{label} changed while it was being opened")
-    if opened.st_uid != os.geteuid():
+    if opened.st_uid != euid():
         os.close(fd)
         raise Refusal(f"{label} is not owned by the current user")
     os.fchmod(fd, 0o700)
@@ -587,7 +604,7 @@ def backup_removed(scope: str, digest: str, value: Any, repository: Path) -> Pat
             written_stat = os.fstat(handle.fileno())
         if (
             not stat.S_ISREG(written_stat.st_mode)
-            or written_stat.st_uid != os.geteuid()
+            or written_stat.st_uid != euid()
             or stat.S_IMODE(written_stat.st_mode) != 0o600
             or written_stat.st_nlink != 1
         ):
@@ -630,7 +647,7 @@ def read_bytes_at(
         raise Refusal(f"cannot inspect {label}: {exc}") from exc
     if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
         raise Refusal(f"{label} must be a regular non-symlink file")
-    if personal and before.st_uid != os.geteuid():
+    if personal and before.st_uid != euid():
         raise Refusal(f"{label} is not owned by the current user")
     if personal and before.st_nlink != 1:
         raise Refusal(f"{label} has {before.st_nlink} hard links; refusing an ambiguous rewrite")
@@ -656,15 +673,14 @@ def read_bytes_at(
 
 
 def exchange_names(directory_fd: int, left: str, right: str) -> None:
-    libc = ctypes.CDLL(None, use_errno=True)
     if sys.platform == "darwin":
-        function = getattr(libc, "renameatx_np", None)
+        function = getattr(ctypes.CDLL(None, use_errno=True), "renameatx_np", None)
     elif sys.platform.startswith("linux"):
-        function = getattr(libc, "renameat2", None)
+        function = getattr(ctypes.CDLL(None, use_errno=True), "renameat2", None)
     else:
         function = None
     if function is None:
-        raise Refusal("this platform lacks the atomic file exchange required for safe cleanup")
+        raise Refusal(NO_EXCHANGE)
     function.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
     function.restype = ctypes.c_int
     result = function(
@@ -871,6 +887,8 @@ def main() -> int:
             emit({**common, "result": "absent", "sha256": digest})
             return 0
 
+        if os.name == "nt":  # before any backup is written or any file is opened for the rewrite
+            raise Refusal(NO_EXCHANGE)
         require_working_shared_statusline(repository)
         backup = backup_removed(scope, digest, settings["statusLine"], repository)
         parent_fd = open_owned_directory(path.parent, "selected settings directory")

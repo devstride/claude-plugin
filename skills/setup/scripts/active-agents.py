@@ -57,7 +57,6 @@ import html
 import json
 import os
 import re
-import signal
 import subprocess
 import sys
 import tempfile
@@ -87,7 +86,7 @@ def fail(message):
 def repo_root():
     try:
         out = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True,
-                             text=True, timeout=10)
+                             text=True, encoding="utf-8", errors="replace", timeout=10)
         if out.returncode == 0 and out.stdout.strip():
             return out.stdout.strip()
     except (OSError, subprocess.SubprocessError):
@@ -251,22 +250,22 @@ def cmd_run(args):
         seconds = float(timeout)
     except ValueError:
         fail("--timeout must be a number of seconds")
+    sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "build-item/scripts"))
+    import portable  # /bin/sh, or Git for Windows' bash where shell=True would run cmd.exe
     # Output goes to a temporary file, never a pipe: a descendant that leaves the process group
     # and keeps the output open cannot then hold this call past the limit.
     with tempfile.TemporaryFile() as output:
         try:
-            child = subprocess.Popen(command, shell=True, cwd=top, env=env, stdin=subprocess.DEVNULL,
-                                     stdout=output, stderr=output, start_new_session=True)
+            child = subprocess.Popen(portable.shell(command), cwd=top, env=env, stdin=subprocess.DEVNULL,
+                                     stdout=output, stderr=output, **portable.group())
         except OSError as error:
             print("%s: FAILED %s" % (label, error))
             return 0
         try:
             child.wait(timeout=seconds)
         except subprocess.TimeoutExpired:
-            try:  # the whole group: a shell's own children must not outlive the limit
-                os.killpg(child.pid, signal.SIGKILL)
-            except OSError:
-                pass
+            portable.kill_tree(child)  # the whole group: a shell's own children must not outlive the limit
             print("%s: FAILED timed out after %gs" % (label, seconds))
             return 0
         output.seek(0)

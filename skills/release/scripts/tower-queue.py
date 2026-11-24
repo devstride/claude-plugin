@@ -45,7 +45,7 @@ def load_config():
     while True:
         path = os.path.join(here, ".claude", "ds-config.json")
         if os.path.isfile(path):
-            with open(path) as handle:
+            with open(path, encoding="utf-8") as handle:
                 config = json.load(handle)
             if not isinstance(config, dict):
                 raise ValueError("%s is not a JSON object" % path)
@@ -57,14 +57,17 @@ def load_config():
 
 
 def status_argv(block):
+    sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "build-item/scripts"))
+    import portable  # the shell and bash to run, which differ on Windows
     commands = block.get("commands") if isinstance(block.get("commands"), dict) else None
     if commands:
         command = commands.get("status")
         if not isinstance(command, str) or not command.strip():
             return None
-        return ["/bin/sh", "-c", command + " --json"]
+        return portable.shell(command + " --json")
     if block.get("provider") in ("github", "devstride"):
-        return ["bash", os.path.join(HERE, "clearance-%s.sh" % block["provider"]), "status", "--json"]
+        return [portable.bash(), os.path.join(HERE, "clearance-%s.sh" % block["provider"]), "status", "--json"]
     return None
 
 
@@ -98,7 +101,8 @@ def check(args):
         print("WAIT status unreadable (release.clearance names no status command or built-in provider)")
         return 2
     try:
-        done = subprocess.run(argv, cwd=root, capture_output=True, text=True, timeout=180)
+        done = subprocess.run(argv, cwd=root, capture_output=True, text=True, timeout=180,
+                              encoding="utf-8", errors="replace")
     except (OSError, subprocess.TimeoutExpired) as error:
         print("WAIT status unreadable (%s)" % error)
         return 2

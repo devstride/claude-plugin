@@ -80,7 +80,7 @@ def int_option(spec, key, default):
 
 def main():
     try:
-        spec = json.load(sys.stdin)
+        spec = json.load(sys.stdin.buffer)  # bytes: UTF-8 whatever the code page
     except ValueError as e:
         fail("stdin is not JSON: %s" % e)
     if not isinstance(spec, dict):

@@ -9,7 +9,7 @@ mkdir -p "$W/bin"; printf '#!/bin/bash\nexec python3 "%s/scripts/tests/fixtures/
 export PATH="$W/bin:$PATH" POST_DEPLOY_REPO=o/r
 A=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 fresh() {
-  export FAKE_GH_STATE="$W/s$RANDOM"; mkdir -p "$FAKE_GH_STATE/.claude"; cd "$FAKE_GH_STATE" || exit 1
+  export FAKE_GH_STATE="$(mktemp -d "$W/s.XXXXXX")"; mkdir -p "$FAKE_GH_STATE/.claude"; cd "$FAKE_GH_STATE" || exit 1
   if [ -n "$1" ]; then printf '{"release":{"clearance":{"provider":"github","scope":"%s"}}}' "$1" > .claude/ds-config.json
   else printf '{"release":{"clearance":{"provider":"github"}}}' > .claude/ds-config.json; fi
 }

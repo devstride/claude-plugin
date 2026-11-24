@@ -39,11 +39,10 @@ import json
 import os
 import re
 import secrets
-import select
-import signal
 import stat
 import subprocess
 import sys
+import threading
 import time
 
 sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
@@ -60,6 +59,15 @@ PAYLOAD_LIMIT = 4 * 1048576   # a prompt hook's payload carries the whole prompt
 KEEP = 7 * 24 * 3600
 
 
+def portable():
+    """The plugin's helper for the calls that differ on Windows (skills/build-item/scripts/portable.py)."""
+    scripts = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills/build-item/scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import portable as module
+    return module
+
+
 def records_path():
     base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     return os.path.join(base, "devstride-plugin", "session-title")
@@ -68,7 +76,7 @@ def records_path():
 def private_dir(path):
     os.makedirs(path, mode=0o700, exist_ok=True)
     info = os.lstat(path)
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != portable().uid():
         raise OSError("untrusted directory")
     return path
 
@@ -76,12 +84,13 @@ def private_dir(path):
 def read_json(path, limit=65536):
     """A regular file we own, opened without following a symlink; None on any doubt."""
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        helper = portable()
+        fd = os.open(path, os.O_RDONLY | helper.flags("O_NONBLOCK", "O_NOFOLLOW"))
     except OSError:
         return None
     try:
         info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (os.getuid(), 0) or info.st_size > limit:
+        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (helper.uid(), 0) or info.st_size > limit:
             return None
         return json.loads(os.read(fd, limit + 1))
     except Exception:
@@ -99,21 +108,23 @@ def remember(sid, title, own):
     directory = private_dir(records_path())
     data = (json.dumps({"title": title, "own": own, "at": int(time.time())}) + "\n").encode()
     temporary = os.path.join(directory, ".%s.%s.tmp" % (sid, secrets.token_hex(8)))
-    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    helper = portable()
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | helper.flags("O_NOFOLLOW"), 0o600)
     try:
         os.write(fd, data)
     finally:
         os.close(fd)
-    os.replace(temporary, os.path.join(directory, sid + ".json"))
+    helper.replace(temporary, os.path.join(directory, sid + ".json"))
 
 
 def prune(own, now):
     """Remove other sessions' records (and temporary files) untouched for KEEP: only files this hook
     names, in a records directory that is ours and no symlink, so nothing else is ever removed."""
     directory = records_path()
+    uid = portable().uid()
     try:
         info = os.lstat(directory)
-        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != uid:
             return
         names = os.listdir(directory)
     except OSError:
@@ -126,7 +137,7 @@ def prune(own, now):
         path = os.path.join(directory, name)
         try:
             info = os.lstat(path)
-            if stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and now - info.st_mtime > KEEP:
+            if stat.S_ISREG(info.st_mode) and info.st_uid == uid and now - info.st_mtime > KEEP:
                 os.unlink(path)
         except OSError:
             pass
@@ -166,55 +177,72 @@ def run(command, root, sid, current, owned, prompt):
         env["SESSION_TITLE_OWNED"] = "1"
     data = prompt.encode("utf-8", "replace")[:PROMPT_LIMIT]
     data = data.decode("utf-8", "ignore").encode("utf-8")  # never end inside a character
+    helper = portable()
     try:
-        child = subprocess.Popen(command, shell=True, cwd=root, env=env, stdin=subprocess.PIPE,
-                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True)
+        # /bin/sh -c (what shell=True runs) on macOS and Linux, Git for Windows' bash on Windows
+        child = subprocess.Popen(helper.shell(command), cwd=root, env=env, stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, **helper.group())
     except Exception:
         return None
     deadline = time.monotonic() + COMMAND_TIMEOUT
-    out, done = b"", False
-    try:
+    chunks, ended, finished = [], [], threading.Event()
+
+    def feed():
         try:
-            child.stdin.write(data)  # at most 8 KB: it fits a pipe's buffer whether or not it is read
+            child.stdin.write(data)
             child.stdin.close()
-        except BrokenPipeError:
+        except Exception:
             pass  # the command did not read its stdin
-        while len(out) <= OUTPUT_LIMIT:
-            left = deadline - time.monotonic()
-            if left <= 0 or not select.select([child.stdout], [], [], left)[0]:
-                break  # out of time
-            chunk = os.read(child.stdout.fileno(), 65536)
-            if not chunk:
-                done = True
-                break
-            out += chunk
+
+    def drain():
+        # A thread, not select(): on Windows select() waits on sockets only, never on a pipe.
+        size = 0
+        try:
+            while size <= OUTPUT_LIMIT:
+                chunk = os.read(child.stdout.fileno(), 65536)
+                if not chunk:
+                    ended.append(True)
+                    break
+                chunks.append(chunk)
+                size += len(chunk)
+        except Exception:
+            pass
+        finished.set()
+
+    threads = [threading.Thread(target=work, daemon=True) for work in (feed, drain)]
+    done = False
+    try:
+        for thread in threads:
+            thread.start()
+        finished.wait(max(0, deadline - time.monotonic()))
+        done = bool(ended)
         if done:
             child.wait(timeout=max(0.01, deadline - time.monotonic()))
     except Exception:
         done = False
     if not done or child.returncode is None:
         # out of time, too much output, or the command outlived its stdout: stop all of it
-        try:
-            os.killpg(child.pid, signal.SIGKILL)
-        except OSError:
-            pass
+        helper.kill_tree(child)
         try:
             child.wait(timeout=1)
         except Exception:
             pass
-    for stream in (child.stdin, child.stdout):
+    for thread, stream in zip(threads, (child.stdin, child.stdout)):
+        thread.join(timeout=0.2)
+        if thread.is_alive():
+            continue  # held by something outside the command's group: left to the process's exit
         try:
             stream.close()
         except Exception:
             pass
     if not done or child.returncode != 0:
         return None
-    return out.decode("utf-8", "replace")
+    return b"".join(chunks).decode("utf-8", "replace")
 
 
 def hook():
     try:
-        payload = json.loads(sys.stdin.read(PAYLOAD_LIMIT) or "{}")
+        payload = json.loads(portable().stdin_text(PAYLOAD_LIMIT) or "{}")
     except Exception:
         return
     if not isinstance(payload, dict):

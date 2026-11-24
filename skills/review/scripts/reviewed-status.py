@@ -77,7 +77,7 @@ class NotFound(Unreadable):
 
 def gh_json(cwd, *args):
     try:
-        p = subprocess.run(["gh"] + list(args), cwd=cwd, capture_output=True, text=True)
+        p = subprocess.run(["gh"] + list(args), cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     except OSError as err:
         raise Unreadable("gh could not run: %s" % err)
     if p.returncode != 0:
@@ -181,7 +181,7 @@ def post_landing(sha, cwd, train):
         return False, "--onto %r: pass the bare train branch name (e.g. train), never a remote ref or a SHA" % train
     request = json.dumps({"base": "origin/" + train, "head": sha, "targetKind": "train"})
     try:
-        p = subprocess.run([sys.executable, GATE, "check"], cwd=cwd, input=request, capture_output=True, text=True)
+        p = subprocess.run([sys.executable, GATE, "check"], cwd=cwd, input=request, capture_output=True, text=True, encoding="utf-8", errors="replace")
     except OSError as err:
         return False, "review-gate.py could not run: %s" % err
     verdict = None
@@ -207,7 +207,7 @@ def post_landing(sha, cwd, train):
 
 def tree(sha, cwd):
     p = subprocess.run(["git", "rev-parse", "--verify", "--quiet", "%s^{tree}" % sha], cwd=cwd,
-                       capture_output=True, text=True, env=dict(os.environ, GIT_NO_REPLACE_OBJECTS="1"))
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", env=dict(os.environ, GIT_NO_REPLACE_OBJECTS="1"))
     return p.stdout.strip() if p.returncode == 0 else None
 
 

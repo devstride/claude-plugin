@@ -85,7 +85,7 @@ def say(line, code=0):
 
 def load_config(head):
     """The release head's own .claude/ds-config.json; {} when that commit has none."""
-    done = subprocess.run(["git", "show", "%s:.claude/ds-config.json" % head], capture_output=True, text=True)
+    done = subprocess.run(["git", "show", "%s:.claude/ds-config.json" % head], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if done.returncode != 0:
         return {}
     try:
@@ -99,7 +99,7 @@ def pr_view(number):
     """`gh pr view <n>`: the live record of one pull request, or None."""
     try:
         done = subprocess.run(["gh", "pr", "view", str(number), "--json", "state,title,baseRefName,baseRefOid,headRefOid,isDraft"],
-                              capture_output=True, text=True, timeout=60)
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     except (OSError, subprocess.TimeoutExpired):
         return None
     if done.returncode != 0:
@@ -129,7 +129,7 @@ def latest_train(source):
             done = subprocess.run(["gh", "pr", "list", "--base", source, "--state", "merged", "--search",
                                    'in:title "%s" sort:created-desc' % title, "--json",
                                    "number,title,body,mergedAt,headRefOid,mergeCommit", "--limit", "50"],
-                                  capture_output=True, text=True, timeout=60)
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         except (OSError, subprocess.TimeoutExpired):
             return None
         if done.returncode != 0:
@@ -164,12 +164,12 @@ def usable_clearance(clearance):
 
 
 def full_sha(rev):
-    done = subprocess.run(["git", "rev-parse", "--verify", "%s^{commit}" % rev], capture_output=True, text=True)
+    done = subprocess.run(["git", "rev-parse", "--verify", "%s^{commit}" % rev], capture_output=True, text=True, encoding="utf-8", errors="replace")
     return done.stdout.strip() if done.returncode == 0 else None
 
 
 def tree_of(head):
-    done = subprocess.run(["git", "rev-parse", "%s^{tree}" % head], capture_output=True, text=True)
+    done = subprocess.run(["git", "rev-parse", "%s^{tree}" % head], capture_output=True, text=True, encoding="utf-8", errors="replace")
     return done.stdout.strip() if done.returncode == 0 else None
 
 
@@ -289,7 +289,7 @@ def changed_migrations(base, head, is_migration, base_name, since=None):
     one as ever: (status letter, path, mode at head, blob at head). The one reader of a migration
     diff: the release's own check and migration-approval.py both use it."""
     if since is None:   # `since`: compare with that commit or tree itself (`head` may then be a tree)
-        done = subprocess.run(["git", "merge-base", base, head], capture_output=True, text=True)
+        done = subprocess.run(["git", "merge-base", base, head], capture_output=True, text=True, encoding="utf-8", errors="replace")
         ask(done.returncode == 0, "no merge base between %s and the head" % base_name)
         since = done.stdout.strip()
     diff = subprocess.run(["git", "diff", "--name-status", "-z", "--no-renames", "--no-relative", "--no-ext-diff", "--ignore-submodules=none", since, head], capture_output=True)
@@ -305,7 +305,7 @@ def changed_migrations(base, head, is_migration, base_name, since=None):
         # --full-tree: the path is from the repository root wherever this runs.
         listed = subprocess.run(["git", "ls-tree", "-z", "--full-tree", head, "--", path], capture_output=True).stdout.decode("utf-8", "surrogateescape")
         mode = listed.split(" ", 1)[0] if listed else ""
-        blob = subprocess.run(["git", "rev-parse", "%s:%s" % (head, path)], capture_output=True, text=True).stdout.strip()
+        blob = subprocess.run(["git", "rev-parse", "%s:%s" % (head, path)], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
         yield status, path, mode, blob
 
 

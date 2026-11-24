@@ -229,7 +229,7 @@ class Retry(Exception):
 
 def gh(*args, env=None):
     try:
-        done = subprocess.run(["gh"] + list(args), capture_output=True, text=True, timeout=60, env=env)
+        done = subprocess.run(["gh"] + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, env=env)
     except (OSError, subprocess.TimeoutExpired) as err:
         raise Unreadable("gh could not run: %s" % err)
     return done.returncode, done.stdout, done.stderr
@@ -664,7 +664,7 @@ def repo_config(path, owner, name):
         if not os.path.exists(path):
             return None
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             config = json.load(f)
     except (OSError, ValueError) as err:
         raise Unreadable("the config %s cannot be read: %s" % (path, err))
@@ -704,7 +704,7 @@ def read_config(path, owner, name):
 
 def git_out(*args):
     try:
-        done = subprocess.run(["git"] + list(args), capture_output=True, text=True, timeout=30)
+        done = subprocess.run(["git"] + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     except (OSError, subprocess.TimeoutExpired):
         return 1, "", ""
     return done.returncode, done.stdout, done.stderr
@@ -848,12 +848,12 @@ def migration_approval(pr, number, expected, owner, name, base, config_path):
                          "migrations cannot be read: %s" % (number, ", ".join([base] + already), err.strip()[:200] or "git fetch failed"))
     handle, rule_file = tempfile.mkstemp(prefix="merge-gate-policy-", suffix=".json")
     try:
-        with os.fdopen(handle, "w") as f:
+        with os.fdopen(handle, "w", encoding="utf-8") as f:
             json.dump(policy, f)
         done = subprocess.run([sys.executable, "-I", MIGRATION_APPROVAL, "check", "--rule", rule_file,
                                "--base", pinned[base], "--head", expected]
                               + [x for b in already for x in ("--already", pinned[b])],
-                              capture_output=True, text=True, timeout=120)
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
         answer = json.loads(done.stdout)
     except (OSError, ValueError, subprocess.TimeoutExpired) as err:
         raise Unreadable("the migration approval check gave no answer for #%d: %s" % (number, err))

@@ -36,7 +36,14 @@
 # DEVSTRIDE_PLUGIN_UPDATE_CHECK=0 disables only the plugin check; status-line refresh remains an
 # independent repository opt-in. Release tags always come from the canonical public repository.
 
-command -v python3 >/dev/null 2>&1 || exit 0
+HOOK_DIR=$(cd "$(dirname "$0")" && pwd)
+. "$HOOK_DIR/python.sh" || exit 0   # the Python 3 to run (on Windows not always `python3`)
+case "${OSTYPE:-}" in
+  # Python on Windows ends each printed line with \r\n, and $(...) keeps the \r: drop it.
+  msys* | cygwin* | win32*) python3() { ( set -o pipefail; command "$DEVSTRIDE_PY" "$@" | tr -d '\r' ); } ;;
+  *) python3() { command "$DEVSTRIDE_PY" "$@"; } ;;
+esac
+PORTABLE_DIR="$HOOK_DIR/../skills/build-item/scripts"
 
 ROOT="${CLAUDE_PLUGIN_ROOT:-}"
 [ -n "$ROOT" ] || exit 0
@@ -55,8 +62,8 @@ $(python3 -c 'import json,os,re,stat,sys
 path=os.path.join(sys.argv[1],".claude","ds-config.json"); valid=True
 if os.path.lexists(path):
   try:
-    fd=os.open(path,os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW); info=os.fstat(fd)
-    if not stat.S_ISREG(info.st_mode) or info.st_uid not in (os.getuid(),0) or info.st_nlink!=1 or info.st_size>1048576: raise ValueError()
+    fd=os.open(path,os.O_RDONLY|getattr(os,"O_NONBLOCK",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_BINARY",0)); info=os.fstat(fd)
+    if not stat.S_ISREG(info.st_mode) or info.st_uid not in (getattr(os,"getuid",lambda:0)(),0) or info.st_nlink!=1 or info.st_size>1048576: raise ValueError()
     raw=b""
     while len(raw)<=1048576:
       chunk=os.read(fd,min(65536,1048577-len(raw)))
@@ -124,13 +131,19 @@ SL_RESULT="n/a"
 SL_REPO="$REPO/.claude/statusline.sh"; SL_SHIPPED="$ROOT/skills/setup/references/statusline-launcher.sh"
 if [ "$SLAUTO" = "1" ] && { [ -e "$SL_REPO" ] || [ -L "$SL_REPO" ]; } \
    && { [ -e "$SL_SHIPPED" ] || [ -L "$SL_SHIPPED" ]; }; then
-  SL_RESULT=$(python3 - "$SL_REPO" "$SL_SHIPPED" "$REPO" "$SL_BASE" "$SL_PROTECTED" <<'PY' 2>/dev/null || echo update-refused
-import fcntl, fnmatch, hashlib, os, re, secrets, stat, subprocess, sys
+  SL_RESULT=$(python3 - "$SL_REPO" "$SL_SHIPPED" "$REPO" "$SL_BASE" "$SL_PROTECTED" "$PORTABLE_DIR" <<'PY' 2>/dev/null || echo update-refused
+import fnmatch, hashlib, os, re, secrets, stat, subprocess, sys
+try:
+    import fcntl
+except ImportError:  # Windows
+    fcntl = None
 
-target, source, repo, base, protected = sys.argv[1:]
+target, source, repo, base, protected = sys.argv[1:6]
 limit = 1024 * 1024
 RELATIVE = ".claude/statusline.sh"
 GIT_ENV = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0", GIT_NO_LAZY_FETCH="1")
+UID = os.geteuid() if hasattr(os, "geteuid") else 0   # Windows: every file reports owner 0
+DIR_FD = os.open in os.supports_dir_fd                # Windows has no directory descriptors
 
 def git(*args):
     # Local reads only, each bounded; any failure reads as "no answer".
@@ -160,7 +173,7 @@ def safe_parent(path, label):
     before = os.lstat(parent)
     if stat.S_ISLNK(before.st_mode) or not stat.S_ISDIR(before.st_mode):
         raise ValueError(label + " parent is not a real directory")
-    if before.st_uid != os.geteuid():
+    if before.st_uid != UID:
         raise ValueError(label + " parent has another owner")
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(parent, flags)
@@ -172,11 +185,11 @@ def safe_read(path, label):
     before = os.lstat(path)
     if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
         raise ValueError(label + " is not a regular non-symlink file")
-    if before.st_uid != os.geteuid() or before.st_nlink != 1:
+    if before.st_uid != UID or before.st_nlink != 1:
         raise ValueError(label + " must be owner-owned with one hard link")
     if before.st_size > limit:
         raise ValueError(label + " is unexpectedly large")
-    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
     opened = os.fstat(descriptor)
     if identity(before) != identity(opened):
         os.close(descriptor); raise ValueError(label + " changed while opening")
@@ -190,7 +203,7 @@ def safe_read_at(directory_fd, name, label):
     before = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
     if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
         raise ValueError(label + " is not a regular non-symlink file")
-    if before.st_uid != os.geteuid() or before.st_nlink != 1 or before.st_size > limit:
+    if before.st_uid != UID or before.st_nlink != 1 or before.st_size > limit:
         raise ValueError(label + " is unsafe or unexpectedly large")
     descriptor = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0), dir_fd=directory_fd)
     opened = os.fstat(descriptor)
@@ -243,14 +256,14 @@ def backup_directory(common):
     # <git-common-dir>/devstride, created owner-only; never a symlink, never someone else's.
     parent = os.open(common, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     try:
-        if os.fstat(parent).st_uid != os.geteuid():
+        if os.fstat(parent).st_uid != UID:
             raise ValueError("git directory has another owner")
         try:
             os.mkdir("devstride", 0o700, dir_fd=parent)
         except FileExistsError:
             pass
         before = os.stat("devstride", dir_fd=parent, follow_symlinks=False)
-        if not stat.S_ISDIR(before.st_mode) or before.st_uid != os.geteuid():
+        if not stat.S_ISDIR(before.st_mode) or before.st_uid != UID:
             raise ValueError("backup directory is not a real owner-owned directory")
         descriptor = os.open("devstride", os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) |
                              getattr(os, "O_NOFOLLOW", 0), dir_fd=parent)
@@ -276,6 +289,54 @@ def move_into_hold(directory_fd, source_name, stem):
         os.unlink(held_name, dir_fd=directory_fd)
         raise
     return held_name
+
+def refresh_by_path(target, target_data, source_data, common):
+    """The refresh where a directory cannot be opened (Windows), in the same order by path: the
+    launcher staged beside the file, the inspected file copied to the backup, and the launcher
+    moved in only while the file still holds what was inspected."""
+    sys.dont_write_bytecode = True
+    sys.path.insert(0, sys.argv[6])
+    import portable  # its replace() retries while the status line itself has the file open
+    folder = os.path.dirname(target)
+    backup = target + ".bak"
+    if common:
+        backup_folder = os.path.join(common, "devstride")
+        try:
+            os.mkdir(backup_folder, 0o700)
+        except FileExistsError:
+            pass
+        info = os.lstat(backup_folder)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != UID:
+            raise ValueError("backup directory is not a real owner-owned directory")
+        backup = os.path.join(backup_folder, "statusline.bak")
+
+    def stage(directory, stem, data):
+        for _ in range(32):
+            path = os.path.join(directory, "." + stem + "." + secrets.token_hex(8))
+            try:
+                descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o700)
+                break
+            except FileExistsError:
+                continue
+        else:
+            raise OSError("could not allocate temporary status-line file")
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(data); handle.flush(); os.fsync(handle.fileno())
+        return path
+
+    staged = held = ""
+    try:
+        staged = stage(folder, os.path.basename(target), source_data)
+        held = stage(os.path.dirname(backup), os.path.basename(backup), target_data)
+        if safe_read(target, "repository status line")[0] != target_data:
+            raise ValueError("repository status line changed before refresh")
+        portable.replace(held, backup); held = ""
+        portable.replace(staged, target); staged = ""
+    finally:
+        for path in (staged, held):
+            if path:
+                try: os.unlink(path)
+                except OSError: pass
 
 def decide(have, want):
     """(skip-result, git-common-dir, feature-branch) for a file behind the shipped launcher."""
@@ -321,6 +382,10 @@ try:
         skipped, common, feature = decide(have, want)
         if skipped:
             print(skipped); raise SystemExit(0)
+        if not DIR_FD:
+            refresh_by_path(target, target_data, source_data, common)
+            print("updated:" + have[1] + ":" + want[1] + (":commit" if feature else ":git" if common else ""))
+            raise SystemExit(0)
         parent_fd = safe_parent(target, "repository status line")
         fcntl.flock(parent_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         target_name = os.path.basename(target)
@@ -459,19 +524,21 @@ fi
 # `timeout`), terminal prompts are disabled so a credential helper cannot hang it, and it runs
 # even when the plugin check is disabled — a fetch is a repository decision, not a plugin one.
 if [ "$FETCH" = "1" ] && git -C "$REPO" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  FETCH_RESULT=$(python3 - "$REPO" "${DEVSTRIDE_SESSION_FETCH_TIMEOUT:-10}" <<'PYFETCH' 2>/dev/null || echo fetch-failed
-import os, signal, subprocess, sys
+  FETCH_RESULT=$(python3 - "$REPO" "${DEVSTRIDE_SESSION_FETCH_TIMEOUT:-10}" "$PORTABLE_DIR" <<'PYFETCH' 2>/dev/null || echo fetch-failed
+import os, subprocess, sys
 repo, deadline = sys.argv[1], float(sys.argv[2])
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[3])
+import portable
 env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="/bin/false")
 env.setdefault("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
 def run(argv, timeout):
     process = subprocess.Popen(argv, cwd=repo, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                               stderr=subprocess.DEVNULL, env=env, start_new_session=True)
+                               stderr=subprocess.DEVNULL, env=env, **portable.group())
     try:
         out, _ = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        try: os.killpg(process.pid, signal.SIGKILL)
-        except Exception: pass
+        portable.kill_tree(process)
         try: process.wait(timeout=2)
         except Exception: pass
         return None
@@ -501,8 +568,8 @@ read -r RUNNING RUNTIME_VALID <<EOF
 $(python3 -c 'import json,os,re,stat,sys
 path=os.path.join(os.path.realpath(sys.argv[1]),".claude-plugin","plugin.json")
 try:
-  fd=os.open(path,os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW); info=os.fstat(fd)
-  if not stat.S_ISREG(info.st_mode) or info.st_uid not in (os.getuid(),0) or info.st_nlink!=1 or info.st_size>1048576: raise ValueError()
+  fd=os.open(path,os.O_RDONLY|getattr(os,"O_NONBLOCK",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_BINARY",0)); info=os.fstat(fd)
+  if not stat.S_ISREG(info.st_mode) or info.st_uid not in (getattr(os,"getuid",lambda:0)(),0) or info.st_nlink!=1 or info.st_size>1048576: raise ValueError()
   data=os.read(fd,1048577); os.close(fd); manifest=json.loads(data); version=manifest.get("version")
   if manifest.get("name")!="devstride" or not isinstance(version,str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+",version): raise ValueError()
   print(version,"1")
@@ -516,8 +583,15 @@ CACHE_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}"
 CACHE_DIR=$(python3 - "$CACHE_ROOT" <<'PY' 2>/dev/null
 import os,stat,sys
 root=os.path.realpath(sys.argv[1]); os.makedirs(root,mode=0o700,exist_ok=True)
-root_info=os.lstat(root)
-if not stat.S_ISDIR(root_info.st_mode) or root_info.st_uid not in (os.getuid(),0): raise SystemExit(1)
+root_info=os.lstat(root); uid=getattr(os,"getuid",lambda:0)()
+if not stat.S_ISDIR(root_info.st_mode) or root_info.st_uid not in (uid,0): raise SystemExit(1)
+if os.open not in os.supports_dir_fd:  # Windows: no directory descriptors, so by path
+  path=os.path.join(root,"devstride-plugin")
+  try: os.mkdir(path,0o700)
+  except FileExistsError: pass
+  info=os.lstat(path)
+  if not stat.S_ISDIR(info.st_mode) or info.st_uid!=uid: raise SystemExit(1)
+  print(path); raise SystemExit(0)
 root_fd=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
 try:
   try: os.mkdir("devstride-plugin",0o700,dir_fd=root_fd)
@@ -539,26 +613,30 @@ state_write() { # atomic, owner-only, no symlink/hardlink following; races refus
   python3 - "$1" "$2" <<'PY' 2>/dev/null
 import json,os,secrets,stat,sys
 path,payload=sys.argv[1],json.loads(sys.argv[2]); parent=os.path.realpath(os.path.dirname(path)); name=os.path.basename(path)
-data=(json.dumps(payload,separators=(",",":"),sort_keys=True)+"\n").encode(); directory=os.open(parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
-temporary=".%s.%s.tmp"%(name,secrets.token_hex(8)); fd=None; original=None
+data=(json.dumps(payload,separators=(",",":"),sort_keys=True)+"\n").encode()
+# Windows has no directory descriptors: there every name is joined to its directory instead.
+AT=os.open in os.supports_dir_fd; directory=os.open(parent,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW) if AT else None
+at=lambda n: (n,{"dir_fd":directory}) if AT else (os.path.join(parent,n),{})
+temporary=".%s.%s.tmp"%(name,secrets.token_hex(8)); fd=None; original=None; uid=getattr(os,"getuid",lambda:0)()
 try:
   try:
-    original=os.stat(name,dir_fd=directory,follow_symlinks=False)
-    if not stat.S_ISREG(original.st_mode) or original.st_uid!=os.getuid() or original.st_nlink!=1: raise ValueError()
+    original=os.stat(at(name)[0],follow_symlinks=False,**at(name)[1])
+    if not stat.S_ISREG(original.st_mode) or original.st_uid!=uid or original.st_nlink!=1: raise ValueError()
   except FileNotFoundError: pass
-  fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=directory)
+  fd=os.open(at(temporary)[0],os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_BINARY",0),0o600,**at(temporary)[1])
   os.write(fd,data); os.fsync(fd); os.close(fd); fd=None
-  try: current=os.stat(name,dir_fd=directory,follow_symlinks=False)
+  try: current=os.stat(at(name)[0],follow_symlinks=False,**at(name)[1])
   except FileNotFoundError: current=None
   identity=lambda s: None if s is None else (s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns,s.st_mode,s.st_uid,s.st_nlink)
   if identity(current)!=identity(original): raise ValueError()
-  os.replace(temporary,name,src_dir_fd=directory,dst_dir_fd=directory); temporary=""; os.fsync(directory)
+  if AT: os.replace(temporary,name,src_dir_fd=directory,dst_dir_fd=directory); temporary=""; os.fsync(directory)
+  else: os.replace(at(temporary)[0],at(name)[0]); temporary=""
 finally:
   if fd is not None: os.close(fd)
   if temporary:
-    try: os.unlink(temporary,dir_fd=directory)
+    try: os.unlink(at(temporary)[0],**at(temporary)[1])
     except FileNotFoundError: pass
-  os.close(directory)
+  if AT: os.close(directory)
 PY
 }
 
@@ -585,8 +663,8 @@ if [ -n "$NEWEST_CACHE" ]; then
 import json,os,re,stat,sys
 path=sys.argv[1]
 try:
-  fd=os.open(path,os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW); info=os.fstat(fd)
-  if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or info.st_nlink!=1 or info.st_size>4096: raise ValueError()
+  fd=os.open(path,os.O_RDONLY|getattr(os,"O_NONBLOCK",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_BINARY",0)); info=os.fstat(fd)
+  if not stat.S_ISREG(info.st_mode) or info.st_uid!=getattr(os,"getuid",lambda:0)() or info.st_nlink!=1 or info.st_size>4096: raise ValueError()
   data=os.read(fd,4097); os.close(fd); value=json.loads(data)
   fetched=value.get("fetchedAt"); newest=value.get("newest"); now=int(sys.argv[2]); ttl=int(sys.argv[3])
   trusted=value.get("schema")==2 and value.get("source")=="https://github.com/devstride/claude-plugin"
@@ -599,7 +677,7 @@ PY
 fi
 if [ -z "$NEWEST" ]; then
   SOURCE="network"
-  NEWEST=$(bash "$LATEST_HELPER" 2>/dev/null)
+  NEWEST=$(bash "$LATEST_HELPER" 2>/dev/null | tr -d '\r')
   if [ -n "$NEWEST" ]; then
     NEWEST_PAYLOAD=$(python3 -c 'import json,sys,time; print(json.dumps({"schema":2,"source":"https://github.com/devstride/claude-plugin","newest":sys.argv[1],"fetchedAt":int(time.time())}))' "$NEWEST")
     state_write "$NEWEST_CACHE" "$NEWEST_PAYLOAD" || true
@@ -609,8 +687,8 @@ fi
 PREV_NOTIFIED=$(python3 - "$RECORD" <<'PY' 2>/dev/null
 import json,os,stat,sys
 try:
-  fd=os.open(sys.argv[1],os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW); info=os.fstat(fd)
-  if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or info.st_nlink!=1 or info.st_size>16384: raise ValueError()
+  fd=os.open(sys.argv[1],os.O_RDONLY|getattr(os,"O_NONBLOCK",0)|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_BINARY",0)); info=os.fstat(fd)
+  if not stat.S_ISREG(info.st_mode) or info.st_uid!=getattr(os,"getuid",lambda:0)() or info.st_nlink!=1 or info.st_size>16384: raise ValueError()
   data=os.read(fd,16385); os.close(fd); value=json.loads(data).get("notifiedFor","")
   if isinstance(value,str) and len(value)<=1024: print(value)
 except Exception:

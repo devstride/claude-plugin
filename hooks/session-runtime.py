@@ -90,6 +90,17 @@ ROLES = {"planning": ("fable", "high"), "runner": ("opus", "high")}
 LOOP_PROMPT = re.compile(r"^\s*(/loop\b|/devstride:update\b|/reload-plugins\b|<<autonomous-loop|<task-notification>)")
 
 
+def portable():
+    """The plugin's helper for the calls that differ on Windows (skills/build-item/scripts/portable.py),
+    found from this file, so it works when the status line compiles this file in its own process."""
+    sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
+    scripts = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills/build-item/scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import portable as module
+    return module
+
+
 def cache_dir():
     return os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "devstride-plugin")
 
@@ -101,12 +112,13 @@ def version_tuple(value):
 def read_json(path, limit=1048576):
     """A regular file we (or root) own, opened without following a symlink; None on any doubt."""
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        helper = portable()
+        fd = os.open(path, os.O_RDONLY | helper.flags("O_NONBLOCK", "O_NOFOLLOW"))
     except OSError:
         return None
     try:
         info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (os.getuid(), 0) or info.st_size > limit:
+        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (helper.uid(), 0) or info.st_size > limit:
             return None
         return json.loads(os.read(fd, limit + 1))
     except Exception:
@@ -127,7 +139,7 @@ def private_dir(path):
     """Create (0700) and vouch for a directory: ours, a real directory, not a symlink."""
     os.makedirs(path, mode=0o700, exist_ok=True)
     info = os.lstat(path)
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != portable().uid():
         raise OSError("untrusted directory")
     return path
 
@@ -135,20 +147,22 @@ def private_dir(path):
 def write_atomic(directory, name, payload):
     data = (json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n").encode()
     temporary = os.path.join(directory, ".%s.%s.tmp" % (name, secrets.token_hex(8)))
-    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    helper = portable()
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | helper.flags("O_NOFOLLOW"), 0o600)
     try:
         os.write(fd, data)
     finally:
         os.close(fd)
-    os.replace(temporary, os.path.join(directory, name))  # replaces a symlink itself, never its target
+    helper.replace(temporary, os.path.join(directory, name))  # replaces a symlink itself, never its target
 
 
 def prune(directory, now):
+    uid = portable().uid()
     for name in os.listdir(directory):
         path = os.path.join(directory, name)
         try:
             info = os.lstat(path)
-            if stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and now - info.st_mtime > KEEP:
+            if stat.S_ISREG(info.st_mode) and info.st_uid == uid and now - info.st_mtime > KEEP:
                 os.unlink(path)
         except OSError:
             pass
@@ -156,7 +170,7 @@ def prune(directory, now):
 
 def read_payload():
     try:
-        payload = json.loads(sys.stdin.read(65536) or "{}")
+        payload = json.loads(portable().stdin_text(65536) or "{}")
         return payload if isinstance(payload, dict) else {}
     except Exception:
         return {}
@@ -277,7 +291,7 @@ def git_common_dir(start):
         if os.path.isdir(dot):
             return here, os.path.realpath(dot)
         if os.path.isfile(dot):
-            with open(dot) as fh:
+            with open(dot, encoding="utf-8") as fh:
                 line = fh.readline().strip()
             if not line.startswith("gitdir:"):
                 return here, None
@@ -285,7 +299,7 @@ def git_common_dir(start):
             common = gitdir
             commondir = os.path.join(gitdir, "commondir")
             if os.path.isfile(commondir):
-                with open(commondir) as fh:
+                with open(commondir, encoding="utf-8") as fh:
                     common = os.path.normpath(os.path.join(gitdir, fh.readline().strip()))
             return here, os.path.realpath(common)
         parent = os.path.dirname(here)
@@ -535,15 +549,16 @@ def take_refresh_lock(now):
     """One background refresh at a time across every session on this machine; a lock older than
     REFRESH_LOCK (a refresh that died) is taken over."""
     lock = os.path.join(private_dir(cache_dir()), "newest.refresh")
+    helper = portable()
     try:
         info = os.lstat(lock)
-        if stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and -60 < now - info.st_mtime < REFRESH_LOCK:
+        if stat.S_ISREG(info.st_mode) and info.st_uid == helper.uid() and -60 < now - info.st_mtime < REFRESH_LOCK:
             return False
         os.unlink(lock)
     except FileNotFoundError:
         pass
     try:
-        os.close(os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
+        os.close(os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL | helper.flags("O_NOFOLLOW"), 0o600))
         return True
     except OSError:
         return False
@@ -552,9 +567,9 @@ def take_refresh_lock(now):
 def spawn_refresh():
     """Start `refresh-newest` detached: the prompt never waits on the network."""
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
-    subprocess.Popen([sys.executable, os.path.realpath(__file__), "refresh-newest"],
-                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     close_fds=True, start_new_session=True, env=env)
+    portable().spawn_detached([sys.executable, os.path.realpath(__file__), "refresh-newest"],
+                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                              close_fds=True, env=env)
 
 
 def refresh_newest():
@@ -566,7 +581,7 @@ def refresh_newest():
                               "skills/update/scripts/update-plugin.py")
         env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
         done = subprocess.run([sys.executable, helper, "latest"], stdin=subprocess.DEVNULL, capture_output=True,
-                              text=True, timeout=FETCH_TIMEOUT, env=env)
+                              text=True, encoding="utf-8", errors="replace", timeout=FETCH_TIMEOUT, env=env)
         newest = done.stdout.strip()
         if done.returncode == 0 and SEMVER.match(newest):
             write_atomic(private_dir(cache_dir()), "newest.json",

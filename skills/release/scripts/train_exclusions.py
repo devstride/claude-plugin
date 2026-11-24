@@ -183,7 +183,7 @@ def reviewed_unit(repo, commit, found, head_regex, train, grandfathered=None, un
     number = found[0]
     try:
         p = subprocess.run(["gh", "pr", "view", number, "--json", "baseRefName,state,mergeCommit,mergedAt"],
-                           cwd=repo, capture_output=True, text=True)
+                           cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
         info = json.loads(p.stdout) if p.returncode == 0 else None
         why = (p.stderr or p.stdout).strip()[:200] if p.returncode else "an answer that is not JSON"
     except (OSError, ValueError) as err:

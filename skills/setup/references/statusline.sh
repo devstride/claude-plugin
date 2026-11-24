@@ -39,12 +39,19 @@
 
 input=$(cat)
 
+# The Python 3 to run: python3, or on Windows the one the loaded plugin's hooks/python.sh finds
+# there (where python3 is often missing or the Microsoft Store's placeholder). The launcher names
+# that plugin in CLAUDE_PLUGIN_ROOT; without it, python3.
+DEVSTRIDE_PY=""
+[ -f "${CLAUDE_PLUGIN_ROOT:-}/hooks/python.sh" ] && . "$CLAUDE_PLUGIN_ROOT/hooks/python.sh"
+py="${DEVSTRIDE_PY:-python3}"
+
 # --- one JSON pass ---------------------------------------------------------
 # The status-line payload and the repo config are both read here, in a single
 # python3 invocation, because process startup dominates the cost of rendering a
 # status line: two parsers is twice the latency for the same answers.
-eval "$(
-  printf '%s' "$input" | python3 -c '
+sl_vars="$(
+  printf '%s' "$input" | "$py" -c '
 import json, os, shlex, sys
 
 def emit(k, v):
@@ -184,6 +191,7 @@ if isinstance(clearance, dict) and clearance:
 emit("SL_CLEARANCE_CMD", clearance_cmd)
 ' 2>/dev/null
 )"
+eval "${sl_vars//$'\r'/}"  # Python on Windows ends each line with \r\n
 
 [ -n "$SL_CWD" ] && cd "$SL_CWD" 2>/dev/null
 
@@ -296,7 +304,7 @@ elif [ -n "$SL_SESSION_ID" ] && [ -n "$SL_CFG_ROOT" ]; then
     sh -c 'echo "$PPID"' >"$nlock/pid" 2>/dev/null
     name=$( (cd "$SL_CFG_ROOT" && CLAUDE_CODE_SESSION_ID="$SL_SESSION_ID" eval "$SL_SESSION_CMD") 2>/dev/null </dev/null ) || name=""
     if ntmp=$(mktemp "$ncache.XXXXXX" 2>/dev/null); then
-      printf '%s' "$name" | python3 -c 'import sys
+      printf '%s' "$name" | "$py" -c 'import sys
 line = (sys.stdin.read().splitlines() or [""])[0]
 sys.stdout.write(" ".join("".join(" " if ord(c) < 32 or ord(c) == 127 or c == "|" else c for c in line).split())[:64].strip())' >"$ntmp" 2>/dev/null
       mv -f "$ntmp" "$ncache" 2>/dev/null || rm -f "$ntmp"

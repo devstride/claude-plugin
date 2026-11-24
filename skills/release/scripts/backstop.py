@@ -176,7 +176,8 @@ def parse_now(text):
 
 
 def run(argv, root, **extra):
-    return subprocess.run(argv, cwd=root, capture_output=True, text=True, stdin=subprocess.DEVNULL, **extra)
+    return subprocess.run(argv, cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          stdin=subprocess.DEVNULL, **extra)
 
 
 def git(root, *args):
@@ -297,14 +298,17 @@ def clearance(config, root):
         return False, "no release.clearance configured"
     if not isinstance(block, dict):
         return True, "release.clearance is not an object, so clearance cannot be read"
+    sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "build-item/scripts"))
+    import portable  # the shell and bash to run, which differ on Windows
     commands = section(block, "commands")
     if commands:
         command = commands.get("status")
         if not isinstance(command, str) or not command.strip():
             return True, "release.clearance.commands.status is not set, so clearance cannot be read"
-        argv = ["/bin/sh", "-c", command + " --json"]
+        argv = portable.shell(command + " --json")
     elif block.get("provider") in ("github", "devstride"):
-        argv = ["bash", os.path.join(HERE, "clearance-%s.sh" % block["provider"]), "status", "--json"]
+        argv = [portable.bash(), os.path.join(HERE, "clearance-%s.sh" % block["provider"]), "status", "--json"]
     else:
         return True, "release.clearance names no provider this check can read"
     try:
@@ -335,7 +339,7 @@ def clearance(config, root):
 def check_holds(path, items, now, root):
     """-> (held, reason) from release-holds.py over the caller's request, which must cover `items`."""
     try:
-        with open(path) as handle:
+        with open(path, encoding="utf-8") as handle:
             request = json.load(handle)
     except (OSError, ValueError) as error:
         raise Answer("ERROR", "the holds request %s cannot be read as JSON (%s)" % (path, error))
@@ -348,7 +352,7 @@ def check_holds(path, items, now, root):
         raise Answer("ERROR", "the holds request leaves out %s: read every release item and its ancestors" % " ".join(missing))
     request.setdefault("now", now.isoformat())
     ran = subprocess.run([sys.executable, HOLDS, "decide"], input=json.dumps(request), capture_output=True,
-                         text=True, cwd=root)
+                         text=True, encoding="utf-8", errors="replace", cwd=root)
     if ran.returncode == 2:   # a hold nobody can read holds
         return True, "held: " + (ran.stderr.strip().splitlines() or ["release-holds refused"])[0]
     if ran.returncode != 0:
@@ -511,7 +515,7 @@ def main(argv):
         return 2
     if verb == "decide":
         try:
-            request = json.loads(sys.stdin.read())
+            request = json.loads(sys.stdin.buffer.read())  # bytes: UTF-8 whatever the code page
             if not isinstance(request, dict):
                 raise ValueError("not an object")
             print(json.dumps(decide_claim(request)))

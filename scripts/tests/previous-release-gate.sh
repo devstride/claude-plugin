@@ -10,7 +10,7 @@ mkdir -p "$W/bin"; printf '#!/bin/bash\nexec python3 "%s/scripts/tests/fixtures/
 export PATH="$W/bin:$PATH" POST_DEPLOY_REPO=o/r POST_DEPLOY_POLL_SECONDS=0 POST_DEPLOY_WAIT_MINUTES=1
 A=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; B=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; H=cccccccccccccccccccccccccccccccccccccccc
 fresh() { # fresh SCOPE — a repo directory with that scope and an empty fake-gh state
-  export FAKE_GH_STATE="$W/s$RANDOM"; mkdir -p "$FAKE_GH_STATE/.claude"; cd "$FAKE_GH_STATE" || exit 1
+  export FAKE_GH_STATE="$(mktemp -d "$W/s.XXXXXX")"; mkdir -p "$FAKE_GH_STATE/.claude"; cd "$FAKE_GH_STATE" || exit 1
   printf '{"release":{"productionBranch":"master","releaseBranchPattern":"release/<YY-MM-DD>[-n]","clearance":{"provider":"github","scope":"%s"}}}' "$1" > .claude/ds-config.json
 }
 prs() { printf '%s' "$1" > "$FAKE_GH_STATE/prs.json"; }

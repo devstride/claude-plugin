@@ -1,5 +1,5 @@
 #!/bin/bash
-# ds-statusline-launcher: managed v2 — installed and kept up to date by the devstride
+# ds-statusline-launcher: managed v3 — installed and kept up to date by the devstride
 # plugin. DELETE THIS LINE to take ownership: the session-start hook only ever
 # replaces a file that still carries it, and never touches one that does not.
 #
@@ -44,6 +44,29 @@ sessions="${XDG_CACHE_HOME:-$HOME/.cache}/devstride-plugin/sessions"
 sid=""; re='"session_id"[[:space:]]*:[[:space:]]*"([A-Za-z0-9_-][A-Za-z0-9._-]*)"'
 [[ $input =~ $re ]] && [ "${#BASH_REMATCH[1]}" -le 128 ] && sid="${BASH_REMATCH[1]}"
 
+# A JSON string's body with no escape but \\ (the separators of a Windows path); unjson decodes
+# one into REPLY. A value with any other escape does not match, as before.
+jstr='(([^"\\]|\\\\)+)'; bs='\'
+unjson() { REPLY=${1//"$bs$bs"/"$bs"}; }  # unquoted: bash 3.2 keeps quotes inside "…" literally
+
+# findpy — sets py to python3; on Windows (Git for Windows' bash), where python3 is often missing
+# or the Microsoft Store's placeholder, to the first of python3, python and `py -3` that runs Python 3.
+py=""
+findpy() {
+  [ -n "$py" ] && return 0
+  case "${OSTYPE:-}" in
+    msys* | cygwin* | win32*)
+      local try
+      export PYTHONUTF8=1 PYTHONDONTWRITEBYTECODE=1
+      for try in python3 python "py -3"; do
+        # shellcheck disable=SC2086  # "py -3" is a command and its argument
+        if $try -c 'import sys; sys.exit(sys.version_info[0] != 3)' >/dev/null 2>&1; then py=$try; return 0; fi
+      done
+      return 1 ;;
+  esac
+  command -v python3 >/dev/null 2>&1 && py=python3
+}
+
 # trusted [FILE] — the sessions directory, and FILE when given, pass the rule above. The
 # ownership and link tests are the shell's own; the permission bits cost one `ls`, whose lines
 # are taken apart in the shell (no temporary file). Anything it cannot read as a permission
@@ -73,10 +96,19 @@ if [ -n "$sid" ] && trusted "$sessions/$sid.json"; then
   { IFS= read -r line <"$sessions/$sid.json"; } 2>/dev/null
   case "$line" in *'"root":"'*) root="${line#*\"root\":\"}"; root="${root%%\"*}" ;; esac
   case "$root" in
-    *\\*) root=$(python3 -c 'import json, sys
+    *\\*)
+      case "${root//"$bs$bs"/}" in
+        *\\*)
+          if findpy; then
+            # shellcheck disable=SC2086  # "py -3" is a command and its argument
+            root=$($py -c 'import json, sys
 with open(sys.argv[1]) as handle:
     value = json.load(handle).get("root")
-sys.stdout.write(value if isinstance(value, str) else "")' "$sessions/$sid.json" 2>/dev/null) ;;
+sys.stdout.write(value if isinstance(value, str) else "")' "$sessions/$sid.json" 2>/dev/null)
+            root="${root%$'\r'}"
+          else root=""; fi ;;
+        *) unjson "$root"; root="$REPLY" ;;  # only \\ (a Windows path): decoded here, no python3
+      esac ;;
   esac
   [ -n "$root" ] && [ -f "$root/$rel" ] || root=""
 fi
@@ -88,10 +120,27 @@ fi
 #     is there.
 reloaded=""
 registry="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json"
-re='"transcript_path"[[:space:]]*:[[:space:]]*"([^"\\]+)"'
-if [ -n "$root" ] && [ "${root#"${registry%/*}/cache/"}" != "$root" ] && [[ $input =~ $re ]] \
-  && [ -f "${BASH_REMATCH[1]}" ]; then
-  rline=$(tail -c 131072 "${BASH_REMATCH[1]}" 2>/dev/null | grep -F '"commandRun":{"command":"reload-plugins"' \
+re='"transcript_path"[[:space:]]*:[[:space:]]*"'"$jstr"'"'
+# On Windows the record may spell a path with a drive letter and backslashes, and HOME the Git
+# Bash way (a leading /c/ and forward slashes): compare one spelling.
+unixy() {
+  REPLY=$1
+  case "${OSTYPE:-}" in
+    msys* | cygwin*)
+      REPLY="${REPLY//\\//}"
+      case "$REPLY" in [A-Za-z]:/*) REPLY="/${REPLY:0:1}${REPLY:2}" ;; esac ;;
+  esac
+}
+incache=""
+if [ -n "$root" ]; then
+  unixy "$root"; croot=$REPLY; unixy "${registry%/*}/cache/"
+  case "${OSTYPE:-}" in msys* | cygwin*) shopt -s nocasematch ;; esac  # drive letters and Windows names ignore case
+  [[ $croot == "$REPLY"* ]] && incache=1
+  shopt -u nocasematch
+fi
+if [ -n "$incache" ] && [[ $input =~ $re ]] \
+  && unjson "${BASH_REMATCH[1]}" && [ -f "$REPLY" ]; then
+  rline=$(tail -c 131072 "$REPLY" 2>/dev/null | grep -F '"commandRun":{"command":"reload-plugins"' \
     | grep -F '"type":"system"' | tail -1)
   if [ -n "$rline" ]; then
     stamp="${rline#*\"timestamp\":\"}"; stamp="${stamp:0:19}"
@@ -130,8 +179,9 @@ if [ -z "$root" ]; then
           hit=1; root="$cached"
         fi
       fi
-      if [ -z "$hit" ] && command -v python3 >/dev/null 2>&1; then
-        root=$(printf '%s' "$input" | python3 -c '
+      if [ -z "$hit" ] && findpy; then
+        # shellcheck disable=SC2086  # "py -3" is a command and its argument
+        root=$(printf '%s' "$input" | $py -c '
 import json, os, sys
 
 rel, registry = sys.argv[1:3]
@@ -206,6 +256,7 @@ for key in ("devstride@devstride", "ds@devstride"):
         rows[path] = min(rank, rows.get(path, rank))
 sys.stdout.write(min(rows.values())[3] if rows else "")
 ' "$rel" "$registry" 2>/dev/null)
+        root="${root%$'\r'}"
         [ -n "$root" ] && [ -f "$root/$rel" ] || root=""
         # Keep the answer: only in a directory that passes the rule, through a temporary file
         # that is created new (never written through a link someone left there).
@@ -234,12 +285,13 @@ fi
 [ "${1:-}" = "--which" ] && exit 0
 
 # The plain line: the directory and its branch, in the full bar's own labels.
-cwd=""; re='"current_dir"[[:space:]]*:[[:space:]]*"([^"\\]+)"'
-[[ $input =~ $re ]] && cwd="${BASH_REMATCH[1]}"
+cwd=""; re='"current_dir"[[:space:]]*:[[:space:]]*"'"$jstr"'"'
+[[ $input =~ $re ]] && unjson "${BASH_REMATCH[1]}" && cwd="$REPLY"
 if [ -z "$cwd" ]; then
-  re='"cwd"[[:space:]]*:[[:space:]]*"([^"\\]+)"'
-  [[ $input =~ $re ]] && cwd="${BASH_REMATCH[1]}"
+  re='"cwd"[[:space:]]*:[[:space:]]*"'"$jstr"'"'
+  [[ $input =~ $re ]] && unjson "${BASH_REMATCH[1]}" && cwd="$REPLY"
 fi
+case "${OSTYPE:-}" in msys* | cygwin* | win32*) cwd="${cwd//"$bs"//}" ;; esac  # C:\a\b → C:/a/b
 [ -d "$cwd" ] || cwd="$PWD"
 branch=$(git -C "$cwd" branch --show-current 2>/dev/null)
 printf '\033[2mRepo:\033[0m %s' "${cwd##*/}"

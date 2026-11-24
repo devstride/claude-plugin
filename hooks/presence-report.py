@@ -34,10 +34,14 @@ sys.dont_write_bytecode = True  # never leave compiled files in the installed pl
 HERE = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "skills/build-item/scripts"))
 sys.path.insert(0, HERE)
-import claim_record  # noqa: E402
-import devstride_connection as connection  # noqa: E402
-import presence  # noqa: E402  hooks/presence.py: the owner-checking reader and the checkout's root
-import presence_settings  # noqa: E402
+try:
+    import claim_record  # noqa: E402
+    import devstride_connection as connection  # noqa: E402
+    import presence  # noqa: E402  hooks/presence.py: the owner-checking reader and the checkout's root
+    import presence_settings  # noqa: E402
+    UNLOADED = None
+except Exception as error:  # a helper this system cannot run: main() says so in its own words
+    UNLOADED = type(error).__name__
 
 TOOL = "report_session_presence"
 # Seconds one call may take. Tests shorten it; nothing else sets DEVSTRIDE_PRESENCE_TIMEOUT.
@@ -198,8 +202,24 @@ def prove(environ):
     return 0
 
 
+def unloaded(argv):
+    """What each mode answers when the plugin's own helpers could not load on this system."""
+    if argv == ["check"]:
+        print("AGENT CONNECTION: NOT READY (the plugin's helpers could not load on this system: %s)" % UNLOADED)
+        print("Fix: update the devstride plugin")
+        print("PRESENCE: OFF (helpers-unavailable)")
+        print("INTERVAL: none")
+        return 0
+    if argv == ["prove"]:
+        print("PROOF: FAILED (the plugin's helpers could not load on this system: %s)" % UNLOADED)
+        return 1
+    return EXIT_TRANSIENT if not argv else 2
+
+
 def main(argv):
     try:
+        if UNLOADED:
+            return unloaded(argv)
         if not argv:
             return report(os.environ)
         if argv == ["check"]:

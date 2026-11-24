@@ -156,7 +156,6 @@ context), whatever goes wrong. python3 and the standard library only.
 """
 import calendar
 import contextlib
-import fcntl
 import json
 import os
 import re
@@ -172,6 +171,7 @@ SCRIPT = os.path.realpath(__file__)
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(SCRIPT))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills/build-item/scripts"))
 import claim_record  # noqa: E402  the one machine naming every claim uses
+import portable  # noqa: E402  the calls that differ on Windows
 import presence_settings  # noqa: E402  the one decision: off, the repository's command, or the built-in reporter
 
 REPORTER = os.path.join(os.path.dirname(SCRIPT), "presence-report.py")
@@ -219,7 +219,7 @@ def cache_dir():
 def private_dir(path):
     os.makedirs(path, mode=0o700, exist_ok=True)
     info = os.lstat(path)
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != portable.uid():
         raise OSError("untrusted directory")
     return path
 
@@ -236,12 +236,12 @@ def records_dir():
 def read_json(path, limit=1048576):
     """A regular file we (or root) own, opened without following a symlink; None on any doubt."""
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        fd = os.open(path, os.O_RDONLY | portable.flags("O_NONBLOCK", "O_NOFOLLOW"))
     except OSError:
         return None
     try:
         info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (os.getuid(), 0) or info.st_size > limit:
+        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (portable.uid(), 0) or info.st_size > limit:
             return None
         return json.loads(os.read(fd, limit + 1))
     except Exception:
@@ -253,12 +253,12 @@ def read_json(path, limit=1048576):
 def write_atomic(directory, name, payload):
     data = (json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n").encode()
     temporary = os.path.join(directory, ".%s.%s.tmp" % (name, secrets.token_hex(8)))
-    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | portable.flags("O_NOFOLLOW"), 0o600)
     try:
         os.write(fd, data)
     finally:
         os.close(fd)
-    os.replace(temporary, os.path.join(directory, name))
+    portable.replace(temporary, os.path.join(directory, name))
 
 
 def load(sid):
@@ -276,7 +276,7 @@ def stale(path, now):
         info = os.lstat(path)
     except OSError:
         return False
-    return stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid() and now - info.st_mtime > KEEP
+    return stat.S_ISREG(info.st_mode) and info.st_uid == portable.uid() and now - info.st_mtime > KEEP
 
 
 def prune(own, now):
@@ -374,7 +374,7 @@ def no_key_notice(event, reason):
             # only when there is truly no key: an address that is not DevStride's, or a configuration
             # file that cannot be read safely, is doctor's to explain, not this line's
             private_dir(cache_dir())
-            os.close(os.open(marker_path(), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
+            os.close(os.open(marker_path(), os.O_WRONLY | os.O_CREAT | os.O_EXCL | portable.flags("O_NOFOLLOW"), 0o600))
             sys.stdout.write(NO_KEY_LINE + "\n")
             sys.stdout.flush()
     except OSError:
@@ -395,16 +395,7 @@ def own_version():
     return _VERSION[0]
 
 
-def alive(pid):
-    if not isinstance(pid, int) or pid <= 1:
-        return False
-    try:
-        os.kill(pid, 0)
-        return True
-    except PermissionError:
-        return True
-    except OSError:
-        return False
+alive = portable.alive  # never os.kill(pid, 0) on Windows, where it sends a Ctrl+C
 
 
 def env_owner():
@@ -417,24 +408,47 @@ def owner_pid():
     the shell that runs this hook. 0 when neither can be found."""
     if env_owner():
         return env_owner()
+    pid = portable.parent_of(os.getppid())
+    # Windows: Git for Windows' bash.exe is a launcher that starts the real bash as its child
+    for _ in range(3 if portable.IS_WINDOWS else 0):
+        if windows_image(pid) not in ("bash", "sh"):
+            break
+        pid = portable.parent_of(pid)
+    return pid if alive(pid) else 0
+
+
+def windows_image(pid):
+    """A Windows process's program name, lower case without .exe; "" when unknown (this file's own
+    small helper: the shared one gives a parent's id, not its name)."""
     try:
-        out = subprocess.run(["ps", "-o", "ppid=", "-p", str(os.getppid())], capture_output=True,
-                             text=True, timeout=2)
-        pid = int(out.stdout.strip())
-        return pid if alive(pid) else 0
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.OpenProcess.restype = wintypes.HANDLE
+        k32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        k32.QueryFullProcessImageNameW.argtypes = (wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR,
+                                                   ctypes.POINTER(wintypes.DWORD))
+        k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        handle = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return ""
+        try:
+            size = wintypes.DWORD(1024)
+            name = ctypes.create_unicode_buffer(size.value)
+            if not k32.QueryFullProcessImageNameW(handle, 0, name, ctypes.byref(size)):
+                return ""
+        finally:
+            k32.CloseHandle(handle)
     except Exception:
-        return 0
+        return ""
+    base = name.value.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    return base[:-4] if base.endswith(".exe") else base
 
 
 def started(pid):
     """A process's start time in epoch seconds, so a reused process id is told apart; 0 unknown.
     Printed in UTC, so a long-lived keeper and a fresh hook read it alike whatever the zone."""
-    try:
-        out = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
-                             timeout=1, env=dict(os.environ, LC_ALL="C", TZ="UTC0"))
-        return calendar.timegm(time.strptime(" ".join(out.stdout.split()), "%a %b %d %H:%M:%S %Y"))
-    except Exception:
-        return 0
+    return portable.started(pid)
 
 
 def lock(sid, kind, block_until_free, touch=True):
@@ -443,10 +457,12 @@ def lock(sid, kind, block_until_free, touch=True):
     was unlinked while we waited is a lock on nothing, so it is taken again on the file now there."""
     path = os.path.join(records_dir(), "%s.%s.lock" % (sid, kind))
     for _ in range(5):
-        fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        fd = os.open(path, os.O_RDWR | os.O_CREAT | portable.flags("O_NOFOLLOW"), 0o600)
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX if block_until_free else fcntl.LOCK_EX | fcntl.LOCK_NB)
+            held = portable.lock(fd, block_until_free)
         except OSError:
+            held = False
+        if not held:
             os.close(fd)
             return None
         try:
@@ -455,7 +471,7 @@ def lock(sid, kind, block_until_free, touch=True):
             same = False
         if same:
             if touch:
-                os.utime(fd)
+                portable.touch(fd, path)
             return fd
         os.close(fd)
     return None
@@ -496,9 +512,12 @@ def retire_keepers(sid):
     the busy mark) until the session ends. Only this user's processes whose command line ends with
     `/hooks/presence.py keeper <this session>`, never this file's own: another session's keeper is
     never touched. Waits up to half a second for its lock to be released (with `ps`, well inside the
-    hook's own limit). Returns whether it ended one."""
+    hook's own limit). Returns whether it ended one. Never on Windows: no keeper from before this
+    check ever ran there, and its `ps` lists no command lines."""
+    if portable.IS_WINDOWS:
+        return False
     try:
-        out = subprocess.run(["ps", "-ww", "-U", str(os.getuid()), "-o", "pid=,command="], capture_output=True,
+        out = subprocess.run(["ps", "-ww", "-U", str(portable.uid()), "-o", "pid=,command="], capture_output=True,
                              text=True, timeout=1)
     except Exception:
         return False
@@ -521,15 +540,14 @@ def retire_keepers(sid):
 
 
 def spawn(*args):
-    subprocess.Popen([sys.executable, SCRIPT] + list(args), stdin=subprocess.DEVNULL,
-                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True,
-                     start_new_session=True)
+    portable.spawn_detached([sys.executable, SCRIPT] + list(args), stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
 
 
 def branch_of(top):
     try:
         out = subprocess.run(["git", "-C", top, "symbolic-ref", "--short", "-q", "HEAD"],
-                             capture_output=True, text=True, timeout=3)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3)
         return out.stdout.strip() if out.returncode == 0 else ""
     except Exception:
         return ""
@@ -590,15 +608,15 @@ def interrupted(path):
     if not isinstance(path, str) or not path:
         return 0
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        fd = os.open(path, os.O_RDONLY | portable.flags("O_NONBLOCK", "O_NOFOLLOW"))
     except (OSError, ValueError):
         return 0
     try:
         info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (os.getuid(), 0):
+        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (portable.uid(), 0):
             return 0
         start = max(0, info.st_size - TRANSCRIPT_TAIL)
-        lines = os.pread(fd, TRANSCRIPT_TAIL, start).split(b"\n")
+        lines = portable.pread(fd, TRANSCRIPT_TAIL, start).split(b"\n")
     except OSError:
         return 0
     finally:
@@ -634,14 +652,14 @@ def went_idle(sid, owner):
     if isinstance(owner, bool) or not isinstance(owner, int) or owner <= 0:
         return 0
     try:
-        fd = os.open(os.path.join(config_dir(), "sessions", "%d.json" % owner), os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        fd = os.open(os.path.join(config_dir(), "sessions", "%d.json" % owner), os.O_RDONLY | portable.flags("O_NONBLOCK", "O_NOFOLLOW"))
     except (OSError, ValueError):
         return 0
     try:
         info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (os.getuid(), 0) or info.st_size > STATUS_LIMIT:
+        if not stat.S_ISREG(info.st_mode) or info.st_uid not in (portable.uid(), 0) or info.st_size > STATUS_LIMIT:
             return 0
-        data = json.loads(os.pread(fd, STATUS_LIMIT, 0))
+        data = json.loads(portable.pread(fd, STATUS_LIMIT, 0))
     except Exception:
         return 0
     finally:
@@ -779,12 +797,14 @@ def run_command(sid, record, event, state, at):
     if mode == "builtin" and time.time() < quiet_until(record):
         return None, mode  # the server refused or could not be reached a moment ago: not again yet
     try:
-        child = subprocess.Popen(command, shell=mode == "command", cwd=cwd, env=env, stdin=subprocess.DEVNULL,
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        # a repository's command runs through the shell: /bin/sh, as shell=True would, or Git for Windows' bash
+        child = subprocess.Popen(portable.shell(command) if mode == "command" else command, cwd=cwd, env=env,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                 **portable.group())
         try:
             return child.wait(timeout=COMMAND_TIMEOUT), mode
         except subprocess.TimeoutExpired:
-            os.killpg(child.pid, signal.SIGKILL)
+            portable.kill_tree(child)
             child.wait()
             return "timeout", mode
     except Exception:
@@ -824,7 +844,7 @@ def send(event, state, sid, incarnation, sequence, at):
 
 def read_payload():
     try:
-        payload = json.loads(sys.stdin.read(PAYLOAD_LIMIT) or "{}")
+        payload = json.loads(portable.stdin_text(PAYLOAD_LIMIT) or "{}")
     except Exception:
         return None
     return payload if isinstance(payload, dict) else None
@@ -961,10 +981,11 @@ def keeper(sid):
         return  # another keeper runs for this session
     poll = 10 * MINUTE / 60
     version = own_version()
+    path = os.path.join(records_path(), "%s.keeper.lock" % sid)
     try:
         while fd is not None:
             time.sleep(poll)
-            os.utime(fd)
+            portable.touch(fd, path)
             peek = load(sid) or {}
             conf = settings(peek.get("top"), peek.get("dir"))
             due = bool(conf) and time.time() - (peek.get("sent") or 0) >= conf["intervalMinutes"] * MINUTE

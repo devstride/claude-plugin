@@ -68,7 +68,6 @@ import os
 import re
 import subprocess
 import sys
-import zoneinfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UTC = datetime.timezone.utc
@@ -111,7 +110,8 @@ def utc(when):
 
 
 def git(root, *args, check=True):
-    done = subprocess.run(["git", "-C", root] + list(args), capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    done = subprocess.run(["git", "-C", root] + list(args), capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
     if check and done.returncode != 0:
         raise Answer("ERROR", "git %s failed: %s" % (args[0], (done.stderr or "").strip()[:200]))
     return done
@@ -131,9 +131,19 @@ def settings(config, section):
     if isinstance(deploy, bool) or not isinstance(deploy, int) or deploy < 0:
         raise Answer("ERROR", "release.estimates.deployMinutes must be a whole number of minutes, 0 or more")
     name = release.get("holdTimeZone") or "UTC"
+    sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "build-item/scripts"))
+    import portable  # UTC without a time-zone database, which Windows does not ship
     try:
-        zone = zoneinfo.ZoneInfo(name)
-    except (zoneinfo.ZoneInfoNotFoundError, ValueError, TypeError):
+        if name in ("UTC", "Etc/UTC"):
+            zone = portable.zone(name)
+        else:
+            from zoneinfo import ZoneInfo
+            zone = ZoneInfo(name)
+    except (KeyError, ValueError, TypeError, ImportError):  # KeyError: ZoneInfoNotFoundError
+        if portable.IS_WINDOWS and importlib.util.find_spec("tzdata") is None:
+            raise Answer("ERROR", "release.holdTimeZone %r needs the tzdata package, because Python on Windows has no "
+                         "time-zone database of its own: install it with py -m pip install tzdata" % (name,))
         raise Answer("ERROR", "release.holdTimeZone is not an IANA time zone: %r" % (name,))
     return landing, source, production, deploy, zone
 

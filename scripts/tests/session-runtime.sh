@@ -204,7 +204,8 @@ if [ -z "$C1$C2" ] && [ $RC -eq 0 ]; then ok "(15) current, or nothing to record
 #      the session-start check's format and drops its lock; a held lock, a pin, the check switched
 #      off or a cache under 30 minutes old starts none. A copy of the helper in a fixture plugin
 #      tree fetches from a fake, so nothing reaches the network.
-FP="$WORK/fakeplugin"; mkdir -p "$FP/hooks" "$FP/skills/update/scripts"; cp "$HELPER" "$FP/hooks/"
+FP="$WORK/fakeplugin"; mkdir -p "$FP/hooks" "$FP/skills/update/scripts" "$FP/skills/build-item/scripts"; cp "$HELPER" "$FP/hooks/"
+cp "$ROOT/skills/build-item/scripts/portable.py" "$FP/skills/build-item/scripts/"   # the helper it imports
 printf 'print("3.17.0")\n' > "$FP/skills/update/scripts/update-plugin.py"
 NJ="$XDG_CACHE_HOME/devstride-plugin/newest.json"; LOCK="$XDG_CACHE_HOME/devstride-plugin/newest.refresh"
 wait_newest() { for _ in $(seq 1 30); do grep -q "$1" "$NJ" 2>/dev/null && [ ! -e "$LOCK" ] && return 0; sleep 0.1; done; return 1; }
@@ -222,7 +223,8 @@ UC=0 RUNTIME="$FP/hooks/session-runtime.py" prompt "$P16" n11 "$R" >/dev/null; s
 grep -q '3.16.0' "$NJ" && NONE=1 || NONE=0
 newest 3.16.0 600; RUNTIME="$FP/hooks/session-runtime.py" prompt "$P16" n12 "$R" >/dev/null; sleep 1
 grep -q '3.16.0' "$NJ" && FRESH=1 || FRESH=0
-if [ $FETCHED = 1 ] && [ "$FMT" = 1 ] && [ "$D1$D2$NONE" = 111 ] && [ $FRESH = 1 ] && [ ! -d "$FP/hooks/__pycache__" ]; then
+if [ $FETCHED = 1 ] && [ "$FMT" = 1 ] && [ "$D1$D2$NONE" = 111 ] && [ $FRESH = 1 ] && [ ! -d "$FP/hooks/__pycache__" ] \
+   && [ ! -d "$FP/skills/build-item/scripts/__pycache__" ]; then
   ok "(16) stale cache → one detached fetch, newest.json in the session-start format, lock dropped; held lock / pin / check off / a 10-minute-old cache → no fetch"
 else bad "(16) d1=$D1 d2=$D2 fetched=$FETCHED fmt=$FMT none=$NONE fresh=$FRESH"; fi
 

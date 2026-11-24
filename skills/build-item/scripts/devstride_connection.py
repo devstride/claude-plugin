@@ -140,7 +140,8 @@ def main_checkout(top):
 def small_text(path, limit=4096):
     """The first bytes of a regular file, stripped; "" for anything else. Opened without blocking,
     so a pipe or a device in that place can never hang a hook."""
-    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+    import portable  # the one place the system differences live
+    fd = os.open(path, portable.flags("O_RDONLY", "O_NONBLOCK"))
     try:
         if not stat.S_ISREG(os.fstat(fd).st_mode):
             return ""
@@ -169,17 +170,18 @@ def owned_file(kind, path, limit=None, root_ok=False):
         return None
     if stat.S_ISLNK(info.st_mode):
         raise UnsafeFile(kind, path, "a link")
+    import portable  # the one place the system differences live
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        fd = os.open(path, portable.flags("O_RDONLY", "O_NONBLOCK", "O_NOFOLLOW"))
     except OSError:
         raise UnsafeFile(kind, path, "unreadable")
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode):
             raise UnsafeFile(kind, path, "a link")
-        if info.st_uid != os.getuid() and not (root_ok and info.st_uid == 0):
+        if info.st_uid != portable.uid() and not (root_ok and info.st_uid == 0):
             raise UnsafeFile(kind, path, "not yours")
-        if info.st_mode & 0o077:
+        if not portable.private(info.st_mode):
             raise UnsafeFile(kind, path, "mode too open")
         if limit is not None and info.st_size > limit:
             raise UnsafeFile(kind, path, "too large")
@@ -280,12 +282,25 @@ def servers(config_path):
     return found
 
 
+def project_entry(own, place):
+    """On Windows, the entry whose project key names `place` in another spelling: Claude Code writes a
+    project key with forward slashes while a real path has backslashes, and Windows paths ignore case.
+    None elsewhere, where a key must match exactly."""
+    if os.name != "nt" or not isinstance(place, str):
+        return None
+    wanted = os.path.normcase(place)
+    for key, entry in own.items():
+        if isinstance(key, str) and os.path.normcase(key) == wanted:
+            return entry
+    return None
+
+
 def connection_key(config_path, places, test=None):
     """(the values of the first usable `devstride` entry, "connection-project" | "connection-user"),
     or (None, "no-key"). An entry that fails a rule is skipped and the next place is tried."""
     own, user = servers(config_path)
     for place in places:
-        values = entry_values(own.get(place), test)
+        values = entry_values(own.get(place, project_entry(own, place)), test)
         if values:
             return values, "connection-project"
     values = entry_values(user, test)

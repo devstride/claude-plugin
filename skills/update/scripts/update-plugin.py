@@ -6,12 +6,12 @@ from __future__ import annotations
 import argparse
 import ast
 from contextlib import contextmanager
-import fcntl
 import functools
 import hashlib
 import json
 import os
 from pathlib import Path
+import posixpath
 import re
 import selectors
 import shlex
@@ -37,6 +37,71 @@ INERT_FILES = frozenset(
 )
 INERT_DIRS = ("scripts/", ".github/", ".claude/")
 TOTAL_DEADLINE: Optional[float] = None
+IS_WINDOWS = os.name == "nt"
+# Descriptor-relative calls (dir_fd, O_DIRECTORY): every macOS and Linux Python has them; Windows has
+# none, so there each check below runs by path instead, still comparing what it opened with what it
+# inspected, so a file swapped in between is caught the same way.
+DIR_FD = hasattr(os, "O_DIRECTORY") and {os.open, os.stat} <= os.supports_dir_fd
+
+
+def portable() -> Any:
+    """The plugin's shared helper for the system calls that differ on Windows, loaded only there:
+    on macOS and Linux this file keeps needing nothing beside it."""
+    sys.dont_write_bytecode = True  # never leave compiled files in the installed plugin
+    scripts = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "build-item/scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import portable as helper
+
+    return helper
+
+
+def uid() -> int:
+    """This user's id; 0 on Windows, the owner every file reports there."""
+    return os.getuid() if hasattr(os, "getuid") else 0
+
+
+def claude() -> str:
+    # npm installs claude.cmd on Windows, which CreateProcess does not find by its bare name.
+    return (portable().which("claude") or "claude") if IS_WINDOWS else "claude"
+
+
+def open_dir(path: str, *, at: Any = None) -> Any:
+    """A directory to look inside without following a link: a descriptor where the system has
+    descriptor-relative calls, else its path, once it has been checked to be a real directory."""
+    if DIR_FD:
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        return os.open(path, flags) if at is None else os.open(path, flags, dir_fd=at)
+    full = path if at is None else os.path.join(at, path)
+    if not stat.S_ISDIR(os.lstat(full).st_mode):
+        raise NotADirectoryError(full)
+    return full
+
+
+def close_dir(handle: Any) -> None:
+    if isinstance(handle, int):
+        os.close(handle)
+
+
+def stat_dir(handle: Any) -> os.stat_result:
+    return os.fstat(handle) if isinstance(handle, int) else os.lstat(handle)
+
+
+def stat_at(handle: Any, name: str) -> os.stat_result:
+    if isinstance(handle, int):
+        return os.stat(name, dir_fd=handle, follow_symlinks=False)
+    return os.lstat(os.path.join(handle, name))
+
+
+def open_at(handle: Any, name: str, flags: int) -> int:
+    if isinstance(handle, int):
+        return os.open(name, flags, dir_fd=handle)
+    return os.open(os.path.join(handle, name), flags)
+
+
+def read_flags() -> int:
+    """O_RDONLY | O_NONBLOCK | O_NOFOLLOW where they exist, in binary mode on Windows."""
+    return os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
 
 
 class UpdateProblem(Exception):
@@ -121,15 +186,14 @@ def safe_json_file(
     if allowed is not None and os.path.commonpath((allowed, parent)) != allowed:
         raise UpdateProblem(f"{label}-unsafe")
     try:
-        dir_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        dir_fd = open_dir(parent)
     except OSError as exc:
         raise UpdateProblem(f"{label}-unreadable") from exc
     try:
-        before = os.stat(path.name, dir_fd=dir_fd, follow_symlinks=False)
-        flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW
-        fd = os.open(path.name, flags, dir_fd=dir_fd)
+        before = stat_at(dir_fd, path.name)
+        fd = open_at(dir_fd, path.name, read_flags())
     except OSError as exc:
-        os.close(dir_fd)
+        close_dir(dir_fd)
         raise UpdateProblem(f"{label}-missing") from exc
     try:
         after = os.fstat(fd)
@@ -145,7 +209,7 @@ def safe_json_file(
         )
         if (
             not stat.S_ISREG(after.st_mode)
-            or after.st_uid not in {os.getuid(), 0}
+            or after.st_uid not in {uid(), 0}
             or after.st_nlink != 1
             or identity(before) != identity(after)
         ):
@@ -163,7 +227,7 @@ def safe_json_file(
             raise UpdateProblem(f"{label}-changed")
     finally:
         os.close(fd)
-        os.close(dir_fd)
+        close_dir(dir_fd)
     try:
         return json.loads(data)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -195,9 +259,16 @@ def run_command(
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            start_new_session=True,
+            **(portable().group() if IS_WINDOWS else {"start_new_session": True}),
         )
         assert process.stdout is not None and process.stderr is not None
+        if IS_WINDOWS:  # select() takes only sockets there: communicate() reads both pipes itself
+            out, err = process.communicate(timeout=timeout)
+            if len(out) > MAX_OUTPUT or len(err) > MAX_OUTPUT:
+                raise UpdateProblem("command-output-too-large", status="failed", command=argv[:3])
+            return_code = process.returncode
+            completed_normally = True
+            return return_code, out, err
         selector.register(process.stdout, selectors.EVENT_READ, "out")
         selector.register(process.stderr, selectors.EVENT_READ, "err")
         buffers = {"out": bytearray(), "err": bytearray()}
@@ -227,7 +298,13 @@ def run_command(
         raise UpdateProblem("command-start-failed", status="failed", command=argv[0]) from exc
     finally:
         selector.close()
-        if process is not None and not completed_normally:
+        if process is not None and not completed_normally and IS_WINDOWS:
+            portable().kill_tree(process)
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                pass
+        elif process is not None and not completed_normally:
             # SIGTERM first, so git can remove its own lock files (a SIGKILLed deepen leaves
             # .git/shallow.lock and wedges every later one), then SIGKILL the whole group.
             for sig, fallback in ((signal.SIGTERM, process.terminate), (signal.SIGKILL, process.kill)):
@@ -299,7 +376,7 @@ def read_pin(repo: str) -> Optional[str]:
 
 def plugin_rows(cwd: str) -> list[dict[str, Any]]:
     data = command_json(
-        ["claude", "plugin", "list", "--json"], cwd=cwd, timeout=15, label="plugin-list"
+        [claude(), "plugin", "list", "--json"], cwd=cwd, timeout=15, label="plugin-list"
     )
     if not isinstance(data, list) or any(not isinstance(row, dict) for row in data):
         raise UpdateProblem("plugin-list-invalid", status="failed")
@@ -473,7 +550,7 @@ def inspect_install(root: str, repo: str) -> dict[str, Any]:
 
 def marketplace_row(name: str, cwd: str) -> dict[str, Any]:
     data = command_json(
-        ["claude", "plugin", "marketplace", "list", "--json"],
+        [claude(), "plugin", "marketplace", "list", "--json"],
         cwd=cwd,
         timeout=15,
         label="marketplace-list",
@@ -745,10 +822,10 @@ def tagged_payload(
             text = target.decode("utf-8") if code == 0 else ""
         except UnicodeDecodeError:
             text = ""
-        resolved = os.path.normpath(os.path.join(os.path.dirname(path), text)) if text else ""
+        resolved = posixpath.normpath(posixpath.join(posixpath.dirname(path), text)) if text else ""
         if (
             not text
-            or os.path.isabs(text)
+            or posixpath.isabs(text)
             or all_modes.get(resolved) not in {"100644", "100755"}
             or inert(resolved)
         ):
@@ -779,7 +856,8 @@ def _verify_installed_payload(
         root_stat = os.lstat(root)
     except OSError as exc:
         raise UpdateProblem("installed-payload-missing") from exc
-    if not stat.S_ISDIR(root_stat.st_mode) or root_stat.st_uid not in {os.getuid(), 0}:
+    me = uid()
+    if not stat.S_ISDIR(root_stat.st_mode) or root_stat.st_uid not in {me, 0}:
         raise UpdateProblem("installed-payload-unsafe")
 
     marker_snapshot: Optional[tuple[int, ...]] = None
@@ -793,41 +871,35 @@ def _verify_installed_payload(
         value.st_ctime_ns,
     )
     try:
-        root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        root_fd = open_dir(root)
         try:
-            opened_root = os.fstat(root_fd)
+            opened_root = stat_dir(root_fd)
             if (opened_root.st_dev, opened_root.st_ino) != (root_stat.st_dev, root_stat.st_ino):
                 raise UpdateProblem("installed-payload-changed")
             try:
-                marker_info = os.stat(".in_use", dir_fd=root_fd, follow_symlinks=False)
+                marker_info = stat_at(root_fd, ".in_use")
             except FileNotFoundError:
                 marker_info = None
             if marker_info is not None:
-                if not stat.S_ISDIR(marker_info.st_mode) or marker_info.st_uid != os.getuid():
+                if not stat.S_ISDIR(marker_info.st_mode) or marker_info.st_uid != me:
                     raise UpdateProblem("installed-payload-unsafe")
-                marker_fd = os.open(
-                    ".in_use", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd
-                )
+                marker_fd = open_dir(".in_use", at=root_fd)
                 try:
-                    opened_marker = os.fstat(marker_fd)
+                    opened_marker = stat_dir(marker_fd)
                     if marker_identity(marker_info) != marker_identity(opened_marker):
                         raise UpdateProblem("installed-payload-changed")
                     marker_snapshot = marker_identity(opened_marker)
                     for name in os.listdir(marker_fd):
-                        info = os.stat(name, dir_fd=marker_fd, follow_symlinks=False)
+                        info = stat_at(marker_fd, name)
                         if (
                             not re.fullmatch(r"[0-9]+", name)
                             or not stat.S_ISREG(info.st_mode)
-                            or info.st_uid != os.getuid()
+                            or info.st_uid != me
                             or info.st_nlink != 1
                             or info.st_size > 4096
                         ):
                             raise UpdateProblem("installed-payload-unsafe")
-                        fd = os.open(
-                            name,
-                            os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW,
-                            dir_fd=marker_fd,
-                        )
+                        fd = open_at(marker_fd, name, read_flags())
                         try:
                             data = os.read(fd, 4097)
                             final = os.fstat(fd)
@@ -851,12 +923,12 @@ def _verify_installed_payload(
                             or len(marker["procStart"]) > 128
                         ):
                             raise UpdateProblem("installed-payload-unsafe")
-                    if marker_identity(opened_marker) != marker_identity(os.fstat(marker_fd)):
+                    if marker_identity(opened_marker) != marker_identity(stat_dir(marker_fd)):
                         raise UpdateProblem("installed-payload-changed")
                 finally:
-                    os.close(marker_fd)
+                    close_dir(marker_fd)
         finally:
-            os.close(root_fd)
+            close_dir(root_fd)
     except UpdateProblem:
         raise
     except OSError as exc:
@@ -869,7 +941,7 @@ def _verify_installed_payload(
         raise error
     try:
         for directory, dirs, files in os.walk(root, followlinks=False, onerror=walk_error):
-            relative_dir = os.path.relpath(directory, root)
+            relative_dir = os.path.relpath(directory, root).replace(os.sep, "/")
             for name in list(dirs):
                 path = name if relative_dir == "." else f"{relative_dir}/{name}"
                 if path == ".in_use" or inert(f"{path}/") or python_cache(directory, name):
@@ -900,28 +972,33 @@ def _verify_installed_payload(
         parent = real(path.parent)
         if os.path.commonpath((root, parent)) != root:
             raise UpdateProblem("installed-payload-unsafe")
-        dir_fd = -1
+        dir_fd = None
         try:
-            dir_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-            item = os.stat(path.name, dir_fd=dir_fd, follow_symlinks=False)
+            dir_fd = open_dir(parent)
+            item = stat_at(dir_fd, path.name)
         except OSError as exc:
-            if dir_fd >= 0:
-                os.close(dir_fd)
+            if dir_fd is not None:
+                close_dir(dir_fd)
             raise UpdateProblem("installed-payload-unreadable") from exc
         try:
-            if item.st_uid not in {os.getuid(), 0} or item.st_nlink != 1:
+            if item.st_uid not in {me, 0} or item.st_nlink != 1:
                 raise UpdateProblem("installed-payload-unsafe")
             if mode == "120000":
                 if not stat.S_ISLNK(item.st_mode):
                     raise UpdateProblem("installed-payload-mismatch")
-                data = os.readlink(path.name, dir_fd=dir_fd).encode("utf-8")
+                if isinstance(dir_fd, int):
+                    data = os.readlink(path.name, dir_fd=dir_fd).encode("utf-8")
+                else:
+                    data = os.readlink(os.path.join(dir_fd, path.name)).encode("utf-8")
             else:
                 if not stat.S_ISREG(item.st_mode):
                     raise UpdateProblem("installed-payload-mismatch")
                 expected_exec = mode == "100755"
-                if bool(item.st_mode & 0o111) != expected_exec or item.st_size > 16 * MAX_OUTPUT:
+                # Windows keeps no execute bit (it reports one only for .exe-style names).
+                executable = bool(item.st_mode & 0o111) if not IS_WINDOWS else expected_exec
+                if executable != expected_exec or item.st_size > 16 * MAX_OUTPUT:
                     raise UpdateProblem("installed-payload-mismatch")
-                fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dir_fd)
+                fd = open_at(dir_fd, path.name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
                 try:
                     opened = os.fstat(fd)
                     if (opened.st_dev, opened.st_ino, opened.st_size, opened.st_mtime_ns) != (
@@ -952,22 +1029,22 @@ def _verify_installed_payload(
             if blob != expected_blob:
                 raise UpdateProblem("installed-payload-mismatch", file=relative)
         finally:
-            os.close(dir_fd)
+            close_dir(dir_fd)
 
     # Claude can add/remove `.in_use` markers while another session starts or stops. Recheck the
     # directory after the payload proof; if it moved, retry everything instead of ignoring a name
     # whose contents changed after validation.
     try:
-        root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        root_fd = open_dir(root)
         try:
             try:
-                final_marker = os.stat(".in_use", dir_fd=root_fd, follow_symlinks=False)
+                final_marker = stat_at(root_fd, ".in_use")
             except FileNotFoundError:
                 final_snapshot = None
             else:
                 final_snapshot = marker_identity(final_marker)
         finally:
-            os.close(root_fd)
+            close_dir(root_fd)
     except OSError as exc:
         raise UpdateProblem("installed-payload-changed") from exc
     if final_snapshot != marker_snapshot:
@@ -1010,29 +1087,38 @@ def update_lock(info: dict[str, Any]) -> Any:
         base.mkdir(mode=0o700, parents=True, exist_ok=True)
         base = Path(real(base))
         base_info = base.lstat()
-        if not stat.S_ISDIR(base_info.st_mode) or base_info.st_uid != os.getuid():
+        if not stat.S_ISDIR(base_info.st_mode) or base_info.st_uid != uid():
             raise UpdateProblem("update-lock-unsafe")
-        base_fd = os.open(base, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        base_fd = open_dir(str(base))
         try:
             try:
-                os.mkdir("devstride-plugin", 0o700, dir_fd=base_fd)
+                if isinstance(base_fd, int):
+                    os.mkdir("devstride-plugin", 0o700, dir_fd=base_fd)
+                else:
+                    os.mkdir(os.path.join(base_fd, "devstride-plugin"), 0o700)
             except FileExistsError:
                 pass
-            lock_dir_info = os.stat(
-                "devstride-plugin", dir_fd=base_fd, follow_symlinks=False
-            )
-            if not stat.S_ISDIR(lock_dir_info.st_mode) or lock_dir_info.st_uid != os.getuid():
+            lock_dir_info = stat_at(base_fd, "devstride-plugin")
+            if not stat.S_ISDIR(lock_dir_info.st_mode) or lock_dir_info.st_uid != uid():
                 raise UpdateProblem("update-lock-unsafe")
-            os.chmod("devstride-plugin", 0o700, dir_fd=base_fd, follow_symlinks=False)
+            if isinstance(base_fd, int):  # Windows keeps no mode bits to set
+                os.chmod("devstride-plugin", 0o700, dir_fd=base_fd, follow_symlinks=False)
         finally:
-            os.close(base_fd)
+            close_dir(base_fd)
         path = base / "devstride-plugin" / "update.lock"
-        fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0), 0o600)
         current = os.fstat(fd)
-        if not stat.S_ISREG(current.st_mode) or current.st_uid != os.getuid() or current.st_nlink != 1:
+        if not stat.S_ISREG(current.st_mode) or current.st_uid != uid() or current.st_nlink != 1:
             raise UpdateProblem("update-lock-unsafe")
-        os.fchmod(fd, 0o600)
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if hasattr(os, "fchmod"):  # Windows before Python 3.13 has none, and no mode bits to set
+            os.fchmod(fd, 0o600)
+        if IS_WINDOWS:
+            if not portable().lock(fd, False):
+                raise BlockingIOError("another update holds the lock")
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError as exc:
         if "fd" in locals():
             os.close(fd)
@@ -1044,8 +1130,11 @@ def update_lock(info: dict[str, Any]) -> Any:
     try:
         yield
     finally:
-        fcntl.flock(fd, fcntl.LOCK_UN)
-        os.close(fd)
+        if not IS_WINDOWS:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)  # which releases the Windows lock too
 
 
 def same_install(left: dict[str, Any], right: dict[str, Any]) -> bool:
@@ -1101,7 +1190,7 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
 
     first_marketplace = contextual(base, marketplace_row, before["marketplace"], repo)
     keep_cache = {"CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE": "1"}
-    refresh = ["claude", "plugin", "marketplace", "update", before["marketplace"]]
+    refresh = [claude(), "plugin", "marketplace", "update", before["marketplace"]]
     code, _, _ = contextual(
         base, run_command, refresh, cwd=repo, timeout=30, extra_env=keep_cache
     )
@@ -1153,7 +1242,7 @@ def apply_update_locked(root: str, repo: str, before: dict[str, Any]) -> dict[st
         return {"status": "current", "code": "already-current", **base}
 
     update = [
-        "claude",
+        claude(),
         "plugin",
         "update",
         before["id"],

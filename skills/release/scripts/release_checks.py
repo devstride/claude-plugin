@@ -56,7 +56,7 @@ class Error(Exception):
 
 
 def git(*args):
-    done = subprocess.run(["git"] + list(args), capture_output=True, text=True)
+    done = subprocess.run(["git"] + list(args), capture_output=True, text=True, encoding="utf-8", errors="replace")
     if done.returncode != 0:
         last = (done.stderr or "").strip().splitlines()
         raise Error("git %s failed: %s" % (" ".join(args), last[-1] if last else "exit %d" % done.returncode))
@@ -69,7 +69,7 @@ def production_branch():
         path = os.path.join(here, ".claude", "ds-config.json")
         if os.path.isfile(path):
             try:
-                with open(path) as handle:
+                with open(path, encoding="utf-8") as handle:
                     config = json.load(handle)
             except (OSError, ValueError) as error:
                 raise Error("%s cannot be read as JSON (%s)" % (path, error))
@@ -109,7 +109,7 @@ def cmd_tip(_args):
 
 
 def contained(tip, commit):
-    done = subprocess.run(["git", "merge-base", "--is-ancestor", tip, commit], capture_output=True, text=True)
+    done = subprocess.run(["git", "merge-base", "--is-ancestor", tip, commit], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if done.returncode not in (0, 1):
         raise Error("git merge-base --is-ancestor failed: %s" % (done.stderr or "").strip()[:200])
     return done.returncode == 0

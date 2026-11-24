@@ -199,6 +199,30 @@ def load_helpers():
         REPORT, CLAIMS = loaded
 
 
+# The few calls that differ on Windows, kept here: the runner loads no module but its two helpers and
+# the library skill cache (the build-item skill's portable.py holds the same rules for every other script).
+
+def os_flags(*names):
+    """os.open flags by name, leaving out any this system lacks (Windows has no O_NOFOLLOW or O_NONBLOCK),
+    with O_BINARY where it exists: without it Windows opens a descriptor in text mode."""
+    value = getattr(os, "O_BINARY", 0)
+    for name in names:
+        value |= getattr(os, name, 0)
+    return value
+
+
+def replace_file(source, target):
+    """os.replace, retried briefly on Windows, where a file another process has open cannot be replaced for a moment."""
+    for attempt in range(6):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if os.name != "nt" or attempt == 5:
+                raise
+            time.sleep(0.02)
+
+
 def run_git(cwd, *args, **options):
     """The only place a process is started. Read-only subcommands, each with a timeout."""
     if not args or args[0] not in GIT_READ_ONLY:
@@ -219,7 +243,7 @@ class World:
     def __init__(self, env=None, git=run_git, uid=None, now=None):
         self.env = os.environ if env is None else env
         self.git = git
-        self.uid = os.getuid() if uid is None else uid
+        self.uid = (os.getuid() if hasattr(os, "getuid") else 0) if uid is None else uid  # Windows: every file's owner reads 0
         self._now = now
 
     def now(self):
@@ -1115,7 +1139,7 @@ def state_name(session, item):
 def read_state(path, world):
     """A state file is read only when it is a regular file this user owns, not a link, and small."""
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        fd = os.open(path, os_flags("O_RDONLY", "O_NONBLOCK", "O_NOFOLLOW"))
     except OSError:
         raise Refuse("state-unreadable", "the run's state file cannot be opened (a link is never followed)")
     try:
@@ -1147,12 +1171,12 @@ def write_state(folder, state):
     if len(data) > STATE_MAX_BYTES:
         raise Refuse("state-unusable", "the run's state has grown past %d bytes" % STATE_MAX_BYTES)
     temporary = os.path.join(folder, ".%s.%s.tmp" % (name, secrets.token_hex(8)))
-    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    fd = os.open(temporary, os_flags("O_WRONLY", "O_CREAT", "O_EXCL", "O_NOFOLLOW"), 0o600)
     try:
         os.write(fd, data)
     finally:
         os.close(fd)
-    os.replace(temporary, os.path.join(folder, name))  # replaces a link itself, never its target
+    replace_file(temporary, os.path.join(folder, name))  # replaces a link itself, never its target
 
 
 def prune(folder, world):
@@ -1727,7 +1751,7 @@ def read_definition_file(path):
     if not isinstance(path, str) or not path:
         raise Refuse("bad-request", "definitionFile is a path")
     try:
-        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+        fd = os.open(path, os_flags("O_RDONLY", "O_NONBLOCK"))
         try:
             info = os.fstat(fd)
             if not stat.S_ISREG(info.st_mode) or info.st_size > DEFINITION_FILE_MAX_BYTES:
@@ -2201,6 +2225,9 @@ def main(argv):
     try:
         if len(argv) != 2:
             raise Refuse("bad-request", "usage: workflow.py %s   (one JSON object on stdin)" % "|".join(COMMANDS))
+        if os.name == "nt" and hasattr(sys.stdin, "reconfigure") and hasattr(sys.stdout, "reconfigure"):  # UTF-8, never the code page
+            sys.stdin.reconfigure(encoding="utf-8")
+            sys.stdout.reconfigure(encoding="utf-8")
         try:
             request = {} if argv[1] == "repository" else json.loads(sys.stdin.read(REQUEST_MAX_BYTES + 1)[:REQUEST_MAX_BYTES])
         except (ValueError, RecursionError):

@@ -44,7 +44,6 @@ import os
 import re
 import subprocess
 import sys
-import zoneinfo
 
 HOLD = re.compile(r"^\s*release hold\s*:\s*(.*?)\s*$", re.I)
 NOT_BEFORE = re.compile(r"^not before\s+(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2}(?::\d{2})?)\s*(Z|[+-](?:0\d|1[0-4]):?[0-5]\d)?)?\.?$", re.I)
@@ -132,7 +131,7 @@ def config_of(req):
     if not os.path.exists(path):
         return {}
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             config = json.load(f)
     except (OSError, ValueError) as err:
         raise Refuse("cannot read %s: %s" % (path, err))
@@ -146,10 +145,19 @@ def release_of(config):
 
 def zone_of(req, config):
     name = req.get("timeZone", release_of(config).get("holdTimeZone") or "UTC")
+    sys.dont_write_bytecode = True  # leave no compiled file in the plugin directory
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:  # isolated mode (-I) leaves the script's own directory off the path
+        sys.path.insert(0, here)
+    import portable  # the one place the system differences live
     try:
-        return zoneinfo.ZoneInfo(name)
-    except (zoneinfo.ZoneInfoNotFoundError, ValueError, TypeError):
-        raise Refuse("the hold zone must be an IANA time zone name such as America/Chicago: %r" % (name,))
+        if name in ("UTC", "Etc/UTC", "GMT"):  # needs no time-zone database, which Windows does not ship
+            return portable.zone(name)
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(name)
+    except (KeyError, ValueError, TypeError, ImportError):  # KeyError: ZoneInfoNotFoundError
+        hint = " (on Windows a zone other than UTC needs the tzdata package: py -m pip install tzdata)" if portable.IS_WINDOWS else ""
+        raise Refuse("the hold zone must be an IANA time zone name such as America/Chicago: %r%s" % (name, hint))
 
 
 def gh_status(sha):

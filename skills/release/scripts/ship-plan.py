@@ -306,7 +306,8 @@ def main(argv):
         return 2
     try:
         try:
-            raw = sys.stdin.read()
+            # UTF-8 whatever the code page, newlines as text mode reads them
+            raw = sys.stdin.buffer.read().decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
         except ValueError as err:
             raise Refused("stdin is not text: %s" % err)
         if argv[1] == "parse":

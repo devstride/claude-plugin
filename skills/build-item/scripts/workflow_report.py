@@ -365,7 +365,7 @@ def _load_state(env, session, item):
     try:
         if not _own_folder(_state_dir(env)):
             return {}
-        with open(_state_path(env, session, item)) as handle:
+        with open(_state_path(env, session, item), encoding="utf-8") as handle:
             return _clean_state(json.load(handle))
     except Exception:
         return {}
@@ -433,7 +433,8 @@ def read_repository(folder="."):
     """The remote named origin, else the only remote, normalized; None when there is none."""
     def git(*args):
         try:
-            out = subprocess.run(["git", "-C", folder] + list(args), capture_output=True, text=True, timeout=5)
+            out = subprocess.run(["git", "-C", folder] + list(args), capture_output=True, text=True, encoding="utf-8",
+                                 errors="replace", timeout=5)
         except Exception:
             return None
         return out.stdout.strip() if out.returncode == 0 else None
