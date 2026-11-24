@@ -1,0 +1,22 @@
+{
+  "about": "Under merge-and-deploy a no to the unrun health check posts error and stops: no documentation or notes.",
+  "definition": "workflows/release-merge-and-deploy.json",
+  "phases": ["close-out"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "merge-and-deploy", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "post-deploy-check", "output": "POST-DEPLOY HEALTH: NOT RUN\nevidence line\n```json\n{\"state\": \"not-run\"}\n```\n"},
+    {"step": "post-deploy-status", "output": "POST-DEPLOY STATUS: NEEDS DECISION accept the unrun health check?\nevidence line\n```json\n{\"state\": \"needs-decision\"}\n```\n"},
+    {"step": "post-deploy-status", "output": "POST-DEPLOY STATUS: ERROR POSTED\nevidence line\n```json\n{\"state\": \"error-posted\"}\n```\n"}
+  ],
+  "answers": ["no, roll back"],
+  "expect": {
+    "order": [
+      ["post-deploy-check", 1],
+      ["post-deploy-status", 1],
+      ["post-deploy-status", 2]
+    ],
+    "outcome": "stopped",
+    "stops": ["post-deploy-status", "post-deploy-status"],
+    "stopReasons": ["accept the unrun health check?", "ERROR POSTED"]
+  }
+}

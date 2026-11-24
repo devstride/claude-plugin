@@ -1,0 +1,32 @@
+{
+  "about": "A head that keeps moving: HEAD MOVED re-issues the review on its own until the review contract's limit (maxAutoRedo 8): the eighth request to run again stops the run, and nothing after the review runs.",
+  "definition": "workflows/release.json",
+  "phases": ["review"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["release-review", 1],
+      ["release-review", 2],
+      ["release-review", 3],
+      ["release-review", 4],
+      ["release-review", 5],
+      ["release-review", 6],
+      ["release-review", 7],
+      ["release-review", 8]
+    ],
+    "outcome": "stopped",
+    "stops": ["release-review"],
+    "stopReasons": ["asked to run again 8 times in a row"]
+  }
+}

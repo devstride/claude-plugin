@@ -17,7 +17,8 @@
         "release 5c",
         "build-item 8",
         "doctor 7",
-        "setup G"
+        "setup G",
+        "release-steps release-docs"
       ],
       "unset": "no documentation system registered; every docs phase reports itself skipped",
       "contract": "skills/release/references/docs-hooks.md",
@@ -44,7 +45,8 @@
         "write-release-notes",
         "release 5e",
         "doctor 7",
-        "setup G"
+        "setup G",
+        "release-steps release-notes"
       ],
       "unset": "release notes cannot be requested; --release-notes reports itself unavailable",
       "contract": "skills/release/references/docs-hooks.md",
@@ -68,7 +70,8 @@
       "calledBy": [
         "sync-knowledge-base",
         "release 5c",
-        "doctor 7"
+        "doctor 7",
+        "release-steps release-kb-sync"
       ],
       "unset": "no knowledge base registered: the step reports NOT CONFIGURED and the release continues",
       "contract": "skills/release/references/docs-hooks.md",
@@ -93,7 +96,9 @@
         "post-deploy",
         "release 5a",
         "release 5d",
-        "doctor 7"
+        "doctor 7",
+        "release post-deploy-check",
+        "release-steps release-close-out"
       ],
       "unset": "the close-out reports the health check as not configured",
       "contract": "skills/release/references/post-deploy-check.md",
@@ -117,14 +122,15 @@
       "calledBy": [
         "classify-release",
         "release 0",
-        "doctor 7"
+        "doctor 7",
+        "release classify-release"
       ],
       "unset": "RELEASE CLASS: FULL — a release is never light by default",
       "contract": "skills/release/references/release-safety-hooks.md",
       "since": "3.20.0",
       "step": "classify-release",
       "stepVerdict": [
-        "RELEASE CLASS: LIGHT | FULL"
+        "RELEASE CLASS: LIGHT | FULL | NOT APPLICABLE"
       ]
     },
     {
@@ -140,14 +146,15 @@
       "calledBy": [
         "pre-merge-check",
         "release 4",
-        "doctor 7"
+        "doctor 7",
+        "release pre-merge-check"
       ],
       "unset": "the go-ahead summary and the recap say: pre-merge production check: not configured",
       "contract": "skills/release/references/release-safety-hooks.md",
       "since": "3.20.0",
       "step": "pre-merge-check",
       "stepVerdict": [
-        "PRE-MERGE: CLEAR | HOLD | NOT RUN | NOT CONFIGURED"
+        "PRE-MERGE: CLEAR | HOLD | NOT RUN | NOT CONFIGURED | NOT APPLICABLE"
       ]
     },
     {
@@ -161,7 +168,9 @@
         "release 4",
         "release 5a",
         "doctor 7",
-        "hotfix-steps deploy-approval"
+        "hotfix-steps deploy-approval",
+        "release-steps owner-go-ahead",
+        "release approve-deploy"
       ],
       "unset": "the deploy runs without an approval step",
       "contract": "skills/release/references/docs-hooks.md",
@@ -177,7 +186,8 @@
       "calledBy": [
         "release 5a",
         "doctor 7",
-        "hotfix-steps deploy-confirm"
+        "hotfix-steps deploy-confirm",
+        "release confirm-deploy"
       ],
       "unset": "the owner confirms the deploy by hand",
       "contract": "skills/release/references/docs-hooks.md",
@@ -191,7 +201,8 @@
       "payload": "RELEASE_COMMIT in the environment (the head the release merges from the source)",
       "verdict": "exit 0 deployed to the development environment; 2 not deployed yet; 1 the development deploy failed",
       "calledBy": [
-        "release 4"
+        "release 4",
+        "release-steps dev-deploy-wait"
       ],
       "unset": "the release does not wait for a development deploy",
       "contract": "skills/release/SKILL.md",
@@ -216,7 +227,9 @@
         "release 0",
         "release 5b",
         "branch-hotfix rules",
-        "doctor 7"
+        "doctor 7",
+        "release-steps tower-claim",
+        "release-steps tower-hand-back"
       ],
       "unset": "no clearance: release runs as before and nothing is claimed",
       "contract": "skills/release/references/clearance.md",
@@ -258,7 +271,7 @@
       "shape": "provider-or-commands",
       "valueType": "object",
       "nullable": true,
-      "payload": "the `record_workflow_step` arguments as one JSON object (the provider sends them to the DevStride tool; a commands report receives them on stdin); with the same switch on, each run first asks `get_workflow_for_item` through the agent's own connection which workflow applies to the item, as skills/run-workflow/references/fetching-the-workflow.md says, and a failed or empty answer runs the built-in workflow",
+      "payload": "the `record_workflow_step` arguments as one JSON object (the provider sends them to the DevStride tool; a commands report receives them on stdin); with the same switch on, each run first asks `get_workflow_for_item` through the agent's own connection which workflow applies to the item, as skills/run-workflow/references/fetching-the-workflow.md says, and a failed or empty answer runs the built-in workflow; at an approval gate the agent asks a person through `request_workflow_gate` and reads the answer once through `get_workflow_gate` (skills/run-workflow/references/gates.md), and the one report that never fails open is the gate's: a gate that cannot be requested stops the run",
       "modes": [
         "report"
       ],
@@ -404,7 +417,9 @@
         "pre-ship",
         "pr 2b",
         "release train step 4b",
-        "release 2b"
+        "release 2b",
+        "release train-pre-ship",
+        "release pre-ship-release"
       ],
       "unset": "no pre-ship checks: an explicit no-op",
       "contract": "skills/pr/references/pre-ship-hold.md",
@@ -413,7 +428,7 @@
       "step": "pre-ship",
       "stepVerdict": [
         "PRE-SHIP SELECTED: <names> | PRE-SHIP: NOTHING TO RUN",
-        "PRE-SHIP: PASS (<n> ran, <k> waived) | PRE-SHIP: FAIL <names>"
+        "PRE-SHIP: PASS (<n> ran, <k> waived) | PRE-SHIP: FAIL <names> | NOT APPLICABLE"
       ]
     },
     {
@@ -580,7 +595,8 @@
         "doctor 4",
         "release 4",
         "setup E3",
-        "hotfix-steps hotfix-stage"
+        "hotfix-steps hotfix-stage",
+        "release-steps owner-go-ahead"
       ],
       "unset": "no per-environment infrastructure: no stage renders and doctor reports N/A",
       "contract": "skills/setup/references/config-defaults.md",

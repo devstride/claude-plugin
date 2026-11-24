@@ -1,0 +1,40 @@
+{
+  "about": "An unattended run whose standing yes holds (the script printed MERGE): the go-ahead answers YES (standing) and the run merges with no stop; the step was handed no owner words.",
+  "definition": "workflows/release.json",
+  "phases": ["review", "go-ahead"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "auto", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "release-review", "output": "RELEASE REVIEW: SETTLED 00000000000000000000000000000000000000f6\nevidence line\n```json\n{\"state\": \"settled\", \"reviewedHead\": \"00000000000000000000000000000000000000f6\"}\n```\n"},
+    {"step": "classify-at-pre-ship", "output": "RELEASE CLASS: LIGHT\nevidence line\n```json\n{\"state\": \"light\"}\n```\n"},
+    {"step": "pre-ship-release", "output": "PRE-SHIP: PASS\nevidence line\n```json\n{\"state\": \"pass\"}\n```\n"},
+    {"step": "discharge-hold", "output": "PRE-SHIP HOLD: NO HOLD\nevidence line\n```json\n{\"state\": \"no-hold\"}\n```\n"},
+    {"step": "docs-plan", "output": "DOCS PLAN: HOOKS 2\nevidence line\n```json\n{\"state\": \"hooks\"}\n```\n"},
+    {"step": "hotfix-catch-up", "output": "HOTFIX CATCH-UP: NONE\nevidence line\n```json\n{\"state\": \"none\"}\n```\n"},
+    {"step": "pre-merge-check", "output": "PRE-MERGE: CLEAR\nevidence line\n```json\n{\"state\": \"clear\"}\n```\n"},
+    {"step": "dev-deploy-before-decision", "output": "DEV DEPLOY: SERVING\nevidence line\n```json\n{\"state\": \"serving\"}\n```\n"},
+    {"step": "go-ahead", "output": "GO-AHEAD: YES (standing)\nevidence line\n```json\n{\"state\": \"yes-standing\"}\n```\n"},
+    {"step": "dev-deploy-after-yes", "output": "DEV DEPLOY: SERVING\nevidence line\n```json\n{\"state\": \"serving\"}\n```\n"},
+    {"step": "merge-confirmations", "output": "MERGE CONFIRMED: HEAD 00000000000000000000000000000000000000f6\nevidence line\n```json\n{\"state\": \"confirmed\"}\n```\n"},
+    {"step": "production-merge", "output": "PRODUCTION MERGE: MERGED 42\nevidence line\n```json\n{\"sha\": \"0000000000000000000000000000000000000017\", \"pullRequest\": 42}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["release-review", 1],
+      ["classify-at-pre-ship", 1],
+      ["pre-ship-release", 1],
+      ["discharge-hold", 1],
+      ["docs-plan", 1],
+      ["hotfix-catch-up", 1],
+      ["pre-merge-check", 1],
+      ["dev-deploy-before-decision", 1],
+      ["go-ahead", 1],
+      ["dev-deploy-after-yes", 1],
+      ["merge-confirmations", 1],
+      ["production-merge", 1]
+    ],
+    "outcome": "completed",
+    "stops": [],
+    "handed": {"go-ahead": {"payload": {"answer": null, "startedBy": "auto"}}}
+  }
+}

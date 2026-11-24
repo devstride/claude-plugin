@@ -52,10 +52,18 @@ for needle in ("first cut, first merged", "release_checks.py contains", "Rebuilt
     if needle not in mad: problems.append("the merge-and-deploy section does not mention %r" % needle)
 for stale in ("Pre-claim checks", "The queue, before every claim"):
     if stale in mad: problems.append("the merge-and-deploy section still says %r (the checks no longer run before every claim)" % stale)
+# cut-to-deploy waits at the claim before it cuts, so what there is to release is read again once
+# it is cleared (the release it waited on may have changed it); the two sections and auto-start.md
+# that describe that read agree
+if "once cleared, re-read step 0's shape before cutting" not in scope:
+    problems.append("the cut-to-deploy section does not say to re-read step 0's shape once cleared, before cutting")
+if "(and re-reads step 0's shape and re-levels the train once cleared)" not in mad:
+    problems.append("the merge-and-deploy section does not describe cut-to-deploy's re-read of step 0's shape")
 branch = re.sub(r"\s+", " ", open(os.path.join(root, "skills/release/references/release-branch.md")).read())
 if "owed item `sync`" not in branch: problems.append("release-branch.md §5 does not name the owed item `sync` under merge-and-deploy")
 auto = re.sub(r"\s+", " ", open(os.path.join(root, "skills/release/references/auto-start.md")).read())
 if "once step 1 has opened the release pull request" not in auto: problems.append("auto-start.md does not say where merge-and-deploy hands the train claim on")
+if "once cleared, re-reads step 0's shape before cutting" not in auto: problems.append("auto-start.md does not describe cut-to-deploy's re-read of step 0's shape")
 print("\n".join(problems) or "OK")
 PY
 OUT="$(python3 "$W/check.py" "$ROOT")"

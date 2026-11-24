@@ -1,0 +1,18 @@
+{
+  "about": "Under S a failed health check stops the run at once: no sync of production, no documentation, no notes.",
+  "definition": "workflows/release.json",
+  "phases": ["close-out"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "post-deploy-check", "output": "POST-DEPLOY HEALTH: FAIL\nevidence line\n```json\n{\"state\": \"fail\"}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["post-deploy-check", 1]
+    ],
+    "outcome": "stopped",
+    "stops": ["post-deploy-check"],
+    "stopReasons": ["POST-DEPLOY HEALTH: FAIL"]
+  }
+}

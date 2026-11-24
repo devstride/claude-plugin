@@ -37,7 +37,8 @@ Usage: build-config-schema.py --write | --check [--release [--base <ref>]]
   --write     regenerate both files
   --check     regenerate in memory; exit 1 naming each file that differs from its committed copy
   --release   with --check: when .claude-plugin/plugin.json's version differs from the one at
-              <base> (default origin/master), also fail on any registry entry still `unreleased`.
+              <base> (default origin/master), also fail on any registry entry, or any step contract in
+              schemas/step-contracts.json (or a workflow feature there), still `unreleased`.
               The plugin may be the repository root or a subdirectory; while <base> does not hold
               it yet, the newest commit whose subject starts `plugin import` is the base instead
 Exit codes: 0 ok, 1 drift / registry fault / unreleased entry, 2 usage or unreadable input.
@@ -51,6 +52,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REGISTRY = "schemas/seam-registry.json"
 SCHEMA = "schemas/ds-config.schema.json"
 TABLE = "skills/setup/references/seam-registry.md"
+CATALOG = "schemas/step-contracts.json"
 ID_FORMAT = "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v{}/schemas/ds-config.schema.json"
 
 VALIDATION_KEYWORDS = {"type", "properties", "patternProperties", "additionalProperties",
@@ -389,6 +391,17 @@ def main(argv):
                 for e in registry[kind]:
                     if e.get("since") == "unreleased":
                         print("UNRELEASED %s: set since to %s for this release" % (e["key"], version))
+                        bad = 1
+            # The step catalog's contracts carry the same mark: DevStride reads a workflow's lowest
+            # plugin version from it, so a release never ships one still `unreleased`.
+            try:
+                catalog = json.loads(read(CATALOG))
+            except (OSError, ValueError) as exc:
+                fail(2, "cannot read %s: %s" % (CATALOG, exc))
+            for label, entries in (("step contract", catalog.get("contracts") or {}), ("workflow feature", catalog.get("features") or {})):
+                for name in sorted(entries):
+                    if isinstance(entries[name], dict) and entries[name].get("since") == "unreleased":
+                        print("UNRELEASED %s %s: set since to %s in %s for this release" % (label, name, version, CATALOG))
                         bad = 1
     if not bad:
         print("SCHEMA: ok (%d hooks, %d settings, version %s)" % (

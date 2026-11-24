@@ -1,0 +1,31 @@
+{
+  "about": "Under M the release ahead has not finished its health check: the gate reads it once a minute outside the tower (no notice), then answers PENDING and the run stops before the go-ahead.",
+  "definition": "workflows/release-merge-and-deploy.json",
+  "phases": ["review", "go-ahead"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "merge-and-deploy", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "release-review", "output": "RELEASE REVIEW: SETTLED 00000000000000000000000000000000000000f6\nevidence line\n```json\n{\"state\": \"settled\", \"reviewedHead\": \"00000000000000000000000000000000000000f6\"}\n```\n"},
+    {"step": "classify-at-pre-ship", "output": "RELEASE CLASS: LIGHT\nevidence line\n```json\n{\"state\": \"light\"}\n```\n"},
+    {"step": "pre-ship-release", "output": "PRE-SHIP: PASS\nevidence line\n```json\n{\"state\": \"pass\"}\n```\n"},
+    {"step": "discharge-hold", "output": "PRE-SHIP HOLD: NO HOLD\nevidence line\n```json\n{\"state\": \"no-hold\"}\n```\n"},
+    {"step": "docs-plan", "output": "DOCS PLAN: HOOKS 2\nevidence line\n```json\n{\"state\": \"hooks\"}\n```\n"},
+    {"step": "hotfix-catch-up", "output": "HOTFIX CATCH-UP: NONE\nevidence line\n```json\n{\"state\": \"none\"}\n```\n"},
+    {"step": "previous-release-gate", "output": "PREVIOUS RELEASE: PENDING\nevidence line\n```json\n{\"state\": \"pending\"}\n```\n", "waits": ["Waiting outside the tower for release/26-11-20 (#41)", "Waiting outside the tower for release/26-11-20 (#41)", "Waiting outside the tower for release/26-11-20 (#41)"]}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["release-review", 1],
+      ["classify-at-pre-ship", 1],
+      ["pre-ship-release", 1],
+      ["discharge-hold", 1],
+      ["docs-plan", 1],
+      ["hotfix-catch-up", 1],
+      ["previous-release-gate", 1]
+    ],
+    "outcome": "stopped",
+    "stops": ["previous-release-gate"],
+    "waits": 3,
+    "stopReasons": ["PREVIOUS RELEASE: PENDING"]
+  }
+}

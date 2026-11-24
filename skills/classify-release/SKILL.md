@@ -7,13 +7,13 @@ description: "Step: ask the repository's release.classifySkill whether a release
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
-Arguments: $ARGUMENTS — the payload `{ "productionBranch", "releaseSource", "head" }` as a fenced
+Arguments: $ARGUMENTS — the payload `{ "productionBranch", "releaseSource", "head", "shape" }` as a fenced
 JSON block (run alone: the configured branches and the release source's tip). Contract:
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-safety-hooks.md`.
 
 ## Verdict
 
-`RELEASE CLASS: LIGHT | FULL`
+`RELEASE CLASS: LIGHT | FULL | NOT APPLICABLE`
 
 ## Steps
 

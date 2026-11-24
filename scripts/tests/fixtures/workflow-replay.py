@@ -13,6 +13,16 @@ XDG_CACHE_HOME against a throwaway git repository (`main`, plus a branch carryin
 (`stopped` when the answers run out) with `expect`. One summary line on stdout; exit 0 when it
 matches, 1 when it does not.
 
+Optional, for a step that waits inside itself and for what the runner hands out:
+- a script entry's `waits` (a list of reasons) is sent through the runner's `wait` before its
+  `done`, the way a step reports that it is still waiting (a queue, a deploy, another release);
+  `expect.waits`, when given, is the number of those calls the run took;
+- `expect.stopReasons`, when given, is one text per stop that the stop's reason must contain;
+- `expect.handed`, when given, maps a step id (its first issue) or `<step id>#<attempt>` to what
+  that issue must have carried:
+  `payload` and `heartbeat` (each a subset: every key given must equal the handed value) and
+  `argument` (the exact text).
+
 What a replay proves: the sequence, the stops, the re-issues and the outcome the runner produces
 for answers written from today's step text. What a model does inside a step is not replayed.
 """
@@ -58,8 +68,10 @@ def main():
 
     script = [dict(e, used=False) for e in scenario["script"]]
     answers = list(scenario.get("answers", []))
-    issued, stops, reports = [], [], 0
-    answer = call("start", {"definition": definition, "context": dict(scenario["context"], cwd=repo)})
+    issued, stops, reasons, reports, waits, handed = [], [], [], 0, 0, {}
+    # A replay is a rehearsal: it also drives step skills that are not switched on yet (the catalog's
+    # dormantSkills, such as the release's). For every other definition the word changes nothing.
+    answer = call("start", {"definition": definition, "context": dict(scenario["context"], cwd=repo), "rehearsal": True})
     outcome = None
     for _ in range(200):
         reports += len(answer.get("reports") or [])
@@ -67,14 +79,20 @@ def main():
         if action == "run":
             step = answer["step"]
             issued.append([step["id"], step["attempt"]])
+            handed.setdefault(step["id"], answer)
+            handed["%s#%d" % (step["id"], step["attempt"])] = answer
             entry = next((e for e in script if not e["used"] and e["step"] == step["id"]), None)
             if entry is None:
                 raise SystemExit("no scripted output left for step %s (attempt %d)" % (step["id"], step["attempt"]))
             entry["used"] = True
+            for reason in entry.get("waits", []):
+                call("wait", {"stepId": step["id"], "attempt": step["attempt"], "reason": reason})
+                waits += 1
             answer = call("done", {"stepId": step["id"], "attempt": step["attempt"],
                                    "output": entry["output"].replace("{head}", head)})
         elif action == "stopped":
             stops.append(answer.get("stepId"))
+            reasons.append(answer.get("reason") or "")
             if not answers:
                 outcome = "stopped"; break
             answer = call("resume", {"answer": answers.pop(0)})
@@ -87,6 +105,26 @@ def main():
     want = {k: expect[k] for k in ("order", "outcome", "stops")}
     if "reportCount" in expect:
         got["reportCount"], want["reportCount"] = reports, expect["reportCount"]
+    if "waits" in expect:
+        got["waits"], want["waits"] = waits, expect["waits"]
+    if "stopReasons" in expect:
+        wanted = expect["stopReasons"]
+        held = len(wanted) == len(reasons) and all(w in r for w, r in zip(wanted, reasons))
+        got["stopReasons"], want["stopReasons"] = (wanted if held else reasons), wanted
+    if "handed" in expect:
+        faults = []
+        for sid, parts in sorted(expect["handed"].items()):
+            given = handed.get(sid)
+            if given is None:
+                faults.append("%s was never issued" % sid)
+                continue
+            for part in ("payload", "heartbeat"):
+                for key, value in parts.get(part, {}).items():
+                    if given.get(part, {}).get(key) != value:
+                        faults.append("%s %s.%s: %s, want %s" % (sid, part, key, json.dumps(given.get(part, {}).get(key)), json.dumps(value)))
+            if "argument" in parts and given.get("argument") != parts["argument"]:
+                faults.append("%s argument: %s, want %s" % (sid, json.dumps(given.get("argument")), json.dumps(parts["argument"])))
+        got["handed"], want["handed"] = faults, []
     if got != want:
         print("got %s, want %s" % (json.dumps(got), json.dumps(want)))
         sys.exit(1)

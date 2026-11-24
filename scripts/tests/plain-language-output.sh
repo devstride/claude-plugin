@@ -60,7 +60,8 @@ else
 fi
 
 if has "$REFERENCE" 'Merged / Released' &&
-   has skills/release/SKILL.md '**Human recap.**'; then
+   has skills/release/SKILL.md '**Human recap.**' &&
+   has skills/release-steps/references/release-recap.md '**Human recap.**'; then
   ok "(5) release recap has an explicit merged/released outcome"
 else
   bad "(5) release recap markers missing"

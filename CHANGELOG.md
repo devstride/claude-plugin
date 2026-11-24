@@ -8,6 +8,202 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.10.0] — 2026-11-23
+
+### Added
+
+- **A workflow step can run only when something is true, carry on past its own failure, or be done
+  by a person (dormant until DevStride offers it).** An organization's workflow may now give a step a
+  condition, from a short fixed list: the review path taken, a tag or work type on the item, whether
+  the change touches certain files, whether there is a repository, or what an earlier step answered,
+  each optionally negated. A step whose condition is false is skipped and the reason is shown; when
+  the agent cannot know a fact (no repository, no item), the step runs and says so, never skipped on
+  a guess. A step that is not one of the four checks the catalog now marks `neverOptional`
+  (`risk-check@1`, `local-checks@1`, `review@1` and `merge@1`) may carry on after a failure: the
+  failure is recorded and shown, never counted as a pass, and the run goes on. A step may also be
+  handed to a person (the new `checkpoint@1`): DevStride asks them, an agent can never mark it
+  done, and either the run is parked for the person or, if the step does not block, goes on while it
+  stays open. A step handed to a person is not switched on yet: `start` refuses a workflow that
+  holds one (`skill-dormant`) unless it says `rehearsal`, wherever the workflow came from. When a
+  run finishes, the agent lists any failures it went past, checkpoints still
+  open and steps skipped by their condition. `start` checks every condition with the same grammar
+  DevStride uses (`schemas/when-condition-fixtures.json` is the one shared list of accepted and
+  refused conditions), file matching uses the plugin's one branch matcher, and a step whose proof
+  another step needs is never skipped, carried past or done by hand. Switching a step off follows
+  the rule it always has, and a condition written on a step that always runs is kept and never
+  read, as before. The step catalog also gains a `features` map whose release version tells
+  DevStride which plugin a definition needs. No built-in workflow uses any of it.
+- **A workflow can stop for a person's approval (dormant until DevStride offers it).** An
+  organization's workflow may now hold a gate: a step of kind `gate` with the new `approval@1`
+  contract, run by the reserved built-in reference `gate`, and optionally naming who may answer it
+  (`answerers`). At a gate the agent writes a short summary and asks DevStride
+  (`request_workflow_gate`); the run is then parked, without polling. When the person has answered
+  in DevStride and asks the agent to continue, it reads the answer once (`get_workflow_gate`): a
+  yes moves the run on, a request for changes sends the agent back to make them (earlier checks
+  run again where the change made them stale) and then asks again, a rejection stops the run, and a
+  gate DevStride withdrew because the run ended there ends the run too. An answer that does not
+  name this gate, or names none, leaves the run parked. An agent can never answer a
+  gate, and a gate that cannot be asked stops the run rather than going on unapproved. Changes asked
+  on the fifth attempt stop for a person. A cleared conversation picks a parked run up with `resume`
+  and the item, taking the story claim again first. A run with no item cannot hold a gate. The
+  schema, `check-workflows.py` and the runner all enforce the gate's shape; doctor lists the two
+  tools. **Gates are not switched on yet**: the step catalog lists `gate` and `checkpoint` under
+  `dormantSkills`, so `start` refuses a workflow that holds one (`skill-dormant`) unless it says
+  `rehearsal`, whether the workflow was handed over in the request, as a file or by DevStride (an
+  organization's workflow with one falls back to the built-in workflow, with a notice). No built-in
+  workflow has a gate, and DevStride does not yet publish a workflow with one, so nothing changes
+  until both are switched on.
+- **A finished build can tell the tracker whether its work landed or shipped (dormant until the
+  tracker accepts it).** A step contract's verdict may now record the run's outcome
+  (`recordsOutcome`), and `complete@1` does: `COMPLETE: LANDED` records `landed`, `DONE` records
+  `shipped`. A run that finishes reports the outcome its latest recording step named, but only to a
+  tracker whose workflow answer lists that outcome (`runOutcomes`); every other tracker still hears
+  `completed`, so nothing changes until DevStride says it understands the new values. A run that is
+  held, declined, stops or fails is reported exactly as before.
+- **Every step of a release can be run, watched and re-run one at a time (shipped, not switched on
+  yet).** The release is written as a list of named steps, from claiming the release train to
+  starting the next release, and each one answers with a fixed first line that says what happened.
+  The new step skill `release-steps` answers each of them, one reference per step read only when
+  that step runs, and `resume-rules.md` says once what every step is told about an adopted or
+  merged release. The step catalog says more about each release step: its verdict line and what
+  each answer means, what it hands on, and which earlier steps it needs (`train-snapshot@1`,
+  `train-pre-ship@1`, `train-level@1`, `release-delta@1`, `classify-release@1`, `release-pr@1`,
+  `release-tip@1`, `classify-at-checks@1`, `pre-ship-at-checks@1`, `pre-merge-at-checks@1`,
+  `release-review@1`, `classify-at-pre-ship@1`, `pre-ship-release@1`, `release-docs-plan@1`,
+  `hotfix-catch-up@1`, `pre-merge-check@1`, `pre-merge-recheck@1`, `owner-go-ahead@1`,
+  `rerun-at-merge@1`, `merge-confirmations@1`, `production-merge@1`, `post-deploy-check@1`,
+  `post-deploy-result@1` and `release-notes@1` changed; `owner-go-ahead-recheck@1` and
+  `post-deploy-check-owed@1` are new). The second go-ahead under the `merge-and-deploy` scope is
+  its own contract that needs the first, and under the `cut-to-deploy` and `merge-and-deploy`
+  scopes the health check never stops the run, so the next step always posts its outcome
+  (`workflows/release-cut-to-deploy.json`, `workflows/release-merge-and-deploy.json` and
+  `workflows/release-post-deploy.json` changed). **`/devstride:release` still follows its own page,
+  exactly as before**: the step runner refuses a definition that runs `release-steps`
+  (`skill-dormant`, listed under `dormantSkills` in the step catalog) unless its `start` says
+  `rehearsal`, and the rewritten release page waits under `scripts/staged/`.
+  `scripts/tests/workflow-release.sh` replays the release through the real runner, as rehearsals,
+  and proves sentence by sentence that the waiting page and the step references hold every rule of
+  the page in use.
+- **The step runner can take a yes or no, list a session's runs, show a step that is waiting, and
+  go back to an earlier step.** A step's verdict may now be one a person confirms (the
+  new `confirm` class): the run stops and asks, a yes records the verdict as accepted without
+  running the step again and hands the person's words to later steps, and a no ends the run as
+  declined. A run with no item is kept under its own run id, and a session still holds one open
+  such run of a workflow, exactly as before: a second `start` is refused, or handed the open run,
+  or replaces it. What is new is that runs of different workflows with no item may be open side by
+  side, that a `start` saying `beside` begins a second run of the same workflow on purpose (the
+  Release loop's next release, not switched on), that `status` with `all` lists a session's
+  unfinished runs, and that a run an earlier version kept under the old name is carried on in one
+  file. The new `wait` command lets a step that waits inside itself (a queue,
+  a deploy) be reported as waiting, with what it waits for, until it answers. A step can send the
+  run back to an earlier step (the new `rewind` class), and a contract may say that one of its
+  requirements must be met after another step (`requiresAfter`). A step that asks to run again on
+  its own now counts against its contract's raised limit where the catalog sets one. A hotfix
+  started with no item behaves as it did; no built-in workflow that runs today uses the yes-or-no
+  stop, `wait`, going back or `beside`.
+- **The runner's rules where these abilities meet are written down and tested.** A step that waits
+  inside itself is `waiting`; a run that waits for a person's answer in DevStride is `parked`, and
+  `status` names the gate it is parked at. Going back re-decides a condition, tries again a failure
+  the run had carried on past, asks a gate again, and leaves a checkpoint the run never waited for
+  alone. One table says which re-issues of a step count towards stopping the run. A declined run is
+  told to the tracker as interrupted, never as landed or shipped.
+  `skills/run-workflow/references/workflow-runner.md` holds each rule, and two new suites prove
+  them: `scripts/tests/workflow-combined.sh`, and `scripts/tests/workflow-dormant.sh`, which
+  replays recorded 4.8.1 answers (Build runs, a hotfix with no item, and definitions 4.8.1 refused)
+  and fails on any difference while DevStride offers none of the newer abilities.
+- **Whether a rollup's children are all finished, and a guarded start for rollup workflows.**
+  `rollup.py` answers whether an item rolls up (from the tracker's rollup chain) and whether every
+  child of a rollup is finished (WAITING, READY, HELD, MANUAL or ASK). When selection finds nothing
+  left to build but some work has landed, the loop asks it and reports the answer ("rollup ready:
+  <item>", or the children still open) beside the usual "N landed, awaiting their release"; it is
+  only reported, and the epic release runs exactly as before. It reads the tracker's answers as
+  they come, and when the tracker says some children are hidden from the account it answers
+  WAITING, never READY. A connection without the rollup tools changes nothing. The step runner starts a children-complete workflow only when its readiness
+  answer is READY and its trigger is the workflow's own, and claims a rollup run with the ordinary
+  story claim on the rollup item. A workflow that starts this way must end by shipping or by
+  handing up to its parent; any other must have no ending.
+
+### Changed
+
+- **The four release check steps say a little more, for callers that read it.** `classify-release`,
+  `pre-ship`, `pre-merge-check` and `post-deploy` end their answer with one small `state` block
+  after the same first line, and the first three answer `NOT APPLICABLE` for a release that is
+  told to them as already merged (`post-deploy` keeps its usual answers); a caller that reads only
+  the first line sees no change. `pre-ship release run` sends the tower's heartbeat first when the
+  session holds the tower. Under the `cut-to-deploy` scope an open release pull request is adopted
+  at the start only when the tower is clear; a stale one is adopted at the claim, on the owner's
+  yes.
+- **One mark for everything new in a release.** A step contract that is new is written
+  `"since": "unreleased"` like a new configuration key, the version registry refuses a new contract
+  without it, and preparing a release names the version in the catalog and the registry together.
+  A version is also refused while a release step has no reference.
+
+### Fixed
+
+- **A session no longer loses its live status keeper on a busy machine.** The background process
+  that keeps a session's status current gave up at once when its lock was taken, so a check that
+  only looked at that lock for a moment could make a new keeper quit, and the session then went
+  unreported until its next hook event. A new keeper now tries for up to two seconds before
+  deciding another one is already running. A real second keeper still leaves, just a little later.
+- **A workflow version that shipped unused can be recorded again once the plugin can run it.**
+  A version every release so far shipped unused, because no plugin could run it yet, may be
+  recorded again at the same number in `workflows/registry.json`; from the first row a plugin can
+  run, that version is closed and its step names are permanent. Before, the registry refused that
+  re-record as soon as the plugin could run the definition, which is the one case it exists for.
+  Naming a release in the registry also no longer guesses a row's note from an unrelated
+  CHANGELOG entry: it takes the entry that names the workflow or contract, and otherwise writes a
+  plain "Revised in <version>."
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since 468d7d0eb0 @ 432240001c, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@468d7d0eb0 | tokens@468d7d0eb0 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/build-item/SKILL.md | 24,000 | 8,000 | 23,992 | 7,998 | -2 | 8,000 |
+| skills/review/SKILL.md | 23,986 | 7,996 | 23,986 | 7,996 | +0 | 7,999 |
+| skills/doctor/SKILL.md | 23,847 | 7,949 | 23,847 | 7,949 | +0 | 8,000 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 18,793 | 6,265 | +0 | 6,300 |
+| skills/rationalize-gantt/SKILL.md | 12,332 | 4,111 | 12,332 | 4,111 | +0 | 4,200 |
+| skills/pr/SKILL.md | 11,538 | 3,846 | 11,538 | 3,846 | +0 | 3,846 |
+| skills/ultracode-build/SKILL.md | 10,327 | 3,443 | 10,327 | 3,443 | +0 | 3,443 |
+| skills/rebalance/SKILL.md | 8,482 | 2,828 | 8,482 | 2,828 | +0 | 2,828 |
+| skills/plan/SKILL.md | 8,385 | 2,795 | 8,385 | 2,795 | +0 | 2,795 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,730 | 2,244 | 6,730 | 2,244 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 6,073 | 2,025 | 6,073 | 2,025 | +0 | 2,100 |
+| skills/insert-defect/SKILL.md | 5,605 | 1,869 | 5,605 | 1,869 | +0 | 1,869 |
+| skills/insert-story/SKILL.md | 4,928 | 1,643 | 4,928 | 1,643 | +0 | 1,643 |
+| skills/branch-hotfix/SKILL.md | 4,799 | 1,600 | 4,906 | 1,636 | +36 | 1,636 |
+| skills/branch-feature/SKILL.md | 3,707 | 1,236 | 3,707 | 1,236 | +0 | 1,236 |
+| skills/risk-check/SKILL.md | 3,598 | 1,200 | 3,598 | 1,200 | +0 | 1,200 |
+| skills/hotfix-steps/SKILL.md | 3,591 | 1,197 | 3,591 | 1,197 | +0 | 1,200 |
+| skills/pre-ship/SKILL.md | 3,587 | 1,196 | 3,589 | 1,197 | +1 | 1,200 |
+| skills/plan-steps/SKILL.md | 3,578 | 1,193 | 3,578 | 1,193 | +0 | 1,200 |
+| skills/run-workflow/SKILL.md | 3,484 | 1,162 | 3,547 | 1,183 | +21 | 1,200 |
+| skills/local-checks/SKILL.md | 3,523 | 1,175 | 3,523 | 1,175 | +0 | 1,200 |
+| skills/merge-story/SKILL.md | 3,240 | 1,080 | 3,240 | 1,080 | +0 | 1,081 |
+| skills/release-steps/SKILL.md (added) | — | — | 3,071 | 1,024 | +1024 | 1,200 |
+| skills/review-story/SKILL.md | 3,020 | 1,007 | 3,020 | 1,007 | +0 | 1,007 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/claim-story/SKILL.md | 2,875 | 959 | 2,875 | 959 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/story-lifecycle/SKILL.md | 2,700 | 900 | 2,700 | 900 | +0 | 900 |
+| skills/capture-findings/SKILL.md | 2,696 | 899 | 2,696 | 899 | +0 | 900 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/local-environment/SKILL.md | 2,083 | 695 | 2,083 | 695 | +0 | 700 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 1,974 | 658 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,536 | 512 | 1,562 | 521 | +9 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/sync-base/SKILL.md | 1,471 | 491 | 1,471 | 491 | +0 | 500 |
+| skills/classify-release/SKILL.md | 1,397 | 466 | 1,423 | 475 | +9 | 500 |
+| alwaysOn.context (skill listing) | 6,474 | 2,158 | 6,573 | 2,191 | +33 | 2,200 |
+| **total (bodies)** | 279,887 | 93,310 | 283,174 | 94,408 | +1098 | |
+
 ## [4.9.0] — 2026-11-23
 
 ### Fixed
@@ -197,7 +393,7 @@ for what each version component means here and how a release is cut.
   for the hotfix merge so the release reuses the hotfix's deploy approval and confirmation steps
   unchanged. The four existing seam steps (classify, pre-ship, pre-merge, post-deploy) serve
   release positions with their own verdict lines. The grouped `release-steps` skill that answers
-  the rest is not written yet, so the runner still refuses the release definitions.
+  the rest did not ship in this version, so the runner still refuses the release definitions.
 - **A step's contract may allow more automatic re-runs.** A contract can raise the runner's cap of
   five automatic re-issues for its own step (`maxAutoRedo`, at most twenty), for long steps such
   as a release review that may restart several times.
@@ -6869,7 +7065,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.9.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.10.0...HEAD
+[4.10.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.9.0...devstride--v4.10.0
 [4.9.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.8.1...devstride--v4.9.0
 [4.8.1]: https://github.com/devstride/claude-plugin/compare/devstride--v4.8.0...devstride--v4.8.1
 [4.8.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.7.0...devstride--v4.8.0

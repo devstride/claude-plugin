@@ -58,6 +58,8 @@ python3 - "$ROOT" > "$WORK/calls.txt" 2>&1 <<'PY2'
 import re, sys
 root = sys.argv[1]
 SITES = [  # skill, the heading the section starts with, the call it must contain
+    # The live release page still makes each call itself, until the release entry is switched to the Release workflow
+    # (scripts/tests/workflow-release.sh says how); these ten sites go with the old page then.
     ("release", "## 0. ", "`classify-release`"),
     ("release", "## 2. ", "`pre-ship release select`"),
     ("release", "## 2b. ", "`classify-release`"),
@@ -68,6 +70,12 @@ SITES = [  # skill, the heading the section starts with, the call it must contai
     ("release", "### 5c. ", "`sync-knowledge-base sync`"),
     ("release", "### 5d. ", "`post-deploy close-out`"),
     ("release", "### 5e. ", "`write-release-notes`"),
+    # the references of release-steps hold each call for the Release workflow's steps
+    ("release-steps/references/release-review.md", "# Review the release", "`pre-ship release select`"),
+    ("release-steps/references/release-docs.md", "# Update documentation", "`update-docs update`"),
+    ("release-steps/references/release-kb-sync.md", "# Sync the knowledge base", "`sync-knowledge-base sync`"),
+    ("release-steps/references/release-close-out.md", "# Close out the release", "`post-deploy close-out`"),
+    ("release-steps/references/release-notes.md", "# Write release notes", "`write-release-notes`"),
     ("build-item", "## 0. ", "`lease-checkout`"),
     ("build-item", "## 0. ", "`return-checkout`"),  # every exit from step 0 returns the lease
     ("build-item", "## 7. ", "`return-checkout`"),
@@ -108,7 +116,31 @@ for skill, head, call in SITES:
                 held = True
         if not held:
             missing.append("%s %s does not call %s" % (skill, head.strip(), call))
-print("\n".join(missing) or "clean %d" % len(SITES))
+# The release's other calls are steps of its definitions: the step runs the seam skill itself, in
+# each of the three full definitions (release.clearance.scope picks one), with the contract's mode.
+import json
+CALLS = [  # step id, the skill it runs, what its contract's argument template starts with (or None)
+    ("classify-release", "classify-release", None),        # was release ## 0.
+    ("classify-at-pre-ship", "classify-release", None),    # was release ## 2b.
+    ("pre-ship-release", "pre-ship", "release run "),      # was release ## 2b.
+    ("pre-merge-check", "pre-merge-check", None),          # was release ## 4.
+    ("post-deploy-check", "post-deploy", "check\n"),        # was release ### 5a.
+]
+MODES = {"post-deploy-check": ("post-deploy-check@1", "post-deploy-check-owed@1")}  # the mode's contracts
+catalog = json.load(open("%s/schemas/step-contracts.json" % root, encoding="utf-8"))["contracts"]
+for ident in ("release", "release-cut-to-deploy", "release-merge-and-deploy"):
+    steps = dict((s["id"], s) for p in json.load(open("%s/workflows/%s.json" % (root, ident), encoding="utf-8"))["phases"] for s in p["steps"])
+    for step, skill, template in CALLS:
+        s = steps.get(step)
+        if s is None:
+            missing.append("workflows/%s.json has no step %s" % (ident, step))
+        elif s["run"].get("ref") != skill or catalog[s["contract"]].get("builtinSkill") != skill:
+            missing.append("workflows/%s.json %s does not run %s" % (ident, step, skill))
+        elif step in MODES and s["contract"] not in MODES[step]:
+            missing.append("workflows/%s.json %s runs %s, not one of %s" % (ident, step, s["contract"], ", ".join(MODES[step])))
+        elif template and not (catalog[s["contract"]].get("argument") or "").startswith(template):
+            missing.append("workflows/%s.json %s does not run %s %s" % (ident, step, skill, template.strip()))
+print("\n".join(missing) or "clean %d" % (len(SITES) + 3 * len(CALLS)))
 PY2
 OUT="$(cat "$WORK/calls.txt")"
 case "$OUT" in

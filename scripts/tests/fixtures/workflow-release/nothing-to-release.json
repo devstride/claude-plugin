@@ -1,0 +1,44 @@
+{
+  "about": "Nothing ahead of production: release-delta answers NOTHING TO RELEASE, the run ends with outcome nothing-to-release and no later step is issued (scope release).",
+  "definition": "workflows/release.json",
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "train-claim", "output": "TRAIN CLAIM: WON\nevidence line\n```json\n{\"state\": \"won\"}\n```\n"},
+    {"step": "tower-claim", "output": "TOWER CLAIM: CLEARED\nevidence line\n```json\n{\"state\": \"cleared\", \"adopted\": false}\n```\n"},
+    {"step": "ground-truth", "output": "GROUND TRUTH: READ\nevidence line\n```json\n{\"state\": \"read\"}\n```\n"},
+    {"step": "release-shape", "output": "RELEASE SHAPE: NEW\nevidence line\n```json\n{\"shape\": \"NEW\", \"pullRequest\": null, \"branch\": null}\n```\n"},
+    {"step": "ci-hold-proof", "output": "CI HOLD: PROVEN\nevidence line\n```json\n{\"state\": \"proven\"}\n```\n"},
+    {"step": "train-finish-earlier", "output": "EARLIER TRAIN: NONE\nevidence line\n```json\n{\"state\": \"none\"}\n```\n"},
+    {"step": "ship-plan", "output": "SHIP PLAN: GO\nevidence line\n```json\n{\"state\": \"go\"}\n```\n"},
+    {"step": "train-snapshot", "output": "TRAIN SNAPSHOT: NOTHING TO SHIP\nevidence line\n```json\n{\"state\": \"nothing-to-ship\"}\n```\n"},
+    {"step": "train-pr", "output": "TRAIN PR: NOT APPLICABLE\nevidence line\n```json\n{\"state\": \"not-applicable\"}\n```\n"},
+    {"step": "train-review", "output": "TRAIN REVIEW: NOT APPLICABLE\nevidence line\n```json\n{\"state\": \"not-applicable\"}\n```\n"},
+    {"step": "train-pre-ship", "output": "PRE-SHIP: NOTHING TO RUN\nevidence line\n```json\n{\"state\": \"nothing-to-run\"}\n```\n"},
+    {"step": "train-merge", "output": "TRAIN MERGE: NOT APPLICABLE\nevidence line\n```json\n{\"state\": \"not-applicable\"}\n```\n"},
+    {"step": "train-close-out", "output": "TRAIN CLOSE-OUT: NONE\nevidence line\n```json\n{\"state\": \"none\"}\n```\n"},
+    {"step": "train-level", "output": "TRAIN LEVEL: ALREADY LEVEL\nevidence line\n```json\n{\"state\": \"already-level\"}\n```\n"},
+    {"step": "release-delta", "output": "RELEASE DELTA: NOTHING TO RELEASE\nevidence line\n```json\n{\"state\": \"nothing-to-release\", \"sourceHead\": \"00000000000000000000000000000000000000b2\", \"productionHead\": \"00000000000000000000000000000000000000b2\"}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["train-claim", 1],
+      ["tower-claim", 1],
+      ["ground-truth", 1],
+      ["release-shape", 1],
+      ["ci-hold-proof", 1],
+      ["train-finish-earlier", 1],
+      ["ship-plan", 1],
+      ["train-snapshot", 1],
+      ["train-pr", 1],
+      ["train-review", 1],
+      ["train-pre-ship", 1],
+      ["train-merge", 1],
+      ["train-close-out", 1],
+      ["train-level", 1],
+      ["release-delta", 1]
+    ],
+    "outcome": "nothing-to-release",
+    "stops": []
+  }
+}

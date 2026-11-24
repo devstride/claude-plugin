@@ -1,10 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "A workflow definition",
-  "description": "A workflow as a written list of phases and steps. Unknown keys are allowed everywhere and are kept. Every number is a whole number. scripts/check-workflows.py checks the rules a schema cannot say, and that the lists below equal its own.",
+  "description": "A workflow as a written list of phases and steps. A workflow that starts when its item's children are complete ends by ship or hand-up; any other ends by null. Unknown keys are allowed everywhere and are kept. Every number is a whole number. scripts/check-workflows.py checks the rules a schema cannot say, and that the lists below equal its own.",
   "type": "object",
   "required": ["schema", "id", "version", "name", "startsWhen", "endsBy", "appliesTo", "minPluginVersion", "phases"],
   "additionalProperties": true,
+  "if": { "properties": { "startsWhen": { "const": "children-complete" } }, "required": ["startsWhen"] },
+  "then": { "properties": { "endsBy": { "enum": ["ship", "hand-up"] } } },
+  "else": { "properties": { "endsBy": { "const": null } } },
   "properties": {
     "schema": { "const": 1 },
     "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,99}$", "description": "Also the file's name, without .json." },
@@ -48,7 +51,7 @@
                 "name": { "type": "string", "minLength": 1, "maxLength": 200 },
                 "summary": { "type": "string", "maxLength": 500 },
                 "contract": { "type": "string", "pattern": "^[a-z][a-z0-9-]*@[0-9]+$" },
-                "kind": { "enum": ["step", "gate"] },
+                "kind": { "enum": ["step", "gate"], "description": "A gate waits for a person's answer in the tracker: its contract is approval@1, and only a gate's is; it runs the reserved built-in reference gate, which names no skill. A step whose when.mode is manual is a checkpoint a person does by hand: kind step, contract checkpoint@1, the reserved built-in reference checkpoint." },
                 "run": {
                   "type": "object",
                   "required": ["source", "ref", "version"],
@@ -65,10 +68,23 @@
                   "additionalProperties": true,
                   "properties": {
                     "mode": { "enum": ["always", "condition", "manual"] },
-                    "condition": { "enum": ["review-path:fast", "review-path:pull-request", null] }
+                    "condition": {"type": ["string", "null"], "maxLength": 200, "pattern": "^!?(?:review-path:(?:fast|pull-request)|(?:item-tag|item-work-type):[^\\s\\x00-\\x1f\\x7f](?:[^\\x00-\\x1f\\x7f]*[^\\s\\x00-\\x1f\\x7f])?|touches:[^\\s\\x00-\\x1f\\x7f]+|has-repository|step-verdict:[a-z0-9][a-z0-9-]*:[A-Z][A-Z0-9 -]*)$", "description": "null unless the mode is condition. One predicate, optionally after one ! (NOT): review-path:fast or review-path:pull-request; item-tag:<name> or item-work-type:<name> (1 to 100 characters); touches:<glob> (1 to 150 characters, no date token, no trailing [-n]); has-repository; step-verdict:<earlier step id>:<VERDICT WORD>. No and, or or free text. The pattern documents the shape; the length limits per predicate, the date-token rule and the step-verdict checks are the runner's and DevStride's (schemas/when-condition-fixtures.json lists the cases)."}
                   }
                 },
-                "onFail": { "enum": ["stop", "continue"] }
+                "onFail": { "enum": ["stop", "continue"], "description": "continue: a failure is recorded and shown, and the run goes on; never on a gate or a required step. On a checkpoint, continue means the run does not wait for the person." },
+                "answerers": {
+                  "type": "array",
+                  "maxItems": 20,
+                  "description": "Only on a gate or a manual step: who may answer it, any one of them. Absent or empty: anyone who can edit the item. The tracker checks the person who answers; an agent never answers a gate or a checkpoint.",
+                  "items": {
+                    "oneOf": [
+                      { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "edit-access" } } },
+                      { "type": "object", "required": ["kind"], "properties": { "kind": { "const": "item-owner" } } },
+                      { "type": "object", "required": ["kind", "roleId"], "properties": { "kind": { "const": "role" }, "roleId": { "type": "string", "minLength": 1, "maxLength": 200 } } },
+                      { "type": "object", "required": ["kind", "username"], "properties": { "kind": { "const": "person" }, "username": { "type": "string", "minLength": 1, "maxLength": 200 } } }
+                    ]
+                  }
+                }
               }
             }
           }

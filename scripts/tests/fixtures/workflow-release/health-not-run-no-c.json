@@ -1,0 +1,32 @@
+{
+  "about": "Under cut-to-deploy a no to the unrun health check posts error and stops: no documentation or notes.",
+  "definition": "workflows/release-cut-to-deploy.json",
+  "phases": ["close-out"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "cut-to-deploy", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "sync-production", "output": "SYNC: DONE\nevidence line\n```json\n{\"state\": \"done\"}\n```\n"},
+    {"step": "delete-release-branch", "output": "RELEASE BRANCH DELETE: DELETED release/26-11-21\nevidence line\n```json\n{\"state\": \"deleted\"}\n```\n"},
+    {"step": "train-level-final", "output": "TRAIN LEVEL: FAST-FORWARDED\nevidence line\n```json\n{\"state\": \"fast-forwarded\", \"autoStart\": \"SKIP nothing waiting\"}\n```\n"},
+    {"step": "post-pending-status", "output": "POST-DEPLOY STATUS: PENDING POSTED\nevidence line\n```json\n{\"state\": \"pending-posted\"}\n```\n"},
+    {"step": "tower-hand-back", "output": "TOWER: HANDED BACK release/26-11-21\nevidence line\n```json\n{\"state\": \"handed-back\"}\n```\n"},
+    {"step": "post-deploy-check", "output": "POST-DEPLOY HEALTH: NOT RUN\nevidence line\n```json\n{\"state\": \"not-run\"}\n```\n"},
+    {"step": "post-deploy-status", "output": "POST-DEPLOY STATUS: NEEDS DECISION accept the unrun health check?\nevidence line\n```json\n{\"state\": \"needs-decision\"}\n```\n"},
+    {"step": "post-deploy-status", "output": "POST-DEPLOY STATUS: ERROR POSTED\nevidence line\n```json\n{\"state\": \"error-posted\"}\n```\n"}
+  ],
+  "answers": ["no, roll back"],
+  "expect": {
+    "order": [
+      ["sync-production", 1],
+      ["delete-release-branch", 1],
+      ["train-level-final", 1],
+      ["post-pending-status", 1],
+      ["tower-hand-back", 1],
+      ["post-deploy-check", 1],
+      ["post-deploy-status", 1],
+      ["post-deploy-status", 2]
+    ],
+    "outcome": "stopped",
+    "stops": ["post-deploy-status", "post-deploy-status"],
+    "stopReasons": ["accept the unrun health check?", "ERROR POSTED"]
+  }
+}

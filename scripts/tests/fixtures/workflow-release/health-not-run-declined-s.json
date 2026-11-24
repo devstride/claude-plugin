@@ -1,0 +1,17 @@
+{
+  "about": "Under S a no to the unrun health check ends the run as declined: nothing after it is issued.",
+  "definition": "workflows/release.json",
+  "phases": ["close-out"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "post-deploy-check", "output": "POST-DEPLOY HEALTH: NOT RUN\nevidence line\n```json\n{\"state\": \"not-run\"}\n```\n"}
+  ],
+  "answers": ["no, investigate first"],
+  "expect": {
+    "order": [
+      ["post-deploy-check", 1]
+    ],
+    "outcome": "declined",
+    "stops": ["post-deploy-check"]
+  }
+}

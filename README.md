@@ -610,6 +610,16 @@ after a fix.
 one reference per step, plus the production deploy's approval and confirmation, which other
 workflows reuse. `branch-hotfix` runs that workflow through the step runner.
 
+**Release steps** — `release-steps` runs every step of the Release workflow the existing seam steps
+do not, one reference per step: the train and tower claims, merging the release train, the cut,
+the review, the owner's go-ahead, the merge, the deploy and the close-out. The six release
+definitions (`workflows/release*.json`: one full release per clearance scope and the three
+partial entries) are generated from `scripts/release-workflow-source.json` by
+`scripts/build-release-workflows.py`. `skills/release-steps/references/resume-rules.md` says once
+what every step does for an adopted or merged release and when it heartbeats. **These steps are
+not switched on yet**: `release` still follows its own page, and the step runner refuses a
+definition that runs `release-steps` (`skill-dormant`) outside a rehearsal.
+
 ### The step runner
 
 `skills/run-workflow/scripts/workflow.py` walks a workflow definition one step at a time, and
@@ -699,7 +709,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **4.9.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **4.10.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 The public repository, `devstride/claude-plugin`, is a published copy written only by the release

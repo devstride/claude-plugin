@@ -191,9 +191,10 @@ machine without the `claude` CLI, `--mode cloud` runs every check that does not 
 steps without running them. The last line is `PLUGIN SOURCE: CLEAN` or
 `PLUGIN SOURCE: FAILED at <step>`.
 
-A key, a step contract or a built-in workflow that is new since the last release is written with
-the literal `unreleased` where its first version belongs (`"since": "unreleased"`,
-`"minPluginVersion": "unreleased"`). Preparing a release runs
+A key, a step contract, a workflow feature or a built-in workflow that is new since the last
+release is written with the literal `unreleased` where its first version belongs
+(`"since": "unreleased"`, `"minPluginVersion": "unreleased"`); the version registry's check refuses
+a new step contract written any other way. Preparing a release runs
 `python3 scripts/stamp-unreleased.py <version>`, which names the version in each; nothing else
 stamps them, so never write the coming version by hand.
 

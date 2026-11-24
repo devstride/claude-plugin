@@ -57,6 +57,7 @@ def scratch(name, change=None, rename=None, schema=None):
         os.makedirs(os.path.join(folder, sub))
     shutil.copy(os.path.join(root, ".claude-plugin", "plugin.json"), os.path.join(folder, ".claude-plugin"))
     shutil.copy(os.path.join(root, "skills", "build-item", "scripts", "workflow_report.py"), os.path.join(folder, "skills", "build-item", "scripts"))
+    shutil.copy(os.path.join(root, "schemas", "when-condition-fixtures.json"), os.path.join(folder, "schemas"))
     published = json.load(open(os.path.join(root, "schemas", "workflow.schema.json"), encoding="utf-8"))
     if schema: schema(published)
     json.dump(published, open(os.path.join(folder, "schemas", "workflow.schema.json"), "w"))
@@ -86,6 +87,15 @@ def steps_in_all(total):
                        for i in range((total + 24) // 25)]
     return apply
 def schema_drift(s): s["properties"]["phases"]["items"]["properties"]["steps"]["items"]["properties"]["kind"]["enum"].append("hook")
+def answerer_drift(s): s["properties"]["phases"]["items"]["properties"]["steps"]["items"]["properties"]["answerers"]["items"]["oneOf"].pop()
+GATE = {"id": "approve", "name": "Approve", "summary": "", "contract": "approval@1", "kind": "gate",
+        "run": {"source": "builtin", "ref": "gate", "version": None}, "when": {"mode": "always", "condition": None}, "onFail": "stop",
+        "answerers": [{"kind": "edit-access"}, {"kind": "item-owner"}, {"kind": "role", "roleId": "r1"}, {"kind": "person", "username": "pat"}]}
+def gated(**change):
+    def apply(d):
+        gate = dict(copy.deepcopy(GATE), **change)
+        d["phases"][2]["steps"].insert(0, dict((k, v) for k, v in gate.items() if v is not None))
+    return apply
 
 CASES = [("a duplicate step id", dict(change=duplicate), "duplicate step id claim"),
          ("an upper-case step id", dict(change=setter(first, "id", "Claim")), "steps[0].id: must match"),
@@ -94,6 +104,8 @@ CASES = [("a duplicate step id", dict(change=duplicate), "duplicate step id clai
          ("a source of skill", dict(change=setter(lambda d: first(d)["run"], "source", "skill")), "run.source: must be one of"),
          ("a condition outside the closed list", dict(change=lambda d: first(d).update(when={"mode": "condition", "condition": "tests:green"})), "when.condition: must be one of"),
          ("a condition with mode always", dict(change=condition_on_always), "when.condition: must be null unless the mode is condition"),
+         ("a manual step in a built-in workflow", dict(change=lambda d: first(d).update(when={"mode": "manual", "condition": None})), "when.mode: a built-in workflow has no step a person does by hand"),
+         ("a built-in step that carries on after a failure", dict(change=setter(first, "onFail", "continue")), "onFail: a built-in workflow's steps stop the run when they fail"),
          ("a missing condition with mode condition", dict(change=no_condition), "when.condition: must be one of"),
          ("a float version", dict(change=setter(lambda d: d, "version", 1.5)), "$.version: a float is not allowed"),
          ("no phases", dict(change=setter(lambda d: d, "phases", [])), "phases: must be a list of at least one phase"),
@@ -105,11 +117,27 @@ CASES = [("a duplicate step id", dict(change=duplicate), "duplicate step id clai
          ("a ref that is not text", dict(change=lambda d: first(d)["run"].update(source="off", ref=5)), "run.ref: must be text or null"),
          ("a when with no condition key", dict(change=lambda d: first(d)["when"].pop("condition")), "when.condition: must be present"),
          ("a version past the limit", dict(change=setter(lambda d: d, "version", 2000000)), "version: must be a whole number from 1 to 1000000"),
-         ("a schema list that differs from the script", dict(schema=schema_drift), "INVALID schemas/workflow.schema.json: kind: the schema lists")]
+         ("a schema list that differs from the script", dict(schema=schema_drift), "INVALID schemas/workflow.schema.json: kind: the schema lists"),
+         ("a children-complete workflow with no ending", dict(change=lambda d: d.update(startsWhen="children-complete", endsBy=None)), "endsBy: a children-complete workflow ends by ship or hand-up"),
+         ("an item-picked-up workflow that ends by shipping", dict(change=setter(lambda d: d, "endsBy", "ship")), "endsBy: a children-complete workflow ends by ship or hand-up"),
+         ("an on-demand workflow that hands up", dict(change=lambda d: d.update(startsWhen="on-demand", endsBy="hand-up")), "endsBy: a children-complete workflow ends by ship or hand-up"),
+         ("a schema without the startsWhen/endsBy pairing", dict(schema=lambda s: s.pop("else")), "INVALID schemas/workflow.schema.json: startsWhen/endsBy:"),
+         ("a gate with another contract", dict(change=gated(contract="custom@1")), "contract: a gate's contract is approval@1"),
+         ("an approval@1 step that is not a gate", dict(change=gated(kind="step", answerers=None)), "kind: approval@1 is a gate's contract"),
+         ("a gate that runs a skill", dict(change=gated(run={"source": "builtin", "ref": "claim-story", "version": None})), "run: a gate runs the reserved built-in reference"),
+         ("answerers on a step that is not a gate", dict(change=lambda d: first(d).update(answerers=[{"kind": "edit-access"}])), "answerers: only a gate or a manual step names who may answer it"),
+         ("more than 20 answerers", dict(change=gated(answerers=[{"kind": "edit-access"}] * 21)), "answerers: must be a list of at most 20 entries"),
+         ("an answerer of an unknown kind", dict(change=gated(answerers=[{"kind": "role"}])), "answerers[0]: must be edit-access, item-owner"),
+         ("a schema whose answerer kinds differ from the script", dict(schema=answerer_drift), "INVALID schemas/workflow.schema.json: answerers.kind: the schema lists")]
 for index, (label, kwargs, reason) in enumerate(CASES):
     rc, out, err = scratch("case-%d" % index, **kwargs)
     check("(8) %s fails with its reason" % label, (rc, reason in out, out.startswith("INVALID ")), (1, True, True))
 check("(9) an unchanged scratch copy passes", scratch("clean")[:2], (0, "WORKFLOWS: ok (1 files, 11 steps)"))
+check("(9d) a gate with each kind of answerer passes", scratch("gated", change=gated())[:2], (0, "WORKFLOWS: ok (1 files, 12 steps)"))
+check("(9e) a gate with no answerers passes", scratch("gated-default", change=gated(answerers=None))[:2], (0, "WORKFLOWS: ok (1 files, 12 steps)"))
+for ending in ("ship", "hand-up"):
+    check("(9a) a children-complete workflow that ends by %s passes" % ending,
+          scratch("rollup-" + ending, change=lambda d, e=ending: d.update(startsWhen="children-complete", endsBy=e))[:2], (0, "WORKFLOWS: ok (1 files, 11 steps)"))
 check("(9b) a definition with 250 steps passes", scratch("steps-250", change=steps_in_all(250))[:2], (0, "WORKFLOWS: ok (1 files, 250 steps)"))
 rc, out, err = scratch("steps-251", change=steps_in_all(251))
 check("(9c) one with 251 steps fails with at most 250 steps in all", (rc, "at most 250 steps in all" in out), (1, True))

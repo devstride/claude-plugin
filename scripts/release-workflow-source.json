@@ -277,8 +277,8 @@
     },
     "go-ahead-recheck": {
       "name": "Owner go-ahead again",
-      "summary": "Show the recap and take the owner's yes or the standing yes before the production merge.",
-      "contract": "owner-go-ahead@1",
+      "summary": "At the final gate, with the tower held, run the standing yes again or apply the yes the earlier go-ahead took.",
+      "contract": "owner-go-ahead-recheck@1",
       "skill": "release-steps"
     },
     "stamp-verify": {
@@ -351,6 +351,13 @@
       "name": "Post-deploy health check",
       "summary": "Run the post-deploy health check.",
       "contract": "post-deploy-check@1",
+      "skill": "post-deploy"
+    },
+    "post-deploy-check-owed": {
+      "id": "post-deploy-check",
+      "name": "Post-deploy health check",
+      "summary": "Run the post-deploy health check after the hand-back; the next step posts its answer.",
+      "contract": "post-deploy-check-owed@1",
       "skill": "post-deploy"
     },
     "post-deploy-status": {
@@ -577,7 +584,7 @@
             "train-level-final",
             "post-pending-status",
             "tower-hand-back",
-            "post-deploy-check",
+            "post-deploy-check-owed",
             "post-deploy-status",
             "update-docs",
             "sync-knowledge-base",
@@ -681,7 +688,7 @@
         {
           "id": "close-out",
           "steps": [
-            "post-deploy-check",
+            "post-deploy-check-owed",
             "post-deploy-status",
             "sync-production",
             "delete-release-branch",
@@ -709,7 +716,7 @@
         {
           "id": "close-out",
           "steps": [
-            "post-deploy-check",
+            "post-deploy-check-owed",
             "post-deploy-status"
           ]
         }

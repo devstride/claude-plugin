@@ -101,6 +101,23 @@ carries the landed comment.
   Done or carrying its comment), so a re-run after any partial run finishes only what is missing;
   report every leaf of the unit left open as "not marked Done: <item>" — never guess.
 
+## A ready rollup is work to do
+
+At the dry-chain exit with leaves landed (`build-item` step 0), ask
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/rollup.py` (JSON in and out; exit 2 is one
+`rollup:` refusal line) whether their nearest rollup, a parent whose own workflow starts once its
+children are complete, is ready. Once per release unit, for one landed leaf: `rollup.py chain` with
+`get_item_rollup_chain`'s answer for it (the nearest entry above it with a `rollup` is the rollup),
+then `rollup.py ready` with the config, that entry as `item`, `get_item_rollup`'s `descendants`,
+`truncated` and `countsReadableChildrenOnly`, the landed set above, `deferred-container.py members`
+as `excluded` and `release-holds.py decide` over it, its ancestors and its leaves as `holds`.
+`READY` with its story claim free (`get_claim`) → "rollup ready: <item>"; else its `reason`, and
+for `WAITING` each `remaining` child and why.
+
+Report it beside "N landed, awaiting their release". It starts nothing: whatever it says, the exit
+is `build-item` step 0's (gate on → step 8 for it, then step 0). No rollup tools → silent;
+a refusal (an undetermined chain names who must publish which workflow) → said once.
+
 ## Projection warning — fetch relationships EXPLICITLY
 
 **Fetch each candidate's relationships EXPLICITLY** — `search_items` and the default `get_item`
@@ -128,7 +145,8 @@ the ready-set lets a HUMAN fan the waves out deliberately; the loop itself stays
 
 ## Cited by
 
-- `build-item` SKILL.md step 0 (canonical owner — selection, recovery, a story named by number)
+- `build-item` SKILL.md step 0 (canonical owner — selection, recovery, a story named by number;
+  the dry-chain exit's ready rollup)
   and the "Serial by design" rule (the ready-set-is-shape reasoning); steps 7 and 8 (landed
   leaves, the close-out)
 - `skills/story-lifecycle/references/complete.md` (Landed leaves: an epic-branch landing)

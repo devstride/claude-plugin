@@ -229,13 +229,15 @@ rc, again, err = nxt(sid)
 check("... and next keeps answering the stop, with no fetch for the later step", rc == 0 and again["action"] == "stopped"
       and again["stepId"] == "check" and state_of(sid)["steps"]["after"]["status"] == state["steps"]["after"]["status"], (rc, err, again))
 
-# 9. onFail continue: this runner carries on after no failure, so it refuses the whole workflow and the built-in one runs
+# 9. onFail continue: a failed library step is recorded failed and the run goes on to the next step
+loose = custom_definition([step_of("check", "custom@1", "library", "tidy-check", 1, on_fail="continue"),
+                           step_of("after", "custom@1", "library", "tidy-after", 1)])
 sid = session()
-rc, answer, err = start(sid, fetched(defn=custom_definition([step_of("check", "custom@1", "library", "tidy-check", 1, on_fail="continue")])))
+rc, answer, err = start(sid, fetched(skills=[line(implements="review@1"), line(stepId="after", name="tidy-after")], defn=loose))
 state = state_of(sid)
-check("a library step with onFail continue is refused: the built-in workflow runs, with a plain notice", rc == 0
-      and state["definitionSource"] == "builtin" and state["skillManifest"] == [] and "organizationId" not in state
-      and "carries on after a failure" in (answer.get("notice") or ""), (rc, err, answer.get("notice") if answer else None))
+check("a failed library step with onFail continue is recorded failed, and the run goes on to the step after it", rc == 0
+      and state["definitionSource"] != "builtin" and state["steps"]["check"]["status"] == "failed"
+      and answer["action"] != "stopped" and state["steps"]["after"]["status"] in ("issued", "pending"), (rc, err, answer, state["steps"]))
 
 # 10. a required step run from a library skill: its contract's proof is still owed
 SIGN = b"# Our sign-off\n\nRecord the sign-off and answer with its fixed first line.\n"

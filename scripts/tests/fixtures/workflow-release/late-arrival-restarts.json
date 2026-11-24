@@ -1,0 +1,39 @@
+{
+  "about": "Late arrivals under releaseTrain.lateArrivals restart: each absorb answers LATE ARRIVAL and the train review is issued again on its own; the third absorb ends the window and the next issue settles.",
+  "definition": "workflows/release.json",
+  "phases": ["train"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "train-finish-earlier", "output": "EARLIER TRAIN: NONE\nevidence line\n```json\n{\"state\": \"none\"}\n```\n"},
+    {"step": "ship-plan", "output": "SHIP PLAN: GO\nevidence line\n```json\n{\"state\": \"go\"}\n```\n"},
+    {"step": "train-snapshot", "output": "TRAIN SNAPSHOT: CUT release-train-snapshot\nevidence line\n```json\n{\"state\": \"cut\", \"head\": \"00000000000000000000000000000000000000c3\", \"sourceBefore\": \"00000000000000000000000000000000000000a1\"}\n```\n"},
+    {"step": "train-pr", "output": "TRAIN PR: OPENED 40\nevidence line\n```json\n{\"state\": \"opened\"}\n```\n"},
+    {"step": "train-review", "output": "TRAIN REVIEW: LATE ARRIVAL 1\nevidence line\n```json\n{\"state\": \"late-arrival\"}\n```\n"},
+    {"step": "train-review", "output": "TRAIN REVIEW: LATE ARRIVAL 1\nevidence line\n```json\n{\"state\": \"late-arrival\"}\n```\n"},
+    {"step": "train-review", "output": "TRAIN REVIEW: LATE ARRIVAL 1\nevidence line\n```json\n{\"state\": \"late-arrival\"}\n```\n"},
+    {"step": "train-review", "output": "TRAIN REVIEW: SETTLED 00000000000000000000000000000000000000c3\nevidence line\n```json\n{\"state\": \"settled\"}\n```\n"},
+    {"step": "train-pre-ship", "output": "PRE-SHIP: PASS\nevidence line\n```json\n{\"state\": \"pass\", \"ranAtTrain\": \"--ran-at-train e2e@00000000000000000000000000000000000000c3\"}\n```\n"},
+    {"step": "train-merge", "output": "TRAIN MERGE: MERGED 40\nevidence line\n```json\n{\"state\": \"merged\"}\n```\n"},
+    {"step": "train-close-out", "output": "TRAIN CLOSE-OUT: CLOSED 2\nevidence line\n```json\n{\"state\": \"closed\"}\n```\n"},
+    {"step": "train-level", "output": "TRAIN LEVEL: FAST-FORWARDED\nevidence line\n```json\n{\"state\": \"fast-forwarded\"}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["train-finish-earlier", 1],
+      ["ship-plan", 1],
+      ["train-snapshot", 1],
+      ["train-pr", 1],
+      ["train-review", 1],
+      ["train-review", 2],
+      ["train-review", 3],
+      ["train-review", 4],
+      ["train-pre-ship", 1],
+      ["train-merge", 1],
+      ["train-close-out", 1],
+      ["train-level", 1]
+    ],
+    "outcome": "completed",
+    "stops": []
+  }
+}

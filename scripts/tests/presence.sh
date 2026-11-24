@@ -381,7 +381,7 @@ ORDER="$(python3 -c '
 import json,sys
 ats=[int(json.loads(l)["PRESENCE_AT"]) for l in open(sys.argv[1])]
 print("ok" if ats==sorted(ats) and len(ats)>=2 else "bad %s" % ats)' "$LOG")"
-# a keeper the burst started beside it leaves once it finds the lock held
+# a duplicate keeper started during the burst tries its lock for up to two seconds before it leaves
 j=0; while KEEPERS="$(pgrep -f "presence.py keeper s25\$" | wc -l | tr -d ' ')" && [ "$KEEPERS" != 1 ] && [ $j -lt 50 ]; do sleep 0.1; j=$((j + 1)); done
 if [ "$UP25" = 0 ] && [ "$i" -lt 100 ] && [ "$ORDER" = ok ] && [ "$KEEPERS" = 1 ]; then
   ok "(25) 30 prompts and Stops at once across two checkouts → queued = done, PRESENCE_AT never falls, one keeper"
@@ -843,6 +843,28 @@ if ! kill -0 "$L40" 2>/dev/null && [ "$(of s50 0)" = 2 ] && [ "$(of s50 2 PRESEN
   ok "(42) ending an earlier version's keeper → a beat from this version at once (busy since the open call), its own keeper running"
 else bad "(42) legacy=$L40 $(grep '"s50"' "$LOG")"; fi
 kill "$L40" 2>/dev/null; stop_keeper s50
+
+# (43) a keeper starting while something only checks the lock (a hook's keeper_running, a test's
+#      probe) waits for it instead of leaving: a check holds the lock, the keeper starts and is still
+#      waiting a second later (a keeper that tries once has left by then), and once the check lets
+#      go the same keeper takes the lock and runs
+: > "$LOG"; O43="$(owner)"
+CLAUDE_PID="$O43" fire SessionStart s51 "$K60" >/dev/null; upto s51 1; stop_keeper s51
+python3 - "$RECORDS/s51.keeper.lock" "$WORK/held43" <<'PY' &
+import fcntl, os, sys, time
+fd = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT, 0o600); fcntl.flock(fd, fcntl.LOCK_EX)
+open(sys.argv[2], "w").close(); time.sleep(60)
+PY
+P43=$!; echo "$P43" >> "$WORK/owners"
+i=0; while [ ! -e "$WORK/held43" ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done
+python3 "$HOOK" keeper s51 >/dev/null 2>&1 & K43=$!; echo "$K43" >> "$WORK/owners"
+sleep 1; INWAIT=no; kill -0 "$K43" 2>/dev/null && INWAIT=yes   # still trying while the check holds it
+kill "$P43" 2>/dev/null; wait "$P43" 2>/dev/null; wait_keeper s51; UP43=$?
+if [ -e "$WORK/held43" ] && [ "$INWAIT" = yes ] && [ "$UP43" = 0 ] && kill -0 "$K43" 2>/dev/null \
+   && [ "$(keeper_pid s51)" = "$K43" ]; then
+  ok "(43) a keeper starting while a check holds its lock waits for it, then runs and holds the lock"
+else bad "(43) held=$([ -e "$WORK/held43" ] && echo yes || echo no) inwait=$INWAIT up=$UP43 alive=$(kill -0 "$K43" 2>/dev/null && echo yes || echo no) pid=$K43/$(keeper_pid s51)"; fi
+kill "$K43" 2>/dev/null; stop_keeper s51
 
 # ── The built-in reporter (B1)-(B8): no repository command, the report goes to DevStride with the
 # key the machine's connection carries. A fake server stands in (it accepts any key and records the

@@ -119,7 +119,9 @@ paths individually) rather than trusting a single root-level run.
   (`scripts/workflow-registry.py`): a changed definition takes the next version and
   `workflow-registry.py record` appends its row; never edit a row or the page by hand.
 - `scripts/` holds repo-level maintenance scripts (`validate.sh`, `measure-cost.sh`, their tests,
-  and `check-source.sh`, the one command that runs every check).
+  and `check-source.sh`, the one command that runs every check). `scripts/staged/` holds a page
+  that is written and tested but not switched on yet, at the path it will take under the plugin
+  root (today the release page that runs the Release workflow); nothing loads it from there.
   Nothing at runtime reads them and the plugin loader ignores the directory — it is not a
   component directory, and it must not move under `.claude-plugin/`.
 - The root documents and `CLAUDE.md` are maintainer files too, as is anything under `.github/` or

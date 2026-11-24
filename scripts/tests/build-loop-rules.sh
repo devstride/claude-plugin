@@ -81,6 +81,15 @@ MUST = [
     (BI, "Any other stop, and every answer carrying `mayHaveLanded`: read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/run-stops.md` in full before acting on it",
      "the stop rules are never loaded"),
     (BI, "every `next`, `done`, `status` and `resume` names the `item`", "two open runs make each command ambiguous"),
+    (BI, "N landed, awaiting their release (gate on → step 8 for it, then step 0; its rollup report: `next-unblocked.md`)",
+     "a fresh session reports the landed work and never cuts the unit's release"),
+    ("skills/build-item/references/next-unblocked.md", "It starts nothing: whatever it says, the exit is `build-item` step 0's (gate on → step 8 for it, then step 0)",
+     "the rollup report is read as standing in for the unit's release"),
+    ("skills/build-item/references/next-unblocked.md", "`get_item_rollup`'s `descendants`, `truncated` and `countsReadableChildrenOnly`",
+     "a rollup is called ready over children this account cannot see"),
+    ("skills/branch-hotfix/SKILL.md", "A start refused `run-open` means this session already has a run open for that item (with no item: a hotfix started with none): `resume` it, or finish or abandon it first",
+     "a refused start is read as a stop, or the wrong run is resumed"),
+    ("skills/branch-hotfix/SKILL.md", "A hotfix for another item is never held up by it", "a hotfix for a second item waits on the first"),
     (RS, "Check the stop's `commit` with the landing test", "a landed merge is resumed and asks for its checks again"),
     (RS, "Landed, but the check cannot prove how → stop for a person, saying exactly that", "an unchecked descendant is recorded as checked"),
     (RS, "reads everything the base gained past it, merges included: `git log --oneline <commit>..origin/<workingBase>`, accounting for any later commit of this story and any merge commit made on the story's branch (a merge of the base into the story can itself carry changes)",
@@ -205,6 +214,8 @@ GONE = [
     (RS, "pushed=$(git rev-parse origin/<branch>)", "a never-pushed branch's lease read the name itself"),
     ("skills/build-item/references/release-holds.md", "and moves on;", "a named one-off's hold was read as moving on to the next story"),
     ("CHANGELOG.md", "after a refused, blocked or unanswered one is a full screen", "true only when no earlier screen was accepted"),
+    ("skills/branch-hotfix/SKILL.md", "a listed run whose `workflowId` is `hotfix`",
+     "any open hotfix of the session, for whatever item, sent a hotfix for another item to resume or close it"),
 ]
 problems = []
 for home, text, why in MUST:

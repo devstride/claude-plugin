@@ -1,5 +1,5 @@
 {
- "_readme": "Canonical cases for skills/run-workflow/scripts/workflow.py, run by scripts/tests/workflow-runner.sh. definitions: the Build definition the tests drive, and a one-step variant. context and outputs: the start context and one passing answer per contract ({head}, {tree} and {patchId} are filled from the test's repository). catalogs: standIn is added to a copy of the real catalog (contracts are added, satisfiedBy is set); faults and sound are edited copies and the fault code each must, or must not, raise. validation: each case edits a definition (set a step's or a top-level field, drop a field, remove, move or add a step, repeat a list's first item until the list holds count items, each copy's id suffixed -2, -3 and so on, or replace it whole) and names the refusal code start must give, or ok; root says which plugin copy runs it (fixture: every step skill present; real: the plugin as released; standIn: the fixture copy with the standIn catalog); git says whether the working directory is a repository. verdicts: an answer, its contract and what its first line parses to (class null: no verdict). proofs: a proof (with the verdict value it came with, where that matters), the git answers given and whether it holds, is stale, is refused or cannot be read. repository: a remote address and the name reports carry for it.",
+ "_readme": "Canonical cases for skills/run-workflow/scripts/workflow.py, run by scripts/tests/workflow-runner.sh. definitions: the Build definition the tests drive, and a one-step variant. context and outputs: the start context and one passing answer per contract ({head}, {tree} and {patchId} are filled from the test's repository). catalogs: standIn is added to a copy of the real catalog (contracts are added, satisfiedBy is set); faults and sound are edited copies and the fault code each must, or must not, raise. validation: each case edits a definition (set a step's or a top-level field, drop a field, remove, move or add a step, repeat a list's first item until the list holds count items, each copy's id suffixed -2, -3 and so on, or replace it whole) and names the refusal code start must give, or ok (rehearsal true: the start says it is a rehearsal, which a gate or a checkpoint needs while it is not switched on); root says which plugin copy runs it (fixture: every step skill present; real: the plugin as released; standIn: the fixture copy with the standIn catalog); git says whether the working directory is a repository. verdicts: an answer, its contract and what its first line parses to (class null: no verdict). proofs: a proof (with the verdict value it came with, where that matters), the git answers given and whether it holds, is stale, is refused or cannot be read. repository: a remote address and the name reports carry for it. outcomes: starts are children-complete start cases (the definition's edits, the context added, and the refusal code start must give or ok); ends are Build runs answered to the end with the canned answers, a contract's verdict line replaced where answer names one, the tracker's runOutcomes (absent: the tracker named none), and the outcome finished gives, the one the step recorded and the one the last report closes the run with.",
  "definitions": {
   "build": {
    "schema": 1,
@@ -505,7 +505,7 @@
       "set": [
        "contracts",
        "sync@1",
-       "neverOptional"
+       "skippable"
       ],
       "value": true
      }
@@ -528,6 +528,61 @@
      }
     ],
     "expect": "requires-unknown"
+   },
+   {
+    "name": "a requirement ordered after a contract it does not require",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "merge@1",
+       "requiresAfter"
+      ],
+      "value": {
+       "build@1": [
+        "review@1"
+       ]
+      }
+     }
+    ],
+    "expect": "requires-after"
+   },
+   {
+    "name": "a requirement ordered after a contract the catalog does not hold",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "merge@1",
+       "requiresAfter"
+      ],
+      "value": {
+       "review@1": [
+        "deploy@1"
+       ]
+      }
+     }
+    ],
+    "expect": "requires-after"
+   },
+   {
+    "name": "requiresAfter that is not a map of lists",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "merge@1",
+       "requiresAfter"
+      ],
+      "value": [
+       "review@1"
+      ]
+     }
+    ],
+    "expect": "shape"
    },
    {
     "name": "a cycle",
@@ -1023,6 +1078,121 @@
      }
     ],
     "expect": "shape"
+   },
+   {
+    "name": "a recorded outcome the tracker does not accept",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "complete@1",
+       "verdict",
+       "values",
+       1,
+       "recordsOutcome"
+      ],
+      "value": "merged"
+     }
+    ],
+    "expect": "records-outcome"
+   },
+   {
+    "name": "a recorded outcome on a stopping verdict",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "complete@1",
+       "verdict",
+       "values",
+       2,
+       "recordsOutcome"
+      ],
+      "value": "landed"
+     }
+    ],
+    "expect": "records-outcome"
+   },
+   {
+    "name": "a recorded outcome that is a run end the runner names itself",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "verdict",
+       "values",
+       0,
+       "recordsOutcome"
+      ],
+      "value": "completed"
+     }
+    ],
+    "expect": "records-outcome"
+   },
+   {
+    "name": "a neverOptional flag that is not true",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "sync@1",
+       "neverOptional"
+      ],
+      "value": false
+     }
+    ],
+    "expect": "shape"
+   },
+   {
+    "name": "a feature this runner does not know",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "features",
+       "when-nightly"
+      ],
+      "value": {
+       "since": "unreleased"
+      }
+     }
+    ],
+    "expect": "shape"
+   },
+   {
+    "name": "a feature whose since is not a version",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "features",
+       "when-manual",
+       "since"
+      ],
+      "value": "soon"
+     }
+    ],
+    "expect": "shape"
+   },
+   {
+    "name": "a features map that is not an object",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "features"
+      ],
+      "value": [
+       "when-manual"
+      ]
+     }
+    ],
+    "expect": "shape"
    }
   ],
   "sound": [
@@ -1079,6 +1249,23 @@
        "reviewProof"
       ],
       "value": "proof:review@1?"
+     }
+    ]
+   },
+   {
+    "name": "handed-up recorded by another continue verdict",
+    "base": "real",
+    "edits": [
+     {
+      "set": [
+       "contracts",
+       "capture@1",
+       "verdict",
+       "values",
+       1,
+       "recordsOutcome"
+      ],
+      "value": "handed-up"
      }
     ]
    }
@@ -1756,7 +1943,7 @@
    "expect": "bad-schema"
   },
   {
-   "name": "a when.condition not listed",
+   "name": "a when.condition outside the grammar",
    "definition": "build",
    "edits": [
     {
@@ -1773,7 +1960,7 @@
    ],
    "root": "fixture",
    "git": true,
-   "expect": "bad-schema"
+   "expect": "bad-condition"
   },
   {
    "name": "a when.mode not listed",
@@ -2315,7 +2502,7 @@
    "expect": "unsupported-gate"
   },
   {
-   "name": "a manual step nothing requires",
+   "name": "a manual step that is not a checkpoint",
    "definition": "build",
    "edits": [
     {
@@ -2332,7 +2519,7 @@
    ],
    "root": "fixture",
    "git": true,
-   "expect": "unsupported-when"
+   "expect": "unsupported-checkpoint"
   },
   {
    "name": "a built-in source for a contract with no built-in skill",
@@ -2419,7 +2606,7 @@
    ],
    "root": "fixture",
    "git": true,
-   "expect": "unsupported-on-fail"
+   "expect": "ok"
   },
   {
    "name": "a step nothing requires may be switched off",
@@ -2916,6 +3103,707 @@
    "root": "fixture",
    "git": true,
    "expect": "unknown-contract"
+  },
+  {
+   "name": "an approval gate after the local checks",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "approve",
+      "name": "Approve",
+      "summary": "A person approves.",
+      "contract": "approval@1",
+      "kind": "gate",
+      "run": {
+       "source": "builtin",
+       "ref": "gate",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "rehearsal": true,
+   "expect": "ok"
+  },
+  {
+   "name": "a gate that runs only when a condition holds",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "approve",
+      "name": "Approve",
+      "summary": "A person approves.",
+      "contract": "approval@1",
+      "kind": "gate",
+      "run": {
+       "source": "builtin",
+       "ref": "gate",
+       "version": null
+      },
+      "when": {
+       "mode": "condition",
+       "condition": "item-tag:needs-approval"
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "rehearsal": true,
+   "expect": "ok"
+  },
+  {
+   "name": "an approval gate outside a rehearsal: not switched on",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "approve",
+      "name": "Approve",
+      "summary": "A person approves.",
+      "contract": "approval@1",
+      "kind": "gate",
+      "run": {
+       "source": "builtin",
+       "ref": "gate",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "skill-dormant"
+  },
+  {
+   "name": "a gate done by hand",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "approve",
+      "name": "Approve",
+      "summary": "A person approves.",
+      "contract": "approval@1",
+      "kind": "gate",
+      "run": {
+       "source": "builtin",
+       "ref": "gate",
+       "version": null
+      },
+      "when": {
+       "mode": "manual",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-when"
+  },
+  {
+   "name": "a gate that carries on after a failure",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "approve",
+      "name": "Approve",
+      "summary": "A person approves.",
+      "contract": "approval@1",
+      "kind": "gate",
+      "run": {
+       "source": "builtin",
+       "ref": "gate",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "continue"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-on-fail"
+  },
+  {
+   "name": "a blocking checkpoint",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "by-hand",
+      "name": "Check by hand",
+      "summary": "Click through the export by hand.",
+      "contract": "checkpoint@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "checkpoint",
+       "version": null
+      },
+      "when": {
+       "mode": "manual",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "rehearsal": true,
+   "expect": "ok"
+  },
+  {
+   "name": "a non-blocking checkpoint with its answerers",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "by-hand",
+      "name": "Check by hand",
+      "summary": "Click through the export by hand.",
+      "contract": "checkpoint@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "checkpoint",
+       "version": null
+      },
+      "when": {
+       "mode": "manual",
+       "condition": null
+      },
+      "onFail": "continue",
+      "answerers": [
+       {
+        "kind": "item-owner"
+       }
+      ]
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "rehearsal": true,
+   "expect": "ok"
+  },
+  {
+   "name": "a blocking checkpoint outside a rehearsal: not switched on",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "by-hand",
+      "name": "Check by hand",
+      "summary": "Click through the export by hand.",
+      "contract": "checkpoint@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "checkpoint",
+       "version": null
+      },
+      "when": {
+       "mode": "manual",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "skill-dormant"
+  },
+  {
+   "name": "a checkpoint the run does not wait for, outside a rehearsal: not switched on",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "by-hand",
+      "name": "Check by hand",
+      "summary": "Click through the export by hand.",
+      "contract": "checkpoint@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "checkpoint",
+       "version": null
+      },
+      "when": {
+       "mode": "manual",
+       "condition": null
+      },
+      "onFail": "continue",
+      "answerers": [
+       {
+        "kind": "item-owner"
+       }
+      ]
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "skill-dormant"
+  },
+  {
+   "name": "a checkpoint that is not manual",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "by-hand",
+      "name": "Check by hand",
+      "summary": "Click through the export by hand.",
+      "contract": "checkpoint@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "checkpoint",
+       "version": null
+      },
+      "when": {
+       "mode": "always",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-checkpoint"
+  },
+  {
+   "name": "a checkpoint run by a skill",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "by-hand",
+      "name": "Check by hand",
+      "summary": "Click through the export by hand.",
+      "contract": "checkpoint@1",
+      "kind": "step",
+      "run": {
+       "source": "builtin",
+       "ref": "sync-base",
+       "version": null
+      },
+      "when": {
+       "mode": "manual",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-checkpoint"
+  },
+  {
+   "name": "a checkpoint of kind gate",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "add",
+     "after": "local-checks",
+     "value": {
+      "id": "by-hand",
+      "name": "Check by hand",
+      "summary": "Click through the export by hand.",
+      "contract": "checkpoint@1",
+      "kind": "gate",
+      "run": {
+       "source": "builtin",
+       "ref": "checkpoint",
+       "version": null
+      },
+      "when": {
+       "mode": "manual",
+       "condition": null
+      },
+      "onFail": "stop"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "unsupported-gate"
+  },
+  {
+   "name": "answerers on a step that is neither a gate nor done by hand: an unknown key there, kept and never read",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "answerers"
+     ],
+     "value": [
+      {
+       "kind": "item-owner"
+      }
+     ]
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "a step nothing requires on a condition from the grammar",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "!touches:**/*.md"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "a step on a condition with no condition",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": null
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-condition"
+  },
+  {
+   "name": "a condition on a step that always runs: kept and never read, as the tracker stores it",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "always",
+      "condition": "review-path:fast"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "a condition that is not text",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": 7
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-schema"
+  },
+  {
+   "name": "a step-verdict naming an earlier step and a word it gives",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "step-verdict:review:SETTLED"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "a step-verdict naming a later step",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "capture",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "step-verdict:sync:CLEAN"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-condition"
+  },
+  {
+   "name": "a step-verdict naming the step itself",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "step-verdict:sync:CLEAN"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-condition"
+  },
+  {
+   "name": "a step-verdict naming no step",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "step-verdict:deploy:PASS"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-condition"
+  },
+  {
+   "name": "a step-verdict naming a word its step never gives",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "set",
+     "step": "sync",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "step-verdict:review:PASS"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "bad-condition"
+  },
+  {
+   "name": "the merge, which nothing later requires, switched off: allowed, as before the newer abilities",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "sync"
+    },
+    {
+     "op": "remove",
+     "step": "capture"
+    },
+    {
+     "op": "remove",
+     "step": "complete"
+    },
+    {
+     "op": "set",
+     "step": "merge",
+     "path": [
+      "run"
+     ],
+     "value": {
+      "source": "off",
+      "ref": null,
+      "version": null
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "ok"
+  },
+  {
+   "name": "the merge, which nothing later requires, made conditional",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "sync"
+    },
+    {
+     "op": "remove",
+     "step": "capture"
+    },
+    {
+     "op": "remove",
+     "step": "complete"
+    },
+    {
+     "op": "set",
+     "step": "merge",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "condition",
+      "condition": "has-repository"
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-not-always"
+  },
+  {
+   "name": "the merge, which nothing later requires, carrying on after a failure",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "sync"
+    },
+    {
+     "op": "remove",
+     "step": "capture"
+    },
+    {
+     "op": "remove",
+     "step": "complete"
+    },
+    {
+     "op": "set",
+     "step": "merge",
+     "path": [
+      "onFail"
+     ],
+     "value": "continue"
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-not-stop"
+  },
+  {
+   "name": "the merge, which nothing later requires, done by hand",
+   "definition": "build",
+   "edits": [
+    {
+     "op": "remove",
+     "step": "sync"
+    },
+    {
+     "op": "remove",
+     "step": "capture"
+    },
+    {
+     "op": "remove",
+     "step": "complete"
+    },
+    {
+     "op": "set",
+     "step": "merge",
+     "path": [
+      "when"
+     ],
+     "value": {
+      "mode": "manual",
+      "condition": null
+     }
+    }
+   ],
+   "root": "fixture",
+   "git": true,
+   "expect": "required-not-always"
   }
  ],
  "verdicts": [
@@ -4962,6 +5850,13 @@
    "detail": ""
   },
   {
+   "contract": "train-pre-ship@1",
+   "output": "PRE-SHIP: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
    "contract": "train-merge@1",
    "output": "TRAIN MERGE: MERGED some detail\n",
    "class": "continue",
@@ -5088,6 +5983,13 @@
    "detail": ""
   },
   {
+   "contract": "classify-release@1",
+   "output": "RELEASE CLASS: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
    "contract": "classify-at-checks@1",
    "output": "RELEASE CLASS: LIGHT\n",
    "class": "continue",
@@ -5102,6 +6004,13 @@
    "detail": ""
   },
   {
+   "contract": "classify-at-checks@1",
+   "output": "RELEASE CLASS: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
    "contract": "classify-at-pre-ship@1",
    "output": "RELEASE CLASS: LIGHT\n",
    "class": "continue",
@@ -5113,6 +6022,13 @@
    "output": "RELEASE CLASS: FULL\n",
    "class": "continue",
    "value": "FULL",
+   "detail": ""
+  },
+  {
+   "contract": "classify-at-pre-ship@1",
+   "output": "RELEASE CLASS: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
    "detail": ""
   },
   {
@@ -5277,6 +6193,13 @@
    "detail": ""
   },
   {
+   "contract": "pre-ship-at-checks@1",
+   "output": "PRE-SHIP: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
    "contract": "dev-deploy-wait@1",
    "output": "DEV DEPLOY: SERVING\n",
    "class": "continue",
@@ -5321,7 +6244,7 @@
   {
    "contract": "pre-merge-at-checks@1",
    "output": "PRE-MERGE: NOT RUN\n",
-   "class": "ask",
+   "class": "confirm",
    "value": "NOT RUN",
    "detail": ""
   },
@@ -5330,6 +6253,13 @@
    "output": "PRE-MERGE: NOT CONFIGURED\n",
    "class": "skipped",
    "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-at-checks@1",
+   "output": "PRE-MERGE: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
    "detail": ""
   },
   {
@@ -5379,6 +6309,13 @@
    "output": "PRE-SHIP: FAIL\n",
    "class": "stop",
    "value": "FAIL",
+   "detail": ""
+  },
+  {
+   "contract": "pre-ship-release@1",
+   "output": "PRE-SHIP: NOT APPLICABLE\n",
+   "class": "continue",
+   "value": "NOT APPLICABLE",
    "detail": ""
   },
   {
@@ -5433,7 +6370,7 @@
   {
    "contract": "hotfix-catch-up@1",
    "output": "HOTFIX CATCH-UP: MERGED some detail\n",
-   "class": "stop",
+   "class": "rewind:release-review@1",
    "value": "MERGED",
    "detail": "some detail"
   },
@@ -5496,7 +6433,7 @@
   {
    "contract": "pre-merge-check@1",
    "output": "PRE-MERGE: NOT RUN\n",
-   "class": "ask",
+   "class": "confirm",
    "value": "NOT RUN",
    "detail": ""
   },
@@ -5505,6 +6442,13 @@
    "output": "PRE-MERGE: NOT CONFIGURED\n",
    "class": "skipped",
    "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-check@1",
+   "output": "PRE-MERGE: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
    "detail": ""
   },
   {
@@ -5524,7 +6468,7 @@
   {
    "contract": "pre-merge-recheck@1",
    "output": "PRE-MERGE: NOT RUN\n",
-   "class": "ask",
+   "class": "confirm",
    "value": "NOT RUN",
    "detail": ""
   },
@@ -5533,6 +6477,13 @@
    "output": "PRE-MERGE: NOT CONFIGURED\n",
    "class": "skipped",
    "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "pre-merge-recheck@1",
+   "output": "PRE-MERGE: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
    "detail": ""
   },
   {
@@ -5551,6 +6502,27 @@
   },
   {
    "contract": "owner-go-ahead@1",
+   "output": "GO-AHEAD: NO\n",
+   "class": "end:declined",
+   "value": "NO",
+   "detail": ""
+  },
+  {
+   "contract": "owner-go-ahead-recheck@1",
+   "output": "GO-AHEAD: YES some detail\n",
+   "class": "continue",
+   "value": "YES",
+   "detail": "some detail"
+  },
+  {
+   "contract": "owner-go-ahead-recheck@1",
+   "output": "GO-AHEAD: NOT YET\n",
+   "class": "ask",
+   "value": "NOT YET",
+   "detail": ""
+  },
+  {
+   "contract": "owner-go-ahead-recheck@1",
    "output": "GO-AHEAD: NO\n",
    "class": "end:declined",
    "value": "NO",
@@ -5603,6 +6575,13 @@
    "output": "PRE-SHIP: NOTHING TO RUN\n",
    "class": "skipped",
    "value": "NOTHING TO RUN",
+   "detail": ""
+  },
+  {
+   "contract": "rerun-at-merge@1",
+   "output": "PRE-SHIP: NOT APPLICABLE\n",
+   "class": "skipped",
+   "value": "NOT APPLICABLE",
    "detail": ""
   },
   {
@@ -5713,12 +6692,40 @@
   {
    "contract": "post-deploy-check@1",
    "output": "POST-DEPLOY HEALTH: NOT RUN\n",
-   "class": "ask",
+   "class": "confirm",
    "value": "NOT RUN",
    "detail": ""
   },
   {
    "contract": "post-deploy-check@1",
+   "output": "POST-DEPLOY HEALTH: NOT CONFIGURED\n",
+   "class": "skipped",
+   "value": "NOT CONFIGURED",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-check-owed@1",
+   "output": "POST-DEPLOY HEALTH: PASS\n",
+   "class": "continue",
+   "value": "PASS",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-check-owed@1",
+   "output": "POST-DEPLOY HEALTH: FAIL\n",
+   "class": "continue",
+   "value": "FAIL",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-check-owed@1",
+   "output": "POST-DEPLOY HEALTH: NOT RUN\n",
+   "class": "continue",
+   "value": "NOT RUN",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-check-owed@1",
    "output": "POST-DEPLOY HEALTH: NOT CONFIGURED\n",
    "class": "skipped",
    "value": "NOT CONFIGURED",
@@ -5744,6 +6751,13 @@
    "class": "stop",
    "value": "ERROR POSTED",
    "detail": ""
+  },
+  {
+   "contract": "post-deploy-result@1",
+   "output": "POST-DEPLOY STATUS: NEEDS DECISION some detail\n",
+   "class": "ask",
+   "value": "NEEDS DECISION",
+   "detail": "some detail"
   },
   {
    "contract": "post-deploy-result@1",
@@ -5982,6 +6996,87 @@
    "class": "continue",
    "value": "ERROR",
    "detail": "some detail"
+  },
+  {
+   "contract": "approval@1",
+   "output": "APPROVAL: REQUESTED\n",
+   "class": "park",
+   "value": "REQUESTED",
+   "detail": ""
+  },
+  {
+   "contract": "approval@1",
+   "output": "APPROVAL: APPROVED\n",
+   "class": "continue",
+   "value": "APPROVED",
+   "detail": ""
+  },
+  {
+   "contract": "approval@1",
+   "output": "APPROVAL: CHANGES rename the button\n",
+   "class": "redo:self",
+   "value": "CHANGES",
+   "detail": "rename the button"
+  },
+  {
+   "contract": "approval@1",
+   "output": "APPROVAL: REJECTED\n",
+   "class": "stop",
+   "value": "REJECTED",
+   "detail": ""
+  },
+  {
+   "contract": "approval@1",
+   "output": "APPROVAL: UNAVAILABLE the gate tools are not offered\n",
+   "class": "stop",
+   "value": "UNAVAILABLE",
+   "detail": "the gate tools are not offered"
+  },
+  {
+   "contract": "approval@1",
+   "output": "APPROVAL: UNAVAILABLE\n",
+   "class": null,
+   "why": "a gate that cannot be requested names why"
+  },
+  {
+   "contract": "checkpoint@1",
+   "output": "CHECKPOINT: REQUESTED\n",
+   "class": "park",
+   "value": "REQUESTED",
+   "detail": ""
+  },
+  {
+   "contract": "checkpoint@1",
+   "output": "CHECKPOINT: DONE\n",
+   "class": "continue",
+   "value": "DONE",
+   "detail": ""
+  },
+  {
+   "contract": "checkpoint@1",
+   "output": "CHECKPOINT: SKIPPED\n",
+   "class": "skipped",
+   "value": "SKIPPED",
+   "detail": ""
+  },
+  {
+   "contract": "checkpoint@1",
+   "output": "CHECKPOINT: UNAVAILABLE the checkpoint tool is not offered\n",
+   "class": "stop",
+   "value": "UNAVAILABLE",
+   "detail": "the checkpoint tool is not offered"
+  },
+  {
+   "contract": "checkpoint@1",
+   "output": "CHECKPOINT: UNAVAILABLE\n",
+   "class": null,
+   "why": "a checkpoint that cannot be requested names why"
+  },
+  {
+   "contract": "checkpoint@1",
+   "output": "CHECKPOINT: DONE by me\n",
+   "class": null,
+   "why": "a done checkpoint carries no detail"
   }
  ],
  "proofs": [
@@ -6786,6 +7881,470 @@
    "commit 0123456789abcdef0123456789abcdef01234567",
    "https://github.com/example/widgets/pull/12",
    "ssh://git@github.com/example/widgets.git"
+  ]
+ },
+ "outcomes": {
+  "starts": [
+   {
+    "name": "a rollup whose children are all complete starts",
+    "edits": [
+     {
+      "op": "top",
+      "path": [
+       "startsWhen"
+      ],
+      "value": "children-complete"
+     },
+     {
+      "op": "top",
+      "path": [
+       "endsBy"
+      ],
+      "value": "hand-up"
+     }
+    ],
+    "context": {
+     "trigger": "children-complete",
+     "rollup": {
+      "verdict": "READY",
+      "reason": "all 3 children are complete",
+      "complete": [
+       "I124",
+       "I125",
+       "I126"
+      ],
+      "remaining": []
+     }
+    },
+    "expect": "ok"
+   },
+   {
+    "name": "a rollup whose context names no trigger takes the workflow's own",
+    "edits": [
+     {
+      "op": "top",
+      "path": [
+       "startsWhen"
+      ],
+      "value": "children-complete"
+     },
+     {
+      "op": "top",
+      "path": [
+       "endsBy"
+      ],
+      "value": "hand-up"
+     }
+    ],
+    "context": {
+     "rollup": {
+      "verdict": "READY",
+      "reason": "all 3 children are complete",
+      "complete": [
+       "I124",
+       "I125",
+       "I126"
+      ],
+      "remaining": []
+     }
+    },
+    "expect": "ok"
+   },
+   {
+    "name": "a rollup still waiting for children is refused, naming them",
+    "edits": [
+     {
+      "op": "top",
+      "path": [
+       "startsWhen"
+      ],
+      "value": "children-complete"
+     },
+     {
+      "op": "top",
+      "path": [
+       "endsBy"
+      ],
+      "value": "hand-up"
+     }
+    ],
+    "context": {
+     "trigger": "children-complete",
+     "rollup": {
+      "verdict": "WAITING",
+      "reason": "",
+      "complete": [
+       "I124"
+      ],
+      "remaining": [
+       {
+        "number": "I125",
+        "title": "Export menu",
+        "why": "in progress"
+       }
+      ]
+     }
+    },
+    "expect": "rollup-not-ready",
+    "message": "rollup is WAITING: still open: I125"
+   },
+   {
+    "name": "a held rollup is refused with its reason",
+    "edits": [
+     {
+      "op": "top",
+      "path": [
+       "startsWhen"
+      ],
+      "value": "children-complete"
+     },
+     {
+      "op": "top",
+      "path": [
+       "endsBy"
+      ],
+      "value": "hand-up"
+     }
+    ],
+    "context": {
+     "trigger": "children-complete",
+     "rollup": {
+      "verdict": "HELD",
+      "reason": "release hold on I120: waiting for the audit",
+      "complete": [],
+      "remaining": []
+     }
+    },
+    "expect": "rollup-not-ready",
+    "message": "rollup is HELD: release hold on I120: waiting for the audit"
+   },
+   {
+    "name": "a rollup that asks the owner is refused",
+    "edits": [
+     {
+      "op": "top",
+      "path": [
+       "startsWhen"
+      ],
+      "value": "children-complete"
+     },
+     {
+      "op": "top",
+      "path": [
+       "endsBy"
+      ],
+      "value": "hand-up"
+     }
+    ],
+    "context": {
+     "trigger": "children-complete",
+     "rollup": {
+      "verdict": "ASK",
+      "reason": "ask the owner once",
+      "complete": [],
+      "remaining": []
+     }
+    },
+    "expect": "rollup-not-ready",
+    "message": "rollup is ASK: ask the owner once"
+   },
+   {
+    "name": "a rollup with no readiness answer is refused",
+    "edits": [
+     {
+      "op": "top",
+      "path": [
+       "startsWhen"
+      ],
+      "value": "children-complete"
+     },
+     {
+      "op": "top",
+      "path": [
+       "endsBy"
+      ],
+      "value": "hand-up"
+     }
+    ],
+    "context": {
+     "trigger": "children-complete"
+    },
+    "expect": "rollup-not-ready",
+    "message": "rollup is not decided"
+   },
+   {
+    "name": "a rollup readiness answer that is not an object is refused",
+    "edits": [
+     {
+      "op": "top",
+      "path": [
+       "startsWhen"
+      ],
+      "value": "children-complete"
+     },
+     {
+      "op": "top",
+      "path": [
+       "endsBy"
+      ],
+      "value": "hand-up"
+     }
+    ],
+    "context": {
+     "trigger": "children-complete",
+     "rollup": "READY"
+    },
+    "expect": "rollup-not-ready",
+    "message": "rollup is not decided"
+   },
+   {
+    "name": "a rollup with no item is refused",
+    "edits": [
+     {
+      "op": "top",
+      "path": [
+       "startsWhen"
+      ],
+      "value": "children-complete"
+     },
+     {
+      "op": "top",
+      "path": [
+       "endsBy"
+      ],
+      "value": "hand-up"
+     }
+    ],
+    "context": {
+     "trigger": "children-complete",
+     "rollup": {
+      "verdict": "READY",
+      "reason": "all 3 children are complete",
+      "complete": [
+       "I124",
+       "I125",
+       "I126"
+      ],
+      "remaining": []
+     },
+     "item": null
+    },
+    "expect": "rollup-not-ready",
+    "message": "names its rollup item"
+   },
+   {
+    "name": "a children-complete trigger for a workflow picked up with its item",
+    "edits": [],
+    "context": {
+     "trigger": "children-complete",
+     "rollup": {
+      "verdict": "READY",
+      "reason": "all 3 children are complete",
+      "complete": [
+       "I124",
+       "I125",
+       "I126"
+      ],
+      "remaining": []
+     }
+    },
+    "expect": "trigger-mismatch"
+   },
+   {
+    "name": "an item-picked-up trigger for a rollup workflow",
+    "edits": [
+     {
+      "op": "top",
+      "path": [
+       "startsWhen"
+      ],
+      "value": "children-complete"
+     },
+     {
+      "op": "top",
+      "path": [
+       "endsBy"
+      ],
+      "value": "hand-up"
+     }
+    ],
+    "context": {
+     "trigger": "item-picked-up",
+     "rollup": {
+      "verdict": "READY",
+      "reason": "all 3 children are complete",
+      "complete": [
+       "I124",
+       "I125",
+       "I126"
+      ],
+      "remaining": []
+     }
+    },
+    "expect": "trigger-mismatch"
+   },
+   {
+    "name": "an on-demand trigger for a workflow picked up with its item",
+    "edits": [],
+    "context": {
+     "trigger": "on-demand"
+    },
+    "expect": "as-before"
+   },
+   {
+    "name": "a rollup workflow with no ending",
+    "edits": [
+     {
+      "op": "top",
+      "path": [
+       "startsWhen"
+      ],
+      "value": "children-complete"
+     }
+    ],
+    "context": {
+     "trigger": "children-complete",
+     "rollup": {
+      "verdict": "READY",
+      "reason": "all 3 children are complete",
+      "complete": [
+       "I124",
+       "I125",
+       "I126"
+      ],
+      "remaining": []
+     }
+    },
+    "expect": "bad-schema"
+   },
+   {
+    "name": "a workflow picked up with its item that ends by shipping",
+    "edits": [
+     {
+      "op": "top",
+      "path": [
+       "endsBy"
+      ],
+      "value": "ship"
+     }
+    ],
+    "context": {},
+    "expect": "bad-schema"
+   }
+  ],
+  "ends": [
+   {
+    "name": "a Build run whose completion LANDED ends landed",
+    "definition": "build",
+    "answer": {
+     "complete@1": "COMPLETE: LANDED"
+    },
+    "runOutcomes": [
+     "completed",
+     "failed",
+     "interrupted",
+     "landed",
+     "handed-up",
+     "shipped"
+    ],
+    "outcome": "completed",
+    "recordedOutcome": "landed",
+    "reported": "landed"
+   },
+   {
+    "name": "a Build run whose completion was DONE ends shipped",
+    "definition": "build",
+    "answer": {},
+    "runOutcomes": [
+     "completed",
+     "failed",
+     "interrupted",
+     "landed",
+     "handed-up",
+     "shipped"
+    ],
+    "outcome": "completed",
+    "recordedOutcome": "shipped",
+    "reported": "shipped"
+   },
+   {
+    "name": "a Build run that landed, to a tracker that names no new outcome, is reported completed",
+    "definition": "build",
+    "answer": {
+     "complete@1": "COMPLETE: LANDED"
+    },
+    "outcome": "completed",
+    "recordedOutcome": "landed",
+    "reported": "completed"
+   },
+   {
+    "name": "a Build run that landed, to a tracker that accepts shipped only, is reported completed",
+    "definition": "build",
+    "answer": {
+     "complete@1": "COMPLETE: LANDED"
+    },
+    "runOutcomes": [
+     "completed",
+     "failed",
+     "interrupted",
+     "shipped"
+    ],
+    "outcome": "completed",
+    "recordedOutcome": "landed",
+    "reported": "completed"
+   },
+   {
+    "name": "a Build run held at the merge still ends interrupted",
+    "definition": "build",
+    "answer": {
+     "merge@1": "MERGE: HELD waiting for the audit"
+    },
+    "runOutcomes": [
+     "completed",
+     "failed",
+     "interrupted",
+     "landed",
+     "handed-up",
+     "shipped"
+    ],
+    "outcome": "held",
+    "recordedOutcome": null,
+    "reported": "interrupted"
+   },
+   {
+    "name": "a Build run whose completion failed still ends failed",
+    "definition": "build",
+    "answer": {
+     "complete@1": "COMPLETE: FAILED the status move was refused"
+    },
+    "runOutcomes": [
+     "completed",
+     "failed",
+     "interrupted",
+     "landed",
+     "handed-up",
+     "shipped"
+    ],
+    "outcome": null,
+    "recordedOutcome": null,
+    "reported": "failed"
+   },
+   {
+    "name": "a definition with no recording step still ends completed",
+    "definition": "claim-only",
+    "answer": {},
+    "runOutcomes": [
+     "completed",
+     "failed",
+     "interrupted",
+     "landed",
+     "handed-up",
+     "shipped"
+    ],
+    "outcome": "completed",
+    "recordedOutcome": null,
+    "reported": "completed"
+   }
   ]
  }
 }

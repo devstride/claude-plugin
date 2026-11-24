@@ -241,6 +241,66 @@
         },
         "note": "The full release as a step list for clearance held from the cut to the deploy.",
         "dormant": true
+      },
+      {
+        "version": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "4c5de04868a3dc49e17a29fdd36bb9261af6453e16985a27aae63cb0d6a4697f",
+        "minPluginVersion": "4.8.0",
+        "steps": {
+          "approve-deploy": "deploy-approval@1",
+          "auto-start-next": "auto-start@1",
+          "ci-hold-proof": "ci-hold-proof@1",
+          "classify-at-pre-ship": "classify-at-pre-ship@1",
+          "classify-release": "classify-release@1",
+          "confirm-deploy": "deploy-confirm@1",
+          "cut-branch": "release-branch@1",
+          "delete-release-branch": "release-branch-delete@1",
+          "dev-deploy-after-yes": "dev-deploy-wait@1",
+          "dev-deploy-before-decision": "dev-deploy-wait@1",
+          "discharge-hold": "pre-ship-resume@1",
+          "docs-plan": "release-docs-plan@1",
+          "go-ahead": "owner-go-ahead@1",
+          "ground-truth": "ground-truth@1",
+          "hotfix-catch-up": "hotfix-catch-up@1",
+          "merge-confirmations": "merge-confirmations@1",
+          "open-release-pr": "release-pr@1",
+          "post-deploy-check": "post-deploy-check-owed@1",
+          "post-deploy-close-out": "release-close-out@1",
+          "post-deploy-status": "post-deploy-result@1",
+          "post-pending-status": "post-deploy-pending@1",
+          "pre-merge-check": "pre-merge-check@1",
+          "pre-ship-release": "pre-ship-release@1",
+          "previous-release-gate": "previous-release@1",
+          "previous-release-recheck": "previous-release@1",
+          "production-merge": "production-merge@1",
+          "release-delta": "release-delta@1",
+          "release-recap": "release-recap@1",
+          "release-review": "release-review@1",
+          "release-shape": "release-shape@1",
+          "score-estimates": "estimates-score@1",
+          "ship-plan": "ship-plan@1",
+          "sync-knowledge-base": "release-kb-sync@1",
+          "sync-production": "release-sync@1",
+          "tower-claim": "tower-claim@1",
+          "tower-hand-back": "tower-hand-back@1",
+          "train-claim": "train-claim@1",
+          "train-claim-hand-on": "train-claim-hand-on@1",
+          "train-close-out": "train-close-out@1",
+          "train-finish-earlier": "train-finish@1",
+          "train-level": "train-level@1",
+          "train-level-final": "train-level@1",
+          "train-merge": "train-merge@1",
+          "train-pr": "train-pr@1",
+          "train-pre-ship": "train-pre-ship@1",
+          "train-review": "train-review@1",
+          "train-snapshot": "train-snapshot@1",
+          "update-docs": "release-docs@1",
+          "write-release-notes": "release-notes@1"
+        },
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet).",
+        "dormant": true
       }
     ],
     "release-docs": [
@@ -333,6 +393,79 @@
         },
         "note": "The full release as a step list for clearance held only to merge and deploy.",
         "dormant": true
+      },
+      {
+        "version": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "e9071cb6c3e3edef7c5ef0b37b901a2b3d815367ead3982ae40e0203edda8c92",
+        "minPluginVersion": "4.8.0",
+        "steps": {
+          "approve-deploy": "deploy-approval@1",
+          "auto-start-next": "auto-start@1",
+          "checks-stamp": "release-stamp@1",
+          "checks-tip": "release-tip@1",
+          "ci-hold-proof": "ci-hold-proof@1",
+          "classify-at-checks": "classify-at-checks@1",
+          "classify-at-pre-ship": "classify-at-pre-ship@1",
+          "classify-release": "classify-release@1",
+          "confirm-deploy": "deploy-confirm@1",
+          "cut-branch": "release-branch@1",
+          "delete-release-branch": "release-branch-delete@1",
+          "dev-deploy-wait": "dev-deploy-wait@1",
+          "discharge-hold": "pre-ship-resume@1",
+          "docs-plan": "release-docs-plan@1",
+          "go-ahead": "owner-go-ahead@1",
+          "go-ahead-recheck": "owner-go-ahead-recheck@1",
+          "ground-truth": "ground-truth@1",
+          "hand-back-after-deploy": "tower-hand-back@1",
+          "hotfix-catch-up": "hotfix-catch-up@1",
+          "merge-confirmations": "merge-confirmations@1",
+          "open-release-pr": "release-pr@1",
+          "post-deploy-check": "post-deploy-check-owed@1",
+          "post-deploy-close-out": "release-close-out@1",
+          "post-deploy-status": "post-deploy-result@1",
+          "post-pending-status": "post-deploy-pending@1",
+          "pre-merge-at-checks": "pre-merge-at-checks@1",
+          "pre-merge-check": "pre-merge-check@1",
+          "pre-merge-recheck": "pre-merge-recheck@1",
+          "pre-ship-at-checks": "pre-ship-at-checks@1",
+          "pre-ship-release": "pre-ship-release@1",
+          "previous-release-gate": "previous-release@1",
+          "previous-release-recheck": "previous-release@1",
+          "production-in-branch": "production-in-branch@1",
+          "production-merge": "production-merge@1",
+          "queue": "tower-queue@1",
+          "queue-final": "tower-queue@1",
+          "release-delta": "release-delta@1",
+          "release-recap": "release-recap@1",
+          "release-review": "release-review@1",
+          "release-shape": "release-shape@1",
+          "rerun-at-merge": "rerun-at-merge@1",
+          "score-estimates": "estimates-score@1",
+          "ship-plan": "ship-plan@1",
+          "stamp-verify": "release-stamp-verify@1",
+          "stamp-verify-final": "release-stamp-verify@1",
+          "sync-knowledge-base": "release-kb-sync@1",
+          "sync-production": "release-sync@1",
+          "tower-claim": "tower-claim@1",
+          "train-claim": "train-claim@1",
+          "train-claim-hand-on": "train-claim-hand-on@1",
+          "train-close-out": "train-close-out@1",
+          "train-finish-earlier": "train-finish@1",
+          "train-level": "train-level@1",
+          "train-level-after-cut": "train-level@1",
+          "train-level-final": "train-level@1",
+          "train-merge": "train-merge@1",
+          "train-pr": "train-pr@1",
+          "train-pre-ship": "train-pre-ship@1",
+          "train-review": "train-review@1",
+          "train-snapshot": "train-snapshot@1",
+          "update-docs": "release-docs@1",
+          "write-release-notes": "release-notes@1"
+        },
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet).",
+        "dormant": true
       }
     ],
     "release-notes": [
@@ -366,10 +499,34 @@
         },
         "note": "A partial release entry that runs only the post-deploy health check.",
         "dormant": true
+      },
+      {
+        "version": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "aa89cbdcccaf98277a2c35fd5e4b9b38626659eb4c083acc0b1ab395b27c0495",
+        "minPluginVersion": "4.8.0",
+        "steps": {
+          "confirm-deploy": "deploy-confirm@1",
+          "merged-release": "merged-release@1",
+          "post-deploy-check": "post-deploy-check-owed@1",
+          "post-deploy-status": "post-deploy-result@1"
+        },
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet).",
+        "dormant": true
       }
     ]
   },
   "contracts": {
+    "approval": [
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "14f67d6d77b42fd2f80cce22eae09fb9d9180f4b2146d51a969572088a6ccabd",
+        "note": "A workflow can stop for a person's approval (dormant until DevStride offers it)."
+      }
+    ],
     "auto-start": [
       {
         "major": 1,
@@ -420,6 +577,15 @@
         "note": "File the follow-up work the build, the risk check and the review left untracked (first published with the step contract catalog)."
       }
     ],
+    "checkpoint": [
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "cf1f84e8ab35d1f85455187d7f8ea8af1bb77db3c300dbd6ef6c72ac6066859f",
+        "note": "A workflow step can run only when something is true, carry on past its own failure, or be done by a person (dormant until DevStride offers it)."
+      }
+    ],
     "ci-hold-proof": [
       {
         "major": 1,
@@ -445,6 +611,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "2e1e087893a4178cf3ac6d81479787ee9f083f6a66e812c7f98747876d2d1438",
         "note": "Classify the release again at the head the checks test (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "330e7e7aca6899adedaea5ced99cb165cd148b4905f9427784d63842958b35b9",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "classify-at-pre-ship": [
@@ -454,6 +627,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "26defbd2e78e5b4967bffabd005dded4b2d7b3a8075918d22032aeed358d8978",
         "note": "Classify the release again at the reviewed head before the pre-ship checks (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "51d2cbed28008b2f0e163aa4c3c004a3cb46944c03d3dee6e58ac7b645a31a7e",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "classify-release": [
@@ -463,6 +643,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "2c0b575b6988435e4f5d3116682f1c479cee62fb1a4069e5f1b5c921358e0619",
         "note": "Say whether the release is light or full; anything unclear is full (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "18c44a09f8906a66016f10f4920f0a37dab1d44301cba0c827511cceee1be9a8",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "complete": [
@@ -479,6 +666,13 @@
         "releasedAt": "2026-11-19",
         "sha256": "0d58090ea3bdc7d1a4e430e884004da09b3befdd0e0c8e8ccbb7b48a78cc2871",
         "note": "Additive revision: adds `profileSource`."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "2a500aefa78bbef8d3d5047f3d6abd4e14fed1e1b4de57b57188cce256a9db59",
+        "note": "A finished build can tell the tracker whether its work landed or shipped (dormant until the tracker accepts it)."
       }
     ],
     "custom": [
@@ -551,6 +745,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "80925529cc248c294dcc92a2f979a5df52e771f6a50073d3b8bbc24a348e0bcc",
         "note": "Merge a hotfix that reached production into the release branch (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "339dafda38ced2dfe66f834254181d1a43a461cafe99f070e3f56588cb1551e7",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "hotfix-close": [
@@ -638,6 +839,13 @@
         "sha256": "26af0a317cf057cfa1e04b0595d80c5c6e74151f23e524a4f2191984964f442d",
         "note": "Content changed without a version bump: the payload's `item` became optional.",
         "slip": true
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "d5d603995ec36c527bb6584943436d59f69193035299ba095915bc3ccff22194",
+        "note": "A workflow step can run only when something is true, carry on past its own failure, or be done by a person (dormant until DevStride offers it)."
       }
     ],
     "merge": [
@@ -654,6 +862,13 @@
         "releasedAt": "2026-11-19",
         "sha256": "77722ac44d0754738855c78dd60f5cf8b0bf7b5a6c29f74a48808ba2f498c3ca",
         "note": "Additive revision: adds `localChecks` and `reviewProof`."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "4d86976d49cffcea0a7b21337a68e8e9ad3b6f2a3364c21830ab250dcce3c158",
+        "note": "A workflow step can run only when something is true, carry on past its own failure, or be done by a person (dormant until DevStride offers it)."
       }
     ],
     "merge-confirmations": [
@@ -663,6 +878,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "46150a50a92eeb567f2a990bb35c10f782acd2cdb40ace6dc4ad7d220dc9aa7a",
         "note": "Confirm the head, CI, pre-ship results, threads and tower before the merge (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "33032695426ecc03c7ea3549becb2939fe936f6c0a876cb11a51ae8a09a349ff",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "merged-release": [
@@ -681,6 +903,22 @@
         "releasedAt": "2026-11-22",
         "sha256": "87b6852c3a058a0e29eff52a4bcbfd77078620bf0640f492025844e6267484fa",
         "note": "Show the recap and take the owner's yes or the standing yes before the production merge (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "66a937bb1ea18efd23c987099a6c6970b774eb49d60db22d90b7e6c3711d0e21",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
+      }
+    ],
+    "owner-go-ahead-recheck": [
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "9f404b607b10fc2be6434a3a8d93c83512656b55812ff511e462f9a6b8479189",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "plan-create": [
@@ -780,6 +1018,22 @@
         "releasedAt": "2026-11-22",
         "sha256": "cd3ca28c9099217d707f7e63091999b10731bc1aeda1b218a8f12d4ac5d2e4b3",
         "note": "Run the post-deploy health check (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "0f256a7cd5686903d3d63da992980ff077fee81fb73916662addaac19cab47ae",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
+      }
+    ],
+    "post-deploy-check-owed": [
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "c1afd0cc8c1defd6a87a2186bc72c2bcd8384aa561a4697adf34c1bc88c93836",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "post-deploy-pending": [
@@ -798,6 +1052,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "2808269073d5bda5979edadfcb4c965c3f1eb011d03d9e544409cd87d54cec6e",
         "note": "Post the health check's result as the release/post-deploy status (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "88e0a7a0cb3ae8940557d08ccc7398324adabd2954583e616c0db5ce79fcc92d",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "pre-merge-at-checks": [
@@ -807,6 +1068,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "8027b24a7babf850b4e05141b627edceb92deeecd3ba1e12e8dbc9d356ca36eb",
         "note": "Ask whether production needs anything before the merge, at the checks head (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "121b14a9f4af897861dbf13a6573f4d7bebf9fb36faee77fa45ca9beff83a32e",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "pre-merge-check": [
@@ -816,6 +1084,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "e2cc81cbca7db44a00f1b344c1a1ca83289548df392847635548e906cd3e9505",
         "note": "Ask whether production needs anything before the merge (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "4008dd126314c391fa4f3900ae6d4bc293a17d64d7570e6977241915e3ea63f6",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "pre-merge-recheck": [
@@ -825,6 +1100,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "e7fbb3d3f0a429ea9470beba2a7a9f95289d30e4cae128a14fb30d71aa3acf07",
         "note": "Ask the pre-merge question again once the tower is claimed (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "cf13b9b3f1c611e0af62b1b8fd69b8cf3c7c3328f08e8af11991e0cd81353dfd",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "pre-ship-at-checks": [
@@ -834,6 +1116,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "79837f4fc8b96c5d56202677b653006835b94f73d6d5e7fd73d75643b91bdd0a",
         "note": "Run the release's pre-ship checks before claiming the tower (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "c8353e7189ca8b625f4f4bdffa8ff734bc3a5648d10d88425c123ec32227559a",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "pre-ship-release": [
@@ -843,6 +1132,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "a8bf7ac3b0a994330d7dcf25cc7b622c994bb222bfb4004cf1e581550164d047",
         "note": "Run the release's pre-ship checks at the reviewed head (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "a3cfdb93ecc214ee4fc5d2a052ed0288a85233e1743d7f02c016f676412b57c6",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "pre-ship-resume": [
@@ -879,6 +1175,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "0617e1b224f038029594e1de66faf696eefb335934a4943328d0afa54e61e12c",
         "note": "Merge the release into production through the merge gate, never a push (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "71dc3f3106b35acd8ce024643cbbea5780a21308e2bc9f3e19fe82e1a459b80b",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "rationalize-gantt": [
@@ -1014,6 +1317,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "7778b4628c7ba2fddc1357314b89b368cf2db8b5250de18a0e3badc1c0704c51",
         "note": "Work out what the release carries and check its holds (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "14ed7f44e6dba257864c67cd709fff6299e0c542b499166a4aa5feec66954300",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "release-docs": [
@@ -1032,6 +1342,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "4eede991a2b08b4151000ca0141c8666b048b4339d48e4794cea1de74a213a75",
         "note": "Plan which documentation hooks run after the deploy is confirmed (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "9b40f825d0d8a88c29792aed084a73e72bac3f8a0337cd7edad5020c0df14b02",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "release-kb-sync": [
@@ -1050,6 +1367,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "ef75859bc5de162868fc7ad88c64667074f37914235fdb120f158134c758ca49",
         "note": "Write release notes, only when they were asked for (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "8b12127662e6847bc8f5ee4619496feb90d23cb8fd61b0bf717bbf88ab5ac1ca",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "release-pr": [
@@ -1059,6 +1383,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "79b71ac700388618d0f9fda7a637080c255aa080474ed0d0821970eae15c388d",
         "note": "Open the release pull request into production as a draft (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "47426fdcde1465a57fd384c03c23f9ea882cb22261f8a870d3062d5ad17778ca",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "release-recap": [
@@ -1077,6 +1408,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "b286de118de113ff26c4bc0a8d5afc79a36bd6b49ee73467f43ff5a813abac6d",
         "note": "Run the full production-release review and settle it (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "53f831780057cc3926227db50b22f248af8c03c4cc88b7c186e25c4d1cc1979a",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "release-shape": [
@@ -1122,6 +1460,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "b0b46dac0b3de39f7a4bebc37e9774fbb55fa6e45258abc78007bdeaf468a424",
         "note": "Record the production tip the checks run against (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "e837931b1e945500d9c537df044a6d7049fd7efa207a1984689aa00c5d4dc719",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "rerun-at-merge": [
@@ -1131,6 +1476,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "12808d9c33aebfd07ac8005b5bff29cf036f7677cb8a1c144625cfcd3f00e4a4",
         "note": "Re-run the pre-ship entries marked to run again at the merge (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "c35a888fc290ef7c2406fba5cf4efc5815d3e2ed537ad5c56bd7916712a2b3a0",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "review": [
@@ -1155,6 +1507,13 @@
         "sha256": "0c5da3a4fefa678245f7c378d1ee707840c409fef20faff898c08580626efb9e",
         "note": "Content changed without a version bump: the payload's `item` became optional.",
         "slip": true
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "5a0953106601779aeda37efec203809c88a16dcc9635101b23a2d0c7456a69cd",
+        "note": "A workflow step can run only when something is true, carry on past its own failure, or be done by a person (dormant until DevStride offers it)."
       }
     ],
     "risk-check": [
@@ -1180,6 +1539,13 @@
         "sha256": "0fceb2f7ded4ef0e93132e175f13c6e471911c427331dc18f15b183dffb62724",
         "note": "Content changed without a version bump: the payload's `item` became optional.",
         "slip": true
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "74aabfe8df0eca611db6bcf68481a639e629d14daedd936779006991968665bd",
+        "note": "A workflow step can run only when something is true, carry on past its own failure, or be done by a person (dormant until DevStride offers it)."
       }
     ],
     "session-model": [
@@ -1297,6 +1663,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "5577ab9535abfd7309ec39be7b17dc3c707503802fb5edab144d2cf35c402f73",
         "note": "Bring the release train level with the release source (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "7ad04f984a218df913379ca0bf0834ee2bf86b376b7702c2595b1e6c7de8df02",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "train-merge": [
@@ -1324,6 +1697,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "72a5ca52225a945a96f3b2ca032b6b623eb1915ef4dcd6e32eeede0e7e536ca7",
         "note": "Run the local pre-ship checks the train needs (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "1f8a35353f4329ad54e34c3eea319024ba21e7f8dc9c1517492a5610dfbdb8dc",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ],
     "train-review": [
@@ -1342,6 +1722,13 @@
         "releasedAt": "2026-11-22",
         "sha256": "6aad3cf72205df31300f2620dcc66715e51e840d68b6df5f39e41e712d011da4",
         "note": "Cut a snapshot of the release train merged with the release source (first published for the Release workflow)."
+      },
+      {
+        "major": 1,
+        "pluginVersion": "4.10.0",
+        "releasedAt": "2026-11-23",
+        "sha256": "a010b18df5809e3efd29363b3be293d1ef95a221ff8e796e6aff00a91a4fde60",
+        "note": "Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet)."
       }
     ]
   }

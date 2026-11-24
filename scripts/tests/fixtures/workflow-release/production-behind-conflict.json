@@ -1,0 +1,26 @@
+{
+  "about": "Production moved on after the cut and merging it in conflicts: the run stops and no pull request is opened.",
+  "definition": "workflows/release-merge-and-deploy.json",
+  "phases": ["cut"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "merge-and-deploy", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "release-delta", "output": "RELEASE DELTA: ITEMS 3\nevidence line\n```json\n{\"state\": \"items\", \"sourceHead\": \"00000000000000000000000000000000000000a1\", \"productionHead\": \"00000000000000000000000000000000000000b2\"}\n```\n"},
+    {"step": "classify-release", "output": "RELEASE CLASS: LIGHT\nevidence line\n```json\n{\"state\": \"light\"}\n```\n"},
+    {"step": "queue", "output": "QUEUE: CLEAR\nevidence line\n```json\n{\"state\": \"clear\"}\n```\n"},
+    {"step": "cut-branch", "output": "RELEASE BRANCH: CUT release/26-11-21\nevidence line\n```json\n{\"state\": \"cut\"}\n```\n"},
+    {"step": "production-in-branch", "output": "PRODUCTION IN BRANCH: CONFLICT backend/a.ts\nevidence line\n```json\n{\"state\": \"conflict\"}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["release-delta", 1],
+      ["classify-release", 1],
+      ["queue", 1],
+      ["cut-branch", 1],
+      ["production-in-branch", 1]
+    ],
+    "outcome": "stopped",
+    "stops": ["production-in-branch"],
+    "stopReasons": ["CONFLICT backend/a.ts"]
+  }
+}

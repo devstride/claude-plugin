@@ -1,0 +1,30 @@
+{
+  "about": "Under cut-to-deploy a failed health check never stops the run itself: the status step posts failure and then stops for the rollback decision; no documentation or notes are issued.",
+  "definition": "workflows/release-cut-to-deploy.json",
+  "phases": ["close-out"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "cut-to-deploy", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "sync-production", "output": "SYNC: DONE\nevidence line\n```json\n{\"state\": \"done\"}\n```\n"},
+    {"step": "delete-release-branch", "output": "RELEASE BRANCH DELETE: DELETED release/26-11-21\nevidence line\n```json\n{\"state\": \"deleted\"}\n```\n"},
+    {"step": "train-level-final", "output": "TRAIN LEVEL: FAST-FORWARDED\nevidence line\n```json\n{\"state\": \"fast-forwarded\", \"autoStart\": \"SKIP nothing waiting\"}\n```\n"},
+    {"step": "post-pending-status", "output": "POST-DEPLOY STATUS: PENDING POSTED\nevidence line\n```json\n{\"state\": \"pending-posted\"}\n```\n"},
+    {"step": "tower-hand-back", "output": "TOWER: HANDED BACK release/26-11-21\nevidence line\n```json\n{\"state\": \"handed-back\"}\n```\n"},
+    {"step": "post-deploy-check", "output": "POST-DEPLOY HEALTH: FAIL\nevidence line\n```json\n{\"state\": \"fail\"}\n```\n"},
+    {"step": "post-deploy-status", "output": "POST-DEPLOY STATUS: FAILURE POSTED\nevidence line\n```json\n{\"state\": \"failure-posted\"}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["sync-production", 1],
+      ["delete-release-branch", 1],
+      ["train-level-final", 1],
+      ["post-pending-status", 1],
+      ["tower-hand-back", 1],
+      ["post-deploy-check", 1],
+      ["post-deploy-status", 1]
+    ],
+    "outcome": "stopped",
+    "stops": ["post-deploy-status"],
+    "stopReasons": ["FAILURE POSTED"]
+  }
+}

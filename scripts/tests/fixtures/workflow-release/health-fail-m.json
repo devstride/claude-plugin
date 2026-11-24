@@ -1,0 +1,20 @@
+{
+  "about": "Under merge-and-deploy a failed health check never stops the run itself: the status step posts failure and then stops for the rollback decision; no documentation or notes are issued, and production is not synced back.",
+  "definition": "workflows/release-merge-and-deploy.json",
+  "phases": ["close-out"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "merge-and-deploy", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "post-deploy-check", "output": "POST-DEPLOY HEALTH: FAIL\nevidence line\n```json\n{\"state\": \"fail\"}\n```\n"},
+    {"step": "post-deploy-status", "output": "POST-DEPLOY STATUS: FAILURE POSTED\nevidence line\n```json\n{\"state\": \"failure-posted\"}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["post-deploy-check", 1],
+      ["post-deploy-status", 1]
+    ],
+    "outcome": "stopped",
+    "stops": ["post-deploy-status"],
+    "stopReasons": ["FAILURE POSTED"]
+  }
+}

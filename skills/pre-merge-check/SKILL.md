@@ -7,12 +7,12 @@ description: "Step: ask the repository's release.preMergeSkill whether productio
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
-Arguments: $ARGUMENTS — the payload `{ "productionBranch", "releaseSource", "head", "pullRequest" }`
+Arguments: $ARGUMENTS — the payload `{ "productionBranch", "releaseSource", "head", "pullRequest", "shape" }`
 as a fenced JSON block. Contract: `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-safety-hooks.md`.
 
 ## Verdict
 
-`PRE-MERGE: CLEAR | HOLD | NOT RUN | NOT CONFIGURED`
+`PRE-MERGE: CLEAR | HOLD | NOT RUN | NOT CONFIGURED | NOT APPLICABLE`
 
 ## Steps
 

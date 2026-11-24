@@ -1,0 +1,39 @@
+{
+  "about": "Head moved before the ready flip: release-review answers HEAD MOVED and is issued again on its own, never a stop, seven times; the eighth attempt settles (the review contract's limit of eight requests to run again is not reached) and only then do the pre-ship checks and the discharge run.",
+  "definition": "workflows/release.json",
+  "phases": ["review"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: HEAD MOVED\nevidence line\n```json\n{\"state\": \"head-moved\", \"reviewedHead\": \"000000000000000000000000000000000000003d\"}\n```\n"},
+    {"step": "release-review", "output": "RELEASE REVIEW: SETTLED 00000000000000000000000000000000000000f6\nevidence line\n```json\n{\"state\": \"settled\", \"reviewedHead\": \"00000000000000000000000000000000000000f6\"}\n```\n"},
+    {"step": "classify-at-pre-ship", "output": "RELEASE CLASS: LIGHT\nevidence line\n```json\n{\"state\": \"light\"}\n```\n"},
+    {"step": "pre-ship-release", "output": "PRE-SHIP: PASS\nevidence line\n```json\n{\"state\": \"pass\"}\n```\n"},
+    {"step": "discharge-hold", "output": "PRE-SHIP HOLD: NO HOLD\nevidence line\n```json\n{\"state\": \"no-hold\"}\n```\n"},
+    {"step": "docs-plan", "output": "DOCS PLAN: HOOKS 2\nevidence line\n```json\n{\"state\": \"hooks\"}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["release-review", 1],
+      ["release-review", 2],
+      ["release-review", 3],
+      ["release-review", 4],
+      ["release-review", 5],
+      ["release-review", 6],
+      ["release-review", 7],
+      ["release-review", 8],
+      ["classify-at-pre-ship", 1],
+      ["pre-ship-release", 1],
+      ["discharge-hold", 1],
+      ["docs-plan", 1]
+    ],
+    "outcome": "completed",
+    "stops": []
+  }
+}

@@ -752,8 +752,8 @@
         {
           "id": "post-deploy-check",
           "name": "Post-deploy health check",
-          "summary": "Run the post-deploy health check.",
-          "contract": "post-deploy-check@1",
+          "summary": "Run the post-deploy health check after the hand-back; the next step posts its answer.",
+          "contract": "post-deploy-check-owed@1",
           "kind": "step",
           "run": {
             "source": "builtin",

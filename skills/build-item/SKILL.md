@@ -191,8 +191,8 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
   whole ready-set.
 - **DRY-CHAIN / TERMINAL:** no selectable candidate → exit cleanly, never re-ask, saying which:
   plan complete (then **Closing**, `deferred-container.md`) / N landed, awaiting their release (gate on →
-  step 8 for it, then step 0) / N blocked by X, Y / N gated. Suggest `/devstride:plan <root>` only
-  when the chain ran out; never invoke it.
+  step 8 for it, then step 0; its rollup report: `next-unblocked.md`) / N blocked by X, Y / N gated.
+  Suggest `/devstride:plan <root>` only when the chain ran out; never invoke it.
 - **Every exit from step 0** (DRY-CHAIN/TERMINAL, ambiguous root, a given item merged or Done, any
   other stop before the run starts) → **`return-checkout`** first when this run leased, and a claim
   the unfinished-run check took is released, also when the gating check passes over that story
@@ -207,8 +207,8 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
 ## The run
 
 Every command is `python3 -B "${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py"
-<command>` with one JSON object on stdin (a file or here-document, never quoted), and every `next`, `done`, `status` and `resume` names the `item`: a session holding two open runs is
-refused one that does not. Every `resume` also carries `"workflow": "build"`. **Read
+<command>` with one JSON object on stdin (a file or here-document, never quoted), and every `next`, `done`, `status` and `resume` names the `item` (with two open runs, one that does not is
+refused). Every `resume` also carries `"workflow": "build"`. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md` in full before the first
 command, and again after a compaction**: the commands, the answers, the stops and resuming.
 
@@ -218,9 +218,8 @@ command, and again after a compaction**: the commands, the answers, the stops an
    (`I<number>-` plus `routing.py slug` of the title), `mode` (`select`, `named` or `resume`), `trigger` `item-picked-up`.
 2. **`resume` with the item first** (a named or handed-off story after step 0's claim check; a
    selected one straight away): it finds this session's open
-   run, or adopts the newest unfinished one another session left for the item in this repository
-   (a cleared conversation, a crash), re-bound here (`adoptedFrom` names where
-   it came from: say it), and hands back its current step. Any command refused `wrong-branch` (a `resume`,
+   run, or adopts the newest unfinished one another session left for the item in this repository,
+   re-bound here (`adoptedFrom` names where it came from: say it), and hands back its current step. Any command refused `wrong-branch` (a `resume`,
    `next` or `done` of an adopted run off its story branch, named) → `git fetch origin
    "+refs/heads/<branch>:refs/remotes/origin/<branch>"` (for a branch only here it fails,
    harmlessly); then `git checkout <branch>` when it exists here, else `git checkout -b

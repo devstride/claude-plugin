@@ -25,7 +25,21 @@ and anyone can run it alone as `/devstride:<name>` — for example to re-run one
   resolve): `NOT CONFIGURED` with the setting and its fix — except a safety step.
 - **Safety steps** (`pre-ship`, `post-deploy`, `classify-release`, `pre-merge-check`): configured
   but missing, failing or answering with no verdict → the STRICTER path, never a pass and never
-  "nothing needed".
+  "nothing needed". Each ends its answer with one fenced `json` block, `{"state": "<the verdict's
+  value in lower case, spaces as hyphens>"}` (`light`, `full`, `pass`, `not-run`): a Release
+  workflow step reads its `state` (the class a later check is given), and a caller reading only
+  the first line ignores it. A passing `pre-ship train run` adds `ranAtTrain`, `--ran-at-train
+  <names>@<sha>` (the passed `runAt: train` entries, the snapshot head) exactly as this release's
+  `release run` takes it; `pre-ship` given `--only` with no names answers `NOTHING TO RUN`.
+- **A release that already merged.** The Release workflow hands these steps the release's
+  `shape` (the payload's `shape`; `pre-ship`'s `--shape`,
+  `${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/resume-rules.md`): `MERGED`, and for
+  `pre-ship train` also `ADOPTED`, → `NOT APPLICABLE` (`PRE-SHIP`, `PRE-MERGE`, `RELEASE CLASS`),
+  the hook not invoked and nothing run. Any other shape, or none, changes nothing.
+- **The tower heartbeat.** `pre-ship release run` without `--only` (the release's own pre-ship
+  step) first sends the tower `heartbeat pre-ship`, only when this session holds the tower (its
+  local clearance record shows it held, `resume-rules.md` "Heartbeats"); no record sends nothing.
+  Exit 4 → `FAIL`: another session owns this release now.
 - **An orchestrator never inlines a step's logic.** It reads the first line, decides, and carries
   the evidence into its recap unchanged.
 

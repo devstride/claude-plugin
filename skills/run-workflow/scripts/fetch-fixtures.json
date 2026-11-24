@@ -449,8 +449,8 @@
      "workflowId": "wf-acme-claim",
      "name": "Acme claim and check",
      "version": 3,
-     "hash": "5af9bdeb0861b44d94db7d9c88e21e091cb62e3adf7f419513573cbe041b36b1",
-     "minPluginVersion": "4.10.0",
+     "hash": "ca1f3e534c037e34aaabd726d9faf33e79d95bc69383877ebd8b29592fa32fe1",
+     "minPluginVersion": "10.0.0",
      "startsWhen": "item-picked-up",
      "matchedBy": "type+repository",
      "alsoMatched": [],
@@ -470,7 +470,7 @@
         "example.com/acme/widgets"
        ]
       },
-      "minPluginVersion": "4.10.0",
+      "minPluginVersion": "10.0.0",
       "phases": [
        {
         "id": "pick-up",

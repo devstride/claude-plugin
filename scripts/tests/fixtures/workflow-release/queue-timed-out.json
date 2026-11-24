@@ -1,0 +1,23 @@
+{
+  "about": "Queue under M: still waiting after release.clearance.waitMinutes, the step answers TIMED OUT naming the pull request ahead; the run stops and nothing is cut.",
+  "definition": "workflows/release-merge-and-deploy.json",
+  "phases": ["cut"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "merge-and-deploy", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "release-delta", "output": "RELEASE DELTA: ITEMS 3\nevidence line\n```json\n{\"state\": \"items\", \"sourceHead\": \"00000000000000000000000000000000000000a1\", \"productionHead\": \"00000000000000000000000000000000000000b2\"}\n```\n"},
+    {"step": "classify-release", "output": "RELEASE CLASS: LIGHT\nevidence line\n```json\n{\"state\": \"light\"}\n```\n"},
+    {"step": "queue", "output": "QUEUE: TIMED OUT 41\nevidence line\n```json\n{\"state\": \"timed-out\"}\n```\n", "waits": ["Waiting behind #41", "Waiting behind #41"]}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["release-delta", 1],
+      ["classify-release", 1],
+      ["queue", 1]
+    ],
+    "outcome": "stopped",
+    "stops": ["queue"],
+    "waits": 2,
+    "stopReasons": ["QUEUE: TIMED OUT 41"]
+  }
+}

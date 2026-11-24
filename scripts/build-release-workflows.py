@@ -11,7 +11,8 @@ Usage: build-release-workflows.py --write | --check | --select <ds-config.json> 
               `DEFINITION: workflows/<id>.json`, or `CONFIG ERROR: ...` naming the key (exit 2)
 
 The source (scripts/release-workflow-source.json) holds every step once (name, summary, contract,
-skill) and each definition's phase list and order. A hand edit of a generated file fails --check.
+skill) and each definition's phase list and order. A source key is the step id, unless the entry
+names its own `id`: one step id may then run a different contract at a different position. A hand edit of a generated file fails --check.
 Exit 0 written, clean or selected, 1 a generated file differs, 2 unreadable or invalid input.
 """
 import json
@@ -58,8 +59,11 @@ def build_step(step_id, step):
     for key in ("name", "summary", "contract", "skill"):
         if not isinstance(step.get(key), str) or not step[key]:
             raise SourceError("step %s: %s must be text" % (step_id, key))
+    ident = step.get("id", step_id)
+    if not isinstance(ident, str) or not ident:
+        raise SourceError("step %s: id must be text" % step_id)
     built = {
-        "id": step_id,
+        "id": ident,
         "name": step["name"],
         "summary": step["summary"],
         "contract": step["contract"],
@@ -93,6 +97,10 @@ def build_definitions(source):
                 used.add(step_id)
             phases.append({"id": phase["id"], "name": names[phase["id"]],
                            "steps": [build_step(step_id, steps[step_id]) for step_id in listed]})
+        ids = [s["id"] for p in phases for s in p["steps"]]
+        repeated = sorted(set(i for i in ids if ids.count(i) > 1))
+        if repeated:
+            raise SourceError("%s: the step id %s appears more than once" % (ident, ", ".join(repeated)))
         if not phases:
             raise SourceError("%s: a definition needs at least one phase" % ident)
         document = {

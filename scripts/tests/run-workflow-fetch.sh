@@ -108,7 +108,7 @@ check("... and only status names the fallback", rc == 0 and status["source"] == 
 NOTICE_START = {
     "incomplete": "DevStride sent an incomplete workflow; running the built-in workflow.",
     "integrity": "The workflow from DevStride failed its integrity check; running the built-in workflow.",
-    "plugin-too-old": "This workflow needs plugin 4.10.0 or newer (this is ",
+    "plugin-too-old": "This workflow needs plugin 10.0.0 or newer (this is ",
     "unrunnable": "The workflow from DevStride could not be run by this plugin (",
 }
 for case in FIX["answers"]:

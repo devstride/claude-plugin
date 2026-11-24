@@ -1,0 +1,37 @@
+{
+  "about": "Documentation answers FAILED; the knowledge-base sync answers NOT RUN, and the run goes on to the close-out and the notes.",
+  "definition": "workflows/release.json",
+  "phases": ["close-out"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "post-deploy-check", "output": "POST-DEPLOY HEALTH: PASS\nevidence line\n```json\n{\"state\": \"pass\"}\n```\n"},
+    {"step": "sync-production", "output": "SYNC: DONE\nevidence line\n```json\n{\"state\": \"done\"}\n```\n"},
+    {"step": "delete-release-branch", "output": "RELEASE BRANCH DELETE: DELETED release/26-11-21\nevidence line\n```json\n{\"state\": \"deleted\"}\n```\n"},
+    {"step": "train-level-final", "output": "TRAIN LEVEL: FAST-FORWARDED\nevidence line\n```json\n{\"state\": \"fast-forwarded\", \"autoStart\": \"SKIP nothing waiting\"}\n```\n"},
+    {"step": "tower-hand-back", "output": "TOWER: HANDED BACK release/26-11-21\nevidence line\n```json\n{\"state\": \"handed-back\"}\n```\n"},
+    {"step": "update-docs", "output": "UPDATE DOCS: FAILED\nevidence line\n```json\n{\"state\": \"failed\"}\n```\n"},
+    {"step": "sync-knowledge-base", "output": "KNOWLEDGE BASE SYNC: NOT RUN\nevidence line\n```json\n{\"state\": \"not-run\"}\n```\n"},
+    {"step": "post-deploy-close-out", "output": "POST-DEPLOY CLOSE-OUT: DONE\nevidence line\n```json\n{\"state\": \"done\"}\n```\n"},
+    {"step": "write-release-notes", "output": "RELEASE NOTES: NOT REQUESTED\nevidence line\n```json\n{\"state\": \"not-requested\"}\n```\n"},
+    {"step": "release-recap", "output": "RELEASE RECAP: MERGED 42\nevidence line\n```json\n{\"state\": \"merged\"}\n```\n"},
+    {"step": "auto-start-next", "output": "AUTO START: SKIP nothing waiting\nevidence line\n```json\n{\"state\": \"skip\"}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["post-deploy-check", 1],
+      ["sync-production", 1],
+      ["delete-release-branch", 1],
+      ["train-level-final", 1],
+      ["tower-hand-back", 1],
+      ["update-docs", 1],
+      ["sync-knowledge-base", 1],
+      ["post-deploy-close-out", 1],
+      ["write-release-notes", 1],
+      ["release-recap", 1],
+      ["auto-start-next", 1]
+    ],
+    "outcome": "completed",
+    "stops": []
+  }
+}

@@ -52,7 +52,8 @@ RAN_TEXT_MAX = 200
 REPOSITORY_MAX = 300
 STATUSES = ("running", "done", "failed", "waiting", "skipped")
 FINISHED = ("done", "failed", "skipped")
-RUN_OUTCOMES = ("completed", "failed", "interrupted")
+# The last three only where the tracker said it accepts them: the runner decides (`tracker_outcome`).
+RUN_OUTCOMES = ("completed", "failed", "interrupted", "landed", "handed-up", "shipped")
 ERROR_KINDS = ("ABSENT", "FORBIDDEN", "UNREACHABLE", "ERROR")
 OFF_WORDS = ("0", "false", "off", "no")
 LINK_KEYS = ("pullRequest", "commit", "comment")
@@ -308,7 +309,7 @@ def build_report_arguments(run_id, session_id, reports, *, item_number=None, rep
         arguments["reports"] = shaped
     if run is not None:
         if not isinstance(run, dict) or run.get("outcome") not in RUN_OUTCOMES:
-            raise ValueError("a run closes as completed, failed or interrupted")
+            raise ValueError("a run closes as completed, failed, interrupted, landed, handed-up or shipped")
         arguments["run"] = {"outcome": run["outcome"], "endedAt": _time(run.get("endedAt"), moment or _now(now))}
     return arguments
 
@@ -468,7 +469,7 @@ def command_payload(env):
         raise Usage("a report's status is one of %s" % ", ".join(STATUSES))
     closing = body.get("run")
     if closing is not None and (not isinstance(closing, dict) or closing.get("outcome") not in RUN_OUTCOMES):
-        raise Usage("a run closes as completed, failed or interrupted")
+        raise Usage("a run closes as completed, failed, interrupted, landed, handed-up or shipped")
     if _off(config, env):
         return {"skip": "off"}
     session, version = _session(env)

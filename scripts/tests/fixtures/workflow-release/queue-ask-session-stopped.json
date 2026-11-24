@@ -1,0 +1,24 @@
+{
+  "about": "Queue under M: after ASK, the owner says the session ahead stopped; the step never adopts or cuts beside it, answers WAIT naming the pull request ahead, and the run stops there.",
+  "definition": "workflows/release-merge-and-deploy.json",
+  "phases": ["cut"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "merge-and-deploy", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "release-delta", "output": "RELEASE DELTA: ITEMS 3\nevidence line\n```json\n{\"state\": \"items\", \"sourceHead\": \"00000000000000000000000000000000000000a1\", \"productionHead\": \"00000000000000000000000000000000000000b2\"}\n```\n"},
+    {"step": "classify-release", "output": "RELEASE CLASS: LIGHT\nevidence line\n```json\n{\"state\": \"light\"}\n```\n"},
+    {"step": "queue", "output": "QUEUE: ASK 41\nevidence line\n```json\n{\"state\": \"ask\"}\n```\n"},
+    {"step": "queue", "output": "QUEUE: WAIT 41\nevidence line\n```json\n{\"state\": \"wait\"}\n```\n"}
+  ],
+  "answers": ["its session has stopped"],
+  "expect": {
+    "order": [
+      ["release-delta", 1],
+      ["classify-release", 1],
+      ["queue", 1],
+      ["queue", 2]
+    ],
+    "outcome": "stopped",
+    "stops": ["queue", "queue"],
+    "stopReasons": ["41", "QUEUE: WAIT 41"]
+  }
+}

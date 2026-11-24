@@ -1,0 +1,300 @@
+{
+  "_readme": "The one list of conditions a workflow step's when.condition may hold, and of the ones it may not. Read by the plugin's runner test (scripts/tests/workflow-conditions.sh) and by DevStride's own parser specs, so the parsers cannot drift. Grammar: an optional leading !, then one predicate: review-path:fast or review-path:pull-request; item-tag:<name> and item-work-type:<name> (1 to 100 characters, the rest of the text including colons, no control characters, no leading or trailing space); touches:<glob> (1 to 150 characters, no white space or control characters, no branch date token such as <YY-MM-DD>, no trailing [-n]); has-repository (no argument); step-verdict:<step id>:<WORD> (a step id [a-z0-9][a-z0-9-]*, a verdict word [A-Z][A-Z0-9 -]*). At most 200 characters in all. No and, or, parentheses or free text. valid is the grammar's answer alone: whether a step-verdict names an earlier step and a word its contract allows is checked against the definition, not here. reason is for people and is never compared.",
+  "cases": [
+    {
+      "text": "review-path:fast",
+      "valid": true
+    },
+    {
+      "text": "review-path:pull-request",
+      "valid": true
+    },
+    {
+      "text": "!review-path:fast",
+      "valid": true,
+      "reason": "a leading ! negates the predicate"
+    },
+    {
+      "text": "item-tag:needs-compliance",
+      "valid": true
+    },
+    {
+      "text": "!item-tag:needs-compliance",
+      "valid": true
+    },
+    {
+      "text": "item-tag:area:billing",
+      "valid": true,
+      "reason": "a tag may contain a colon: the argument is the rest of the text"
+    },
+    {
+      "text": "item-tag:Customer request",
+      "valid": true,
+      "reason": "a space inside a name is kept"
+    },
+    {
+      "text": "item-tag:tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+      "valid": true,
+      "reason": "a tag of exactly 100 characters"
+    },
+    {
+      "text": "item-work-type:Defect",
+      "valid": true
+    },
+    {
+      "text": "item-work-type:Support Request",
+      "valid": true
+    },
+    {
+      "text": "!item-work-type:Epic",
+      "valid": true
+    },
+    {
+      "text": "touches:**/events/**",
+      "valid": true
+    },
+    {
+      "text": "touches:backend/**",
+      "valid": true
+    },
+    {
+      "text": "touches:docs/*.md",
+      "valid": true
+    },
+    {
+      "text": "!touches:**/*.md",
+      "valid": true
+    },
+    {
+      "text": "touches:a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/**",
+      "valid": true,
+      "reason": "a glob of exactly 150 characters"
+    },
+    {
+      "text": "has-repository",
+      "valid": true
+    },
+    {
+      "text": "!has-repository",
+      "valid": true
+    },
+    {
+      "text": "step-verdict:build:NEEDS DECISION",
+      "valid": true,
+      "reason": "a verdict word may hold a space"
+    },
+    {
+      "text": "step-verdict:risk-check:CLEAR",
+      "valid": true
+    },
+    {
+      "text": "!step-verdict:local-checks:NOT CONFIGURED",
+      "valid": true
+    },
+    {
+      "text": "step-verdict:build:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "valid": true,
+      "reason": "exactly 200 characters"
+    },
+    {
+      "text": "",
+      "valid": false,
+      "reason": "a condition is one predicate, never empty"
+    },
+    {
+      "text": "!",
+      "valid": false,
+      "reason": "a negation needs a predicate"
+    },
+    {
+      "text": "!!has-repository",
+      "valid": false,
+      "reason": "one ! at most"
+    },
+    {
+      "text": "has-repository:x",
+      "valid": false,
+      "reason": "has-repository takes no argument"
+    },
+    {
+      "text": "has-repository:",
+      "valid": false,
+      "reason": "has-repository takes no argument, not even an empty one"
+    },
+    {
+      "text": " has-repository",
+      "valid": false,
+      "reason": "no leading space"
+    },
+    {
+      "text": "has-repository ",
+      "valid": false,
+      "reason": "no trailing space"
+    },
+    {
+      "text": "HAS-REPOSITORY",
+      "valid": false,
+      "reason": "predicate names are lower case"
+    },
+    {
+      "text": "Review-path:fast",
+      "valid": false,
+      "reason": "predicate names are lower case"
+    },
+    {
+      "text": "ITEM-TAG:needs-compliance",
+      "valid": false,
+      "reason": "predicate names are lower case"
+    },
+    {
+      "text": "item-type:Defect",
+      "valid": false,
+      "reason": "not a predicate this grammar has"
+    },
+    {
+      "text": "branch:main",
+      "valid": false,
+      "reason": "not a predicate this grammar has"
+    },
+    {
+      "text": "review-path",
+      "valid": false,
+      "reason": "review-path needs fast or pull-request"
+    },
+    {
+      "text": "review-path:",
+      "valid": false,
+      "reason": "review-path needs fast or pull-request"
+    },
+    {
+      "text": "review-path:slow",
+      "valid": false,
+      "reason": "review-path is fast or pull-request"
+    },
+    {
+      "text": "review-path:fast ",
+      "valid": false,
+      "reason": "review-path is exactly fast or pull-request"
+    },
+    {
+      "text": "item-tag:",
+      "valid": false,
+      "reason": "an empty tag"
+    },
+    {
+      "text": "item-tag",
+      "valid": false,
+      "reason": "item-tag needs a tag after a colon"
+    },
+    {
+      "text": "item-tag: needs-compliance",
+      "valid": false,
+      "reason": "a tag never starts with a space"
+    },
+    {
+      "text": "item-tag:needs-compliance ",
+      "valid": false,
+      "reason": "a tag never ends with a space"
+    },
+    {
+      "text": "item-tag:ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+      "valid": false,
+      "reason": "a tag is at most 100 characters"
+    },
+    {
+      "text": "item-tag:needs\tcompliance",
+      "valid": false,
+      "reason": "no control characters"
+    },
+    {
+      "text": "item-work-type:",
+      "valid": false,
+      "reason": "an empty work type"
+    },
+    {
+      "text": "item-work-type:Defect\n",
+      "valid": false,
+      "reason": "no control characters"
+    },
+    {
+      "text": "touches:",
+      "valid": false,
+      "reason": "an empty glob"
+    },
+    {
+      "text": "touches:docs/my file.md",
+      "valid": false,
+      "reason": "a glob holds no white space"
+    },
+    {
+      "text": "touches:release/<YY-MM-DD>/**",
+      "valid": false,
+      "reason": "a glob holds no branch date token"
+    },
+    {
+      "text": "touches:release/**[-n]",
+      "valid": false,
+      "reason": "a glob never ends with the branch pattern's [-n]"
+    },
+    {
+      "text": "touches:a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/*",
+      "valid": false,
+      "reason": "a glob is at most 150 characters"
+    },
+    {
+      "text": "step-verdict:build",
+      "valid": false,
+      "reason": "step-verdict names a step and a verdict word"
+    },
+    {
+      "text": "step-verdict:build:",
+      "valid": false,
+      "reason": "an empty verdict word"
+    },
+    {
+      "text": "step-verdict::READY",
+      "valid": false,
+      "reason": "an empty step id"
+    },
+    {
+      "text": "step-verdict:build:ready",
+      "valid": false,
+      "reason": "a verdict word is upper case"
+    },
+    {
+      "text": "step-verdict:Build:READY",
+      "valid": false,
+      "reason": "a step id is lower case"
+    },
+    {
+      "text": "step-verdict:build:READY:NOW",
+      "valid": false,
+      "reason": "a verdict word holds no colon"
+    },
+    {
+      "text": "step-verdict:build:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "valid": false,
+      "reason": "201 characters: a condition is at most 200"
+    },
+    {
+      "text": "has-repository and item-tag:x",
+      "valid": false,
+      "reason": "two predicates joined by a word: no and, no or"
+    },
+    {
+      "text": "touches:a/** or touches:b/**",
+      "valid": false,
+      "reason": "two predicates joined by a word: no and, no or"
+    },
+    {
+      "text": "(has-repository)",
+      "valid": false,
+      "reason": "no parentheses"
+    },
+    {
+      "text": "not has-repository",
+      "valid": false,
+      "reason": "negation is a leading !, never a word"
+    }
+  ]
+}

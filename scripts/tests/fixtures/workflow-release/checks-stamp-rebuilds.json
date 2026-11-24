@@ -1,0 +1,33 @@
+{
+  "about": "Production moved while the checks ran (M): the stamp answers CHANGED and is issued again, the round run inside the step, three times; the fourth attempt stamps.",
+  "definition": "workflows/release-merge-and-deploy.json",
+  "phases": ["checks"],
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "merge-and-deploy", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "checks-tip", "output": "PRODUCTION TIP: AT 00000000000000000000000000000000000000e5\nevidence line\n```json\n{\"state\": \"at\", \"head\": \"00000000000000000000000000000000000000d4\", \"productionTip\": \"00000000000000000000000000000000000000e5\"}\n```\n"},
+    {"step": "classify-at-checks", "output": "RELEASE CLASS: LIGHT\nevidence line\n```json\n{\"state\": \"light\"}\n```\n"},
+    {"step": "pre-ship-at-checks", "output": "PRE-SHIP: PASS\nevidence line\n```json\n{\"state\": \"pass\"}\n```\n"},
+    {"step": "dev-deploy-wait", "output": "DEV DEPLOY: SERVING\nevidence line\n```json\n{\"state\": \"serving\"}\n```\n"},
+    {"step": "pre-merge-at-checks", "output": "PRE-MERGE: CLEAR\nevidence line\n```json\n{\"state\": \"clear\"}\n```\n"},
+    {"step": "checks-stamp", "output": "CHECKS STAMP: CHANGED e5e5e5e5..f7f7f7f7\nevidence line\n```json\n{\"state\": \"changed\"}\n```\n"},
+    {"step": "checks-stamp", "output": "CHECKS STAMP: CHANGED e5e5e5e5..f7f7f7f7\nevidence line\n```json\n{\"state\": \"changed\"}\n```\n"},
+    {"step": "checks-stamp", "output": "CHECKS STAMP: CHANGED e5e5e5e5..f7f7f7f7\nevidence line\n```json\n{\"state\": \"changed\"}\n```\n"},
+    {"step": "checks-stamp", "output": "CHECKS STAMP: STAMPED 00000000000000000000000000000000000000d4\nevidence line\n```json\n{\"state\": \"stamped\"}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["checks-tip", 1],
+      ["classify-at-checks", 1],
+      ["pre-ship-at-checks", 1],
+      ["dev-deploy-wait", 1],
+      ["pre-merge-at-checks", 1],
+      ["checks-stamp", 1],
+      ["checks-stamp", 2],
+      ["checks-stamp", 3],
+      ["checks-stamp", 4]
+    ],
+    "outcome": "completed",
+    "stops": []
+  }
+}

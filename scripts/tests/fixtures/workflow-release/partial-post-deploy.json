@@ -1,0 +1,23 @@
+{
+  "about": "The release-post-deploy entry: the newest merged release is found, its deploy confirmed, then only its own steps run; nothing is claimed, opened or merged.",
+  "definition": "workflows/release-post-deploy.json",
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "merge-and-deploy", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "merged-release", "output": "MERGED RELEASE: FOUND 42\nevidence line\n```json\n{\"sha\": \"0000000000000000000000000000000000000017\", \"pullRequest\": 42}\n```\n"},
+    {"step": "confirm-deploy", "output": "DEPLOY: CONFIRMED 0000000000000000000000000000000000000017\nevidence line\n```json\n{\"mergeCommit\": \"0000000000000000000000000000000000000017\", \"confirmedAt\": \"2026-11-21T19:00:00Z\"}\n```\n"},
+    {"step": "post-deploy-check", "output": "POST-DEPLOY HEALTH: PASS\nevidence line\n```json\n{\"state\": \"pass\"}\n```\n"},
+    {"step": "post-deploy-status", "output": "POST-DEPLOY STATUS: SUCCESS POSTED\nevidence line\n```json\n{\"state\": \"success-posted\"}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["merged-release", 1],
+      ["confirm-deploy", 1],
+      ["post-deploy-check", 1],
+      ["post-deploy-status", 1]
+    ],
+    "outcome": "completed",
+    "stops": [],
+    "handed": {"confirm-deploy": {"payload": {"mergeSha": "0000000000000000000000000000000000000017"}}}
+  }
+}

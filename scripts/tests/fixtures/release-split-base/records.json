@@ -1,0 +1,203 @@
+{
+ "_readme": "What the release's references and scripts held before the release page was split into steps. recordLines: each line of the references of the last release before the split (4.7.0) that tells a step to write a shared record. scripts: the SHA-256 of each release script as the release page in use runs it today (4.9.0 made them run on Windows; no record format changed). scripts/tests/workflow-release.sh reads it. A change to one of those scripts is a change to what a mixed fleet shares: re-pin its fingerprint here in the same change, on purpose.",
+ "recordLines": [
+  {
+   "path": "skills/release/references/auto-start.md",
+   "line": "- **Kind `release-train`, key `<owner>/<repo>`** (`python3"
+  },
+  {
+   "path": "skills/release/references/backstop.md",
+   "line": "The `--json` record carries the claim to make: `claim` (kind `release-train`, key"
+  },
+  {
+   "path": "skills/release/references/backstop.md",
+   "line": "  winner per key: `list_claims` kind `release-train`, `keyPrefix` `<owner>/<repo>@`, state `all`,"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  honour one contract (verbs, exit codes, verdict lines, local record, `status --json`). Optional:"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "| `status [--short] [--json]` | the clearance line (or `CLEAR`), then `On final: #<n> <head>` for the oldest open release pull request into the production branch, `Waiting: #<n> <head>` for each later one, `Hotfix landed: #<n> <head> <mergedAt>` for each hotfix merged into production since `takenAt`, `Close-out owed: <release> #<pr> — <items> (handed back <age> by <user> on <machine>, session …)` for each entry in this machine's owed file | `1` the store could not be read: `UNKNOWN (…)` — never shown as clear |"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "| `release [--force] [--owed <item>]… [--step-aside]` | `RELEASED <branch>`, or `CLEAR (nothing to release)`; with `--owed`, a second line `Close-out owed: <items>`; with `--step-aside`, `RELEASED <branch> (stepped aside)` | `4` NOT HOLDER (`--force` releases anyway, prints the record first, and is the owner's command) · `1` `--step-aside` with `--owed` or `--force` |"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "- **The local record.** On `claim` and `adopt` the provider writes"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "- **Close-out owed.** Work that runs after the hand-back is recorded by `release --owed <item>`"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  clearance\"). `owed --done <item>` settles an item of this session's newest entry (else the"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  **A repository provider without `commands.owed` gets plain `release` (never `--owed`) and no"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  `owed` calls**; the recap names the owed work instead."
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "`merge-and-deploy` claims only at step 4 and hands back at 5a (below). **0a** `claim --wait --purpose release` before anything else (with a `claims` block, after the `release-train` claim only: `auto-start.md`'s lock order),"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "close-out and release notes, each passed as `--owed <item>` and settled by `owed --done <item>`,"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  `release-train` claim is taken before any of this (`auto-start.md`'s lock order). 0b's train pull request body carries"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  `<!-- devstride:release-train-holder <digest> on <machine> -->` (`<digest>`: the first 12 hex"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  `release-train` claim comes first and decides which markers are adoptable (`auto-start.md`)."
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  runs `release --owed post-deploy-check` with the other `--owed` items. The post-deploy check is then the FIRST owed"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  item: `post-deploy check`, its result posted as `release/post-deploy`, then `owed --done"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  under the `release-train` claim, held until step 1 has opened the release pull request"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  and confirms the deploy and hands the tower back right there: `release --owed post-deploy-check"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  --owed sync` with the other `--owed` items. The post-deploy check runs FIRST (its result posted"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  as `release/post-deploy`, then `owed --done post-deploy-check`), so the release behind merges as"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  the train level), with `heartbeat` calls skipped (nothing is held) and `owed --done sync` at the"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "  `stepped-aside`, removes the local record and stops the keeper exactly like `release`, and owes"
+  },
+  {
+   "path": "skills/release/references/clearance.md",
+   "line": "- **Adoption.** The release pull request body carries `<!-- devstride:release-holder <digest> on"
+  },
+  {
+   "path": "skills/release/references/docs-hooks.md",
+   "line": "  \"kind\": \"production-release\","
+  },
+  {
+   "path": "skills/release/references/docs-hooks.md",
+   "line": "`owed --done <item>` only on a successful or genuinely current result:"
+  },
+  {
+   "path": "skills/release/references/release-branch.md",
+   "line": "`<!-- devstride:release-train source <sourceBefore> snapshot <trainSnapshot> -->`; that marker,"
+  },
+  {
+   "path": "skills/release/references/release-branch.md",
+   "line": "`<!-- devstride:support-train source … snapshot … -->` with the same fields and is read the same way."
+  },
+  {
+   "path": "skills/release/references/release-branch.md",
+   "line": "range marker, `devstride:release-train` OR `devstride:support-train` (the marker written before"
+  },
+  {
+   "path": "skills/release/references/release-branch.md",
+   "line": "`devstride:release-train-holder` would also match — so an"
+  },
+  {
+   "path": "skills/release/references/release-branch.md",
+   "line": "  recorded in the release pull request's marker `<!-- devstride:release-branch <name> cut <sha>"
+  },
+  {
+   "path": "skills/release/references/release-branch.md",
+   "line": "   is settled by `owed --done sync` before the next release starts), heartbeating the train claim"
+  },
+  {
+   "path": "skills/release/references/release-branch.md",
+   "line": "   stops, whichever comes first, settled by `owed --done` as always; its own step 6 runs then too,"
+  },
+  {
+   "path": "skills/release/references/release-branch.md",
+   "line": "   5a, so this step does nothing): the provider's `release --owed <item>` for"
+  },
+  {
+   "path": "skills/release/references/release-pr.md",
+   "line": "End with `<!-- devstride:loop -->`, as `pr` does (the convention-only workflow's marker, never a"
+  },
+  {
+   "path": "skills/release/references/release-pr.md",
+   "line": "`<!-- devstride:release-branch <name> cut <sha> -->` (the cut point, read back on adoption)."
+  },
+  {
+   "path": "skills/release/references/release-pr.md",
+   "line": "Under scope `merge-and-deploy` a third, `<!-- devstride:release-holder <digest> on <machine> -->`,"
+  },
+  {
+   "path": "skills/release/references/release-pr.md",
+   "line": "  sanitized `<!-- devstride:review-context -->` final marker and the fast-story ledgers, namespace"
+  },
+  {
+   "path": "skills/release/references/ship-plan.md",
+   "line": "`release-train` claim does that."
+  },
+  {
+   "path": "skills/release/references/ship-plan.md",
+   "line": "Only the session that holds the `release-train` claim runs it, and only on the path that CUTS a"
+  },
+  {
+   "path": "skills/release/references/ship-plan.md",
+   "line": "1. **The plan already on the claim**: `get_claim` (kind `release-train`, key `<owner>/<repo>`) and"
+  },
+  {
+   "path": "skills/release/references/ship-plan.md",
+   "line": "5. `wait` → heartbeat the `release-train` claim with phase `gathering` and the record's payload"
+  },
+  {
+   "path": "skills/release/references/ship-plan.md",
+   "line": "`<!-- devstride:release-gather waited <minutes> carried <units|none> missed <units|none> -->`."
+  },
+  {
+   "path": "skills/release/references/ship-plan.md",
+   "line": "`release-train` claim (`get_claim`, key `<owner>/<repo>`, one row; a `commands` provider's `get`,"
+  }
+ ],
+ "scripts": {
+  "skills/release/scripts/auto-start.py": "9a83be791406c48bc3d3446f73ab7141c837cc0536f2190f32c02608d6af2ecb",
+  "skills/release/scripts/backstop.py": "27a401967a8431f49f84e871bdde44074381018fc08bf4c8effbb70a558417a7",
+  "skills/release/scripts/clearance-devstride.sh": "3241f033fff4c9673c7ca6b50d45f57c81859e356ac4134db82f4fc6683dc940",
+  "skills/release/scripts/clearance-github.sh": "15937403aee205b251cd6aed18a1fb3238208e45ca9c9ff9a295abce4edef85f",
+  "skills/release/scripts/clearance_core.py": "dd36ea09d6e3a66298f8f4d4ea991719829a23c2b2e89ad8eab30c71754f1e24",
+  "skills/release/scripts/estimate.py": "482bfe218d6308983c82a597a2fce66ac887b2a88070e59bd1f78c06755875ae",
+  "skills/release/scripts/migration-approval.py": "f906d9e55e473848cceafc0d7a17bbadb65d2e12ef3adaafd253b10e8b3f02dc",
+  "skills/release/scripts/post-deploy-status.sh": "96b5099e1a85e9f438002e44ff003ff1ecac2493a3be721e26ab306bf8d73eaa",
+  "skills/release/scripts/post_deploy_gate.py": "0995301434097b06d17818f048f93c4c06d6523f31c9554676f71eb76c5e6fb5",
+  "skills/release/scripts/previous-release-gate.sh": "e3f7fc6c942c2cb8838d26143ad87a052781defdbdcd18608066a03b2b8b91a3",
+  "skills/release/scripts/release_checks.py": "8d3399265e681f6ad074e38717f0832e3b265477fe90d502a994075bfc91f40f",
+  "skills/release/scripts/ship-plan.py": "bb3f909cafe6059752da52024cbe5a94edad797f8e0fe87d39432a7340f6f083",
+  "skills/release/scripts/standing-yes.py": "a9d25ba66f58892ba62c245d45d3b1b2b82858d4593224b61c755997b98dc968",
+  "skills/release/scripts/tower-queue.py": "124b14d1bb3030a2f688a50af73ff69dd9127509d4110a46da99ad90ac643df8",
+  "skills/release/scripts/train_exclusions.py": "3f38fcb848d24f1fa4802be5f75e314ec01f4b4830a1cca4ae93f68d027126e8",
+  "skills/release/scripts/train_receipts.py": "4a269ef8c57e902c7bef913b4e03e6ddf6b11299e1cd2031fb20d43365e9bbc1"
+ }
+}

@@ -187,6 +187,7 @@ BEAT_AFTER = 60          # a prompt re-sends when the last send is this old
 CHANGE_AFTER = 30        # a state change within this of the last send waits for the next send
 COMMAND_TIMEOUT = 20
 KEEP = 7 * 24 * 3600
+KEEPER_LOCK_TRIES = 20   # a new keeper tries its lock this many times, 0.1 s apart, before it leaves
 STARTED_SLACK = 5        # seconds a process's reported start time may drift before it is another process
 PAYLOAD_LIMIT = 4 * 1048576   # a prompt hook's payload carries the whole prompt
 # Seconds in a keeper minute. Tests shorten it; nothing else sets DEVSTRIDE_PRESENCE_MINUTE.
@@ -976,7 +977,16 @@ def interrupt(record, peek, mark, idle=False):
 def keeper(sid):
     if load(sid) is None:
         return  # no session to keep
-    fd = lock(sid, "keeper", False)
+    # A check that a keeper runs (keeper_running, here or in a test) holds the lock for a moment, so
+    # one refused attempt is not proof: try for up to two seconds. A real keeper holds the lock for
+    # as long as it runs, so a second keeper still leaves, a little later.
+    fd = None
+    for attempt in range(KEEPER_LOCK_TRIES):
+        fd = lock(sid, "keeper", False)
+        if fd is not None:
+            break
+        if attempt + 1 < KEEPER_LOCK_TRIES:
+            time.sleep(0.1)
     if fd is None:
         return  # another keeper runs for this session
     poll = 10 * MINUTE / 60

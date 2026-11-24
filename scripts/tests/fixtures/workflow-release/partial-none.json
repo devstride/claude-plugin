@@ -1,0 +1,17 @@
+{
+  "about": "A partial entry with no merged release to work on: merged-release answers NONE and the run stops there.",
+  "definition": "workflows/release-docs.json",
+  "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
+  "script": [
+    {"step": "merged-release", "output": "MERGED RELEASE: NONE\nevidence line\n```json\n{\"sha\": \"\", \"pullRequest\": null}\n```\n"}
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      ["merged-release", 1]
+    ],
+    "outcome": "stopped",
+    "stops": ["merged-release"],
+    "stopReasons": ["MERGED RELEASE: NONE"]
+  }
+}

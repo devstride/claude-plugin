@@ -33,6 +33,8 @@ when the connection is not ready).
 - **Never print the stored entry**: `claude mcp get` shows a key-based entry's header values, so
   doctor never runs it and never advises it for one. A `devstride` server kept under another name,
   or only in a project `.mcp.json`, is not found: the fix is the same step.
+- **Workflows** are checked in the same section:
+  `${CLAUDE_PLUGIN_ROOT}/skills/doctor/references/workflows-checks.md`.
 
 ## `claims`
 

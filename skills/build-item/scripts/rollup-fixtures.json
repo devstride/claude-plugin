@@ -1,0 +1,3831 @@
+{
+ "_about": "Canonical examples for skills/build-item/scripts/rollup.py, with no git and no network. Each `chain` case runs `chain` and must answer `expect` exactly. Each `ready` case runs `ready` on `readyDefaults` with the case's `request` merged over it (objects merged key by key, a value of \"__delete__\" removes the key), and must answer `expect` with `reason` removed; `reasonContains`, when present, must be in the reason. The cases named \"the server's exact shape\" hold DevStride's answers as `get_item_rollup_chain` and `get_item_rollup` give them (a work type as `{id, name}`, a descendant's `workTypeName`, the server's own `excluded` flags); the others write a work type as its name, which reads the same. An `*Errors` case must exit 2 with one rollup: line containing `contains`. Tooling that re-implements the rule, or calls it, should run these against the installed script.",
+ "readyDefaults": {
+  "config": {
+   "epicIntegrationBranches": {
+    "autoRelease": true
+   },
+   "hierarchyRoles": {
+    "leaf": [
+     "Story",
+     "Defect"
+    ]
+   },
+   "defects": {
+    "deferredContainerTitle": "Deferred",
+    "deferredContainerLegacyTitles": [
+     "Deferred Defects"
+    ]
+   }
+  },
+  "item": {
+   "number": "I100",
+   "title": "Release the reports",
+   "workType": "Capability",
+   "rollup": "ship"
+  },
+  "descendants": [],
+  "truncated": false,
+  "countsReadableChildrenOnly": false,
+  "landed": [],
+  "excluded": [],
+  "holds": {
+   "held": false,
+   "reason": "no hold"
+  }
+ },
+ "chain": [
+  {
+   "name": "maps not-rollup to null, hand-up and ship to themselves, a workstream to null",
+   "request": {
+    "item": "I201",
+    "chain": {
+     "chain": [
+      {
+       "number": "I201",
+       "title": "Story 201",
+       "workType": "Story",
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "I202",
+       "title": "Epic 202",
+       "workType": "Epic",
+       "rollup": {
+        "state": "rollup",
+        "source": "workflow",
+        "endsBy": "hand-up"
+       }
+      },
+      {
+       "number": "I203",
+       "title": "Capability 203",
+       "workType": "Capability",
+       "rollup": {
+        "state": "rollup",
+        "source": "workflow",
+        "endsBy": "ship"
+       }
+      },
+      {
+       "number": "I204",
+       "title": "Workstream 204",
+       "workType": null,
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "expect": {
+    "chain": [
+     {
+      "number": "I201",
+      "title": "Story 201",
+      "workType": "Story",
+      "rollup": null
+     },
+     {
+      "number": "I202",
+      "title": "Epic 202",
+      "workType": "Epic",
+      "rollup": "hand-up"
+     },
+     {
+      "number": "I203",
+      "title": "Capability 203",
+      "workType": "Capability",
+      "rollup": "ship"
+     },
+     {
+      "number": "I204",
+      "title": "Workstream 204",
+      "workType": null,
+      "rollup": null
+     }
+    ],
+    "leafParents": [
+     "Epic"
+    ]
+   }
+  },
+  {
+   "name": "the built-in default's endsBy is read as given",
+   "request": {
+    "item": "I201",
+    "chain": {
+     "chain": [
+      {
+       "number": "I201",
+       "title": "Story 201",
+       "workType": "Story",
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "I202",
+       "title": "Epic 202",
+       "workType": "Epic",
+       "rollup": {
+        "state": "rollup",
+        "source": "built-in-default",
+        "builtIn": "epic-release",
+        "endsBy": "hand-up"
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "expect": {
+    "chain": [
+     {
+      "number": "I201",
+      "title": "Story 201",
+      "workType": "Story",
+      "rollup": null
+     },
+     {
+      "number": "I202",
+      "title": "Epic 202",
+      "workType": "Epic",
+      "rollup": "hand-up"
+     }
+    ],
+    "leafParents": [
+     "Epic"
+    ]
+   }
+  },
+  {
+   "name": "endsBy carried only on the matched workflow",
+   "request": {
+    "item": "I202",
+    "chain": {
+     "chain": [
+      {
+       "number": "I202",
+       "title": "Epic 202",
+       "workType": "Epic",
+       "rollup": {
+        "state": "rollup",
+        "source": "workflow",
+        "workflow": {
+         "id": "w1",
+         "name": "Ship it",
+         "endsBy": "ship"
+        }
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "expect": {
+    "chain": [
+     {
+      "number": "I202",
+      "title": "Epic 202",
+      "workType": "Epic",
+      "rollup": "ship"
+     }
+    ],
+    "leafParents": [
+     "Epic"
+    ]
+   }
+  },
+  {
+   "name": "no rollup anywhere up the chain: every entry null",
+   "request": {
+    "item": "I201",
+    "chain": {
+     "chain": [
+      {
+       "number": "I201",
+       "title": "Story 201",
+       "workType": "Story",
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "I205",
+       "title": "Objective 205",
+       "workType": "Objective",
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic",
+      "Objective"
+     ]
+    }
+   },
+   "expect": {
+    "chain": [
+     {
+      "number": "I201",
+      "title": "Story 201",
+      "workType": "Story",
+      "rollup": null
+     },
+     {
+      "number": "I205",
+      "title": "Objective 205",
+      "workType": "Objective",
+      "rollup": null
+     }
+    ],
+    "leafParents": [
+     "Epic",
+     "Objective"
+    ]
+   }
+  },
+  {
+   "name": "the server's exact shape: work types and leaf parents as {id, name}, a workstream null, the built-in epic release",
+   "request": {
+    "item": "I301",
+    "chain": {
+     "chain": [
+      {
+       "number": "I301",
+       "title": "Cart",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c11",
+        "name": "Story"
+       },
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "I302",
+       "title": "Checkout",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c12",
+        "name": "Epic"
+       },
+       "rollup": {
+        "state": "rollup",
+        "source": "built-in-default",
+        "builtIn": "epic-release",
+        "startsWhen": "children-complete",
+        "endsBy": "hand-up"
+       }
+      },
+      {
+       "number": "I303",
+       "title": "Platform",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c13",
+        "name": "Capability"
+       },
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "F12",
+       "title": "Engineering",
+       "workType": null,
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      }
+     ],
+     "leafParents": [
+      {
+       "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c12",
+       "name": "Epic"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "chain": [
+     {
+      "number": "I301",
+      "title": "Cart",
+      "workType": "Story",
+      "rollup": null
+     },
+     {
+      "number": "I302",
+      "title": "Checkout",
+      "workType": "Epic",
+      "rollup": "hand-up"
+     },
+     {
+      "number": "I303",
+      "title": "Platform",
+      "workType": "Capability",
+      "rollup": null
+     },
+     {
+      "number": "F12",
+      "title": "Engineering",
+      "workType": null,
+      "rollup": null
+     }
+    ],
+    "leafParents": [
+     "Epic"
+    ]
+   }
+  },
+  {
+   "name": "the server's exact shape: a published rollup workflow says how it ends",
+   "request": {
+    "item": "I301",
+    "chain": {
+     "chain": [
+      {
+       "number": "I301",
+       "title": "Cart",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c11",
+        "name": "Story"
+       },
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "I302",
+       "title": "Checkout",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c12",
+        "name": "Epic"
+       },
+       "rollup": {
+        "state": "rollup",
+        "source": "workflow",
+        "workflow": {
+         "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c21",
+         "name": "Epic rollup",
+         "version": 1,
+         "hash": "3f0c4a4f6f1d4c3e9a7b2d4e6f8a0c1e3f0c4a4f6f1d4c3e9a7b2d4e6f8a0c1e",
+         "startsWhen": "children-complete",
+         "endsBy": "ship"
+        },
+        "startsWhen": "children-complete",
+        "endsBy": "ship"
+       }
+      },
+      {
+       "number": "I303",
+       "title": "Platform",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c13",
+        "name": "Capability"
+       },
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "F12",
+       "title": "Engineering",
+       "workType": null,
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      }
+     ],
+     "leafParents": [
+      {
+       "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c12",
+       "name": "Epic"
+      }
+     ]
+    }
+   },
+   "expect": {
+    "chain": [
+     {
+      "number": "I301",
+      "title": "Cart",
+      "workType": "Story",
+      "rollup": null
+     },
+     {
+      "number": "I302",
+      "title": "Checkout",
+      "workType": "Epic",
+      "rollup": "ship"
+     },
+     {
+      "number": "I303",
+      "title": "Platform",
+      "workType": "Capability",
+      "rollup": null
+     },
+     {
+      "number": "F12",
+      "title": "Engineering",
+      "workType": null,
+      "rollup": null
+     }
+    ],
+    "leafParents": [
+     "Epic"
+    ]
+   }
+  }
+ ],
+ "chainErrors": [
+  {
+   "name": "undetermined: names the two types and the remedy",
+   "request": {
+    "item": "I202",
+    "chain": {
+     "chain": [
+      {
+       "number": "I202",
+       "title": "Epic 202",
+       "workType": "Epic",
+       "rollup": {
+        "state": "undetermined",
+        "source": "ambiguous",
+        "candidates": [
+         "Epic",
+         "Objective"
+        ]
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic",
+      "Objective"
+     ]
+    }
+   },
+   "contains": "I202: Epic and Objective can both hold stories directly and no rollup workflow says which one releases: ask a person with the workflow edit permission to publish the organization's rollup workflow for the right type in the Agents module"
+  },
+  {
+   "name": "undetermined on an ancestor: names it and the item asked about",
+   "request": {
+    "item": "I201",
+    "chain": {
+     "chain": [
+      {
+       "number": "I201",
+       "title": "Story 201",
+       "workType": "Story",
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "I202",
+       "title": "Epic 202",
+       "workType": "Epic",
+       "rollup": {
+        "state": "undetermined",
+        "source": "ambiguous"
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic",
+      "Objective"
+     ]
+    }
+   },
+   "contains": "I202 (Epic 202), above I201: Epic and Objective can both hold stories directly"
+  },
+  {
+   "name": "the answer is not an object",
+   "request": {
+    "item": "I201",
+    "chain": [
+     {
+      "number": "I201",
+      "title": "Story 201",
+      "workType": "Story",
+      "rollup": {
+       "state": "not-rollup",
+       "source": "none"
+      }
+     }
+    ]
+   },
+   "contains": "not an object with a non-empty chain"
+  },
+  {
+   "name": "the answer has no chain",
+   "request": {
+    "item": "I201",
+    "chain": {
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "contains": "not an object with a non-empty chain"
+  },
+  {
+   "name": "an empty chain",
+   "request": {
+    "item": "I201",
+    "chain": {
+     "chain": [],
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "contains": "not an object with a non-empty chain"
+  },
+  {
+   "name": "the first entry is not the item asked about",
+   "request": {
+    "item": "I201",
+    "chain": {
+     "chain": [
+      {
+       "number": "I202",
+       "title": "Epic 202",
+       "workType": "Epic",
+       "rollup": {
+        "state": "rollup",
+        "source": "workflow",
+        "endsBy": "hand-up"
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "contains": "starts at I202, not at the item asked about, I201"
+  },
+  {
+   "name": "no item asked about",
+   "request": {
+    "chain": {
+     "chain": [
+      {
+       "number": "I201",
+       "title": "Story 201",
+       "workType": "Story",
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "contains": "item must be"
+  },
+  {
+   "name": "a rollup with no endsBy",
+   "request": {
+    "item": "I202",
+    "chain": {
+     "chain": [
+      {
+       "number": "I202",
+       "title": "Epic 202",
+       "workType": "Epic",
+       "rollup": {
+        "state": "rollup",
+        "source": "workflow"
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "contains": "ends by null"
+  },
+  {
+   "name": "a rollup whose endsBy is not hand-up or ship",
+   "request": {
+    "item": "I202",
+    "chain": {
+     "chain": [
+      {
+       "number": "I202",
+       "title": "Epic 202",
+       "workType": "Epic",
+       "rollup": {
+        "state": "rollup",
+        "source": "workflow",
+        "endsBy": "deploy"
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "contains": "ends by \"deploy\""
+  },
+  {
+   "name": "endsBy and the workflow's endsBy disagree",
+   "request": {
+    "item": "I202",
+    "chain": {
+     "chain": [
+      {
+       "number": "I202",
+       "title": "Epic 202",
+       "workType": "Epic",
+       "rollup": {
+        "state": "rollup",
+        "source": "workflow",
+        "endsBy": "ship",
+        "workflow": {
+         "endsBy": "hand-up"
+        }
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "contains": "its workflow says"
+  },
+  {
+   "name": "an unknown state",
+   "request": {
+    "item": "I201",
+    "chain": {
+     "chain": [
+      {
+       "number": "I201",
+       "title": "Story 201",
+       "workType": "Story",
+       "rollup": {
+        "state": "maybe"
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "contains": "rollup state"
+  },
+  {
+   "name": "no leafParents",
+   "request": {
+    "item": "I201",
+    "chain": {
+     "chain": [
+      {
+       "number": "I201",
+       "title": "Story 201",
+       "workType": "Story",
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      }
+     ]
+    }
+   },
+   "contains": "leafParents"
+  },
+  {
+   "name": "an entry listed twice",
+   "request": {
+    "item": "I201",
+    "chain": {
+     "chain": [
+      {
+       "number": "I201",
+       "title": "Story 201",
+       "workType": "Story",
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "I201",
+       "title": "Story 201",
+       "workType": "Story",
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      }
+     ],
+     "leafParents": [
+      "Epic"
+     ]
+    }
+   },
+   "contains": "appears twice"
+  },
+  {
+   "name": "the server's exact shape, undetermined: the candidates are names beside {id, name} leaf parents",
+   "request": {
+    "item": "I301",
+    "chain": {
+     "chain": [
+      {
+       "number": "I301",
+       "title": "Cart",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c11",
+        "name": "Story"
+       },
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "I302",
+       "title": "Checkout",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c12",
+        "name": "Epic"
+       },
+       "rollup": {
+        "state": "undetermined",
+        "source": "ambiguous",
+        "candidates": [
+         "Epic",
+         "Objective"
+        ]
+       }
+      },
+      {
+       "number": "I303",
+       "title": "Platform",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c13",
+        "name": "Capability"
+       },
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "F12",
+       "title": "Engineering",
+       "workType": null,
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      }
+     ],
+     "leafParents": [
+      {
+       "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c12",
+       "name": "Epic"
+      },
+      {
+       "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c14",
+       "name": "Objective"
+      }
+     ]
+    }
+   },
+   "contains": "Checkout), above I301: Epic and Objective can both hold stories directly"
+  },
+  {
+   "name": "the server's exact shape, undetermined with no candidates: the leaf parents' names are used",
+   "request": {
+    "item": "I301",
+    "chain": {
+     "chain": [
+      {
+       "number": "I301",
+       "title": "Cart",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c11",
+        "name": "Story"
+       },
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "I302",
+       "title": "Checkout",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c12",
+        "name": "Epic"
+       },
+       "rollup": {
+        "state": "undetermined",
+        "source": "ambiguous"
+       }
+      },
+      {
+       "number": "I303",
+       "title": "Platform",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c13",
+        "name": "Capability"
+       },
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      },
+      {
+       "number": "F12",
+       "title": "Engineering",
+       "workType": null,
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      }
+     ],
+     "leafParents": [
+      {
+       "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c12",
+       "name": "Epic"
+      },
+      {
+       "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c14",
+       "name": "Objective"
+      }
+     ]
+    }
+   },
+   "contains": "Epic and Objective can both hold stories directly"
+  },
+  {
+   "name": "a work type object with no name",
+   "request": {
+    "item": "I301",
+    "chain": {
+     "chain": [
+      {
+       "number": "I301",
+       "title": "Cart",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c11"
+       },
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      }
+     ],
+     "leafParents": [
+      {
+       "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c12",
+       "name": "Epic"
+      }
+     ]
+    }
+   },
+   "contains": "I301 has a workType that is neither a name nor null"
+  },
+  {
+   "name": "a leaf parent with no name",
+   "request": {
+    "item": "I301",
+    "chain": {
+     "chain": [
+      {
+       "number": "I301",
+       "title": "Cart",
+       "workType": {
+        "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c11",
+        "name": "Story"
+       },
+       "rollup": {
+        "state": "not-rollup",
+        "source": "none"
+       }
+      }
+     ],
+     "leafParents": [
+      {
+       "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c12"
+      }
+     ]
+    }
+   },
+   "contains": "no leafParents list"
+  }
+ ],
+ "ready": [
+  {
+   "name": "five stories, two done and one landed: WAITING names the other two",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "landed": [
+     "I103"
+    ]
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101",
+     "I102",
+     "I103"
+    ],
+    "remaining": [
+     {
+      "number": "I104",
+      "title": "Story 104",
+      "why": "not done or landed"
+     },
+     {
+      "number": "I105",
+      "title": "Story 105",
+      "why": "not done or landed"
+     }
+    ]
+   },
+   "reasonContains": "3 of 5 children of I100 (Release the reports) complete; waiting on I104, I105"
+  },
+  {
+   "name": "every story done or landed, automatic release on: READY",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "landed": [
+     "I104",
+     "I105"
+    ]
+   },
+   "expect": {
+    "verdict": "READY",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": []
+   },
+   "reasonContains": "ready to ship"
+  },
+  {
+   "name": "a hand-up rollup that is complete is READY to hand up",
+   "request": {
+    "item": {
+     "rollup": "hand-up"
+    },
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "READY",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": []
+   },
+   "reasonContains": "ready to hand up"
+  },
+  {
+   "name": "complete but held: HELD, the hold's reason quoted",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     }
+    ],
+    "holds": {
+     "held": true,
+     "reason": "I100: Release hold: not before 2026-12-01"
+    }
+   },
+   "expect": {
+    "verdict": "HELD",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": []
+   },
+   "reasonContains": "held: \"I100: Release hold: not before 2026-12-01\""
+  },
+  {
+   "name": "held but not complete: WAITING comes first",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "holds": {
+     "held": true,
+     "reason": "not before 2026-12-01"
+    }
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101"
+    ],
+    "remaining": [
+     {
+      "number": "I102",
+      "title": "Story 102",
+      "why": "not done or landed"
+     },
+     {
+      "number": "I103",
+      "title": "Story 103",
+      "why": "not done or landed"
+     },
+     {
+      "number": "I104",
+      "title": "Story 104",
+      "why": "not done or landed"
+     },
+     {
+      "number": "I105",
+      "title": "Story 105",
+      "why": "not done or landed"
+     }
+    ]
+   }
+  },
+  {
+   "name": "complete, automatic release off: MANUAL",
+   "request": {
+    "config": {
+     "epicIntegrationBranches": {
+      "autoRelease": false
+     }
+    },
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "MANUAL",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": []
+   },
+   "reasonContains": "report it release-ready and stop"
+  },
+  {
+   "name": "complete, automatic release \"ask\": ASK",
+   "request": {
+    "config": {
+     "epicIntegrationBranches": {
+      "autoRelease": "ask"
+     }
+    },
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "ASK",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": []
+   },
+   "reasonContains": "ask the owner once"
+  },
+  {
+   "name": "the deferred container and its members are excluded: READY although a deferred defect is open",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I106",
+      "parentNumber": "I100",
+      "title": "Deferred",
+      "workType": "Epic",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I107",
+      "parentNumber": "I106",
+      "title": "Defect 107",
+      "workType": "Defect",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "excluded": [
+     "I106",
+     "I107"
+    ]
+   },
+   "expect": {
+    "verdict": "READY",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": []
+   }
+  },
+  {
+   "name": "a member under the excluded container is excluded even when the caller names only the container",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I106",
+      "parentNumber": "I100",
+      "title": "Deferred",
+      "workType": "Epic",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I107",
+      "parentNumber": "I106",
+      "title": "Defect 107",
+      "workType": "Defect",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "excluded": [
+     "I106"
+    ]
+   },
+   "expect": {
+    "verdict": "READY",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": []
+   }
+  },
+  {
+   "name": "DevStride's own excluded flag is ignored: an open story it flags still counts",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": true
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104"
+    ],
+    "remaining": [
+     {
+      "number": "I105",
+      "title": "Story 105",
+      "why": "not done or landed"
+     }
+    ]
+   }
+  },
+  {
+   "name": "a nested grouping counts only through its leaves: one of its two stories open",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I110",
+      "parentNumber": "I100",
+      "title": "Exports",
+      "workType": "Epic",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I111",
+      "parentNumber": "I110",
+      "title": "Story 111",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I112",
+      "parentNumber": "I110",
+      "title": "Story 112",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": [
+     {
+      "number": "I110",
+      "title": "Exports",
+      "why": "1 of 2 under it complete; waiting on I112"
+     }
+    ]
+   }
+  },
+  {
+   "name": "a nested grouping whose leaves are done or landed counts, though the grouping itself is not done",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I110",
+      "parentNumber": "I100",
+      "title": "Exports",
+      "workType": "Epic",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I111",
+      "parentNumber": "I110",
+      "title": "Story 111",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I112",
+      "parentNumber": "I110",
+      "title": "Story 112",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "landed": [
+     "I112"
+    ]
+   },
+   "expect": {
+    "verdict": "READY",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105",
+     "I110"
+    ],
+    "remaining": []
+   }
+  },
+  {
+   "name": "a grouping marked done does not count while a leaf under it is open",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I110",
+      "parentNumber": "I100",
+      "title": "Exports",
+      "workType": "Epic",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I111",
+      "parentNumber": "I110",
+      "title": "Story 111",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I112",
+      "parentNumber": "I110",
+      "title": "Story 112",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": [
+     {
+      "number": "I110",
+      "title": "Exports",
+      "why": "1 of 2 under it complete; waiting on I112"
+     }
+    ]
+   }
+  },
+  {
+   "name": "an empty grouping is neither counted nor progress",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I120",
+      "parentNumber": "I100",
+      "title": "Later",
+      "workType": "Epic",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I121",
+      "parentNumber": "I100",
+      "title": "Notes",
+      "workType": null,
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "READY",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": []
+   }
+  },
+  {
+   "name": "a rollup child does not count merely because its own children are done",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I130",
+      "parentNumber": "I100",
+      "title": "Billing",
+      "workType": "Epic",
+      "done": false,
+      "isRollup": true
+     },
+     {
+      "number": "I131",
+      "parentNumber": "I130",
+      "title": "Story 131",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I132",
+      "parentNumber": "I130",
+      "title": "Story 132",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": [
+     {
+      "number": "I130",
+      "title": "Billing",
+      "why": "a rollup: neither handed up nor done"
+     }
+    ]
+   }
+  },
+  {
+   "name": "a rollup child counts once it is in landed (its release merge is in this item's branch), children open or not",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I130",
+      "parentNumber": "I100",
+      "title": "Billing",
+      "workType": "Epic",
+      "done": false,
+      "isRollup": true
+     },
+     {
+      "number": "I131",
+      "parentNumber": "I130",
+      "title": "Story 131",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I132",
+      "parentNumber": "I130",
+      "title": "Story 132",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "landed": [
+     "I130"
+    ]
+   },
+   "expect": {
+    "verdict": "READY",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105",
+     "I130"
+    ],
+    "remaining": []
+   }
+  },
+  {
+   "name": "a rollup child counts once it is done",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I130",
+      "parentNumber": "I100",
+      "title": "Billing",
+      "workType": "Epic",
+      "done": true,
+      "isRollup": true
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "READY",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105",
+     "I130"
+    ],
+    "remaining": []
+   }
+  },
+  {
+   "name": "three levels deep: a feature, an epic in it and stories in that, one story open",
+   "request": {
+    "descendants": [
+     {
+      "number": "I140",
+      "parentNumber": "I100",
+      "title": "Search",
+      "workType": "Feature",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I141",
+      "parentNumber": "I140",
+      "title": "Indexing",
+      "workType": "Epic",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I142",
+      "parentNumber": "I141",
+      "title": "Story 142",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I143",
+      "parentNumber": "I141",
+      "title": "Story 143",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I144",
+      "parentNumber": "I140",
+      "title": "Story 144",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101"
+    ],
+    "remaining": [
+     {
+      "number": "I140",
+      "title": "Search",
+      "why": "1 of 2 under it complete; waiting on I143"
+     }
+    ]
+   }
+  },
+  {
+   "name": "three levels deep, a rollup two levels down landed and every story done: READY",
+   "request": {
+    "descendants": [
+     {
+      "number": "I140",
+      "parentNumber": "I100",
+      "title": "Search",
+      "workType": "Feature",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I141",
+      "parentNumber": "I140",
+      "title": "Indexing",
+      "workType": "Epic",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I142",
+      "parentNumber": "I141",
+      "title": "Story 142",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I143",
+      "parentNumber": "I141",
+      "title": "Story 143",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I144",
+      "parentNumber": "I140",
+      "title": "Story 144",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I145",
+      "parentNumber": "I141",
+      "title": "Ranking",
+      "workType": "Epic",
+      "done": false,
+      "isRollup": true
+     },
+     {
+      "number": "I146",
+      "parentNumber": "I145",
+      "title": "Story 146",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     }
+    ],
+    "landed": [
+     "I143",
+     "I145"
+    ]
+   },
+   "expect": {
+    "verdict": "READY",
+    "complete": [
+     "I101",
+     "I140"
+    ],
+    "remaining": []
+   }
+  },
+  {
+   "name": "a leaf-type child with work under it must itself be done or landed",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I150",
+      "parentNumber": "I100",
+      "title": "Story 150",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I151",
+      "parentNumber": "I150",
+      "title": "Defect 151",
+      "workType": "Defect",
+      "done": true,
+      "isRollup": false
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": [
+     {
+      "number": "I150",
+      "title": "Story 150",
+      "why": "not done or landed itself"
+     }
+    ]
+   }
+  },
+  {
+   "name": "a Defect is a leaf type too: open, it is waited on",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": true,
+      "isRollup": false
+     },
+     {
+      "number": "I160",
+      "parentNumber": "I100",
+      "title": "Crash on save",
+      "workType": "Defect",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101",
+     "I102",
+     "I103",
+     "I104",
+     "I105"
+    ],
+    "remaining": [
+     {
+      "number": "I160",
+      "title": "Crash on save",
+      "why": "not done or landed"
+     }
+    ]
+   }
+  },
+  {
+   "name": "nothing counted under the item: WAITING, never READY",
+   "request": {
+    "descendants": [
+     {
+      "number": "I106",
+      "parentNumber": "I100",
+      "title": "Deferred",
+      "workType": "Epic",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I107",
+      "parentNumber": "I106",
+      "title": "Defect 107",
+      "workType": "Defect",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "excluded": [
+     "I106",
+     "I107"
+    ]
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [],
+    "remaining": []
+   },
+   "reasonContains": "nothing to release"
+  },
+  {
+   "name": "no descendants at all: WAITING",
+   "request": {
+    "descendants": []
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [],
+    "remaining": []
+   }
+  },
+  {
+   "name": "the server's exact shape: descendants carry workTypeName; one done, one landed, one open: WAITING names the third",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Cart",
+      "workTypeName": "Story",
+      "done": true,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Pay",
+      "workTypeName": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Receipt",
+      "workTypeName": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": false
+     }
+    ],
+    "landed": [
+     "I102"
+    ]
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101",
+     "I102"
+    ],
+    "remaining": [
+     {
+      "number": "I103",
+      "title": "Receipt",
+      "why": "not done or landed"
+     }
+    ]
+   },
+   "reasonContains": "2 of 3 children of I100 (Release the reports) complete; waiting on I103"
+  },
+  {
+   "name": "the server's exact shape: every story done or landed is READY",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Cart",
+      "workTypeName": "Story",
+      "done": true,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Pay",
+      "workTypeName": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Receipt",
+      "workTypeName": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": false
+     }
+    ],
+    "landed": [
+     "I102",
+     "I103"
+    ]
+   },
+   "expect": {
+    "verdict": "READY",
+    "complete": [
+     "I101",
+     "I102",
+     "I103"
+    ],
+    "remaining": []
+   },
+   "reasonContains": "all 3 children of I100 (Release the reports) complete"
+  },
+  {
+   "name": "the server's exact shape: a rollup child and a workstream beside the stories (workTypeName null)",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Cart",
+      "workTypeName": "Story",
+      "done": true,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I110",
+      "parentNumber": "I100",
+      "title": "Invoices",
+      "workTypeName": "Epic",
+      "done": false,
+      "isRollup": true,
+      "excluded": false
+     },
+     {
+      "number": "I111",
+      "parentNumber": "I110",
+      "title": "Totals",
+      "workTypeName": "Story",
+      "done": true,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "F20",
+      "parentNumber": "I100",
+      "title": "Notes",
+      "workTypeName": null,
+      "done": false,
+      "isRollup": false,
+      "excluded": true,
+      "excludedByTitle": true
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101"
+    ],
+    "remaining": [
+     {
+      "number": "I110",
+      "title": "Invoices",
+      "why": "a rollup: neither handed up nor done"
+     }
+    ]
+   },
+   "reasonContains": "1 of 2 children"
+  },
+  {
+   "name": "a descendant's workType written as {id, name} reads like its name",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Cart",
+      "workType": {
+       "id": "0b5c8e9a-6f1d-4c3e-9a7b-2d4e6f8a0c11",
+       "name": "Story"
+      },
+      "done": true,
+      "isRollup": false
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "READY",
+    "complete": [
+     "I101"
+    ],
+    "remaining": []
+   }
+  },
+  {
+   "name": "hidden children: every child the caller can see is complete, and it is still WAITING, never READY",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Cart",
+      "workTypeName": "Story",
+      "done": true,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Pay",
+      "workTypeName": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": false
+     }
+    ],
+    "landed": [
+     "I102"
+    ],
+    "countsReadableChildrenOnly": true
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101",
+     "I102"
+    ],
+    "remaining": []
+   },
+   "reasonContains": "some items under I100 (Release the reports) are hidden from this account, so its children cannot all be counted: a rollup is never started over work it cannot see"
+  },
+  {
+   "name": "hidden children, and a visible one still open: WAITING names the visible one too",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Cart",
+      "workTypeName": "Story",
+      "done": true,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Pay",
+      "workTypeName": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Receipt",
+      "workTypeName": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": false
+     }
+    ],
+    "countsReadableChildrenOnly": true
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101"
+    ],
+    "remaining": [
+     {
+      "number": "I102",
+      "title": "Pay",
+      "why": "not done or landed"
+     },
+     {
+      "number": "I103",
+      "title": "Receipt",
+      "why": "not done or landed"
+     }
+    ]
+   },
+   "reasonContains": "of those it can see, waiting on I102, I103"
+  },
+  {
+   "name": "hidden children outrank a hold and automatic release off: WAITING, not HELD or MANUAL",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Cart",
+      "workTypeName": "Story",
+      "done": true,
+      "isRollup": false,
+      "excluded": false
+     }
+    ],
+    "countsReadableChildrenOnly": true,
+    "holds": {
+     "held": true,
+     "reason": "waiting for the audit"
+    },
+    "config": {
+     "epicIntegrationBranches": {
+      "autoRelease": false
+     }
+    }
+   },
+   "expect": {
+    "verdict": "WAITING",
+    "complete": [
+     "I101"
+    ],
+    "remaining": []
+   },
+   "reasonContains": "hidden from this account"
+  }
+ ],
+ "readyErrors": [
+  {
+   "name": "an item that is not a rollup",
+   "request": {
+    "item": {
+     "rollup": null
+    },
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "contains": "is not a rollup"
+  },
+  {
+   "name": "an item with no rollup at all",
+   "request": {
+    "item": {
+     "rollup": "__delete__"
+    },
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "contains": "is not a rollup"
+  },
+  {
+   "name": "a truncated descendants list",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "truncated": true
+   },
+   "contains": "truncated"
+  },
+  {
+   "name": "no truncated flag",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "truncated": "__delete__"
+   },
+   "contains": "truncated"
+  },
+  {
+   "name": "missing holds",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "holds": "__delete__"
+   },
+   "contains": "holds is required"
+  },
+  {
+   "name": "holds without a held flag",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "holds": {
+     "held": "__delete__",
+     "reason": "x"
+    }
+   },
+   "contains": "holds is required"
+  },
+  {
+   "name": "a hold without its reason",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "holds": {
+     "held": true,
+     "reason": "__delete__"
+    }
+   },
+   "contains": "needs its reason"
+  },
+  {
+   "name": "autoRelease absent",
+   "request": {
+    "config": {
+     "epicIntegrationBranches": {
+      "autoRelease": "__delete__"
+     }
+    },
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "contains": "autoRelease"
+  },
+  {
+   "name": "autoRelease not true, false or ask",
+   "request": {
+    "config": {
+     "epicIntegrationBranches": {
+      "autoRelease": 1
+     }
+    },
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "contains": "autoRelease"
+  },
+  {
+   "name": "no leaf types",
+   "request": {
+    "config": {
+     "hierarchyRoles": {
+      "leaf": []
+     }
+    },
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "contains": "hierarchyRoles.leaf"
+  },
+  {
+   "name": "landed is not a list",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "landed": "I101"
+   },
+   "contains": "landed"
+  },
+  {
+   "name": "excluded missing",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ],
+    "excluded": "__delete__"
+   },
+   "contains": "excluded"
+  },
+  {
+   "name": "descendants is not a list",
+   "request": {
+    "descendants": {
+     "descendants": [
+      {
+       "number": "I101",
+       "parentNumber": "I100",
+       "title": "Story 101",
+       "workType": "Story",
+       "done": false,
+       "isRollup": false
+      },
+      {
+       "number": "I102",
+       "parentNumber": "I100",
+       "title": "Story 102",
+       "workType": "Story",
+       "done": false,
+       "isRollup": false
+      },
+      {
+       "number": "I103",
+       "parentNumber": "I100",
+       "title": "Story 103",
+       "workType": "Story",
+       "done": false,
+       "isRollup": false
+      },
+      {
+       "number": "I104",
+       "parentNumber": "I100",
+       "title": "Story 104",
+       "workType": "Story",
+       "done": false,
+       "isRollup": false
+      },
+      {
+       "number": "I105",
+       "parentNumber": "I100",
+       "title": "Story 105",
+       "workType": "Story",
+       "done": false,
+       "isRollup": false
+      }
+     ]
+    }
+   },
+   "contains": "flat list"
+  },
+  {
+   "name": "a descendant whose parent is not in the list",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I109",
+      "parentNumber": "I108",
+      "title": "Story 109",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "contains": "parent I108"
+  },
+  {
+   "name": "a descendant listed twice",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "contains": "appears twice"
+  },
+  {
+   "name": "the item listed among its own descendants",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Story 103",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I104",
+      "parentNumber": "I100",
+      "title": "Story 104",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I105",
+      "parentNumber": "I100",
+      "title": "Story 105",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I100",
+      "parentNumber": "I101",
+      "title": "Story 100",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "contains": "appears twice"
+  },
+  {
+   "name": "a descendant without done",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "workType": "Story",
+      "isRollup": false
+     }
+    ]
+   },
+   "contains": "done and isRollup"
+  },
+  {
+   "name": "descendants that loop and never reach the item",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I102",
+      "title": "Story 101",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I101",
+      "title": "Story 102",
+      "workType": "Story",
+      "done": false,
+      "isRollup": false
+     }
+    ]
+   },
+   "contains": "loop"
+  },
+  {
+   "name": "no countsReadableChildrenOnly flag: whether children were hidden is never assumed",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Cart",
+      "workTypeName": "Story",
+      "done": true,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Pay",
+      "workTypeName": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Receipt",
+      "workTypeName": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": false
+     }
+    ],
+    "countsReadableChildrenOnly": "__delete__"
+   },
+   "contains": "countsReadableChildrenOnly must say whether DevStride hid some items under I100 from the caller"
+  },
+  {
+   "name": "a countsReadableChildrenOnly that is not true or false",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Cart",
+      "workTypeName": "Story",
+      "done": true,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I102",
+      "parentNumber": "I100",
+      "title": "Pay",
+      "workTypeName": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": false
+     },
+     {
+      "number": "I103",
+      "parentNumber": "I100",
+      "title": "Receipt",
+      "workTypeName": "Story",
+      "done": false,
+      "isRollup": false,
+      "excluded": false
+     }
+    ],
+    "countsReadableChildrenOnly": "no"
+   },
+   "contains": "countsReadableChildrenOnly must say"
+  },
+  {
+   "name": "a descendant whose workTypeName is not a name",
+   "request": {
+    "descendants": [
+     {
+      "number": "I101",
+      "parentNumber": "I100",
+      "title": "Cart",
+      "workTypeName": 7,
+      "done": true,
+      "isRollup": false,
+      "excluded": false
+     }
+    ]
+   },
+   "contains": "I101 has a workType that is neither a name nor null"
+  }
+ ]
+}

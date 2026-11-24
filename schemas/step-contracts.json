@@ -313,7 +313,8 @@
         "build@1"
       ],
       "claimPhase": "STORY RISK CHECK",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "neverOptional": true
     },
     "local-checks@1": {
       "summary": "Run the repository's local checks on the final tree and leave a receipt.",
@@ -400,7 +401,8 @@
         "risk-check@1"
       ],
       "claimPhase": "Verify",
-      "shipIntentStage": "verifying"
+      "shipIntentStage": "verifying",
+      "neverOptional": true
     },
     "review@1": {
       "summary": "Review the change with the configured reviewers and settle every finding.",
@@ -486,7 +488,8 @@
         "local-checks@1"
       ],
       "claimPhase": "Review",
-      "shipIntentStage": "reviewing"
+      "shipIntentStage": "reviewing",
+      "neverOptional": true
     },
     "merge@1": {
       "summary": "Land the reviewed change on its target.",
@@ -562,7 +565,8 @@
         "risk-check@1"
       ],
       "claimPhase": "Merge",
-      "shipIntentStage": "landing"
+      "shipIntentStage": "landing",
+      "neverOptional": true
     },
     "complete@1": {
       "summary": "Record the landed work on the item: its status, dates, links and claims.",
@@ -587,12 +591,14 @@
           {
             "value": "DONE",
             "detail": "none",
-            "class": "continue"
+            "class": "continue",
+            "recordsOutcome": "shipped"
           },
           {
             "value": "LANDED",
             "detail": "none",
-            "class": "continue"
+            "class": "continue",
+            "recordsOutcome": "landed"
           },
           {
             "value": "FAILED",
@@ -2558,7 +2564,9 @@
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "head": "string",
+          "sourceBefore": "string"
         }
       },
       "proof": {
@@ -2637,22 +2645,25 @@
       "summary": "Run the local pre-ship checks the train needs.",
       "builtinSkill": "pre-ship",
       "payload": {
-        "base": "context.productionBranch",
-        "head": "context.releaseHead?"
+        "base": "result:train-snapshot@1.sourceBefore?",
+        "head": "result:train-snapshot@1.head?",
+        "shape": "result:release-shape@1.shape?"
       },
-      "argument": "train run {base} {head}",
+      "argument": "train run {base} {head} --shape {shape}",
       "verdict": {
         "label": "PRE-SHIP",
         "values": [
           { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
           { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
-          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" }
+          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
         ]
       },
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "ranAtTrain": "string"
         }
       },
       "proof": {
@@ -2749,7 +2760,8 @@
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "autoStart": "string"
         }
       },
       "proof": {
@@ -2780,7 +2792,9 @@
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "sourceHead": "string",
+          "productionHead": "string"
         }
       },
       "proof": {
@@ -2796,14 +2810,16 @@
       "payload": {
         "productionBranch": "context.productionBranch",
         "releaseSource": "context.releaseSource",
-        "head": "context.releaseHead?"
+        "head": "result:release-delta@1.sourceHead?",
+        "shape": "result:release-shape@1.shape?"
       },
       "argument": null,
       "verdict": {
         "label": "RELEASE CLASS",
         "values": [
           { "value": "LIGHT", "detail": "none", "class": "continue" },
-          { "value": "FULL", "detail": "none", "class": "continue" }
+          { "value": "FULL", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
         ]
       },
       "result": {
@@ -2817,64 +2833,6 @@
       },
       "requires": [],
       "claimPhase": "Classify the release",
-      "shipIntentStage": null
-    },
-    "classify-at-checks@1": {
-      "summary": "Classify the release again at the head the checks test.",
-      "builtinSkill": "classify-release",
-      "payload": {
-        "productionBranch": "context.productionBranch",
-        "releaseSource": "context.releaseSource",
-        "head": "context.releaseHead?"
-      },
-      "argument": null,
-      "verdict": {
-        "label": "RELEASE CLASS",
-        "values": [
-          { "value": "LIGHT", "detail": "none", "class": "continue" },
-          { "value": "FULL", "detail": "none", "class": "continue" }
-        ]
-      },
-      "result": {
-        "required": ["state"],
-        "types": {
-          "state": "string"
-        }
-      },
-      "proof": {
-        "binding": "none"
-      },
-      "requires": [],
-      "claimPhase": "Classify at the checks",
-      "shipIntentStage": null
-    },
-    "classify-at-pre-ship@1": {
-      "summary": "Classify the release again at the reviewed head before the pre-ship checks.",
-      "builtinSkill": "classify-release",
-      "payload": {
-        "productionBranch": "context.productionBranch",
-        "releaseSource": "context.releaseSource",
-        "head": "context.releaseHead?"
-      },
-      "argument": null,
-      "verdict": {
-        "label": "RELEASE CLASS",
-        "values": [
-          { "value": "LIGHT", "detail": "none", "class": "continue" },
-          { "value": "FULL", "detail": "none", "class": "continue" }
-        ]
-      },
-      "result": {
-        "required": ["state"],
-        "types": {
-          "state": "string"
-        }
-      },
-      "proof": {
-        "binding": "none"
-      },
-      "requires": [],
-      "claimPhase": "Classify before pre-ship",
       "shipIntentStage": null
     },
     "tower-queue@1": {
@@ -2997,7 +2955,8 @@
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "pullRequest": "number"
         }
       },
       "proof": {
@@ -3057,7 +3016,9 @@
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "head": "string",
+          "productionTip": "string"
         }
       },
       "proof": {
@@ -3067,21 +3028,54 @@
       "claimPhase": "Read the production tip",
       "shipIntentStage": null
     },
+    "classify-at-checks@1": {
+      "summary": "Classify the release again at the head the checks test.",
+      "builtinSkill": "classify-release",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "result:release-tip@1.head?",
+        "shape": "result:release-shape@1.shape?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE CLASS",
+        "values": [
+          { "value": "LIGHT", "detail": "none", "class": "continue" },
+          { "value": "FULL", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Classify at the checks",
+      "shipIntentStage": null
+    },
     "pre-ship-at-checks@1": {
       "summary": "Run the release's pre-ship checks before claiming the tower.",
       "builtinSkill": "pre-ship",
       "payload": {
-        "base": "context.productionBranch",
-        "head": "context.releaseHead?",
-        "releaseClass": "context.releaseClass?"
+        "base": "result:release-tip@1.productionTip?",
+        "head": "result:release-tip@1.head?",
+        "releaseClass": "result:classify-at-checks@1.state?",
+        "shape": "result:release-shape@1.shape?"
       },
-      "argument": "release run {base} {head} {releaseClass}",
+      "argument": "release run {base} {head} {releaseClass} --shape {shape}",
       "verdict": {
         "label": "PRE-SHIP",
         "values": [
           { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
           { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
-          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" }
+          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
         ]
       },
       "result": {
@@ -3135,9 +3129,10 @@
       "payload": {
         "productionBranch": "context.productionBranch",
         "releaseSource": "context.releaseSource",
-        "head": "context.releaseHead?",
-        "pullRequest": "context.pullRequest?",
-        "answer": "step.answer?"
+        "head": "result:release-tip@1.head?",
+        "pullRequest": "result:release-pr@1.pullRequest?",
+        "answer": "step.answer?",
+        "shape": "result:release-shape@1.shape?"
       },
       "argument": null,
       "verdict": {
@@ -3145,14 +3140,16 @@
         "values": [
           { "value": "CLEAR", "detail": "none", "class": "continue" },
           { "value": "HOLD", "detail": "none", "class": "stop" },
-          { "value": "NOT RUN", "detail": "none", "class": "ask" },
-          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+          { "value": "NOT RUN", "detail": "none", "class": "confirm" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
         ]
       },
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "answer": "string"
         }
       },
       "proof": {
@@ -3199,7 +3196,8 @@
         "scope": "context.scope?",
         "startedBy": "context.startedBy?",
         "shape": "result:release-shape@1?",
-        "tower": "result:tower-claim@1?"
+        "tower": "result:tower-claim@1?",
+        "profile": "context.profile?"
       },
       "argument": null,
       "verdict": {
@@ -3225,22 +3223,55 @@
       "shipIntentStage": null,
       "maxAutoRedo": 8
     },
+    "classify-at-pre-ship@1": {
+      "summary": "Classify the release again at the reviewed head before the pre-ship checks.",
+      "builtinSkill": "classify-release",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "releaseSource": "context.releaseSource",
+        "head": "result:release-review@1.reviewedHead?",
+        "shape": "result:release-shape@1.shape?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "RELEASE CLASS",
+        "values": [
+          { "value": "LIGHT", "detail": "none", "class": "continue" },
+          { "value": "FULL", "detail": "none", "class": "continue" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Classify before pre-ship",
+      "shipIntentStage": null
+    },
     "pre-ship-release@1": {
       "summary": "Run the release's pre-ship checks at the reviewed head.",
       "builtinSkill": "pre-ship",
       "payload": {
-        "base": "context.productionBranch",
-        "head": "context.releaseHead?",
-        "releaseClass": "context.releaseClass?",
-        "ranAtTrain": "context.ranAtTrain?",
-        "releaseReview": "result:release-review@1"
+        "base": "result:release-delta@1.productionHead?",
+        "head": "result:release-review@1.reviewedHead",
+        "releaseClass": "result:classify-at-pre-ship@1.state?",
+        "ranAtTrain": "result:train-pre-ship@1.ranAtTrain?",
+        "releaseReview": "result:release-review@1",
+        "shape": "result:release-shape@1.shape?"
       },
-      "argument": "release run {base} {head} {releaseClass} {ranAtTrain}",
+      "argument": "release run {base} {head} {releaseClass} {ranAtTrain} --shape {shape}",
       "verdict": {
         "label": "PRE-SHIP",
         "values": [
           { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
-          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" }
+          { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "continue" }
         ]
       },
       "result": {
@@ -3295,7 +3326,9 @@
         "scope": "context.scope?",
         "startedBy": "context.startedBy?",
         "shape": "result:release-shape@1?",
-        "tower": "result:tower-claim@1?"
+        "tower": "result:tower-claim@1?",
+        "releaseNotes": "context.releaseNotes?",
+        "noDocs": "context.noDocs?"
       },
       "argument": null,
       "verdict": {
@@ -3333,7 +3366,7 @@
         "label": "HOTFIX CATCH-UP",
         "values": [
           { "value": "NONE", "detail": "none", "class": "continue" },
-          { "value": "MERGED", "detail": "required", "class": "stop", "detailName": "pr" },
+          { "value": "MERGED", "detail": "required", "class": "rewind:release-review@1", "detailName": "pr" },
           { "value": "SAME TREE", "detail": "required", "class": "continue", "detailName": "sha" }
         ]
       },
@@ -3391,9 +3424,10 @@
       "payload": {
         "productionBranch": "context.productionBranch",
         "releaseSource": "context.releaseSource",
-        "head": "context.releaseHead?",
-        "pullRequest": "context.pullRequest?",
-        "answer": "step.answer?"
+        "head": "result:release-review@1.reviewedHead?",
+        "pullRequest": "result:release-pr@1.pullRequest?",
+        "answer": "step.answer?",
+        "shape": "result:release-shape@1.shape?"
       },
       "argument": null,
       "verdict": {
@@ -3401,14 +3435,16 @@
         "values": [
           { "value": "CLEAR", "detail": "none", "class": "continue" },
           { "value": "HOLD", "detail": "none", "class": "stop" },
-          { "value": "NOT RUN", "detail": "none", "class": "ask" },
-          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+          { "value": "NOT RUN", "detail": "none", "class": "confirm" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
         ]
       },
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "answer": "string"
         }
       },
       "proof": {
@@ -3424,9 +3460,10 @@
       "payload": {
         "productionBranch": "context.productionBranch",
         "releaseSource": "context.releaseSource",
-        "head": "context.releaseHead?",
-        "pullRequest": "context.pullRequest?",
-        "answer": "step.answer?"
+        "head": "result:release-review@1.reviewedHead?",
+        "pullRequest": "result:release-pr@1.pullRequest?",
+        "answer": "step.answer?",
+        "shape": "result:release-shape@1.shape?"
       },
       "argument": null,
       "verdict": {
@@ -3434,14 +3471,16 @@
         "values": [
           { "value": "CLEAR", "detail": "none", "class": "continue" },
           { "value": "HOLD", "detail": "none", "class": "stop" },
-          { "value": "NOT RUN", "detail": "none", "class": "ask" },
-          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+          { "value": "NOT RUN", "detail": "none", "class": "confirm" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
         ]
       },
       "result": {
         "required": ["state"],
         "types": {
-          "state": "string"
+          "state": "string",
+          "answer": "string"
         }
       },
       "proof": {
@@ -3483,8 +3522,46 @@
         "binding": "none"
       },
       "requires": ["release-review@1", "pre-ship-release@1"],
+      "satisfiedBy": ["owner-go-ahead-recheck@1"],
       "claimPhase": "Wait for the go-ahead",
       "shipIntentStage": null
+    },
+    "owner-go-ahead-recheck@1": {
+      "summary": "At the final gate, with the tower held, run the standing yes again or apply the yes the earlier go-ahead took.",
+      "builtinSkill": "release-steps",
+      "payload": {
+        "scope": "context.scope?",
+        "startedBy": "context.startedBy?",
+        "shape": "result:release-shape@1?",
+        "tower": "result:tower-claim@1?",
+        "answer": "step.answer?",
+        "releaseReview": "result:release-review@1",
+        "preShipRelease": "result:pre-ship-release@1",
+        "goAhead": "result:owner-go-ahead@1"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "GO-AHEAD",
+        "values": [
+          { "value": "YES", "detail": "required", "class": "continue", "detailName": "source" },
+          { "value": "NOT YET", "detail": "none", "class": "ask" },
+          { "value": "NO", "detail": "none", "class": "end:declined" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string",
+          "answer": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": ["release-review@1", "pre-ship-release@1", "owner-go-ahead@1"],
+      "claimPhase": "Recheck the go-ahead",
+      "shipIntentStage": null,
+      "since": "4.10.0"
     },
     "release-stamp-verify@1": {
       "summary": "Verify the checks stamp still matches the branch and production.",
@@ -3522,18 +3599,20 @@
       "summary": "Re-run the pre-ship entries marked to run again at the merge.",
       "builtinSkill": "pre-ship",
       "payload": {
-        "base": "context.productionBranch",
-        "head": "context.releaseHead?",
-        "releaseClass": "context.releaseClass?",
-        "rerunNames": "context.rerunAtMerge?"
+        "base": "result:release-delta@1.productionHead?",
+        "head": "result:release-review@1.reviewedHead?",
+        "releaseClass": "result:classify-at-pre-ship@1.state?",
+        "rerunNames": "context.rerunAtMerge?",
+        "shape": "result:release-shape@1.shape?"
       },
-      "argument": "release run {base} {head} {releaseClass} --only {rerunNames}",
+      "argument": "release run {base} {head} {releaseClass} --only {rerunNames} --shape {shape}",
       "verdict": {
         "label": "PRE-SHIP",
         "values": [
           { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
           { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
-          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" }
+          { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" },
+          { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
         ]
       },
       "result": {
@@ -3579,6 +3658,7 @@
         "binding": "none"
       },
       "requires": ["release-review@1", "pre-ship-release@1", "owner-go-ahead@1"],
+      "requiresAfter": { "owner-go-ahead@1": ["tower-claim@1"] },
       "claimPhase": "Confirm the merge",
       "shipIntentStage": null
     },
@@ -3615,6 +3695,7 @@
         "binding": "none"
       },
       "requires": ["release-review@1", "pre-ship-release@1", "owner-go-ahead@1", "merge-confirmations@1"],
+      "requiresAfter": { "owner-go-ahead@1": ["tower-claim@1"] },
       "claimPhase": "Merge to production",
       "shipIntentStage": null
     },
@@ -3715,18 +3796,49 @@
       "builtinSkill": "post-deploy",
       "payload": {
         "productionBranch": "context.productionBranch",
-        "merge": "result:production-merge@1?",
-        "mergedRelease": "result:merged-release@1?",
-        "deploy": "result:deploy-confirm@1?",
+        "mergeCommit": "result:hotfix-merge@1.sha?",
+        "deployConfirmedAt": "result:deploy-confirm@1.confirmedAt?",
         "answer": "step.answer?"
       },
-      "argument": null,
+      "argument": "check\n```json\n{\"productionBranch\": \"{productionBranch}\", \"mergeCommit\": \"{mergeCommit}\", \"deployConfirmedAt\": \"{deployConfirmedAt}\"}\n```",
       "verdict": {
         "label": "POST-DEPLOY HEALTH",
         "values": [
           { "value": "PASS", "detail": "none", "class": "continue" },
           { "value": "FAIL", "detail": "none", "class": "stop" },
-          { "value": "NOT RUN", "detail": "none", "class": "ask" },
+          { "value": "NOT RUN", "detail": "none", "class": "confirm" },
+          { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
+        ]
+      },
+      "result": {
+        "required": ["state"],
+        "types": {
+          "state": "string",
+          "answer": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Post-deploy health check",
+      "shipIntentStage": null
+    },
+    "post-deploy-check-owed@1": {
+      "summary": "Run the post-deploy health check after the hand-back; the next step posts its answer.",
+      "builtinSkill": "post-deploy",
+      "payload": {
+        "productionBranch": "context.productionBranch",
+        "mergeCommit": "result:hotfix-merge@1.sha?",
+        "deployConfirmedAt": "result:deploy-confirm@1.confirmedAt?"
+      },
+      "argument": "check\n```json\n{\"productionBranch\": \"{productionBranch}\", \"mergeCommit\": \"{mergeCommit}\", \"deployConfirmedAt\": \"{deployConfirmedAt}\"}\n```",
+      "verdict": {
+        "label": "POST-DEPLOY HEALTH",
+        "values": [
+          { "value": "PASS", "detail": "none", "class": "continue" },
+          { "value": "FAIL", "detail": "none", "class": "continue" },
+          { "value": "NOT RUN", "detail": "none", "class": "continue" },
           { "value": "NOT CONFIGURED", "detail": "none", "class": "skipped" }
         ]
       },
@@ -3741,7 +3853,8 @@
       },
       "requires": [],
       "claimPhase": "Post-deploy health check",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "since": "4.10.0"
     },
     "post-deploy-result@1": {
       "summary": "Post the health check's result as the release/post-deploy status.",
@@ -3750,7 +3863,8 @@
         "scope": "context.scope?",
         "startedBy": "context.startedBy?",
         "shape": "result:release-shape@1?",
-        "tower": "result:tower-claim@1?"
+        "tower": "result:tower-claim@1?",
+        "answer": "step.answer?"
       },
       "argument": null,
       "verdict": {
@@ -3759,6 +3873,7 @@
           { "value": "SUCCESS POSTED", "detail": "none", "class": "continue" },
           { "value": "FAILURE POSTED", "detail": "none", "class": "stop" },
           { "value": "ERROR POSTED", "detail": "none", "class": "stop" },
+          { "value": "NEEDS DECISION", "detail": "required", "class": "ask", "detailName": "question" },
           { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
         ]
       },
@@ -3943,7 +4058,8 @@
         "scope": "context.scope?",
         "startedBy": "context.startedBy?",
         "shape": "result:release-shape@1?",
-        "tower": "result:tower-claim@1?"
+        "tower": "result:tower-claim@1?",
+        "releaseNotes": "context.releaseNotes?"
       },
       "argument": null,
       "verdict": {
@@ -4031,6 +4147,92 @@
       "requires": [],
       "claimPhase": "Decide the next release",
       "shipIntentStage": null
+    },
+    "approval@1": {
+      "summary": "Ask a person in DevStride to approve before the run goes on; an agent never gives the answer.",
+      "builtinSkill": null,
+      "payload": {
+        "item": "context.item?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "APPROVAL",
+        "values": [
+          { "value": "REQUESTED", "detail": "none", "class": "park" },
+          { "value": "APPROVED", "detail": "none", "class": "continue" },
+          { "value": "CHANGES", "detail": "optional", "class": "redo:self", "detailName": "note" },
+          { "value": "REJECTED", "detail": "optional", "class": "stop", "detailName": "note" },
+          { "value": "UNAVAILABLE", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": [],
+        "types": {
+          "id": "string",
+          "gateId": "string",
+          "status": "string",
+          "requestedAt": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Wait for approval",
+      "shipIntentStage": null,
+      "since": "4.10.0"
+    },
+    "checkpoint@1": {
+      "summary": "Hand a step to a person, who marks it done or skipped in DevStride; an agent never gives the answer.",
+      "builtinSkill": null,
+      "payload": {
+        "item": "context.item?"
+      },
+      "argument": null,
+      "verdict": {
+        "label": "CHECKPOINT",
+        "values": [
+          { "value": "REQUESTED", "detail": "none", "class": "park" },
+          { "value": "DONE", "detail": "none", "class": "continue" },
+          { "value": "SKIPPED", "detail": "none", "class": "skipped" },
+          { "value": "UNAVAILABLE", "detail": "required", "class": "stop", "detailName": "reason" }
+        ]
+      },
+      "result": {
+        "required": [],
+        "types": {
+          "id": "string",
+          "gateId": "string",
+          "status": "string",
+          "requestedAt": "string"
+        }
+      },
+      "proof": {
+        "binding": "none"
+      },
+      "requires": [],
+      "claimPhase": "Wait for a person",
+      "shipIntentStage": null,
+      "since": "4.10.0"
+    }
+  },
+  "dormantSkills": {
+    "release-steps": "the Release workflow runs only in a rehearsal until its rehearsal has passed; /devstride:release follows its own page",
+    "gate": "an approval gate runs only in a rehearsal until DevStride offers approval gates",
+    "checkpoint": "a checkpoint, a step a person does by hand, runs only in a rehearsal until DevStride offers checkpoints"
+  },
+  "features": {
+    "when-condition": {
+      "summary": "A step runs only when its condition holds, and otherwise is skipped with the reason (when.mode condition).",
+      "since": "4.10.0"
+    },
+    "when-manual": {
+      "summary": "A person does the step by hand (when.mode manual, contract checkpoint@1).",
+      "since": "4.10.0"
+    },
+    "on-fail-continue": {
+      "summary": "A step's failure is shown and the workflow carries on (onFail continue).",
+      "since": "4.10.0"
     }
   }
 }

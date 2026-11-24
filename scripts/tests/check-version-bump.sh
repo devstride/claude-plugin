@@ -182,6 +182,29 @@ empty_repo no-import; echo seed > "$R/seed.txt"; git -C "$R" add -A; git -C "$R"
 git -C "$R" checkout -q -b work; plugin_tree; git -C "$R" add -A; git -C "$R" commit -qm "copied by hand"; BASE=master
 echo two > "$P/scripts/tool.sh"; check
 expect "(21) base without the plugin and no import commit → usage error, never a silent pass" 2 "no commit whose subject starts 'plugin import'"
+
+# --- rule 4: no version while a release step has no reference ---
+# release_steps MODE... — a workflow whose steps the grouped release-steps skill serves, and its body
+release_steps() {
+  mkdir -p "$P/workflows" "$P/skills/release-steps/references"; echo body > "$P/skills/release-steps/SKILL.md"
+  python3 - "$P/workflows/release.json" "$@" <<'PY'
+import json, sys
+steps = [{"id": m, "contract": m + "@1", "run": {"source": "builtin", "ref": "release-steps"}} for m in sys.argv[2:]]
+steps.append({"id": "other", "contract": "pre-ship@1", "run": {"source": "builtin", "ref": "pre-ship"}})
+json.dump({"id": "release", "phases": [{"id": "start", "steps": steps}]}, open(sys.argv[1], "w"))
+PY
+}
+new_case steps-unwritten; release_steps train-claim tower-claim; echo ref > "$P/skills/release-steps/references/train-claim.md"
+set_version 1.1.0; changelog_heading 1.1.0; check
+expect "(32) a bump while a release step has no reference → refused, names the mode" 1 "1 release step(s) have no reference yet.*(tower-claim)"
+
+new_case steps-written; release_steps train-claim tower-claim
+echo ref > "$P/skills/release-steps/references/train-claim.md"; echo ref > "$P/skills/release-steps/references/tower-claim.md"
+set_version 1.1.0; changelog_heading 1.1.0; check
+expect "(33) a bump with every release step's reference written → ok" 0 "bumped from 1.0.0"
+
+new_case steps-unwritten-no-bump; release_steps train-claim tower-claim; check
+expect "(34) the same gap without a bump is the ordinary rule's business, not this one's" 1 "without a version bump"
 }
 
 run_set

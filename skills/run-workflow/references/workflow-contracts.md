@@ -12,21 +12,47 @@ each step's answer to, for whoever writes or changes a definition
 ## What `start` refuses
 
 `bad-schema` (a field the definition schema requires is missing, of the wrong type or past its
-limit: at most 12 phases, 40 steps in a phase, 250 in all), `credential-in-definition` (a string
+limit: at most 12 phases, 40 steps in a phase, 250 in all; `children-complete` ends by `ship` or
+`hand-up`, any other `startsWhen` by `null`; `answerers` on a gate or a manual step (on any other step it is an unknown key, kept and never read): at most 20 entries, each
+`edit-access`, `item-owner`, a `role` with its `roleId` or a `person` with their `username`), `credential-in-definition` (a string
 that looks like a credential, anywhere in it, named by where it is, never echoed),
 `duplicate-step-id`, `plugin-too-old` (the definition needs a newer plugin), `unknown-contract`,
 `unknown-contract-major`, `requires-missing` and `requires-not-earlier` (a contract's required step
 is absent, or only later, or a second step providing it comes after a step that requires it, whose
-changes then nothing would check), `required-not-always`, `required-not-stop` and `required-off`
-(the step that provides a required contract must always run, must stop the run when it fails and
-cannot be switched off), `unsupported-gate`, `unsupported-when`, `unsupported-source` and
-`unsupported-on-fail` (features this plugin does not run: a gate, a conditional or manual step, a
-built-in source for a contract with no built-in skill, a step that carries on after a failure),
-`library-version` (a library skill step must pin a version), `skill-missing` (a step names
+changes then nothing would check), `requires-not-after` (a requirement the contract's
+`requiresAfter` orders after another contract is met only by a step before that contract's nearest
+earlier step: the merge confirmations and the production merge need a go-ahead given after the
+tower claim), `bad-condition` (a `condition` step names no condition, its condition is outside the
+grammar of `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/conditions.md`, or a
+`step-verdict` names no earlier step or a word that step's contract never gives; a condition on a
+step of any other mode is kept and never read), `required-not-always`, `required-not-stop`
+and `required-off` (the step that provides a required contract must always run, must stop the run
+when it fails and cannot be switched off; a step whose contract the catalog marks `neverOptional`
+(the risk check, local checks, review and merge, and any contract that stands in for one) must
+always run and stop the run when it fails wherever a workflow runs it, required or not),
+`unsupported-gate` (a gate is a step of kind `gate` with the contract `approval@1`, only a gate has
+that contract, and it runs the reserved built-in reference `gate`, which needs no skill file),
+`unsupported-when` (a gate runs always or on a condition, never by hand), `unsupported-on-fail` (a
+gate never carries on), `unsupported-checkpoint` (a `manual` step is of kind `step` with the
+contract `checkpoint@1` and the reserved built-in reference `checkpoint`, and only a manual step
+has that contract), `gate-needs-item` (a gate or a checkpoint in a run that names no item: the
+tracker files a person's answer under the item), `unsupported-source` (a built-in source for a
+contract with no built-in skill),
+`library-version` (a library skill step must pin a version), `rewind-missing` (a step that can
+answer `rewind:<contract>`, which names another catalog contract, has no such step before it),
+`rewind-not-always` (the step it would go back to is conditional or carries on after a failure),
+`skill-dormant` (a step runs what the catalog lists under `dormantSkills`, a built-in skill or the
+reserved reference `gate` or `checkpoint`: it ships but is not switched on, and only a `start` with
+`rehearsal` true runs it, whoever handed the definition over), `skill-missing` (a step names
 a skill this plugin does not have) and `repository-required` (a contract bound to the tree, the patch or the
 story, outside a git work tree). Required steps come only from each contract's `requires` list in
-the catalog, so a renamed or re-sourced step is covered whatever skill runs it: a workflow can
-replace a required step, never drop, weaken or move it.
+the catalog, plus the `neverOptional` marks, so a renamed or re-sourced step is covered whatever
+skill runs it: a workflow can replace a required step, never drop, weaken or move it. A step that is
+not required may be conditional (the `when` mode `condition`), done by a person (`manual`), or carry on
+after a failure (`onFail` `continue`). DevStride takes a definition's lowest plugin version from the
+`since` of each contract it uses and of each entry of the catalog's `features` map
+(`when-condition`, `when-manual`, `on-fail-continue`) it uses, so an older plugin refuses a
+definition with these rather than ignoring them.
 
 ## What is reported
 
@@ -91,9 +117,17 @@ nothing before a finished merge is re-opened. `next` issues the first step, in o
 finished with a valid proof: a stale proof re-issues the step that produced it before anything that
 relies on it. A proof that does not match the
 repository when the step answers counts as a failed attempt and the step is issued again. The
-runner counts its own re-issues per step (not a step's own `redo:self`), starts again from 0 when
-the step finishes with a proof that holds, and stops at the fifth in a row (kind
-`attempts-exhausted`). A local-checks pass names at least one command and carries a receipt.
+runner counts its own re-issues per step (a step's own `redo:self` or a `rewind` back to it only
+where the contract sets `maxAutoRedo`, and never a person's answer or resume), starts again from 0 when the step finishes with a proof that holds, and stops
+at the fifth in a row, or at the contract's `maxAutoRedo` where the catalog raises it (a whole
+number from 6 to 20) (kind `attempts-exhausted`). A local-checks pass names at least one command and carries a receipt.
+
+**A `confirm` verdict** (a person's yes records it as accepted, without the step running again:
+`workflow-runner.md`, "A step's answer") is allowed only in a contract that takes no proof (binding
+`none`, no proof keys; `confirm-proof`) and whose result lists `answer` as optional text, where the
+accepted answer is kept (`confirm-result`). The catalog check refuses any other. An accepted
+verdict's result is what the step gave plus `answer`, so a later step reads any other key of it
+with a `?`.
 
 Five named rules, a closed list:
 
@@ -134,7 +168,15 @@ contract in X's list** meets it. It is honoured in three places: start validatio
 is absent, later, conditional, non-stopping or switched off is refused exactly as the original
 would be), payload paths (a result path naming X reads the stand-in's result, so a stand-in must
 always give every key a dependent reads without a `?`), and supersession. Only a release adding a
-stand-in contract appends to a list. No shipped contract carries the field yet.
+stand-in contract appends to a list.
+
+An entry may also carry `requiresAfter`: a map from contracts in its own `requires` list to lists
+of other catalog contracts (the catalog check refuses anything else, `requires-after`). The step
+that meets such a requirement must come after the nearest earlier step of each listed contract,
+switched off or not; when none of that contract comes before, nothing is ordered. Under scope
+`merge-and-deploy` this is what makes the recheck at the final gate (`owner-go-ahead-recheck@1`,
+a stand-in for `owner-go-ahead@1`) required in its own right, while the recheck requires the first
+go-ahead.
 
 ## Cited by
 

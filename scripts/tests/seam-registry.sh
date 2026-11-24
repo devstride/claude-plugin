@@ -2,7 +2,8 @@
 # Tests for schemas/seam-registry.json and scripts/build-config-schema.py: the registry is well
 # formed and points at real files, skills and hook scripts, the committed schema and table are exactly what it
 # generates, the schema uses only the keywords the validator implements, and a release cannot
-# ship an entry still marked "unreleased". Mutations run on a scratch copy, never the checkout.
+# ship an entry, or a step contract, still marked "unreleased". Mutations run on a scratch copy,
+# never the checkout.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; GEN="scripts/build-config-schema.py"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
@@ -137,6 +138,20 @@ gen --check --release --base main
 edit .claude-plugin/plugin.json 'd["version"] = "99.0.0"'; gen --write >/dev/null; gen --check --release --base main
 [ "$RC" = 1 ] && printf '%s' "$OUT" | grep -q "^UNRELEASED .*: set since to 99.0.0" \
   && ok "(16) a version bump with an unreleased entry is refused, naming the version" || bad "(16) exit $RC: $OUT"
+copy; edit schemas/step-contracts.json '[c.__setitem__("since", "1.0.0") for c in list(d["contracts"].values()) + list(d.get("features", {}).values()) if "since" in c]; d["contracts"]["claim@1"]["since"] = "unreleased"'
+git -C "$WORK/r" add -A && git -C "$WORK/r" -c user.name=t -c user.email=t@example.invalid commit -qm unreleased-contract
+gen --check --release --base main
+[ "$RC" = 0 ] && ok "(16b) same version as the base: an unreleased step contract is fine" || bad "(16b) exit $RC: $OUT"
+edit .claude-plugin/plugin.json 'd["version"] = "99.0.0"'; gen --write >/dev/null; gen --check --release --base main
+[ "$RC" = 1 ] && printf '%s' "$OUT" | grep -q "^UNRELEASED step contract claim@1: set since to 99.0.0" \
+  && ! printf '%s' "$OUT" | grep -q "^UNRELEASED step contract approval@1" \
+  && ok "(16c) a version bump with an unreleased step contract is refused, naming it and the version" || bad "(16c) exit $RC: $OUT"
+copy; edit schemas/step-contracts.json '[c.__setitem__("since", "1.0.0") for c in list(d["contracts"].values()) + list(d["features"].values()) if "since" in c]; d["features"]["when-manual"]["since"] = "unreleased"'
+git -C "$WORK/r" add -A && git -C "$WORK/r" -c user.name=t -c user.email=t@example.invalid commit -qm unreleased-feature
+edit .claude-plugin/plugin.json 'd["version"] = "99.0.0"'; gen --write >/dev/null; gen --check --release --base main
+[ "$RC" = 1 ] && printf '%s' "$OUT" | grep -q "^UNRELEASED workflow feature when-manual: set since to 99.0.0" \
+  && ! printf '%s' "$OUT" | grep -q "^UNRELEASED step contract" \
+  && ok "(16d) a version bump with an unreleased workflow feature is refused, naming it and the version" || bad "(16d) exit $RC: $OUT"
 gen --check --release --base no-such-ref
 [ "$RC" = 2 ] && ok "(17) an unreadable base is exit 2" || bad "(17) exit $RC: $OUT"
 
@@ -218,5 +233,19 @@ PYS
 copy; edit schemas/seam-registry.json 'd["hooks"][0]["step"] = "update-docs"; d["hooks"][0].pop("stepVerdict", None)'; gen --check
 [ "$RC" = 1 ] && printf '%s' "$OUT" | grep -q "^REGISTRY .*stepVerdict" \
   && ok "(21) a hook naming a step without its verdict lines is a REGISTRY finding" || bad "(21) exit $RC: $OUT"
+
+# (22) the workflows seam names the two gate tools, and doctor's workflows check lists both
+OUT="$(python3 - "$ROOT" <<'PYG'
+import json, os, sys
+root = sys.argv[1]
+hooks = {h["key"]: h for h in json.load(open(os.path.join(root, "schemas/seam-registry.json")))["hooks"]}
+doctor = open(os.path.join(root, "skills/doctor/references/workflows-checks.md"), encoding="utf-8").read()
+names = ("request_workflow_gate", "get_workflow_gate")
+problems = ["SEAM " + n for n in names if "`%s`" % n not in hooks["workflows"]["payload"]]
+problems += ["DOCTOR " + n for n in names if "`%s`" % n not in doctor]
+print("\n".join(problems) or "clean")
+PYG
+)"
+[ "$OUT" = clean ] && ok "(22) the workflows seam and doctor name request_workflow_gate and get_workflow_gate" || bad "(22) $OUT"
 
 exit "$FAIL"

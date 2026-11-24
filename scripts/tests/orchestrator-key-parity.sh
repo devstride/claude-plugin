@@ -2,6 +2,7 @@
 # scripts/tests/orchestrator-key-parity.sh — CONTRIBUTING's key walk, made mechanical: every dotted
 # config key an orchestrator body cited at the base ref is still cited by the new body, or by a step
 # skill or contract that body now points to. A paragraph moved into a step must not drop a key.
+# A grouped step skill (release-steps) points to its references as `references/<mode>.md`.
 # ultracode-build counts as an orchestrator too: its risk check and gate moved into two steps.
 #
 # Undotted top-level keys (`preShipChecks`, `baseBranch` …) count too when the registry registers
@@ -51,7 +52,8 @@ POINTER = re.compile(r"\$\{CLAUDE_PLUGIN_ROOT\}/([A-Za-z0-9_./-]+)")
 steps = ["update-docs", "sync-knowledge-base", "write-release-notes", "pre-ship", "post-deploy",
          "local-environment", "lease-checkout", "return-checkout", "classify-release", "pre-merge-check",
          "claim-story", "story-lifecycle", "risk-check", "local-checks", "review-story", "merge-story",
-         "capture-findings", "sync-base", "run-workflow", "branch-feature", "ultracode-build", "hotfix-steps"]
+         "capture-findings", "sync-base", "run-workflow", "branch-feature", "ultracode-build", "hotfix-steps",
+         "release-steps"]
 import json
 reg = json.load(open(os.path.join(root, "schemas/seam-registry.json"), encoding="utf-8"))
 TOP = {re.sub(r"\[\]$", "", e["key"].split(".")[0]) for e in reg["hooks"] + reg["settings"]}
@@ -74,6 +76,10 @@ for n in names:
     for text in list(reach):
         for rel in POINTER.findall(text):
             reach.append(read(rel))
+            # a grouped step skill cites one reference per mode as `references/<mode>.md`: every
+            # reference in that directory is one it cites
+            if rel.endswith("/references/") and os.path.isdir(os.path.join(root, rel)):
+                reach += [read(rel + f) for f in sorted(os.listdir(os.path.join(root, rel))) if f.endswith(".md")]
     after = set().union(*(keys(t) for t in reach))
     # a key renamed on purpose counts as kept when its new name is cited (the old name is read by name)
     lost = sorted(k for k in before - after if RENAMED.get(k, k) not in after)

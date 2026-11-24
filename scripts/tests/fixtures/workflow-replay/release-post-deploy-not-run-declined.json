@@ -1,0 +1,61 @@
+{
+  "definition": "workflows/release-post-deploy.json",
+  "context": {
+    "productionBranch": "main",
+    "scope": "cut-to-deploy"
+  },
+  "script": [
+    {
+      "step": "merged-release",
+      "output": "MERGED RELEASE: FOUND #12\nevidence line\n```json\n{\"sha\": \"{head}\", \"pullRequest\": 12}\n```\n"
+    },
+    {
+      "step": "confirm-deploy",
+      "output": "DEPLOY: CONFIRMED {head}\nevidence line\n```json\n{\"mergeCommit\": \"{head}\", \"confirmedAt\": \"2026-11-22T08:00:00Z\"}\n```\n"
+    },
+    {
+      "step": "post-deploy-check",
+      "output": "POST-DEPLOY HEALTH: NOT RUN\nevidence line\n```json\n{\"state\": \"not-run\"}\n```\n"
+    },
+    {
+      "step": "post-deploy-status",
+      "output": "POST-DEPLOY STATUS: NEEDS DECISION accept the unrun health check? (the alarm read timed out)\nevidence line\n```json\n{\"state\": \"needs-decision\"}\n```\n"
+    },
+    {
+      "step": "post-deploy-status",
+      "output": "POST-DEPLOY STATUS: ERROR POSTED\nevidence line\n```json\n{\"state\": \"error-posted\"}\n```\n"
+    }
+  ],
+  "answers": [
+    "no"
+  ],
+  "expect": {
+    "order": [
+      [
+        "merged-release",
+        1
+      ],
+      [
+        "confirm-deploy",
+        1
+      ],
+      [
+        "post-deploy-check",
+        1
+      ],
+      [
+        "post-deploy-status",
+        1
+      ],
+      [
+        "post-deploy-status",
+        2
+      ]
+    ],
+    "outcome": "stopped",
+    "stops": [
+      "post-deploy-status",
+      "post-deploy-status"
+    ]
+  }
+}

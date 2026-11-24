@@ -18,9 +18,10 @@ when a release is prepared, and never edited or deleted by hand.
                          origin/main or origin/master); `--base none` skips the base comparison
   stamp <version> [--date YYYY-MM-DD] [--changelog <file>]
                          name the release in every `unreleased` row: the version, the date (today
-                         in US Central time unless given) and, for a row with no note, the line of
-                         that version's CHANGELOG section that best names it; then rewrite
-                         HISTORY.md
+                         in US Central time unless given) and, for a row with no note, the
+                         headline of that version's CHANGELOG entry that names it (its file, its
+                         `<name> workflow`, its id in backticks, or a hyphenated id), else a neutral
+                         sentence ("Revised in <version>."); then rewrite HISTORY.md
   verify-stamp <version> no row is left `unreleased`, every row of <version> carries its date and
                          a note, and HISTORY.md is current
   history [--write|--check]
@@ -31,18 +32,21 @@ Every command takes `--root <plugin dir>` (default: the folder above this script
 What `check` refuses:
   - a registry that does not match schemas/workflow-registry.schema.json
   - rows out of order: a workflow's versions start at 1 and rise by exactly one; a version repeats
-    only on a historical row marked `slip` or on a row marked `dormant` whose every earlier row at
-    that version is dormant too (a definition no released plugin could run). A contract's majors
+    only on a historical row marked `slip` or when every earlier row at that version is `dormant`
+    (every release that carried it had no runner for it). The new row is `dormant` only when this
+    plugin cannot run the definition; once a row at a version is not, that version is closed and
+    its step ids are permanent. A contract's majors
     rise by at most one, and a major may hold several revisions (the catalog's rule: additive
     within a major)
+  - a contract new in this release that the catalog does not write `"since": "unreleased"`, or
+    one whose `since` is not the release its first row names
   - a definition or contract whose fingerprint has no row at its version, a definition whose
     version is not its newest row's, a recorded workflow that no longer ships, and a step id that
     a runnable version shipped and the definition dropped or moved to another contract
   - a released row with no date or no note, a note that is not one plain line, or a note the
     public hygiene check flags (scripts/check-public-hygiene.sh, with no allow list)
   - against the base: a released row edited or deleted, an unreleased row with no row left at its
-    version, a new row marked `slip`, and a new `dormant` row at a version already recorded while
-    the definition can run
+    version, a new row marked `slip`, and a new `dormant` row for a definition this plugin can run
   - a HISTORY.md that is not what `history` writes
 
 Last line of `check`: `REGISTRY: ok (<n> workflow rows, <m> contract rows)` or
@@ -125,6 +129,14 @@ class Plugin:
         except OSError:
             return {}
 
+    def dormant_skills(self):
+        """The built-in step skills the catalog lists as not switched on yet (`dormantSkills`)."""
+        try:
+            listed = self.load_json("schemas/step-contracts.json").get("dormantSkills", {})
+        except OSError:
+            return set()
+        return set(listed) if isinstance(listed, dict) else set()
+
     def registry(self):
         return self.load_json(REGISTRY)
 
@@ -152,12 +164,15 @@ class Plugin:
 
     def runnable(self, definition, catalog):
         """True when this plugin can run the definition: every contract is in the catalog and
-        every built-in step skill exists. A definition that is not is dormant."""
+        every built-in step skill exists and is switched on (the catalog's `dormantSkills` lists
+        the ones that ship but are not). A definition that is not is dormant."""
+        dormant = self.dormant_skills()
         for step in steps_of(definition):
             if step["contract"] not in catalog:
                 return False
             run = step.get("run", {})
-            if run.get("source") == "builtin" and not os.path.isfile(self.path("skills/%s/SKILL.md" % run.get("ref"))):
+            if run.get("source") == "builtin" and (
+                    run.get("ref") in dormant or not os.path.isfile(self.path("skills/%s/SKILL.md" % run.get("ref")))):
                 return False
         return True
 
@@ -234,9 +249,14 @@ def record(plugin):
             updated.append("%s v%s" % (wid, entry["version"]))
             continue
         if same:
-            if dormant and all(r.get("dormant") for r in same) and last is same[-1]:
-                rows.append(workflow_row(entry, True))
-                appended.append("%s v%s (dormant)" % (wid, entry["version"]))
+            # A version may be re-recorded only while every release that carried it shipped it
+            # dormant (no runner for it), so no running plugin ever saw the earlier content. The new
+            # row is dormant only when this tree cannot run it either; a runnable re-record is the
+            # first row at that version a plugin can run, and its step ids are permanent from then on.
+            if all(r.get("dormant") for r in same) and last is same[-1]:
+                rows.append(workflow_row(entry, dormant))
+                appended.append("%s v%s (%s)" % (wid, entry["version"], "dormant" if dormant
+                                                 else "re-recorded over a version that shipped dormant"))
                 continue
             raise Refused("%s changed but its version did not; bump it first" % wid)
         expected = last["version"] + 1 if last else 1
@@ -335,11 +355,11 @@ def order_faults(registry, plugin_version):
                 earlier = [r for r in rows[:i] if r["version"] == row["version"]]
                 if row.get("slip"):
                     continue
-                if row.get("dormant") and all(r.get("dormant") for r in earlier):
+                if all(r.get("dormant") for r in earlier):
                     continue
                 faults.append("%s: its content changed at a version already recorded; bump the version "
-                              "(only a definition no released plugin could run may be re-recorded, "
-                              "marked dormant)" % tag)
+                              "(a version may be re-recorded only while every earlier row at it is "
+                              "dormant: no released plugin could run it)" % tag)
             elif row["version"] < prev["version"]:
                 faults.append("%s: the version goes backwards (after v%s)" % (tag, prev["version"]))
             elif row["version"] != prev["version"] + 1:
@@ -409,15 +429,28 @@ def current_faults(plugin, registry):
         if lost or moved:
             faults.append("%s: every step id a runnable version shipped stays, with its contract (gone: %s; moved: %s)"
                           % (wid, ", ".join(lost) or "none", ", ".join(moved) or "none"))
-        if not plugin.runnable(definition, catalog) and rows[-1]["version"] == entry["version"] and not rows[-1].get("dormant"):
+        can_run = plugin.runnable(definition, catalog)
+        if not can_run and rows[-1]["version"] == entry["version"] and not rows[-1].get("dormant"):
             faults.append("%s: this plugin cannot run it, so its newest row must be marked dormant" % wid)
+        if (can_run and rows[-1].get("dormant") and rows[-1]["pluginVersion"] == UNRELEASED
+                and rows[-1]["sha256"] == entry["sha256"]):
+            faults.append("%s: this plugin can run it, so its unreleased row must not be marked dormant (run record)" % wid)
     for wid in sorted(set(workflows) - set(defs)):
         faults.append("recorded workflow %s no longer ships" % wid)
     for key, body in catalog.items():
         name, major = split_contract(key)
         sha = plugin.contract_sha(body)
-        if not any(r["major"] == major and r["sha256"] == sha for r in registry["contracts"].get(name, [])):
+        rows = [r for r in registry["contracts"].get(name, []) if r["major"] == major]
+        if not any(r["sha256"] == sha for r in rows):
             faults.append("%s: not recorded at this content (run scripts/workflow-registry.py record)" % key)
+        # The catalog's `since` and the registry say one thing: a contract that is new in this
+        # release is written `unreleased` in both, and the release's stamp names the version in both.
+        first = rows[0]["pluginVersion"] if rows else None
+        since = body.get("since") if isinstance(body, dict) else None
+        if first == UNRELEASED and since != UNRELEASED:
+            faults.append("%s: new in this release, so the catalog writes it \"since\": \"unreleased\" (the release's stamp names the version)" % key)
+        elif first not in (None, UNRELEASED) and since is not None and since != first:
+            faults.append("%s: the catalog says since %s, but its first row was released in %s" % (key, since, first))
     return faults
 
 
@@ -514,10 +547,10 @@ def base_faults(plugin, registry, base_registry):
                 tag = "%s %s %s" % (kind[:-1], name, row[field])
                 if row.get("slip"):
                     faults.append("%s: a new row cannot be marked slip; bump the version instead" % tag)
-                if kind == "workflows" and row.get("dormant") and any(r[field] == row[field] for r in base_rows):
+                if kind == "workflows" and row.get("dormant"):
                     definition = defs.get(name)
-                    if definition is None or plugin.runnable(definition, catalog):
-                        faults.append("%s: re-recorded as dormant, but this plugin can run it; bump the version" % tag)
+                    if definition is not None and plugin.runnable(definition, catalog):
+                        faults.append("%s: marked dormant, but this plugin can run it; record it unmarked" % tag)
     return faults
 
 
@@ -610,12 +643,21 @@ def headline(bullet):
     return text
 
 
-def note_for(bullets, words):
+def note_for(bullets, words, fallback):
+    """The headline of the first bullet that names the row by one of `words` (forms specific
+    enough not to match an unrelated entry), else the neutral `fallback`: a guess frozen into a row
+    that may never be edited would be worse than a plain one."""
     for bullet in bullets:
         lowered = bullet.lower()
         if any(re.search(r"(?<![\w-])%s(?![\w-])" % re.escape(w.lower()), lowered) for w in words if w):
             return headline(bullet)
-    return headline(bullets[0]) if bullets else ""
+    return fallback
+
+
+def distinctive(name):
+    """A bare id or contract name is matched on its own only when it is hyphenated (release-post-deploy,
+    risk-check); a plain word such as build, plan or claim turns up in unrelated entries."""
+    return name if "-" in name else None
 
 
 def stamp(plugin, version, date, changelog):
@@ -629,22 +671,28 @@ def stamp(plugin, version, date, changelog):
     count = 0
     for wid, rows in registry["workflows"].items():
         name = defs.get(wid, {}).get("name", wid)
-        for row in rows:
+        for i, row in enumerate(rows):
             if row["pluginVersion"] != UNRELEASED:
                 continue
             row.update({"pluginVersion": version, "releasedAt": date})
             if row["minPluginVersion"] == UNRELEASED:
                 row["minPluginVersion"] = version
             if not row["note"].strip():
-                row["note"] = note_for(bullets, ["workflows/%s.json" % wid, "%s workflow" % name, wid])
+                revised = any(r["version"] == row["version"] for r in rows[:i])
+                row["note"] = note_for(bullets, ["workflows/%s.json" % wid, "%s workflow" % name, "`%s`" % wid,
+                                                 distinctive(wid)],
+                                       "Revised in %s." % version if revised
+                                       else "Version %s, first shipped in %s." % (row["version"], version))
             count += 1
     for cname, rows in registry["contracts"].items():
-        for row in rows:
+        for i, row in enumerate(rows):
             if row["pluginVersion"] != UNRELEASED:
                 continue
             row.update({"pluginVersion": version, "releasedAt": date})
             if not row["note"].strip():
-                row["note"] = note_for(bullets, ["%s@%s" % (cname, row["major"]), cname])
+                revision = any(r["major"] == row["major"] for r in rows[:i])
+                row["note"] = note_for(bullets, ["%s@%s" % (cname, row["major"]), "`%s`" % cname, distinctive(cname)],
+                                       "%s in %s." % ("Revised" if revision else "Published", version))
             count += 1
     plugin.write_registry(registry)
     write_history(plugin, registry)

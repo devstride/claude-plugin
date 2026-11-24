@@ -310,7 +310,8 @@ if MODE == "table":
     print("| File | bytes@%s | tokens@%s | bytes now | tokens now | Δ tokens | budget |" % (SINCE, SINCE))
     print("|---|---:|---:|---:|---:|---:|---:|")
     tb = tt = nb = nt = 0
-    names = sorted(set(bodies) | set(ref_bodies), key=lambda n: -(bodies.get(n) or ref_bodies[n])["tokens"])
+    # ties in the name's order: a set has none of its own, and two runs on one tree must print one table
+    names = sorted(set(bodies) | set(ref_bodies), key=lambda n: (-(bodies.get(n) or ref_bodies[n])["tokens"], n))
     for n in names:
         b, r = bodies.get(n), ref_bodies.get(n)
         if r: tb += r["bytes"]; tt += r["tokens"]

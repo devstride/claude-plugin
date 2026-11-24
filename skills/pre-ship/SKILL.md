@@ -12,12 +12,12 @@ Arguments: $ARGUMENTS — `pr|release|train` (`train`: no class or `--skip`), `s
 - `release run`: the class `classify-release` printed for THIS head (none → `full`).
 - `--only <names>`: re-run just those selected entries — review 7.1b's failed/affected re-run, or
   the `rerunAtMerge` entries (`clearance.md`).
-- `--ran-at-train <names>@<sha>` (`release`): those `runAt: train` entries passed at `<sha>`; skipped only if `<sha>` is the commit the release branch was cut from or has the head's tree, else they run.
+- `--ran-at-train <names>@<sha>` (`release`): those `runAt: train` entries passed at `<sha>`; skipped only if `<sha>` is the commit the release branch was cut from or has the head's tree.
 - `--skip <name>` (repeatable, `release` only): the owner's explicit waiver of that entry.
 
 ## Verdict
 
-`PRE-SHIP SELECTED: <names> | PRE-SHIP: NOTHING TO RUN` and `PRE-SHIP: PASS (<n> ran, <k> waived) | PRE-SHIP: FAIL <names>`
+`PRE-SHIP SELECTED: <names> | PRE-SHIP: NOTHING TO RUN` and `PRE-SHIP: PASS (<n> ran, <k> waived) | PRE-SHIP: FAIL <names> | NOT APPLICABLE`
 
 ## Select
 

@@ -14,11 +14,14 @@ the same answers every time, also after a restart or a cleared conversation. The
 
   python3 -B workflow.py <command>     one JSON object on stdin, one JSON object on stdout
 
-  start   {"definition" | "definitionFile", "context", "fetched"?, "session"?, "replace"?}
-  next    {"runId"?, "item"?}
+  start   {"definition" | "definitionFile", "context", "fetched"?, "session"?, "replace"?, "rehearsal"?, "beside"?}
+          a context `trigger` other than the definition's startsWhen is refused; a children-complete
+          start needs `context.rollup`, rollup.py ready's answer, with the verdict READY
+  next    {"runId"?, "item"?, "gateAnswer"?, "facts"?}  gateAnswer: what get_workflow_gate read at the gate the run is parked at
   done    {"runId"?, "item"?, "stepId", "attempt", "output"}
-  status  {"runId"?, "item"?, "includeDefinition"?}
+  status  {"runId"?, "item"?, "includeDefinition"?} | {"all": true}
   resume  {"runId"?, "item"?, "workflow"?, "answer"?, "session"?}
+  wait    {"runId"?, "item"?, "stepId", "attempt", "reason"?}   the issued step is waiting inside itself
   reported {"runId"?, "item"?, "ok"}       what became of a run's reports; the first failure hands back one line to say
   unsent  {"cwd"?}                         this repository's runs whose reports failed, each shaped again in full
   judge   {"item", "answer"}               whether the newest tracked run of an item did every required step
@@ -27,14 +30,18 @@ the same answers every time, also after a restart or a cleared conversation. The
 Every request may carry `session` (else the agent's own session id, else `manual-<pid of the
 calling shell>`) and `now` (an ISO time, for tests). `start`, `next`, `done` and `resume` answer
 with the next action: `run` (the step to run, the skill, its payload and argument, the heartbeat
-to send), `finished` or `stopped`. Every answer carries `reports`: ready argument objects for the
-tracker's step-recording tool. Sending them is the caller's job and may fail without consequence.
+to send), `finished` or `stopped`; at an approval gate or a checkpoint, `request-gate`, `parked` or
+`address-changes`; at a conditional step whose facts are not yet known, `need-facts`. `start`, `next`,
+`done` and `resume` may carry `facts` (references/conditions.md): what a condition is decided from.
+Every answer carries `reports`: ready argument objects for the tracker's step-recording tool. Sending them is the caller's job and may fail without consequence.
 
 Exit 0 with an answer; 2 with exactly one `workflow: <code>: <message>` line on stderr and nothing
 on stdout for a refusal; 1 (also one `workflow:` line) for anything else. Never a traceback.
 
-State: one file per session and item under ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/workflows,
-owner-only, written atomically, pruned after seven days.
+State: one file per session and item (a run with no item: per session and run id, and a session
+holds one open such run of a workflow unless a start says `beside`) under
+${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/workflows, owner-only, written atomically, pruned
+after seven days.
 """
 import hashlib
 import importlib.util
@@ -53,7 +60,7 @@ sys.dont_write_bytecode = True  # loading the helpers below must never write int
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 CATALOG_PATH = os.path.join(PLUGIN_ROOT, "schemas", "step-contracts.json")
-COMMANDS = ("start", "next", "done", "status", "resume", "reported", "unsent", "judge", "repository")
+COMMANDS = ("start", "next", "done", "wait", "status", "resume", "reported", "unsent", "judge", "repository")
 
 KEEP_SECONDS = 7 * 24 * 3600
 STATE_MAX_BYTES = 1048576
@@ -87,16 +94,39 @@ PAYLOAD_PATH = re.compile(
 # The catalog's vocabulary (schemas/step-contracts.json).
 ENTRY_FIELDS = ("summary", "builtinSkill", "payload", "argument", "verdict", "result", "proof",
                 "requires", "claimPhase", "shipIntentStage")
-# Optional entry fields: a contract a satisfier may stand in for, and the two step-skill rule flags
+# Optional entry fields: a contract a satisfier may stand in for, the requirements that must be met
+# after another step (requiresAfter: a required contract mapped to the contracts whose nearest
+# earlier step must come before the step that meets it), and the two step-skill rule flags
 # (delegates: the step may run one Workflow of drafting agents; interactive: it may hold a
 # conversation with the person inside the step). The runner passes the flags through unchanged.
-OPTIONAL_FIELDS = ("satisfiedBy", "maxAutoRedo", "delegates", "interactive")
-CLASSES = ("continue", "skipped", "redo:self", "stop", "ask")
+# since: the plugin release that first carried the contract (`unreleased` until a release stamps it).
+# neverOptional: a step with this contract, when a workflow runs it, always runs and stops the run
+# when it fails, whether or not a later step requires it: never on a condition, by hand or carried on past.
+OPTIONAL_FIELDS = ("satisfiedBy", "requiresAfter", "maxAutoRedo", "delegates", "interactive", "since", "neverOptional")
+# The catalog's features map: what a definition may use beyond its contracts, each with the release
+# that first ran it. DevStride takes a definition's lowest plugin version from these and the contracts.
+FEATURES = ("when-condition", "when-manual", "on-fail-continue")
+# confirm: the run stops for a person's yes or no in the conversation. park: the run is parked until
+# a person answers the step in the tracker (an approval gate or a checkpoint); nothing is running.
+# Neither is the `wait` command, which marks an issued step as waiting inside itself.
+CLASSES = ("continue", "skipped", "redo:self", "stop", "ask", "confirm", "park")
+PARK_CLASS = "park"
+# What ships but is not switched on yet (the catalog's `dormantSkills`: a built-in step skill, or
+# the reserved built-in reference `gate` or `checkpoint`, and one line on what it waits for). A
+# definition that runs one, whatever handed it to `start`, is refused (`skill-dormant`) unless the
+# start says it is a rehearsal. load_catalog fills it.
+DORMANT_SKILLS = {}
+# A confirm verdict waits for a person's yes or no: the answer's first word, whatever follows it.
+CONFIRM_ANSWER = re.compile(r"^\s*(yes|no)\b", re.I)
+CONFIRM_DECLINED = "declined"  # the outcome a no ends the run with
 # The steps that cut a run's branch and merge it: Build's, and the Hotfix steps that stand in for them
 # (`satisfiedBy`). An adopted run is carried on only on the branch the first cut, until the second ended.
 BRANCH_CONTRACTS = ("branch@1", "hotfix-branch@1")
 MERGE_CONTRACTS = ("merge@1", "hotfix-merge@1")
 END_CLASS = re.compile(r"^end:([a-z][a-z-]*)$")
+# rewind:<contract>: the run goes back to the nearest earlier step of that contract and runs it and
+# every step after it again, in order, up to and including the step that answered.
+REWIND_CLASS = re.compile(r"^rewind:([a-z][a-z0-9-]*@[0-9]+)$")
 DETAILS = ("none", "optional", "required")
 BINDINGS = ("none", "tree", "patch", "story")
 BINDING_FIELDS = {"none": (), "tree": ("tree",), "patch": ("base", "patchId"), "story": ("base", "head")}
@@ -115,9 +145,16 @@ APPLIES_TO = ("workTypes", "tags", "repositories")
 KINDS = ("step", "gate")
 RUN_SOURCES = ("builtin", "library", "repo", "off")
 WHEN_MODES = ("always", "condition", "manual")
-CONDITIONS = ("review-path:fast", "review-path:pull-request", None)
 ON_FAIL = ("stop", "continue")
 NAME_MAX, SUMMARY_MAX = 200, 500
+# An approval gate: a step of kind gate, contract approval@1, run by the reserved built-in reference
+# gate, which names no skill file. Who may answer it (answerers) is the tracker's to check.
+GATE_CONTRACT, GATE_REF = "approval@1", "gate"
+# A checkpoint: a step a person does by hand (when.mode manual), contract checkpoint@1, run by the
+# reserved built-in reference checkpoint. onFail stop: the run waits for the person; continue: it does not.
+CHECKPOINT_CONTRACT, CHECKPOINT_REF = "checkpoint@1", "checkpoint"
+ANSWERER_FIELDS = {"edit-access": (), "item-owner": (), "role": ("roleId",), "person": ("username",)}
+ANSWERERS_MAX = 20
 MAX_PHASES, MAX_PHASE_STEPS, MAX_STEPS = 12, 40, 250
 
 # How a run's end, or the kind of stop it is waiting at, is named to the tracker. The one table.
@@ -130,7 +167,17 @@ RUN_OUTCOME = {
     "no-verdict": "failed",
     "proof": "failed",
     "attempts-exhausted": "failed",
+    CONFIRM_DECLINED: "interrupted",  # a person said no at a confirm verdict; never completed, landed or shipped
 }
+# What the tracker accepts as a run's end: the three above, and the three a step may record
+# (`recordsOutcome` on a verdict value of the catalog). A run that finishes normally is reported as
+# the outcome its latest recording step named, and only to a tracker whose workflow answer lists
+# that outcome (`runOutcomes`); to any other it is reported `completed`, as before.
+# A step asked of a person in the tracker and not answered yet: parked (the run waits for it) or
+# open (a checkpoint the run went on without). The tracker is told `waiting` for both.
+PARKED_STATUSES = ("parked", "open")
+TRACKER_OUTCOMES = ("completed", "failed", "interrupted", "landed", "handed-up", "shipped")
+RECORDED_OUTCOMES = ("landed", "handed-up", "shipped")
 
 # What looks like a credential: shapes, not words. An evidence line that matches is dropped whole,
 # a verdict detail or a refusal message is replaced, and a definition that holds one is refused.
@@ -393,10 +440,37 @@ def _entry_shape(entry):
         return "shipIntentStage is one of %s or null" % ", ".join(STAGES)
     if "satisfiedBy" in entry and not (isinstance(entry["satisfiedBy"], list) and all(isinstance(s, str) for s in entry["satisfiedBy"])):
         return "satisfiedBy is a list of contract names"
+    if "requiresAfter" in entry and not (
+            isinstance(entry["requiresAfter"], dict) and entry["requiresAfter"]
+            and all(isinstance(k, str) and isinstance(v, list) and v and all(isinstance(a, str) for a in v)
+                    for k, v in entry["requiresAfter"].items())):
+        return "requiresAfter maps a required contract to a list of contract names"
     if "maxAutoRedo" in entry and not (_whole(entry["maxAutoRedo"]) and AUTO_REDO_LIMIT < entry["maxAutoRedo"] <= AUTO_REDO_MAX):
         return "maxAutoRedo is a whole number above %d and at most %d" % (AUTO_REDO_LIMIT, AUTO_REDO_MAX)
     if any(flag in entry and not isinstance(entry[flag], bool) for flag in ("delegates", "interactive")):
         return "delegates and interactive are true or false"
+    if "since" in entry and not _since(entry["since"]):
+        return "since is a plugin version x.y.z or unreleased"
+    if "neverOptional" in entry and entry["neverOptional"] is not True:
+        return "neverOptional is true or absent"
+    return None
+
+
+def _since(value):
+    return value == "unreleased" or (isinstance(value, str) and bool(SEMVER.match(value)))
+
+
+def _features_fault(features):
+    """Why the catalog's features map is not shaped as one, or None."""
+    if not isinstance(features, dict):
+        return "features is an object"
+    for name, feature in features.items():
+        if name not in FEATURES:
+            return "features names %s, which this runner does not know" % name
+        if (not isinstance(feature, dict) or not _since(feature.get("since"))
+                or not all(key in ("since", "summary") for key in feature)
+                or ("summary" in feature and not (isinstance(feature["summary"], str) and feature["summary"].strip()))):
+            return "the feature %s holds since (a plugin version x.y.z or unreleased) and an optional summary" % name
     return None
 
 
@@ -422,7 +496,18 @@ def check_catalog(catalog):
     if (not isinstance(catalog, dict) or catalog.get("schema") != 1 or isinstance(catalog.get("schema"), bool)
             or not isinstance(catalog.get("contracts"), dict) or not catalog["contracts"]):
         return ["shape: catalog: needs schema 1 and a contracts object"]
+    problem = _features_fault(catalog.get("features", {}))
+    if problem:
+        return ["shape: features: %s" % problem]
     contracts = catalog["contracts"]
+    dormant = catalog.get("dormantSkills", {})
+    if not isinstance(dormant, dict) or not all(
+            isinstance(skill, str) and SLUG.match(skill) and isinstance(why, str) and why.strip() and not CONTROL.search(why)
+            for skill, why in dormant.items()):
+        return ["shape: dormantSkills: each entry is a step skill's name, or gate or checkpoint, and one line on what it waits for"]
+    served = set(entry.get("builtinSkill") for entry in contracts.values() if isinstance(entry, dict)) | set((GATE_REF, CHECKPOINT_REF))
+    for skill in sorted(set(dormant) - served):
+        fault("dormant-skill", skill, "no contract names it as its built-in skill")
     for name, entry in contracts.items():
         if not CONTRACT.match(name):
             fault("name", name, "a contract is named <name>@<major>")
@@ -436,6 +521,12 @@ def check_catalog(catalog):
         for need in entry["requires"]:
             if need not in contracts:
                 fault("requires-unknown", name, "requires %s, which the catalog does not hold" % need)
+        for need, earlier in entry.get("requiresAfter", {}).items():
+            if need not in entry["requires"]:
+                fault("requires-after", name, "requiresAfter names %s, which this contract does not require" % need)
+            for other in earlier:
+                if other not in contracts or other == need:
+                    fault("requires-after", name, "requiresAfter puts %s after %s, which is not another catalog contract" % (need, other))
     if faults:
         return faults
     # Every contract some other one requires, with the contracts that may stand in for it.
@@ -457,10 +548,23 @@ def check_catalog(catalog):
             if value["class"] == "continue" and pinned - set(value.get("proof", {})):
                 fault("proof-values", name, "%s does not pin %s, which another verdict pins" % (value["value"], ", ".join(sorted(pinned))))
         for value in entry["verdict"]["values"]:
-            if value["class"] not in CLASSES and not END_CLASS.match(value["class"]):
+            rewind = REWIND_CLASS.match(value["class"])
+            if value["class"] not in CLASSES and not END_CLASS.match(value["class"]) and not rewind:
                 fault("class", name, "%s has the unknown class %s" % (value["value"], value["class"]))
+            if rewind and (rewind.group(1) not in contracts or rewind.group(1) == name):
+                fault("rewind", name, "%s sends the run back to %s, which is not another catalog contract" % (value["value"], rewind.group(1)))
             if value["class"] == "skipped" and name in relied:
                 fault("required-skippable", name, "%s skips a step another contract requires" % value["value"])
+            if value["class"] == "confirm":
+                # An accepted verdict is recorded without the step running again, so nothing can
+                # be asked of a proof, and the accepted answer has a place in the result.
+                if proof["binding"] != "none" or "required" in proof:
+                    fault("confirm-proof", name, "%s is confirmed by a person, so the contract takes no proof" % value["value"])
+                if entry["result"]["types"].get("answer") != "string" or "answer" in entry["result"]["required"]:
+                    fault("confirm-result", name, "%s is confirmed by a person, so the result lists answer as optional text" % value["value"])
+            if "recordsOutcome" in value and (value["recordsOutcome"] not in RECORDED_OUTCOMES or value["class"] != "continue"):
+                fault("records-outcome", name, "%s records the run's outcome only on a continue verdict, as one of %s"
+                      % (value["value"], ", ".join(RECORDED_OUTCOMES)))
         phase = entry["claimPhase"]
         if phase is not None and (not phase or len(phase) > CLAIM_PHASE_MAX or CONTROL.search(phase)):
             fault("claim-phase", name, "a claim phase is 1 to %d characters with no control character" % CLAIM_PHASE_MAX)
@@ -511,6 +615,8 @@ def load_catalog():
     faults = check_catalog(catalog)
     if faults:
         raise RuntimeError("the step contract catalog is unsound (%s)" % faults[0])
+    DORMANT_SKILLS.clear()
+    DORMANT_SKILLS.update(catalog.get("dormantSkills", {}))
     return catalog["contracts"]
 
 
@@ -526,6 +632,150 @@ def provider(steps, contracts, index, need):
         if steps[earlier]["contract"] in accepted:
             return earlier
     return None
+
+
+# --- a step's condition (references/conditions.md) ------------------------------------------------
+
+# One predicate, optionally negated: the grammar DevStride parses too. schemas/when-condition-fixtures.json
+# is the one list of accepted and refused strings both read, so the two cannot drift.
+CONDITION_MAX, CONDITION_NAME_MAX, CONDITION_GLOB_MAX = 200, 100, 150
+PREDICATES = ("review-path", "item-tag", "item-work-type", "touches", "has-repository", "step-verdict")
+REVIEW_PATHS = {"fast": "fast-local", "pull-request": "pull-request"}  # the condition's word: the review proof's path
+CONDITION_STEP = re.compile(r"[a-z0-9][a-z0-9-]*")
+CONDITION_WORD = re.compile(r"[A-Z][A-Z0-9 -]*")
+BRANCH_DATE_TOKEN = re.compile(r"<[A-Z]{2}-[A-Z]{2}-[A-Z]{2}>")
+WHITE = re.compile(r"\s")
+# The fact each predicate is decided from, when the agent supplies it (has-repository, review-path and
+# step-verdict are decided from the run itself).
+CONDITION_FACTS = {"item-tag": "itemTags", "item-work-type": "workType", "touches": "changedPaths"}
+FACT_LISTS, FACT_TEXTS = ("changedPaths", "itemTags"), ("workType",)
+FACT_LIST_MAX, FACT_TEXT_MAX = 10000, 1024
+
+
+class BadCondition(ValueError):
+    """A condition the grammar refuses; the message is the plain reason."""
+
+
+def parse_condition(text):
+    """(negated, predicate, argument) for a condition the grammar accepts; argument is None for
+    has-repository. Anything else raises BadCondition with the reason. Never evaluates the text."""
+    if not isinstance(text, str) or not text:
+        raise BadCondition("a condition is one predicate, such as has-repository")
+    if len(text) > CONDITION_MAX:
+        raise BadCondition("a condition is at most %d characters" % CONDITION_MAX)
+    negated = text.startswith("!")
+    body = text[1:] if negated else text
+    name, colon, argument = body.partition(":")
+    if name == "has-repository":
+        if colon:
+            raise BadCondition("has-repository takes no argument")
+        return negated, name, None
+    if name not in PREDICATES:
+        raise BadCondition("a condition is one of %s, optionally after one !; there is no and, or or free text"
+                           % ", ".join(PREDICATES))
+    if not colon:
+        raise BadCondition("%s needs its argument after a colon" % name)
+    if name == "review-path":
+        if argument not in REVIEW_PATHS:
+            raise BadCondition("review-path is fast or pull-request")
+    elif name in ("item-tag", "item-work-type"):
+        if not argument or len(argument) > CONDITION_NAME_MAX or CONTROL.search(argument) or argument != argument.strip():
+            raise BadCondition("%s names 1 to %d characters, with no control character and no space at either end"
+                               % (name, CONDITION_NAME_MAX))
+    elif name == "touches":
+        if (not argument or len(argument) > CONDITION_GLOB_MAX or WHITE.search(argument) or CONTROL.search(argument)
+                or BRANCH_DATE_TOKEN.search(argument) or argument.endswith("[-n]")):
+            raise BadCondition("touches is a glob of 1 to %d characters with no white space, no date token and no "
+                               "trailing [-n]" % CONDITION_GLOB_MAX)
+    else:
+        step, colon, word = argument.partition(":")
+        if not (colon and CONDITION_STEP.fullmatch(step) and CONDITION_WORD.fullmatch(word)):
+            raise BadCondition("step-verdict is step-verdict:<step id>:<VERDICT WORD>, a lower-case step id and an "
+                               "upper-case verdict word")
+    return negated, name, argument
+
+
+def verdict_value(entry, verdict):
+    """The verdict value a recorded verdict line names, or None (no verdict, or not the contract's)."""
+    parsed = parse_verdict(entry, verdict) if isinstance(verdict, str) else None
+    return parsed[0]["value"] if parsed else None
+
+
+ROUTING = None  # skills/build-item/scripts/routing.py, loaded only when a touches condition is decided
+
+
+def glob_matcher(glob):
+    """routing.py's one anchored glob matcher (first_match), never a copy: `**` crosses directories
+    and needs a character, `*` is one path segment, anything else is literal."""
+    global ROUTING
+    if ROUTING is None:
+        path = os.path.join(os.path.dirname(os.path.dirname(HERE)), "build-item/scripts/routing.py")
+        spec = importlib.util.spec_from_file_location("routing", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        def refuse(message):
+            raise BadCondition("touches: %s" % message)
+        module.fail = refuse
+        ROUTING = module
+    return lambda name: ROUTING.first_match(name, [glob]) is not None
+
+
+def facts_of(request):
+    """The facts a request carries for deciding conditions (references/conditions.md). A fact may be
+    null: the agent cannot know it, and a condition that needs it runs its step. Unknown keys are kept out."""
+    facts = request.get("facts", {})
+    if not isinstance(facts, dict):
+        raise Refuse("bad-request", "facts is an object")
+    out = {}
+    for key in FACT_LISTS + FACT_TEXTS:
+        if key not in facts:
+            continue
+        value = facts[key]
+        if value is None:
+            out[key] = None
+        elif key in FACT_TEXTS:
+            if not (isinstance(value, str) and len(value) <= FACT_TEXT_MAX):
+                raise Refuse("bad-request", "facts.%s is text of at most %d characters, or null" % (key, FACT_TEXT_MAX))
+            out[key] = value
+        else:
+            if not (isinstance(value, list) and len(value) <= FACT_LIST_MAX
+                    and all(isinstance(entry, str) and len(entry) <= FACT_TEXT_MAX for entry in value)):
+                raise Refuse("bad-request", "facts.%s is a list of at most %d texts, or null" % (key, FACT_LIST_MAX))
+            out[key] = value
+    return out
+
+
+def condition_fault(steps, contracts, index):
+    """Why a step's when does not hold together (the bad-condition refusal), or None."""
+    step = steps[index]
+    mode, text = step["when"]["mode"], step["when"]["condition"]
+    if mode == "condition" and text is None:
+        return "step %s runs only when a condition holds, and names none" % step["id"]
+    if mode != "condition" or text is None:
+        # A condition on a step of any other mode is kept and never read, as it always was: the
+        # tracker stores one beside `always`, and that step simply runs.
+        return None
+    try:
+        _, name, argument = parse_condition(text)
+    except BadCondition as error:
+        return "step %s: %s" % (step["id"], error)
+    if name == "step-verdict":
+        named, _, word = argument.partition(":")
+        earlier = [at for at in range(index) if steps[at]["id"] == named]
+        if not earlier:
+            return "step %s: step-verdict names %s, which is not an earlier step" % (step["id"], named)
+        entry = contracts[steps[earlier[0]]["contract"]]
+        if word not in [value["value"] for value in entry["verdict"]["values"]]:
+            return "step %s: step %s never answers %s" % (step["id"], named, word)
+    return None
+
+
+def never_optional(contracts):
+    """The contracts a step must always run and stop on: those the catalog marks neverOptional, and
+    the contracts that stand in for them (satisfiedBy)."""
+    marked = [name for name, entry in contracts.items() if entry.get("neverOptional")]
+    return set(marked + [stand for name in marked for stand in contracts[name].get("satisfiedBy", [])])
 
 
 # --- the definition ----------------------------------------------------------------------------
@@ -564,6 +814,8 @@ def _shape_fault(definition):
         return "startsWhen must be one of %s" % ", ".join(STARTS_WHEN)
     if "endsBy" not in definition or definition["endsBy"] not in ENDS_BY:
         return "endsBy must be ship, hand-up or null"
+    if (definition["startsWhen"] == "children-complete") != (definition["endsBy"] is not None):
+        return "a children-complete workflow ends by ship or hand-up, and any other ends by null"
     applies = definition.get("appliesTo")
     if not isinstance(applies, dict) or any(not isinstance(applies.get(key), list) or not all(isinstance(v, str) for v in applies[key])
                                             for key in APPLIES_TO):
@@ -614,10 +866,27 @@ def _shape_fault(definition):
             when = step.get("when")
             if not isinstance(when, dict) or when.get("mode") not in WHEN_MODES:
                 return "%s.when.mode must be one of %s" % (at, ", ".join(WHEN_MODES))
-            if "condition" not in when or when["condition"] not in CONDITIONS:
-                return "%s.when.condition must be review-path:fast, review-path:pull-request or null" % at
+            if "condition" not in when or not (when["condition"] is None or isinstance(when["condition"], str)):
+                return "%s.when.condition must be text or null" % at
             if step.get("onFail") not in ON_FAIL:
                 return "%s.onFail must be one of %s" % (at, ", ".join(ON_FAIL))
+            if "answerers" in step and (step["kind"] == "gate" or when["mode"] == "manual"):
+                # Read only where it means something: on any other step it is an unknown key, kept
+                # and never read, as it was before gates.
+                problem = _answerers_fault(step["answerers"])
+                if problem:
+                    return "%s.answerers %s" % (at, problem)
+    return None
+
+
+def _answerers_fault(answerers):
+    """Why a gate's answerers list is not the schema's shape, or None."""
+    if not isinstance(answerers, list) or len(answerers) > ANSWERERS_MAX:
+        return "must be a list of at most %d entries" % ANSWERERS_MAX
+    for entry in answerers:
+        fields = ANSWERER_FIELDS.get(entry.get("kind")) if isinstance(entry, dict) else None
+        if fields is None or not all(_text(entry.get(field), NAME_MAX) for field in fields):
+            return "entries are edit-access, item-owner, a role with its roleId or a person with their username"
     return None
 
 
@@ -641,8 +910,10 @@ def _credential_at(value, path="$"):
     return None
 
 
-def validate_definition(definition, contracts, plugin_version, in_work_tree, root=PLUGIN_ROOT):
-    """Refuse a definition this plugin cannot run whole. The codes are part of the contract."""
+def validate_definition(definition, contracts, plugin_version, in_work_tree, root=PLUGIN_ROOT, rehearsal=False, has_item=True):
+    """Refuse a definition this plugin cannot run whole. The codes are part of the contract.
+    `rehearsal`: the start asked to rehearse, so a dormant step skill is run. `has_item`: the run
+    names an item, which a step answered by a person in the tracker needs."""
     problem = _shape_fault(definition)
     if problem:
         raise Refuse("bad-schema", problem)
@@ -669,6 +940,10 @@ def validate_definition(definition, contracts, plugin_version, in_work_tree, roo
             if CONTRACT.match(step["contract"]).group(1) in names:
                 raise Refuse("unknown-contract-major", "step %s: this plugin does not know %s" % (step["id"], step["contract"]))
             raise Refuse("unknown-contract", "step %s: no contract is called %s" % (step["id"], step["contract"]))
+    for index in range(len(steps)):
+        problem = condition_fault(steps, contracts, index)
+        if problem:
+            raise Refuse("bad-condition", problem)
     for index, step in enumerate(steps):
         if step["run"]["source"] == "off":
             continue
@@ -690,24 +965,77 @@ def validate_definition(definition, contracts, plugin_version, in_work_tree, roo
             if again:
                 # Its changes would come after the step that checks them, so nothing would.
                 raise Refuse("requires-not-earlier", "step %s provides %s after step %s, which requires it" % (again[0]["id"], need, step["id"]))
+            for other in contracts[step["contract"]].get("requiresAfter", {}).get(need, []):
+                # A requirement that must be met after another step (a go-ahead given while the tower
+                # is held): a provider before that step's nearest earlier occurrence does not count.
+                last = provider(steps, contracts, index, other)
+                if last is not None and at < last:
+                    raise Refuse("requires-not-after", "step %s needs its %s step after step %s; %s comes before it" % (
+                        step["id"], need, steps[last]["id"], given["id"]))
+    for index, step in enumerate(steps):
+        if step["run"]["source"] == "off":
+            continue
+        for value in contracts[step["contract"]]["verdict"]["values"]:
+            rewind = REWIND_CLASS.match(value["class"])
+            at = provider(steps, contracts, index, rewind.group(1)) if rewind else None
+            if rewind and (at is None or steps[at]["run"]["source"] == "off"):
+                raise Refuse("rewind-missing", "step %s can send the run back to a %s step, and none runs before it" % (
+                    step["id"], rewind.group(1)))
+            if rewind and (steps[at]["when"]["mode"] != "always" or steps[at]["onFail"] != "stop"):
+                # The step a run goes back to is where it starts again: it must always run and stop on failure.
+                raise Refuse("rewind-not-always", "step %s can send the run back to step %s, which must always run and stop "
+                             "the run when it fails" % (step["id"], steps[at]["id"]))
+    never = never_optional(contracts)
     for step in steps:
-        if step["kind"] == "gate":
-            raise Refuse("unsupported-gate", "step %s is a gate, which this plugin does not run" % step["id"])
+        if step["contract"] not in never:
+            continue
+        # Never conditional, by hand or carried on past, whether or not a later step relies on it.
+        # Switching one off stays under the rule above (`required-off`, when a later step requires
+        # it), exactly as before these features: a tracker that publishes none of them sees no change.
+        if step["run"]["source"] == "off":
+            continue
         if step["when"]["mode"] != "always":
-            raise Refuse("unsupported-when", "step %s runs on %s, which this plugin does not support" % (step["id"], step["when"]["mode"]))
+            raise Refuse("required-not-always", "step %s is a %s step, which every workflow runs; it must always run" % (step["id"], step["contract"]))
+        if step["onFail"] != "stop":
+            raise Refuse("required-not-stop", "step %s is a %s step, which every workflow runs; it must stop the run when it fails" % (
+                step["id"], step["contract"]))
+    for step in steps:
+        gate, manual = step["kind"] == "gate", step["when"]["mode"] == "manual"
+        if gate != (step["contract"] == GATE_CONTRACT):
+            raise Refuse("unsupported-gate", "step %s: a gate is a step of kind gate with contract %s, and only a gate has it" % (
+                step["id"], GATE_CONTRACT))
+        if gate and (step["run"]["source"], step["run"]["ref"]) != ("builtin", GATE_REF):
+            raise Refuse("unsupported-gate", "step %s is a gate, which runs only the reserved built-in reference %s" % (step["id"], GATE_REF))
+        if gate and manual:
+            raise Refuse("unsupported-when", "step %s is a gate, which runs always or on a condition, never by hand" % step["id"])
+        if gate and step["onFail"] != "stop":
+            raise Refuse("unsupported-on-fail", "step %s is a gate, which always stops the run when it is not approved" % step["id"])
+        if manual != (step["contract"] == CHECKPOINT_CONTRACT) or (manual and (
+                step["kind"], step["run"]["source"], step["run"]["ref"]) != ("step", "builtin", CHECKPOINT_REF)):
+            raise Refuse("unsupported-checkpoint", "step %s: a step a person does by hand runs manual, with contract %s and the "
+                         "reserved built-in reference %s, and only such a step has that contract" % (step["id"], CHECKPOINT_CONTRACT, CHECKPOINT_REF))
+        if (gate or manual) and not has_item and step["run"]["source"] != "off":
+            # The tracker files a person's answer under the run's item, and a parked run is found again by it.
+            raise Refuse("gate-needs-item", "step %s is answered by a person in the tracker, which needs an item; this run names none" % step["id"])
         source = step["run"]["source"]
         if source == "library" and not (_whole(step["run"]["version"]) and step["run"]["version"] >= 1):
             raise Refuse("library-version", "step %s runs a library skill, which must name a pinned version" % step["id"])
-        if source == "builtin" and contracts[step["contract"]]["builtinSkill"] is None:
+        if source == "builtin" and contracts[step["contract"]]["builtinSkill"] is None and not (gate or manual):
             raise Refuse("unsupported-source", "step %s: this plugin runs no %s skill for %s" % (step["id"], source, step["contract"]))
-        if step["onFail"] != "stop":
-            raise Refuse("unsupported-on-fail", "step %s carries on after a failure, which this plugin does not support" % step["id"])
     for step in steps:
         if step["run"]["source"] != "builtin":
             continue
         ref = step["run"]["ref"]
-        if not SLUG.match(ref) or not os.path.isfile(os.path.join(root, "skills", ref, "SKILL.md")):
+        gate, manual = step["kind"] == "gate", step["when"]["mode"] == "manual"
+        # The reserved built-in references gate and checkpoint need no skill file; every other names one.
+        if not (gate or manual) and (not SLUG.match(ref) or not os.path.isfile(os.path.join(root, "skills", ref, "SKILL.md"))):
             raise Refuse("skill-missing", "step %s names the skill %s, which this plugin does not have" % (step["id"], ref))
+        if ref in DORMANT_SKILLS and not rehearsal:
+            # Whatever handed the definition over (a file, the request itself, the tracker's answer):
+            # nothing asks a person through a tool the tracker may not have, and no dormant skill runs.
+            what = "is an approval gate" if gate else "is a checkpoint" if manual else "runs the skill %s" % ref
+            raise Refuse("skill-dormant", "step %s %s, which this plugin has not switched on yet (%s)" % (
+                step["id"], what, DORMANT_SKILLS[ref]))
     for step in steps:
         binding = contracts[step["contract"]]["proof"]["binding"]
         if step["run"]["source"] != "off" and binding != "none" and not in_work_tree:
@@ -752,7 +1080,7 @@ def _one_line(text):
     return re.sub(r"\s+", " ", CONTROL.sub(" ", str(text))).strip()
 
 
-def choose_definition(builtin, fetched, trigger, contracts, version, in_work_tree, context):
+def choose_definition(builtin, fetched, trigger, contracts, version, in_work_tree, context, rehearsal=False, has_item=True):
     """Which definition a run pins: the organization's when the tracker's answer is whole, sound
     and runnable here, else the built-in one. Never refuses: every fault is a fallback."""
     def fallback(code, **fields):
@@ -786,7 +1114,7 @@ def choose_definition(builtin, fetched, trigger, contracts, version, in_work_tre
                 not version or _version(required) > _version(version)):
             return fallback("plugin-too-old", required=required, running=version or "unknown")
     try:
-        steps = validate_definition(definition, contracts, version, in_work_tree)
+        steps = validate_definition(definition, contracts, version, in_work_tree, rehearsal=rehearsal, has_item=has_item)
         check_context(steps, contracts, context)
     except Refuse as refusal:
         return fallback("unrunnable", reason=_one_line(shown(str(refusal))).rstrip("."))
@@ -1132,8 +1460,36 @@ def state_dir(world, create):
     return path
 
 
-def state_name(session, item):
-    return "%s.%s.json" % (session, item or "run")
+def state_name(session, item, run_id):
+    """One file per session and item; a run with no item is keyed by its run id, so a session
+    may hold one of each workflow (and a second of one only by a start that says `beside`)."""
+    return "%s.%s.json" % (session, item or run_id)
+
+
+def legacy_name(session):
+    """Where an earlier plugin kept a session's one run with no item."""
+    return "%s.run.json" % session
+
+
+def state_names(state):
+    names = [state_name(state["sessionId"], state["item"], state["runId"])]
+    return names if state["item"] else names + [legacy_name(state["sessionId"])]
+
+
+def settle_legacy(folder, session, world):
+    """A run with no item that an earlier plugin wrote takes the name this one writes, so it is
+    carried on in one file. The one rule for that file: whatever may write such a run settles it
+    first (find_run, a start, `reported` by run id; an adoption writes the adopter's file and
+    removes this one), and nothing ever writes the old name, so a run is never kept in two files."""
+    old = os.path.join(folder, legacy_name(session))
+    if not os.path.lexists(old):
+        return
+    try:
+        state = read_state(old, world)
+    except Refuse:
+        return
+    if state.get("sessionId") == session and state["item"] is None:
+        replace_file(old, os.path.join(folder, state_name(session, None, state["runId"])))
 
 
 def read_state(path, world):
@@ -1166,7 +1522,7 @@ def read_state(path, world):
 def write_state(folder, state):
     """Atomic and owner-only: a new file beside the final name, then moved over it."""
     state["seq"] += 1
-    name = state_name(state["sessionId"], state["item"])
+    name = state_name(state["sessionId"], state["item"], state["runId"])
     data = (json.dumps(state, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
     if len(data) > STATE_MAX_BYTES:
         raise Refuse("state-unusable", "the run's state has grown past %d bytes" % STATE_MAX_BYTES)
@@ -1212,6 +1568,30 @@ def runs_workflow(state, wanted):
     return wanted is None or wanted in (state["definition"].get("id"), state.get("builtinId"))
 
 
+def open_without_item(world, folder, session, workflow):
+    """This session's open runs with no item of one workflow (`workflow`: the id of the built-in
+    definition a start was handed, or the one a run stands in for), oldest first. An earlier plugin
+    kept one such run to a session, and a start still meets it: refused, handed back or replaced."""
+    settle_legacy(folder, session, world)
+    found = []
+    for name in sorted(os.listdir(folder)):
+        if name.startswith(".") or not (name.startswith(session + ".") and name.endswith(".json")):
+            continue
+        try:
+            state = read_state(os.path.join(folder, name), world)
+        except Refuse:
+            continue  # not a state file, or gone: it is no open run
+        if (state.get("sessionId") == session and state["item"] is None and not state.get("outcome")
+                and name in state_names(state) and runs_workflow(state, workflow)):
+            found.append(state)
+    return sorted(found, key=lambda state: (str(state.get("startedAt")), state["runId"]))
+
+
+def workflow_of(state):
+    """The built-in workflow a run is one of: the one its start was handed, else the one it pinned."""
+    return state.get("builtinId") or state["definition"].get("id")
+
+
 def find_run(world, request, session):
     """This session's run: the one for the item, else the one with the run id, else its only
     open run. Returns (folder, state)."""
@@ -1222,8 +1602,9 @@ def find_run(world, request, session):
     if folder is None:
         raise Refuse("no-run", "this session has no run")
     if item:
-        names = [state_name(session, item)] if os.path.lexists(os.path.join(folder, state_name(session, item))) else []
+        names = [state_name(session, item, None)] if os.path.lexists(os.path.join(folder, state_name(session, item, None))) else []
     else:
+        settle_legacy(folder, session, world)
         names = sorted(name for name in os.listdir(folder) if name.startswith(session + ".") and name.endswith(".json"))
     states = [read_state(os.path.join(folder, name), world) for name in names]
     states = [state for state in states if state.get("sessionId") == session]
@@ -1236,6 +1617,78 @@ def find_run(world, request, session):
     if len(states) > 1:
         raise Refuse("ambiguous-run", "this session has %d open runs; name the item or the run" % len(states))
     return folder, states[0]
+
+
+# --- an approval gate ------------------------------------------------------------------------------
+
+GATE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
+GATE_NOTE_MAX = 1000
+# The two answers an agent may give a gate itself; every other one is a person's, read from the tracker.
+GATE_AGENT_VALUES = ("REQUESTED", "UNAVAILABLE")
+# get_workflow_gate answers { status: pending | answered | withdrawn, answer: approve | changes | reject, ... }:
+# a gate still pending or withdrawn says so in its status; an answered one names the decision in its answer.
+GATE_OPEN = {"pending": "pending", "requested": "pending", "waiting": "pending", "withdrawn": "withdrawn"}
+GATE_ANSWERS = {"approve": "approved", "approved": "approved", "changes": "changes", "changes-requested": "changes",
+                "changes_requested": "changes", "reject": "rejected", "rejected": "rejected"}
+# A checkpoint is answered done or skipped, and only a checkpoint is: an approval's words keep it waiting, and the other way round.
+CHECKPOINT_ANSWERS = {"done": "done", "skipped": "skipped", "skip": "skipped"}
+GATE_SUMMARY = ("Write the summary yourself, in at most 1,000 characters: what was done, what you ask the person to "
+                "approve, and what you will do if they approve, ask for changes or reject. No secrets, tokens or personal data.")
+GATE_THEN = ("Call request_workflow_gate on the DevStride connection with these arguments plus your summary, then call done "
+             "with the first line APPROVAL: REQUESTED and the tool's answer as the fenced json result block. If the tool is "
+             "absent, refuses or cannot be reached, call done with APPROVAL: UNAVAILABLE <reason>: the run stops at the gate "
+             "and never goes on unapproved.")
+CHECKPOINT_SUMMARY = ("Write what the person should do and what result you need, in at most 1,000 characters, from the "
+                      "step's instruction. No secrets, tokens or personal data.")
+CHECKPOINT_THEN = ("Call request_workflow_gate on the DevStride connection with these arguments plus your text as the summary, then "
+                   "call done with the first line CHECKPOINT: REQUESTED and the tool's answer as the fenced json result block. If "
+                   "the tool is absent, refuses or cannot be reached, call done with CHECKPOINT: UNAVAILABLE <reason>.")
+GATE_WAIT = "Ask your person to answer it in DevStride; ask your agent to continue when they have. Do not poll."
+FACTS_THEN = ("Collect the facts named in needs as skills/run-workflow/references/conditions.md says, then call next with "
+              "{\"facts\": {...}}; pass a fact you cannot know as null, and the step runs.")
+GATE_CHECK = ("When asked to continue, call get_workflow_gate once with these arguments and pass its answer to next as "
+              "{\"gateAnswer\": <the answer>}; if the read fails, pass {\"gateAnswer\": {\"unavailable\": true}}.")
+GATE_WITHDRAWN = ("The gate at step %s was withdrawn: the run ended in DevStride before anyone answered it, so this run "
+                  "has ended too. Start the workflow again to ask for approval anew.")
+GATE_CHANGES = ("Make the changes the note asks for, then call next: an earlier step whose proof the changes made stale "
+                "runs again before the gate is requested again.")
+
+
+def gate_object(value):
+    """The gate in a tool's answer: the answer itself, or the data or gate object it wraps it in."""
+    for _ in range(3):
+        if not isinstance(value, dict) or "id" in value or "gateId" in value:
+            break
+        inner = next((value[key] for key in ("data", "gate") if isinstance(value.get(key), dict)), None)
+        if inner is None:
+            break
+        value = inner
+    return value if isinstance(value, dict) else None
+
+
+def gate_decision(gate, answers=GATE_ANSWERS):
+    """pending, withdrawn, or the decision `answers` names (approved, changes or rejected for a gate;
+    done or skipped for a checkpoint). The status decides first (pending or withdrawn); then the
+    decision word, from answer, decision or status. Anything else is pending: never approved."""
+    words = dict((key, gate[key].strip().lower()) for key in ("status", "answer", "decision") if isinstance(gate.get(key), str))
+    if words.get("status") in GATE_OPEN:
+        return GATE_OPEN[words["status"]]
+    return next((answers[words[key]] for key in ("answer", "decision", "status") if words.get(key) in answers), "pending")
+
+
+def gate_id_of(gate):
+    for key in ("id", "gateId"):
+        value = (gate or {}).get(key)
+        if isinstance(value, str) and GATE_ID.match(value):
+            return value
+    return None
+
+
+def gate_note(gate):
+    """A person's note on their answer, as one line of at most 1,000 characters; never a credential."""
+    note = next((gate[key] for key in ("note", "comment", "answerNote", "reason") if isinstance(gate.get(key), str)), "")
+    note = _one_line(note)[:GATE_NOTE_MAX]
+    return WITHHELD if note and has_secret(note) else note
 
 
 # --- one run -----------------------------------------------------------------------------------
@@ -1262,6 +1715,7 @@ class Run:
         self.closing = None     # the run's end as the tracker is told it
         self.resend_definition = False
         self.commit = None      # the commit HEAD is on, read once per command
+        self.facts = {}         # what this command was told for deciding conditions (facts_of)
 
     def record(self, index):
         return self.state["steps"][self.steps[index]["id"]]
@@ -1412,6 +1866,154 @@ class Run:
                    "target": context.get("workingBase"), "stage": stage}
         return request if stage and all(isinstance(value, str) and value for value in request.values()) else None
 
+    def is_gate(self, index):
+        return self.steps[index]["kind"] == "gate"
+
+    def is_checkpoint(self, index):
+        return self.steps[index]["when"]["mode"] == "manual"
+
+    def asks_person(self, index):
+        """A gate or a checkpoint: requested in the tracker, answered there by a person, never by an agent."""
+        return self.is_gate(index) or self.is_checkpoint(index)
+
+    def blocks(self, index):
+        """True when the run waits for the person's answer: every gate, and a checkpoint that stops on failure."""
+        return self.is_gate(index) or self.steps[index]["onFail"] == "stop"
+
+    def continues(self, index):
+        """A non-blocking step: its failure is recorded and the run goes on. Never a gate or a required step."""
+        step = self.steps[index]
+        return step["onFail"] == "continue" and not self.is_gate(index) and step["contract"] not in never_optional(self.contracts)
+
+    def step_line(self, index):
+        step = self.steps[index]
+        return {"id": step["id"], "name": step["name"], "phase": step["phase"], "contract": step["contract"],
+                "attempt": self.record(index)["attempt"]}
+
+    def handout(self, index):
+        return self.gate_request(index) if self.asks_person(index) else self.run_answer(index)
+
+    def gate_request(self, index):
+        """request-gate: the agent writes the summary and asks the tracker; a gate or a checkpoint never runs a skill."""
+        step, record = self.steps[index], self.record(index)
+        checkpoint = self.is_checkpoint(index)
+        verdicts = [{"stepId": earlier["id"], "name": earlier["name"], "verdict": self.record(at)["verdict"]}
+                    for at, earlier in enumerate(self.steps[:index]) if self.record(at)["verdict"]]
+        answer = {"action": "request-gate", "runId": self.state["runId"], "step": self.step_line(index),
+                  "kind": "checkpoint" if checkpoint else "approval", "blocking": self.blocks(index),
+                  "attempt": record["attempt"], "contract": step["contract"], "item": self.state["item"],
+                  "payload": self.payload(index), "verdicts": verdicts, "tool": "request_workflow_gate",
+                  "arguments": {"runId": self.state["runId"], "stepId": step["id"], "attempt": record["attempt"]},
+                  "summaryGuidance": CHECKPOINT_SUMMARY if checkpoint else GATE_SUMMARY,
+                  "then": CHECKPOINT_THEN if checkpoint else GATE_THEN,
+                  "heartbeat": {"phase": self.entry(index)["claimPhase"], "stage": None, "shipIntent": None}}
+        if checkpoint:
+            answer["instruction"] = step["summary"]  # what the person is asked to do, as the workflow says it
+        return answer
+
+    def gate_parked(self, index, note=None):
+        """parked: the run is parked at the gate until a person answers it in the tracker."""
+        gate = self.record(index)["gate"]
+        answer = {"action": "parked", "runId": self.state["runId"], "step": self.step_line(index),
+                  "gate": {"id": gate["id"], "since": gate["since"]}, "check": "get_workflow_gate",
+                  "arguments": {"gateId": gate["id"]}, "advice": GATE_WAIT, "then": GATE_CHECK}
+        if note:
+            answer["note"] = note
+        return answer
+
+    def parked_gate(self):
+        """The gate or blocking checkpoint the run is parked at, or None."""
+        for index in range(len(self.steps)):
+            if self.parked_at(index):
+                return index
+        return None
+
+    def parked_at(self, index):
+        record = self.record(index)
+        return self.asks_person(index) and record["status"] == "parked" and bool(record.get("gate"))
+
+    def left_open(self, index):
+        """A non-blocking checkpoint asked and not yet answered: the run went on without it."""
+        record = self.record(index)
+        return self.is_checkpoint(index) and record["status"] == "open" and bool(record.get("gate"))
+
+    def requested_gate(self, text):
+        """(gate id, since) from the request tool's answer in a REQUESTED step's result block."""
+        try:
+            block = json.loads(text) if text and len(text.encode("utf-8")) <= RESULT_MAX_BYTES else None
+        except (ValueError, RecursionError):
+            block = None
+        gate = gate_object(block)
+        since = next((gate[key] for key in ("requestedAt", "createdAt") if isinstance(gate.get(key), str)), None) if gate else None
+        return gate_id_of(gate), since if isinstance(since, str) and REPORT.ISO.match(since) else self.world.now()
+
+    def answer_gate(self, answer):
+        """Map the person's answer, as get_workflow_gate read it, to the run's next action. Anything that
+        is not a readable approval of this gate keeps the run waiting: a gate is never read as approved."""
+        state = self.state
+        index = self.parked_gate()
+        if index is None or state["outcome"] or state["stopped"] or state["current"]:
+            raise Refuse("not-parked", "the run is not parked at a gate, so there is no answer to read")
+        if not isinstance(answer, dict):
+            raise Refuse("bad-request", "gateAnswer is the get_workflow_gate answer as one JSON object")
+        step, record, entry = self.steps[index], self.record(index), self.entry(index)
+        if answer.get("unavailable") is True:
+            return self.gate_parked(index, "The gate could not be read, so the run is still parked; it is never read as approved.")
+        gate = gate_object(answer)
+        named = gate_id_of(gate)
+        if named is None:
+            # No gate id, or one that is no id: nothing says the answer is this gate's, so it moves nothing.
+            return self.gate_parked(index, "That answer names no gate, so it cannot be read as this gate's; the run is still parked.")
+        if named != record["gate"]["id"]:
+            return self.gate_parked(index, "That answer is not for this gate, so the run is still parked.")
+        checkpoint = self.is_checkpoint(index)
+        status = gate_decision(gate, CHECKPOINT_ANSWERS if checkpoint else GATE_ANSWERS)
+        if status == "pending":
+            return self.gate_parked(index)
+        if status == "withdrawn":
+            # DevStride withdraws a run's open gates when the run ends there, so nobody can answer this one now
+            # and the run cannot go on: it ends interrupted, as a run whose item was finished elsewhere does.
+            record.update(status="failed", endedAt=self.world.now(), redo=None, result={"gateId": record["gate"]["id"], "status": status})
+            record["class"] = "stop"
+            return dict(self.finish("interrupted"), note=GATE_WITHDRAWN % step["id"])
+        if checkpoint:
+            # done or skipped: the tracker wrote the step's report when the person answered.
+            value = next(v for v in entry["verdict"]["values"] if v["value"] == {"done": "DONE", "skipped": "SKIPPED"}[status])
+            record.update(verdict="%s: %s" % (entry["verdict"]["label"], value["value"]), endedAt=self.world.now(), redo=None,
+                          result={"gateId": record["gate"]["id"], "status": status})
+            record["class"] = value["class"]
+            record["status"] = "done" if status == "done" else "skipped"
+            if status == "done":
+                record.update(doneSeq=state["seq"] + 1, autoRedo=0, refresh=False)
+            return self.advance()
+        value = next(v for v in entry["verdict"]["values"] if v["value"] == {"approved": "APPROVED", "changes": "CHANGES",
+                                                                              "rejected": "REJECTED"}[status])
+        note = gate_note(gate) if value["detail"] != "none" else ""
+        verdict = REPORT.clean_verdict("%s: %s %s" % (entry["verdict"]["label"], value["value"], note))
+        # The tracker wrote the step's report when the person answered: the runner sends none for it.
+        record.update(verdict=verdict, endedAt=self.world.now(), redo=None, result={"gateId": record["gate"]["id"], "status": status})
+        record["class"] = value["class"]
+        if status == "approved":
+            record.update(status="done", doneSeq=state["seq"] + 1, autoRedo=0, refresh=False)
+            return self.advance()
+        if status == "rejected":
+            record["status"] = "failed"
+            return self.stop("failed", verdict, index)
+        if record["autoRedo"] + 1 >= entry.get("maxAutoRedo", AUTO_REDO_LIMIT):
+            record["status"] = "failed"
+            return self.stop("attempts-exhausted", "step %s was sent back for changes on %d attempts; a person decides how "
+                             "to go on" % (step["id"], record["attempt"]), index)
+        record.update(status="done", redo="changes")
+        return {"action": "address-changes", "runId": state["runId"], "step": self.step_line(index), "note": note,
+                "attempt": record["attempt"] + 1, "then": GATE_CHANGES}
+
+    def claim_step(self):
+        """The first finished story claim step, which an adopted parked run asks again first, or None."""
+        for index, step in enumerate(self.steps):
+            if step["contract"] == "claim@1" and ended_well(self.record(index)):
+                return step["id"]
+        return None
+
     def run_answer(self, index):
         step, record, entry = self.steps[index], self.record(index), self.entry(index)
         payload = self.payload(index)
@@ -1454,12 +2056,15 @@ class Run:
 
     def report(self, index):
         step, record = self.steps[index], self.record(index)
-        status = "running" if record["status"] == "issued" else record["status"]
+        waiting = record.get("waiting") if record["status"] == "issued" else None
+        status = "waiting" if waiting else "running" if record["status"] == "issued" else record["status"]
+        if status in PARKED_STATUSES:
+            status = "waiting"  # the tracker's one word for a step that waits, whatever it waits for
         # A step repaired by hand is reported as a later attempt: the tracker never changes an
         # attempt it holds as finished, so the repair would otherwise stay recorded as the failure.
         attempt = min(max(record["attempt"], 1) + record.get("repairs", 0), REPORT.MAX_ATTEMPT)
         self.events.append({"step": step["id"], "attempt": attempt, "status": status,
-                            "verdict": record["verdict"], "evidence": record["evidence"], "links": record["links"],
+                            "verdict": waiting or record["verdict"], "evidence": record["evidence"], "links": record["links"],
                             "startedAt": record["startedAt"], "endedAt": record["endedAt"], "ran": record["ran"]})
 
     def stop(self, kind, reason, index):
@@ -1474,15 +2079,97 @@ class Run:
     def finish(self, outcome):
         self.state["current"] = None
         self.state["outcome"], self.state["endedAt"] = outcome, self.world.now()
-        self.closing = {"outcome": RUN_OUTCOME.get(outcome, "interrupted"), "endedAt": self.state["endedAt"]}
+        if outcome == "completed":
+            self.state["recordedOutcome"] = self.recorded_outcome()
+        self.closing = {"outcome": tracker_outcome(self.state, outcome), "endedAt": self.state["endedAt"]}
         return self.finished_answer()
+
+    def recorded_outcome(self):
+        """The outcome the latest finished step with a recording verdict named, or None."""
+        found = [(record.get("outcomeSeq") or 0, record["recordsOutcome"]) for record in self.state["steps"].values()
+                 if record["status"] == "done" and record.get("recordsOutcome") in RECORDED_OUTCOMES]
+        return max(found)[1] if found else None
 
     def finished_answer(self):
         results = {}
         for index, step in enumerate(self.steps):
             if self.record(index)["status"] == "done":
                 results[step["contract"]] = self.record(index)["result"]
-        return {"action": "finished", "runId": self.state["runId"], "outcome": self.state["outcome"], "results": results}
+        return {"action": "finished", "runId": self.state["runId"], "outcome": self.state["outcome"],
+                "recordedOutcome": self.state.get("recordedOutcome"), "results": results,
+                # What did not stop the run, never hidden: failures it went on past, checkpoints still
+                # waiting for a person, and the steps whose condition was false.
+                "continuedPastFailures": [{"stepId": step["id"], "verdict": self.record(index)["verdict"]}
+                                          for index, step in enumerate(self.steps) if self.record(index).get("continued")],
+                "openCheckpoints": [{"stepId": step["id"], "gateId": self.record(index)["gate"]["id"]}
+                                    for index, step in enumerate(self.steps) if self.left_open(index)],
+                "skippedByCondition": [step["id"] for index, step in enumerate(self.steps)
+                                       if self.record(index).get("skippedByCondition")]}
+
+    def fail_or_stop(self, index, kind, reason):
+        """A step that failed: a non-blocking one is marked so and the run goes on; any other stops it."""
+        if self.continues(index):
+            self.record(index)["continued"] = True
+            return None
+        return self.stop(kind, reason, index)
+
+    def proof_missing(self, index):
+        """Why a step may not be handed out because a proof its contract requires was never given, or None.
+        Defence in depth behind start's rules: a required step that somehow ended skipped gave none."""
+        for need in self.entry(index)["requires"]:
+            given = self.provider(index, need)
+            if given is None:
+                return "step %s needs a %s step before it, and there is none" % (self.steps[index]["id"], need)
+            if self.record(given)["status"] != "done":
+                return "step %s needs the proof of step %s, which ended %s and gave none" % (
+                    self.steps[index]["id"], self.steps[given]["id"], self.record(given)["status"])
+        return None
+
+    def condition_decision(self, index):
+        """(decision, needs, note) for a conditional step: decision True, False or None (undecided:
+        the step runs, the note says why); needs, the facts to ask for first."""
+        text = self.steps[index]["when"]["condition"]
+        negated, name, argument = parse_condition(text)
+        unknown = None
+        if name == "has-repository":
+            value = isinstance(self.state["context"].get("repository"), str)
+        elif name == "review-path":
+            at = self.provider(index, "review@1")
+            path = (self.record(at)["proof"] or {}).get("path") if at is not None and self.record(at)["status"] == "done" else None
+            value, unknown = (None, "the review path") if path is None else (path == REVIEW_PATHS[argument], None)
+        elif name == "step-verdict":
+            named, _, word = argument.partition(":")
+            at = self.index_of(named)
+            value = verdict_value(self.entry(at), self.record(at)["verdict"]) == word
+        else:
+            fact = CONDITION_FACTS[name]
+            if fact not in self.facts:
+                return None, [fact], None
+            known = self.facts[fact]
+            if known is None:
+                value, unknown = None, fact
+            elif name == "item-tag":
+                value = any(tag.strip().casefold() == argument.casefold() for tag in known)
+            elif name == "item-work-type":
+                value = known.strip().casefold() == argument.casefold()
+            else:
+                matches = glob_matcher(argument)
+                value = any(matches(path) for path in known)
+        if value is None:
+            return None, [], "condition could not be decided: %s unknown" % unknown
+        return value != negated, [], None
+
+    def need_facts(self, index, needs):
+        return {"action": "need-facts", "runId": self.state["runId"], "step": self.step_line(index),
+                "condition": self.steps[index]["when"]["condition"], "needs": needs, "then": FACTS_THEN}
+
+    def skip_by_condition(self, index):
+        """A step whose condition was false: shown skipped, with the condition as its reason."""
+        record, moment = self.record(index), self.world.now()
+        record.update(status="skipped", verdict=REPORT.clean_verdict("SKIPPED: %s was false" % self.steps[index]["when"]["condition"]),
+                      evidence=[], links={}, startedAt=moment, endedAt=moment, skippedByCondition=True)
+        record["class"] = "skipped"
+        self.report(index)
 
     def issue(self, index, cause):
         """Hand out a step. `cause` names the runner's own reason for a re-issue (None when a
@@ -1490,6 +2177,9 @@ class Run:
         maxAutoRedo) stops the run."""
         step, record = self.steps[index], self.record(index)
         self.branch_fault(index)
+        missing = self.proof_missing(index)
+        if missing:
+            return self.stop("proof", missing, index)
         refused = self.merge_refused(index)
         if refused:
             return self.stop("proof", refused, index)
@@ -1498,10 +2188,18 @@ class Run:
                 self.head()
             except GitFailed as error:
                 return self.stop("proof", "the commit step %s would merge cannot be read: %s" % (step["id"], error), index)
-        if cause and cause != "redo":  # a step's own verdict asking for another go is not the runner's re-issue
+        # The one counting rule (references/workflow-runner.md, "Counting a step's re-issues"). Counted:
+        # the runner's own re-issues (a stale or mismatched proof, the step a rewind goes back to) and a
+        # person's changes at a gate, each against the contract's maxAutoRedo or the default; a step's own
+        # redo:self only where its contract sets maxAutoRedo. Never counted: the plain order, a person's
+        # resume, and the story claim asked again for an adopted parked run (reclaim).
+        entry = self.contracts[step["contract"]]
+        if cause and cause != "reclaim" and (cause != "redo" or "maxAutoRedo" in entry):
             record["autoRedo"] += 1
-            limit = self.contracts[step["contract"]].get("maxAutoRedo", AUTO_REDO_LIMIT)
+            limit = entry.get("maxAutoRedo", AUTO_REDO_LIMIT)
             if record["autoRedo"] >= limit:
+                if cause == "redo":
+                    return self.stop("attempts-exhausted", "step %s asked to run again %d times in a row" % (step["id"], limit), index)
                 return self.stop("attempts-exhausted", "step %s was re-issued %d times without its proof holding" % (
                     step["id"], limit - 1), index)
         if record["attempt"] >= REPORT.MAX_ATTEMPT:
@@ -1509,7 +2207,14 @@ class Run:
         try:
             self.payload(index)
         except KeyError as error:
-            return self.stop("failed", "step %s cannot be handed %s: an earlier step did not give it" % (step["id"], error.args[0]), index)
+            reason = "step %s cannot be handed %s: an earlier step did not give it" % (step["id"], error.args[0])
+            if self.continues(index):
+                moment = self.world.now()
+                record.update(attempt=record["attempt"] + 1, status="failed", verdict=REPORT.clean_verdict(reason), evidence=[],
+                              links={}, startedAt=moment, endedAt=moment, refresh=False, redo=None)
+                record["class"] = None
+                self.report(index)
+            return self.fail_or_stop(index, "failed", reason) or self.advance()
         ref = step["run"]["ref"]
         if step["run"]["source"] == "repo":
             code, found = read_repo_skill(self.world, self.state["context"]["cwd"], ref)
@@ -1521,14 +2226,16 @@ class Run:
                               issuedHead=self.commit, ran={"source": "repo", "ref": ref if isinstance(ref, str) else None})
                 record["class"] = None
                 self.report(index)
-                return self.stop("failed", "The skill file %s could not be used (%s); fix the file or the workflow, then resume." % (
-                    ref, REPO_FAILURES[code]), index)
+                return self.fail_or_stop(index, "failed", "The skill file %s could not be used (%s); fix the file or the workflow, "
+                                         "then resume." % (ref, REPO_FAILURES[code])) or self.advance()
             ran = dict((key, found[key]) for key in ("source", "ref", "version", "hash"))
         elif step["run"]["source"] == "library":
             resolved = self.library_resolve(index)
             if "action" in resolved:
                 return resolved
             ran = resolved["ran"]
+        elif self.asks_person(index):
+            ran = {"source": "builtin", "ref": GATE_REF if self.is_gate(index) else CHECKPOINT_REF, "version": self.state["pluginVersion"]}
         else:
             try:
                 with open(os.path.join(PLUGIN_ROOT, "skills", ref, "SKILL.md"), "rb") as handle:
@@ -1538,15 +2245,17 @@ class Run:
             ran = {"source": "builtin", "ref": ref, "version": self.state["pluginVersion"], "hash": digest}
         # A step re-issued only to refresh its own stale proof does not void the steps that rely
         # on it: they hold their own proofs (a rebase that leaves the patch alone keeps the review).
-        refresh = cause == "stale" or (cause == "mismatch" and record.get("refresh", False))
+        refresh = cause in ("stale", "reclaim") or (cause == "mismatch" and record.get("refresh", False))
         record.update(attempt=record["attempt"] + 1, status="issued", verdict=None, evidence=[], links={},
-                      startedAt=self.world.now(), endedAt=None, refresh=refresh, redo=None, issuedHead=self.commit, ran=ran)
+                      startedAt=self.world.now(), endedAt=None, refresh=refresh, redo=None, issuedHead=self.commit, ran=ran,
+                      waiting=None)
         if step["run"]["source"] == "library":
             record["libraryFile"], record["libraryFetches"] = resolved["file"], 0
         record["class"] = None
+        record.pop("gate", None)
         self.state["current"] = {"stepId": step["id"], "attempt": record["attempt"]}
         self.report(index)
-        return self.run_answer(index)
+        return self.handout(index)
 
     def manifest_line(self, index):
         step = self.steps[index]
@@ -1567,8 +2276,8 @@ class Run:
                            "hash": line["hash"] if line else None}, libraryFetches=0)
         record["class"] = None
         self.report(index)
-        return self.stop("failed", "The library skill %s version %s for step %s could not be used: %s." % (
-            step["run"]["ref"], step["run"]["version"], step["id"], reason), index)
+        return self.fail_or_stop(index, "failed", "The library skill %s version %s for step %s could not be used: %s." % (
+            step["run"]["ref"], step["run"]["version"], step["id"], reason)) or self.advance()
 
     def library_resolve(self, index):
         """{"ran", "file"} for a verified cached copy, else an answer: fetch-skill, or the failed-step form."""
@@ -1618,7 +2327,10 @@ class Run:
                 record["libraryFile"] = found["path"]
             self.branch_fault(index, handed_back=True)
             self.report(index)  # the same running report again: harmless, and a lost one is not lost
-            return self.run_answer(index)
+            return self.handout(index)
+        if state.get("reclaim"):
+            # An adopted run parked at a gate: the story claim is asked again first, so this session holds it.
+            return self.issue(self.index_of(state["reclaim"]), "reclaim")
         for index, step in enumerate(self.steps):
             record = self.record(index)
             if step["run"]["source"] == "off":
@@ -1628,6 +2340,19 @@ class Run:
                     record["class"] = "skipped"
                     self.report(index)
                 continue
+            if self.parked_at(index):
+                return self.gate_parked(index)
+            if record.get("continued") or self.left_open(index):
+                continue  # a non-blocking step that failed, or a checkpoint left for the person: shown, never re-run
+            if step["when"]["mode"] == "condition" and record["status"] == "pending" and (record["attempt"] == 0 or record.get("redecide")):
+                decided, needs, note = self.condition_decision(index)
+                if needs:
+                    return self.need_facts(index, needs)
+                record.pop("redecide", None)
+                if decided is False:
+                    self.skip_by_condition(index)
+                    continue
+                record["conditionNote"] = note  # undecided: the step runs, and its evidence says why
             cause = record.get("redo")
             if ended_well(record):
                 if not self.relied_on(index):
@@ -1639,7 +2364,7 @@ class Run:
                 if cause is None:
                     continue
             elif record["status"] == "done":
-                cause = "redo"  # its own verdict asked for another go
+                cause = record.get("redo") or "redo"  # its own verdict, or a person's changes, asked for another go
             return self.issue(index, cause)
         return self.finish("completed")
 
@@ -1648,16 +2373,19 @@ class Run:
         for the step and the run. Whatever cannot be read as a pass is recorded as a failure."""
         state, step, record, entry = self.state, self.steps[index], self.record(index), self.entry(index)
         state["current"], state["stopped"] = None, None
+        if state.get("reclaim") == step["id"]:
+            del state["reclaim"]
         kept = record.get("answer")  # a step that asks to run again keeps the person's reply (below)
-        record.update(endedAt=self.world.now(), answer=None, evidence=[], links={}, redo=None)
+        record.update(endedAt=self.world.now(), answer=None, evidence=[], links={}, redo=None, waiting=None)
         parsed = parse_verdict(entry, output) if isinstance(output, str) else None
         if parsed is None:
             record.update(status="failed", verdict="No verdict")
             record["class"] = None
-            self.report(index)
-            self.stop("no-verdict", "step %s did not open its answer with a `%s: …` verdict its contract lists" % (
-                step["id"], entry["verdict"]["label"]), index)
-            self.may_have_landed(index)
+            if not self.asks_person(index):
+                self.report(index)
+            if self.fail_or_stop(index, "no-verdict", "step %s did not open its answer with a `%s: …` verdict its contract lists" % (
+                    step["id"], entry["verdict"]["label"])):
+                self.may_have_landed(index)
             return
         value, detail = parsed
         if has_secret(detail):
@@ -1665,9 +2393,12 @@ class Run:
         line = REPORT.clean_verdict("%s: %s %s" % (entry["verdict"]["label"], value["value"], detail))
         lines, text = split_output(output)
         result, proof, links, problem = read_result(entry, text)
+        if record.get("conditionNote"):
+            lines = [record["conditionNote"]] + lines  # a condition that could not be decided ran the step: say so
         record.update(verdict=line, evidence=REPORT.clean_evidence([l for l in lines if not has_secret(l)]),
                       result=result, proof=proof, links=links)
         kind = record["class"] = value["class"]
+        record["recordsOutcome"] = None
         if kind == "redo:self":
             record["answer"] = kept  # e.g. a deploy approval retried while the deploy is not waiting yet
         after = None  # (stop kind, reason) once the report is queued
@@ -1690,6 +2421,8 @@ class Run:
                 if step["contract"] == "risk-check@1" and record.get("passed"):
                     record["result"] = accumulate(record["passed"]["result"], result)
                 record["passed"] = {"proof": proof, "result": record["result"]}
+                if value.get("recordsOutcome") in RECORDED_OUTCOMES:
+                    record.update(recordsOutcome=value["recordsOutcome"], outcomeSeq=state["seq"] + 1)
                 if not (record.get("refresh") and record["doneSeq"]):
                     record["doneSeq"] = state["seq"] + 1
                 record.update(refresh=False, autoRedo=0)  # its proof holds: the runner's re-issues start again from 0
@@ -1698,17 +2431,73 @@ class Run:
         elif kind == "stop":
             record["status"] = "failed"
             after = ("failed", line)
-        elif kind == "ask":
+        elif kind in ("ask", "confirm"):
             record["status"] = "waiting"
-            after = ("needs-person", detail)
-        else:  # redo:self, or end:<outcome>
+            after = ("needs-person", detail if kind == "ask" else line)
+        elif kind == PARK_CLASS:
+            gate, since = self.requested_gate(text)
+            if not self.asks_person(index) or gate is None:
+                record["status"] = "failed"
+                after = ("failed", "step %s: %s, so nothing is waited on and nothing goes on unapproved" % (
+                    step["id"], "the request's answer names no gate" if self.asks_person(index) else "only a gate or a checkpoint parks a run"))
+            else:
+                # A blocking one parks the run; a non-blocking checkpoint is left open and the run goes on.
+                record.update(status="parked" if self.blocks(index) else "open", gate={"id": gate, "since": since})
+        else:  # redo:self, rewind:<contract> or end:<outcome>
             record["status"] = "done"
-        self.report(index)
+            if REWIND_CLASS.match(kind):
+                self.rewind(index, REWIND_CLASS.match(kind).group(1))
+        if not (self.asks_person(index) and record["status"] in ("done", "failed")):
+            # DevStride writes a gate's or a checkpoint's done and failed itself and refuses them from an agent, which would
+            # lose the run's end sent with them: one that could not be requested is told only by the run's end.
+            self.report(index)
+        if after and after[0] in ("failed", "proof") and self.continues(index):
+            after = None  # a non-blocking step: recorded failed, shown, and the run goes on
+            record["continued"] = True
         if after:
             self.stop(after[0], after[1], index)
+            if kind == "confirm":
+                self.state["stopped"]["confirm"] = True  # a yes accepts the verdict, a no ends the run
             self.may_have_landed(index)
         elif END_CLASS.match(kind):
             self.finish(END_CLASS.match(kind).group(1))
+
+    def rewind(self, index, contract):
+        """rewind:<contract>: the nearest earlier step providing `contract`, and every step after it
+        up to this one, are run again in order; this step, left done but not passed, comes last.
+        Whatever relied on the steps run again is superseded by them (a go-ahead is asked again).
+        references/workflow-runner.md, "Going back", says what happens to each kind of step in between."""
+        target = self.provider(index, contract)
+        for at in range(target, index):
+            step, record = self.steps[at], self.record(at)
+            if step["run"]["source"] == "off":
+                continue
+            if self.is_checkpoint(at) and not self.blocks(at):
+                continue  # a checkpoint the run never waited for: open or answered, it stays as it is
+            # Everything else runs again: a failure the run went on past is tried again, a gate or a
+            # blocking checkpoint is asked again as a new attempt, and a condition is decided again.
+            record.update(status="pending", redo="rewind" if at == target else None, recordsOutcome=None)
+            record["class"] = None
+            for key in ("continued", "skippedByCondition", "conditionNote", "gate"):
+                record.pop(key, None)
+            if step["when"]["mode"] == "condition":
+                record["redecide"] = True
+
+    def confirm(self, index, text, yes):
+        """A person's answer to a confirm verdict. A yes records the verdict as accepted: the step
+        is done as it answered, never run again, and its result carries the answer. A no ends the
+        run as declined."""
+        state, record = self.state, self.record(index)
+        state["stopped"] = None
+        record.update(status="done", endedAt=self.world.now(), answer=text, accepted=yes,
+                      verdict=REPORT.clean_verdict("%s (%s)" % (record["verdict"], "accepted" if yes else "declined")))
+        if yes:
+            record["class"] = "continue"
+            record["result"] = dict(record["result"], answer=text)
+            record["passed"] = {"proof": record["proof"], "result": record["result"]}
+            record.update(doneSeq=state["seq"] + 1, refresh=False, autoRedo=0)
+        self.report(index)
+        return self.advance() if yes else self.finish(CONFIRM_DECLINED)
 
     def may_have_landed(self, index):
         """merge-may-have-landed: a merge that answered and then stopped may have landed first, so
@@ -1763,6 +2552,53 @@ def read_definition_file(path):
         raise Refuse("definition-unreadable", "the definition file cannot be read as JSON")
 
 
+def tracker_outcome(state, outcome):
+    """How a run's end is named to the tracker: the runner's table, except that a run finishing
+    normally names the outcome its latest recording step recorded, when the tracker accepts it."""
+    named = RUN_OUTCOME.get(outcome, "interrupted")
+    recorded = state.get("recordedOutcome")
+    if named == "completed" and recorded in RECORDED_OUTCOMES and recorded in (state.get("trackerOutcomes") or []):
+        return recorded
+    return named
+
+
+def accepted_outcomes(fetched):
+    """The run outcomes the tracker's workflow answer says it accepts (`runOutcomes`), of the ones
+    this runner knows. An answer that lists none, an error or no answer at all: none of the new ones."""
+    if isinstance(fetched, dict) and isinstance(fetched.get("data"), dict):
+        fetched = fetched["data"]
+    listed = fetched.get("runOutcomes") if isinstance(fetched, dict) else None
+    if not isinstance(listed, list):
+        return []
+    return [outcome for outcome in TRACKER_OUTCOMES if outcome in listed]
+
+
+def rollup_fault(definition, context, item):
+    """Why a children-complete run may not start: its trigger, or the readiness answer it carries
+    (`context.rollup`, rollup.py ready's answer). None when it may, or when it is no rollup."""
+    trigger = context.get("trigger", definition["startsWhen"])
+    if trigger != definition["startsWhen"] and "children-complete" in (trigger, definition["startsWhen"]):
+        # Only a rollup's trigger is held to its definition: every other start reads as it always has.
+        return "trigger-mismatch", "the context's trigger %s is not the workflow's %s" % (
+            _one_line(str(trigger))[:60], definition["startsWhen"])
+    if definition["startsWhen"] != "children-complete":
+        return None
+    if item is None:
+        return "rollup-not-ready", "a rollup run names its rollup item"
+    rollup = context.get("rollup")
+    verdict = rollup.get("verdict") if isinstance(rollup, dict) else None
+    if verdict == "READY":
+        return None
+    if not isinstance(verdict, str) or not verdict:
+        return "rollup-not-ready", "rollup is not decided: pass rollup.py ready's answer for %s as context.rollup" % item
+    reason = rollup.get("reason") if isinstance(rollup.get("reason"), str) else ""
+    remaining = [entry.get("number") for entry in rollup.get("remaining") or [] if isinstance(entry, dict)
+                 and isinstance(entry.get("number"), str)] if isinstance(rollup.get("remaining"), list) else []
+    if not reason and remaining:
+        reason = "still open: %s" % ", ".join(remaining[:10])
+    return "rollup-not-ready", "rollup is %s: %s" % (_one_line(verdict)[:20], _one_line(reason or "its children are not all complete")[:300])
+
+
 def new_record():
     return {"attempt": 0, "autoRedo": 0, "status": "pending", "verdict": None, "class": None, "evidence": [],
             "result": {}, "proof": None, "links": {}, "startedAt": None, "endedAt": None, "doneSeq": None,
@@ -1793,29 +2629,54 @@ def command_start(world, request, contracts):
         raise Refuse("bad-request", "context.cwd must be a directory")
     cwd = os.path.realpath(cwd)
     session = session_of(request, world)
+    facts = facts_of(request)
     version = CLAIMS.plugin_version(PLUGIN_ROOT)
     in_work_tree = world.in_work_tree(cwd)
-    steps = validate_definition(definition, contracts, version, in_work_tree)
+    rehearsal, beside = request.get("rehearsal", False), request.get("beside", False)
+    if not isinstance(rehearsal, bool):
+        raise Refuse("bad-request", "rehearsal is true or false")
+    if not isinstance(beside, bool) or (beside and (item is not None or request.get("replace") is True)):
+        raise Refuse("bad-request", "beside is true or false, only for a run with no item, and never with replace")
+    steps = validate_definition(definition, contracts, version, in_work_tree, rehearsal=rehearsal, has_item=item is not None)
     check_context(steps, contracts, context)
+    refusal = rollup_fault(definition, context, item)
+    if refusal:
+        raise Refuse(*refusal)
     trigger = context.get("trigger", definition["startsWhen"])
+    if trigger == "children-complete":
+        # The existing story claim serialises two sessions on one rollup: no new claim kind.
+        context["claim"] = {"kind": "story", "key": item}
     folder = state_dir(world, create=True)
-    path = os.path.join(folder, state_name(session, item))
-    replaced = []
-    if os.path.lexists(path):
-        old = read_state(path, world)
-        if not old["outcome"]:
-            if request.get("replace") is not True and "fetched" in request:
-                # A run under way keeps the definition it pinned: the answer is where it is, and no notice again.
-                run = Run(old, contracts, world)
-                answer = run.advance()
-                answer.update(definitionHash=old["definitionHash"], definitionSource=old.get("definitionSource", "builtin"),
-                              workflow=pinned_workflow(old), notice=None, reports=run.reports())
-                write_state(folder, old)
-                return answer
-            if request.get("replace") is not True:
-                raise Refuse("run-open", "this session already has an open run for %s; resume it, or start with replace" % (item or "no item"))
-            replaced = close_replaced(old, world)
-    chosen = choose_definition(definition, request.get("fetched", MISSING), trigger, contracts, version, in_work_tree, context)
+    # One open run to a session and item. A run with no item is kept under its own run id, and a
+    # session still holds one open such run of a workflow, as it did when they shared one file: a
+    # start meets it unless it says `beside` (a second run on purpose). Other workflows' runs with
+    # no item are left alone.
+    if item:
+        path = os.path.join(folder, state_name(session, item, None))
+        opened = [read_state(path, world)] if os.path.lexists(path) else []
+        opened = [old for old in opened if not old["outcome"]]
+    else:
+        opened = [] if beside else open_without_item(world, folder, session, definition.get("id"))
+    if len(opened) > 1:
+        raise Refuse("ambiguous-run", "this session has %d open runs of the %s workflow with no item; resume one by its "
+                     "run id, or end it (resume with close), before starting another" % (len(opened), definition.get("id")))
+    replaced, ended = [], None
+    if opened:
+        old = opened[0]
+        if request.get("replace") is not True and "fetched" in request:
+            # A run under way keeps the definition it pinned: the answer is where it is, and no notice again.
+            run = Run(old, contracts, world)
+            run.facts = facts_of(request)
+            answer = run.advance()
+            answer.update(definitionHash=old["definitionHash"], definitionSource=old.get("definitionSource", "builtin"),
+                          workflow=pinned_workflow(old), notice=None, reports=run.reports())
+            write_state(folder, old)
+            return answer
+        if request.get("replace") is not True:
+            raise Refuse("run-open", "this session already has an open run for %s; resume it, or start with replace" % (item or "no item"))
+        replaced, ended = close_replaced(old, world), old
+    chosen = choose_definition(definition, request.get("fetched", MISSING), trigger, contracts, version, in_work_tree, context,
+                               rehearsal=rehearsal, has_item=item is not None)
     builtin_id, definition = definition.get("id"), chosen["definition"]
     steps = flat_steps(definition)
     prune(folder, world)
@@ -1828,13 +2689,22 @@ def command_start(world, request, contracts):
              "definitionSource": chosen["source"], "workflowId": chosen["workflow"]["id"],
              "workflowName": chosen["workflow"]["name"], "workflowVersion": chosen["workflow"]["version"],
              "workflowHash": chosen["workflow"]["hash"], "fallbackReason": chosen["reason"],
-             "skillManifest": chosen["skills"], "builtinId": builtin_id}
+             "skillManifest": chosen["skills"], "builtinId": builtin_id,
+             "trackerOutcomes": accepted_outcomes(request.get("fetched"))}
     if chosen["organizationId"]:
         state["organizationId"] = chosen["organizationId"]
+    if rehearsal:
+        state["rehearsal"] = True  # the start asked to run step skills this plugin has not switched on yet
     run = Run(state, contracts, world)
+    run.facts = facts
     answer = run.advance()
     answer.update(definitionHash=state["definitionHash"], definitionSource=chosen["source"], workflow=pinned_workflow(state),
                   notice=chosen["notice"], reports=replaced + run.reports())
+    if ended is not None and not item:
+        # The replaced run has a file of its own (a run for an item is overwritten below): it is
+        # ended there first, so the session never holds two open runs of the workflow.
+        ended.update(outcome="interrupted", endedAt=world.now(), current=None)
+        write_state(folder, ended)
     write_state(folder, state)
     return answer
 
@@ -1856,7 +2726,9 @@ def workflow_line(state):
 def command_next(world, request, contracts):
     folder, state = find_run(world, request, session_of(request, world))
     run = Run(state, contracts, world)
-    answer = run.advance()
+    run.facts = facts_of(request)
+    # gateAnswer: the person's answer to the gate the run is parked at, as get_workflow_gate read it.
+    answer = run.answer_gate(request["gateAnswer"]) if "gateAnswer" in request else run.advance()
     answer["reports"] = run.reports()
     write_state(folder, state)
     return answer
@@ -1876,8 +2748,18 @@ def command_done(world, request, contracts):
     if not (issued or repaired):
         raise Refuse("not-current-step", "the run is not waiting for attempt %s of step %s" % (attempt, step_id))
     index = run.index_of(step_id)
+    if run.asks_person(index) and isinstance(request.get("output"), str):
+        parsed = parse_verdict(run.entry(index), request["output"])
+        if parsed is not None and parsed[0]["value"] not in GATE_AGENT_VALUES:
+            # An agent never answers a gate or a checkpoint: a person does, in the tracker, and next reads it.
+            label = run.entry(index)["verdict"]["label"]
+            raise Refuse("gate-answered-by-agent", "step %s is %s, answered only by a person in DevStride; "
+                         "report %s: REQUESTED or %s: UNAVAILABLE, then read the answer with get_workflow_gate "
+                         "and pass it to next as gateAnswer" % (step_id, "a checkpoint" if run.is_checkpoint(index) else "an approval gate",
+                                                               label, label))
     if repaired and not issued:
         run.record(index)["repairs"] = run.record(index).get("repairs", 0) + 1
+    run.facts = facts_of(request)
     run.complete(index, request.get("output"))
     record = run.record(index)
     recorded = {"stepId": step_id, "attempt": attempt, "verdict": record["verdict"], "class": record["class"], "status": record["status"]}
@@ -1887,16 +2769,89 @@ def command_done(world, request, contracts):
     return answer
 
 
+def command_wait(world, request, contracts):
+    """The issued step says it is waiting inside itself (a queue, a deploy, another release): it
+    is reported `waiting` with the reason until its `done`. Nothing else about the run changes."""
+    folder, state = find_run(world, request, session_of(request, world))
+    run = Run(state, contracts, world)
+    step_id, attempt, reason = request.get("stepId"), request.get("attempt"), request.get("reason", "Waiting")
+    if isinstance(attempt, bool) or not isinstance(attempt, int) or not isinstance(step_id, str):
+        raise Refuse("bad-request", "wait names the step (stepId) and its attempt (a whole number)")
+    if not isinstance(reason, str) or not REPORT.clean_verdict(reason):
+        raise Refuse("bad-request", "reason is one line saying what the step waits for")
+    if state["current"] != {"stepId": step_id, "attempt": attempt}:
+        raise Refuse("not-current-step", "the run has not issued attempt %s of step %s" % (attempt, step_id))
+    index = run.index_of(step_id)
+    if run.asks_person(index):
+        # A gate or a checkpoint runs nothing that could wait: once requested, the run is parked.
+        raise Refuse("wait-not-a-step", "step %s is answered by a person in the tracker, so it parks the run once requested; "
+                     "wait is for a step that waits inside itself" % step_id)
+    reason = WITHHELD if has_secret(reason) else REPORT.clean_verdict(reason)
+    run.record(index)["waiting"] = reason
+    run.report(index)
+    answer = {"runId": state["runId"], "waiting": {"stepId": step_id, "attempt": attempt, "reason": reason}, "reports": run.reports()}
+    write_state(folder, state)
+    return answer
+
+
+def parked_step(state):
+    """The id of the step an unfinished run is parked at (a gate, or a checkpoint the run waits for), or None."""
+    if state["outcome"]:
+        return None
+    return next((step["id"] for step in flat_steps(state["definition"])
+                 if state["steps"][step["id"]]["status"] == "parked" and state["steps"][step["id"]].get("gate")), None)
+
+
+def parked_at(state):
+    """{stepId, id, since} for the gate a run is parked at, or None."""
+    at = parked_step(state)
+    return dict(state["steps"][at]["gate"], stepId=at) if at else None
+
+
+def run_state(state):
+    """finished, stopped (a person must act in the conversation), parked (a person must answer in
+    the tracker; no step is issued) or running."""
+    if state["outcome"]:
+        return "finished"
+    if state["stopped"]:
+        return "stopped"
+    return "parked" if not state["current"] and parked_step(state) else "running"
+
+
+def position_of(state):
+    """Where an unfinished run is: {stepId, index, of}, or None. A parked run is at its gate."""
+    at = (state["current"] or state["stopped"] or {}).get("stepId") or parked_step(state)
+    ids = [step["id"] for step in flat_steps(state["definition"])]
+    return {"stepId": at, "index": ids.index(at) + 1, "of": len(ids)} if at in ids and not state["outcome"] else None
+
+
+def command_status_all(world, request):
+    """This session's unfinished runs, oldest first. Read-only."""
+    session, folder = session_of(request, world), state_dir(world, create=False)
+    runs = []
+    for state in (own_states(world, folder) if folder else []):
+        if state["sessionId"] == session and not state["outcome"]:
+            waiting = state["steps"][state["current"]["stepId"]].get("waiting") if state["current"] else None
+            runs.append({"runId": state["runId"], "item": state["item"], "workflowId": pinned_workflow(state)["id"],
+                         "workflow": workflow_line(state), "startedAt": state["startedAt"],
+                         "state": run_state(state), "position": position_of(state),
+                         "stopped": state["stopped"], "waiting": waiting, "parkedAt": parked_at(state)})
+    runs.sort(key=lambda run: (str(run["startedAt"]), run["runId"]))
+    return {"runs": runs}
+
+
 def command_status(world, request, contracts):
+    if "all" in request:
+        if request["all"] is not True or request.get("item") is not None or request.get("runId") is not None:
+            raise Refuse("bad-request", "all is only ever true, and it names no run")
+        return command_status_all(world, request)
     _, state = find_run(world, request, session_of(request, world))
     run = Run(state, contracts, world)
-    rows = [{"stepId": step["id"], "phase": step["phase"], "name": step["name"], "status": run.record(index)["status"],
+    rows = [{"stepId": step["id"], "phase": step["phase"], "name": step["name"],
+             "status": "waiting" if run.record(index)["status"] == "issued" and run.record(index).get("waiting") else run.record(index)["status"],
              "verdict": run.record(index)["verdict"], "attempt": run.record(index)["attempt"]}
             for index, step in enumerate(run.steps)]
-    at = (state["current"] or state["stopped"] or {}).get("stepId")
-    position = None
-    if at and not state["outcome"]:
-        position = {"stepId": at, "index": run.index_of(at) + 1, "of": len(rows)}
+    position = position_of(state)
     table = ["| Phase | Step | Status | Verdict | Attempt |", "|---|---|---|---|---|"]
     for row in rows:
         table.append("| %s | %s | %s | %s | %s |" % tuple(
@@ -1905,8 +2860,9 @@ def command_status(world, request, contracts):
     if request.get("includeDefinition") is True:
         run.resend_definition = True
     source = "organization" if state.get("definitionSource") == "organization" else "builtin"
-    return {"runId": state["runId"], "state": "finished" if state["outcome"] else "stopped" if state["stopped"] else "running",
+    return {"runId": state["runId"], "state": run_state(state),
             "position": position, "rows": rows, "table": "\n".join(table), "workflow": workflow_line(state),
+            "parkedAt": parked_at(state),
             "definitionSource": source,
             "source": SOURCE_LABELS.get(None if source == "organization" else state.get("fallbackReason") or "not-fetched", "built-in"),
             "reports": run.reports()}
@@ -1923,7 +2879,7 @@ def replay_reports(state, contracts, world):
     run.resend_definition = True
     ended = state["outcome"] or (state["stopped"] or {}).get("kind")
     if ended:
-        run.closing = {"outcome": RUN_OUTCOME.get(ended, "interrupted"), "endedAt": state.get("endedAt") or world.now()}
+        run.closing = {"outcome": tracker_outcome(state, ended), "endedAt": state.get("endedAt") or world.now()}
     return run.reports()
 
 
@@ -1935,7 +2891,7 @@ def own_states(world, folder):
             continue
         try:
             state = read_state(os.path.join(folder, name), world)
-            named = state_name(state["sessionId"], state["item"]) == name and "outcome" in state and "stopped" in state
+            named = name in state_names(state) and "outcome" in state and "stopped" in state
         except (Refuse, OSError, KeyError, TypeError):
             continue  # not this user's, not a state file, or gone
         if named:
@@ -1968,6 +2924,8 @@ def command_reported(world, request, contracts):
     elif first:
         state["reportsUnsent"] = world.now()
     if first or (good and state["outcome"]):
+        if not state["item"]:
+            settle_legacy(folder, state["sessionId"], world)  # one an earlier plugin kept: moved first, never written twice
         write_state(folder, state)  # a stopped run's replay writes nothing: its file is not kept alive by it
     return {"runId": state["runId"], "unsent": bool(state.get("reportsUnsent")), "say": UNSENT_LINE if first else None}
 
@@ -2027,7 +2985,8 @@ def judge_run(run, definition):
             if step.get("onFail") == "stop":
                 gaps.append({"stepId": step["id"], "reason": "failed"})
         elif status in ("running", "waiting"):
-            gaps.append({"stepId": step["id"], "reason": "unfinished"})
+            if not (status == "waiting" and dig(step, ["when", "mode"]) == "manual" and step.get("onFail") == "continue"):
+                gaps.append({"stepId": step["id"], "reason": "unfinished"})  # a checkpoint left for a person is no gap
     return ("incomplete" if gaps else "complete"), gaps
 
 
@@ -2100,7 +3059,7 @@ def adopt(world, request, session, cwd):
         except (Refuse, OSError):
             continue  # not this user's, not a state file, or gone: never adopted
         if (not state["outcome"] and state["sessionId"] != session and (item is None or state["item"] == item)
-                and (not run_id or state["runId"] == run_id) and state_name(state["sessionId"], state["item"]) == name
+                and (not run_id or state["runId"] == run_id) and name in state_names(state)
                 and runs_workflow(state, wanted)):
             if same_repository(world, state, cwd):
                 found.append((modified, path, state))
@@ -2112,9 +3071,11 @@ def adopt(world, request, session, cwd):
     if not found:
         raise Refuse("no-run", "there is no unfinished run to resume")
     _, old_path, state = max(found, key=lambda entry: entry[0])
-    mine = os.path.join(folder, state_name(session, state["item"]))
-    if os.path.lexists(mine) and not read_state(mine, world)["outcome"]:
-        # As start: an open run of this session's own is never overwritten.
+    mine = os.path.join(folder, state_name(session, state["item"], state["runId"]))
+    if (os.path.lexists(mine) and not read_state(mine, world)["outcome"]) or (
+            state["item"] is None and open_without_item(world, folder, session, workflow_of(state))):
+        # As start: an open run of this session's own is never overwritten, and a session holds
+        # one open run with no item of a workflow.
         raise Refuse("run-open", "this session already has an open run for %s; finish it, or start with replace" % (state["item"] or "no item"))
     adopted_from = {"sessionId": state["sessionId"], "cwd": state["context"].get("cwd")}
     state["sessionId"] = session
@@ -2153,6 +3114,7 @@ def command_resume(world, request, contracts):
         folder, state, adopted_from, old_path = adopt(world, request, session, cwd)
     prune(folder, world)
     run = Run(state, contracts, world)
+    run.facts = facts_of(request)
     if request.get("close") is True:
         # A run whose item was finished elsewhere: ended as interrupted, never carried on.
         answer = run.finish("interrupted")
@@ -2168,6 +3130,17 @@ def command_resume(world, request, contracts):
         write_adopted(folder, state, old_path)
         return answer
     at = (state["stopped"] or state["current"] or {}).get("stepId")
+    if at and state["stopped"] and answer_text is not None and state["steps"][at]["class"] == "confirm" and state["steps"][at]["status"] == "waiting":
+        # A confirm verdict is answered, never run again: without an answer the step is issued again below.
+        said = CONFIRM_ANSWER.match(answer_text)
+        if said is None:
+            raise Refuse("confirm-answer", "step %s waits for an answer that starts with yes or no" % at)
+        answer = run.confirm(run.index_of(at), answer_text, said.group(1).lower() == "yes")
+        if adopted_from:
+            answer["adoptedFrom"] = adopted_from
+        answer["reports"] = run.reports()
+        write_adopted(folder, state, old_path)
+        return answer
     if at:
         record = state["steps"][at]
         if state["stopped"]:
@@ -2175,6 +3148,9 @@ def command_resume(world, request, contracts):
         if answer_text is not None:
             record["answer"] = answer_text
     state["stopped"] = None
+    if adopted_from and not state["current"] and run.parked_gate() is not None and run.claim_step():
+        # A parked run taken over by this session: its story claim is asked again before anything else.
+        state["reclaim"] = run.claim_step()
     answer = run.advance()
     if adopted_from:
         answer["adoptedFrom"] = adopted_from
@@ -2196,6 +3172,7 @@ def command_repository(world, request, contracts):
 
 
 HANDLERS = {"repository": command_repository, "start": command_start, "next": command_next, "done": command_done,
+            "wait": command_wait,
             "status": command_status, "resume": command_resume, "reported": command_reported,
             "unsent": command_unsent, "judge": command_judge}
 

@@ -17,6 +17,9 @@ All read-only. It lists tools; it never calls one.
   runs use the built-in workflow". That is a normal state.
 - **`get_agent_skill`** (a skill from the organization's library): offered → PASS; missing → INFO,
   never WARN or FAIL: "needed only when your organization's workflow uses library skills".
+- **`request_workflow_gate` and `get_workflow_gate`** (an approval gate: ask a person, read their
+  answer): both offered → PASS; either missing → INFO, never WARN or FAIL: "needed only when your
+  organization's workflow has an approval gate; without them such a run stops at the gate".
 - **No DevStride connection at all** → N/A.
 - A run that fell back says why in `workflow.py status` (`source`, for example
   `built-in (DevStride unavailable)`); doctor names that one line when asked about a run.

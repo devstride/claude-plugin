@@ -6,7 +6,8 @@ written with the literal `unreleased` where its first version belongs. Preparing
 this script once, with the release's version, and nothing else does the stamping:
 
   schemas/seam-registry.json     every  "since": "unreleased"
-  schemas/step-contracts.json    every  "since": "unreleased"             (when the file exists)
+  schemas/step-contracts.json    every  "since": "unreleased"             (when the file exists:
+                                 its new contracts and its `features`)
   workflows/*.json               every  "minPluginVersion": "unreleased"
 
 Only those values change. The files are edited as text, so every other byte (order, spacing,
