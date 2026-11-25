@@ -160,7 +160,11 @@ class Plugin:
                 "steps": {s["id"]: s["contract"] for s in steps_of(definition)}}
 
     def contract_sha(self, entry):
-        return self.report.definition_hash({k: v for k, v in entry.items() if k != "since"})
+        # since is the release that stamps it; judgement and ownContext say only where a step agent
+        # runs the step (skills/run-workflow/references/step-agents.md), and configSkip only when the
+        # runner answers it from the config the step would read: none changes the contract.
+        return self.report.definition_hash({k: v for k, v in entry.items()
+                                            if k not in ("since", "judgement", "ownContext", "configSkip")})
 
     def runnable(self, definition, catalog):
         """True when this plugin can run the definition: every contract is in the catalog and
@@ -229,7 +233,11 @@ def record(plugin):
         entry = plugin.workflow_entry(definition)
         dormant = not plugin.runnable(definition, catalog)
         rows = workflows.setdefault(wid, [])
-        if any(r["version"] == entry["version"] and r["sha256"] == entry["sha256"] for r in rows):
+        if any(r["version"] == entry["version"] and r["sha256"] == entry["sha256"] for r in rows) and not (
+                not dormant and rows[-1]["version"] == entry["version"] and rows[-1].get("dormant")):
+            # Recorded already, unless this tree can run what its newest row says shipped dormant:
+            # switched on with its content unchanged, it is recorded again below as runnable, so its
+            # step ids are permanent from then on.
             continue
         lost, moved = step_drift(rows, entry["steps"])
         if moved:
@@ -343,7 +351,10 @@ def order_faults(registry, plugin_version):
         seen = set()
         for i, row in enumerate(rows):
             tag = "%s v%s" % (wid, row["version"])
-            if (row["version"], row["sha256"]) in seen:
+            twins = [r for r in rows[:i] if (r["version"], r["sha256"]) == (row["version"], row["sha256"])]
+            # The one fingerprint recorded twice is a definition switched on unchanged: shipped
+            # dormant, then recorded once more as runnable, from which release its step ids hold.
+            if twins and (row.get("dormant") or not all(r.get("dormant") for r in twins)):
                 faults.append("%s: the same fingerprint is recorded twice" % tag)
             seen.add((row["version"], row["sha256"]))
             if i == 0:
@@ -435,6 +446,8 @@ def current_faults(plugin, registry):
         if (can_run and rows[-1].get("dormant") and rows[-1]["pluginVersion"] == UNRELEASED
                 and rows[-1]["sha256"] == entry["sha256"]):
             faults.append("%s: this plugin can run it, so its unreleased row must not be marked dormant (run record)" % wid)
+        elif can_run and rows[-1].get("dormant") and rows[-1]["version"] == entry["version"]:
+            faults.append("%s: this plugin can run it, but its newest row says it shipped dormant; record it as runnable (run record)" % wid)
     for wid in sorted(set(workflows) - set(defs)):
         faults.append("recorded workflow %s no longer ships" % wid)
     for key, body in catalog.items():
@@ -535,7 +548,7 @@ def base_faults(plugin, registry, base_registry):
                 match = [r for r in head_rows if r[field] == row[field] and r["sha256"] == row["sha256"]]
                 if not match:
                     faults.append("%s: a released row was deleted or its fingerprint edited" % tag)
-                elif match[0] != row:
+                elif row not in match:  # a definition switched on unchanged has two rows of one fingerprint
                     faults.append("%s: a released row was edited" % tag)
         for name, head_rows in registry[kind].items():
             base_rows = base_registry.get(kind, {}).get(name, [])

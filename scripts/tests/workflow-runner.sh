@@ -588,6 +588,31 @@ def section_lifecycle():
           seen["build"]["heartbeat"] == {"phase": "Build", "stage": "building", "shipIntent": {"route": "epic-release", "unit": "I123", "branch": "feature", "target": "main", "stage": "building"}}
           and seen["claim"]["heartbeat"] == {"phase": None, "stage": None, "shipIntent": None}
           and seen["local-checks"]["heartbeat"]["phase"] == "Verify" and seen["merge"]["heartbeat"]["stage"] == "landing", seen["build"]["heartbeat"])
+    check("each step names where it runs: the judgement steps in the conversation, the rest routine",
+          dict((step_id, answer["agent"]) for step_id, answer in seen.items())
+          == dict((step_id, "conversation" if step_id in ("build", "risk-check", "review", "merge", "capture") else "routine") for step_id in seen),
+          dict((step_id, answer["agent"]) for step_id, answer in seen.items()))
+    module_agent = module.step_agent
+    check("a step that talks with the person, starts agents of its own or weighs evidence stays in the conversation, and so does a repository's or library's step",
+          all(module_agent({flag: True}, "builtin") == "conversation" for flag in ("interactive", "delegates", "judgement"))
+          and module_agent({}, "repo") == "conversation" and module_agent({}, "library") == "conversation"
+          and module_agent({}, "builtin") == "routine")
+    check("a judgement step marked ownContext runs in the judgement step agent, never one that talks or delegates, nor a repository's",
+          module_agent({"judgement": True, "ownContext": True}, "builtin") == "judgement"
+          and module_agent({"judgement": True, "ownContext": True, "interactive": True}, "builtin") == "conversation"
+          and module_agent({"judgement": True, "ownContext": True}, "repo") == "conversation")
+    holds = lambda test, config, payload=None, workflow="release": module.skip_test_holds(test, config, payload or {}, workflow)
+    check("config-skip tests: absent, empty, not-true, in, notIn and workflowNotIn read as written",
+          holds({"config": "claims", "is": "absent"}, {}) and holds({"config": "claims", "is": "absent"}, {"claims": None})
+          and not holds({"config": "claims", "is": "absent"}, {"claims": {}})
+          and holds({"config": "preShipChecks", "is": "empty"}, {"preShipChecks": []}) and not holds({"config": "preShipChecks", "is": "empty"}, {"preShipChecks": [1]})
+          and holds({"config": "release.autoStart.enabled", "is": "not-true"}, {"release": {"autoStart": {"enabled": "true"}}})
+          and not holds({"config": "release.autoStart.enabled", "is": "not-true"}, {"release": {"autoStart": {"enabled": True}}})
+          and holds({"payload": "releaseNotes", "in": ["false", False]}, {}, {"releaseNotes": False})
+          and not holds({"payload": "releaseNotes", "in": ["false", False]}, {}, {})
+          and holds({"payload": "shape", "notIn": ["MERGED"]}, {}, {}) and not holds({"payload": "shape", "notIn": ["MERGED"]}, {}, {"shape": "MERGED"})
+          and not holds({"workflowNotIn": ["release-notes"]}, {}, {}, "release-notes")
+          and module.config_skip({"configSkip": [{"when": [{"config": "claims", "is": "absent"}]}]}, None, {}, "release") is None)
     declared = subprocess.run([sys.executable, "-B", os.path.join(ROOT, "skills/build-item/scripts/ship-intent.py"), "record"],
                               input=json.dumps(seen["build"]["heartbeat"]["shipIntent"]), capture_output=True, text=True)
     check("the ship-intent request is one the ship-intent helper takes as it is",

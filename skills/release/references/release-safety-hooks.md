@@ -20,8 +20,8 @@ name, a mode word, and a fenced JSON payload. `null` or absent means not configu
 
 ## `release.classifySkill` — light or full
 
-- **When:** `release` step 0, once the release head is known, and again at step 2b; the step is
-  `classify-release`.
+- **When:** `release`'s `classify-release` step, once the release head is known, and again at
+  `classify-at-pre-ship`, just before `pre-ship-release`; both run the step skill `classify-release`.
 - **Invocation:** `classify` and `{ "productionBranch": "<name>", "releaseSource": "<name>",
   "head": "<sha>" }`.
 - **First line:** exactly `RELEASE CLASS: LIGHT` or `RELEASE CLASS: FULL`, then one line giving
@@ -29,15 +29,15 @@ name, a mode word, and a fenced JSON payload. `null` or absent means not configu
   repository's own rule; the plugin only carries the class.
 - **Unset, a name with no `SKILL.md`, a failing run or any other first line:** `RELEASE CLASS:
   FULL`, with the reason. A release is never light by default.
-- **Where it goes:** the class and reason print in step 0's delta summary. Because a merge, a
-  review fix or a hotfix can change the delta after step 0, step 2b runs `classify-release`
-  AGAIN at the head it tests, immediately before `pre-ship release run`; that class is the one
-  exported to every pre-ship command as `RELEASE_CLASS=light|full` and the one the step-4 recap
-  reports.
+- **Where it goes:** the class and reason print in the delta summary before the cut. Because a
+  merge, a review fix or a hotfix can change the delta after that, `classify-at-pre-ship` runs
+  `classify-release` AGAIN at the head `pre-ship-release` tests, immediately before `pre-ship
+  release run`; that class is the one exported to every pre-ship command as
+  `RELEASE_CLASS=light|full` and the one the `go-ahead` recap reports.
 
 ## `release.preMergeSkill` — anything production needs before the merge
 
-- **When:** `release` step 4, after the PR is green and settled and BEFORE the owner is asked for
+- **When:** `release`'s `pre-merge-check` step, before `go-ahead`: after the PR is green and settled and BEFORE the owner is asked for
   the go-ahead; the step is `pre-merge-check`. Read-only: it reports, it never changes production.
 - **Invocation:** `check` and `{ "productionBranch": "<name>", "releaseSource": "<name>",
   "head": "<sha>", "pullRequest": { "number": 0, "url": "..." } }`.
@@ -55,5 +55,6 @@ name, a mode word, and a fenced JSON payload. `null` or absent means not configu
 ## Cited by
 
 - `skills/classify-release/SKILL.md`, `skills/pre-merge-check/SKILL.md` — the two steps.
-- `skills/release/SKILL.md` — steps 0, 2b and 4.
+- `skills/release/SKILL.md` — the step skills it runs; the Release definitions — the steps
+  `classify-release`, `classify-at-pre-ship` and `pre-merge-check`.
 - `skills/doctor/SKILL.md` — section 7, the hook loop.

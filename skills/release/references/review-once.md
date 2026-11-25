@@ -18,7 +18,7 @@ as its SKILL.md says (every engine on the production PR, every `releaseOnly` che
 }
 ```
 
-With `reviewIdenticalTree: false`, step 2 compares the release head's tree with the tree a full
+With `reviewIdenticalTree: false`, `release-review` compares the release head's tree with the tree a full
 review last settled at a pull request into `releaseSource` (the release-train pull request, an
 epic release pull request): `git rev-parse <sha>^{tree}`.
 
@@ -33,21 +33,21 @@ epic release pull request): `git rev-parse <sha>^{tree}`.
   changed the tree → `review` runs as a follow-up over that difference, carrying the settled ledger,
   with its own scope rules (`skills/review/references/delta-re-review.md`), which widen the scope
   when they say so. Once that follow-up settles, its head counts as the reviewed tree.
-- Absent, or `reviewIdenticalTree` not `false` → step 2 runs as written.
+- Absent, or `reviewIdenticalTree` not `false` → `release-review` runs as written.
 
-Say which path the release took in the step-4 recap, with the two tree hashes.
+Say which path the release took in the `go-ahead` recap, with the two tree hashes.
 
 ## `onlyWhenTouched` on a `releaseOnly` pre-ship check
 
 A `releaseOnly` `preShipChecks` entry runs at every release, `pathGlobs` ignored — unless it ALSO
 sets `"onlyWhenTouched": true`. Then it runs only when the release diff touches one of its
-`pathGlobs`, and step 2b reports the skip with its reason. The diff is
-`origin/<productionBranch>...<head>` for the release head as it stands at 2b, and the
+`pathGlobs`, and `pre-ship-release` reports the skip with its reason. The diff is
+`origin/<productionBranch>...<head>` for the release head as it stands at `pre-ship-release`, and the
 selection is recomputed whenever the head moves (a fix commit, a hotfix merge). A diff that cannot
 be computed runs the check.
 
 A `releaseOnly` entry may also set `"runAt": "train"`: it then runs at the release train
-(`release-branch.md` §1 step 4b) on the snapshot head; the only automatic 2b skip for it is same-snapshot train evidence, else 2b runs it. `runAt` on
+(`release-branch.md` §1 step 4b) on the snapshot head; the only automatic `pre-ship-release` skip for it is same-snapshot train evidence, else `pre-ship-release` runs it. `runAt` on
 any other `when`, or together with `onlyWhenTouched`, is a config error.
 
 ## A train that carries reviewed release units
@@ -64,5 +64,5 @@ production pull request's one `highRiskEngine` pass still runs.
 
 ## Cited by
 
-- `skills/release/SKILL.md` and `references/release-pr.md` — step 2; `skills/pre-ship/SKILL.md` — 2b's selection.
+- `skills/release-steps/references/release-review.md` and `references/release-pr.md` — `release-review`; `skills/pre-ship/SKILL.md` — `pre-ship-release`'s selection.
 - `skills/release/references/release-branch.md` — §1 step 4.

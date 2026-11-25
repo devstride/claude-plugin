@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v4.11.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v4.12.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -548,7 +548,7 @@
         "properties": {
           "command": {
             "type": "string",
-            "description": "command hook — none; selected by the entry's when, pathGlobs and runAt (a releaseOnly entry with runAt train is selected at the release-train step, and at release 2b unless it passed at the train on the same snapshot)"
+            "description": "command hook — none; selected by the entry's when, pathGlobs and runAt (a releaseOnly entry with runAt train is selected at the release-train step, and at the release's pre-ship-release step unless it passed at the train on the same snapshot)"
           },
           "name": {
             "type": "string",
@@ -587,7 +587,7 @@
             "enum": [
               "train"
             ],
-            "description": "a releaseOnly check with runAt train runs on the release-train snapshot before the train merges (outside release clearance under release.clearance.scope cut-to-deploy), and is not repeated at the release's step 2b when it passed there on the same snapshot; only valid with when releaseOnly, never with onlyWhenTouched"
+            "description": "a releaseOnly check with runAt train runs on the release-train snapshot before the train merges (outside release clearance under release.clearance.scope cut-to-deploy), and is not repeated at the release's pre-ship-release step when it passed there on the same snapshot; only valid with when releaseOnly, never with onlyWhenTouched"
           }
         },
         "patternProperties": {

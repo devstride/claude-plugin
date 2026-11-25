@@ -128,8 +128,8 @@ repository that cannot safely use them — and `autoRelease` is the profile's, s
 - **`preShipChecks[].runAt`**: `"train"`, valid only on a `when: "releaseOnly"` entry (anything else
   is a config error), and not together with `onlyWhenTouched` (also a config error). The check runs on
   the release-train snapshot before the train merges (outside release clearance under
-  `release.clearance.scope: "cut-to-deploy"`), and is not repeated at the release's step 2b when it passed there on the same snapshot
-  (the only automatic 2b skip for it; otherwise 2b runs it). Absent, a `releaseOnly` check runs at 2b as before.
+  `release.clearance.scope: "cut-to-deploy"`), and is not repeated at the release's `pre-ship-release` step when it passed there on the same snapshot
+  (the only automatic skip there; otherwise `pre-ship-release` runs it). Absent, a `releaseOnly` check runs at `pre-ship-release` as before.
 - **`preShipChecks[].rerunAtMerge`**: `true` on a `when: "releaseOnly"` entry (anything else, or
   together with `runAt`, is a config error). Under `release.clearance.scope: "merge-and-deploy"`
   the entry, which passed before the tower claim, runs again (`pre-ship release run --only`) at
@@ -315,7 +315,7 @@ a trailing `[-n]`): `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patt
 - **`release.devDeployVerification`** — optional command shaped like `release.deployVerification`,
   run with `RELEASE_COMMIT` = the head the release pull request merges from the source (`<sourceHead>`, the cut, with a release branch; `<reviewedHead>` without one): exit 0 deployed to the
   development environment, 2 not deployed yet, 1 the development deploy failed. When it is set AND
-  the release delta touches a `release.releaseBranchFixExclusions` path, `release` runs it at step 4
+  the release delta touches a `release.releaseBranchFixExclusions` path, `release` runs it at its `go-ahead` phase
   after the owner's yes and before the production merge, polling every 60 s for at most 45 minutes
   on exit 2; exit 1 or the timeout STOPS, never merging production over a failed development deploy.
   A release touching no such path does not wait.

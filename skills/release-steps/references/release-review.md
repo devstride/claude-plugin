@@ -5,7 +5,7 @@ load: contract
 
 `release-steps`' `release-review@1` step. How `review` is invoked, how the head is re-validated
 and what happens to findings are
-`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-pr.md` "Step 2", cited, not copied.
+`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-pr.md` "`release-review`" sections, cited, not copied.
 
 1. **Config wins.** Load `.claude/ds-config.json`: `release.productionBranch`,
    `release.releaseBranchPattern`, `release.releaseBranchFixExclusions`,
@@ -45,7 +45,8 @@ and what happens to findings are
    advances only by this run's fix commits and a hotfix merge, each re-reviewed. Anything else →
    `HEAD MOVED`: a ready pull request is first returned to draft (`gh pr ready --undo`); the next
    attempt recomputes the delta and restarts the review on the new head with the same ledger,
-   target and safety triggers. Any return to this step voids any owner yes already given.
+   target and safety triggers, once the release holds pass on every item the recomputed delta
+   carries, with its ancestors (`release-delta.md` step 5; held → `BLOCKED`, naming the item). Any return to this step voids any owner yes already given.
 9. **Findings.** Only a genuinely ambiguous or risky finding stalls → `BLOCKED`, with a
    recommendation. Each untracked deferral becomes a `create-defect deferred` or
    `create-story deferred` item when a plan root exists, else it is noted for the owner; never

@@ -103,7 +103,7 @@ definition or a deferral route.**
   the argument `local-full <base>`; no PR): the merge-boundary review with no PR, cloud reviewer or CI, recorded
   for the landing gate. **Read `${CLAUDE_PLUGIN_ROOT}/skills/review/references/local-full.md`
   before running it.**
-- **PRE-SHIP RESUME** (`pr`/`release` step 2c) — the return from a **7.1b** hold. **Start at 7.1**:
+- **PRE-SHIP RESUME** (`pr` 2c, `discharge-hold`) — the return from a **7.1b** hold. **Start at 7.1**:
   re-resolve the PR, re-run 7.1's base/patch check and the paginated zero-unresolved check, flip,
   settle. A changed patch → step 5's contextual wave through 3–6.5, back to 7.1, zero threads, flip.
   **Never restart**; carry ledger, counters, safety triggers and lessons tally.
@@ -268,7 +268,7 @@ reads `skipping`, or CI is red.**
    gets affected checks, main-agent inspection and human review; P1/serious-P2 fixes continue). A
    rebase never resets the count.
 
-   **7.1b. PRE-SHIP HOLD** — caller-declared (`pr`/`release` step 2b): **STOP HERE and hand back**
+   **7.1b. PRE-SHIP HOLD** — caller-declared (`pr` 2b, `pre-ship-release`): **STOP HERE and hand back**
    (review settled, head current, still draft, pre-ship outstanding) — even with no CI or CI on
    drafts (resume then skips an inapplicable flip); after 7.1 so the suites test the FINAL head. **The caller MUST re-invoke in PRE-SHIP
    RESUME** — an unresumed hold strands a permanent draft; a caller that cannot finish says so and

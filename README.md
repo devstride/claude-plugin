@@ -565,7 +565,7 @@ Skills are namespaced by the plugin, so they invoke as `/devstride:<name>`.
 | `branch-feature` | Cuts a working branch from the working base (`base: <branch>`) |
 | `branch-hotfix` | Runs the Hotfix workflow (`workflows/hotfix.json`) through the step runner: cuts the hotfix branch from the production branch, resets the local environment, then fixes, reviews, merges and confirms the deploy on your yes; never waits for a release |
 | `create-story` / `create-defect` | Creates a one-off item outside any plan and delivers it end to end; `create-story deferred <item>` / `create-defect deferred <item>` instead parks a follow-up or a bug in the plan's deferred container |
-| `release` | Promotes the release branch to production with a full gated review; with `release.clearance` set, claims one-release-at-a-time clearance first and hands it back last; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
+| `release` | Promotes the release branch to production with a full gated review, run as the Release workflow through the step runner one step at a time; with `release.clearance` set, claims one-release-at-a-time clearance first and hands it back last; updates docs through your local docs skill by default, and writes release notes only on `--release-notes`, after the deploy is confirmed |
 | `setup` | Inspects your repo, maps your work types onto the loop's roles, writes `.claude/ds-config.json`, then proves it by running it — including that the configured local review engine actually runs read-only; `setup agents` sets up the Active Agents board, tag and view after a typed yes; `setup drills` checks the sign-in token for a repository's throwaway drill sessions and tells you the one command that makes it |
 | `doctor` | Checks git, `gh`, the plugin, DevStride, config, CI gates, docs, the Active Agents board and personal status-line settings; after the shared replacement is committed and verified, it can separately remove only the personal `statusLine` key you approve while preserving every other setting and script |
 | `update` | Updates the exact loaded copy, verifies its official tag and files, then stops for a checked plugin reload (restart is the fallback) |
@@ -616,9 +616,8 @@ the review, the owner's go-ahead, the merge, the deploy and the close-out. The s
 definitions (`workflows/release*.json`: one full release per clearance scope and the three
 partial entries) are generated from `scripts/release-workflow-source.json` by
 `scripts/build-release-workflows.py`. `skills/release-steps/references/resume-rules.md` says once
-what every step does for an adopted or merged release and when it heartbeats. **These steps are
-not switched on yet**: `release` still follows its own page, and the step runner refuses a
-definition that runs `release-steps` (`skill-dormant`) outside a rehearsal.
+what every step does for an adopted or merged release and when it heartbeats. `release` runs the
+definition its clearance scope picks through the step runner, one step at a time.
 
 ### The step runner
 
@@ -709,7 +708,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **4.11.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **4.12.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 The public repository, `devstride/claude-plugin`, is a published copy written only by the release

@@ -3,8 +3,7 @@
 # that offers none of them, every answer equals the 4.8.1 runner's.
 #
 # The newer abilities (approval gates and checkpoints, conditions, carrying on after a failure,
-# starting when an item's children are complete, the landed and shipped run endings, the Release
-# workflow's step skill) need something the tracker does not offer everywhere yet. Until it does, a
+# starting when an item's children are complete, the landed and shipped run endings) need something the tracker does not offer everywhere yet. Until it does, a
 # run must behave exactly as it did in 4.8.1. This test proves it three ways:
 #
 #   1. Recorded answers. scripts/tests/fixtures/workflow-dormant/release-4.8.1.json holds every
@@ -22,9 +21,11 @@
 #   2. Nothing new is ever asked for: no walk answers with a gate, a parked run, a changes request
 #      or a need for facts, and no run is reported with an ending other than completed, failed or
 #      interrupted, even when a step recorded a landing.
-#   3. The Release definitions are still refused at `start` (4.8.1: the step skill was missing; now:
-#      it is not switched on), and nothing is written. So is a definition that holds a gate or a
-#      checkpoint, whoever hands it over (4.8.1: it knew no such step; now: not switched on).
+#   3. A definition that holds a gate or a checkpoint is still refused at `start`, whoever hands it
+#      over (4.8.1: it knew no such step; now: not switched on), and nothing is written.
+#
+# The Release workflow is switched on, so its walk (4.8.1 refused each release definition) is the one
+# recorded walk no longer replayed: RETIRED says so, and workflow-release.sh case (140) starts them.
 #
 # `--record <plugin root>` rewrites the fixture from another copy of the plugin. It was recorded once,
 # from the 4.8.1 release, and is never recorded from a later runner: that would compare this runner
@@ -305,12 +306,6 @@ def walks(root):
     w.said.append({"written": sorted(name for _, _, names in os.walk(w.cache) for name in names)})
     out["a gate and a checkpoint handed to start"] = w.said
 
-    w = Walk(root)
-    for ident in RELEASES:
-        w.call("start", {"definitionFile": os.path.join(root, "workflows", ident + ".json"),
-                         "context": {"item": None, "cwd": w.repo, "release": {}, "scope": "release"}})
-    w.said.append({"written": sorted(name for _, _, names in os.walk(w.cache) for name in names)})
-    out["the release definitions"] = w.said
     return out
 
 
@@ -332,17 +327,22 @@ if RECORD:
 # What this runner's answers hold that 4.8.1's did not, and the only values each may have here.
 # recordedOutcome is the runner's own note of what a step recorded: the agent is shown it, and the
 # tracker is told it only when it lists that ending (checked below: here it never is).
+# agent says only where a run answer's step runs (skills/run-workflow/references/step-agents.md): a
+# driver that does not read it runs every step in its conversation, exactly as 4.8.1's did.
 ADDED = {"recordedOutcome": (None, "landed", "shipped"), "continuedPastFailures": ([],), "openCheckpoints": ([],),
-         "skippedByCondition": ([],), "parkedAt": (None,)}
+         "skippedByCondition": ([],), "parkedAt": (None,), "agent": ("routine", "conversation")}
 # The refusals whose code changed, by walk: the release step skill was missing, and is now not
 # switched on; a gate or a checkpoint was a step 4.8.1 had no contract for, and is now not switched on.
-RENAMED_REFUSALS = {"the release definitions": {"skill-missing": "skill-dormant"},
-                    "a gate and a checkpoint handed to start": {"unknown-contract": "skill-dormant"}}
+RENAMED_REFUSALS = {"a gate and a checkpoint handed to start": {"unknown-contract": "skill-dormant"}}
+# The recorded walks no longer replayed, each with why: the fixture is never edited.
+RETIRED = {"the release definitions": "the Release workflow is switched on: workflow-release.sh case (140) starts each definition"}
 OLD_ACTIONS = ("run", "stopped", "finished")
 OLD_ENDINGS = ("completed", "failed", "interrupted")
 
 try:
     before = json.load(open(FIXTURE, encoding="utf-8"))["walks"]
+    check("each retired walk is one 4.8.1 recorded", sorted(set(RETIRED) - set(before)) == [], sorted(RETIRED))
+    before = dict((name, calls) for name, calls in before.items() if name not in RETIRED)
 except (OSError, ValueError) as error:
     check("the answers recorded from 4.8.1 are readable: never skipped, or this test proves nothing", False, error)
     sys.exit(0)
@@ -381,10 +381,6 @@ check("a step that recorded a landing still ends the run as completed, to a trac
       len(landed) == 1 and landed[0]["answer"]["outcome"] == "completed"
       and [r["run"]["outcome"] for r in landed[0]["answer"]["reports"] if "run" in r] == ["completed"]
       and any(isinstance(v, str) and v.startswith("COMPLETE: ") for v in verdicts), (landed, verdicts[-3:]))
-release = now["the release definitions"]
-check("every release definition is refused at start and nothing is written",
-      [call["exit"] for call in release[:-1]] == [2] * 6 and set(call["refused"] for call in release[:-1]) == {"skill-dormant"}
-      and release[-1] == {"written": []}, release)
 handed = now["a gate and a checkpoint handed to start"]
 check("a gate or a checkpoint handed to start, in the request or as a file, is refused as not switched on, and nothing is written",
       [call["exit"] for call in handed[:-1]] == [2] * 4 and set(call["refused"] for call in handed[:-1]) == {"skill-dormant"}
@@ -394,8 +390,8 @@ check("an organization's workflow that switches the review off, with nothing aft
       off[0]["exit"] == 0 and off[0]["answer"]["definitionSource"] == "organization" and off[-1]["answer"]["action"] == "finished", off[0])
 
 # Which built-in workflows the walks above cover, said exactly: Build (for an item) and the Hotfix
-# (with no item) are replayed against 4.8.1's answers; the Release definitions are refused; Plan
-# and Rebalance are walked by their own suite (workflow-plan.sh), never against 4.8.1's answers.
+# (with no item) are replayed against 4.8.1's answers; the Release definitions, Plan and Rebalance
+# are walked by their own suites (workflow-plan.sh), never against 4.8.1's answers.
 # A built-in workflow in none of the three lists fails the check below, so a new one is placed on purpose.
 REPLAYED = set(call["answer"]["workflow"]["id"] for walk in now.values() for call in walk
                if call.get("command") == "start" and (call.get("answer") or {}).get("definitionSource") == "builtin")
@@ -414,7 +410,7 @@ for name in sorted(os.listdir(os.path.join(ROOT, "workflows"))):
                     or step["onFail"] != "stop" or "answerers" in step):
                 used.append("%s %s" % (name, step["id"]))
 check("no built-in workflow has a gate, a checkpoint, a condition, a step that carries on or a rollup start", used == [], used)
-check("every built-in workflow is replayed against 4.8.1 here (Build, Hotfix), refused here (the Release ones) or walked by its own suite",
+check("every built-in workflow is replayed against 4.8.1 here (Build, Hotfix) or walked by its own suite (the Release ones, Plan, Rebalance)",
       REPLAYED == {"build", "hotfix"} and shipped == REPLAYED | set(RELEASES) | ELSEWHERE,
       (sorted(REPLAYED), sorted(shipped ^ (REPLAYED | set(RELEASES) | ELSEWHERE))))
 hotfix_walk = now["a hotfix run with no item"]
@@ -434,6 +430,6 @@ OUT="$(python3 -B "$WORK/cases.py" "$ROOT" "$WORK" "$RECORD" 2>&1)"; RC=$?
 printf '%s\n' "$OUT" | sed 's/^/  /'
 N="$(printf '%s\n' "$OUT" | grep -c '^ok')"
 if [ $RC -ne 0 ] || printf '%s\n' "$OUT" | grep -q '^FAIL'; then bad "a case failed or the script did not finish (exit $RC)"
-elif [ -z "$RECORD" ] && [ "$N" -lt 60 ]; then bad "only $N cases ran, expected at least 60"
+elif [ -z "$RECORD" ] && [ "$N" -lt 58 ]; then bad "only $N cases ran, expected at least 58"
 else ok "(all $N cases passed)"; fi
 exit $FAIL

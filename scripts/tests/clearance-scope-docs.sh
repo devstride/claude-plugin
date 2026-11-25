@@ -28,7 +28,7 @@ for script in ("post-deploy-status.sh", "previous-release-gate.sh"):
     if script not in scope: problems.append("the section does not name %s" % script)
     if not os.path.isfile(os.path.join(root, "skills/release/scripts", script)): problems.append("%s does not exist" % script)
 for needle in ("post-deploy only", "cut-to-deploy", "merge-and-deploy", "step aside",
-               "no heartbeat before that step 4 claim", "(`merge-and-deploy`: never merge uncleared)"):
+               "no heartbeat before that claim (`clearance.md`)", "(`merge-and-deploy`: never merge uncleared)"):
     if needle not in skill: problems.append("release SKILL.md does not mention %r" % needle)
 # merge-and-deploy: its section exists, every phase it heartbeats is a default phase, and every
 # script it cites exists
@@ -41,7 +41,7 @@ for phase in sorted(set(re.findall(r"`heartbeat ([a-z-]+)", mad))):
 for script in ("release_checks.py", "tower-queue.py", "previous-release-gate.sh"):
     if script not in mad: problems.append("the merge-and-deploy section does not name %s" % script)
     if not os.path.isfile(os.path.join(root, "skills/release/scripts", script)): problems.append("%s does not exist" % script)
-for needle in ("release --step-aside", "rerunAtMerge", "release-holder", "no heartbeat before step 4's claim"):
+for needle in ("release --step-aside", "rerunAtMerge", "release-holder", "no heartbeat before the `go-ahead` phase's `tower-claim`"):
     if needle not in mad: problems.append("the merge-and-deploy section does not mention %r" % needle)
 # the queue (the tower held only for the merge and the deploy): the cut waits at the queue, the
 # release is prepared on top of the one ahead (production brought in, then the checks), it is
@@ -55,15 +55,15 @@ for stale in ("Pre-claim checks", "The queue, before every claim"):
 # cut-to-deploy waits at the claim before it cuts, so what there is to release is read again once
 # it is cleared (the release it waited on may have changed it); the two sections and auto-start.md
 # that describe that read agree
-if "once cleared, re-read step 0's shape before cutting" not in scope:
-    problems.append("the cut-to-deploy section does not say to re-read step 0's shape once cleared, before cutting")
-if "(and re-reads step 0's shape and re-levels the train once cleared)" not in mad:
-    problems.append("the merge-and-deploy section does not describe cut-to-deploy's re-read of step 0's shape")
+if "once cleared, re-read the release's shape before cutting" not in scope:
+    problems.append("the cut-to-deploy section does not say to re-read the release's shape once cleared, before cutting")
+if "(and re-reads the release's shape and re-levels the train once cleared)" not in mad:
+    problems.append("the merge-and-deploy section does not describe cut-to-deploy's re-read of the release's shape")
 branch = re.sub(r"\s+", " ", open(os.path.join(root, "skills/release/references/release-branch.md")).read())
 if "owed item `sync`" not in branch: problems.append("release-branch.md §5 does not name the owed item `sync` under merge-and-deploy")
 auto = re.sub(r"\s+", " ", open(os.path.join(root, "skills/release/references/auto-start.md")).read())
-if "once step 1 has opened the release pull request" not in auto: problems.append("auto-start.md does not say where merge-and-deploy hands the train claim on")
-if "once cleared, re-reads step 0's shape before cutting" not in auto: problems.append("auto-start.md does not describe cut-to-deploy's re-read of step 0's shape")
+if "once `open-release-pr` has opened the release pull request" not in auto: problems.append("auto-start.md does not say where merge-and-deploy hands the train claim on")
+if "once cleared, re-reads the release's shape before cutting" not in auto: problems.append("auto-start.md does not describe cut-to-deploy's re-read of the release's shape")
 print("\n".join(problems) or "OK")
 PY
 OUT="$(python3 "$W/check.py" "$ROOT")"

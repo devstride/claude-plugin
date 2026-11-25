@@ -1,5 +1,5 @@
 {
-  "about": "A hotfix landed after the yes, so the head is not the reviewed head: merge-confirmations answers NOT CONFIRMED and the run stops; resumed, the confirmations are issued again (never the merge), answer NOT CONFIRMED again and the run stops again.",
+  "about": "A review thread was left unresolved after the yes: merge-confirmations answers NOT CONFIRMED and the run stops; resumed, the confirmations are issued again (never the merge), answer NOT CONFIRMED again and the run stops again. (A moved head is HEAD MOVED instead: merge-head-moved.)",
   "definition": "workflows/release.json",
   "phases": ["review", "go-ahead"],
   "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
@@ -15,8 +15,8 @@
     {"step": "go-ahead", "output": "GO-AHEAD: NOT YET\nevidence line\n```json\n{\"state\": \"not-yet\"}\n```\n"},
     {"step": "go-ahead", "output": "GO-AHEAD: YES (owner)\nevidence line\n```json\n{\"state\": \"yes-owner\", \"answer\": \"yes, merge it\"}\n```\n"},
     {"step": "dev-deploy-after-yes", "output": "DEV DEPLOY: SERVING\nevidence line\n```json\n{\"state\": \"serving\"}\n```\n"},
-    {"step": "merge-confirmations", "output": "MERGE CONFIRMED: NOT CONFIRMED head 000000000000000000000000000000000000003d\nevidence line\n```json\n{\"state\": \"not-confirmed\"}\n```\n"},
-    {"step": "merge-confirmations", "output": "MERGE CONFIRMED: NOT CONFIRMED head 000000000000000000000000000000000000003d\nevidence line\n```json\n{\"state\": \"not-confirmed\"}\n```\n"}
+    {"step": "merge-confirmations", "output": "MERGE CONFIRMED: NOT CONFIRMED threads 1 unresolved\nevidence line\n```json\n{\"state\": \"not-confirmed\"}\n```\n"},
+    {"step": "merge-confirmations", "output": "MERGE CONFIRMED: NOT CONFIRMED threads 1 unresolved\nevidence line\n```json\n{\"state\": \"not-confirmed\"}\n```\n"}
   ],
   "answers": ["yes, merge it", "carry on"],
   "expect": {
@@ -37,6 +37,6 @@
     ],
     "outcome": "stopped",
     "stops": ["go-ahead", "merge-confirmations", "merge-confirmations"],
-    "stopReasons": ["", "NOT CONFIRMED head", "NOT CONFIRMED head"]
+    "stopReasons": ["", "NOT CONFIRMED threads", "NOT CONFIRMED threads"]
   }
 }

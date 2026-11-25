@@ -336,6 +336,12 @@ check("an approval is recorded done and reported by no one but the tracker",
 while run.answer["action"] == "run":
     run.done()
 check("the approved run finishes", run.answer["action"] == "finished" and run.answer["outcome"] == "completed", run.answer)
+_, said, _, _ = run.call("reported", {"item": "I123", "ok": False})
+_, unsent, _, err = run.call("unsent", {"cwd": run.repo})
+replayed = [r for runs in (unsent or {}).get("runs", []) for call in runs["reports"] for r in call.get("reports", [])]
+check("a replay of its unsent reports never says the approval was done: the tracker writes a gate's end, never an agent",
+      bool(replayed) and [r for r in replayed if r.get("stepId") == "approve" and r.get("status") in ("done", "failed")] == []
+      and (unsent["runs"][0]["reports"][-1].get("run") or {}).get("outcome") == "completed", (said, unsent, err))
 
 # --- rejected, unavailable, a request with no gate --------------------------------------------
 rejected = Driver()

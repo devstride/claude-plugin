@@ -7,7 +7,7 @@ load: contract
 final gate asks again in its own step,
 `${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/owner-go-ahead-recheck.md`. What the recap
 carries is
-`${CLAUDE_PLUGIN_ROOT}/skills/release/references/merge-and-deploy.md` "Step 4 — the human recap";
+`${CLAUDE_PLUGIN_ROOT}/skills/release/references/merge-and-deploy.md` "`go-ahead` — the human recap";
 the standing yes and the unattended stop are
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`. Both cited, not copied. This is
 answered in the session; it is never an approval gate somewhere else.
@@ -18,7 +18,14 @@ answered in the session; it is never an approval gate somewhere else.
    `needsYou.label`.
 2. **Shape** (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/resume-rules.md`): `MERGED`
    → `YES (already merged)`, naming the pull request. Nothing is asked and nothing is merged: the
-   merge already happened on a yes given then.
+   merge already happened on a yes given then. On a release branch (none without
+   `release.releaseBranchPattern`), a production branch (fetched) no longer an ancestor of its
+   head → `HOTFIX LANDED <pr>` (the hotfix pull request), whatever the `answer`: the runner goes
+   back to the catch-up, a yes given on the old recap is void, and this step asks again. Read the
+   ancestry from a status printed either way, safe under `set -e` (`if git merge-base
+   --is-ancestor origin/<productionBranch> <head>; then echo ancestor=yes; else echo
+   "ancestor=no exit=$?"; fi`: exit `1` is a hotfix landed; any other is a git error, `NOT YET`
+   naming it, never a yes), never from output that prints only on success.
 3. **Heartbeat.** Send the tower `heartbeat final` as the recap is shown, only when this session
    holds the tower (`resume-rules.md` "Heartbeats"). After a wait for a person, heartbeat the
    train claim before anything else.
@@ -27,8 +34,11 @@ answered in the session; it is never an approval gate somewhere else.
    the pre-merge verdict, the previous-release gate's exit, the dev deploy wait's exit, the
    documentation plan, and `<reviewedHead>` from the payload's `releaseReview`. Under scope
    `merge-and-deploy` the pre-ship result and the dev deploy wait's exit are the checks phase's
-   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`). A line that cannot
-   be read is never guessed: the standing yes is not tried, and the recap says what is missing.
+   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/auto-start.md`). Under scope `release` (no
+   clearance block, or the default) the definition has no previous-release step and the gate's
+   exit is `0`: `previous-release-gate.sh` answers `NOT GATED` there. A line a step of this
+   definition should have produced and that cannot be read is never guessed: the standing yes
+   is not tried, and the recap says what is missing.
 5. **Show the recap.** Lead with `READY` or `BLOCKED`, then everything `merge-and-deploy.md`
    lists: each change in plain English, the class, the pre-merge verdict, each pre-ship entry as
    passed at the train, at the checks, skipped by path or waived (never "covered by CI"), the
@@ -59,11 +69,11 @@ answered in the session; it is never an approval gate somewhere else.
 
 ## Verdict
 
-`GO-AHEAD: YES <source> | NOT YET | NO`
+`GO-AHEAD: YES <source> | HOTFIX LANDED <pr> | NOT YET | NO`
 
 ## Result
 
-`state`: `yes-owner`, `yes-standing`, `already-merged`, `not-yet` or `no`; `answer`: the owner's
+`state`: `yes-owner`, `yes-standing`, `already-merged`, `hotfix-landed`, `not-yet` or `no`; `answer`: the owner's
 own words when they gave any, otherwise left out.
 
 ## Cited by

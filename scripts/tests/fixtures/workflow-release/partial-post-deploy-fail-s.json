@@ -1,0 +1,63 @@
+{
+  "about": "The post-deploy-only entry under the default scope with a failed health check: no status is posted there, so the result step answers NOT POSTED FAIL and the run stops for the owner's rollback decision instead of finishing complete.",
+  "definition": "workflows/release-post-deploy.json",
+  "context": {
+    "item": null,
+    "productionBranch": "main",
+    "releaseSource": "develop",
+    "scope": "release",
+    "startedBy": "person",
+    "releaseNotes": "false",
+    "noDocs": false,
+    "profile": {
+      "name": "extended",
+      "source": "config"
+    }
+  },
+  "script": [
+    {
+      "step": "merged-release",
+      "output": "MERGED RELEASE: FOUND 42\nevidence line\n```json\n{\"sha\": \"0000000000000000000000000000000000000017\", \"pullRequest\": 42}\n```\n"
+    },
+    {
+      "step": "confirm-deploy",
+      "output": "DEPLOY: CONFIRMED 0000000000000000000000000000000000000017\nevidence line\n```json\n{\"mergeCommit\": \"0000000000000000000000000000000000000017\", \"confirmedAt\": \"2026-11-21T19:00:00Z\"}\n```\n"
+    },
+    {
+      "step": "post-deploy-check",
+      "output": "POST-DEPLOY HEALTH: FAIL\nevidence line\n```json\n{\"state\": \"fail\"}\n```\n"
+    },
+    {
+      "step": "post-deploy-status",
+      "output": "POST-DEPLOY STATUS: NOT POSTED FAIL\nevidence line\n```json\n{\"state\": \"not-posted\"}\n```\n"
+    }
+  ],
+  "answers": [],
+  "expect": {
+    "order": [
+      [
+        "merged-release",
+        1
+      ],
+      [
+        "confirm-deploy",
+        1
+      ],
+      [
+        "post-deploy-check",
+        1
+      ],
+      [
+        "post-deploy-status",
+        1
+      ]
+    ],
+    "outcome": "stopped",
+    "stops": [
+      "post-deploy-status"
+    ],
+    "stopReasons": [
+      "NOT POSTED FAIL"
+    ]
+  }
+}

@@ -29,7 +29,7 @@ release deserves one.
 5. **Run it**: the Skill tool, `write-release-notes`, with the mode and that payload as a fenced
    JSON block. Its first line is the verdict:
    - `PUBLISHED` or `DRAFTED` → translate it, the location and whether it is live or awaiting the
-     owner exact; then the provider's `owed --done release-notes`.
+     owner exact; then the provider's `owed --done release-notes --pr <n>`.
    - `NOT CONFIGURED` (`docs.releaseNotesSkill` unset or not resolving) → `NOT CONFIGURED`: say
      the request cannot be met, with the fix (`/devstride:setup docs`). Nothing is improvised, and
      the run stops.

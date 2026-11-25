@@ -10,7 +10,10 @@ NON-final), cited, not copied; the release call is
 and the key `auto-start.py key` prints.
 
 1. **Config wins.** Load `.claude/ds-config.json`. No `claims` block → `NOT APPLICABLE`. The
-   payload's `shape` is `MERGED` → `NOT APPLICABLE`.
+   payload's `shape` is `MERGED`, or its `tower` has `adopted: true` and the adopted pull request
+   (the provider's local record's `pr`,
+   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md` "The local record") has merged,
+   whatever `shape` said (`resume-rules.md` "What the payload carries") → `NOT APPLICABLE`.
 2. **Where it runs.** Scopes `release` and `cut-to-deploy`: right after the cut, while this run
    holds the tower. Scope `merge-and-deploy`, which holds no tower until the final gate: after the
    release pull request is open and the train is level again, since that open pull request is what

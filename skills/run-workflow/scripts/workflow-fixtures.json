@@ -6173,6 +6173,13 @@
   },
   {
    "contract": "pre-ship-at-checks@1",
+   "output": "PRE-SHIP: HEAD MOVED some detail\n",
+   "class": "rewind:release-tip@1",
+   "value": "HEAD MOVED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "pre-ship-at-checks@1",
    "output": "PRE-SHIP: PASS\n",
    "class": "continue",
    "value": "PASS",
@@ -6299,6 +6306,13 @@
   },
   {
    "contract": "pre-ship-release@1",
+   "output": "PRE-SHIP: HEAD MOVED some detail\n",
+   "class": "rewind:release-review@1",
+   "value": "HEAD MOVED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "pre-ship-release@1",
    "output": "PRE-SHIP: PASS\n",
    "class": "continue",
    "value": "PASS",
@@ -6313,9 +6327,23 @@
   },
   {
    "contract": "pre-ship-release@1",
+   "output": "PRE-SHIP: NOTHING TO RUN\n",
+   "class": "continue",
+   "value": "NOTHING TO RUN",
+   "detail": ""
+  },
+  {
+   "contract": "pre-ship-release@1",
    "output": "PRE-SHIP: NOT APPLICABLE\n",
    "class": "continue",
    "value": "NOT APPLICABLE",
+   "detail": ""
+  },
+  {
+   "contract": "pre-ship-resume@1",
+   "output": "PRE-SHIP HOLD: PRODUCTION MOVED\n",
+   "class": "skipped",
+   "value": "PRODUCTION MOVED",
    "detail": ""
   },
   {
@@ -6495,6 +6523,13 @@
   },
   {
    "contract": "owner-go-ahead@1",
+   "output": "GO-AHEAD: HOTFIX LANDED some detail\n",
+   "class": "rewind:hotfix-catch-up@1",
+   "value": "HOTFIX LANDED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "owner-go-ahead@1",
    "output": "GO-AHEAD: NOT YET\n",
    "class": "ask",
    "value": "NOT YET",
@@ -6538,14 +6573,14 @@
   {
    "contract": "release-stamp-verify@1",
    "output": "CHECKS STAMP: CHANGED\n",
-   "class": "stop",
+   "class": "rewind:hotfix-catch-up@1",
    "value": "CHANGED",
    "detail": ""
   },
   {
    "contract": "release-stamp-verify@1",
    "output": "CHECKS STAMP: BEHIND\n",
-   "class": "stop",
+   "class": "rewind:hotfix-catch-up@1",
    "value": "BEHIND",
    "detail": ""
   },
@@ -6599,10 +6634,24 @@
    "detail": "some detail"
   },
   {
+   "contract": "merge-confirmations@1",
+   "output": "MERGE CONFIRMED: HEAD MOVED some detail\n",
+   "class": "rewind:release-review@1",
+   "value": "HEAD MOVED",
+   "detail": "some detail"
+  },
+  {
    "contract": "production-merge@1",
    "output": "PRODUCTION MERGE: MERGED some detail\n",
    "class": "continue",
    "value": "MERGED",
+   "detail": "some detail"
+  },
+  {
+   "contract": "production-merge@1",
+   "output": "PRODUCTION MERGE: HOTFIX LANDED some detail\n",
+   "class": "rewind:hotfix-catch-up@1",
+   "value": "HOTFIX LANDED",
    "detail": "some detail"
   },
   {
@@ -6733,6 +6782,13 @@
   },
   {
    "contract": "post-deploy-result@1",
+   "output": "POST-DEPLOY STATUS: RECHECK\n",
+   "class": "rewind:post-deploy-check-owed@1",
+   "value": "RECHECK",
+   "detail": ""
+  },
+  {
+   "contract": "post-deploy-result@1",
    "output": "POST-DEPLOY STATUS: SUCCESS POSTED\n",
    "class": "continue",
    "value": "SUCCESS POSTED",
@@ -6765,6 +6821,13 @@
    "class": "skipped",
    "value": "NOT APPLICABLE",
    "detail": ""
+  },
+  {
+   "contract": "post-deploy-result@1",
+   "output": "POST-DEPLOY STATUS: NOT POSTED some detail\n",
+   "class": "stop",
+   "value": "NOT POSTED",
+   "detail": "some detail"
   },
   {
    "contract": "release-sync@1",

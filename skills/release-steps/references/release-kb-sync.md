@@ -26,11 +26,11 @@ the documentation it mirrors.
 3. **Run it**: the Skill tool, `sync-knowledge-base sync`, with `{"docsOutcome": "published",
    "live": true}`. Its first line is the verdict: `DONE`, `CURRENT` or `FAILED`; a hook that does
    not resolve → `NOT CONFIGURED`; anything else or nothing → `FAILED`.
-4. **Settle.** `DONE` or `CURRENT` → the provider's `owed --done knowledge-base`. `FAILED` → it
+4. **Settle.** `DONE` or `CURRENT` → the provider's `owed --done knowledge-base --pr <n>`. `FAILED` → it
    stays owed; never undo or revert the documentation push. Add the line `re-run:
    /devstride:sync-knowledge-base sync {"docsOutcome": "published", "live": true}` and, with a
    provider that records owed work, `then, on DONE or CURRENT: <the provider's owed command>
-   --done knowledge-base`. The run continues.
+   --done knowledge-base --pr <n>`. The run continues.
 
 ## Verdict
 

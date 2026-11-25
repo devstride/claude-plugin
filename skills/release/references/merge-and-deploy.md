@@ -1,22 +1,22 @@
 ---
 load: contract
 ---
-# The go-ahead, the production merge and the deploy (steps 4 and 5a)
+# The go-ahead, the production merge and the deploy (the `go-ahead` and `deploy` phases)
 
-The `release` body keeps the order of steps 4 and 5a, their verdict lines and the hard floors; this
-file holds what the recap carries, what is confirmed on the yes, and how the merge and the deploy
-are confirmed. Read it in full before step 4, or before 5a when step 4 did not run.
+The Release definitions keep the order of these steps; this file holds what the recap carries,
+what is confirmed on the yes, and how the merge and the deploy are confirmed. Read it in full
+before `go-ahead`, or before `approve-deploy` when `go-ahead` did not run.
 
-## Step 4 — the human recap
+## `go-ahead` — the human recap
 
 Lead with `READY` or `BLOCKED`, then every included change in plain English, where it deploys, and
 what "yes" versus "no" does. Then:
 
-- the PR (green + settled), the review tally, the delta and 2b's release class;
+- the PR (green + settled), the review tally, the delta and `classify-at-pre-ship`'s release class;
 - the pre-merge verdict;
-- **each 2b result (or its waiver)** — each pre-ship entry reported as passed at the train on
-  <sha>, at 2b, skipped by path, or waived, never "covered by CI";
-- the documentation plan (the steps 5c will call / "none registered" / "suppressed");
+- **each `pre-ship-release` result (or its waiver)** — each pre-ship entry reported as passed at the
+  train on <sha>, at `pre-ship-release`, skipped by path, or waived, never "covered by CI";
+- the documentation plan (the hooks `update-docs` will call / "none registered" / "suppressed");
 - the release-notes decision (default: none written);
 - the consequence notices
   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/consequence-notices.md`);
@@ -27,13 +27,13 @@ what "yes" versus "no" does. Then:
 - with `release.clearance` set, the provider's `status`
   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`, "Where the release skill calls
   it"); under scope `merge-and-deploy` also the check stamp (the tree, the production tip and when
-  0p's checks ran), the release it was prepared on top of (the production tip in the stamp) and
+  the `checks` phase ran), the release it was prepared on top of (the production tip in the stamp) and
   whether it waits outside the tower;
 - with `release.devDeployVerification` set and a delta touching a fix-exclusion path, the dev
   deploy wait (run after the yes — a standing yes: before it — and before the checks below, per
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`).
 
-## Step 4 — on the yes
+## `go-ahead` — on the yes
 
 In this order, after the yes and before the merge:
 
@@ -43,25 +43,25 @@ In this order, after the yes and before the merge:
    (`--branch --pr`; BUSY while the release ahead still merges or deploys), then `heartbeat
    final`, the previous-release gate once more (one read; pending steps aside again, a failure
    STOPs, and no yes lifts either), the stamp verify (`CHANGED` or `BEHIND`: rebuilt on what is
-   now ahead, back to step 2), the pre-merge check, every `rerunAtMerge` entry and the standing
-   yes again, in that order (§ Scope `merge-and-deploy`); 0p already ran the dev deploy wait.
+   now ahead, back to `release-review`), the pre-merge check, every `rerunAtMerge` entry and the standing
+   yes again, in that order (§ Scope `merge-and-deploy`); the `checks` phase already ran the dev deploy wait.
 2. **The dev deploy wait**, when it applies (a standing yes ran it before the decision instead).
 
 Then confirm:
 
 1. The head equals `<reviewedHead>` (the only tolerated advance is `review` 7.3's same-tree empty
-   re-trigger commit; anything else → back to step 2).
+   re-trigger commit; anything else → back to `release-review`).
 2. The PR is non-draft (a draft-hold PR still draft never ran CI) and green at that head (the
    merge gate proves both).
-3. Every 2b check passed or was waived.
+3. Every `pre-ship-release` check passed or was waived.
 4. The paginated **zero-unresolved-threads** check still reads zero (a late comment is replied-to
    AND resolved via `review` step 6 first, never merged over).
 5. With `release.clearance` set, this pull request is the one `On final` in the provider's
    `status`, else STOP.
 
-Then run the `MERGE` line of `merge-gate.py <n> <reviewedHead> --all-green` (step 4); else STOP.
+Then `production-merge` runs the `MERGE` line of `merge-gate.py <n> <reviewedHead> --all-green`; else STOP.
 
-## Step 5a — the merge and the deploy
+## `production-merge` to `confirm-deploy` — the merge and the deploy
 
 - **Merge**: the PR reads `MERGED`; the merge commit and timestamp go into the payload; `live`
   stays `false` until the deploy is confirmed, then `true`. Scope `merge-and-deploy`: post the
@@ -72,15 +72,16 @@ Then run the `MERGE` line of `merge-gate.py <n> <reviewedHead> --all-green` (ste
   retry (bounded), else STOP; never send the owner to approve.
 - **Deploy**: `release.deployVerification` set → run it with `RELEASE_COMMIT=<merge sha>`; exit 0
   confirms; non-zero → retry on an interval suited to the deploy; still failing → report it
-  unconfirmed and STOP (no 5c–5e). Unset → ask the owner to confirm (a legitimate pause). Nothing
-  in 5c–5e would run and no `release.postDeployCheckSkill` → skip the confirmation, said so.
-- **Score the estimates**: deploy confirmed, or its confirmation skipped → score every quote the
+  unconfirmed and STOP (no `update-docs` to `write-release-notes`). Unset → ask the owner to confirm
+  (a legitimate pause). Nothing from `update-docs` to `write-release-notes` would run and no `release.postDeployCheckSkill` → skip the confirmation, said so.
+- **Score the estimates** (`score-estimates`): deploy confirmed, or its confirmation skipped → score every quote the
   shipped items carry and post each score
   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/estimates.md`, Scoring at the release); it never
   blocks or delays the release.
 
 ## Cited by
 
-- `skills/release/SKILL.md` — step 4's pointer ("Read … in full before step 4"), and step 5a's
-  ("read it first when step 4 did not run this session").
+- `skills/release-steps/references/owner-go-ahead.md`, `merge-confirmations.md`,
+  `production-merge.md`, `dev-deploy-wait.md` and `release-recap.md`;
+  `skills/hotfix-steps/references/deploy-approval.md`.
 - `skills/release/references/estimates.md` — the score after the production merge.

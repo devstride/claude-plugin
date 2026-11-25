@@ -49,7 +49,7 @@ script and then the claim calls below. A run that does not START does nothing mo
 - **Nothing is releasing it**, checked BEFORE anything is claimed: no open pull request into
   `release.productionBranch` headed by the release source or a `release.releaseBranchPattern`
   branch (`gh pr list --repo <host>/<owner>/<repo>`, all three read from origin, always, with or
-  without clearance; a release waiting at step 4 for the owner's yes may have let its train claim
+  without clearance; a release waiting at `go-ahead` for the owner's yes may have let its train claim
   lapse, and the backstop never adopts it); and, with `release.clearance` set, its provider's
   `status --json` reads `clear`, `derived`, with no release pull request on final. Held (stale
   included: the owner settles a stale release), unreadable, a failed or truncated list, an origin
@@ -94,7 +94,7 @@ progress.
   run `due --json --recheck <key>` (with `--holds` again, re-read): anything but `START` → release
   the train claim (outcome `released`, never final) and the backstop key (outcome `changed`, not
   final), and stop. `START` → run **`release`** in this session declaring `started-by: auto`
-  (inside `release backstop`: carry on as that release run; `auto-start.md`'s path: its step 0
+  (inside `release backstop`: carry on as that release run; `auto-start.md`'s path: its `train-claim` step
   refreshes the train claim; the unattended stop and the standing yes apply).
 - **Shadow, won:** the same steps, reading instead of claiming: `get_claim` the train key; live →
   `release_claim` the backstop key with outcome `busy`, not final, the record (with `trainClaim:

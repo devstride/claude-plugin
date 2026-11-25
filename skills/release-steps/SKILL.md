@@ -7,9 +7,6 @@ description: "Step: one step of a Release workflow, chosen by the payload's cont
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
-**Not switched on yet.** Do a step only when the step runner issued it in a rehearsal. Asked for
-alone by name → no verdict line: say releases are made with `/devstride:release`, and stop.
-
 Arguments: $ARGUMENTS — one JSON object, the step's payload
 (`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`). Its reserved `contract` key names the
 step; the **mode** is the contract name without `@1` (never the step id).
@@ -43,6 +40,11 @@ The mode's own `## Verdict`, equal to the catalog's grammar: that line first, th
    `${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/resume-rules.md` once per run: what the
    payload's `shape` and `tower` mean, which modes answer `NOT APPLICABLE` for an adopted or
    merged release, and when a step heartbeats the tower and the train claim.
+3. **"The runner's `status`"**, wherever a reference reads this run's earlier answers, is
+   `status` with `evidence` `true` and `runId` the run that issued this step (the `runId` of its
+   `run` answer; two release runs may be open at once): each row then carries its step's evidence
+   lines and result, never only the verdict
+   (`${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md`).
 
 **Floors.** Never proceed uncleared; a hotfix never claims; a yes is read only from the
 payload's `answer`; never force-push or `--delete-branch` a protected branch.

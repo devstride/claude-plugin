@@ -1,0 +1,120 @@
+{
+  "about": "A pre-ship check fails and a fix is pushed to the release branch: the resume hands \"moved <sha>\" to the pre-ship step, which answers HEAD MOVED, and the run goes back through the review of the new head before the checks run there. Before, every retry tested the old head again.",
+  "definition": "workflows/release.json",
+  "phases": [
+    "review"
+  ],
+  "context": {
+    "item": null,
+    "productionBranch": "main",
+    "releaseSource": "develop",
+    "scope": "release",
+    "startedBy": "person",
+    "releaseNotes": "false",
+    "noDocs": false,
+    "profile": {
+      "name": "extended",
+      "source": "config"
+    }
+  },
+  "script": [
+    {
+      "step": "release-review",
+      "output": "RELEASE REVIEW: SETTLED 00000000000000000000000000000000000000f6\nevidence line\n```json\n{\"state\": \"settled\", \"reviewedHead\": \"00000000000000000000000000000000000000f6\"}\n```\n"
+    },
+    {
+      "step": "classify-at-pre-ship",
+      "output": "RELEASE CLASS: LIGHT\nevidence line\n```json\n{\"state\": \"light\"}\n```\n"
+    },
+    {
+      "step": "pre-ship-release",
+      "output": "PRE-SHIP: FAIL integration\nevidence line\n```json\n{\"state\": \"fail\"}\n```\n"
+    },
+    {
+      "step": "pre-ship-release",
+      "output": "PRE-SHIP: HEAD MOVED 00000000000000000000000000000000000000f8\nevidence line\n```json\n{\"state\": \"head-moved\"}\n```\n"
+    },
+    {
+      "step": "release-review",
+      "output": "RELEASE REVIEW: SETTLED 00000000000000000000000000000000000000f8\nevidence line\n```json\n{\"state\": \"settled\", \"reviewedHead\": \"00000000000000000000000000000000000000f8\"}\n```\n"
+    },
+    {
+      "step": "classify-at-pre-ship",
+      "output": "RELEASE CLASS: LIGHT\nevidence line\n```json\n{\"state\": \"light\"}\n```\n"
+    },
+    {
+      "step": "pre-ship-release",
+      "output": "PRE-SHIP: PASS (1 ran, 0 waived)\nevidence line\n```json\n{\"state\": \"pass\"}\n```\n"
+    },
+    {
+      "step": "discharge-hold",
+      "output": "PRE-SHIP HOLD: NO HOLD\nevidence line\n```json\n{\"state\": \"no-hold\"}\n```\n"
+    },
+    {
+      "step": "docs-plan",
+      "output": "DOCS PLAN: HOOKS 2\nevidence line\n```json\n{\"state\": \"hooks\"}\n```\n"
+    }
+  ],
+  "answers": [
+    "moved 00000000000000000000000000000000000000f8"
+  ],
+  "expect": {
+    "order": [
+      [
+        "release-review",
+        1
+      ],
+      [
+        "classify-at-pre-ship",
+        1
+      ],
+      [
+        "pre-ship-release",
+        1
+      ],
+      [
+        "pre-ship-release",
+        2
+      ],
+      [
+        "release-review",
+        2
+      ],
+      [
+        "classify-at-pre-ship",
+        2
+      ],
+      [
+        "pre-ship-release",
+        3
+      ],
+      [
+        "discharge-hold",
+        1
+      ],
+      [
+        "docs-plan",
+        1
+      ]
+    ],
+    "outcome": "completed",
+    "stops": [
+      "pre-ship-release"
+    ],
+    "stopReasons": [
+      "FAIL integration"
+    ],
+    "handed": {
+      "pre-ship-release#2": {
+        "payload": {
+          "answer": "moved 00000000000000000000000000000000000000f8"
+        }
+      },
+      "pre-ship-release#3": {
+        "payload": {
+          "head": "00000000000000000000000000000000000000f8"
+        }
+      }
+    }
+  }
+}

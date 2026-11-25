@@ -1,5 +1,5 @@
 {
-  "about": "The merge gate refuses the merge (a hotfix landed): the run stops at the production merge and no deploy step is issued.",
+  "about": "The merge gate refuses the merge (the head moved): the run stops at the production merge and no deploy step is issued.",
   "definition": "workflows/release.json",
   "phases": ["review", "go-ahead", "deploy"],
   "context": {"item": null, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person", "releaseNotes": "false", "noDocs": false, "profile": {"name": "extended", "source": "config"}},
@@ -16,7 +16,7 @@
     {"step": "go-ahead", "output": "GO-AHEAD: YES (owner)\nevidence line\n```json\n{\"state\": \"yes-owner\", \"answer\": \"yes, merge it\"}\n```\n"},
     {"step": "dev-deploy-after-yes", "output": "DEV DEPLOY: SERVING\nevidence line\n```json\n{\"state\": \"serving\"}\n```\n"},
     {"step": "merge-confirmations", "output": "MERGE CONFIRMED: HEAD 00000000000000000000000000000000000000f6\nevidence line\n```json\n{\"state\": \"confirmed\"}\n```\n"},
-    {"step": "production-merge", "output": "PRODUCTION MERGE: REFUSED hotfix landed\nevidence line\n```json\n{\"sha\": \"\", \"pullRequest\": 42}\n```\n"}
+    {"step": "production-merge", "output": "PRODUCTION MERGE: REFUSED head moved\nevidence line\n```json\n{\"sha\": \"\", \"pullRequest\": 42}\n```\n"}
   ],
   "answers": ["yes, merge it"],
   "expect": {
@@ -37,6 +37,6 @@
     ],
     "outcome": "stopped",
     "stops": ["go-ahead", "production-merge"],
-    "stopReasons": ["", "REFUSED hotfix landed"]
+    "stopReasons": ["", "REFUSED head moved"]
   }
 }

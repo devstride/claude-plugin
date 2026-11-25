@@ -80,7 +80,7 @@ A sub-skill returns the fork to its top-level caller, which writes the entry.
 - The item is skipped exactly as a gated item is (`build-item` step 0's GATING CHECK) while an
   entry on it is open. Work done stays committed and pushed on its branch.
 - Nothing else to do → end cleanly, naming every entry queued.
-- **`release` step 4's unattended stop is always a NOTICE and changes nothing else there**: the one
+- **The release's `go-ahead` unattended stop is always a NOTICE and changes nothing else there**: the one
   notification, the wait and the held clearance are `auto-start.md`'s.
 
 ## Pick-up — the top-level run only, never a sub-skill
@@ -90,7 +90,7 @@ THIS skill.
 
 - `build-item`, plan mode: once the plan root resolves, the items under it.
 - `build-item`, a given item or a one-off (no root needed): before its run starts, that item itself.
-- `release`: step 0, only to close stale notices.
+- `release`: its `ground-truth` step, only to close stale notices.
 - `build-item` also reads `needsYou.fallbackItem`, for its own entries, only ever to close a
   stale NOTICE (the root now resolves), never to act.
 
@@ -156,6 +156,7 @@ tag named <label>, so nothing can be queued" (fix: create it, or correct `needsY
 - `build-item` SKILL.md step 0 (pick-up for a root or a given item; every pause of an unattended run)
 - `ultracode-build` SKILL.md contract (the stop-and-ask floor)
 - `review` SKILL.md step 4 (the ambiguous / risky / unverifiable bucket)
-- `release` SKILL.md step 0 (closing stale notices; step 4's unattended stop, a notice) and
-  `release/references/auto-start.md` "Unattended stop"
+- `release` SKILL.md "B. Stops" (an unattended run's stop); its steps `ground-truth` (closing stale
+  notices) and `go-ahead` (the unattended stop, a notice), and `release/references/auto-start.md`
+  "Unattended stop"
 - `doctor` SKILL.md §4 (the settings report)

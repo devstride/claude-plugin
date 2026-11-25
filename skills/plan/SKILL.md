@@ -81,11 +81,11 @@ full before the first command, and again after a compaction.**
 2. **`resume`** with the item (a cleared or crashed session's run is picked up); refused `no-run`
    → **`start`** with `definitionFile` `${CLAUDE_PLUGIN_ROOT}/workflows/plan.json` and the context
    `{ "item": <parent> }`. Any other refusal (exit 2) → say its line and stop.
-3. **For each `run` answer**: invoke the named skill through the Skill tool with `argument`
-   unchanged (plus ` answer: <it>` when the payload carries the person's `answer` and the argument
-   does not); the steps read this command's arguments (the description, the profile word, `start`,
-   `item-days`, `--ticket`) from the conversation. Then `done` with `stepId`, `attempt` and the
-   skill's WHOLE answer as `output`. Its answer is the next action.
+3. **For each `run` answer**: run it where its `agent` says, as
+   `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/step-agents.md` says (read it in full
+   first): a step agent, or here the named skill with `argument` unchanged, then `done`. The steps
+   read this command's arguments (the description, the profile word, `start`, `item-days`,
+   `--ticket`): a step agent's `arguments` line.
 4. **Reports.** Forward every `reports` object in order as
    `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` says (on by default,
    checked once per run); a failed forward is one line, never a stop.

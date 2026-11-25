@@ -13,13 +13,13 @@ before waiving a check.
 wall-clock — the config's `_preShipChecks_readme` records each repo's reason). Nothing in CI
 covers them, so an absent CI check for one is EXPECTED and CORRECT, never pending. Local gating
 did not lower the bar; it MOVED it: a regression in one of these suites reaches production
-unnoticed unless the release runs them — which is why step 2b is mandatory rather than
-advisory (a `runAt: train` entry may instead have passed at the train, step 4b, on the same
-snapshot; with no such evidence 2b runs it), why entries run unconditionally at the release boundary (path arguments are exactly
+unnoticed unless the release runs them — which is why `pre-ship-release` is mandatory rather than
+advisory (a `runAt: train` entry may instead have passed at the train, `train-pre-ship`, on the same
+snapshot; with no such evidence `pre-ship-release` runs it), why entries run unconditionally at the release boundary (path arguments are exactly
 what the rule overrides), and why "covered by CI" is the one false assurance never to give an
 owner. If a cloud job is ever restored for such a suite, its `verify.skipDuringStoryBuilds`
 entry and workflow job are added together and the `preShipChecks` entry dropped — otherwise it
-runs twice. Step 2 declares the pre-ship hold because the order matters too: flipping the pull
+runs twice. `release-review` declares the pre-ship hold because the order matters too: flipping the pull
 request ready first would let a pre-ship fix reach production past no reviewer.
 
 Scope `merge-and-deploy` runs these checks outside the tower, at the release branch head once it
@@ -43,7 +43,7 @@ release branch two advances are expected and each is re-reviewed before it count
 fix commits and a hotfix merge of the production branch. The one tolerated advance is `review` 7.3's single empty
 re-trigger commit: its tree equals the settled tree, so the review still describes the merged
 code. Anything else means the reviewed diff is stale and CI re-ran on a diff nobody reviewed —
-back through step 2, never merged over.
+back through `release-review`, never merged over.
 
 ## Why there is no freeze
 
@@ -66,6 +66,6 @@ review scope turns out to be.
 
 ## Cited by
 
-- `skills/release/SKILL.md` — step 2's pointer ("Read … when a pre-ship check is red, when the
-  head advanced by anything other than this run's fix commits or a hotfix merge, or before waiving
-  a check"); `skills/release/references/release-pr.md` — step 2's scope and suites.
+- `skills/release-steps/references/release-review.md` — its pointer (why the head may advance
+  only by this run's fix commits or a hotfix merge); `skills/release/references/release-pr.md` —
+  `release-review`'s scope and suites.

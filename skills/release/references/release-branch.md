@@ -10,7 +10,7 @@ release train's one-offs merged into the source first so they ship with it.
 A reviewed release unit (an epic's pull request merged onto the train through its own review) may
 carry migrations and infrastructure on the train; the exclusion check below covers only work no
 pull request reviewed, and `release.devDeployVerification` makes the release wait for the
-development deploy (SKILL step 4), given `RELEASE_COMMIT` = the head the release pull request merges from the source (`<sourceHead>`, the cut, with a release branch; `<reviewedHead>` without one).
+development deploy (the `go-ahead` phase's dev deploy wait), given `RELEASE_COMMIT` = the head the release pull request merges from the source (`<sourceHead>`, the cut, with a release branch; `<reviewedHead>` without one).
 
 `releaseTrain` below means `releaseTrain`, or `supportTrain` when only that is present; both present
 is a config error — STOP and name it.
@@ -21,12 +21,12 @@ pull request's head is `release.releaseSource`, as before, and sections 2–4 an
 `releaseTrain.branch` absent → section 1 does not run. Names are tested with the anchored rule in
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-patterns.md`, never a substring.
 
-## 1. Merge the release train (step 0b)
+## 1. Merge the release train (the `train` phase)
 
 Runs only when `release.mergeTrainBeforeCut` is `true`, `releaseTrain.branch` exists on origin (absent
 while another `train/*` branch is there → STOP and name the cutover, `routing.py`'s rule: one-offs
 ride that branch until it is renamed; never release around it), and
-step 0 adopted no open release pull request headed by a release BRANCH (one cut earlier, so the
+the `release-shape` step adopted no open release pull request headed by a release BRANCH (one cut earlier, so the
 train would not ship with it). Otherwise a no-op, reported in one line ("release train: not
 configured", or "skipped — adopted release").
 
@@ -111,7 +111,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    and declaring `merge-only: true`,
    `fix-exclusions: true` and, when `releaseTrain.lateArrivals` is `"restart"`, `late-arrivals`. `pr` owns the draft hold, the pre-ship checks its step 2 selects and the
    ready-flip that releases CI once; the untracked-deferral list it returns (an adopted run's too)
-   goes to `release` step 2, never spliced. Fixes are committed on the snapshot, each passing §3's
+   goes to the release's `release-review` step, never spliced. Fixes are committed on the snapshot, each passing §3's
    staged-file check first (a migration or deploy-configuration fix leaves the train: merge it to
    the source by its own pull request); once cut (and again on an adopted pull request) run the
    exclusion check with `--source-before <sourceBefore> --head <snapshot head>` and put each
@@ -173,16 +173,16 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    **`pre-ship train run`** at the snapshot head: every `preShipChecks` entry with `when:
    "releaseOnly"` and `runAt: "train"`, in the background, printing `pre-ship`'s evidence lines
    plus, on all passing, `PRE-SHIP TRAIN: PASS <names> at <sha>` (`NOTHING TO RUN` is an explicit
-   no-op, said so). Step 2b gets `--ran-at-train <names>@<sha>` from that line; it is the only
-   automatic 2b skip for such an entry. **A red result STOPS the train merge.** The fix path: the
+   no-op, said so). The release's `pre-ship-release` step gets `--ran-at-train <names>@<sha>` from that line; it is the only
+   automatic `pre-ship-release` skip for such an entry. **A red result STOPS the train merge.** The fix path: the
    owner may instead waive it in words; otherwise commit the fix on the snapshot, convert the pull
    request to draft, re-enter `pr` steps 2–2c at the new head, in their order (`pre-ship pr select` declares
    the hold, `review`'s step 5 follow-up with the cumulative ledger settles to 7.1b, every
    selected check runs on that final head, then PRE-SHIP RESUME flips it ready and settles CI),
    and rerun this step at that head; step 5's `<reviewedHead>` pin is that new head. Under scope `release` the clearance is
-   already held (step 0a); under `cut-to-deploy` it is not claimed until the cut, and under
-   `merge-and-deploy` not until step 4. With no train
-   pull request, no passing line or a different tree, step 2b runs these entries itself.
+   already held (the `tower-claim` step at the start); under `cut-to-deploy` it is not claimed until the cut, and under
+   `merge-and-deploy` not until the `go-ahead` phase's `tower-claim`. With no train
+   pull request, no passing line or a different tree, `pre-ship-release` runs these entries itself.
 5. **Merge** — first `git fetch origin <releaseSource>` and run the exclusion check with
    `--source-before <sourceBefore> --head <reviewedHead>` (source merges are not train work, and a
    reviewed release unit is allowed; exit 1 STOPS); then run the `MERGE` line of
@@ -209,7 +209,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
    one-offs landed meanwhile — merge `origin/<releaseSource>` into the train (`git merge --no-ff`, a
    conflict STOPS) and push, so the train never falls behind the source.
 
-## 2. Cut the release branch (step 0c)
+## 2. Cut the release branch (the `cut-branch` step)
 
 - **Name** — the pattern with its date token set to today (`<YY-MM-DD>` → `26-10-02`). If that
   name exists on origin (`git ls-remote --exit-code --heads origin <name>`) and the pattern ends in
@@ -217,7 +217,7 @@ for merged ones take the latest `mergedAt`. Never trust best-match ranking or a 
   not match the pattern, so it would be neither adopted nor protected). Check every generated name
   against the pattern before pushing it.
 - **One release at a time.** An open pull request into `productionBranch` whose head matches the
-  pattern is ADOPTED by step 0 instead of cutting; a second one open at once — or one still headed
+  pattern is ADOPTED by the `release-shape` step instead of cutting; a second one open at once — or one still headed
   by `releaseSource` from before the pattern was set — is a STOP that names both. Under scope
   `merge-and-deploy`, one whose holder marker names another session is neither adopted nor a STOP:
   this release WAITS at the queue (`tower-queue.py`, `clearance.md`) until it merges, then cuts
@@ -260,20 +260,20 @@ over the merge's range (its step 5 rule), carrying the ledger, counters and the 
 declaration; never a fresh cycle 1. A merge that leaves the tree unchanged (history only, e.g.
 production's own earlier release merge) needs no re-review: say so, set `<reviewedHead>` to the new
 same-tree head, and invoke `review` in PRE-SHIP RESUME mode so it flips the pull request ready and
-settles CI there without a review cycle. Right after the cut, before step 1 has opened the pull
+settles CI there without a review cycle. Right after the cut, before `open-release-pr` has opened the pull
 request (scope `merge-and-deploy`, prepared on top of the release ahead), the merge is simply pushed
-with the branch: there is no review to re-enter, and the first review reads it with everything else. Any return to step 2 voids an owner yes already given; step
-4 asks again. Never rebase. `review` hands back here when its step 7.1 finds the production branch
+with the branch: there is no review to re-enter, and the first review reads it with everything else. Any return to `release-review` voids an owner yes already given;
+`go-ahead` asks again. Never rebase. `review` hands back here when its step 7.1 finds the production branch
 advanced under a release-branch head.
 
-## 5. Close out inside the clearance (step 5b)
+## 5. Close out inside the clearance (`sync-production` to `tower-hand-back`)
 
-Default scope: runs right after 5a's post-deploy check passes, BEFORE documentation (5c), the post-deploy
-check's own close-out (5d) and release notes (5e): these steps are what the next release depends
+Default scope: runs right after `post-deploy-check` passes, BEFORE documentation (`update-docs`), the post-deploy
+check's own close-out (`post-deploy-close-out`) and release notes (`write-release-notes`): these steps are what the next release depends
 on, so they finish while this release still holds clearance, and nothing else does. Under scope
-`cut-to-deploy` it runs as soon as 5a confirms the deploy, and the post-deploy check follows the
+`cut-to-deploy` it runs as soon as `confirm-deploy` confirms the deploy, and the post-deploy check follows the
 hand-back as the first owed item, `post-deploy-check` (`clearance.md`). Under `merge-and-deploy` the
-next release brings production in itself, so the tower is handed back at 5a and steps 1–3 run after
+next release brings production in itself, so the tower is handed back at `hand-back-after-deploy` and steps 1–3 run after
 the post-deploy check as the owed item `sync`, with no heartbeat (nothing is held).
 
 1. **Sync production into the source.** Without it the release branch's fix commits never reach
@@ -313,26 +313,28 @@ the post-deploy check as the owed item `sync`, with no heartbeat (nothing is hel
    (step 4), run the first owed item (`post-deploy-check` under scope `cut-to-deploy`: the next
    release's merge waits on it anyway; under `merge-and-deploy` both are already done, and `sync`
    is settled by `owed --done sync` before the next release starts), heartbeating the train claim
-   through it, then invoke **`release`** in this session declaring `started-by: auto`; its step 0
+   through it, then invoke **`release`** in this session declaring `started-by: auto`; its `train-claim` step
    refreshes the train claim this session already holds. This release's other owed items (`docs`,
-   `close-out`, `release-notes`) run when that release first waits for the owner (its step 4) or
-   stops, whichever comes first, settled by `owed --done` as always; its own step 6 runs then too,
+   `close-out`, `release-notes`) run when that release first waits for the owner (its `go-ahead` step) or
+   stops, whichever comes first, settled by `owed --done` as always; its own `release-recap` runs then too,
    without trigger 3 (the next release is already running). Under `merge-and-deploy` they run
    first instead, heartbeating the train claim, before `release` is invoked: the next release
    may spend hours in review and CI before it first waits. A failed post-deploy check STOPs as
    it always does, and the train claim is then released `handed-on`.
 4. **Hand clearance back** (`release.clearance` set; under `merge-and-deploy` it was handed back at
-   5a, so this step does nothing): the provider's `release --owed <item>` for
+   `hand-back-after-deploy`, so this step does nothing): the provider's `release --owed <item>` for
    each later step still to run (`post-deploy-check` under scopes `cut-to-deploy` and `merge-and-deploy`, then `docs`,
    `close-out`, `release-notes` — only those that will run),
    only now — after 1–3, never before — so a session that waits on `claim --wait` starts from a
-   synced source and a level train (the next release's step 0 checks only that the source is
-   ahead of production, and its train merge writes the same train branch). A 5b that stops before
+   synced source and a level train (the next release's `release-delta` checks only that the source is
+   ahead of production, and its train merge writes the same train branch). A close-out that stops before
    this point keeps clearance for the retry (`clearance.md`).
 
 ## Cited by
 
-- `skills/release/SKILL.md` — steps 0b, 0c, the protected-branch floor, the hotfix rule and step 5b;
-  `references/release-pr.md` — step 2's head re-validation.
+- `skills/release/SKILL.md` — the protected-branch floor and the release-branch pointer; the
+  `release-steps` references for the train phase, `cut-branch`, `hotfix-catch-up` and
+  `sync-production` to `tower-hand-back`; `references/release-pr.md` — the `release-review` head
+  re-validation.
 - `skills/review/SKILL.md` — step 7.1's hand-back on a release-branch head.
 - `skills/release/scripts/estimate.py` — a train delivery read by its snapshot slug and title.

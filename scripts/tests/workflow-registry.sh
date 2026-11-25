@@ -49,9 +49,13 @@ def git(root, *args):
                           capture_output=True, text=True, check=True).stdout
 
 
-def plugin_copy(name, with_git=True):
+RELEASE_IDS = ("release", "release-cut-to-deploy", "release-merge-and-deploy", "release-post-deploy", "release-docs", "release-notes")
+
+
+def plugin_copy(name, with_git=True, before_switch_on=False):
     """A copy of the parts of the plugin the registry reads, committed on `main` as the base, with
-    a `story` branch checked out on top."""
+    a `story` branch checked out on top. before_switch_on: the copy as it stood before the Release
+    workflow was switched on (its step skill dormant, and only the rows that shipped dormant)."""
     root = os.path.join(WORK, name)
     for sub in ("workflows", "schemas", "scripts", ".claude-plugin", "skills"):
         os.makedirs(os.path.join(root, sub), exist_ok=True)
@@ -65,6 +69,19 @@ def plugin_copy(name, with_git=True):
     shutil.copy(os.path.join(ROOT, "CHANGELOG.md"), root)
     for skill in os.listdir(os.path.join(ROOT, "skills")):
         os.symlink(os.path.join(ROOT, "skills", skill), os.path.join(root, "skills", skill))
+    if before_switch_on:
+        path = os.path.join(root, "schemas/step-contracts.json")
+        catalog = json.load(open(path, encoding="utf-8"))
+        catalog["dormantSkills"] = dict([("release-steps", "the Release workflow runs only in a rehearsal")] + list(catalog["dormantSkills"].items()))
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(catalog, handle, indent=2)
+        reg = json.load(open(os.path.join(root, "workflows/registry.json"), encoding="utf-8"))
+        for wid in RELEASE_IDS:
+            reg["workflows"][wid] = [r for r in reg["workflows"][wid] if r.get("dormant")]
+        with open(os.path.join(root, "workflows/registry.json"), "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(reg, indent=2, ensure_ascii=False) + "\n")
+        rc, out = run(root, "history", "--write")
+        assert rc == 0, out
     if with_git:
         git(root, "init", "-q", "-b", "main")
         git(root, "add", "-A")
@@ -177,7 +194,7 @@ reg = load(root); reg["workflows"]["hotfix"].append(wr.workflow_row(entry_of(roo
 rc, out = run(root, "check", "--base", "main")
 check("(5a) a changed fingerprint at a released version is refused", rc == 1 and faulted(out, "hotfix v1: its content changed at a version already recorded"), out)
 
-root = plugin_copy("dormant-rerecord")
+root = plugin_copy("dormant-rerecord", before_switch_on=True)
 shipped_rows = len(load(root)["workflows"]["release-post-deploy"])  # every one at version 1, dormant
 edit_definition(root, "release-post-deploy", lambda d: d["phases"][-1]["steps"][-1].__setitem__("summary", "A changed health-check step."))
 rc, rout = run(root, "record"); regenerate(root)
@@ -207,9 +224,9 @@ def switch_on_release(root):
 
 
 RELEASES = ("release-cut-to-deploy", "release-merge-and-deploy", "release-post-deploy")
-root = plugin_copy("release-switch-on")
+root = plugin_copy("release-switch-on", before_switch_on=True)
 before = load(root)
-check("(5c) the three newer release definitions shipped dormant at version 1, in every release so far",
+check("(5c) before the switch-on, the three newer release definitions shipped dormant at version 1, in every release",
       all(before["workflows"][w] and all(r["version"] == 1 and r.get("dormant") for r in before["workflows"][w]) for w in RELEASES))
 switch_on_release(root)
 rc, rout = run(root, "record"); regenerate(root)
@@ -240,6 +257,34 @@ reg = load(root); reg["workflows"]["release-post-deploy"][-1]["dormant"] = True;
 rc, out = run(root, "check", "--base", "main")
 check("(5h) ... even marked dormant: a hand-made dormant row for a definition this plugin can run is refused",
       rc == 1 and faulted(out, "workflow release-post-deploy 1: marked dormant, but this plugin can run it"), out)
+
+# (5i) Switched on with no definition changed: each release definition this plugin can now run,
+# whose newest row still says it shipped dormant, is refused by check until record re-records it
+# as runnable at the same version, so a later change to its step ids is refused from then on.
+ALL_RELEASES = RELEASE_IDS
+root = plugin_copy("release-switch-on-unchanged", before_switch_on=True)
+path = os.path.join(root, "schemas/step-contracts.json")
+catalog = json.load(open(path, encoding="utf-8")); catalog["dormantSkills"].pop("release-steps")
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(catalog, handle, indent=2)
+rc, out = run(root, "check", "--base", "main")
+check("(5i) switched on with nothing else changed, check refuses each release definition still recorded as dormant",
+      rc == 1 and all(faulted(out, "%s: this plugin can run it, but its newest row says it shipped dormant" % w) for w in ALL_RELEASES), out)
+before = load(root)
+rc, rout = run(root, "record"); regenerate(root)
+rc2, out = run(root, "check", "--base", "main")
+after = load(root)
+check("(5j) ... record re-records each one as runnable at its own version, once, and check is clean",
+      rc == 0 and rc2 == 0 and all(len(after["workflows"][w]) == len(before["workflows"][w]) + 1
+                                   and after["workflows"][w][-1]["version"] == 1 and not after["workflows"][w][-1].get("dormant")
+                                   and after["workflows"][w][-1]["sha256"] == before["workflows"][w][-1]["sha256"] for w in ALL_RELEASES)
+      and "0 appended" in run(root, "record")[1], (rout, out))
+check("(5k) ... so the release's step ids are permanent from now on",
+      wr.shipped_steps(after["workflows"]["release"]).get("production-merge") == "production-merge@1", after["workflows"]["release"])
+check("(5l) as shipped: each release definition's dormant rows are followed by one runnable row with the newest's fingerprint",
+      all(not shipped["workflows"][w][-1].get("dormant") and shipped["workflows"][w][-2].get("dormant")
+          and shipped["workflows"][w][-1]["sha256"] == shipped["workflows"][w][-2]["sha256"] for w in ALL_RELEASES),
+      dict((w, [(r["pluginVersion"], r.get("dormant")) for r in shipped["workflows"][w]]) for w in ALL_RELEASES))
 
 # (6) slips are history only.
 root = plugin_copy("new-slip")
@@ -356,10 +401,9 @@ check("(8n) a definition whose step skill exists and is switched on can run", pl
 catalog_edit(root, lambda c: c.__setitem__("dormantSkills", {"hotfix-steps": "it waits for its rehearsal"}))
 check("(8o) ... and cannot once the catalog lists that skill under dormantSkills", plugin.runnable(hotfix, plugin.catalog()) is False)
 shipped = wr.Plugin(ROOT)
-check("(8p) the shipped release definitions are dormant for that reason, and every other built-in workflow can run (gates and checkpoints, which no built-in has, are listed too)",
-      sorted(wid for wid, d in shipped.definitions().items() if not shipped.runnable(d, shipped.catalog()))
-      == ["release", "release-cut-to-deploy", "release-docs", "release-merge-and-deploy", "release-notes", "release-post-deploy"]
-      and shipped.dormant_skills() == {"release-steps", "gate", "checkpoint"}, shipped.dormant_skills())
+check("(8p) every shipped built-in workflow can run, the Release ones included; only gates and checkpoints, which no built-in has, stay dormant",
+      sorted(wid for wid, d in shipped.definitions().items() if not shipped.runnable(d, shipped.catalog())) == []
+      and shipped.dormant_skills() == {"gate", "checkpoint"}, shipped.dormant_skills())
 
 # (9) the page generator against its golden fixture.
 root = os.path.join(WORK, "golden")

@@ -14,7 +14,14 @@ anchored rule of `${CLAUDE_PLUGIN_ROOT}/skills/release/references/branch-pattern
    (production is brought into a release branch, and without one there is none).
 2. **Shape** (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/resume-rules.md`): `ADOPTED`
    → `ADOPTED <branch>` (its fix-exclusion check ran when the shape was read); `MERGED` →
-   `ADOPTED <branch>`, the merged release's branch, with nothing cut.
+   `ADOPTED <branch>`, the merged release's branch, with nothing cut. **The payload's `tower`
+   with `adopted: true` wins over the shape** (`resume-rules.md` "What the payload carries":
+   under `cut-to-deploy` the shape was read before the tower claim adopted): the branch is the
+   provider's local record's `branch`
+   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md` "The local record"), its pull
+   request open or merged alike → `ADOPTED <branch>`, nothing cut and the train not levelled; an
+   open one first passes the fix-exclusion check (§3) on its commits above the source (the shape
+   never read them): a match → `REFUSED <the matching commit>`. A merged one shipped as it is.
 3. **Scope `cut-to-deploy` with a `claims` block**: the release this one waited behind at the
    tower claim may have synced fixes into the source, so first level the train by
    `release-branch.md` §1 step 7's rule, under the train claim this run still holds (a conflict →

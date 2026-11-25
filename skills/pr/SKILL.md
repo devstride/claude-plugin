@@ -140,7 +140,7 @@ never request, rerun or wait on one, or read it as pending. **Never narrow a glo
 it exists because a change there breaks the check invisibly.
 
 - **`PRE-SHIP: FAIL` blocks the PR — fix it; never ship over it.** Report each entry's name,
-  command, pass/fail and counts. No per-PR waiver (waivers exist only in `release` step 2b).
+  command, pass/fail and counts. No per-PR waiver (waivers live only at `pre-ship-release`).
 
 ## 2c. Discharge the pre-ship hold
 

@@ -8,7 +8,8 @@ final tower claim and before the merge confirmations. It is its own contract so 
 workflow cannot drop either go-ahead: it requires the first one (`owner-go-ahead@1`) before it, and
 the merge confirmations need a go-ahead given after the tower claim, which only this step is.
 The procedure is `${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/owner-go-ahead.md`, cited,
-not copied: its steps 1, 2, 4, 6, 7 and 9 hold here unchanged, and step 8 is this step.
+not copied: its steps 1, 4, 6, 7 and 9 hold here unchanged, step 8 is this step, and its step 2
+is step 1 below (no `HOTFIX LANDED`: the stamp check right after catches one).
 
 1. **Shape** (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/resume-rules.md`): `MERGED`
    → `YES (already merged)`, naming the pull request. Nothing is asked and nothing is merged.

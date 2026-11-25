@@ -25,7 +25,8 @@ on. Off → send nothing for the whole run.
 
 Send the objects in the order the answer lists them, one call each, never edited, merged or
 reordered. When the tracker answers that it needs the definition (`DEFINITION_REQUIRED`), the
-object it refused was not recorded: run `status` with the item and `includeDefinition` once, take
+object it refused was not recorded: run `status` with the refused object's `runId` (or the item)
+and `includeDefinition` once, take
 the `definition` from the object it returns, and send the REFUSED object again with that
 `definition` added (its `reports` and `run` unchanged), once; then carry on with the next object.
 The `status` object alone carries no step reports, so sending only it would lose the refused batch.

@@ -183,6 +183,15 @@ rc, out = run(root, "--record")
 check("a step id that changed contract is refused by --record", rc == 1 and "changed contract" in out, (rc, out))
 
 root = scratch("dormant-rerecord")
+# As it stood before the Release workflow was switched on: its step skill dormant, and only the
+# rows that shipped dormant.
+catalog_path = os.path.join(root, "schemas/step-contracts.json")
+catalog = json.load(open(catalog_path, encoding="utf-8")); catalog["dormantSkills"]["release-steps"] = "it waits for its rehearsal"
+json.dump(catalog, open(catalog_path, "w", encoding="utf-8"), indent=2)
+registry_path = os.path.join(root, "workflows/registry.json")
+registry = json.load(open(registry_path, encoding="utf-8"))
+registry["workflows"]["release-post-deploy"] = [r for r in registry["workflows"]["release-post-deploy"] if r.get("dormant")]
+json.dump(registry, open(registry_path, "w", encoding="utf-8"), indent=2)
 before = len(rows(root, "release-post-deploy"))
 edit(root, lambda d: d["phases"][-1]["steps"][-1].__setitem__("summary", "A changed health-check step."), "release-post-deploy")
 rc, out = run(root)

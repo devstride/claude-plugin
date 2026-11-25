@@ -76,7 +76,7 @@ for _, line in rows(env["NT_ITEMS"]):
     if len(parts) >= 2 and parts[0] == "item":
         items.add(parts[1])
 ITEM = re.compile(r"\bI[0-9]{4,6}\b")
-TARGETS = ["skills", "hooks", "schemas", "workflows", ".claude-plugin", "README.md", "CONTRIBUTING.md", "RELEASING.md"]
+TARGETS = ["skills", "agents", "hooks", "schemas", "workflows", ".claude-plugin", "README.md", "CONTRIBUTING.md", "RELEASING.md"]
 files = []
 for t in TARGETS:
     p = os.path.join(root, t)

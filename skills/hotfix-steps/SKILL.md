@@ -9,7 +9,7 @@ Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the
 
 Arguments: $ARGUMENTS — one JSON object, the step's payload
 (`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`); its reserved `contract` key names the step
-(the Hotfix workflow's, and two deploy steps other workflows reuse).
+(the Hotfix's, and two shared deploy steps).
 
 ## Verdict
 
@@ -40,7 +40,8 @@ Arguments: $ARGUMENTS — one JSON object, the step's payload
    - Any other contract, or none → no verdict line: say so, and stop.
 
 **Floors.** Never wait on another release; never set `DEVSTRIDE_MERGE_GUARD=0`; a
-yes is read only from the payload's `answer` and never carried over to a newer merge.
+yes is read from the payload's `answer` (a release: `deploy-approval.md`)
+and never carried over to a newer merge.
 
 ## Result
 

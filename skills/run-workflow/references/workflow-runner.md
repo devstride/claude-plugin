@@ -30,8 +30,8 @@ run with no item is named only by its `runId`; a session holds one open such run
 | `next` | `gateAnswer`?, `facts`? | The next action. Asked again before `done`, it hands back the issued step and attempt as they were: the step may already have acted, so only its `done` moves the run on. `gateAnswer` is what `get_workflow_gate` read for the gate or checkpoint the run is parked at (refused `not-parked` when it is parked at none). `facts` decide a condition (`need-facts`; `start`, `done` and `resume` take them too) |
 | `done` | `stepId`, `attempt`, `output` (the step's whole final answer, as text) | Records the issued step's answer and returns the next action plus `recorded`. Any other step or attempt is refused (`not-current-step`), except the step a stopped run stopped on, repaired by hand. A gate takes only `APPROVAL: REQUESTED` or `APPROVAL: UNAVAILABLE`, a checkpoint only `CHECKPOINT: REQUESTED` or `CHECKPOINT: UNAVAILABLE` (`gate-answered-by-agent`) |
 | `wait` | `stepId`, `attempt`, `reason`? (one line) | For a step that waits inside itself (a queue, a deploy, another release): the issued step is reported `waiting` with the reason, on the same attempt, until its `done`. Nothing else changes: the step still ends with its verdict, and any other step or attempt is refused (`not-current-step`). Never for a gate or a checkpoint (`wait-not-a-step`): those park the run ("Waiting and parked") |
-| `status` | `includeDefinition`? | Read-only: `state` (running, stopped, parked or finished), `position`, one row per step, a ready Markdown `table` and `parkedAt` (the gate a parked run is at: `stepId`, `id`, `since`; else null). With `includeDefinition`, one report object carrying the definition. With `all` `true` and no run named: `runs`, this session's unfinished runs, oldest first, each with `runId`, `item`, `workflowId`, `state`, `position`, `stopped`, `waiting` and `parkedAt` |
-| `resume` | `workflow`, `answer`?, `cwd`?, `landed`?, `close`? | Continues after a restart or a stop, only a run of `workflow` (the id of the built-in definition this entry starts, such as `build` or `hotfix`; an organization's workflow standing in for it counts): this session's run of another workflow is refused `other-workflow`, another session's is never adopted. An issued step comes back as it was, otherwise as `next`. `answer`, a person's reply to a question, reaches that step's payload for that attempt only; at a `confirm` stop it must start with yes or no (the table below). A merge stop comes back as the stop until `landed` is `false`. `close` `true` ends the run as interrupted |
+| `status` | `includeDefinition`?, `evidence`?; or `all`, `others`?, `cwd`? | Read-only: `state` (running, stopped, parked or finished), `position`, one row per step, a ready Markdown `table` and `parkedAt` (the gate a parked run is at: `stepId`, `id`, `since`; else null). With `includeDefinition`, one report object carrying the definition. With `evidence` `true`, each row also carries its step's recorded `evidence`, `result` and `waiting`: a later step reads them there, never from memory. With `all` `true` and no run named: `runs`, this session's unfinished runs, oldest first, each with `runId`, `item`, `workflowId`, `state`, `position`, `stopped`, `waiting` and `parkedAt`; `others` `true` adds `others`: other sessions' unfinished runs in this checkout (`cwd`), with `sessionId`, adopted by run id once that session has ended |
+| `resume` | `workflow`, `answer`?, `cwd`?, `landed`?, `close`?, `beside`? | Continues after a restart or a stop, only a run of `workflow` (the id of the built-in definition this entry starts, such as `build` or `hotfix`; an organization's workflow standing in for it counts): this session's run of another workflow is refused `other-workflow`, another session's is never adopted. An issued step comes back as it was, otherwise as `next`. `answer`, a person's reply to a question, reaches that step's payload for that attempt only; at a `confirm` stop it must start with yes or no (the table below). A merge stop comes back as the stop until `landed` is `false`. `close` `true` ends the run as interrupted |
 
 The context: `item` (an item number or null), `goal`, `profile` (`name` and `source`),
 `workingBase`, `oneOff`, `route` (`train`, `develop-pr` or `epic-release`), `releaseUnit`,
@@ -47,7 +47,8 @@ An action is one of:
 
 - **`run`**: `step` (`id`, `name`, `phase`, `contract`, `attempt`), `skill` (the built-in skill to
   invoke), `payload`, `argument` (the contract's template rendered from the payload, else the
-  payload as one compact JSON string: pass it to the skill unchanged) and `heartbeat`.
+  payload as one compact JSON string: pass it to the skill unchanged), `heartbeat` and `agent`
+  (where the step runs, `routine`, `judgement` or `conversation`: `step-agents.md` beside this file).
 - **`finished`**: `outcome` (`completed`, the outcome a step ended the run with, such as `held`, or
   `declined` after a no at a `confirm` stop), `recordedOutcome` (below), `results` (each finished
   step's result by contract),
@@ -64,7 +65,12 @@ An action is one of:
   **Read `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/conditions.md` in full before acting
   on one.**
 
-Every answer also carries `runId` and `reports`; `start` adds the definition's hash. A `run` answer for a repository step (its source is `repo`) has `skill: null` and `instructions` (the committed file's text, path, commit and hash). Follow `instructions.text` as that step's skill, then answer `done` with the verdict line its contract names.
+Every answer also carries `runId` and `reports`; `start` adds the definition's hash. An answer
+adds `decided` (`stepId`, `attempt`, `verdict`) when the runner answered steps itself from the
+repository's `.claude/ds-config.json`, with no model turn: a built-in step whose contract's
+`configSkip` rule matched (the config lacks the hook or block the step would read) is recorded done
+with the verdict its skill gives in that case, its evidence line beginning "Decided from the
+repository's config". A config that cannot be read decides nothing. A `run` answer for a repository step (its source is `repo`) has `skill: null` and `instructions` (the committed file's text, path, commit and hash). Follow `instructions.text` as that step's skill, then answer `done` with the verdict line its contract names.
 
 ## A step's answer
 
@@ -238,9 +244,9 @@ remote, or, with none, the same git folder; another repository's is refused,
 current directory) and names the old session and checkout in `adoptedFrom`; the next report carries
 the definition again under the new session. A run parked at a gate asks its story claim step again
 first. Both kinds of run are adopted the same way: one with an item by the item, one with no item
-only by its run id; a run with no item is never parked, because `start` refuses a gate or a
+only by its run id (listed by `status` with `all` and `others`); a run with no item is never parked, because `start` refuses a gate or a
 checkpoint in it (`gate-needs-item`). A finished run is never adopted, and an adoption that
-would overwrite this session's own open run for that item (no item: of that workflow) is refused (`run-open`). **An adopted
+would overwrite this session's own open run for that item (no item: of that workflow) is refused (`run-open`), unless a resume by run id says `beside` `true`, as a start may. **An adopted
 run goes on only on its story branch** (the branch step's `branch`) until its merge has finished:
 while the checkout is on any other branch, or none, every command that would hand out a step is
 refused (`wrong-branch`, naming the branch; nothing changes, the adoption included), so check the

@@ -43,7 +43,7 @@ With `claims` set, the release is declared as
   computed manifest of cross-story contracts, combined behaviour and develop-merge resolutions;
   cloud may still cover the whole PR. A firing
   `verify.skipDuringStoryBuilds` suite is mandatory, with no story exemption; with the list empty,
-  local pre-ship suites remain the callers' step-2b responsibility.
+  local pre-ship suites remain the callers' responsibility (`pr` step 2b, the release's `pre-ship-release`).
 - **Consequence notices**, just before the merge: gather the release's notices, run the release
   unit's own check on the final reviewed head, then reconcile
   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/consequence-notices.md`).

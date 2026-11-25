@@ -4,8 +4,8 @@ load: contract
 # Recap the release — what shipped, in plain English, and what is still owed
 
 `release-steps`' `release-recap@1` step, the last report of every release run. What the recap
-carries is `${CLAUDE_PLUGIN_ROOT}/skills/release/references/merge-and-deploy.md` "Step 4 — the
-human recap" for the change list, and the owed work is
+carries is `${CLAUDE_PLUGIN_ROOT}/skills/release/references/merge-and-deploy.md` "`go-ahead` —
+the human recap" for the change list, and the owed work is
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md` "The provider contract" (`owed`),
 both cited, not copied. It changes nothing in git, on GitHub or in the tower.
 

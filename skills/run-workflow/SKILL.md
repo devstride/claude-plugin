@@ -32,11 +32,10 @@ runner failed; say its line and stop, never retrying.
 2. **`start`** with that path as `definitionFile`, the answer as `fetched`, and a `context` holding `trigger` and every key the
    reference's Commands section lists (`mode` is a story-claim mode, `named` for a named item).
    The person starting the run supplies them; a missing one is refused (`context-missing`).
-3. **For each `run` answer**: send its heartbeat (the phase to the story claim, the ship-intent
-   request to the ship-intent helper; skip whichever is null), invoke the named skill through the
-   Skill tool with `argument` unchanged (`skill` null: follow `instructions.text` as that skill) (plus ` answer: <it>` when the payload carries a person's
-   `answer` and the argument does not), then call `done` with `stepId` (the step's `id`),
-   `attempt` and `output` (that skill's WHOLE final answer). Its answer is the next action. Read
+3. **For each `run` answer**: run it where its `agent` says, as
+   `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/step-agents.md` says (read it in full
+   first): a step agent, or here (send its heartbeat, invoke the named skill with `argument`
+   unchanged, then `done` with `stepId`, `attempt` and its WHOLE answer as `output`). Read
    `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/gates.md` in full when an answer is
    `request-gate`, `parked` or `address-changes`, and
    `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/conditions.md` in full on `need-facts`.

@@ -19,8 +19,8 @@ the same answers every time, also after a restart or a cleared conversation. The
           start needs `context.rollup`, rollup.py ready's answer, with the verdict READY
   next    {"runId"?, "item"?, "gateAnswer"?, "facts"?}  gateAnswer: what get_workflow_gate read at the gate the run is parked at
   done    {"runId"?, "item"?, "stepId", "attempt", "output"}
-  status  {"runId"?, "item"?, "includeDefinition"?} | {"all": true}
-  resume  {"runId"?, "item"?, "workflow"?, "answer"?, "session"?}
+  status  {"runId"?, "item"?, "includeDefinition"?, "evidence"?} | {"all": true, "others"?, "cwd"?}
+  resume  {"runId"?, "item"?, "workflow"?, "answer"?, "session"?, "beside"?}
   wait    {"runId"?, "item"?, "stepId", "attempt", "reason"?}   the issued step is waiting inside itself
   reported {"runId"?, "item"?, "ok"}       what became of a run's reports; the first failure hands back one line to say
   unsent  {"cwd"?}                         this repository's runs whose reports failed, each shaped again in full
@@ -99,10 +99,26 @@ ENTRY_FIELDS = ("summary", "builtinSkill", "payload", "argument", "verdict", "re
 # earlier step must come before the step that meets it), and the two step-skill rule flags
 # (delegates: the step may run one Workflow of drafting agents; interactive: it may hold a
 # conversation with the person inside the step). The runner passes the flags through unchanged.
+# judgement: the step weighs evidence or writes for a person (a review, a merge that may need its
+# conflicts resolved, the owner's go-ahead), or writes what this conversation approved (a plan's
+# items), so it stays in the conversation, on the session's own model. Together they decide a `run` answer's `agent` (step_agent below). ownContext (with
+# judgement only): the step runs late in a long run, so it runs in a fresh context of its own on the
+# session's model rather than in the long conversation (the judgement step agent).
+# configSkip: rules that answer the step from the repository's config alone, with no model turn,
+# when the config lacks what the step would run (no hook, no block): config_skip below. Each rule's
+# answer is a verdict the step itself gives in that case.
 # since: the plugin release that first carried the contract (`unreleased` until a release stamps it).
 # neverOptional: a step with this contract, when a workflow runs it, always runs and stops the run
 # when it fails, whether or not a later step requires it: never on a condition, by hand or carried on past.
-OPTIONAL_FIELDS = ("satisfiedBy", "requiresAfter", "maxAutoRedo", "delegates", "interactive", "since", "neverOptional")
+OPTIONAL_FIELDS = ("satisfiedBy", "requiresAfter", "maxAutoRedo", "delegates", "interactive", "judgement", "ownContext",
+                   "configSkip", "since", "neverOptional")
+# A configSkip rule: `when`, a list of tests that must all hold, each on the repository's config
+# (`config`, a dotted path in .claude/ds-config.json), the step's payload (`payload`, a dotted
+# path) or the workflow (`workflowNotIn`, built-in definition ids); `value`, the verdict value it
+# answers (listed, taking no detail, never a stop or a question); `evidence`, its one line; and
+# `result`, the result it records.
+SKIP_TESTS = ("absent", "empty", "not-true")
+SKIP_ANSWERS = ("continue", "skipped")
 # The catalog's features map: what a definition may use beyond its contracts, each with the release
 # that first ran it. DevStride takes a definition's lowest plugin version from these and the contracts.
 FEATURES = ("when-condition", "when-manual", "on-fail-continue")
@@ -216,6 +232,9 @@ WITHHELD = "[withheld]"
 NOT_SHOWN = "the message names a value that looks like a credential, so it is not shown"
 
 MISSING = object()
+CONFIG_MAX_BYTES = 1 << 20
+# The first evidence line of a step the runner answered from the repository's config (config_skip).
+DECIDED_NOTE = "Decided from the repository's config, with no model turn: "
 REPORT = None   # skills/build-item/scripts/workflow_report.py: hashing, normalizing, capping, report shape
 CLAIMS = None   # skills/build-item/scripts/claim_record.py: the session id and the plugin version
 
@@ -449,11 +468,124 @@ def _entry_shape(entry):
         return "maxAutoRedo is a whole number above %d and at most %d" % (AUTO_REDO_LIMIT, AUTO_REDO_MAX)
     if any(flag in entry and not isinstance(entry[flag], bool) for flag in ("delegates", "interactive")):
         return "delegates and interactive are true or false"
+    if "judgement" in entry and entry["judgement"] is not True:
+        return "judgement is true or absent"
+    if "ownContext" in entry and (entry["ownContext"] is not True or entry.get("judgement") is not True):
+        return "ownContext is true or absent, and only on a judgement step"
+    if "configSkip" in entry:
+        problem = _skip_fault(entry)
+        if problem:
+            return "configSkip: " + problem
     if "since" in entry and not _since(entry["since"]):
         return "since is a plugin version x.y.z or unreleased"
     if "neverOptional" in entry and entry["neverOptional"] is not True:
         return "neverOptional is true or absent"
     return None
+
+
+def _skip_fault(entry):
+    """Why an entry's configSkip rules are not shaped as rules, or None."""
+    rules = entry["configSkip"]
+    if not isinstance(rules, list) or not rules:
+        return "a list of rules"
+    if entry.get("interactive") or entry.get("delegates"):
+        return "a step that talks with the person or starts agents is never answered from config"
+    values = dict((v["value"], v) for v in entry["verdict"]["values"])
+    for rule in rules:
+        if not isinstance(rule, dict) or sorted(rule) != ["evidence", "result", "value", "when"]:
+            return "each rule has when, value, evidence and result"
+        value = values.get(rule["value"])
+        if value is None or value["detail"] != "none" or value["class"] not in SKIP_ANSWERS or "proof" in value:
+            return "%r is not a listed value without a detail that goes on" % (rule["value"],)
+        if entry["proof"].get("required") or entry["proof"]["binding"] != "none":
+            return "a step that leaves a proof is never answered from config"
+        if not isinstance(rule["evidence"], str) or not rule["evidence"].strip() or "\n" in rule["evidence"]:
+            return "evidence is one line"
+        required = entry["result"]["required"]
+        if not isinstance(rule["result"], dict) or any(key not in rule["result"] for key in required):
+            return "result holds every required key"
+        if not isinstance(rule["when"], list) or not rule["when"]:
+            return "when is a list of tests"
+        for test in rule["when"]:
+            if not isinstance(test, dict):
+                return "a test is an object"
+            if sorted(test) == ["workflowNotIn"]:
+                if not (isinstance(test["workflowNotIn"], list) and all(isinstance(i, str) for i in test["workflowNotIn"])):
+                    return "workflowNotIn is a list of definition ids"
+                continue
+            where = [k for k in ("config", "payload") if k in test]
+            if len(where) != 1 or not isinstance(test[where[0]], str) or not test[where[0]]:
+                return "a test names one config or payload path"
+            tests = [k for k in test if k not in ("config", "payload")]
+            if tests == ["is"] and test["is"] in SKIP_TESTS:
+                continue
+            if tests == ["in"] and isinstance(test["in"], list):
+                continue
+            if tests == ["notIn"] and isinstance(test["notIn"], list):
+                continue
+            return "a test is `is` (%s), `in` or `notIn`" % ", ".join(SKIP_TESTS)
+    return None
+
+
+def _dig_path(value, path):
+    for key in path.split("."):
+        if not isinstance(value, dict) or key not in value:
+            return MISSING
+        value = value[key]
+    return value
+
+
+def skip_test_holds(test, config, payload, workflow):
+    if "workflowNotIn" in test:
+        return workflow not in test["workflowNotIn"]
+    found = _dig_path(config if "config" in test else payload, test.get("config") or test.get("payload"))
+    if "is" in test:
+        if test["is"] == "absent":
+            return found is MISSING or found is None
+        if test["is"] == "empty":
+            return found is MISSING or found is None or found in ("", [], {})
+        return found is not True  # not-true
+    if "in" in test:
+        return found is not MISSING and found in test["in"]
+    return found is MISSING or found not in test["notIn"]  # notIn
+
+
+def config_skip(entry, config, payload, workflow):
+    """The rule of `entry` that answers the step from the repository's config, or None. A config
+    that cannot be read answers nothing: the step then runs as usual."""
+    if not isinstance(config, dict):
+        return None
+    for rule in entry.get("configSkip") or []:
+        if all(skip_test_holds(test, config, payload, workflow) for test in rule["when"]):
+            return rule
+    return None
+
+
+def asks_without_answer(entry):
+    """True for a step that can stop to ask the person (an `ask` or `confirm` verdict) but whose
+    payload carries no `answer`: on its resumed attempt, only the conversation holds the reply."""
+    values = entry.get("verdict", {}).get("values", [])
+    payload = entry.get("payload") or {}
+    return (any(isinstance(v, dict) and v.get("class") in ("ask", "confirm") for v in values)
+            and "step.answer?" not in payload.values() and "step.answer" not in payload.values())
+
+
+def step_agent(entry, source):
+    """Where a `run` answer's step runs (skills/run-workflow/references/step-agents.md): `routine`
+    (a step agent on a smaller model, which also runs the routine steps after it) unless the step
+    talks with the person or starts agents of its own, or is a repository's or library's own step:
+    those are `conversation`, run by the conversation that drives the run. A step that weighs
+    evidence or writes for a person (`judgement`) is `conversation` too, except one marked
+    `ownContext`, late in a long run: `judgement`, a fresh agent on the session's own model, which
+    also runs the routine steps after it. It decides only where the step runs: which steps run,
+    their order and their proofs are unchanged."""
+    if any(entry.get(flag) for flag in ("interactive", "delegates")) or source in ("repo", "library"):
+        return "conversation"
+    if asks_without_answer(entry):
+        return "conversation"  # the person's reply reaches it only through this conversation
+    if entry.get("judgement"):
+        return "judgement" if entry.get("ownContext") else "conversation"
+    return "routine"
 
 
 def _since(value):
@@ -1716,9 +1848,55 @@ class Run:
         self.resend_definition = False
         self.commit = None      # the commit HEAD is on, read once per command
         self.facts = {}         # what this command was told for deciding conditions (facts_of)
+        self.decided = []       # steps this command answered from the repository's config (config_skip)
+        self.config = MISSING   # .claude/ds-config.json of the run's checkout, read once per command
+
+    def repo_config(self):
+        """The run's checkout's .claude/ds-config.json, or None when it cannot be read as an object."""
+        if self.config is MISSING:
+            self.config = None
+            cwd = self.state["context"].get("cwd")
+            if not isinstance(cwd, str) or not cwd:
+                return None  # no checkout named: nothing is decided from config
+            try:
+                with open(os.path.join(cwd, ".claude", "ds-config.json"), "rb") as handle:
+                    data = handle.read(CONFIG_MAX_BYTES + 1)
+                found = json.loads(data.decode("utf-8")) if len(data) <= CONFIG_MAX_BYTES else None
+                self.config = found if isinstance(found, dict) else None
+            except (OSError, ValueError, UnicodeDecodeError, RecursionError):
+                self.config = None
+        return self.config
+
+    def decide_from_config(self, index):
+        """A built-in step the repository's config answers by itself (config_skip): recorded done
+        as if its skill had answered, with no model turn. True when it was."""
+        step, entry = self.steps[index], self.entry(index)
+        if ("configSkip" not in entry or step["run"]["source"] != "builtin" or step["run"].get("ref") != entry["builtinSkill"]
+                or self.asks_person(index)):
+            return False
+        try:
+            payload = self.payload(index)
+        except KeyError:
+            return False
+        if payload.get("answer") is not None:
+            return False  # a person's answer to this step is the skill's to read, never a config default
+        rule = config_skip(entry, self.repo_config(), payload, workflow_of(self.state))
+        if rule is None:
+            return False
+        output = "%s: %s\n%s\n```json\n%s\n```\n" % (
+            entry["verdict"]["label"], rule["value"], DECIDED_NOTE + rule["evidence"], json.dumps(rule["result"]))
+        self.complete(index, output)
+        record = self.record(index)
+        self.decided.append({"stepId": step["id"], "attempt": record["attempt"], "verdict": record["verdict"]})
+        return True
 
     def record(self, index):
         return self.state["steps"][self.steps[index]["id"]]
+
+    def tell_decided(self, answer):
+        """An answer names the steps this command answered from the repository's config, in order."""
+        if self.decided:
+            answer["decided"] = list(self.decided)
 
     def entry(self, index):
         return self.contracts[self.steps[index]["contract"]]
@@ -2027,7 +2205,8 @@ class Run:
                   "skill": {"source": "builtin", "ref": step["run"]["ref"]},
                   "payload": payload, "argument": argument,
                   "heartbeat": {"phase": entry["claimPhase"], "stage": entry["shipIntentStage"],
-                                "shipIntent": self.ship_intent(index, entry["shipIntentStage"])}}
+                                "shipIntent": self.ship_intent(index, entry["shipIntentStage"])},
+                  "agent": step_agent(entry, step["run"]["source"])}
         if step["run"]["source"] == "repo":
             answer["skill"] = None
             answer["instructions"] = self.repo_instructions(index)
@@ -2255,6 +2434,8 @@ class Run:
         record.pop("gate", None)
         self.state["current"] = {"stepId": step["id"], "attempt": record["attempt"]}
         self.report(index)
+        if self.decide_from_config(index):
+            return self.advance()
         return self.handout(index)
 
     def manifest_line(self, index):
@@ -2670,6 +2851,7 @@ def command_start(world, request, contracts):
             answer = run.advance()
             answer.update(definitionHash=old["definitionHash"], definitionSource=old.get("definitionSource", "builtin"),
                           workflow=pinned_workflow(old), notice=None, reports=run.reports())
+            run.tell_decided(answer)
             write_state(folder, old)
             return answer
         if request.get("replace") is not True:
@@ -2700,6 +2882,7 @@ def command_start(world, request, contracts):
     answer = run.advance()
     answer.update(definitionHash=state["definitionHash"], definitionSource=chosen["source"], workflow=pinned_workflow(state),
                   notice=chosen["notice"], reports=replaced + run.reports())
+    run.tell_decided(answer)
     if ended is not None and not item:
         # The replaced run has a file of its own (a run for an item is overwritten below): it is
         # ended there first, so the session never holds two open runs of the workflow.
@@ -2730,6 +2913,7 @@ def command_next(world, request, contracts):
     # gateAnswer: the person's answer to the gate the run is parked at, as get_workflow_gate read it.
     answer = run.answer_gate(request["gateAnswer"]) if "gateAnswer" in request else run.advance()
     answer["reports"] = run.reports()
+    run.tell_decided(answer)
     write_state(folder, state)
     return answer
 
@@ -2765,6 +2949,7 @@ def command_done(world, request, contracts):
     recorded = {"stepId": step_id, "attempt": attempt, "verdict": record["verdict"], "class": record["class"], "status": record["status"]}
     answer = run.advance()
     answer.update(recorded=recorded, reports=run.reports())
+    run.tell_decided(answer)
     write_state(folder, state)
     return answer
 
@@ -2826,18 +3011,33 @@ def position_of(state):
 
 
 def command_status_all(world, request):
-    """This session's unfinished runs, oldest first. Read-only."""
+    """This session's unfinished runs, oldest first. Read-only. With `others` true, also the
+    unfinished runs other sessions left in this checkout (`cwd`), which a new session adopts by
+    their run ids: it never sees them otherwise. A run in another checkout of the repository is
+    another session's live work, never listed here."""
     session, folder = session_of(request, world), state_dir(world, create=False)
-    runs = []
+    others = request.get("others", False)
+    cwd = request.get("cwd", os.getcwd())
+    if not isinstance(others, bool) or (others and not (isinstance(cwd, str) and os.path.isdir(cwd))):
+        raise Refuse("bad-request", "others is true or false, and cwd must be a directory")
+    runs, left = [], []
     for state in (own_states(world, folder) if folder else []):
-        if state["sessionId"] == session and not state["outcome"]:
-            waiting = state["steps"][state["current"]["stepId"]].get("waiting") if state["current"] else None
-            runs.append({"runId": state["runId"], "item": state["item"], "workflowId": pinned_workflow(state)["id"],
-                         "workflow": workflow_line(state), "startedAt": state["startedAt"],
-                         "state": run_state(state), "position": position_of(state),
-                         "stopped": state["stopped"], "waiting": waiting, "parkedAt": parked_at(state)})
+        if state["outcome"]:
+            continue
+        waiting = state["steps"][state["current"]["stepId"]].get("waiting") if state["current"] else None
+        row = {"runId": state["runId"], "item": state["item"], "workflowId": pinned_workflow(state)["id"],
+               "workflow": workflow_line(state), "startedAt": state["startedAt"],
+               "state": run_state(state), "position": position_of(state),
+               "stopped": state["stopped"], "waiting": waiting, "parkedAt": parked_at(state)}
+        if state["sessionId"] == session:
+            runs.append(row)
+        elif others and os.path.realpath(str(state["context"].get("cwd") or "")) == os.path.realpath(cwd):
+            left.append(dict(row, sessionId=state["sessionId"]))
     runs.sort(key=lambda run: (str(run["startedAt"]), run["runId"]))
-    return {"runs": runs}
+    if not others:
+        return {"runs": runs}
+    left.sort(key=lambda run: (str(run["startedAt"]), run["runId"]))
+    return {"runs": runs, "others": left}
 
 
 def command_status(world, request, contracts):
@@ -2845,12 +3045,24 @@ def command_status(world, request, contracts):
         if request["all"] is not True or request.get("item") is not None or request.get("runId") is not None:
             raise Refuse("bad-request", "all is only ever true, and it names no run")
         return command_status_all(world, request)
+    if "others" in request:
+        raise Refuse("bad-request", "others goes only with all")
+    if "evidence" in request and not isinstance(request["evidence"], bool):
+        raise Refuse("bad-request", "evidence is true or false")
     _, state = find_run(world, request, session_of(request, world))
     run = Run(state, contracts, world)
     rows = [{"stepId": step["id"], "phase": step["phase"], "name": step["name"],
              "status": "waiting" if run.record(index)["status"] == "issued" and run.record(index).get("waiting") else run.record(index)["status"],
              "verdict": run.record(index)["verdict"], "attempt": run.record(index)["attempt"]}
             for index, step in enumerate(run.steps)]
+    if request.get("evidence") is True:
+        # What each step recorded, for a later step that reads it (a line the health check asked
+        # the close-out for, a stamp, a queue notice already given): the same redacted lines the
+        # tracker is sent, the result block's kept keys, and what an issued step said it waits for.
+        for index, row in enumerate(rows):
+            record = run.record(index)
+            row.update(evidence=list(record.get("evidence") or []), result=dict(record.get("result") or {}),
+                       waiting=record.get("waiting"))
     position = position_of(state)
     table = ["| Phase | Step | Status | Verdict | Attempt |", "|---|---|---|---|---|"]
     for row in rows:
@@ -2874,7 +3086,10 @@ def replay_reports(state, contracts, world):
     changes nothing."""
     run = Run(state, contracts, world)
     for index in range(len(run.steps)):
-        if run.record(index)["status"] != "pending":
+        status = run.record(index)["status"]
+        if status != "pending" and not (run.asks_person(index) and status in ("done", "failed")):
+            # As `complete`: a gate's or a checkpoint's done and failed are the tracker's own to
+            # write, and an agent's would get the batch carrying the run's end refused.
             run.report(index)
     run.resend_definition = True
     ended = state["outcome"] or (state["stopped"] or {}).get("kind")
@@ -3045,6 +3260,7 @@ def adopt(world, request, session, cwd):
     is known, so a refused resume leaves the run where it was. Returns (folder, state, adoptedFrom,
     the old state file)."""
     item, run_id, wanted = item_of(request.get("item")), request.get("runId"), request.get("workflow")
+    beside = request.get("beside") is True  # checked by command_resume: only with a run id
     folder = state_dir(world, create=False)
     if folder is None or not (item or run_id):
         raise Refuse("no-run", "there is no unfinished run to resume")
@@ -3073,10 +3289,12 @@ def adopt(world, request, session, cwd):
     _, old_path, state = max(found, key=lambda entry: entry[0])
     mine = os.path.join(folder, state_name(session, state["item"], state["runId"]))
     if (os.path.lexists(mine) and not read_state(mine, world)["outcome"]) or (
-            state["item"] is None and open_without_item(world, folder, session, workflow_of(state))):
+            state["item"] is None and not beside and open_without_item(world, folder, session, workflow_of(state))):
         # As start: an open run of this session's own is never overwritten, and a session holds
-        # one open run with no item of a workflow.
-        raise Refuse("run-open", "this session already has an open run for %s; finish it, or start with replace" % (state["item"] or "no item"))
+        # one open run with no item of a workflow unless the resume says `beside`, as a start
+        # may (two overlapping releases a new session takes over, one by one).
+        raise Refuse("run-open", "this session already has an open run for %s; finish it, resume this one by its run id "
+                     "with beside, or start with replace" % (state["item"] or "no item"))
     adopted_from = {"sessionId": state["sessionId"], "cwd": state["context"].get("cwd")}
     state["sessionId"] = session
     state["context"]["cwd"] = cwd  # proofs are read in the checkout that carries the run on
@@ -3092,6 +3310,9 @@ def command_resume(world, request, contracts):
         raise Refuse("bad-request", "answer is text of at most %d characters" % ANSWER_MAX_CHARS)
     if ("landed" in request and request["landed"] is not False) or ("close" in request and request["close"] is not True):
         raise Refuse("bad-request", "landed is only ever false, and close only ever true")
+    if "beside" in request and (not isinstance(request["beside"], bool) or (request["beside"] and (
+            request.get("runId") is None or request.get("item") is not None))):
+        raise Refuse("bad-request", "beside is true or false, and only with a run id and no item")
     cwd = request.get("cwd", os.getcwd())
     if not isinstance(cwd, str) or not os.path.isdir(cwd):
         raise Refuse("bad-request", "cwd must be a directory")
@@ -3127,6 +3348,7 @@ def command_resume(world, request, contracts):
         if adopted_from:
             answer["adoptedFrom"] = adopted_from
         answer["reports"] = run.reports()
+        run.tell_decided(answer)
         write_adopted(folder, state, old_path)
         return answer
     at = (state["stopped"] or state["current"] or {}).get("stepId")
@@ -3139,6 +3361,7 @@ def command_resume(world, request, contracts):
         if adopted_from:
             answer["adoptedFrom"] = adopted_from
         answer["reports"] = run.reports()
+        run.tell_decided(answer)
         write_adopted(folder, state, old_path)
         return answer
     if at:
@@ -3155,6 +3378,7 @@ def command_resume(world, request, contracts):
     if adopted_from:
         answer["adoptedFrom"] = adopted_from
     answer["reports"] = run.reports()
+    run.tell_decided(answer)
     write_adopted(folder, state, old_path)
     return answer
 

@@ -18,13 +18,16 @@ read").
      `<!-- devstride:release-branch <name> cut <sha> -->` marker (no marker: `git merge-base
      origin/<name> origin/<releaseSource>`, said so); with no `release.releaseBranchPattern` the
      pull request is headed by the source, so its `origin/<releaseSource>` tip.
-   - `MERGED` → the merged release's own range (its merge commit's first parent to its second),
-     so the close-out names what shipped. Never `NOTHING TO RELEASE` here: that would end the run
-     before its close-out. No holds are read for code already in production.
+   - `MERGED` → the merged release's own range, `<merge>^1..<merge>^2` (its merge commit's first
+     parent to its second), so the close-out names what shipped; `<sourceHead>` is `<merge>^2`.
+     Never `NOTHING TO RELEASE` here: that would end the run before its close-out. No holds are
+     read for code already in production.
 3. **Nothing ahead** (`NEW`): `git rev-list --count origin/<productionBranch>..<sourceHead>` is
-   `0` → `NOTHING TO RELEASE`. The run ends; nothing is cut.
-4. **The delta.** `git log --first-parent origin/<productionBranch>..<sourceHead>` and the pull
-   requests merged in that range (`gh pr list --base <releaseSource> --state merged`, kept only
+   `0` → `NOTHING TO RELEASE`. The run ends; nothing is cut. A tower this run claimed (the default
+   scope claims at the start) is handed back first, with the provider's plain `release`.
+4. **The delta.** `git log --first-parent origin/<productionBranch>..<sourceHead>` (`MERGED`:
+   `<merge>^1..<merge>^2`, since production already holds it) and the pull requests merged in
+   that range (`gh pr list --base <releaseSource> --state merged`, kept only
    when the merge commit is in the range): the epics and stories that landed, the **user-facing**
    subset (UI, API, behaviour, permissions, migrations) against the internal rest, and any
    breaking change or migration called out. Report it in plain words: it drives the release pull

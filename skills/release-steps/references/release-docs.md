@@ -30,7 +30,7 @@ the health check did not fail. It calls the existing step skill **`update-docs`*
    verdict: `PUBLISHED`, `STAGED`, `CURRENT`, `NOT CONFIGURED` (unset, or a hook that does not
    resolve) or `FAILED`; anything else or nothing → `FAILED`. Translate the evidence with pages,
    branch, pull request and live address exact.
-6. **Settle by the table**, through the provider's `owed --done <item>`:
+6. **Settle by the table**, through the provider's `owed --done <item> --pr <n>`:
    - `PUBLISHED` → settle `docs`; `knowledge-base` stays owed for the sync that follows.
    - `CURRENT` → settle `docs` and `knowledge-base`: nothing new to mirror.
    - `STAGED` → settle `docs`, and name the owner action (a draft to look at, a pull request to

@@ -5,7 +5,7 @@ load: contract
 
 `release-steps`' `release-docs-plan@1` step. The payload's shape and the rule for each hook are
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md` "The delta payload" and "What
-`release` does with each docs verdict" (its step-3 rule), cited, not copied.
+`release` does with each docs verdict" (its `docs-plan` rule), cited, not copied.
 
 1. **Config wins.** Load `.claude/ds-config.json`: `docs.updateSkill`,
    `docs.knowledgeBaseSyncSkill`, `docs.releaseNotesSkill`, `release.productionBranch`, and the

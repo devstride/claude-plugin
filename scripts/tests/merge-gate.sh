@@ -727,7 +727,7 @@ FAIL=0; echo "$OUT" | grep -q '^FAIL' && FAIL=1
 BARE="$(grep -rn -- '--admin' "$ROOT/skills" "$ROOT/hooks" | grep -v 'skills/pr/scripts/merge-gate.py' \
   | grep -v 'skills/review/references/delivery-loop-invariants.md' | grep -vi 'merge-gate' || true)"
 [ -z "$BARE" ] && echo "  ok   (30) no shipped text merges with its own --admin" || { echo "  FAIL (30) a bare --admin: $BARE"; FAIL=1; }
-for site in skills/release/SKILL.md skills/release-steps/references/production-merge.md skills/release/references/release-branch.md skills/release/references/auto-start.md \
+for site in skills/release-steps/references/production-merge.md skills/release/references/release-branch.md skills/release/references/auto-start.md \
             skills/merge-story/references/merge-paths.md skills/build-item/references/epic-release-steps.md; do
   grep -q 'merge-gate.py' "$ROOT/$site" && echo "  ok   (31) $site runs the merge gate" || { echo "  FAIL (31) $site merges without merge-gate.py"; FAIL=1; }
 done

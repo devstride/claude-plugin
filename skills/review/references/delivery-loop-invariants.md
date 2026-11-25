@@ -279,9 +279,9 @@ K7. One matching rule for `protectedBranches`, `releaseBranchPattern` and
     `release/26-10-02/extra` or `release/`; `release/*` never matches `release` or `a/release/b`;
     `stacks/**` never matches `docs/stacks/x`. Contract:
     `skills/release/references/branch-patterns.md`.
-K8. With `release.clearance` set, `release` CLAIMS clearance before the train or the cut (step 0a),
+K8. With `release.clearance` set, `release` CLAIMS clearance before the train or the cut (`tower-claim`),
     heartbeats each phase (exit 4 = another session owns the release: STOP), and hands it back at
-    5b — after a passing post-deploy check, the sync into the source, the branch deletion and the
+    `tower-hand-back` — after a passing post-deploy check, the sync into the source, the branch deletion and the
     train update, BEFORE docs, the check's close-out and notes, which are recorded as owed
     (`release --owed`) and run serially by the same session, never by a second copy — so a failed
     post-deploy check keeps it for the retry. A phase past its budget is STUCK (an alarm, never a
@@ -536,7 +536,7 @@ Q1. `release` must declare DRIVEN mode when invoking `review`, or the release pa
 Q2. `release.postDeployCheckSkill` names a LOCAL skill invoked once, after the deploy is confirmed
     and before the hand-back/docs/release notes, with `check` + `{productionBranch, mergeCommit,
     deployConfirmedAt}`; a `CLOSE-OUT OWED` line asks for one `close-out` invocation after docs. Its first line is `POST-DEPLOY HEALTH: PASS|FAIL|NOT RUN`, evidence lines
-    name their commands. `FAIL` STOPS for a rollback decision — never on to 5b/5c/6 alone; `NOT RUN`
+    name their commands. `FAIL` STOPS for a rollback decision — never on to `sync-production`, `update-docs` or `release-recap` alone; `NOT RUN`
     is degradation and asked about; absent key reports **not configured**. `NOT RUN` and **not
     configured** are different facts and never collapse into each other.
 Q3. Doctor checks that a configured `postDeployCheckSkill` names an existing local skill; `setup`
@@ -737,7 +737,7 @@ for needle in "pull_request_review_id" "suppressed due to low confidence" "graph
               "mandatoryLenses" "mandatory lens" "mandatory-lenses.md" \
               "release.releaseBranchPattern" "releaseBranchFixExclusions" "requestPolicy" \
               "releaseTrain.branch" "final-head" "branch-patterns.md" \
-              "release.clearance" "clearance.md" "release-tower" "never claims" "handed back at 5b" \
+              "release.clearance" "clearance.md" "release-tower" "never claims" "handed back as the scope says" \
               "stories per epic" "epics per capability" "Shape targets"; do
   printf '%s' "$ALL" | grep -qiF "$needle" || echo "MISSING (anywhere): $needle"
 done
@@ -775,8 +775,6 @@ skills/review/SKILL.md|automatedReviewers
 skills/review/SKILL.md|baseBranches
 skills/pr/SKILL.md|baseBranches
 skills/pre-ship/SKILL.md|source and destination
-skills/release/SKILL.md|DRIVEN
-skills/release/SKILL.md|0a. Clearance
 skills/release-steps/references/release-review.md|DRIVEN
 skills/release-steps/references/tower-claim.md|Claim the tower — one cleared release at a time
 skills/branch-hotfix/SKILL.md|never claims release clearance
@@ -805,11 +803,9 @@ skills/doctor/SKILL.md|local > shared
 skills/doctor/references/repairs.md|ask outside the batch
 skills/doctor/scripts/statusline-override.py|require_clean_committed_shared
 skills/build-item/SKILL.md|Built / Checked / Next
-skills/release/SKILL.md|Merged / Released
 skills/release-steps/references/release-recap.md|Merged / Released
 skills/doctor/SKILL.md|Changed:
 scripts/tests/plain-language-output.sh|every user-invocable skill
-skills/release/SKILL.md|delivery-profiles.md
 skills/release-steps/references/release-review.md|delivery-profiles.md
 skills/build-item/SKILL.md|never makes the loop concurrent
 skills/hotfix-steps/references/hotfix-environment.md|localEnvironment
@@ -843,7 +839,6 @@ skills/build-item/references/progress-table.md|not configured
 skills/plan-steps/references/plan-discovery.md|yes, build this
 skills/pr/SKILL.md|cannot guarantee CI-last
 skills/plan/references/delivery-profiles.md|review-settled
-skills/release/SKILL.md|reviewedHead
 skills/release-steps/references/release-review.md|reviewedHead
 skills/release/SKILL.md|release-notes
 skills/doctor/SKILL.md|text to PRINT
@@ -864,8 +859,6 @@ skills/review/references/delta-re-review.md|localReReviewScope
 skills/review/SKILL.md|exact range
 skills/review/SKILL.md|second timeout STOPS
 skills/release/references/release-pr.md|sanitized `<!-- devstride:review-context -->` final marker
-skills/release/SKILL.md|release-pr.md
-skills/release/SKILL.md|merge-and-deploy.md
 skills/release-steps/references/release-pr.md|release-pr.md
 skills/release-steps/references/owner-go-ahead.md|merge-and-deploy.md
 skills/release/references/release-pr.md|PRE-SHIP RESUME
@@ -886,7 +879,6 @@ hooks/version-check.sh|NEVER exits non-zero
 hooks/version-check.sh|total-timeout 120
 skills/review/SKILL.md|EMPTY COMMIT
 skills/review/SKILL.md|diff --cached --quiet
-skills/release/SKILL.md|empty re-trigger commit
 skills/release-steps/references/merge-confirmations.md|empty re-trigger commit
 skills/review/SKILL.md|mergeable_state
 skills/review/SKILL.md|per workflow
@@ -901,15 +893,12 @@ skills/setup/references/ci-cost-patterns.md|convention-only shape
 hooks/version-check.sh|installPath
 hooks/version-check.sh|show-toplevel
 skills/build-item/SKILL.md|Ground truth first
-skills/release/SKILL.md|Ground truth
 skills/release-steps/references/ground-truth.md|Ground truth
 skills/build-item/references/plain-language-output.md|labelled **unverified**
 skills/build-item/references/plain-language-output.md|Steps you must do yourself
-skills/release/SKILL.md|postDeployCheckSkill
-skills/release/SKILL.md|never proceed to 5b (default scope), 5c or 6
+skills/release/SKILL.md|never proceed to `sync-production` (default scope), `update-docs` or `release-recap`
 skills/release-steps/references/release-close-out.md|postDeployCheckSkill
 skills/release/SKILL.md|second copy
-skills/release/SKILL.md|release --owed
 skills/release-steps/references/tower-hand-back.md|release --owed
 skills/release/references/clearance.md|original-stopped
 skills/release/references/clearance.md|phaseStartedAt
@@ -954,7 +943,6 @@ skills/review/SKILL.md|No result, no review
 skills/review/SKILL.md|through `round`
 skills/review/references/local-full.md|no engine returned a result
 skills/build-item/scripts/review-gate.py|a bare name does not say whether it returned a result
-skills/release/SKILL.md|merge-gate.py <n> <reviewedHead> --all-green
 skills/release-steps/references/production-merge.md|merge-gate.py <n> <reviewedHead> --all-green
 skills/release/references/release-branch.md|merge-gate.py <n> <reviewedHead> --delete-branch
 skills/release/references/release-branch.md|merge-gate.py <n> <settled head>
@@ -971,7 +959,6 @@ skills/pr/scripts/merge-gate.py|an admin merge would bypass a block it cannot na
 skills/pr/scripts/merge-gate.py|has no review proof
 skills/review/references/review-ledger.md|`NOT POSTED` is a STOP before the
 skills/merge-story/references/merge-paths.md|release-holds.md
-skills/release/SKILL.md|release-holds.md
 skills/release-steps/references/release-delta.md|release-holds.md
 skills/release/references/release-branch.md|Release holds.
 skills/release/SKILL.md|light or written
@@ -1021,8 +1008,6 @@ skills/merge-story/references/merge-paths.md|integration-branch or train base
 skills/build-item/SKILL.md|merged or Done → never started
 skills/build-item/references/next-unblocked.md|A story named by number
 skills/build-item/references/next-unblocked.md|The release unit first
-skills/release/SKILL.md|create-defect deferred
-skills/release/SKILL.md|create-story deferred
 skills/release-steps/references/release-review.md|create-defect deferred
 skills/release-steps/references/release-review.md|create-story deferred
 skills/build-item/references/next-unblocked.md|deferredContainerLegacyTitles

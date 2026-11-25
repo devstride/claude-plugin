@@ -6,8 +6,8 @@ load: contract
 `release-steps`' `dev-deploy-wait@1` step, at three positions the payload's `step` names. The seam
 is `release.devDeployVerification`, its row in
 `${CLAUDE_PLUGIN_ROOT}/skills/release/references/docs-hooks.md`; when it runs is
-`${CLAUDE_PLUGIN_ROOT}/skills/release/references/merge-and-deploy.md` "Step 4 — on the yes" and,
-for scope `merge-and-deploy`, `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md` (0p),
+`${CLAUDE_PLUGIN_ROOT}/skills/release/references/merge-and-deploy.md` "`go-ahead` — on the yes" and,
+for scope `merge-and-deploy`, `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md` (the `checks` phase),
 all cited, not copied.
 
 1. **Config wins.** Load `.claude/ds-config.json`. No `release.devDeployVerification` →

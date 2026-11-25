@@ -226,6 +226,7 @@
       ],
       "claimPhase": "Build",
       "shipIntentStage": "building",
+      "judgement": true,
       "satisfiedBy": [
         "hotfix-fix@1"
       ]
@@ -314,6 +315,7 @@
       ],
       "claimPhase": "STORY RISK CHECK",
       "shipIntentStage": null,
+      "judgement": true,
       "neverOptional": true
     },
     "local-checks@1": {
@@ -489,6 +491,7 @@
       ],
       "claimPhase": "Review",
       "shipIntentStage": "reviewing",
+      "judgement": true,
       "neverOptional": true
     },
     "merge@1": {
@@ -566,6 +569,7 @@
       ],
       "claimPhase": "Merge",
       "shipIntentStage": "landing",
+      "judgement": true,
       "neverOptional": true
     },
     "complete@1": {
@@ -683,7 +687,8 @@
         "complete@1"
       ],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "sync@1": {
       "summary": "Bring the working base up to date and confirm the tree is clean.",
@@ -761,7 +766,8 @@
       },
       "requires": [],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "hotfix-preflight@1": {
       "summary": "Check the working tree and name the hotfix branch from the repository's config.",
@@ -960,7 +966,8 @@
       },
       "requires": ["hotfix-report@1"],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "hotfix-merge@1": {
       "summary": "Merge the reviewed hotfix pull request into the production branch, only on the person's yes.",
@@ -1147,7 +1154,8 @@
       },
       "requires": [],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "plan-orient@1": {
       "summary": "Resolve the plan root, its delivery profile and the organization's shape.",
@@ -1260,7 +1268,8 @@
       },
       "requires": [],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "plan-discovery@1": {
       "summary": "Ask the questions that change the shape, until the person says 'yes, build this'.",
@@ -1381,7 +1390,8 @@
         "plan-discovery@1"
       ],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "plan-draft@1": {
       "summary": "Draft the specs for the signed-off shape; the drafting agents never write to DevStride.",
@@ -1528,7 +1538,8 @@
         "plan-draft-approval@1"
       ],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "plan-wire@1": {
       "summary": "Wire the dependency edges and prove no new leaf is left without one.",
@@ -1594,7 +1605,8 @@
       "shipIntentStage": null,
       "satisfiedBy": [
         "rebalance-rewire@1"
-      ]
+      ],
+      "judgement": true
     },
     "rationalize-gantt@1": {
       "summary": "Date the plan from its dependency graph, with the auto-scheduler off.",
@@ -1751,7 +1763,8 @@
         "plan-number@1"
       ],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "rebalance-gates@1": {
       "summary": "Check that nothing else is writing to the plan and the arguments are whole.",
@@ -1996,7 +2009,8 @@
         "rebalance-probe@1"
       ],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "rebalance-rewire@1": {
       "summary": "Move every absorbed item's edges to its successor, adding before removing.",
@@ -2059,7 +2073,8 @@
         "rebalance-successors@1"
       ],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "rebalance-renumber@1": {
       "summary": "Give each successor the number slot of its first absorbed item.",
@@ -2105,7 +2120,8 @@
         "rebalance-rewire@1"
       ],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "rebalance-archive@1": {
       "summary": "Archive the originals only after their successors have edges.",
@@ -2146,7 +2162,8 @@
         "rebalance-renumber@1"
       ],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "rebalance-marker@1": {
       "summary": "Rewrite the plan root's delivery profile line, and only that line.",
@@ -2187,7 +2204,8 @@
         "rebalance-archive@1"
       ],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "rebalance-report@1": {
       "summary": "Report the re-sliced plan and the next item the build loop will pick.",
@@ -2280,7 +2298,8 @@
       },
       "requires": [],
       "claimPhase": null,
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "release-shape@1": {
       "summary": "Say whether this release is new, an open release to adopt, or a merged one to close out.",
@@ -2411,7 +2430,8 @@
       },
       "requires": [],
       "claimPhase": "Claim the release train",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "configSkip": [{"when": [{"config": "claims", "is": "absent"}], "value": "NOT CONFIGURED", "evidence": "The repository's config has no claims block, so no train claim is taken; the release-holder marker protects the train pull request instead.", "result": {"state": "not-configured"}}]
     },
     "ground-truth@1": {
       "summary": "Fetch both branches and read what other sessions landed.",
@@ -2574,7 +2594,8 @@
       },
       "requires": [],
       "claimPhase": "Snapshot the train",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "train-pr@1": {
       "summary": "Open the release train's pull request into the release source.",
@@ -2639,6 +2660,7 @@
       "requires": [],
       "claimPhase": "Review the train",
       "shipIntentStage": null,
+      "judgement": true,
       "maxAutoRedo": 8
     },
     "train-pre-ship@1": {
@@ -2833,7 +2855,8 @@
       },
       "requires": [],
       "claimPhase": "Classify the release",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "configSkip": [{"when": [{"config": "release.classifySkill", "is": "absent"}, {"payload": "shape", "notIn": ["MERGED"]}], "value": "FULL", "evidence": "No classifier configured (release.classifySkill is not set), so the release is never treated as light.", "result": {"state": "full"}}]
     },
     "tower-queue@1": {
       "summary": "Wait in the release queue behind any older release pull request.",
@@ -2933,6 +2956,7 @@
       "requires": [],
       "claimPhase": "Bring production in",
       "shipIntentStage": null,
+      "judgement": true,
       "maxAutoRedo": 6
     },
     "release-pr@1": {
@@ -2995,7 +3019,8 @@
       },
       "requires": [],
       "claimPhase": "Hand on the train claim",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "configSkip": [{"when": [{"config": "claims", "is": "absent"}], "value": "NOT APPLICABLE", "evidence": "The repository's config has no claims block, so there is no train claim to hand on.", "result": {"state": "not-applicable"}}]
     },
     "release-tip@1": {
       "summary": "Record the production tip the checks run against.",
@@ -3057,7 +3082,8 @@
       },
       "requires": [],
       "claimPhase": "Classify at the checks",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "configSkip": [{"when": [{"config": "release.classifySkill", "is": "absent"}, {"payload": "shape", "notIn": ["MERGED"]}], "value": "FULL", "evidence": "No classifier configured (release.classifySkill is not set), so the release is never treated as light.", "result": {"state": "full"}}]
     },
     "pre-ship-at-checks@1": {
       "summary": "Run the release's pre-ship checks before claiming the tower.",
@@ -3066,14 +3092,17 @@
         "base": "result:release-tip@1.productionTip?",
         "head": "result:release-tip@1.head?",
         "releaseClass": "result:classify-at-checks@1.state?",
-        "shape": "result:release-shape@1.shape?"
+        "ranAtTrain": "result:train-pre-ship@1.ranAtTrain?",
+        "shape": "result:release-shape@1.shape?",
+        "answer": "step.answer?"
       },
-      "argument": "release run {base} {head} {releaseClass} --shape {shape}",
+      "argument": "release run {base} {head} {releaseClass} {ranAtTrain} --shape {shape}",
       "verdict": {
         "label": "PRE-SHIP",
         "values": [
           { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
           { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
+          { "value": "HEAD MOVED", "detail": "optional", "class": "rewind:release-tip@1", "detailName": "head" },
           { "value": "NOTHING TO RUN", "detail": "none", "class": "skipped" },
           { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
         ]
@@ -3121,7 +3150,8 @@
       },
       "requires": [],
       "claimPhase": "Wait for the staging deploy",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "configSkip": [{"when": [{"config": "release.devDeployVerification", "is": "absent"}], "value": "NOT APPLICABLE", "evidence": "release.devDeployVerification is not set, so there is no staging deploy to wait for.", "result": {"state": "not-applicable"}}]
     },
     "pre-merge-at-checks@1": {
       "summary": "Ask whether production needs anything before the merge, at the checks head.",
@@ -3157,7 +3187,8 @@
       },
       "requires": [],
       "claimPhase": "Pre-merge check at the checks",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "configSkip": [{"when": [{"config": "release.preMergeSkill", "is": "absent"}, {"payload": "shape", "notIn": ["MERGED"]}], "value": "NOT CONFIGURED", "evidence": "pre-merge production check: not configured (release.preMergeSkill is not set); this does not mean production needs nothing.", "result": {"state": "not-configured"}}]
     },
     "release-stamp@1": {
       "summary": "Stamp the head, tree and production tip the checks passed on.",
@@ -3221,6 +3252,7 @@
       "requires": [],
       "claimPhase": "Review the release",
       "shipIntentStage": null,
+      "judgement": true,
       "maxAutoRedo": 8
     },
     "classify-at-pre-ship@1": {
@@ -3252,7 +3284,8 @@
       },
       "requires": [],
       "claimPhase": "Classify before pre-ship",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "configSkip": [{"when": [{"config": "release.classifySkill", "is": "absent"}, {"payload": "shape", "notIn": ["MERGED"]}], "value": "FULL", "evidence": "No classifier configured (release.classifySkill is not set), so the release is never treated as light.", "result": {"state": "full"}}]
     },
     "pre-ship-release@1": {
       "summary": "Run the release's pre-ship checks at the reviewed head.",
@@ -3263,7 +3296,8 @@
         "releaseClass": "result:classify-at-pre-ship@1.state?",
         "ranAtTrain": "result:train-pre-ship@1.ranAtTrain?",
         "releaseReview": "result:release-review@1",
-        "shape": "result:release-shape@1.shape?"
+        "shape": "result:release-shape@1.shape?",
+        "answer": "step.answer?"
       },
       "argument": "release run {base} {head} {releaseClass} {ranAtTrain} --shape {shape}",
       "verdict": {
@@ -3271,6 +3305,8 @@
         "values": [
           { "value": "PASS", "detail": "optional", "class": "continue", "detailName": "counts" },
           { "value": "FAIL", "detail": "optional", "class": "stop", "detailName": "names" },
+          { "value": "HEAD MOVED", "detail": "optional", "class": "rewind:release-review@1", "detailName": "head" },
+          { "value": "NOTHING TO RUN", "detail": "none", "class": "continue" },
           { "value": "NOT APPLICABLE", "detail": "none", "class": "continue" }
         ]
       },
@@ -3303,6 +3339,7 @@
         "values": [
           { "value": "DISCHARGED", "detail": "none", "class": "continue" },
           { "value": "NO HOLD", "detail": "none", "class": "skipped" },
+          { "value": "PRODUCTION MOVED", "detail": "none", "class": "skipped" },
           { "value": "STILL HELD", "detail": "required", "class": "stop", "detailName": "why" }
         ]
       },
@@ -3317,7 +3354,8 @@
       },
       "requires": [],
       "claimPhase": "Discharge the pre-ship hold",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "release-docs-plan@1": {
       "summary": "Plan which documentation hooks run after the deploy is confirmed.",
@@ -3382,6 +3420,7 @@
       "requires": [],
       "claimPhase": "Catch up with a hotfix",
       "shipIntentStage": null,
+      "judgement": true,
       "maxAutoRedo": 6
     },
     "previous-release@1": {
@@ -3452,7 +3491,8 @@
       },
       "requires": [],
       "claimPhase": "Pre-merge check",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "configSkip": [{"when": [{"config": "release.preMergeSkill", "is": "absent"}, {"payload": "shape", "notIn": ["MERGED"]}], "value": "NOT CONFIGURED", "evidence": "pre-merge production check: not configured (release.preMergeSkill is not set); this does not mean production needs nothing.", "result": {"state": "not-configured"}}]
     },
     "pre-merge-recheck@1": {
       "summary": "Ask the pre-merge question again once the tower is claimed.",
@@ -3488,7 +3528,8 @@
       },
       "requires": [],
       "claimPhase": "Pre-merge recheck",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "configSkip": [{"when": [{"config": "release.preMergeSkill", "is": "absent"}, {"payload": "shape", "notIn": ["MERGED"]}], "value": "NOT CONFIGURED", "evidence": "pre-merge production check: not configured (release.preMergeSkill is not set); this does not mean production needs nothing.", "result": {"state": "not-configured"}}]
     },
     "owner-go-ahead@1": {
       "summary": "Show the recap and take the owner's yes or the standing yes before the production merge.",
@@ -3507,6 +3548,7 @@
         "label": "GO-AHEAD",
         "values": [
           { "value": "YES", "detail": "required", "class": "continue", "detailName": "source" },
+          { "value": "HOTFIX LANDED", "detail": "required", "class": "rewind:hotfix-catch-up@1", "detailName": "pr" },
           { "value": "NOT YET", "detail": "none", "class": "ask" },
           { "value": "NO", "detail": "none", "class": "end:declined" }
         ]
@@ -3524,7 +3566,8 @@
       "requires": ["release-review@1", "pre-ship-release@1"],
       "satisfiedBy": ["owner-go-ahead-recheck@1"],
       "claimPhase": "Wait for the go-ahead",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "owner-go-ahead-recheck@1": {
       "summary": "At the final gate, with the tower held, run the standing yes again or apply the yes the earlier go-ahead took.",
@@ -3561,6 +3604,7 @@
       "requires": ["release-review@1", "pre-ship-release@1", "owner-go-ahead@1"],
       "claimPhase": "Recheck the go-ahead",
       "shipIntentStage": null,
+      "judgement": true,
       "since": "4.10.0"
     },
     "release-stamp-verify@1": {
@@ -3577,8 +3621,8 @@
         "label": "CHECKS STAMP",
         "values": [
           { "value": "UNCHANGED", "detail": "none", "class": "continue" },
-          { "value": "CHANGED", "detail": "none", "class": "stop" },
-          { "value": "BEHIND", "detail": "none", "class": "stop" },
+          { "value": "CHANGED", "detail": "none", "class": "rewind:hotfix-catch-up@1" },
+          { "value": "BEHIND", "detail": "none", "class": "rewind:hotfix-catch-up@1" },
           { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" }
         ]
       },
@@ -3603,7 +3647,8 @@
         "head": "result:release-review@1.reviewedHead?",
         "releaseClass": "result:classify-at-pre-ship@1.state?",
         "rerunNames": "context.rerunAtMerge?",
-        "shape": "result:release-shape@1.shape?"
+        "shape": "result:release-shape@1.shape?",
+        "answer": "step.answer?"
       },
       "argument": "release run {base} {head} {releaseClass} --only {rerunNames} --shape {shape}",
       "verdict": {
@@ -3645,6 +3690,7 @@
         "label": "MERGE CONFIRMED",
         "values": [
           { "value": "HEAD", "detail": "required", "class": "continue", "detailName": "head" },
+          { "value": "HEAD MOVED", "detail": "required", "class": "rewind:release-review@1", "detailName": "head" },
           { "value": "NOT CONFIRMED", "detail": "required", "class": "stop", "detailName": "which" }
         ]
       },
@@ -3660,7 +3706,8 @@
       "requires": ["release-review@1", "pre-ship-release@1", "owner-go-ahead@1"],
       "requiresAfter": { "owner-go-ahead@1": ["tower-claim@1"] },
       "claimPhase": "Confirm the merge",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "production-merge@1": {
       "summary": "Merge the release into production through the merge gate, never a push.",
@@ -3680,6 +3727,7 @@
         "label": "PRODUCTION MERGE",
         "values": [
           { "value": "MERGED", "detail": "required", "class": "continue", "detailName": "pr" },
+          { "value": "HOTFIX LANDED", "detail": "required", "class": "rewind:hotfix-catch-up@1", "detailName": "pr" },
           { "value": "REFUSED", "detail": "required", "class": "stop", "detailName": "reason" },
           { "value": "ERROR", "detail": "required", "class": "stop", "detailName": "reason" }
         ]
@@ -3822,7 +3870,8 @@
       },
       "requires": [],
       "claimPhase": "Post-deploy health check",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true
     },
     "post-deploy-check-owed@1": {
       "summary": "Run the post-deploy health check after the hand-back; the next step posts its answer.",
@@ -3854,6 +3903,7 @@
       "requires": [],
       "claimPhase": "Post-deploy health check",
       "shipIntentStage": null,
+      "judgement": true,
       "since": "4.10.0"
     },
     "post-deploy-result@1": {
@@ -3874,6 +3924,8 @@
           { "value": "FAILURE POSTED", "detail": "none", "class": "stop" },
           { "value": "ERROR POSTED", "detail": "none", "class": "stop" },
           { "value": "NEEDS DECISION", "detail": "required", "class": "ask", "detailName": "question" },
+          { "value": "NOT POSTED", "detail": "required", "class": "stop", "detailName": "verdict" },
+          { "value": "RECHECK", "detail": "none", "class": "rewind:post-deploy-check-owed@1" },
           { "value": "NOT APPLICABLE", "detail": "none", "class": "skipped" }
         ]
       },
@@ -3919,7 +3971,9 @@
       },
       "requires": [],
       "claimPhase": "Sync production back",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true,
+      "ownContext": true
     },
     "release-branch-delete@1": {
       "summary": "Delete the release branch once both branches contain it.",
@@ -3984,7 +4038,9 @@
       },
       "requires": [],
       "claimPhase": "Update documentation",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true,
+      "ownContext": true
     },
     "release-kb-sync@1": {
       "summary": "Refresh the knowledge base after documentation was published.",
@@ -4018,7 +4074,8 @@
       },
       "requires": [],
       "claimPhase": "Sync the knowledge base",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "configSkip": [{"when": [{"config": "docs.knowledgeBaseSyncSkill", "is": "absent"}], "value": "NOT CONFIGURED", "evidence": "No knowledge-base sync hook is configured (docs.knowledgeBaseSyncSkill is not set).", "result": {"state": "not-configured"}}]
     },
     "release-close-out@1": {
       "summary": "Run the post-deploy close-out when the health check said one is owed.",
@@ -4049,7 +4106,9 @@
       },
       "requires": [],
       "claimPhase": "Close out the release",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true,
+      "ownContext": true
     },
     "release-notes@1": {
       "summary": "Write release notes, only when they were asked for.",
@@ -4083,7 +4142,10 @@
       },
       "requires": [],
       "claimPhase": "Write release notes",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true,
+      "ownContext": true,
+      "configSkip": [{"when": [{"payload": "releaseNotes", "in": ["false", false]}, {"workflowNotIn": ["release-notes"]}], "value": "NOT REQUESTED", "evidence": "release notes: not requested", "result": {"state": "not-requested"}}]
     },
     "release-recap@1": {
       "summary": "Write the plain-language recap of the release.",
@@ -4114,7 +4176,9 @@
       },
       "requires": [],
       "claimPhase": "Recap the release",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "judgement": true,
+      "ownContext": true
     },
     "auto-start@1": {
       "summary": "Decide whether the next release starts now.",
@@ -4146,7 +4210,8 @@
       },
       "requires": [],
       "claimPhase": "Decide the next release",
-      "shipIntentStage": null
+      "shipIntentStage": null,
+      "configSkip": [{"when": [{"config": "release.autoStart.enabled", "is": "not-true"}], "value": "NOT CONFIGURED", "evidence": "release.autoStart is not enabled, so no next release starts by itself.", "result": {"state": "not-configured"}}, {"when": [{"config": "claims", "is": "absent"}], "value": "NOT CONFIGURED", "evidence": "The repository's config has no claims block, and auto start is honoured only with one.", "result": {"state": "not-configured"}}]
     },
     "approval@1": {
       "summary": "Ask a person in DevStride to approve before the run goes on; an agent never gives the answer.",
@@ -4217,7 +4282,6 @@
     }
   },
   "dormantSkills": {
-    "release-steps": "the Release workflow runs only in a rehearsal until its rehearsal has passed; /devstride:release follows its own page",
     "gate": "an approval gate runs only in a rehearsal until DevStride offers approval gates",
     "checkpoint": "a checkpoint, a step a person does by hand, runs only in a rehearsal until DevStride offers checkpoints"
   },

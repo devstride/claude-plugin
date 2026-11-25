@@ -65,8 +65,8 @@ beside the plan").
   user is present and asks; `boardId` is otherwise an explicit `null`, as on the container and
   on every node created here, and never `activeAgents.boardId`. Filing writes no date; the item is never built and never given a
   delivery phase. A person who names one by number can still build it as a one-off.
-- **What does not widen.** The bar is the CALLERS' (`review` step 4, `capture-findings`, `release`
-  step 2): only a verified P1, a security finding, or a finding both likely and material is filed;
+- **What does not widen.** The bar is the CALLERS' (`review` step 4, `capture-findings`, the release's
+  `release-review`): only a verified P1, a security finding, or a finding both likely and material is filed;
   anything below it is dismissed with a one-line reason. A person's explicit `deferred` request is
   filed as asked. Discovered scope
   the plan genuinely needs is not deferred work: it splices into the chain with `insert-story`.

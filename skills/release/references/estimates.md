@@ -41,7 +41,7 @@ re-runs `quote` (a new token, a new comment) only when the person asks for a fre
 
 ## Scoring at the release
 
-After `release` merges into the production branch (`merge-and-deploy.md`, step 5a), once the deploy
+After `release` merges into the production branch (`merge-and-deploy.md`, the `score-estimates` step), once the deploy
 is confirmed or its confirmation was skipped (never while it is unconfirmed): `estimate.py shipped
 --merge <merge sha> --json` lists the landings that merge brought, each with the items its commit
 message names. For each `[estimate v1 sha=<that landing>…]` token a listed item carries with no
@@ -82,6 +82,6 @@ commit's (the merge onto the train or the source), whatever commit `quote` was g
 - `skills/build-item/references/plain-language-output.md` — Time estimates.
 - `skills/build-item/references/item-status.md` — the landed event's quote.
 - `skills/build-item/references/epic-release-steps.md` — the release unit's quote.
-- `skills/release/references/merge-and-deploy.md` — step 5a's score.
+- `skills/release/references/merge-and-deploy.md` — the `score-estimates` step.
 - `skills/setup/references/config-defaults.md` — `release.estimates.deployMinutes`.
 - `skills/release/scripts/estimate.py` — its rules.

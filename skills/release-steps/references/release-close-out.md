@@ -13,8 +13,9 @@ verdict", both cited, not copied.
 1. **Config wins.** Load `.claude/ds-config.json`: `release.postDeployCheckSkill`,
    `release.productionBranch`, `release.clearance` (a repository provider without
    `commands.owed` gets no `owed` calls).
-2. **When it applies**, from this run's recorded verdicts (the runner's `status`, never memory):
-   only when the health check's evidence ends with a `CLOSE-OUT OWED: <list>` line. No such line,
+2. **When it applies**, from this run's recorded evidence (the runner's `status` with `evidence`
+   `true`, the health check's row; never memory, and never the verdict alone, which carries no
+   evidence): only when that row's `evidence` holds a `CLOSE-OUT OWED: <list>` line. No such line,
    no health check in this run, or `release.postDeployCheckSkill` unset → `NOT APPLICABLE`: a
    skill that printed no such line is never invoked with `close-out`.
 3. **Safe to re-run.** An earlier attempt of this step in this run answered `DONE` → `DONE`
@@ -26,7 +27,7 @@ verdict", both cited, not copied.
    `FAILED` → `failed`.
 5. **Run it**: the Skill tool, `post-deploy close-out`, with that payload as a fenced JSON
    block, once. Its first line is the verdict:
-   - `DONE` → the provider's `owed --done close-out` → `DONE`.
+   - `DONE` → the provider's `owed --done close-out --pr <n>` → `DONE`.
    - `PARTIAL`, anything else, or nothing → `PARTIAL`: the item stays owed, and the evidence names
      what is left for the recap and the owner. The run continues.
 

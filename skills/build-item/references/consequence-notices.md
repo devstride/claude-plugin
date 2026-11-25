@@ -75,7 +75,7 @@ short "none" withdrawal.
 
 ## Release recaps repeat them
 
-`release` (step 4's recap before the yes) and the epic release (with step 8's unit check, before
+`release` (the `go-ahead` recap before the yes) and the epic release (with step 8's unit check, before
 its merge) gather every notice the release carries, ONCE, before the merge: for each item it
 carries (the items the release-holds check reads, and each release unit's leaves via
 `get_item_hierarchy`), `list_comments` oldest first, every page, then `consequence-notices.py
@@ -96,7 +96,7 @@ needs the leaves' standing notices), then reconcile.
 Each `recap` line goes under **Consequence notices**; none → "Consequence notices: none".
 **Record them before the merge**: one comment on the release pull request (`gh pr comment`),
 headed `Consequence notices` with the recorded base and head SHAs, then the lines (or "none"), and
-ending `<!-- devstride:consequence-notices -->`. The recaps after the merge (release step 6, the
+ending `<!-- devstride:consequence-notices -->`. The recaps after the merge (the release's `release-recap`, the
 epic `Merged / Released` recap) and a session recovering an already-merged release read the newest
 such comment written by the account the session runs as (`gh api user`), and repeat it, marked
 "recorded at an older head <sha>" when its head is not the one that merged; they never gather or reconcile again, because after the merge the

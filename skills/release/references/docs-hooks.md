@@ -34,7 +34,7 @@ cites it rather than restating it.
 | `docs.releaseNotesSkill` | Name of the local skill that writes and publishes a release note. `null` or absent: release notes cannot be requested; `--release-notes` on `release` reports itself unavailable rather than improvising. |
 | `docs.updateOnEpicRelease` | `false` by default. `true` makes `build-item` step 8 invoke `docs.updateSkill` after a release-unit (epic) release pull request merges, so documentation moves with each release unit rather than only at the production cut. |
 | `release.deployApproval` | Optional command approving a waiting deploy after the merge, on the owner's yes (`RELEASE_COMMIT`): 0 = approved and read back, 2 = not waiting yet, else STOP. |
-| `release.devDeployVerification` | Optional shell command, given `RELEASE_COMMIT` (the head the release pull request merges from the source: the cut `<sourceHead>` with a release branch, else `<reviewedHead>`): exit 0 the development environment serves it, 2 not deployed yet, 1 the development deploy failed. `release` runs it at step 4, after the owner's yes and before the production merge, only when the release delta touches a `release.releaseBranchFixExclusions` path; for a standing yes, before that decision and whatever the delta (`auto-start.md`). Poll every 60 s on exit 2 for at most 45 minutes, then STOP; on exit 1 STOP and never merge production over a failed development deploy. The run recap names the wait. Unset: no wait. |
+| `release.devDeployVerification` | Optional shell command, given `RELEASE_COMMIT` (the head the release pull request merges from the source: the cut `<sourceHead>` with a release branch, else `<reviewedHead>`): exit 0 the development environment serves it, 2 not deployed yet, 1 the development deploy failed. `release` runs it in its `go-ahead` phase, after the owner's yes and before the production merge, only when the release delta touches a `release.releaseBranchFixExclusions` path; for a standing yes, before that decision and whatever the delta (`auto-start.md`). Poll every 60 s on exit 2 for at most 45 minutes, then STOP; on exit 1 STOP and never merge production over a failed development deploy. The run recap names the wait. Unset: no wait. |
 | `release.deployVerification` | Optional shell command that exits 0 only when production is actually serving the merge commit, given as the `RELEASE_COMMIT` environment variable. `release` runs it to prove the deploy is live before release notes are written. `null`: the owner confirms the deploy by hand instead. |
 
 `release.docsRepo` is the pre-1.0 shape — a sibling docs checkout the plugin operated on directly.
@@ -51,7 +51,7 @@ none).
   run with `no docs`.
 - **Release notes are written only when the owner asks** — `--release-notes true|draft` on
   `release`, per invocation — and only after the production deploy is confirmed live. If a release
-  seems to deserve one, say so in step 4's recap.
+  seems to deserve one, say so in the `go-ahead` recap.
 - **No skill in this plugin decides on its own that a delta "warrants" a note, is "large", or is
   "user-facing enough".** Those are the owner's words to say, never adjectives for the loop to
   interpret: a loop that judges a release note-worthy will eventually publish one the owner did
@@ -124,7 +124,7 @@ owner's answers, or by hand.
 
 Optional, `null` by default: the name of a local skill that brings a knowledge base (a help centre,
 a search index, an assistant's source set) in line with documentation that was just published.
-Its step is `sync-knowledge-base`, which `release` calls right after 5c.
+Its step is `sync-knowledge-base`, which `release` calls right after `update-docs`.
 
 - **It runs only after documentation was published live.** Mode `sync` with `{ "docsOutcome":
   "published", "live": true }`. Any other outcome, or `live` false, is `NOT RUN` without invoking
@@ -142,11 +142,11 @@ Its step is `sync-knowledge-base`, which `release` calls right after 5c.
 
 ## What `release` does with each docs verdict
 
-**Step 3 — the documentation plan, before anything is owed.** For each hook this release would
+**`docs-plan` — the documentation plan, before anything is owed.** For each hook this release would
 run (`docs.updateSkill`; `docs.knowledgeBaseSyncSkill`; `docs.releaseNotesSkill` when
 `--release-notes` asked), check that `.claude/skills/<name>/SKILL.md` exists:
 
-- **Resolves** → it joins the plan in the step-4 recap and is owed at 5b (`docs`,
+- **Resolves** → it joins the plan in the `go-ahead` recap and is owed at `tower-hand-back` (`docs`,
   `knowledge-base`, `release-notes`), unless `no docs` suppresses the first two. **The
   knowledge-base sync joins only beside a `docs.updateSkill` that resolves**: with no valid docs
   hook the docs can never publish, so a configured sync would sit owed forever — it is left out
@@ -158,7 +158,7 @@ run (`docs.updateSkill`; `docs.knowledgeBaseSyncSkill`; `docs.releaseNotesSkill`
 - **`release.docsRepo` present** → report the deprecation and its migration whatever else is
   set; a valid `docs.updateSkill` still runs.
 
-**Steps 5c–5e — owed accounting and the close-out's `docs` value.** Each owed item is settled with
+**`update-docs` to `write-release-notes` — owed accounting and the close-out's `docs` value.** Each owed item is settled with
 `owed --done <item>` only on a successful or genuinely current result:
 
 | `update-docs` | `docs` owed | `knowledge-base` owed | close-out `docs` |
@@ -167,7 +167,7 @@ run (`docs.updateSkill`; `docs.knowledgeBaseSyncSkill`; `docs.releaseNotesSkill`
 | `CURRENT` | settled | settled: nothing new to mirror | `nothing to change` |
 | `STAGED` | settled; the recap names the owner action (a draft to look at, a pull request to merge) | stays owed; catch-up once the docs are live | `skipped` |
 | `FAILED` | stays owed | stays owed | `failed` |
-| `NOT CONFIGURED` | never owed (step 3 left it out) | never owed | `skipped` |
+| `NOT CONFIGURED` | never owed (`docs-plan` left it out) | never owed | `skipped` |
 | `no docs` | never owed | never owed | `skipped` |
 
 `write-release-notes`: `PUBLISHED` or `DRAFTED` settles `release-notes`; `FAILED` keeps it owed.

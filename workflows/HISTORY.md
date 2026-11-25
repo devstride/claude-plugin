@@ -18,6 +18,7 @@ version marked *shipped unused* was published as data before any released plugin
 - [Release: release notes only (`release-notes`)](#release-release-notes-only-release-notes): version 1
 - [Release: post-deploy only (`release-post-deploy`)](#release-post-deploy-only-release-post-deploy): version 1
 - [Step contracts](#step-contracts): 104 contracts
+  - [4.12.0, 2026-11-25](#4120-2026-11-25)
   - [4.10.0, 2026-11-23](#4100-2026-11-23)
   - [4.8.0, 2026-11-22](#480-2026-11-22)
   - [4.3.0, 2026-11-19](#430-2026-11-19)
@@ -58,52 +59,58 @@ Current version **1**, minimum plugin version **4.8.0**, 1 row(s) recorded.
 
 ## Release (`release`)
 
-Current version **1**, minimum plugin version **4.8.0**, 1 row(s) recorded.
-
-| Version | Plugin release | Date | Steps changed | Note |
-| --- | --- | --- | --- | --- |
-| 1 | 4.8.0 | 2026-11-22 | first version: 45 steps | The full release as a step list for the default clearance scope, generated from one source with the other release definitions. *Shipped unused: no released plugin could run it.* |
-
-## Release (clearance from cut to deploy) (`release-cut-to-deploy`)
-
 Current version **1**, minimum plugin version **4.8.0**, 2 row(s) recorded.
 
 | Version | Plugin release | Date | Steps changed | Note |
 | --- | --- | --- | --- | --- |
+| 1 | 4.12.0 | 2026-11-25 | none | `/devstride:release` now runs the Release workflow one step at a time. |
+| 1 | 4.8.0 | 2026-11-22 | first version: 45 steps | The full release as a step list for the default clearance scope, generated from one source with the other release definitions. *Shipped unused: no released plugin could run it.* |
+
+## Release (clearance from cut to deploy) (`release-cut-to-deploy`)
+
+Current version **1**, minimum plugin version **4.8.0**, 3 row(s) recorded.
+
+| Version | Plugin release | Date | Steps changed | Note |
+| --- | --- | --- | --- | --- |
+| 1 | 4.12.0 | 2026-11-25 | none | `/devstride:release` now runs the Release workflow one step at a time. |
 | 1 | 4.10.0 | 2026-11-23 | contract changed: `post-deploy-check` (post-deploy-check@1 → post-deploy-check-owed@1) | Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet). *Shipped unused: no released plugin could run it.* |
 | 1 | 4.8.0 | 2026-11-22 | first version: 49 steps | The full release as a step list for clearance held from the cut to the deploy. *Shipped unused: no released plugin could run it.* |
 
 ## Release: documentation only (`release-docs`)
 
-Current version **1**, minimum plugin version **4.8.0**, 1 row(s) recorded.
-
-| Version | Plugin release | Date | Steps changed | Note |
-| --- | --- | --- | --- | --- |
-| 1 | 4.8.0 | 2026-11-22 | first version: 4 steps | A partial release entry that runs only the documentation update. *Shipped unused: no released plugin could run it.* |
-
-## Release (clearance for merge and deploy) (`release-merge-and-deploy`)
-
 Current version **1**, minimum plugin version **4.8.0**, 2 row(s) recorded.
 
 | Version | Plugin release | Date | Steps changed | Note |
 | --- | --- | --- | --- | --- |
+| 1 | 4.12.0 | 2026-11-25 | none | Revised in 4.12.0. |
+| 1 | 4.8.0 | 2026-11-22 | first version: 4 steps | A partial release entry that runs only the documentation update. *Shipped unused: no released plugin could run it.* |
+
+## Release (clearance for merge and deploy) (`release-merge-and-deploy`)
+
+Current version **1**, minimum plugin version **4.8.0**, 3 row(s) recorded.
+
+| Version | Plugin release | Date | Steps changed | Note |
+| --- | --- | --- | --- | --- |
+| 1 | 4.12.0 | 2026-11-25 | none | `/devstride:release` now runs the Release workflow one step at a time. |
 | 1 | 4.10.0 | 2026-11-23 | contract changed: `go-ahead-recheck` (owner-go-ahead@1 → owner-go-ahead-recheck@1), `post-deploy-check` (post-deploy-check@1 → post-deploy-check-owed@1) | Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet). *Shipped unused: no released plugin could run it.* |
 | 1 | 4.8.0 | 2026-11-22 | first version: 62 steps | The full release as a step list for clearance held only to merge and deploy. *Shipped unused: no released plugin could run it.* |
 
 ## Release: release notes only (`release-notes`)
 
-Current version **1**, minimum plugin version **4.8.0**, 1 row(s) recorded.
-
-| Version | Plugin release | Date | Steps changed | Note |
-| --- | --- | --- | --- | --- |
-| 1 | 4.8.0 | 2026-11-22 | first version: 3 steps | A partial release entry that writes only the release notes. *Shipped unused: no released plugin could run it.* |
-
-## Release: post-deploy only (`release-post-deploy`)
-
 Current version **1**, minimum plugin version **4.8.0**, 2 row(s) recorded.
 
 | Version | Plugin release | Date | Steps changed | Note |
 | --- | --- | --- | --- | --- |
+| 1 | 4.12.0 | 2026-11-25 | none | `/devstride:release` now runs the Release workflow one step at a time. |
+| 1 | 4.8.0 | 2026-11-22 | first version: 3 steps | A partial release entry that writes only the release notes. *Shipped unused: no released plugin could run it.* |
+
+## Release: post-deploy only (`release-post-deploy`)
+
+Current version **1**, minimum plugin version **4.8.0**, 3 row(s) recorded.
+
+| Version | Plugin release | Date | Steps changed | Note |
+| --- | --- | --- | --- | --- |
+| 1 | 4.12.0 | 2026-11-25 | none | Revised in 4.12.0. |
 | 1 | 4.10.0 | 2026-11-23 | contract changed: `post-deploy-check` (post-deploy-check@1 → post-deploy-check-owed@1) | Every step of a release can be run, watched and re-run one at a time (shipped, not switched on yet). *Shipped unused: no released plugin could run it.* |
 | 1 | 4.8.0 | 2026-11-22 | first version: 4 steps | A partial release entry that runs only the post-deploy health check. *Shipped unused: no released plugin could run it.* |
 
@@ -112,6 +119,20 @@ Current version **1**, minimum plugin version **4.8.0**, 2 row(s) recorded.
 Each contract is `name@major`. A major version only grows by additions; a *revision* is a
 later published content of the same major, and a *slip* is one that changed more than that
 without a new major.
+
+### 4.12.0, 2026-11-25
+
+| Contract | Note |
+| --- | --- |
+| `merge-confirmations@1` (revision) | Revised in 4.12.0. |
+| `owner-go-ahead@1` (revision) | Revised in 4.12.0. |
+| `post-deploy-result@1` (revision) | Revised in 4.12.0. |
+| `pre-ship-at-checks@1` (revision) | Revised in 4.12.0. |
+| `pre-ship-release@1` (revision) | Revised in 4.12.0. |
+| `pre-ship-resume@1` (revision) | Revised in 4.12.0. |
+| `production-merge@1` (revision) | Revised in 4.12.0. |
+| `release-stamp-verify@1` (revision) | Revised in 4.12.0. |
+| `rerun-at-merge@1` (revision) | Revised in 4.12.0. |
 
 ### 4.10.0, 2026-11-23
 

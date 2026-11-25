@@ -461,8 +461,8 @@ bad["dormantSkills"] = {"no-such-skill": "why"}
 check("the catalog check refuses a dormant skill no contract names", any(f.startswith("dormant-skill: no-such-skill") for f in module.check_catalog(bad)), module.check_catalog(bad))
 bad["dormantSkills"] = {"sync-base": ""}
 check("... and one with no reason", module.check_catalog(bad) == ["shape: dormantSkills: each entry is a step skill's name, or gate or checkpoint, and one line on what it waits for"], module.check_catalog(bad))
-check("the shipped catalog lists the release steps, the approval gate and the checkpoint as not switched on, and nothing else",
-      sorted(CATALOG.get("dormantSkills", {})) == ["checkpoint", "gate", "release-steps"] and module.check_catalog(CATALOG) == [], CATALOG.get("dormantSkills"))
+check("the shipped catalog lists the approval gate and the checkpoint as not switched on, and nothing else (the release steps are on)",
+      sorted(CATALOG.get("dormantSkills", {})) == ["checkpoint", "gate"] and module.check_catalog(CATALOG) == [], CATALOG.get("dormantSkills"))
 attempt = Driver(plugin("plain"), build_with("local-checks", GATE), rehearsal=False)
 check("so a gate handed to start outside a rehearsal is refused like a dormant skill, with the catalog's reason, and nothing is written",
       refused(attempt.result, "skill-dormant") and CATALOG["dormantSkills"]["gate"] in attempt.result[3] and attempt.files() == [], attempt.result[3])

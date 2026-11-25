@@ -26,9 +26,9 @@ which thresholds lives in that skill. This file is the authority for the contrac
 
 ## When it runs
 
-`release` invokes it with `check` once, **after the production deploy is confirmed** (step 5a —
+`release` invokes it with `check` once, **after the production deploy is confirmed** (`post-deploy-check`, after `confirm-deploy` —
 the merge commit is known and `release.deployVerification` or the owner has confirmed the deploy)
-and **before** the hand-back (5b; default scope only), the documentation update (5c) and the release notes (5e). A
+and **before** the hand-back (`sync-production` to `tower-hand-back`; default scope only), the documentation update (`update-docs`) and the release notes (`write-release-notes`). A
 health check before the deploy is confirmed measures the previous release; one after the docs are
 published cannot stop them. Under the default clearance scope the release still holds its
 clearance while `check` runs, so `check` does only what the next release depends on (health, and
@@ -70,7 +70,7 @@ substitute for `FAIL`.
 Work nothing else waits on — messages owed to customers once the release is live, removing local
 resources the release prepared — does NOT run inside `check`: it would hold the clearance for it.
 Instead, after its evidence, `check` prints one line `CLOSE-OUT OWED: <short list>`. `release`
-records it as owed at the hand-back (5b) and, once documentation (5c) has finished, invokes the
+records it as owed at the hand-back (`tower-hand-back`) and, once documentation (`update-docs`) has finished, invokes the
 skill again with the word `close-out`, the same payload, and `"docs": "published" | "nothing to
 change" | "skipped" | "failed"` added. It does that work once and returns `POST-DEPLOY CLOSE-OUT:
 DONE` or `POST-DEPLOY CLOSE-OUT: PARTIAL` with the evidence and what is left; PARTIAL keeps the
@@ -81,7 +81,7 @@ item owed and is reported to the owner. A skill that prints no such line is neve
 
 | First line | `release` |
 |---|---|
-| `PASS` | Continue to 5b (scopes `cut-to-deploy` and `merge-and-deploy`: post `success`, then the rest of the owed work). Carry the evidence, and any `CLOSE-OUT OWED` line, into the close-out. |
+| `PASS` | Continue to the close-out (scopes `cut-to-deploy` and `merge-and-deploy`: post `success`, then the rest of the owed work). Carry the evidence, and any `CLOSE-OUT OWED` line, into the close-out. |
 | `FAIL` | **STOP.** Surface the evidence and ask the owner for a rollback decision. Never continue to documentation, release notes or the close-out on your own — public text about a release that is being rolled back is the failure this gate exists to prevent. |
 | `NOT RUN` | Report it as this-run degradation ("post-deploy health: not run — <reason>") and ask the owner whether to proceed. Not a pass, not a failure. |
 | Key absent | No invocation. The close-out says **post-deploy health: not configured**. |
@@ -91,6 +91,7 @@ configured** are different facts, and a `PASS` a human did not see the evidence 
 
 ## Cited by
 
-- `skills/release/SKILL.md` — steps 5a and 5d.
+- `skills/post-deploy/SKILL.md` — the `post-deploy-check` step;
+  `skills/release-steps/references/release-close-out.md` — `post-deploy-close-out`.
 - `skills/doctor/SKILL.md` — section 7 (documentation hooks and the post-deploy check).
 - `skills/setup/references/config-defaults.md` — the key's default.

@@ -162,11 +162,8 @@ order_ok release-train.md "Step 7 terminates" && order_ok epic-release-steps.md 
 # The release's steps are the workflow definitions now: in each of the three full ones (the
 # clearance scope picks one) `train-claim` is the first step, ahead of `release-shape` (which
 # adopts) and `tower-claim`; neither the entry nor those two steps claims anything first.
-# The live release page keeps the same order in its own step 0, until the release entry is switched to the Release workflow.
 SK="$ROOT/skills/release/SKILL.md"
 flat() { tr '\n' ' ' < "$1" | tr -s ' '; }   # wrapped prose read as one line
-line_of() { grep -n -F -- "$2" "$1" | head -1 | cut -d: -f1; }
-T="$(line_of "$SK" 'the train claim first**')"; S="$(line_of "$SK" '**Confirm the shape**')"; C="$(line_of "$SK" '**0a. Clearance**')"
 ORDER="$(python3 - "$ROOT" <<'PY17'
 import json, os, sys
 for ident in ("release", "release-cut-to-deploy", "release-merge-and-deploy"):
@@ -177,15 +174,14 @@ for ident in ("release", "release-cut-to-deploy", "release-merge-and-deploy"):
 PY17
 )"
 RS="$ROOT/skills/release-steps/references"
-[ -n "$T" ] && [ -n "$S" ] && [ -n "$C" ] && [ "$T" -lt "$S" ] && [ "$S" -lt "$C" ] \
-  && ! printf '%s\n' "$ORDER" | grep -qv ':ok$' && [ "$(printf '%s\n' "$ORDER" | grep -c ':ok$')" = 3 ] \
+! printf '%s\n' "$ORDER" | grep -qv ':ok$' && [ "$(printf '%s\n' "$ORDER" | grep -c ':ok$')" = 3 ] \
   && grep -q 'One lock order, train then' "$ROOT/skills/release/references/auto-start.md" \
   && grep -q "auto-start.md\`'s lock order" "$ROOT/skills/release/references/clearance.md" \
   && ! flat "$SK" | grep -q 'claims it before anything else' \
   && ! flat "$RS/release-shape.md" | grep -q 'claims it before anything else' \
   && ! flat "$RS/tower-claim.md" | grep -q 'claims it before anything else' \
   && ! flat "$ROOT/skills/release/references/clearance.md" | grep -q 'purpose release` before anything else,' \
-  && ok "(17) the train claim precedes release adoption and the tower claim, for every run" || bad "(17) lock order: page train $T shape $S clearance $C; $(printf '%s ' $ORDER)"
+  && ok "(17) the train claim precedes release adoption and the tower claim, for every run" || bad "(17) lock order: $(printf '%s ' $ORDER)"
 
 # (18) after the hand-on, a release pushes the train only under the train claim again; every train
 # pull request opened with a claims block carries the holder marker, and an absent one is never

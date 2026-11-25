@@ -58,18 +58,6 @@ python3 - "$ROOT" > "$WORK/calls.txt" 2>&1 <<'PY2'
 import re, sys
 root = sys.argv[1]
 SITES = [  # skill, the heading the section starts with, the call it must contain
-    # The live release page still makes each call itself, until the release entry is switched to the Release workflow
-    # (scripts/tests/workflow-release.sh says how); these ten sites go with the old page then.
-    ("release", "## 0. ", "`classify-release`"),
-    ("release", "## 2. ", "`pre-ship release select`"),
-    ("release", "## 2b. ", "`classify-release`"),
-    ("release", "## 2b. ", "`pre-ship release run`"),
-    ("release", "## 4. ", "`pre-merge-check`"),
-    ("release", "### 5a. ", "`post-deploy check`"),
-    ("release", "### 5c. ", "`update-docs update`"),
-    ("release", "### 5c. ", "`sync-knowledge-base sync`"),
-    ("release", "### 5d. ", "`post-deploy close-out`"),
-    ("release", "### 5e. ", "`write-release-notes`"),
     # the references of release-steps hold each call for the Release workflow's steps
     ("release-steps/references/release-review.md", "# Review the release", "`pre-ship release select`"),
     ("release-steps/references/release-docs.md", "# Update documentation", "`update-docs update`"),

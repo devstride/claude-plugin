@@ -11,7 +11,7 @@ mandatory. This file is the exact procedure for deciding that, and the failure m
 **If `verify.skipDuringStoryBuilds` is empty — the default — none of this runs.** There is no
 applicability to compute, no label to add, and no mapped check to wait on. Skip straight past it.
 A repo with no slow cloud suite is the normal case; a slow suite that runs LOCALLY instead belongs
-in `preShipChecks`, walked by `pr` step 2b and `release` step 2b, and never produces a CI check
+in `preShipChecks`, walked by `pr` step 2b and the release's `pre-ship-release` step, and never produces a CI check
 at all.
 
 **Each entry's three cases must mirror the repo's own workflow file exactly.** If you add,

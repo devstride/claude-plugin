@@ -26,4 +26,4 @@ as a fenced JSON block. Contract: `${CLAUDE_PLUGIN_ROOT}/skills/release/referenc
    must happen first. A failed run or any other first line → `PRE-MERGE: NOT RUN` with the reason.
 
 A safety step: `HOLD` stops the release before the go-ahead and `NOT RUN` asks the owner — both
-decisions belong to `release` step 4.
+decisions belong to the release run, before its `go-ahead` step.

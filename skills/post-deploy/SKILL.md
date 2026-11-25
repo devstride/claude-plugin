@@ -26,9 +26,10 @@ this step follows unchanged.
    other first line, or a failed run → `POST-DEPLOY HEALTH: NOT RUN` with the reason — never a pass.
 4. `close-out`: pass `DONE` or `PARTIAL` through; anything else → `POST-DEPLOY CLOSE-OUT:
    PARTIAL` with the reason and what is left.
-5. Then its evidence lines, each naming its command. A `CLOSE-OUT OWED: <list>` line is kept
-   verbatim as the LAST line, so the owed accounting is never lost.
+5. Then its evidence lines, each naming its command. A `CLOSE-OUT OWED: <list>` line, which the
+   skill prints last, is kept verbatim as the FIRST evidence line, right under the verdict: a long
+   report is cut short from its end when recorded, so the owed accounting is never lost.
 
 This step does not interpret health, decide a rollback or send anything. The stop-and-ask
 decisions — `FAIL` stops the release for a rollback decision, `NOT RUN` asks whether to proceed —
-belong to `release` step 5a.
+belong to the release run.

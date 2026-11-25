@@ -35,7 +35,7 @@ merge gate are read there.
    (the sync branch is disposable; never a protected one). `REFUSE` or `ERROR` → `STOPPED`.
    Then `git fetch origin <productionBranch> <releaseSource>` again → `DONE`.
 6. **Settle.** Under `merge-and-deploy`, after `DONE` or `ALREADY SYNCED`: the provider's
-   `owed --done sync` (the release behind brings production in itself, so it never waited on
+   `owed --done sync --pr <n>` (the release behind brings production in itself, so it never waited on
    this). The release-branch deletion and the train levelling follow as their own steps. A
    provider without `commands.owed` gets no `owed` call.
 

@@ -1,0 +1,96 @@
+{
+  "about": "A post-deploy-only run under the default scope stops on a failed health check; the owner fixes the cause and answers, so the status step answers RECHECK, the runner runs the health check again, it passes, and the run finishes. Before, every resume read the recorded failure again without checking production.",
+  "definition": "workflows/release-post-deploy.json",
+  "context": {
+    "item": null,
+    "productionBranch": "main",
+    "releaseSource": "develop",
+    "scope": "release",
+    "startedBy": "person",
+    "releaseNotes": "false",
+    "noDocs": false,
+    "profile": {
+      "name": "extended",
+      "source": "config"
+    }
+  },
+  "script": [
+    {
+      "step": "merged-release",
+      "output": "MERGED RELEASE: FOUND 42\nevidence line\n```json\n{\"sha\": \"0000000000000000000000000000000000000017\", \"pullRequest\": 42}\n```\n"
+    },
+    {
+      "step": "confirm-deploy",
+      "output": "DEPLOY: CONFIRMED 0000000000000000000000000000000000000017\nevidence line\n```json\n{\"mergeCommit\": \"0000000000000000000000000000000000000017\", \"confirmedAt\": \"2026-11-21T19:00:00Z\"}\n```\n"
+    },
+    {
+      "step": "post-deploy-check",
+      "output": "POST-DEPLOY HEALTH: FAIL\nevidence line\n```json\n{\"state\": \"fail\"}\n```\n"
+    },
+    {
+      "step": "post-deploy-status",
+      "output": "POST-DEPLOY STATUS: NOT POSTED FAIL\nevidence line\n```json\n{\"state\": \"not-posted\"}\n```\n"
+    },
+    {
+      "step": "post-deploy-status",
+      "output": "POST-DEPLOY STATUS: RECHECK\nevidence line\n```json\n{\"state\": \"recheck\"}\n```\n"
+    },
+    {
+      "step": "post-deploy-check",
+      "output": "POST-DEPLOY HEALTH: PASS\nevidence line\n```json\n{\"state\": \"pass\"}\n```\n"
+    },
+    {
+      "step": "post-deploy-status",
+      "output": "POST-DEPLOY STATUS: NOT APPLICABLE\nevidence line\n```json\n{\"state\": \"not-applicable\"}\n```\n"
+    }
+  ],
+  "answers": [
+    "fixed the alarm, check again"
+  ],
+  "expect": {
+    "order": [
+      [
+        "merged-release",
+        1
+      ],
+      [
+        "confirm-deploy",
+        1
+      ],
+      [
+        "post-deploy-check",
+        1
+      ],
+      [
+        "post-deploy-status",
+        1
+      ],
+      [
+        "post-deploy-status",
+        2
+      ],
+      [
+        "post-deploy-check",
+        2
+      ],
+      [
+        "post-deploy-status",
+        3
+      ]
+    ],
+    "outcome": "completed",
+    "stops": [
+      "post-deploy-status"
+    ],
+    "stopReasons": [
+      "NOT POSTED FAIL"
+    ],
+    "handed": {
+      "post-deploy-status#2": {
+        "payload": {
+          "answer": "fixed the alarm, check again"
+        }
+      }
+    }
+  }
+}

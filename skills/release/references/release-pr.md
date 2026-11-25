@@ -1,13 +1,12 @@
 ---
 load: contract
 ---
-# The release pull request — its body and the gated review (steps 1–2c)
+# The release pull request — its body and the gated review (`open-release-pr` to `discharge-hold`)
 
-The `release` body keeps the order of steps 1–2c, their verdict lines and the hard floors; this
-file holds how each is carried out, and is read in full before step 1 (before step 2 when step 1
-did not run).
+The Release definitions keep the order of these steps; this file holds how each is carried out,
+and is read in full before `open-release-pr` (before `release-review` when it did not run).
 
-## Step 1 — the release-flavored body
+## `open-release-pr` — the release-flavored body
 
 `prBodyTemplate.sections` in order, flavor by POSITION:
 
@@ -27,17 +26,17 @@ bypass of the draft hold) and, on a release branch, a second marker line
 Under scope `merge-and-deploy` a third, `<!-- devstride:release-holder <digest> on <machine> -->`,
 written now so the body is never edited after the ready flip (`clearance.md`).
 
-## Step 2 — invoking `review`
+## `release-review` — invoking `review`
 
 - **The profile never loosens this step.** It sets the review's normal cycle target and fix floor;
   a production release is a PR-path review under every profile, so the configured CLI engine and
   every in-scope cloud reviewer run — unless `release.productionReview` is set: then
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/review-once.md`, read first, decides how much of
-  step 2 runs.
+  `release-review` runs.
 - **What the invocation declares.** **DRIVEN** — undeclared, `review`'s standalone ask-gates and
   notifications pause an autonomous release — and, on a release branch, `release-branch: true` (its
   7.1 then hands a moved base back to the hotfix rule). Pass `review-moment: production-release`,
-  critical merge-gate routing, and a scope manifest from step 0: files/symbols where epics
+  critical merge-gate routing, and a scope manifest from `release-delta`: files/symbols where epics
   interact, conflict-resolution commits, migrations/public contracts, and commits with no settled
   reviewed-head record.
 - **Seed prior dispositions.** Load each constituent PR's
@@ -48,48 +47,49 @@ written now so the body is never edited after the ready flip (`clearance.md`).
 - **Enforce the release-surface scope with that manifest**, not narrative alone; never blindly
   re-read approved code (why: `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-gates.md`).
   Pre-ship checks stay non-negotiable. Consume `review`'s findings summary and untracked-deferral
-  list before step 4.
+  list before `go-ahead`.
 - **The pre-ship hold.** Declared whenever any `preShipChecks` entry has `when` ∈
   {`releaseOnly`, `always`}: `pre-ship release select`, run here without `--ran-at-train`, prints
-  `PRE-SHIP SELECTED`. No such entry → no hold, skip 2c. Scope `merge-and-deploy` declares it
-  the same way; at 7.1b a head whose tree 0p's check stamp covers discharges it at once, and any
-  other head re-runs 0p before 2c (nothing is held then, `clearance.md`).
+  `PRE-SHIP SELECTED`. No such entry → no hold, and `discharge-hold` answers `NO HOLD`. Scope
+  `merge-and-deploy` declares it the same way; at 7.1b a head whose tree the `checks` phase's stamp
+  covers discharges it at once, and any other head re-runs the `checks` phase before
+  `discharge-hold` (nothing is held then, `clearance.md`).
   The release head is protected so `review`'s 7.1 never rebases it — the hold still fires.
 - **Order**: merge-gate Claude + local CLI + cloud review concurrently (every finding
-  verified/triaged/fixed/replied/resolved) → the pre-ship checks (2b) → the ready-flip releases CI,
+  verified/triaged/fixed/replied/resolved) → the pre-ship checks (`pre-ship-release`) → the ready-flip releases CI,
   once, on the final reviewed diff.
 - **Where suites run.** `preShipChecks` suites run LOCALLY only (`pre-ship`);
   `verify.skipDuringStoryBuilds` governs slow CLOUD suites (moving one between them:
   `release-gates.md`).
 
-## Step 2 — the head, re-validated before the flip
+## `release-review` — the head, re-validated before the flip
 
 On a release branch the head advances only by this run's fix commits and a hotfix merge
 (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` §4), each re-reviewed; without
-one it must still equal `<sourceHead>`. Anything else → recompute the delta and restart step 2 on
+one it must still equal `<sourceHead>`. Anything else → recompute the delta and restart `release-review` on
 the new head with the same ledger, target and safety triggers. Record the SHA that finally settles
 as `<reviewedHead>` (after `review` 7.3's empty re-trigger commit if one fired — same tree).
-Nothing is frozen: an advance after the flip goes back through step 2 — a ready PR is first
-returned to draft (`gh pr ready --undo`), so CI waits — never merged over; any return to step 2
-voids any owner yes given.
+Nothing is frozen: an advance after the flip goes back through `release-review` — a ready PR is
+first returned to draft (`gh pr ready --undo`), so CI waits — never merged over; any return to
+`release-review` voids any owner yes given.
 
-## Step 2 — findings
+## `release-review` — findings
 
 Only genuinely ambiguous/risky findings stall — surface them with a recommendation. A dismissed
-finding stays dismissed; each entry on this release's or the step-0b train pull request's
+finding stays dismissed; each entry on this release's or the train pull request's (`train-pr`)
 untracked-deferral list → `create-defect deferred <item#>` (a bug) or
 `create-story deferred <item#>` (the item it concerns; discovered scope: `insert-story`) with a plan root, else noted for
 the owner — never spliced.
 
-## Step 2b — running the checks
+## `pre-ship-release` — running the checks
 
-Run `classify-release` again at the head 2b tests (a merge, fix or hotfix changes the delta), then
+Run `classify-release` again (`classify-at-pre-ship`) at the head `pre-ship-release` tests (a merge, fix or hotfix changes the delta), then
 `pre-ship release run` with THAT class. Add `--ran-at-train <names>@<sha>` only from THIS release's
 `PRE-SHIP TRAIN: PASS` line, else every `runAt: train` entry runs here. Report each entry's result
-in step 4's recap. The owner may explicitly waive one ("skip <name>") — pass `--skip <name>`,
+in the `go-ahead` recap. The owner may explicitly waive one ("skip <name>") — pass `--skip <name>`,
 reported `WAIVED`; "not run" is legitimate, silent omission is not.
 
-## Step 2c — discharging the hold
+## `discharge-hold` — discharging the hold
 
 `review` in PRE-SHIP RESUME mode re-enters at 7.1, re-checks the unresolved threads, flips the PR
 ready and settles CI. Carry the same ledger, target and safety triggers: a verified P1/serious-P2
@@ -98,4 +98,4 @@ declared hold left undischarged leaves the PR a draft, CI never released.
 
 ## Cited by
 
-- `skills/release/SKILL.md` — step 1's pointer ("Read … in full before step 1"), and steps 2–2c.
+- `skills/release-steps/references/release-pr.md`, `release-review.md` and `pre-ship-resume.md`.

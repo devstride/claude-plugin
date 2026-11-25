@@ -41,7 +41,8 @@ load: contract
    owed), quoting `RELEASED …` and the `Close-out owed:` line. Exit `4` (NOT HOLDER) → no verdict
    line: another session owns the release now, and the run stops. Never `--force`: that is the
    owner's command.
-5. Every later owed step settles its item with the provider's `owed --done <item>`.
+5. Every later owed step settles its item with the provider's `owed --done <item> --pr <n>`, `<n>`
+   this run's release pull request: a session holding two releases settles the right one.
 
 ## Verdict
 

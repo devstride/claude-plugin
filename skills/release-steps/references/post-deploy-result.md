@@ -12,7 +12,16 @@ it", cited, not copied.
 
 1. **Config wins.** Load `.claude/ds-config.json`: `release.clearance` and its `scope`,
    `release.postDeployCheckSkill`. The payload's `scope` wins when set. No clearance block, or
-   scope `release` → `NOT APPLICABLE`: no status is posted under the default scope.
+   scope `release` → `NOT APPLICABLE`: no status is posted under the default scope. Except, there
+   (the post-deploy-only entry), a health `FAIL`, or `NOT RUN` the `answer` declines →
+   `NOT POSTED <verdict>`: the run stops for the owner's rollback decision; `NOT RUN` with an
+   answer that neither accepts nor declines, or none → `NEEDS DECISION`, as in step 3.
+   **Re-issued after this step stopped or asked** (`NOT POSTED`, `FAILURE POSTED`, `ERROR POSTED`
+   or `NEEDS DECISION`): an `answer` asking to check again (the owner fixed the cause, or a later
+   check passed) → `RECHECK`, read before any yes or no: the runner runs the health check again,
+   then this step posts its new result. After a stop, any other answer (a rollback, a question)
+   or none → the same verdict, posting nothing again: a later post-deploy-only result is never
+   overwritten, and a rollback is decided outside the run.
 2. **Inputs**, from this run's recorded verdicts and results (the runner's `status`, never
    memory): the merge commit (`production-merge`'s `sha`, else `merged-release`'s; the full SHA)
    and the health check's verdict line with its evidence. Here the check
@@ -32,20 +41,22 @@ it", cited, not copied.
      the owner to accept the unrun check, with its reason. The runner issues this step again
      with the answer.
    - A check verdict that cannot be read → `error` → `ERROR POSTED`, and the run stops.
-   Safe to re-run: it posts from the recorded check verdict each time.
+   Safe to re-run: it posts from the recorded check verdict each time, except the `RECHECK` of
+   step 1, which posts nothing.
 4. **The script's line.** `SKIPPED` or `NOT GATED` → `NOT APPLICABLE`. `FAILED` or exit `1` → one
    more try; still failing → no verdict line, naming the error, and the run stops.
-5. **Settle the owed item** once posted: the provider's `owed --done post-deploy-check` (never with
+5. **Settle the owed item** once posted: the provider's `owed --done post-deploy-check --pr <n>` (never with
    a provider without `commands.owed`; the owed file is advisory, so this never fails). Under
    `FAIL` it is settled too: the check ran and its result is recorded.
 
 ## Verdict
 
-`POST-DEPLOY STATUS: SUCCESS POSTED | FAILURE POSTED | ERROR POSTED | NEEDS DECISION <question> | NOT APPLICABLE`
+`POST-DEPLOY STATUS: SUCCESS POSTED | FAILURE POSTED | ERROR POSTED | NEEDS DECISION <question> | NOT POSTED <verdict> | RECHECK | NOT APPLICABLE`
 
 ## Result
 
-`state`: `success-posted`, `failure-posted`, `error-posted`, `needs-decision` or `not-applicable`.
+`state`: `success-posted`, `failure-posted`, `error-posted`, `needs-decision`, `not-posted`,
+`recheck` or `not-applicable`.
 
 ## Cited by
 

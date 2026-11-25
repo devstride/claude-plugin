@@ -5,7 +5,7 @@ load: contract
 
 `release-steps`' `release-tip@1` step (the step `checks-tip`), the first step of the checks under
 scope `merge-and-deploy`, which run before the tower is claimed. The phase is
-`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md` "Scope `merge-and-deploy`" (0p),
+`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md` "Scope `merge-and-deploy`" (the `checks` phase),
 cited, not copied; the stamp's rules are the header of
 `${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/release_checks.py`.
 

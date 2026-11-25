@@ -4,7 +4,7 @@ load: contract
 # Discharge the pre-ship hold — the ready flip, once, after the checks
 
 `release-steps`' `pre-ship-resume@1` step, run after the release's pre-ship checks passed. What
-the resume does is `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-pr.md` "Step 2c",
+the resume does is `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-pr.md` "`discharge-hold`",
 cited, not copied.
 
 1. **Config wins.** Load `.claude/ds-config.json`: `preShipChecks`, `release.productionReview`.
@@ -13,14 +13,27 @@ cited, not copied.
 3. **Was a hold declared?** Yes when `pre-ship release select` prints `PRE-SHIP SELECTED` (the
    review declared one whenever it does), and yes on the identical-tree path of
    `${CLAUDE_PLUGIN_ROOT}/skills/release/references/review-once.md`, which leaves the ready flip
-   to this step. Neither → `NO HOLD`: the review marked the pull request ready itself.
+   to this step. Neither → `NO HOLD`: the review marked the pull request ready itself. Under scope
+   `merge-and-deploy`, a settled head whose tree is not the newest stamp's (the catch-up merged
+   production in) is still stamped first, as step 4 says, its pre-ship step passed or empty there.
 4. **Never discharge over a red or unrun check.** The pre-ship step answered `PRE-SHIP: PASS`
-   (each entry passed, or was waived on the owner's own words) at the head the review settled.
+   (each entry passed, or was waived on the owner's own words), or `NOTHING TO RUN` (no entry
+   selected, so none is unrun), at the head the review settled.
    Otherwise → `STILL HELD`, naming the entry; never "covered by CI". Under scope
    `merge-and-deploy` a settled head whose tree equals the checks stamp's tree counts the checks'
    own `PRE-SHIP` line ("passed at <sha>"); any other tree needs that pre-ship step at the settled
    head first (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md` "Scope
-   `merge-and-deploy`").
+   `merge-and-deploy`"), and then a new stamp, since the old one names a tree that will not
+   merge: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/release_checks.py stamp --head
+   <settled head> --class <the class at pre-ship> --master <m>`, `<m>` the production tip the
+   settled head holds when the catch-up merged production in this round (`release_checks.py tip`,
+   then `contains --head <settled head>`: exit 3 → `PRODUCTION MOVED`), else the `master` of this run's
+   newest stamp (`release-stamp-verify.md` step 2: a rebuilt round's tip wins), else the checks
+   phase's `PRODUCTION TIP: AT <m>` row. Exit 0 → its printed `CHECKS STAMP head …` line is this
+   step's first evidence line, word for word. `CHANGED master` (production moved since the
+   checks) → `PRODUCTION MOVED`, still a draft: the catch-up next merges production in and sends
+   the run back through the review, or marks it ready itself on the same tree; `ERROR` →
+   `STILL HELD`, saying why.
 5. **Re-invoke `review` in PRE-SHIP RESUME mode, naming that mode** — a plain re-invocation
    wrongly restarts cycle 1 — with the same ledger, target and safety triggers. It re-enters at
    its 7.1, re-checks the unresolved threads, marks the pull request ready and settles CI, once.
@@ -32,11 +45,11 @@ cited, not copied.
 
 ## Verdict
 
-`PRE-SHIP HOLD: DISCHARGED | NO HOLD | STILL HELD <why>`
+`PRE-SHIP HOLD: DISCHARGED | NO HOLD | PRODUCTION MOVED | STILL HELD <why>`
 
 ## Result
 
-`state`: `discharged`, `no-hold` or `still-held`.
+`state`: `discharged`, `no-hold`, `production-moved` or `still-held`.
 
 ## Cited by
 

@@ -238,31 +238,31 @@ RELEASE_PUBLISHED = {
     'train-claim-hand-on@1': ('release-steps', 'TRAIN CLAIM: HANDED ON=continue | HELD=continue | NOT APPLICABLE=skipped', 'none', [], 'Hand on the train claim', None),
     'release-tip@1': ('release-steps', 'PRODUCTION TIP: AT=continue', 'none', [], 'Read the production tip', None),
     'classify-at-checks@1': ('classify-release', 'RELEASE CLASS: LIGHT=continue | FULL=continue | NOT APPLICABLE=skipped', 'none', [], 'Classify at the checks', None),
-    'pre-ship-at-checks@1': ('pre-ship', 'PRE-SHIP: PASS=continue | FAIL=stop | NOTHING TO RUN=skipped | NOT APPLICABLE=skipped', 'none', [], 'Pre-ship before the tower', None),
+    'pre-ship-at-checks@1': ('pre-ship', 'PRE-SHIP: PASS=continue | FAIL=stop | HEAD MOVED=rewind:release-tip@1 | NOTHING TO RUN=skipped | NOT APPLICABLE=skipped', 'none', [], 'Pre-ship before the tower', None),
     'dev-deploy-wait@1': ('release-steps', 'DEV DEPLOY: SERVING=continue | FAILED=stop | TIMED OUT=stop | NOT APPLICABLE=skipped', 'none', [], 'Wait for the staging deploy', None),
     'pre-merge-at-checks@1': ('pre-merge-check', 'PRE-MERGE: CLEAR=continue | HOLD=stop | NOT RUN=confirm | NOT CONFIGURED=skipped | NOT APPLICABLE=skipped', 'none', [], 'Pre-merge check at the checks', None),
     'release-stamp@1': ('release-steps', 'CHECKS STAMP: STAMPED=continue | CHANGED=redo:self', 'none', [], 'Stamp the checks', None),
     'release-review@1': ('release-steps', 'RELEASE REVIEW: SETTLED=continue | HEAD MOVED=redo:self | BLOCKED=stop', 'none', [], 'Review the release', None),
     'classify-at-pre-ship@1': ('classify-release', 'RELEASE CLASS: LIGHT=continue | FULL=continue | NOT APPLICABLE=skipped', 'none', [], 'Classify before pre-ship', None),
-    'pre-ship-release@1': ('pre-ship', 'PRE-SHIP: PASS=continue | FAIL=stop | NOT APPLICABLE=continue', 'none', ['release-review@1'], 'Pre-ship checks', None),
-    'pre-ship-resume@1': ('release-steps', 'PRE-SHIP HOLD: DISCHARGED=continue | NO HOLD=skipped | STILL HELD=stop', 'none', [], 'Discharge the pre-ship hold', None),
+    'pre-ship-release@1': ('pre-ship', 'PRE-SHIP: PASS=continue | FAIL=stop | HEAD MOVED=rewind:release-review@1 | NOTHING TO RUN=continue | NOT APPLICABLE=continue', 'none', ['release-review@1'], 'Pre-ship checks', None),
+    'pre-ship-resume@1': ('release-steps', 'PRE-SHIP HOLD: DISCHARGED=continue | NO HOLD=skipped | PRODUCTION MOVED=skipped | STILL HELD=stop', 'none', [], 'Discharge the pre-ship hold', None),
     'release-docs-plan@1': ('release-steps', 'DOCS PLAN: HOOKS=continue | NONE REGISTERED=continue | SUPPRESSED=continue', 'none', [], 'Plan the documentation', None),
     'hotfix-catch-up@1': ('release-steps', 'HOTFIX CATCH-UP: NONE=continue | MERGED=rewind:release-review@1 | SAME TREE=continue', 'none', [], 'Catch up with a hotfix', None),
     'previous-release@1': ('release-steps', 'PREVIOUS RELEASE: SUCCESS=continue | PENDING=stop | FAILED=ask | NOT GATED=continue | UNREADABLE=ask', 'none', [], 'Check the previous release', None),
     'pre-merge-check@1': ('pre-merge-check', 'PRE-MERGE: CLEAR=continue | HOLD=stop | NOT RUN=confirm | NOT CONFIGURED=skipped | NOT APPLICABLE=skipped', 'none', [], 'Pre-merge check', None),
     'pre-merge-recheck@1': ('pre-merge-check', 'PRE-MERGE: CLEAR=continue | HOLD=stop | NOT RUN=confirm | NOT CONFIGURED=skipped | NOT APPLICABLE=skipped', 'none', [], 'Pre-merge recheck', None),
-    'owner-go-ahead@1': ('release-steps', 'GO-AHEAD: YES=continue | NOT YET=ask | NO=end:declined', 'none', ['release-review@1', 'pre-ship-release@1'], 'Wait for the go-ahead', None),
+    'owner-go-ahead@1': ('release-steps', 'GO-AHEAD: YES=continue | HOTFIX LANDED=rewind:hotfix-catch-up@1 | NOT YET=ask | NO=end:declined', 'none', ['release-review@1', 'pre-ship-release@1'], 'Wait for the go-ahead', None),
     'owner-go-ahead-recheck@1': ('release-steps', 'GO-AHEAD: YES=continue | NOT YET=ask | NO=end:declined', 'none', ['release-review@1', 'pre-ship-release@1', 'owner-go-ahead@1'], 'Recheck the go-ahead', None),
-    'release-stamp-verify@1': ('release-steps', 'CHECKS STAMP: UNCHANGED=continue | CHANGED=stop | BEHIND=stop | ERROR=stop', 'none', [], 'Verify the checks stamp', None),
+    'release-stamp-verify@1': ('release-steps', 'CHECKS STAMP: UNCHANGED=continue | CHANGED=rewind:hotfix-catch-up@1 | BEHIND=rewind:hotfix-catch-up@1 | ERROR=stop', 'none', [], 'Verify the checks stamp', None),
     'rerun-at-merge@1': ('pre-ship', 'PRE-SHIP: PASS=continue | FAIL=stop | NOTHING TO RUN=skipped | NOT APPLICABLE=skipped', 'none', [], 'Re-run checks at the merge', None),
-    'merge-confirmations@1': ('release-steps', 'MERGE CONFIRMED: HEAD=continue | NOT CONFIRMED=stop', 'none', ['release-review@1', 'pre-ship-release@1', 'owner-go-ahead@1'], 'Confirm the merge', None),
-    'production-merge@1': ('release-steps', 'PRODUCTION MERGE: MERGED=continue | REFUSED=stop | ERROR=stop', 'none', ['release-review@1', 'pre-ship-release@1', 'owner-go-ahead@1', 'merge-confirmations@1'], 'Merge to production', None),
+    'merge-confirmations@1': ('release-steps', 'MERGE CONFIRMED: HEAD=continue | HEAD MOVED=rewind:release-review@1 | NOT CONFIRMED=stop', 'none', ['release-review@1', 'pre-ship-release@1', 'owner-go-ahead@1'], 'Confirm the merge', None),
+    'production-merge@1': ('release-steps', 'PRODUCTION MERGE: MERGED=continue | HOTFIX LANDED=rewind:hotfix-catch-up@1 | REFUSED=stop | ERROR=stop', 'none', ['release-review@1', 'pre-ship-release@1', 'owner-go-ahead@1', 'merge-confirmations@1'], 'Merge to production', None),
     'post-deploy-pending@1': ('release-steps', 'POST-DEPLOY STATUS: PENDING POSTED=continue | NOT APPLICABLE=skipped', 'none', [], 'Post the pending status', None),
     'estimates-score@1': ('release-steps', 'ESTIMATES: SCORED=continue | NONE=continue | NOTED FAILURE=continue', 'none', [], 'Score estimates', None),
     'tower-hand-back@1': ('release-steps', 'TOWER: HANDED BACK=continue | KEPT=stop | NOT APPLICABLE=skipped', 'none', [], 'Hand back the tower', None),
     'post-deploy-check@1': ('post-deploy', 'POST-DEPLOY HEALTH: PASS=continue | FAIL=stop | NOT RUN=confirm | NOT CONFIGURED=skipped', 'none', [], 'Post-deploy health check', None),
     'post-deploy-check-owed@1': ('post-deploy', 'POST-DEPLOY HEALTH: PASS=continue | FAIL=continue | NOT RUN=continue | NOT CONFIGURED=skipped', 'none', [], 'Post-deploy health check', None),
-    'post-deploy-result@1': ('release-steps', 'POST-DEPLOY STATUS: SUCCESS POSTED=continue | FAILURE POSTED=stop | ERROR POSTED=stop | NEEDS DECISION=ask | NOT APPLICABLE=skipped', 'none', [], 'Post the health result', None),
+    'post-deploy-result@1': ('release-steps', 'POST-DEPLOY STATUS: SUCCESS POSTED=continue | FAILURE POSTED=stop | ERROR POSTED=stop | NEEDS DECISION=ask | NOT POSTED=stop | RECHECK=rewind:post-deploy-check-owed@1 | NOT APPLICABLE=skipped', 'none', [], 'Post the health result', None),
     'release-sync@1': ('release-steps', 'SYNC: DONE=continue | ALREADY SYNCED=continue | STOPPED=stop', 'none', [], 'Sync production back', None),
     'release-branch-delete@1': ('release-steps', 'RELEASE BRANCH DELETE: DELETED=continue | KEPT=continue | NOT APPLICABLE=skipped', 'none', [], 'Delete the release branch', None),
     'release-docs@1': ('release-steps', 'UPDATE DOCS: PUBLISHED=continue | STAGED=continue | CURRENT=continue | NOT CONFIGURED=skipped | FAILED=continue | NOT APPLICABLE=skipped', 'none', [], 'Update documentation', None),
@@ -297,31 +297,31 @@ RELEASE_LINES = {
     'train-claim-hand-on@1': 'TRAIN CLAIM: HANDED ON | HELD <why> | NOT APPLICABLE',
     'release-tip@1': 'PRODUCTION TIP: AT <sha>',
     'classify-at-checks@1': 'RELEASE CLASS: LIGHT | FULL | NOT APPLICABLE',
-    'pre-ship-at-checks@1': 'PRE-SHIP: PASS [<counts>] | FAIL [<names>] | NOTHING TO RUN | NOT APPLICABLE',
+    'pre-ship-at-checks@1': 'PRE-SHIP: PASS [<counts>] | FAIL [<names>] | HEAD MOVED [<head>] | NOTHING TO RUN | NOT APPLICABLE',
     'dev-deploy-wait@1': 'DEV DEPLOY: SERVING | FAILED <reason> | TIMED OUT | NOT APPLICABLE',
     'pre-merge-at-checks@1': 'PRE-MERGE: CLEAR | HOLD | NOT RUN | NOT CONFIGURED | NOT APPLICABLE',
     'release-stamp@1': 'CHECKS STAMP: STAMPED <stamp> | CHANGED <range>',
     'release-review@1': 'RELEASE REVIEW: SETTLED <head> | HEAD MOVED | BLOCKED <findings>',
     'classify-at-pre-ship@1': 'RELEASE CLASS: LIGHT | FULL | NOT APPLICABLE',
-    'pre-ship-release@1': 'PRE-SHIP: PASS [<counts>] | FAIL [<names>] | NOT APPLICABLE',
-    'pre-ship-resume@1': 'PRE-SHIP HOLD: DISCHARGED | NO HOLD | STILL HELD <why>',
+    'pre-ship-release@1': 'PRE-SHIP: PASS [<counts>] | FAIL [<names>] | HEAD MOVED [<head>] | NOTHING TO RUN | NOT APPLICABLE',
+    'pre-ship-resume@1': 'PRE-SHIP HOLD: DISCHARGED | NO HOLD | PRODUCTION MOVED | STILL HELD <why>',
     'release-docs-plan@1': 'DOCS PLAN: HOOKS <hooks> | NONE REGISTERED | SUPPRESSED',
     'hotfix-catch-up@1': 'HOTFIX CATCH-UP: NONE | MERGED <pr> | SAME TREE <sha>',
     'previous-release@1': 'PREVIOUS RELEASE: SUCCESS | PENDING | FAILED <release> | NOT GATED | UNREADABLE',
     'pre-merge-check@1': 'PRE-MERGE: CLEAR | HOLD | NOT RUN | NOT CONFIGURED | NOT APPLICABLE',
     'pre-merge-recheck@1': 'PRE-MERGE: CLEAR | HOLD | NOT RUN | NOT CONFIGURED | NOT APPLICABLE',
-    'owner-go-ahead@1': 'GO-AHEAD: YES <source> | NOT YET | NO',
+    'owner-go-ahead@1': 'GO-AHEAD: YES <source> | HOTFIX LANDED <pr> | NOT YET | NO',
     'owner-go-ahead-recheck@1': 'GO-AHEAD: YES <source> | NOT YET | NO',
     'release-stamp-verify@1': 'CHECKS STAMP: UNCHANGED | CHANGED | BEHIND | ERROR <reason>',
     'rerun-at-merge@1': 'PRE-SHIP: PASS [<counts>] | FAIL [<names>] | NOTHING TO RUN | NOT APPLICABLE',
-    'merge-confirmations@1': 'MERGE CONFIRMED: HEAD <head> | NOT CONFIRMED <which>',
-    'production-merge@1': 'PRODUCTION MERGE: MERGED <pr> | REFUSED <reason> | ERROR <reason>',
+    'merge-confirmations@1': 'MERGE CONFIRMED: HEAD <head> | HEAD MOVED <head> | NOT CONFIRMED <which>',
+    'production-merge@1': 'PRODUCTION MERGE: MERGED <pr> | HOTFIX LANDED <pr> | REFUSED <reason> | ERROR <reason>',
     'post-deploy-pending@1': 'POST-DEPLOY STATUS: PENDING POSTED | NOT APPLICABLE',
     'estimates-score@1': 'ESTIMATES: SCORED <count> | NONE | NOTED FAILURE',
     'tower-hand-back@1': 'TOWER: HANDED BACK <owed> | KEPT <why> | NOT APPLICABLE',
     'post-deploy-check@1': 'POST-DEPLOY HEALTH: PASS | FAIL | NOT RUN | NOT CONFIGURED',
     'post-deploy-check-owed@1': 'POST-DEPLOY HEALTH: PASS | FAIL | NOT RUN | NOT CONFIGURED',
-    'post-deploy-result@1': 'POST-DEPLOY STATUS: SUCCESS POSTED | FAILURE POSTED | ERROR POSTED | NEEDS DECISION <question> | NOT APPLICABLE',
+    'post-deploy-result@1': 'POST-DEPLOY STATUS: SUCCESS POSTED | FAILURE POSTED | ERROR POSTED | NEEDS DECISION <question> | NOT POSTED <verdict> | RECHECK | NOT APPLICABLE',
     'release-sync@1': 'SYNC: DONE | ALREADY SYNCED | STOPPED <why>',
     'release-branch-delete@1': 'RELEASE BRANCH DELETE: DELETED <branch> | KEPT <why> | NOT APPLICABLE',
     'release-docs@1': 'UPDATE DOCS: PUBLISHED | STAGED | CURRENT | NOT CONFIGURED | FAILED | NOT APPLICABLE',
@@ -416,13 +416,13 @@ RELEASE_PAYLOADS = {
     'train-claim-hand-on@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?'}, None),
     'release-tip@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?'}, None),
     'classify-at-checks@1': ({'productionBranch': 'context.productionBranch', 'releaseSource': 'context.releaseSource', 'head': 'result:release-tip@1.head?', 'shape': 'result:release-shape@1.shape?'}, None),
-    'pre-ship-at-checks@1': ({'base': 'result:release-tip@1.productionTip?', 'head': 'result:release-tip@1.head?', 'releaseClass': 'result:classify-at-checks@1.state?', 'shape': 'result:release-shape@1.shape?'}, 'release run {base} {head} {releaseClass} --shape {shape}'),
+    'pre-ship-at-checks@1': ({'base': 'result:release-tip@1.productionTip?', 'head': 'result:release-tip@1.head?', 'releaseClass': 'result:classify-at-checks@1.state?', 'ranAtTrain': 'result:train-pre-ship@1.ranAtTrain?', 'shape': 'result:release-shape@1.shape?', 'answer': 'step.answer?'}, 'release run {base} {head} {releaseClass} {ranAtTrain} --shape {shape}'),
     'dev-deploy-wait@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?'}, None),
     'pre-merge-at-checks@1': ({'productionBranch': 'context.productionBranch', 'releaseSource': 'context.releaseSource', 'head': 'result:release-tip@1.head?', 'pullRequest': 'result:release-pr@1.pullRequest?', 'answer': 'step.answer?', 'shape': 'result:release-shape@1.shape?'}, None),
     'release-stamp@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?'}, None),
     'release-review@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?', 'profile': 'context.profile?'}, None),
     'classify-at-pre-ship@1': ({'productionBranch': 'context.productionBranch', 'releaseSource': 'context.releaseSource', 'head': 'result:release-review@1.reviewedHead?', 'shape': 'result:release-shape@1.shape?'}, None),
-    'pre-ship-release@1': ({'base': 'result:release-delta@1.productionHead?', 'head': 'result:release-review@1.reviewedHead', 'releaseClass': 'result:classify-at-pre-ship@1.state?', 'ranAtTrain': 'result:train-pre-ship@1.ranAtTrain?', 'releaseReview': 'result:release-review@1', 'shape': 'result:release-shape@1.shape?'}, 'release run {base} {head} {releaseClass} {ranAtTrain} --shape {shape}'),
+    'pre-ship-release@1': ({'base': 'result:release-delta@1.productionHead?', 'head': 'result:release-review@1.reviewedHead', 'releaseClass': 'result:classify-at-pre-ship@1.state?', 'ranAtTrain': 'result:train-pre-ship@1.ranAtTrain?', 'releaseReview': 'result:release-review@1', 'shape': 'result:release-shape@1.shape?', 'answer': 'step.answer?'}, 'release run {base} {head} {releaseClass} {ranAtTrain} --shape {shape}'),
     'pre-ship-resume@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?'}, None),
     'release-docs-plan@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?', 'releaseNotes': 'context.releaseNotes?', 'noDocs': 'context.noDocs?'}, None),
     'hotfix-catch-up@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?'}, None),
@@ -432,7 +432,7 @@ RELEASE_PAYLOADS = {
     'owner-go-ahead@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?', 'answer': 'step.answer?', 'releaseReview': 'result:release-review@1', 'preShipRelease': 'result:pre-ship-release@1'}, None),
     'owner-go-ahead-recheck@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?', 'answer': 'step.answer?', 'releaseReview': 'result:release-review@1', 'preShipRelease': 'result:pre-ship-release@1', 'goAhead': 'result:owner-go-ahead@1'}, None),
     'release-stamp-verify@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?'}, None),
-    'rerun-at-merge@1': ({'base': 'result:release-delta@1.productionHead?', 'head': 'result:release-review@1.reviewedHead?', 'releaseClass': 'result:classify-at-pre-ship@1.state?', 'rerunNames': 'context.rerunAtMerge?', 'shape': 'result:release-shape@1.shape?'}, 'release run {base} {head} {releaseClass} --only {rerunNames} --shape {shape}'),
+    'rerun-at-merge@1': ({'base': 'result:release-delta@1.productionHead?', 'head': 'result:release-review@1.reviewedHead?', 'releaseClass': 'result:classify-at-pre-ship@1.state?', 'rerunNames': 'context.rerunAtMerge?', 'shape': 'result:release-shape@1.shape?', 'answer': 'step.answer?'}, 'release run {base} {head} {releaseClass} --only {rerunNames} --shape {shape}'),
     'merge-confirmations@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?', 'releaseReview': 'result:release-review@1', 'preShipRelease': 'result:pre-ship-release@1', 'ownerGoAhead': 'result:owner-go-ahead@1'}, None),
     'production-merge@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?', 'releaseReview': 'result:release-review@1', 'preShipRelease': 'result:pre-ship-release@1', 'ownerGoAhead': 'result:owner-go-ahead@1', 'mergeConfirmations': 'result:merge-confirmations@1'}, None),
     'post-deploy-pending@1': ({'scope': 'context.scope?', 'startedBy': 'context.startedBy?', 'shape': 'result:release-shape@1?', 'tower': 'result:tower-claim@1?'}, None),
@@ -486,6 +486,77 @@ edited = copy.deepcopy(catalog)
 edited["contracts"]["review@1"]["neverOptional"] = "yes"
 check("a neverOptional that is not true fails the catalog", any(f.startswith("shape: review@1: neverOptional") for f in runner.check_catalog(edited)),
       runner.check_catalog(edited))
+JUDGEMENT = ["build@1", "risk-check@1", "review@1", "merge@1", "release-sync@1", "capture@1", "custom@1", "hotfix-fix@1", "session-model@1", "plan-ground@1",
+             "rebalance-successors@1", "plan-create@1", "plan-wire@1", "rebalance-rewire@1", "rebalance-renumber@1", "rebalance-archive@1",
+             "rebalance-marker@1", "plan-sign-off-record@1", "plan-hand-off@1", "splice@1", "train-snapshot@1", "train-review@1", "production-in-branch@1", "release-review@1", "pre-ship-resume@1",
+             "hotfix-catch-up@1", "owner-go-ahead@1", "owner-go-ahead-recheck@1", "merge-confirmations@1", "post-deploy-check@1",
+             "post-deploy-check-owed@1", "release-docs@1", "release-close-out@1", "release-notes@1", "release-recap@1"]
+check("the steps that weigh evidence or write for a person are marked judgement, and none that talks with the person or starts agents",
+      sorted(n for n, e in all_contracts.items() if e.get("judgement")) == sorted(JUDGEMENT)
+      and all(e["judgement"] is True and not e.get("interactive") and not e.get("delegates") for e in all_contracts.values() if "judgement" in e),
+      sorted(n for n, e in all_contracts.items() if "judgement" in e))
+def agent_front(name):
+    text = open(os.path.join(root, "agents", name + ".md"), encoding="utf-8").read()
+    head = text.split("---")[1]
+    return dict(line.split(": ", 1) for line in head.strip().splitlines()), text
+steps_front, steps_text = agent_front("workflow-steps")
+check("the routine step agent runs on a smaller model and follows the step-agents file",
+      steps_front.get("model") == "sonnet" and "skills/run-workflow/references/step-agents.md" in steps_text, steps_front)
+judgement_front, judgement_text = agent_front("workflow-judgement")
+check("the judgement step agent runs on the session's own model, never one named, and follows the step-agents file",
+      judgement_front.get("model") == "inherit" and "skills/run-workflow/references/step-agents.md" in judgement_text, judgement_front)
+check("the plugin's agents are the two step agents",
+      sorted(os.listdir(os.path.join(root, "agents"))) == ["workflow-judgement.md", "workflow-steps.md"])
+OWN_CONTEXT = ["release-sync@1", "release-docs@1", "release-close-out@1", "release-notes@1", "release-recap@1"]
+check("the steps late in a release that weigh evidence run in a fresh context of their own, and only judgement steps do",
+      sorted(n for n, e in all_contracts.items() if e.get("ownContext")) == sorted(OWN_CONTEXT), sorted(n for n, e in all_contracts.items() if e.get("ownContext")))
+check("the post-deploy health check runs in the conversation: it may wait there for the owner's reply, and only the conversation knows the release's class",
+      [n for n in ("post-deploy-check@1", "post-deploy-check-owed@1") if runner.step_agent(all_contracts[n], "builtin") != "conversation"] == [])
+check("the merge confirmation, which may review a late comment, runs in the conversation",
+      runner.step_agent(all_contracts["merge-confirmations@1"], "builtin") == "conversation")
+for name, change, code in (("train-claim@1", {"ownContext": True}, "ownContext"), ("release-recap@1", {"ownContext": "yes"}, "ownContext"),
+                           ("train-claim@1", {"configSkip": []}, "configSkip"),
+                           ("train-claim@1", {"configSkip": [{"when": [{"config": "claims", "is": "absent"}], "value": "LOST", "evidence": "x", "result": {"state": "x"}}]}, "configSkip"),
+                           ("train-claim@1", {"configSkip": [{"when": [{"config": "claims", "is": "gone"}], "value": "NOT CONFIGURED", "evidence": "x", "result": {"state": "x"}}]}, "configSkip"),
+                           ("train-claim@1", {"configSkip": [{"when": [{"config": "claims", "is": "absent"}], "value": "NOT CONFIGURED", "evidence": "x", "result": {}}]}, "configSkip"),
+                           ("train-claim@1", {"configSkip": [{"when": [], "value": "NOT CONFIGURED", "evidence": "x", "result": {"state": "x"}}]}, "configSkip")):
+    edited = copy.deepcopy(catalog)
+    edited["contracts"][name].update(change)
+    check("a malformed %s fails the catalog: %s %r" % (code, name, change),
+          any(f.startswith("shape: %s: %s" % (name, code)) for f in runner.check_catalog(edited)), runner.check_catalog(edited))
+skips = dict((n, e["configSkip"]) for n, e in all_contracts.items() if "configSkip" in e)
+check("a config skip answers only a step that talks with nobody and starts no agents",
+      skips and all(not all_contracts[n].get(f) for n in skips for f in ("interactive", "delegates", "neverOptional")), sorted(skips))
+edited = copy.deepcopy(catalog)
+edited["contracts"]["train-claim@1"]["interactive"] = True
+check("a config skip on a step that talks with the person fails the catalog",
+      any(f.startswith("shape: train-claim@1: configSkip") for f in runner.check_catalog(edited)), runner.check_catalog(edited))
+check("no step that touches the go-ahead, a merge, a claim taken, a pre-ship check or a record is answered from config",
+      [n for n in skips if any(word in n for word in ("go-ahead", "merge@", "tower", "status", "recap", "close-out", "review"))
+       or all_contracts[n]["builtinSkill"] == "pre-ship"] == [])
+check("the plan steps that ask the person (the sign-off's dates, the hand-off's next round) run in the conversation",
+      [n for n in ("plan-sign-off-record@1", "plan-hand-off@1") if runner.step_agent(all_contracts[n], "builtin") != "conversation"] == [])
+check("a step that can ask the person but whose payload carries no answer runs in the conversation",
+      [n for n, e in all_contracts.items() if runner.asks_without_answer(e) and runner.step_agent(e, "builtin") != "conversation"] == []
+      and runner.step_agent(all_contracts["rebalance-gates@1"], "builtin") == "conversation"
+      and runner.step_agent(all_contracts["tower-queue@1"], "builtin") == "routine")
+check("the merge-time rerun takes the person's answer, so a waiver reaches it",
+      all_contracts["rerun-at-merge@1"]["payload"].get("answer") == "step.answer?")
+check("a step that writes what this conversation approved runs in the conversation",
+      [n for n in all_contracts if all_contracts[n].get("builtinSkill") == "plan-steps"
+       and "this conversation" in open(os.path.join(root, "skills", "plan-steps", "references", n.split("@")[0] + ".md"), encoding="utf-8").read()
+       and runner.step_agent(all_contracts[n], "builtin") != "conversation"] == [])
+check("a pre-merge or classify step is never answered from config for a release that already merged",
+      [n for n, rules in skips.items() if all_contracts[n]["builtinSkill"] in ("pre-merge-check", "classify-release")
+       and not all({"payload": "shape", "notIn": ["MERGED"]} in r["when"] for r in rules)] == [])
+check("every workflow driver sends its run answers where step-agents.md says",
+      all("skills/run-workflow/references/step-agents.md" in open(os.path.join(root, "skills", s, "SKILL.md"), encoding="utf-8").read()
+          for s in ("run-workflow", "release", "plan")))
+for bad in (False, "yes"):
+    edited = copy.deepcopy(catalog)
+    edited["contracts"]["review@1"]["judgement"] = bad
+    check("a judgement that is not true fails the catalog: %r" % (bad,),
+          any(f.startswith("shape: review@1: judgement") for f in runner.check_catalog(edited)), runner.check_catalog(edited))
 for bad in ("soon", "4.9", 49):
     edited = copy.deepcopy(catalog)
     edited["contracts"]["approval@1"]["since"] = bad

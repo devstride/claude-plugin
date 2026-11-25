@@ -1,0 +1,91 @@
+{
+  "about": "A pre-ship check fails and the owner waives it by name: the run stops at the failure, and the resume hands the owner's \"skip integration\" to the re-issued pre-ship step as its answer, so the step can record the waiver instead of running the same failing check again.",
+  "definition": "workflows/release.json",
+  "phases": [
+    "review"
+  ],
+  "context": {
+    "item": null,
+    "productionBranch": "main",
+    "releaseSource": "develop",
+    "scope": "release",
+    "startedBy": "person",
+    "releaseNotes": "false",
+    "noDocs": false,
+    "profile": {
+      "name": "extended",
+      "source": "config"
+    }
+  },
+  "script": [
+    {
+      "step": "release-review",
+      "output": "RELEASE REVIEW: SETTLED 00000000000000000000000000000000000000f6\nevidence line\n```json\n{\"state\": \"settled\", \"reviewedHead\": \"00000000000000000000000000000000000000f6\"}\n```\n"
+    },
+    {
+      "step": "classify-at-pre-ship",
+      "output": "RELEASE CLASS: LIGHT\nevidence line\n```json\n{\"state\": \"light\"}\n```\n"
+    },
+    {
+      "step": "pre-ship-release",
+      "output": "PRE-SHIP: FAIL integration\nevidence line\n```json\n{\"state\": \"fail\"}\n```\n"
+    },
+    {
+      "step": "pre-ship-release",
+      "output": "PRE-SHIP: PASS (0 ran, 1 waived)\nWAIVED integration \u2014 the owner's explicit skip, recorded\n```json\n{\"state\": \"pass\"}\n```\n"
+    },
+    {
+      "step": "discharge-hold",
+      "output": "PRE-SHIP HOLD: NO HOLD\nevidence line\n```json\n{\"state\": \"no-hold\"}\n```\n"
+    },
+    {
+      "step": "docs-plan",
+      "output": "DOCS PLAN: HOOKS 2\nevidence line\n```json\n{\"state\": \"hooks\"}\n```\n"
+    }
+  ],
+  "answers": [
+    "skip integration"
+  ],
+  "expect": {
+    "order": [
+      [
+        "release-review",
+        1
+      ],
+      [
+        "classify-at-pre-ship",
+        1
+      ],
+      [
+        "pre-ship-release",
+        1
+      ],
+      [
+        "pre-ship-release",
+        2
+      ],
+      [
+        "discharge-hold",
+        1
+      ],
+      [
+        "docs-plan",
+        1
+      ]
+    ],
+    "outcome": "completed",
+    "stops": [
+      "pre-ship-release"
+    ],
+    "stopReasons": [
+      "FAIL integration"
+    ],
+    "handed": {
+      "pre-ship-release#2": {
+        "payload": {
+          "answer": "skip integration"
+        }
+      }
+    }
+  }
+}

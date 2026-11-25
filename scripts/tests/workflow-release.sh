@@ -19,26 +19,10 @@
 # shares, a failed report forward and the no-runner order are driven inline.
 # No network.
 #
-# THE RELEASE WORKFLOW IS NOT SWITCHED ON. /devstride:release follows skills/release/SKILL.md, the
-# page of the last release before the split, and the runner refuses the release definitions outside
-# a rehearsal. The rewritten entry page waits at scripts/staged/skills/release/SKILL.md, and every
-# case here that reads "the entry" reads that file. Cases (140) to (142) hold the switch off. To
-# switch it on, once a rehearsal of the Release workflow has passed, in one change:
-#   1. move scripts/staged/skills/release/SKILL.md over skills/release/SKILL.md;
-#   2. delete the "release-steps" line from "dormantSkills" in schemas/step-contracts.json, and
-#      the "Not switched on yet" paragraph from skills/release-steps/SKILL.md;
-#   3. here: ENTRY becomes "skills/release/SKILL.md", LIVE and the live-page callers in case (34)
-#      go, the walks stop passing "rehearsal", and cases (140) to (142) are deleted;
-#   4. drop what still holds the old page, each marked "until the release entry is switched":
-#      the ten release sites in step-skills.sh, the page order in auto-start.sh (17), the first
-#      site in merge-gate.sh (31), the page's lines in plain-language-output.sh (5) and
-#      profile-default.sh (9); in skills/review/references/delivery-loop-invariants.md the pairs
-#      pinned to skills/release/SKILL.md whose words the new page does not hold (the needle check
-#      names them) and the step numbers in K8 and Q2; in schemas/seam-registry.json the numbered
-#      "release <n>" callers (then scripts/build-config-schema.py --write); the README's
-#      `release` row and its "not switched on yet" sentence; scripts/tests/workflow-dormant.sh's
-#      release walk; the budget of skills/release/SKILL.md;
-#   5. write the CHANGELOG entry and prepare the version as for any change to a skill.
+# THE RELEASE WORKFLOW IS SWITCHED ON: /devstride:release is skills/release/SKILL.md, which runs
+# the definitions on the runner, and every case here that reads "the entry" reads that page. The
+# release's own step skill is no longer dormant, so the walks here start without a rehearsal and
+# case (140) proves the runner starts every release definition so.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; bad() { echo "  FAIL $1"; FAIL=1; }
@@ -185,10 +169,7 @@ for scope, ident in (("release", "release"), ("cut-to-deploy", "release-cut-to-d
 import re
 BASE = "devstride--v4.7.0"
 BASE_DIR = os.path.join(root, "scripts/tests/fixtures/release-split-base")
-# The rewritten entry page waits here until the Release workflow is switched on (the header of this
-# file says how): the live page, skills/release/SKILL.md, is still the page of BASE.
-ENTRY = "scripts/staged/skills/release/SKILL.md"
-LIVE = "skills/release/SKILL.md"
+ENTRY = "skills/release/SKILL.md"
 flat = lambda t: " ".join(t.split())
 R = "skills/release-steps/references/"
 
@@ -229,10 +210,10 @@ MOVED = {  # how the old sentence began: [(the new words carrying its rule, thei
     "**Steps 0–3 run autonomously**": [("**Every step before the owner go-ahead runs autonomously** — the train, the cut, the checks and the review — surfacing only genuine forks", E)],
     "**Docs are on by default and still outward-facing**": [("run only after the deploy is confirmed, suppressed with the knowledge-base sync by \"no docs\".", E)],
     "**A release branch is PROTECTED**": [("never by substring): new commits only — never rebased, amended, force-pushed or `--delete-branch`ed; the `delete-release-branch` step is the one place it is deleted.", E)],
-    "**Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` when": [("is set** (the train, the cut, the delete, the fix-commit check, hotfixes).", E)],
+    "**Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/release-branch.md` when": [("acts on them reads: **read it here before acting on a release branch outside a step**.", E)],
     "**Clearance first, handed back at 5b**": [("**Clearance first, handed back as the scope says** when `release.clearance` is set.", E)],
-    "**Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`": [("before the first step**: the claim (before all but the train claim), `heartbeat <phase>` before each phase's first mutation — exit 4 is a STOP, another session owns this release now — and the hand-back before docs.", E)],
-    "`merge-and-deploy` claims only to merge and deploy": [("Scope `merge-and-deploy` claims only to merge and deploy (step 4 to 5a in `clearance.md`'s numbering; a release that must wait then may step aside)", E)],
+    "**Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`": [("outside a step**: the claim (before all but the train claim), `heartbeat <phase>` before each phase's first mutation — exit 4 is a STOP, another session owns this release now — and the hand-back before docs.", E)],
+    "`merge-and-deploy` claims only to merge and deploy": [("Scope `merge-and-deploy` claims only to merge and deploy (from the yes to `hand-back-after-deploy`; a release that must wait then may step aside)", E)],
     "**`claims` set → the train claim first**": [("**Train, then tower: one lock order for every run.**", R + "train-claim.md")],
     "**`needsYou.label` set** → read": [("needs-you.md` now and read the stale notices it describes", R + "ground-truth.md"), ("queues one notice", R + "owner-go-ahead.md")],
     "`releaseSource` (**develop**) → `productionBranch` (**master**)": [("(`master`), whatever branch the checkout is on.", R + "release-shape.md")],
@@ -279,7 +260,7 @@ MOVED = {  # how the old sentence began: [(the new words carrying its rule, thei
     "Step 4 reports the class.": [("the release class, the pre-ship result, the pre-merge verdict", R + "owner-go-ahead.md")],
     "FAIL` is a STOP**": [("`FAIL` naming EVERY failed entry**", PS)],
     "Never present a release green over a red or unrun check": [("**Never discharge over a red or unrun check.**", R + "pre-ship-resume.md"), ("naming the entry; never \"covered by CI\".", R + "pre-ship-resume.md")],
-    "An owner waiver (\"skip <name>\")": [("`--skip <name>` (repeatable, `release` only): the owner's explicit waiver of that entry.", PS)],
+    "An owner waiver (\"skip <name>\")": [("`--skip <name>` (repeatable, `release` only), or `answer: skip <name>` (the owner's words): their waiver.", PS)],
     "Discharge the pre-ship hold": [("# Discharge the pre-ship hold — the ready flip, once, after the checks", R + "pre-ship-resume.md")],
     "**Only when step 2 declared a hold.**": [("**Was a hold declared?**", R + "pre-ship-resume.md"), ("**Re-invoke `review` in PRE-SHIP RESUME mode, naming that mode** — a plain re-invocation wrongly restarts cycle 1 — with the same ledger, target and safety triggers.", R + "pre-ship-resume.md")],
     "**Never leave a declared hold undischarged**": [("A declared hold is never left undischarged without saying so", R + "pre-ship-resume.md"), ("that is the owner's decision (a waiver at the pre-ship step)", R + "pre-ship-resume.md")],
@@ -287,7 +268,7 @@ MOVED = {  # how the old sentence began: [(the new words carrying its rule, thei
     "Build the `production-release` payload": [("**Build the `production-release` payload** over `origin/<productionBranch>..<reviewedHead>`", R + "release-docs-plan.md")],
     "**Resolve the documentation plan now**": [("**Resolve each hook** by checking that `.claude/skills/<name>/SKILL.md` exists", R + "release-docs-plan.md")],
     "Never invoke docs before step 5a confirms the deploy.": [("Nothing is invoked or published here: documentation and notes run only after the deploy is confirmed.", R + "release-docs-plan.md")],
-    "**Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/merge-and-deploy.md` in full before step 4**": [("\"Step 4 — the human recap\"; the standing yes and the unattended stop are", R + "owner-go-ahead.md")],
+    "**Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/merge-and-deploy.md` in full before step 4**": [("\"`go-ahead` — the human recap\"; the standing yes and the unattended stop are", R + "owner-go-ahead.md")],
     "**Pre-merge production check first**": [("Read `release.preMergeSkill`.", PM)],
     "`HOLD` → STOP before asking": [("`HOLD` stops the release before the go-ahead", PM)],
     "`NOT RUN` → ask whether to proceed;": [("`NOT RUN` asks the owner", PM)],
@@ -295,7 +276,7 @@ MOVED = {  # how the old sentence began: [(the new words carrying its rule, thei
     "**Human recap.** Lead with `READY` or `BLOCKED`": [("**Show the recap.** Lead with `READY` or `BLOCKED`, then everything `merge-and-deploy.md` lists", R + "owner-go-ahead.md")],
     "**Then ASK** (standing yes:": [("**The standing yes.**", R + "owner-go-ahead.md"), ("**The owner's yes** is read only from the payload's `answer`", R + "owner-go-ahead.md")],
     "**never proceed without a yes.**": [("**No yes yet** → `NOT YET`, saying what is waited for.", R + "owner-go-ahead.md")],
-    "**On a release branch, before merging**": [("`hotfix-catch-up@1` step, run before the recap and the yes.", R + "hotfix-catch-up.md"), ("`REFUSED hotfix landed`", R + "production-merge.md")],
+    "**On a release branch, before merging**": [("`hotfix-catch-up@1` step, run before the recap and the yes.", R + "hotfix-catch-up.md"), ("a production branch that is not an ancestor of the head → `HOTFIX LANDED <pr>`", R + "production-merge.md")],
     "**Scope `cut-to-deploy`**: run the previous-release gate": [("`previous-release@1` step: the same step before the recap and again on the yes.", R + "previous-release.md")],
     "`merge-and-deploy`: wait outside the tower, claim on the yes).": [("this session not holding the tower (it waits outside it)", R + "previous-release.md")],
     "**Dev deploy wait**": [("only when a standing yes is configured", R + "dev-deploy-wait.md"), ("only after the owner's own yes", R + "dev-deploy-wait.md")],
@@ -313,20 +294,20 @@ MOVED = {  # how the old sentence began: [(the new words carrying its rule, thei
     "`git checkout <productionBranch> && git pull --ff-only`": [("**Fresh refs**: `git checkout <productionBranch> && git pull --ff-only`, the release source likewise", R + "release-sync.md")],
     "`heartbeat close-out` first, then `release --owed <item>`": [("send the tower `heartbeat close-out` first", R + "release-sync.md"), ("ONE `release` call, `--owed <item>` repeated for each item", R + "tower-hand-back.md"), ("A repository provider without `commands.owed` gets plain `release`, never `--owed`", R + "tower-hand-back.md")],
     "A FAIL, an unanswered NOT RUN or a stop before here KEEPS clearance.": [("a stop before the hand-back keeps clearance for the retry", R + "tower-hand-back.md")],
-    "`merge-and-deploy` handed back at 5a": [("Under `merge-and-deploy` nothing is held: no heartbeat.", R + "release-sync.md"), ("the provider's `owed --done sync`", R + "release-sync.md")],
+    "`merge-and-deploy` handed back at 5a": [("Under `merge-and-deploy` nothing is held: no heartbeat.", R + "release-sync.md"), ("the provider's `owed --done sync --pr <n>`", R + "release-sync.md")],
     "`no docs` → skip this and the sync": [("Print the catch-up whole, because a bare `/devstride:update-docs update` refuses without a payload", R + "release-docs.md")],
     "Otherwise **`update-docs update`** with the completed payload": [("Translate the evidence with pages, branch, pull request and live address exact.", R + "release-docs.md")],
     "Only after `PUBLISHED`, and only with `docs.knowledgeBaseSyncSkill` in the plan": [("The documentation step answered anything but `PUBLISHED`", R + "release-kb-sync.md")],
     "**`sync-knowledge-base sync`** (`docsOutcome": [("never undo or revert the documentation push.", R + "release-kb-sync.md")],
-    "Settle or keep `docs` and `knowledge-base` per verdict": [("**Settle by the table**, through the provider's `owed --done <item>`", R + "release-docs.md"), ("`FAILED` → both stay owed", R + "release-docs.md")],
-    "After a `CLOSE-OUT OWED` line only": [("only when the health check's evidence ends with a `CLOSE-OUT OWED: <list>` line.", R + "release-close-out.md"), ("An earlier attempt of this step in this run answered `DONE` → `DONE` again, invoking nothing: the close-out runs once.", R + "release-close-out.md")],
-    "`DONE` → `owed --done close-out`;": [("`DONE` → the provider's `owed --done close-out` → `DONE`.", R + "release-close-out.md")],
+    "Settle or keep `docs` and `knowledge-base` per verdict": [("**Settle by the table**, through the provider's `owed --done <item> --pr <n>`", R + "release-docs.md"), ("`FAILED` → both stay owed", R + "release-docs.md")],
+    "After a `CLOSE-OUT OWED` line only": [("only when that row's `evidence` holds a `CLOSE-OUT OWED: <list>` line.", R + "release-close-out.md"), ("An earlier attempt of this step in this run answered `DONE` → `DONE` again, invoking nothing: the close-out runs once.", R + "release-close-out.md")],
+    "`DONE` → `owed --done close-out`;": [("`DONE` → the provider's `owed --done close-out --pr <n>` → `DONE`.", R + "release-close-out.md")],
     "`PARTIAL` → report what is left.": [("the evidence names what is left for the recap and the owner.", R + "release-close-out.md")],
     "Release notes — only when asked": [("# Write release notes — only when they were asked for", R + "release-notes.md")],
     "`--release-notes` absent or `false`": [("Absent or `false` → `NOT REQUESTED`, with the evidence line \"release notes: not requested\".", R + "release-notes.md"), ("this step never decides a release deserves one.", R + "release-notes.md")],
     "Otherwise call **`write-release-notes`**": [("It calls the existing step skill **`write-release-notes`** once, in mode `publish` or `draft`.", R + "release-notes.md")],
     "`NOT CONFIGURED` → report it cannot be met and stop": [("say the request cannot be met", R + "release-notes.md"), ("the location and whether it is live or awaiting the owner exact", R + "release-notes.md")],
-    "`PUBLISHED`/`DRAFTED` → `owed --done release-notes`;": [("then the provider's `owed --done release-notes`.", R + "release-notes.md")],
+    "`PUBLISHED`/`DRAFTED` → `owed --done release-notes`;": [("then the provider's `owed --done release-notes --pr <n>`.", R + "release-notes.md")],
     "**Human recap.** Lead with `Merged / Released`": [("**Human recap.** In the plain-language rule's words, leading with `Merged / Released`", R + "release-recap.md"), ("whether the tower was handed back (kept, with the reason, when a check failed or the close-out stopped early)", R + "release-recap.md")],
     "Update any project memory tracking release state": [("Update any project memory that tracks release state", R + "release-recap.md")],
     "Then `release.autoStart.enabled` → its trigger 3": [("`release.autoStart.enabled` and the `claims` block.", R + "auto-start.md"), ("→ `SKIP started at the levelling`", R + "auto-start.md")],
@@ -443,19 +424,35 @@ registry = json.load(open(os.path.join(root, "schemas", "seam-registry.json"), e
 ids = set(s["id"] for ident in PINNED for _, steps in PINNED[ident] for s in [{"id": x} for x in steps])
 callers = [(h["key"], c) for h in registry["hooks"] for c in h.get("calledBy") or []]
 wrong = []
-# Until the release entry is switched, the live page still calls each seam from its own numbered
-# sections, so those callers stay beside the step names; they go with the old page.
-live_sections = set(re.findall(r"^#+ (\d+[a-z]?)\.", open(os.path.join(root, LIVE), encoding="utf-8").read(), re.M))
 for key, caller in callers:
     parts = caller.split()
-    if parts[0] == "release" and ((len(parts) == 2 and parts[1] in live_sections) or caller == "release train step 4b"):
-        continue
     if parts[0] == "release" and (len(parts) != 2 or parts[1] not in ids):
         wrong.append("%s: %s" % (key, caller))
     for skill in ("release-steps", "hotfix-steps"):
         if parts[0] == skill and (len(parts) != 2 or not os.path.isfile(os.path.join(root, "skills", skill, "references", parts[1] + ".md"))):
             wrong.append("%s: %s" % (key, caller))
 check("(34) every registry caller of the release names a live step or mode (%d callers)" % len([c for c in callers if c[1].split()[0] in ("release", "release-steps")]), wrong, [])
+# Prose names the release's steps by id, never by a section number of the old numbered page
+# ("release step 4", "`release` step 2b", "SKILL step 4"; in the release's own references a bare
+# 0a-0p, 2b, 2c or 5a-5e, `pr`'s own steps 2 to 2c excepted). Code spans and fenced blocks are skipped.
+def prose_of(text):
+    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    return " ".join(re.sub(r"`[^`\n]*`", lambda m: m.group(0) if m.group(0) in ("`release`", "`pr`") else " ", text).split())
+OLD_BARE = re.compile(r"(?<![\w.§-])(?:0[abcp]|5[a-e])(?![\w-])|(?<!`pr` )(?<!`pr` steps 2 to )(?<!`pr` steps 2–)(?<![\w.§-])2[bc](?![\w-])")
+OLD_NAMED = re.compile(r"(?:`release`|\brelease)(?:'s)?(?: SKILL\.md)? steps? (?:[0-6][a-p]?)(?![\w.])|\brelease [0-6][a-e](?![\w])|\bSKILL step \d")
+old_pointers = []
+for w, _, fs in os.walk(os.path.join(root, "skills")):
+    for f in sorted(fs):
+        if f.endswith(".md"):
+            rel = os.path.relpath(os.path.join(w, f), root)
+            text = prose_of(open(os.path.join(w, f), encoding="utf-8").read())
+            hits = OLD_NAMED.findall(text) + (OLD_BARE.findall(text) if rel.split(os.sep)[1] in ("release", "release-steps", "hotfix-steps") else [])
+            old_pointers += ["%s: %s" % (rel, h) for h in hits]
+check("(34b) no prose points at a numbered section of the old release page", old_pointers, [])
+check("(34c) ... and the scan sees the old shape: it flags \"release step 5a\", \"`release` step 2b\" and a bare 0b",
+      (bool(OLD_NAMED.search(prose_of("see release step 5a"))), bool(OLD_NAMED.search(prose_of("as `release` step 2b says"))),
+       bool(OLD_BARE.search(prose_of("before 0b merges"))), bool(OLD_BARE.search(prose_of("`pr` steps 2 to 2c")))),
+      (True, True, True, False))
 # --- the seam checks are handed real commit ids: each full definition walked through the runner ----
 # The class, pre-ship, pre-merge and post-deploy checks read the release's heads, its pull request
 # and its class from the results of earlier steps, never from a context nobody fills. Each full
@@ -491,9 +488,16 @@ def scripted(contract):
                       for k in entry["result"]["required"])
     return "%s\nevidence line\n```json\n%s\n```\n" % (verdict, json.dumps(result))
 
-def walk(ident):
-    repo, cache = os.path.join(tmp, "walk-" + ident), os.path.join(tmp, "cache-" + ident)
+WALKS = []
+def walk(ident, config=None, notes="draft", definition=None):
+    WALKS.append(ident)
+    tag = ident + ("-config-%d" % len(WALKS) if config is not None else "")
+    repo, cache = os.path.join(tmp, "walk-" + tag), os.path.join(tmp, "cache-" + tag)
     os.makedirs(repo); os.makedirs(cache)
+    if config is not None:
+        os.makedirs(os.path.join(repo, ".claude"))
+        with open(os.path.join(repo, ".claude", "ds-config.json"), "w", encoding="utf-8") as out:
+            out.write(config if isinstance(config, str) else json.dumps(config))
     for args in (["init", "-q", "-b", "main"], ["-c", "user.name=T", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false",
                                                 "commit", "-q", "--allow-empty", "-m", "first"]):
         subprocess.run(["git", "-C", repo] + args, check=True, capture_output=True)
@@ -501,20 +505,22 @@ def walk(ident):
     for name in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "GIT_DIR", "GIT_WORK_TREE"):
         env.pop(name, None)
     def call(command, request):
-        if command == "start":
-            request = dict(request, rehearsal=True)  # the release's step skill is not switched on yet: these walks are rehearsals
         done = subprocess.run([sys.executable, "-B", runner_path, command], input=json.dumps(dict(request, session="walk")),
                               capture_output=True, text=True, env=env, cwd=repo)
         return json.loads(done.stdout) if done.returncode == 0 else {"action": "error", "why": done.stdout + done.stderr}
     context = {"item": None, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person",
-               "releaseNotes": "draft", "noDocs": False, "profile": {"name": "extended", "source": "config"},
+               "releaseNotes": notes, "noDocs": False, "profile": {"name": "extended", "source": "config"},
                "rerunAtMerge": "e2e", "cwd": repo}
-    answer = call("start", {"definitionFile": os.path.join(root, "workflows", ident + ".json"), "context": context})
-    handed = {}
+    answer = call("start", {"definitionFile": definition or os.path.join(root, "workflows", ident + ".json"), "context": context})
+    handed, decided = {}, []
+    decided += answer.get("decided", [])
     while answer.get("action") == "run" and len(handed) < 200:
         step = answer["step"]
         handed[step["id"]] = (step["contract"], answer["payload"], answer["argument"])
         answer = call("done", {"stepId": step["id"], "attempt": step["attempt"], "output": scripted(step["contract"])})
+        decided += answer.get("decided", [])
+    if config is not None:
+        return answer, handed, decided
     return answer, handed
 
 def seam_faults(handed):
@@ -535,7 +541,7 @@ def seam_faults(handed):
         elif contract == "train-pre-ship@1":
             want(step_id, argument, "train run %s %s --shape NEW" % (SRC, SNAP))
         elif contract == "pre-ship-at-checks@1":
-            want(step_id, argument, "release run %s %s light --shape NEW" % (PTIP, TIP))
+            want(step_id, argument, "release run %s %s light %s --shape NEW" % (PTIP, TIP, RAN))
         elif contract == "pre-ship-release@1":
             want(step_id, argument, "release run %s %s light %s --shape NEW" % (PROD, REV, RAN))
         elif contract == "rerun-at-merge@1":
@@ -564,6 +570,54 @@ for ident in ("release", "release-cut-to-deploy", "release-merge-and-deploy"):
     unreached = [s["id"] for s in steps if s["id"] not in handed]
     check("(36) %s: every check is handed real commit ids, the pull request and the class (%d steps)" % (ident, len(steps)),
           seam_faults(handed) + ["%s: never handed out" % s for s in unreached], [])
+
+# Lever 2: a step whose hook or block the repository's config lacks is answered by the runner, with
+# no model turn, exactly as its skill answers that case; a configured hook, an unreadable config,
+# release notes that were asked for and a re-run that names a check all still hand the step out.
+BARE = {"release": {"clearance": {"provider": "github"}}, "preShipChecks": [], "docs": {"updateSkill": "docs"}}
+def decided_ids(ident, config, notes="false", definition=None):
+    end, handed, decided = walk(ident, config, notes, definition)
+    return end.get("action"), end.get("outcome"), dict((d["stepId"], d["verdict"].split(": ", 1)[1]) for d in decided), handed
+# Pre-ship steps are never answered from config: the release's own one heartbeats the tower first,
+# and a resumed answer or an adopted shape changes what they say.
+SKIPPED = {"train-claim": "NOT CONFIGURED", "classify-release": "FULL",
+           "train-claim-hand-on": "NOT APPLICABLE", "classify-at-pre-ship": "FULL",
+           "pre-merge-check": "NOT CONFIGURED", "sync-knowledge-base": "NOT CONFIGURED", "write-release-notes": "NOT REQUESTED",
+           "auto-start-next": "NOT CONFIGURED"}
+MAD_SKIPPED = dict(SKIPPED, **{"classify-at-checks": "FULL", "dev-deploy-wait": "NOT APPLICABLE",
+                               "pre-merge-at-checks": "NOT CONFIGURED", "pre-merge-recheck": "NOT CONFIGURED"})
+RELEASE_SKIPPED = dict(SKIPPED, **{"dev-deploy-before-decision": "NOT APPLICABLE", "dev-deploy-after-yes": "NOT APPLICABLE"})
+for ident, want in (("release", RELEASE_SKIPPED), ("release-merge-and-deploy", MAD_SKIPPED)):
+    action, outcome, got, handed = decided_ids(ident, dict(BARE, release={"clearance": {"provider": "github", "scope": ident[8:] or "release"}}))
+    check("(37) %s: with no hooks configured, the runner answers those steps itself and the run still ends" % ident,
+          (action, outcome, got, sorted(set(got) & set(handed))), ("finished", "completed", want, []))
+    check("(37) %s: no pre-ship step is answered from config" % ident,
+          [i for i in got if i.startswith("pre-ship") or i in ("train-pre-ship", "rerun-at-merge")], [])
+    configured = dict(BARE, claims={"provider": "x"}, preShipChecks=[{"name": "e2e"}],
+                      release={"classifySkill": "c", "preMergeSkill": "p", "devDeployVerification": {"x": 1},
+                               "autoStart": {"enabled": True}, "clearance": {"provider": "github", "scope": ident[8:] or "release"}},
+                      docs={"updateSkill": "docs", "knowledgeBaseSyncSkill": "kb"})
+    action, outcome, got, handed = decided_ids(ident, configured, notes="draft")
+    check("(38) %s: every hook configured, release notes asked for: nothing is decided from config" % ident, (outcome, got), ("completed", {}))
+action, outcome, got, handed = decided_ids("release", "{not json")
+check("(39) an unreadable config decides nothing: every step is handed out", (outcome, got), ("completed", {}))
+action, outcome, got, handed = decided_ids("release", dict(BARE, release={"autoStart": {"enabled": True}}))
+check("(40) auto start enabled without a claims block is still not configured", got.get("auto-start-next"), "NOT CONFIGURED")
+action, outcome, got, handed = decided_ids("release", " " * (1 << 20) + json.dumps(BARE))
+check("(40) a config over the size limit decides nothing", (outcome, got), ("completed", {}))
+swapped = json.load(open(os.path.join(root, "workflows", "release.json"), encoding="utf-8"))
+for phase in swapped["phases"]:
+    for step in phase["steps"]:
+        if step["id"] == "pre-merge-check":
+            step["run"]["ref"] = "release-steps"
+swapped_path = os.path.join(tmp, "swapped-release.json")
+json.dump(swapped, open(swapped_path, "w", encoding="utf-8"))
+action, outcome, got, handed = decided_ids("release", BARE, definition=swapped_path)
+check("(40) a step whose definition names another skill than its contract's is never answered from config",
+      ("pre-merge-check" in got, "classify-release" in got), (False, True))
+action, outcome, got, handed = decided_ids("release-notes", BARE)
+check("(40) the release-notes-only entry IS the request: its notes step is never answered as not requested",
+      (outcome, "write-release-notes" in got, "write-release-notes" in handed), ("completed", False, True))
 PY
 PRC=$?; OUT="$(cat "$T/cases.out")"
 echo "$OUT" | sed 's/^ok   /  ok   /; s/^FAIL /  FAIL /'
@@ -779,7 +833,7 @@ def start(definition, n):
     context = {"item": None, "productionBranch": "main", "releaseSource": "develop", "scope": "release", "startedBy": "person",
                "releaseNotes": "false", "noDocs": False, "profile": {"name": "extended", "source": "config"}, "cwd": repo}
     done = subprocess.run([sys.executable, "-B", runner, "start"], capture_output=True, text=True, env=env, cwd=repo,
-                          input=json.dumps({"definition": definition, "context": context, "session": "required-%d" % n, "rehearsal": True}))
+                          input=json.dumps({"definition": definition, "context": context, "session": "required-%d" % n}))
     return done.returncode, done.stderr.strip()
 # Each step carrying a required contract is edited on its own, so a definition that carries the
 # contract twice cannot lose one of the two unnoticed: under merge-and-deploy the go-ahead is the yes
@@ -849,13 +903,15 @@ flat = lambda p: " ".join(open(os.path.join(root, p), encoding="utf-8").read().s
 ref = lambda mode: flat("skills/release-steps/references/%s.md" % mode)
 steps_of = lambda i: [s["id"] for p in json.load(open(os.path.join(root, "workflows", i + ".json"), encoding="utf-8"))["phases"] for s in p["steps"]]
 none_of = lambda s, ids: [x for x in ids if x in issued(s)]
+catalog_values = lambda c: json.load(open(os.path.join(root, "schemas", "step-contracts.json"), encoding="utf-8"))["contracts"][c]["verdict"]["values"]
 MERGING = ["pre-merge-check", "go-ahead", "merge-confirmations", "production-merge"]
 AFTER_DEPLOY = ["post-deploy-check", "update-docs", "sync-knowledge-base", "write-release-notes"]
 
-SECOND = ["hotfix-merged-mid-review", "hotfix-same-tree", "head-moved-restarts", "head-moved-exhausted",
+SECOND = ["hotfix-merged-mid-review", "hotfix-same-tree", "hotfix-landed-at-go-ahead", "hotfix-landed-at-merge", "head-moved-restarts", "head-moved-exhausted",
           "stamp-changed-at-final-gate", "stamp-behind-at-final-gate", "stamp-error-at-final-gate", "checks-stamp-rebuilds",
           "standing-yes-merge", "standing-yes-ask", "previous-release-pending-c", "previous-release-pending-m",
           "previous-release-failed-override", "previous-release-recheck-steps-aside", "merge-not-confirmed",
+          "merge-head-moved", "pre-ship-waiver", "pre-ship-fix-pushed", "partial-post-deploy-fail-s", "partial-post-deploy-recheck-s",
           "production-merge-refused", "merge-same-tree-advance", "deploy-approval-not-configured",
           "deploy-approval-retry-then-stops", "deploy-approval-waits-for-yes", "deploy-unconfirmed", "deploy-hand-back-m",
           "health-fail-s", "health-not-run-accepted-s", "health-not-run-declined-s", "health-fail-c", "health-fail-m",
@@ -904,13 +960,52 @@ check("(86) a head that keeps moving: the eighth HEAD MOVED stops the run, and n
        json.load(open(os.path.join(root, "schemas", "step-contracts.json"), encoding="utf-8"))["contracts"]["release-review@1"]["maxAutoRedo"]),
       (8, ["release-review"], ["asked to run again 8 times in a row"], "release-review", 8))
 
-# The stamp at the final gate (M): CHANGED, BEHIND and ERROR each stand the tower aside and stop
-# before the merge; in the checks phase a moved production is a round the step runs again itself.
-sv = ref("release-stamp-verify")
-for name in ("stamp-changed-at-final-gate", "stamp-behind-at-final-gate", "stamp-error-at-final-gate"):
+# A hotfix that lands after the catch-up, while the recap waits for the owner or between the yes
+# and the merge: the go-ahead or the production merge answers HOTFIX LANDED, and the run goes back to
+# the catch-up, the review and the go-ahead, which asks again (the earlier yes is void).
+for name, at in (("hotfix-landed-at-go-ahead", "go-ahead"), ("hotfix-landed-at-merge", "production-merge")):
     s = load(name)
-    check("(87) %s: stops at the stamp, before the recheck, the confirmations and the merge" % name,
-          (issued(s)[-1], none_of(s, ["pre-merge-recheck", "rerun-at-merge", "merge-confirmations", "production-merge"])), ("stamp-verify", []))
+    order = s["expect"]["order"]
+    back = [i for i, x in enumerate(order) if x[0] == at and "HOTFIX LANDED" in said(s, at)[x[1] - 1]][0] + 1
+    check("(86b) %s: %s answers HOTFIX LANDED, the catch-up merges production in and the review, the go-ahead and the merge follow" % (name, at),
+          (order[back][0], said(s, "hotfix-catch-up"), attempts(s, "release-review"), order[-1][0], s["expect"]["outcome"]),
+          ("hotfix-catch-up", ["HOTFIX CATCH-UP: NONE", "HOTFIX CATCH-UP: MERGED 77", "HOTFIX CATCH-UP: NONE"], [1, 2], "production-merge", "completed"))
+    check("(86c) ... the go-ahead after the catch-up is handed no answer: the yes on the old recap is void",
+          s["expect"]["handed"]["go-ahead#3"]["payload"], {"answer": None})
+check("(86d) ... the go-ahead and the production merge contracts send a landed hotfix back to the catch-up, and their steps say so",
+      ([v["class"] for c in ("owner-go-ahead@1", "production-merge@1") for v in catalog_values(c) if v["value"] == "HOTFIX LANDED"],
+       "a yes given on the old recap is void, and this step asks again" in ref("owner-go-ahead"),
+       "The runner sends the run back to the catch-up" in ref("production-merge")),
+      (["rewind:hotfix-catch-up@1", "rewind:hotfix-catch-up@1"], True, True))
+
+check("(86e) the release's pre-ship step takes the pre-ship skill's NOTHING TO RUN as its train and checks steps do, and the standing yes reads it",
+      ([(c, v["class"]) for c in ("train-pre-ship@1", "pre-ship-at-checks@1", "pre-ship-release@1") for v in catalog_values(c) if v["value"] == "NOTHING TO RUN"],
+       'pre == "PRE-SHIP: NOTHING TO RUN"' in open(os.path.join(root, "skills", "release", "scripts", "standing-yes.py"), encoding="utf-8").read()),
+      ([("train-pre-ship@1", "skipped"), ("pre-ship-at-checks@1", "skipped"), ("pre-ship-release@1", "continue")], True))
+
+check("(86f) under merge-and-deploy the discharge stamps a tree the hotfix catch-up changed, hold or no hold, so the stamp verify reads the new head",
+      "is still stamped first, as step 4 says" in ref("pre-ship-resume"), True)
+check("(86g) ... and after a catch-up that merged production in, the new stamp's baseline is the production tip the head now holds, not the old stamp's",
+      "the production tip the settled head holds when the catch-up merged production in this round" in ref("pre-ship-resume"), True)
+
+# The stamp at the final gate (M): CHANGED and BEHIND stand the tower aside and send the run back to
+# the catch-up, which rebuilds the release on what is ahead; ERROR stands it aside and stops before
+# the merge; in the checks phase a moved production is a round the step runs again itself.
+sv = ref("release-stamp-verify")
+for name in ("stamp-changed-at-final-gate", "stamp-behind-at-final-gate"):
+    s = load(name)
+    order = s["expect"]["order"]
+    back = order.index(["stamp-verify", 1]) + 1
+    check("(87) %s: goes back to the catch-up, claims the tower again, and merges only after the stamp holds on the new head" % name,
+          (order[back], attempts(s, "release-review"), attempts(s, "tower-claim"), said(s, "stamp-verify")[-1],
+           order.index(["stamp-verify", 2]) < order.index(["merge-confirmations", 1]), order[-1][0]),
+          (["hotfix-catch-up", 2], [1, 2], [1, 2], "CHECKS STAMP: UNCHANGED", True, "production-merge"))
+s = load("stamp-error-at-final-gate")
+check("(87) stamp-error-at-final-gate: stops at the stamp, before the recheck, the confirmations and the merge",
+      (issued(s)[-1], none_of(s, ["pre-merge-recheck", "rerun-at-merge", "merge-confirmations", "production-merge"])), ("stamp-verify", []))
+check("(87a) ... CHANGED and BEHIND rewind to the catch-up in the contract, and the step says the runner sends the run back",
+      ([v["class"] for v in catalog_values("release-stamp-verify@1") if v["value"] in ("CHANGED", "BEHIND")],
+       "runner sends the run back to the hotfix catch-up" in sv), (["rewind:hotfix-catch-up@1"] * 2, True))
 check("(88) ... its step stands the tower aside (which owes nothing) and voids any yes",
       ("run the provider's `release --step-aside` when this session holds the tower" in sv,
        "A stepped-aside release holds nothing and owes nothing" in sv, "Any owner yes is void" in sv), (True, True, True))
@@ -958,11 +1053,11 @@ mc = ref("merge-confirmations")
 s = load("merge-not-confirmed")
 check("(97) merge confirmations NOT CONFIRMED: stops; resumed, the confirmations are asked again and the merge is never issued",
       (attempts(s, "merge-confirmations"), "production-merge" in issued(s), s["expect"]["outcome"]), ([1, 2], False, "stopped"))
-check("(98) ... the five confirmations, in order, and the only tolerated advances keep the tree",
-      ([w for w in ("**The head.**", "**Ready and green.**", "**Pre-ship.**", "**Threads.**", "**The tower.**") if w in mc],
-       mc.index("**The head.**") < mc.index("**Ready and green.**") < mc.index("**Pre-ship.**") < mc.index("**Threads.**") < mc.index("**The tower.**"),
-       "The only tolerated advances leave the tree the same" in mc),
-      (["**The head.**", "**Ready and green.**", "**Pre-ship.**", "**Threads.**", "**The tower.**"], True, True))
+SIX = ("**The head.**", "**Ready and green.**", "**Pre-ship.**", "**Threads.**", "**The tower's order.**", "**The tower is held.**")
+check("(98) ... the six confirmations, in order, and the only tolerated advances keep the tree",
+      ([w for w in SIX if w in mc], [mc.index(w) for w in SIX if w in mc] == sorted(mc.index(w) for w in SIX if w in mc),
+       "The only tolerated advances leave the tree the same" in mc, "never merges uncleared" in mc),
+      (list(SIX), True, True, True))
 catalog = json.load(open(os.path.join(root, "schemas", "step-contracts.json"), encoding="utf-8"))["contracts"]
 check("(99) the production merge requires the review, the pre-ship, the go-ahead and the confirmations, the go-ahead after the tower claim",
       (sorted(catalog["production-merge@1"]["requires"]), catalog["production-merge@1"]["requiresAfter"]),
@@ -1042,11 +1137,11 @@ check("(119) notes not requested is skipped and said", (said(load("standard-rele
       (["RELEASE NOTES: NOT REQUESTED"], True))
 check("(120) notes draft and publish settle release-notes; FAILED keeps it owed, and the run goes on to the recap",
       ([issued(load("notes-" + k))[-2] for k in ("drafted", "published", "failed")],
-       "then the provider's `owed --done release-notes`." in rn, "`release-notes` stays owed, with the re-run line. The run continues." in rn),
+       "then the provider's `owed --done release-notes --pr <n>`." in rn, "`release-notes` stays owed, with the re-run line. The run continues." in rn),
       (["release-recap"] * 3, True, True))
 
 # The partial entries.
-entry = flat("scripts/staged/skills/release/SKILL.md")  # the rewritten entry page: the header says where it waits
+entry = flat("skills/release/SKILL.md")
 for ident in ("post-deploy", "docs", "notes"):
     s = load("partial-" + ident)
     check("(121) %s only: exactly its definition's steps, nothing claimed, opened or merged" % ident,
@@ -1070,8 +1165,6 @@ def caller(repo, cache, session):
     for name in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "GIT_DIR", "GIT_WORK_TREE"):
         env.pop(name, None)
     def call(command, request):
-        if command == "start":
-            request = dict(request, rehearsal=True)  # as above: a rehearsal
         done = subprocess.run([sys.executable, "-B", runner, command], input=json.dumps(dict(request, session=session)),
                               capture_output=True, text=True, env=env, cwd=repo)
         return (json.loads(done.stdout) if done.returncode == 0 else {"action": "refused", "exit": done.returncode, "why": done.stderr.strip()})
@@ -1102,7 +1195,8 @@ def drive(call, answer, run_id, override, until=None):
     return answer, seen
 
 # Auto start (trigger 5): the levelling records START; the loop keeps the train claim and starts a
-# NEW run in the same session while the first one's owed steps wait (`beside`: without it a second
+# NEW run in the same session once the first one's owed steps ran (under merge-and-deploy: the
+# documentation, close-out and notes first; only the recap and the auto start wait) (`beside`: without it a second
 # start of the same workflow with no item is refused, as a session's one open run always was); both
 # have their own state file, `status` with `all` lists both, and the first resumes by its run id
 # once the second stops.
@@ -1114,9 +1208,9 @@ a = call("start", {"definition": first_def, "context": context(repo)})
 first = a.get("runId")
 START = {"train-level-final": verdict("TRAIN LEVEL", "FAST-FORWARDED", {"state": "fast-forwarded", "autoStart": "START"}),
          "auto-start-next": verdict("AUTO START", "SKIP started at the levelling", {"state": "skip"})}
-a, seen = drive(call, a, first, START, until="update-docs")
-check("(124) auto start: the first run levels the train with START and waits at its owed documentation",
-      (seen[-1], a.get("action"), a.get("step", {}).get("id")), ("train-level-final", "run", "update-docs"))
+a, seen = drive(call, a, first, START, until="release-recap")
+check("(124) auto start: the first run levels the train with START, runs its owed documentation, close-out and notes, and waits at the recap",
+      ("update-docs" in seen and "write-release-notes" in seen, a.get("action"), a.get("step", {}).get("id")), (True, "run", "release-recap"))
 plain = call("start", {"definitionFile": os.path.join(root, "workflows", "release-merge-and-deploy.json"), "context": context(repo, startedBy="auto")})
 check("(124b) ... a plain second start of the same definition is refused while the first run is open, and the page says to start the next one beside it",
       (plain.get("why", "").startswith("workflow: run-open"), "start a NEW run (`beside` `true`, `started-by: auto`" in entry), (True, True))
@@ -1133,8 +1227,8 @@ check("(126) ... each run has its own state file, and a command naming neither i
        call("next", {}).get("why", "").startswith("workflow: ambiguous-run")), (2, True))
 a = call("resume", {"runId": first})
 a, seen = drive(call, a, first, START)
-check("(127) ... the first run resumes by its id at the documentation, skips the auto start (already started) and finishes",
-      (seen[0], seen[-1], a.get("action"), a.get("outcome")), ("update-docs", "auto-start-next", "finished", "completed"))
+check("(127) ... the first run resumes by its id at the recap, skips the auto start (already started) and finishes",
+      (seen[0], seen[-1], a.get("action"), a.get("outcome")), ("release-recap", "auto-start-next", "finished", "completed"))
 listed = call("status", {"all": True}).get("runs", [])
 check("(128) ... leaving only the second run, still waiting at the owner's yes", [(r["runId"] == second, r["state"]) for r in listed], [(True, "stopped")])
 LOST = verdict("AUTO START", "SKIP train claim held by devstride-07", {"state": "skip"})
@@ -1144,6 +1238,58 @@ c = call2("start", {"definition": first_def, "context": context(repo2)})
 c, _ = drive(call2, c, c.get("runId"), {"auto-start-next": LOST})
 check("(129) a lost train claim at the auto start carries on silently: the run finishes, no stop", (c.get("action"), c.get("outcome")),
       ("finished", "completed"))
+
+# After a restart the close-out still sees what the health check asked for: the runner's status,
+# asked with evidence, carries each step's evidence lines (status alone carries only verdicts, as
+# 4.8.1 answered), and the owed line is the first evidence line, kept when a long report is cut.
+repo5, cache5 = repo_at("owed-repo"), os.path.join(tmp, "owed-cache")
+call5 = caller(repo5, cache5, "owed-session")
+e = call5("start", {"definition": first_def, "context": context(repo5)})
+owed_id = e.get("runId")
+# A long report: the owed line, first, survives the recorder cutting the evidence from its end.
+OWED = {"post-deploy-check": "POST-DEPLOY HEALTH: PASS\nCLOSE-OUT OWED: customer replies\n%s\n```json\n%s\n```\n"
+        % ("\n".join("alarm %d read: OK (aws cloudwatch describe-alarms)" % n for n in range(60)), json.dumps({"state": "pass"}))}
+e, _ = drive(call5, e, owed_id, OWED, until="post-deploy-close-out")
+rows = dict((r["stepId"], r) for r in call5("status", {"runId": owed_id, "evidence": True}).get("rows", []))
+plain_rows = call5("status", {"runId": owed_id}).get("rows", [])
+co = open(os.path.join(root, "skills/release-steps/references/release-close-out.md"), encoding="utf-8").read()
+pd = open(os.path.join(root, "skills/post-deploy/SKILL.md"), encoding="utf-8").read()
+check("(129b) after a restart the close-out reads the health check's owed line from status with evidence, its first line, even after a long report",
+      ((rows.get("post-deploy-check") or {}).get("evidence", [None])[0], (rows.get("post-deploy-check") or {}).get("result"),
+       all("evidence" not in r for r in plain_rows), "the runner's `status` with `evidence`" in " ".join(co.split()),
+       "is kept verbatim as the FIRST evidence line, right under the verdict" in " ".join(pd.split())),
+      ("CLOSE-OUT OWED: customer replies", {"state": "pass"}, True, True, True))
+
+# Two overlapping releases left by a session that ended: a new session lists them (status with all
+# and others), adopts the newer one by its run id, and the older one beside it, as the entry says.
+repo6, cache6 = repo_at("overlap-repo"), os.path.join(tmp, "overlap-cache")
+old_call, new_call = caller(repo6, cache6, "ended-session"), caller(repo6, cache6, "fresh-session")
+o1 = old_call("start", {"definition": first_def, "context": context(repo6)})
+older = o1.get("runId")
+o1, _ = drive(old_call, o1, older, START, until="update-docs")
+o2 = old_call("start", {"definitionFile": os.path.join(root, "workflows", "release-merge-and-deploy.json"),
+                        "context": context(repo6, startedBy="auto"), "beside": True})
+newer = o2.get("runId")
+o2, _ = drive(old_call, o2, newer, {"go-ahead": verdict("GO-AHEAD", "NOT YET", {"state": "not-yet"})})
+listed = new_call("status", {"all": True, "others": True})
+check("(129c) a new session lists the two releases an ended session left in this repository, oldest first, none as its own",
+      (listed.get("runs"), [(r["runId"], r["sessionId"]) for r in listed.get("others", [])]),
+      ([], [(older, "ended-session"), (newer, "ended-session")]))
+no_id = new_call("resume", {"beside": True})
+with_item = new_call("resume", {"runId": newer, "item": "I1", "beside": True})
+check("(129c2) beside is refused without a run id, or with an item",
+      (no_id.get("exit"), "beside is true or false" in no_id.get("why", ""), with_item.get("exit"), "beside" in with_item.get("why", "")),
+      (2, True, 2, True))
+took_newer = new_call("resume", {"runId": newer, "answer": "not yet"})
+plain_older = new_call("resume", {"runId": older})
+took_older = new_call("resume", {"runId": older, "beside": True})
+mine = sorted(r["runId"] for r in new_call("status", {"all": True}).get("runs", []))
+check("(129d) ... adopts the newer by its run id, refuses the older without beside, takes it beside, and then holds both",
+      ((took_newer.get("adoptedFrom") or {}).get("sessionId"), plain_older.get("why", "").startswith("workflow: run-open"),
+       (took_older.get("adoptedFrom") or {}).get("sessionId"), (took_older.get("step") or {}).get("id"), mine == sorted([older, newer]),
+       "the newer of two first (D), the second with `beside` `true`." in entry,
+       "only a run of a release definition counts, resumed by `runId`, its `workflowId` as `workflow`." in entry),
+      ("ended-session", True, "ended-session", "update-docs", True, True, True))
 
 # The backstop never creates a run: it is the entry's own check, not a step, and only START after
 # the train claim starts one. Run with no release.backstop block, it answers OFF and the runner's
@@ -1183,8 +1329,34 @@ else:
     base_records = json.load(open(records_file, encoding="utf-8"))
     now = " ".join(" ".join(open(os.path.join(w, f), encoding="utf-8").read().split()) for base in ("skills/release", "skills/release-steps")
                    for w, _, fs in os.walk(os.path.join(root, base)) for f in fs if f.endswith(".md"))
-    lost = ["%s: %s" % (r["path"], r["line"].strip()[:100]) for r in base_records["recordLines"]
-            if " ".join(r["line"].split()).strip("- ") not in now]
+    # Lines whose only change is a pointer to an old numbered section of the release page, now the
+    # step id it meant: each is pinned to its new words instead, and keeps every code span and
+    # marker the base line carried, so the record it tells a step to write is unchanged.
+    REPOINTED = {
+        "`merge-and-deploy` claims only at step 4 and hands back at 5a (below). **0a** `claim --wait --purpose release` before anything else (with a `claims` block, after the `release-train` claim only: `auto-start.md`'s lock order),":
+            "`merge-and-deploy` claims only at the `go-ahead` phase's `tower-claim` and hands back at `hand-back-after-deploy` (below). **`tower-claim`** `claim --wait --purpose release` before anything else (with a `claims` block, after the `release-train` claim only: `auto-start.md`'s lock order),",
+        "`release-train` claim is taken before any of this (`auto-start.md`'s lock order). 0b's train pull request body carries":
+            "`release-train` claim is taken before any of this (`auto-start.md`'s lock order). The train pull request body (`train-pr`) carries",
+        "under the `release-train` claim, held until step 1 has opened the release pull request":
+            "under the `release-train` claim, held until `open-release-pr` has opened the release pull request",
+        "and confirms the deploy and hands the tower back right there: `release --owed post-deploy-check":
+            "`approve-deploy` and `confirm-deploy` approve and confirm the deploy, and `hand-back-after-deploy` hands the tower back right there: `release --owed post-deploy-check",
+        "stops, whichever comes first, settled by `owed --done` as always; its own step 6 runs then too,":
+            "stops, whichever comes first, settled by `owed --done` as always; its own `release-recap` runs then too,",
+        "5a, so this step does nothing): the provider's `release --owed <item>` for":
+            "`hand-back-after-deploy`, so this step does nothing): the provider's `release --owed <item>` for",
+    }
+    def spans(text):
+        return set(re.findall(r"`[^`]+`|<!--.*?-->", text))
+    lost = []
+    for r in base_records["recordLines"]:
+        line = " ".join(r["line"].split()).strip("- ")
+        moved = REPOINTED.get(line)
+        if moved is not None and (moved not in now or not spans(line) <= spans(moved)):
+            lost.append("%s: %s (repointed)" % (r["path"], line[:100]))
+        elif moved is None and line not in now:
+            lost.append("%s: %s" % (r["path"], r["line"].strip()[:100]))
+    check("(132b) mixed fleet: every repointed record line is a base record line", sorted(set(REPOINTED) - set(" ".join(r["line"].split()).strip("- ") for r in base_records["recordLines"])), [])
     count = len(base_records["recordLines"])
     # The one sentence the merge-and-deploy scope's adoption rule rewrote (clearance.md, "0a moves") names no record format.
     check("(132) mixed fleet: each of the %d record lines the base release's references tell a step to write is still there, word for word" % count,
@@ -1197,26 +1369,24 @@ else:
     check("(133) ... and no script that writes a marker, a claim, the clearance record or the owed file changed since it was pinned",
           sorted(k for k in set(here) | set(base_records["scripts"]) if here.get(k) != base_records["scripts"].get(k)), [])
 
-# --- the switch is off --------------------------------------------------------------------------
-# /devstride:release still follows the page of the last release before the split, word for word,
-# and the runner refuses every release definition unless the start is a rehearsal.
-live_page = open(os.path.join(root, "skills/release/SKILL.md"), encoding="utf-8").read()
-base_page = open(os.path.join(root, "scripts/tests/fixtures/release-split-base/release.md"), encoding="utf-8").read()
-check("(140) not switched on: the live release page is the page of the last release before the split, byte for byte, and names no runner",
-      (live_page == base_page, "run-workflow" in live_page or "release-steps" in live_page), (True, False))
-dormant_env = dict(os.environ, XDG_CACHE_HOME=os.path.join(tmp, "dormant-cache"))
+# --- the switch is on ---------------------------------------------------------------------------
+# /devstride:release runs the definitions on the runner, and the runner starts every release
+# definition with no rehearsal; gates and checkpoints, which no release definition has, stay dormant.
+on_env = dict(os.environ, XDG_CACHE_HOME=os.path.join(tmp, "on-cache"))
 for name in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "GIT_DIR", "GIT_WORK_TREE"):
-    dormant_env.pop(name, None)
-refusals = []
+    on_env.pop(name, None)
+started = []
 for ident in ("release", "release-cut-to-deploy", "release-merge-and-deploy", "release-docs", "release-notes", "release-post-deploy"):
-    done = subprocess.run([sys.executable, "-B", runner, "start"], capture_output=True, text=True, env=dormant_env, cwd=repo_at("dormant-" + ident),
-                          input=json.dumps({"definitionFile": os.path.join(root, "workflows", ident + ".json"), "session": "dormant",
-                                            "context": context(repo_at("dormant-" + ident + "-context"))}))
-    refusals.append((ident, done.returncode, done.stdout, done.stderr.split(":")[1].strip() if done.stderr.count(":") > 1 else done.stderr))
-check("(141) not switched on: the runner refuses every release definition that is not a rehearsal (skill-dormant), and answers nothing",
-      [(rc, out, code) for _, rc, out, code in refusals], [(2, "", "skill-dormant")] * 6)
-check("(142) ... and no run was written", os.path.isdir(os.path.join(tmp, "dormant-cache", "devstride-plugin", "workflows"))
-      and os.listdir(os.path.join(tmp, "dormant-cache", "devstride-plugin", "workflows")) != [], False)
+    done = subprocess.run([sys.executable, "-B", runner, "start"], capture_output=True, text=True, env=on_env, cwd=repo_at("on-" + ident),
+                          input=json.dumps({"definitionFile": os.path.join(root, "workflows", ident + ".json"), "session": "on-" + ident,
+                                            "context": context(repo_at("on-" + ident + "-context"))}))
+    started.append((ident, done.returncode, (json.loads(done.stdout) if done.returncode == 0 else {}).get("action"),
+                    "rehearsal" in (json.loads(done.stdout) if done.returncode == 0 else {})))
+live_page = open(os.path.join(root, "skills/release/SKILL.md"), encoding="utf-8").read()
+check("(140) switched on: the release page runs the runner, and the runner starts every release definition with no rehearsal",
+      ([(i, rc, a) for i, rc, a, _ in started], "run-workflow" in live_page and "release-steps" in live_page,
+       sorted(json.load(open(os.path.join(root, "schemas", "step-contracts.json"), encoding="utf-8"))["dormantSkills"])),
+      ([(i, 0, "run") for i, _, _, _ in started], True, ["checkpoint", "gate"]))
 
 # A forwarding command that fails (`reported` with ok false, as the loop records an exit 1) leaves
 # the run's order and outcome unchanged.

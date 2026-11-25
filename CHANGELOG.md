@@ -8,6 +8,192 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.12.0] — 2026-11-24
+
+### Changed
+
+- **`/devstride:release` now runs the Release workflow one step at a time.** A release walks the
+  definition its clearance scope picks (`workflows/release.json`, `release-cut-to-deploy.json` or
+  `release-merge-and-deploy.json`, or a partial entry for `docs only`, `release-notes only` or
+  `post-deploy only`) through the step runner, so each step can be watched, stopped and resumed on
+  its own, and a restart or a cleared conversation picks the release up where it was. Every pull
+  request marker, claim, clearance record and owed item a step writes is the same as before, so a
+  release followed by hand and one on the runner can adopt each other. The six release definitions
+  are recorded as runnable from this version. Approval gates and checkpoints are still not switched
+  on.
+- **A release or a plan on the step runner spends less of the session's own model.** The routine
+  steps, most of a run, now run several in a row in the new `workflow-steps` agent, a small fresh
+  context on a smaller model, and the conversation that drives the run keeps only their verdicts. The steps
+  that weigh evidence or write for a person (reviews, a merge that may need its conflicts
+  resolved, the owner's go-ahead, the recap, documentation and the post-deploy check) stay in the
+  conversation on the session's own model, as do the steps that talk with the person. Each `run`
+  answer says where its step runs (`agent`: `routine` or `conversation`), from a new `judgement`
+  flag in the step-contract catalog. Which steps run, their order, their proofs, the go-ahead and
+  every record a release leaves are unchanged, and a tool with no agents runs every step in the
+  conversation as before.
+- **Steps the repository has nothing configured for take no model turn.** When the config lacks
+  the hook or block a release step would read (no classifier, no pre-merge check, no claims, no
+  knowledge-base sync, no staging-deploy check, release notes not asked for, auto start off), the
+  step runner records that step itself with exactly the verdict its skill gives in that case, and
+  the answer lists it under `decided`. The rules are a new `configSkip` field in the step-contract
+  catalog; a configured hook, a release that already merged, a person's answer to the step, or a
+  config that cannot be read still hands the step out, and the pre-ship checks always run.
+- **The late steps of a release run in a fresh context of their own.** After the deploy, the
+  sync, documentation, close-out, release notes and recap run in the new
+  `workflow-judgement` agent on the session's own model (`agent: judgement`, from a new
+  `ownContext` flag), instead of in the long conversation that drove the release; the routine
+  steps between them still run on the smaller model. The post-deploy health check stays in the
+  conversation: it may stop and wait there for the person's reply, and the conversation is what
+  knows whether the release was classified light. The merge confirmation, which may have to
+  review a late comment, stays there too. The driver now
+  reads only `step-agents.md` before its first runner command.
+
+### Fixed
+
+- **A waiver given when a check fails again at the merge reaches that check.** The merge-time
+  rerun of the release's pre-ship checks now carries the person's answer, as the other pre-ship
+  steps do, so `skip <name>` is honoured instead of the check running again.
+- **The close-out still sees what the health check owes after a restart.** The runner's `status`
+  can now carry each step's recorded evidence (`evidence` `true`), and the release reads earlier
+  answers there; the post-deploy step keeps its `CLOSE-OUT OWED` line as the first evidence line,
+  so a long health report cut short when recorded never loses it.
+- **A new session can take over two overlapping releases an ended one left.** `status` with `all`
+  and `others` lists the unfinished runs other sessions left in this checkout (never another
+  checkout's, which is a live session's work), and `resume` by run id with `beside` `true` adopts
+  the second beside the first.
+- **A replay of unsent step reports never says an approval gate or checkpoint was done**: DevStride
+  writes those itself.
+- **The release steps carry the fixes made to the old release page since the split**: an adopted
+  tower wins over the release's shape, a merged release's range reads the merge's two parents, a
+  queue notice is never a stop, the merge confirms the tower is held, and under `merge-and-deploy`
+  the newest stamp is the one checked.
+- **A definition switched on without changing is re-recorded as runnable** by
+  `workflow-registry.py record`, and its check fails until it is.
+- **A release's yes approves its production deploy too**, as it always did: the deploy approval
+  step reads the release's go-ahead from the run instead of stopping to ask again after the merge.
+- **A release whose head moves checks the release holds again** on the work it newly carries
+  before its review restarts, and a release adopted late at the tower passes the fix-exclusion
+  check on its branch before it is accepted.
+- **Under the `merge-and-deploy` scope the finished release's documentation, close-out and notes
+  run before the next release starts**, as the release-branch rules say.
+- **The release checks stamp is kept whole**: it is also the stamp step's first evidence line,
+  where the final verify reads it, and the retry after a `CHANGED` recognises it from the step's
+  recorded result.
+- **Every pointer to a release step names the step.** The release's references, and the other
+  skills that cite them, name each step by its id in the Release definitions (`go-ahead`,
+  `confirm-deploy`, `tower-hand-back` and the rest), no longer by a section number of the release
+  page those definitions replaced. A step that reads earlier answers from the runner's `status`
+  names the run that issued it, since two release runs may be open at once.
+- **A hotfix that lands while a release waits for the owner's yes, or between the yes and the
+  merge, sends the release back through its review in the same run.** The go-ahead and the
+  production merge answer `HOTFIX LANDED`, and under `merge-and-deploy` the final stamp check's
+  `CHANGED` or `BEHIND` does the same: the run goes back to the hotfix catch-up, which brings
+  production into the release branch, and the review, the checks and the go-ahead run again, so the
+  owner is asked again on the new head. Before, the run only stopped, and a session had to start
+  a new release run to adopt its own pull request. Found in the scratch-repository rehearsal. A
+  release with no release branch (no `release.releaseBranchPattern`) has nothing to catch up, so
+  its go-ahead never answers `HOTFIX LANDED` and never sends it round that loop.
+- **A release with no pre-ship checks configured is recorded as it was before**: the release's
+  pre-ship step accepts the pre-ship skill's own `NOTHING TO RUN`, as the train and checks steps
+  already did, instead of refusing it as no verdict.
+- **Under `merge-and-deploy` a release that took a hotfix in reaches its merge.** After the catch-up
+  merges production into the release branch and the review and pre-ship checks run again, the
+  release's checks stamp now names the new head even when no pre-ship hold was declared; before,
+  the stamp still named the tree from before the hotfix, so the check just before the merge always
+  read it as changed. That new stamp is taken against the production commit the hotfix catch-up
+  brought in, not the one the first checks started from, which the stamp tool would refuse.
+- **A release whose pull request moved after the yes goes back through its review in the same
+  run.** When the merge confirmations find the head is no longer the reviewed one, they answer
+  `HEAD MOVED` and the run returns to the review, the checks and a fresh go-ahead. Before, the run
+  stopped there and every resume stopped again on the same stale head.
+- **The owner can waive a failing pre-ship check on the runner.** Their "skip <name>" reaches the
+  pre-ship step as its answer, and the step records the waiver as before. Before, the resumed step
+  ran the same failing check again.
+- **A release with no pre-ship checks configured is marked ready on the identical-tree path.** The
+  discharge step accepts `NOTHING TO RUN`, so the pull request no longer stays a draft forever.
+- **The checks before the tower reuse a train check that already passed on the same tree**, as the
+  release's own pre-ship step does, instead of running it again.
+- **An empty release train runs no train checks**: with no snapshot head the train's pre-ship
+  step answers `NOT APPLICABLE` instead of running every train check on whatever is checked out.
+- **A failed health check in a `post-deploy only` run under the default scope stops for the
+  owner's rollback decision** (`NOT POSTED`), instead of ending the run as complete.
+- **After a restart, `/devstride:release` resumes only release runs**, never a build, plan or
+  hotfix run the same session left open.
+- **The final go-ahead under `merge-and-deploy` never answers `HOTFIX LANDED`**, which its step
+  cannot take; the stamp check right after it catches a hotfix. And a hotfix the production merge
+  finds steps the tower aside first, so the rebuild never holds it.
+- **A fix pushed after a failed pre-ship check goes back through the review.** Resumed with
+  `answer: moved <head>`, the pre-ship step answers `HEAD MOVED` and the run reviews and checks the
+  new head. Before, every retry tested the old head again.
+- **A hotfix landing while a release's checks run no longer strands it as a draft.** The
+  discharge step answers `PRODUCTION MOVED`, and the catch-up right after it brings production in
+  and sends the run back through the review. Before, every retry stopped on the same stale stamp.
+- **A moved head at the merge under `merge-and-deploy` steps the tower aside** before the run goes
+  back to its review, so the rebuild never holds production clearance.
+- **A release stopped by a failed health check checks production again when resumed with an
+  answer.** The health status step answers `RECHECK`, the health check runs again and its new
+  result is posted, in a full release and in `post-deploy only` alike. Before, every resume read
+  the recorded failure again without looking at production.
+- **The owner can accept an unrun health check in a `post-deploy only` run** under the default
+  scope; only a failure, or a declined unrun check, stops there, and any other reply is asked
+  again.
+- **A release with nothing to release hands the tower back** before the run ends.
+- **A session holding two releases settles each one's owed work on that release**, by naming its
+  pull request, never the newest release's.
+- **The owner's waiver also reaches the pre-ship checks before the tower** under
+  `merge-and-deploy`, and a fix pushed after a failed check before the tower goes back to
+  the checks on the new head.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since dfd9e65b6a @ cef5cbf5a4, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@dfd9e65b6a | tokens@dfd9e65b6a | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/build-item/SKILL.md | 23,992 | 7,998 | 23,992 | 7,998 | +0 | 8,000 |
+| skills/review/SKILL.md | 23,986 | 7,996 | 23,994 | 7,998 | +2 | 7,999 |
+| skills/doctor/SKILL.md | 23,847 | 7,949 | 23,847 | 7,949 | +0 | 8,000 |
+| skills/rationalize-gantt/SKILL.md | 12,332 | 4,111 | 12,332 | 4,111 | +0 | 4,200 |
+| skills/release/SKILL.md | 18,793 | 6,265 | 11,950 | 3,984 | -2281 | 4,000 |
+| skills/pr/SKILL.md | 11,538 | 3,846 | 11,538 | 3,846 | +0 | 3,846 |
+| skills/ultracode-build/SKILL.md | 10,327 | 3,443 | 10,327 | 3,443 | +0 | 3,443 |
+| skills/rebalance/SKILL.md | 8,482 | 2,828 | 8,482 | 2,828 | +0 | 2,828 |
+| skills/plan/SKILL.md | 8,385 | 2,795 | 8,329 | 2,777 | -18 | 2,795 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,730 | 2,244 | 6,730 | 2,244 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 6,073 | 2,025 | 6,073 | 2,025 | +0 | 2,100 |
+| skills/insert-defect/SKILL.md | 5,605 | 1,869 | 5,605 | 1,869 | +0 | 1,869 |
+| skills/insert-story/SKILL.md | 4,928 | 1,643 | 4,928 | 1,643 | +0 | 1,643 |
+| skills/branch-hotfix/SKILL.md | 4,906 | 1,636 | 4,906 | 1,636 | +0 | 1,636 |
+| skills/branch-feature/SKILL.md | 3,707 | 1,236 | 3,707 | 1,236 | +0 | 1,236 |
+| skills/pre-ship/SKILL.md | 3,589 | 1,197 | 3,599 | 1,200 | +3 | 1,200 |
+| skills/risk-check/SKILL.md | 3,598 | 1,200 | 3,598 | 1,200 | +0 | 1,200 |
+| skills/hotfix-steps/SKILL.md | 3,591 | 1,197 | 3,596 | 1,199 | +2 | 1,200 |
+| skills/plan-steps/SKILL.md | 3,578 | 1,193 | 3,578 | 1,193 | +0 | 1,200 |
+| skills/local-checks/SKILL.md | 3,523 | 1,175 | 3,523 | 1,175 | +0 | 1,200 |
+| skills/run-workflow/SKILL.md | 3,547 | 1,183 | 3,354 | 1,118 | -65 | 1,200 |
+| skills/release-steps/SKILL.md | 3,071 | 1,024 | 3,288 | 1,096 | +72 | 1,200 |
+| skills/merge-story/SKILL.md | 3,240 | 1,080 | 3,240 | 1,080 | +0 | 1,081 |
+| skills/review-story/SKILL.md | 3,020 | 1,007 | 3,020 | 1,007 | +0 | 1,007 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/claim-story/SKILL.md | 2,875 | 959 | 2,875 | 959 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/story-lifecycle/SKILL.md | 2,700 | 900 | 2,700 | 900 | +0 | 900 |
+| skills/capture-findings/SKILL.md | 2,696 | 899 | 2,696 | 899 | +0 | 900 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/post-deploy/SKILL.md | 1,974 | 658 | 2,095 | 699 | +41 | 700 |
+| skills/local-environment/SKILL.md | 2,083 | 695 | 2,083 | 695 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,562 | 521 | 1,589 | 530 | +9 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/sync-base/SKILL.md | 1,471 | 491 | 1,471 | 491 | +0 | 500 |
+| skills/classify-release/SKILL.md | 1,423 | 475 | 1,423 | 475 | +0 | 500 |
+| alwaysOn.context (skill listing) | 6,573 | 2,191 | 6,573 | 2,191 | +0 | 2,200 |
+| **total (bodies)** | 283,174 | 94,408 | 276,470 | 92,173 | -2235 | |
+
 ## [4.11.0] — 2026-11-24
 
 ### Fixed
@@ -7130,7 +7316,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.11.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.12.0...HEAD
+[4.12.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.11.0...devstride--v4.12.0
 [4.11.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.10.0...devstride--v4.11.0
 [4.10.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.9.0...devstride--v4.10.0
 [4.9.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.8.1...devstride--v4.9.0
