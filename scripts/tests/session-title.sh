@@ -219,4 +219,36 @@ PY
   && ok "(12) hooks.json runs it on UserPromptSubmit and SessionStart startup|resume|fork, guarded and bounded" \
   || bad "(12) wired: $WIRED"
 
+# (13) a rename asked for on the Agent Fleet, kept by the built-in reporter: applied with or without
+#      a titleCommand, inside a repository or not, over any title; the command is not run meanwhile;
+#      a link, a bad record or a bad time is ignored
+asked() { # asked SID JSON — the reporter's kept request for SID, as session_rename.py writes it
+  mkdir -p "$RECORDS"; chmod 700 "$RECORDS"; printf '%s' "$2" > "$RECORDS/$1.request.json"; chmod 600 "$RECORDS/$1.request.json"
+}
+OUTSIDE="$WORK/outside"; mkdir -p "$OUTSIDE"
+asked r1 '{"name":"Asked  for","at":"2026-11-24T10:00:00.000Z"}'
+fire UserPromptSubmit r1 "$PLAIN" ',"prompt":"x","session_title":"Mine"'; A="$(title_of)"
+OWN="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["own"])' "$RECORDS/r1.json" 2>/dev/null)"
+fire UserPromptSubmit r1 "$PLAIN" ',"prompt":"x","session_title":"Asked for"'; B="$OUT"
+fire UserPromptSubmit r1 "$PLAIN" ',"prompt":"x","session_title":"Typed later"'; B2="$OUT"
+asked r1 '{"name":"Asked again","at":"2026-11-24T11:00:00.000Z"}'
+fire UserPromptSubmit r1 "$PLAIN" ',"prompt":"x","session_title":"Typed later"'; B3="$(title_of)"
+asked r2 '{"name":"From the fleet","at":"t2"}'; say "Command title" replace
+fire UserPromptSubmit r2 "$R" ',"prompt":"x"'; C="$(title_of)"; CRAN="$([ -e "$SAID/env.json" ] && echo ran || echo idle)"
+say "Command title"; fire UserPromptSubmit r2 "$R" ',"prompt":"x","session_title":"From the fleet"'; C2="$OUT"; CRAN2="$([ -e "$SAID/env.json" ] && echo ran || echo idle)"
+asked r8 '{"name":"Already so","at":"t8"}'; fire UserPromptSubmit r8 "$OUTSIDE" ',"prompt":"x","session_title":"Already so"'; J="$OUT"
+JOWN="$(python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["own"], r["applied"])' "$RECORDS/r8.json" 2>/dev/null)"
+asked r3 '{"name":"Nowhere","at":"t3"}'; fire SessionStart r3 "$OUTSIDE" ',"source":"resume"'; D="$(title_of)"
+fire SessionStart r3 "$OUTSIDE" ',"source":"clear"'; E="$OUT"
+ln -s "$RECORDS/r3.request.json" "$RECORDS/r4.request.json"; fire UserPromptSubmit r4 "$OUTSIDE" ',"prompt":"x"'; F="$OUT"
+asked r5 '{"name":"No time"}'; fire UserPromptSubmit r5 "$OUTSIDE" ',"prompt":"x"'; G="$OUT"
+asked r6 'not json'; fire UserPromptSubmit r6 "$OUTSIDE" ',"prompt":"x"'; H="$OUT"
+asked r7 '{"name":"a|b\u0007c","at":"t7"}'; fire UserPromptSubmit r7 "$OUTSIDE" ',"prompt":"x"'; I="$(title_of)"
+if [ "$A" = "UserPromptSubmit|Asked for" ] && [ "$OWN" = "False" ] && [ -z "$B" ] && [ -z "$B2" ] && [ "$B3" = "UserPromptSubmit|Asked again" ] \
+   && [ "$C" = "UserPromptSubmit|From the fleet" ] && [ "$CRAN" = idle ] && [ -z "$C2" ] && [ "$CRAN2" = ran ] \
+   && [ "$D" = "SessionStart|Nowhere" ] && [ -z "$E" ] && [ -z "$F" ] && [ -z "$G" ] && [ -z "$H" ] \
+   && [ "$I" = "UserPromptSubmit|a b c" ] && [ -z "$J" ] && [ "$JOWN" = "False t8" ]; then
+  ok "(13) a Fleet rename the reporter kept is applied once over a person's title, with no titleCommand, in a repository with one (whose command runs again after it) and outside any; never the hook's own, even when the title already matched; a /rename typed after it is kept, a newer request applies; a link, a record without a time and one that is not JSON ignored; the name cleaned"
+else bad "(13) a=$A own=$OWN b=$B b2=$B2 b3=$B3 c=$C ran=$CRAN c2=$C2 ran2=$CRAN2 d=$D e=$E f=$F g=$G h=$H i=$I j=$J jown=$JOWN"; fi
+
 exit $FAIL

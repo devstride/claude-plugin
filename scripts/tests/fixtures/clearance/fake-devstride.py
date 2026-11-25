@@ -8,7 +8,9 @@ port to <state dir>/port once it listens and serves until killed.
 state or session id, a control character, an over-long text, an interval outside 1 to 60, a stamp
 that is not a whole number) and appends each accepted call's arguments to <state dir>/presence.jsonl
 with `_keyDigest`, the digest of the API key header it arrived with (never the key). It answers
-{outcome: recorded}, or `ended` for an end, or the word in the control file `presence-outcome`.
+{outcome: recorded}, or `ended` for an end, or the word in the control file `presence-outcome`; a
+recorded answer also carries `rename`, the JSON object in the control file `presence-rename`, as
+the real server does, until a report sends that object's `at` back as `renameApplied`.
 
 Control files in the state dir (any may be absent):
   now        an ISO instant used as the server's clock (default: the real one)
@@ -101,7 +103,8 @@ def fresh(a):
     return row
 
 
-PRESENCE_TEXT = {"machine": 200, "label": 200, "branch": 500, "checkout": 500, "item": 64, "pluginVersion": 64, "endReason": 64}
+PRESENCE_TEXT = {"machine": 200, "label": 200, "branch": 500, "checkout": 500, "item": 64, "pluginVersion": 64, "endReason": 64,
+                 "renameApplied": 64}
 PRESENCE_STAMPS = ("reportedAt", "activeAt", "busySince")
 PRESENCE_KEYS = set(PRESENCE_TEXT) | set(PRESENCE_STAMPS) | {"event", "sessionId", "state", "intervalMinutes"}
 
@@ -268,7 +271,15 @@ class Handler(BaseHTTPRequestHandler):
             with open(os.path.join(STATE, "presence.jsonl"), "a") as handle:
                 handle.write(json.dumps(dict(args, _keyDigest=digest(self.headers.get("X-DevStride-Api-Key") or ""))) + "\n")
             outcome = control("presence-outcome") or ("ended" if args["event"] == "end" else "recorded")
-            return self.text(json.dumps({"data": {"outcome": outcome}}))
+            answer = {"outcome": outcome}
+            asked = control("presence-rename")
+            if outcome == "recorded" and asked:
+                asked = json.loads(asked)
+                if args.get("renameApplied") == asked.get("at"):
+                    os.unlink(os.path.join(STATE, "presence-rename"))  # taken: the server stops asking
+                else:
+                    answer["rename"] = asked
+            return self.text(json.dumps({"data": answer}))
         try:
             data = call(tool, args)
         except KeyError:

@@ -518,7 +518,7 @@ headless runs. The recipe and the record it writes are in
   failure changes nothing and never blocks a prompt; keep the command local and quick. Remote
   Control (claude.ai/code, the Claude app) shows the session's title, so it follows; for a
   `claude remote-control` session, from Claude Code 2.1.329. `null`
-  (the default) sets no title.
+  (the default) sets no title. A Fleet rename (`session-presence.md`) is applied first, once.
 
 - **`jobClassGate`** turns on the plugin's `UserPromptSubmit` hook (`hooks/session-gate.sh`). The
   hook records the JOB CLASS of each top-level `/devstride:<skill>` command per session, under

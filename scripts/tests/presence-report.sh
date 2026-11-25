@@ -269,6 +269,84 @@ OUT="$(HOME="$WORK/empty-home" CLAUDE_CONFIG_DIR="$WORK/empty-config" python3 "$
 if [ "$OUT" = "AGENT CONNECTION: NOT READY (no API key: browser sign-in only, or no devstride connection)" ]; then ok "(8b) an empty home and an empty configuration directory → NOT READY: nothing else is read"
 else bad "(8b) $OUT"; fi
 
+# (10) a rename asked for on the Agent Fleet: a recorded answer's request is kept for the title hook,
+#      the title hook applies it, and once the session carries the name the next report says so and
+#      the kept request goes; another answer keeps it, an end removes it; the exit code never changes
+key; noconfig
+TH="$ROOT/hooks/session-title.py"; RSID=4c1e2f00-aaaa-bbbb-cccc-000000000010; KEPT="$XDG_CACHE_HOME/devstride-plugin/session-title/$RSID.request.json"
+mkdir -p "$CLAUDE_CONFIG_DIR/sessions"
+named() { printf '{"sessionId":"%s","name":"%s"}' "$RSID" "$1" > "$CLAUDE_CONFIG_DIR/sessions/4242.json"; }
+beat() { report PRESENCE_EVENT="${1:-beat}" PRESENCE_SESSION_ID="$RSID" PRESENCE_STATE=working PRESENCE_MACHINE=m9 CLAUDE_CODE_SESSION_ID="$RSID" CLAUDE_PID=4242; }
+kept() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["name"])' "$KEPT" 2>/dev/null || echo none; }
+prompt() { printf '{"hook_event_name":"UserPromptSubmit","session_id":"%s","cwd":"%s","prompt":"x","session_title":"%s"}' "$RSID" "$WORK/dir" "$1" \
+  | python3 "$TH" hook | python3 -c 'import json,sys; t=sys.stdin.read(); print(json.loads(t)["hookSpecificOutput"]["sessionTitle"] if t.strip() else "-")'; }
+named "Old name"; printf '{"name":"New  name","at":"2026-11-24T16:00:00.000Z"}' > "$DS/presence-rename"
+beat; A="$RC:$OUT:$(last renameApplied):$(last label):$(kept)"
+MODE="$(python3 -c 'import os,stat,sys; print(oct(stat.S_IMODE(os.stat(os.path.dirname(sys.argv[1])).st_mode)), oct(stat.S_IMODE(os.stat(sys.argv[1]).st_mode)))' "$KEPT" 2>/dev/null)"
+printf 'stale' > "$DS/presence-outcome"; beat; B="$RC:$(kept)"; rm -f "$DS/presence-outcome"
+beat; A2="$RC:$(last renameApplied):$(kept)"
+C="$(prompt "Old name")"; D="$(prompt "New name")"
+named "Something else"; beat; E="$RC:$(last renameApplied):$(kept)"
+named "New name"; beat; F="$RC:$(last renameApplied):$([ -e "$DS/presence-rename" ] && echo asking || echo taken):$(kept)"
+beat; G="$RC:$(last renameApplied):$(kept)"
+printf '{"name":"Again","at":"2026-11-24T17:00:00.000Z"}' > "$DS/presence-rename"; beat; H1="$(kept)"
+beat end; H="$RC:$(last renameApplied):$(kept)"
+printf '{"name":"Third","at":"2026-11-24T18:00:00.000Z"}' > "$DS/presence-rename"; beat; I1="$(prompt "New name")"
+named "Typed by hand"; beat; I="$RC:$(last renameApplied):$([ -e "$DS/presence-rename" ] && echo asking || echo taken)"
+beat; I2="$(kept)"
+printf '{"name":"Fourth","at":"2026-11-24T19:00:00.000Z"}' > "$DS/presence-rename"; beat; named "Fourth"; beat; J="$(last renameApplied):$(kept)"
+rm -f "$DS/presence-rename"
+if [ "$A" = "0::-:Old name:New name" ] && [ "$MODE" = "0o700 0o600" ] && [ "$B" = "0:New name" ] && [ "$A2" = "0:-:New name" ] \
+   && [ "$C" = "New name" ] && [ "$D" = "-" ] \
+   && [ "$E" = "0:2026-11-24T16:00:00.000Z:none" ] && [ "$F" = "0:-:taken:none" ] && [ "$G" = "0:-:none" ] \
+   && [ "$H1" = "Again" ] && [ "$H" = "0:-:none" ] && [ "$I1" = "Third" ] \
+   && [ "$I" = "0:2026-11-24T18:00:00.000Z:taken" ] && [ "$I2" = "none" ] && [ "$J" = "2026-11-24T19:00:00.000Z:none" ]; then
+  ok "(10) a Fleet rename on a recorded answer is kept owner-only (name cleaned) and set as the title at the next prompt; renameApplied is sent only once the session's own name matches or the title hook set it (a /rename typed since never strands it), and the server stops asking; a stale answer keeps it, a recorded answer without one or an end removes it; exit 0 throughout"
+else bad "(10) a=$A mode=$MODE b=$B a2=$A2 c=$C d=$D e=$E f=$F g=$G h1=$H1 h=$H i1=$I1 i=$I i2=$I2 j=$J"; fi
+
+# (10b) the kept request is read, replaced or removed only in a records directory that is this
+#       user's own, never a link nor open to others for writing
+if python3 - "$ROOT" "$WORK/rn" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "skills/build-item/scripts"))
+work = sys.argv[2]
+os.makedirs(work)
+os.environ["XDG_CACHE_HOME"] = os.path.join(work, "cache")
+import session_rename as r
+r.write("s1", "Name", "t1")
+assert r.read("s1") == {"name": "Name", "at": "t1"}
+records = r.directory()
+assert oct(os.stat(records).st_mode & 0o777) == "0o700" and oct(os.stat(r.path("s1")).st_mode & 0o777) == "0o600"
+assert oct(os.stat(os.path.dirname(records)).st_mode & 0o777) == "0o700", "a parent this creates is private"
+os.chmod(os.path.dirname(records), 0o775)
+assert r.read("s1") == {"name": "Name", "at": "t1"}, "a parent left open to the group by a umask of 002 is fine"
+os.chmod(os.path.dirname(records), 0o777)
+assert r.read("s1") is None, "a parent other users may write to is not trusted"
+os.chmod(os.path.dirname(records), 0o755)
+os.chmod(records, 0o770)
+assert r.read("s1") is None, "a directory others may write to is not read"
+r.remove("s1"); assert os.path.exists(r.path("s1")), "nor removed from"
+os.chmod(records, 0o700)
+elsewhere = os.path.join(work, "elsewhere"); os.makedirs(elsewhere, mode=0o700)
+open(os.path.join(elsewhere, "s2.request.json"), "w").write('{"name":"Other","at":"t2"}')
+os.rename(records, records + ".real"); os.symlink(elsewhere, records)
+assert r.read("s2") is None, "a linked directory is not read"
+r.remove("s2"); assert os.path.exists(os.path.join(elsewhere, "s2.request.json")), "nor removed from"
+try:
+    r.write("s3", "N", "t3"); raise SystemExit("wrote through a linked directory")
+except OSError:
+    pass
+os.unlink(records); os.rename(records + ".real", records)
+os.symlink(r.path("s1"), r.path("s4"))
+assert r.read("s4") is None, "a linked request is not read"
+assert r.read("../s1") is None and r.read("") is None and r.read(None) is None
+assert r.request_of({"outcome": "stale", "rename": {"name": "x", "at": "t"}}) is None
+assert r.request_of({"outcome": "recorded", "rename": {"name": " a\tb ", "at": "t"}}) == ("a b", "t")
+assert r.request_of({"outcome": "recorded", "rename": {"name": "x", "at": "t" * 65}}) is None
+PY
+then ok "(10b) the kept request lives owner-only; a directory open to others, a linked directory or a linked request is never read, written or removed through; a bad session id, a non-recorded answer or an over-long time is no request"
+else bad "(10b) the rename helper's file safety"; fi
+
 # (9) across every captured output, and everything the reporter left on disk: no key, secret or organization id
 if ! grep -rqF -e "$KEY" -e "$SECRET" -e "$ORG" "$ALL" "$XDG_CACHE_HOME" 2>/dev/null \
    && ! grep -qF -e "$SECRET" -e "$ORG" "$DS/presence.jsonl" && ! grep -qF "$KEY" "$DS/presence.jsonl"; then

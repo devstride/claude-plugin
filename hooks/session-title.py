@@ -1,13 +1,24 @@
 #!/usr/bin/env python3
-"""hooks/session-title.py — let the repository name an unnamed session, through Claude Code's own title.
+"""hooks/session-title.py — let the repository name an unnamed session, and apply a rename asked for
+on the Agent Fleet, through Claude Code's own title.
 
 Claude Code lets a SessionStart or UserPromptSubmit hook set the session's title, with the same
-effect as /rename. This hook asks the consuming repository for one, through ONE command it names in
-`.claude/ds-config.json`:
+effect as /rename. This hook sets one in two cases, in this order:
 
-    "session": { "titleCommand": "<the repository's own command>" }
+  - A rename someone asked for on the Agent Fleet, for a session the plugin's built-in reporter
+    reports (hooks/presence-report.py keeps the request on this machine through
+    skills/build-item/scripts/session_rename.py, inside a repository or not). It is a person's
+    request, so it is applied whatever title the session has, once per request (its time is kept
+    in this hook's record as `applied`), is never OWNED, and the repository's command does not run
+    at the event that applies it. The reporter's next report, once the session carries the name,
+    tells the server it was taken, and the request is removed then.
+  - Otherwise, a title from the consuming repository, through ONE command it names in
+    `.claude/ds-config.json`:
 
-An absent, null or blank command, or a session outside a repository, runs nothing and writes nothing.
+        "session": { "titleCommand": "<the repository's own command>" }
+
+    An absent, null or blank command, or a session outside a repository, runs nothing and writes
+    nothing.
 
   hook     (the hook command; the event comes from the payload's hook_event_name)
            UserPromptSubmit, and SessionStart whose source is startup, resume or fork (the sources
@@ -28,10 +39,11 @@ An absent, null or blank command, or a session outside a repository, runs nothin
            The hook prints `{"hookSpecificOutput":{"hookEventName":<event>,"sessionTitle":<t>}}`
            only when the title differs from the custom title the session already has.
 Records: ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/session-title/<session>.json (the title this hook
-last set, and whether it set it on its own), owner-only, written only when a title is printed or
-stops being the hook's own, and touched whenever the session runs the hook;
-another session's record untouched for 7 days is pruned at a new session's start. Nothing is
-written in the repository or the plugin directory. FAILS OPEN: every hook exits 0, and prints
+last set, whether it set it on its own, and the time of the last Fleet rename it applied),
+owner-only, written only when a title is printed, a Fleet rename is applied or a title stops being
+the hook's own, and touched whenever the session runs the hook; beside it, the reporter's
+<session>.request.json, which this hook only reads. Another session's record or request untouched
+for 7 days is pruned at a new session's start. Nothing is written in the repository or the plugin directory. FAILS OPEN: every hook exits 0, and prints
 nothing but that one JSON line (a prompt hook's other stdout would become context), whatever goes
 wrong. python3 and the standard library only.
 """
@@ -66,6 +78,16 @@ def portable():
         sys.path.insert(0, scripts)
     import portable as module
     return module
+
+
+def requested(sid):
+    """(name, at) of the rename asked for on the Agent Fleet that the built-in reporter keeps for
+    this session, or None."""
+    portable()  # puts the plugin's helpers on the path
+    import session_rename
+    kept = session_rename.read(sid)
+    name = clean(kept["name"]) if kept else ""
+    return (name, kept["at"]) if name else None
 
 
 def records_path():
@@ -104,9 +126,17 @@ def last_set(sid):
     return record if isinstance(record, dict) and isinstance(record.get("title"), str) else {}
 
 
-def remember(sid, title, own):
+def remember(sid, title, own, applied=None):
+    """Record the title this hook last set; `applied` is the time of the last Fleet rename it set,
+    carried over from the record when not given, so that request is never applied twice."""
+    if applied is None:
+        kept = last_set(sid).get("applied")
+        applied = kept if isinstance(kept, str) else None
+    record = {"title": title, "own": own, "at": int(time.time())}
+    if applied:
+        record["applied"] = applied
     directory = private_dir(records_path())
-    data = (json.dumps({"title": title, "own": own, "at": int(time.time())}) + "\n").encode()
+    data = (json.dumps(record) + "\n").encode()
     temporary = os.path.join(directory, ".%s.%s.tmp" % (sid, secrets.token_hex(8)))
     helper = portable()
     fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | helper.flags("O_NOFOLLOW"), 0o600)
@@ -118,8 +148,9 @@ def remember(sid, title, own):
 
 
 def prune(own, now):
-    """Remove other sessions' records (and temporary files) untouched for KEEP: only files this hook
-    names, in a records directory that is ours and no symlink, so nothing else is ever removed."""
+    """Remove other sessions' records, kept requests (and temporary files) untouched for KEEP: only
+    files this hook or the reporter names, in a records directory that is ours and no symlink, so
+    nothing else is ever removed."""
     directory = records_path()
     uid = portable().uid()
     try:
@@ -130,9 +161,10 @@ def prune(own, now):
     except OSError:
         return
     for name in names:
-        if name == own + ".json":
+        if name in (own + ".json", own + ".request.json"):
             continue
-        if not (name.endswith(".json") and SESSION_ID.match(name[:-5])) and not RECORD_TEMP.match(name):
+        request = name.endswith(".request.json") and SESSION_ID.match(name[:-13])
+        if not request and not (name.endswith(".json") and SESSION_ID.match(name[:-5])) and not RECORD_TEMP.match(name):
             continue
         path = os.path.join(directory, name)
         try:
@@ -252,14 +284,24 @@ def hook():
         return
     if event == "SessionStart" and payload.get("source") not in SOURCES:
         return
+    if event == "SessionStart" and payload.get("source") == "startup":
+        prune(sid, time.time())  # reads nothing but this hook's own directory, and only when it exists
+    current = payload.get("session_title") if isinstance(payload.get("session_title"), str) else ""
+    asked = requested(sid)
+    if asked and last_set(sid).get("applied") != asked[1]:
+        # a person asked for this name on the Agent Fleet: it wins over any title once, and is never
+        # the hook's own, so a later /rename and the repository's own titles take over again after it
+        name, at = asked
+        remember(sid, name, False, applied=at)  # before printing: a title the hook cannot record is never set
+        if name != current:
+            sys.stdout.write(json.dumps({"hookSpecificOutput": {"hookEventName": event, "sessionTitle": name}}) + "\n")
+            sys.stdout.flush()
+        return
     cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) and payload.get("cwd") else os.getcwd()
     root, config = config_root(cwd)
     command = title_command(config) if root else None
     if not command:
         return  # nothing configured: nothing runs and nothing is written
-    if event == "SessionStart" and payload.get("source") == "startup":
-        prune(sid, time.time())
-    current = payload.get("session_title") if isinstance(payload.get("session_title"), str) else ""
     mine = last_set(sid)
     if mine:
         try:  # a session still in use keeps its record however long its title stays the same

@@ -628,7 +628,7 @@
         "hooks/session-title.py",
         "doctor 4"
       ],
-      "unset": "the plugin never sets a session title; the session keeps the name a person gave it or Claude Code's own",
+      "unset": "the plugin sets no title of its own; the session keeps the name a person gave it or Claude Code's own (a Fleet rename still applies)",
       "contract": "skills/setup/references/config-defaults.md",
       "since": "3.55.0"
     },

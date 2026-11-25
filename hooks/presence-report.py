@@ -20,8 +20,16 @@ whose repository names no presence command of its own (skills/setup/references/s
 
 What is sent, and nothing else: event, sessionId, state, machine, label (the session's own name),
 branch, checkout (the folder's base name, never a path), item, pluginVersion, intervalMinutes,
-reportedAt, activeAt, busySince, endReason. Never session text, a prompt, a file's content, a path
-or the machine's address. The key is found by skills/build-item/scripts/devstride_connection.py and
+reportedAt, activeAt, busySince, endReason, renameApplied. Never session text, a prompt, a file's
+content, a path or the machine's address.
+
+A rename someone asked for on the Agent Fleet comes back on a recorded answer as `rename` (the name
+and when it was asked for). The reporter keeps it on this machine
+(skills/build-item/scripts/session_rename.py), where hooks/session-title.py sets it as the session's
+own title at the next prompt; once the session's name is the one asked for, or the title hook has
+set it, every report carries the request's time as `renameApplied`, so the server stops asking. A recorded answer with no request
+removes the kept one, and so does an end; any other answer keeps it. Keeping it never changes the
+exit code. The key is found by skills/build-item/scripts/devstride_connection.py and
 goes only to a DevStride API host; it is never printed, logged, or taken from or put on a command
 line. python3 and the standard library only.
 """
@@ -39,6 +47,7 @@ try:
     import devstride_connection as connection  # noqa: E402
     import presence  # noqa: E402  hooks/presence.py: the owner-checking reader and the checkout's root
     import presence_settings  # noqa: E402
+    import session_rename  # noqa: E402  the rename asked for on the Agent Fleet, kept for the title hook
     UNLOADED = None
 except Exception as error:  # a helper this system cannot run: main() says so in its own words
     UNLOADED = type(error).__name__
@@ -117,15 +126,47 @@ def credentials(environ):
 
 
 def deliver(body, creds):
-    """Send one report; the exit code the hook reads."""
+    """Send one report; (the exit code the hook reads, the server's answer or None)."""
     try:
         answer = connection.call_tool(TOOL, body, creds, timeout=TIMEOUT, attempts=1)
     except (connection.Absent, connection.Refused):
-        return EXIT_REFUSED
+        return EXIT_REFUSED, None
     except connection.Problem:
-        return EXIT_TRANSIENT
+        return EXIT_TRANSIENT, None
     outcome = answer.get("outcome") if isinstance(answer, dict) else None
-    return 0 if outcome in OUTCOMES else EXIT_TRANSIENT
+    return (0, answer) if outcome in OUTCOMES else (EXIT_TRANSIENT, None)
+
+
+def with_rename_applied(body):
+    """The body, carrying `renameApplied` when the session already has the name a kept request asked for."""
+    try:
+        if body["event"] != "end":
+            kept = session_rename.read(body["sessionId"])
+            # taken: the session carries the name, or the title hook set it (a person may have renamed it since)
+            if kept and (session_rename.same(body.get("label"), kept["name"])
+                         or session_rename.applied(body["sessionId"]) == kept["at"]):
+                return dict(body, renameApplied=kept["at"])
+    except Exception:
+        pass  # the report stands without it
+    return body
+
+
+def keep_rename(body, answer):
+    """Keep, replace or drop the session's waiting rename after an answer; never raises."""
+    try:
+        sid = body["sessionId"]
+        if body["event"] == "end":
+            session_rename.remove(sid)
+            return
+        if not isinstance(answer, dict) or answer.get("outcome") != "recorded":
+            return  # an answer that is not a renewal says nothing about the request
+        asked = session_rename.request_of(answer)
+        if asked:
+            session_rename.write(sid, asked[0], asked[1])
+        else:
+            session_rename.remove(sid)
+    except Exception:
+        pass  # a convenience for the session's name; the report stands without it
 
 
 def report(environ):
@@ -138,7 +179,11 @@ def report(environ):
         return EXIT_REFUSED  # an address that is not DevStride's: nothing to try again soon
     except connection.Problem:
         return EXIT_TRANSIENT  # no key just now (a file being rewritten): the keeper leaves if it stays so
-    return deliver(body, creds)
+    body = with_rename_applied(body)
+    code, answer = deliver(body, creds)
+    if code == 0 or body["event"] == "end":  # an ended session waits on no rename, whatever the answer
+        keep_rename(body, answer)
+    return code
 
 
 def check(environ):

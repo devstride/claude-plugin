@@ -709,7 +709,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **4.10.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **4.11.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 The public repository, `devstride/claude-plugin`, is a published copy written only by the release

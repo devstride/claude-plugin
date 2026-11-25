@@ -57,8 +57,8 @@ read). A project `.mcp.json` is not read, nor a `devstride` server kept under an
 
 `event`, `sessionId`, `state`, `machine`, `label` (the session's own name), `branch`, `checkout`
 (the folder's base name, never a path; none outside a repository), `item`, `pluginVersion`,
-`intervalMinutes`, `reportedAt`, `activeAt`, `busySince` and, on an end, `endReason`: the values of
-the variables below, cleaned (control characters become spaces; cut to 500 characters for the
+`intervalMinutes`, `reportedAt`, `activeAt`, `busySince`, `renameApplied` and, on an end, `endReason`:
+the values of the variables below, cleaned (control characters become spaces; cut to 500 characters for the
 branch and checkout, 200 for the machine and label, 64 for the item, version and end reason). **Never session text, a
 prompt, a file's content, a path or the machine's address.** Reports go to the organization the key
 belongs to. Any member's agent reports its own sessions; who may read the fleet view is the
@@ -70,6 +70,12 @@ quietly:** one attempt, 15 seconds at most, never on a turn's clock, never a wor
 with no such tool, or one that refuses the key (HTTP 401 or 403), quiets the session's reports for
 30 minutes; an unreachable or failing server (a timeout, HTTP 429 or 5xx) for 2 minutes; the next
 good answer clears it. An end that falls inside a quiet window is not sent: the row lapses by silence.
+
+**A rename asked for on the Agent Fleet** comes back on a `recorded` answer as `rename`. The
+reporter keeps it (`<session>.request.json` beside the title hook's records, owner-only) and
+`hooks/session-title.py` sets it as the session's title at the next prompt, start, resume or fork,
+as `/rename` would, once, over any title and before any `session.titleCommand`. Once it is set,
+reports send its time as `renameApplied`; a `recorded` answer without one, or an end, drops it.
 
 ## Connecting this machine
 
