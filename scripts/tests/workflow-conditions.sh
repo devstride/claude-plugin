@@ -45,6 +45,7 @@ def plugin():
         os.makedirs(os.path.join(root, folder))
     for path in (".claude-plugin/plugin.json", "schemas/step-contracts.json", "schemas/when-condition-fixtures.json", RUNNER,
                  "skills/build-item/scripts/workflow_report.py", "skills/build-item/scripts/claim_record.py",
+                 "skills/build-item/scripts/session_stop.py", "skills/build-item/scripts/portable.py",
                  "skills/build-item/scripts/routing.py"):
         shutil.copy(os.path.join(ROOT, path), os.path.join(root, path))
     for skill in SKILLS:

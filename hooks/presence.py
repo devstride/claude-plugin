@@ -30,7 +30,15 @@ The contract: skills/setup/references/session-presence.md.
   hook     (the hook command; the event comes from the payload's hook_event_name)
            SessionStart     -> state "starting", sends `start`, starts this session's keeper when
                                none runs (as every event does; source `compact`, the session carrying on after a compaction, is
-                               ignored); the session's process and its start time are always re-read
+                               ignored); the session's process and its start time are always re-read,
+                               and so is whether it runs with no person at it (`unattended`:
+                               DEVSTRIDE_UNATTENDED=1, CLAUDE_CODE_ENTRYPOINT starting with `sdk`,
+                               or `-p` / `--print` among the process's own arguments); while this
+                               machine keeps a stop for the session (stopped, ended, now resumed:
+                               no keeper listened while it was ended), it runs the keeper's stop
+                               check once, waiting at most 3 seconds, so the session's first prompt
+                               meets the server's answer, not the one kept before it ended (a slower
+                               answer still lands, for the start after)
            UserPromptSubmit -> state "working"; sends `beat` on a state change, when the last send
                                is a minute old, or when the session moved to another checkout; with
                                no record yet (a session that began before the block existed or the
@@ -98,7 +106,7 @@ The contract: skills/setup/references/session-presence.md.
            second for the lock, starts its own and, when it ended one, sends `beat` at once (the ended
            keeper may have dropped a queued report): a keeper from before this check never leaves.
   keeper <session>  (detached, one per session, holding the session's keeper lock, which is how a
-           hook knows one runs) checks every 10 seconds: it exits once the session has ended, its
+           hook knows one runs) wakes every 5 seconds and checks every 10: it exits once the session has ended, its
            record is gone, reporting is switched off or the connection loses its key (re-read every
            check; Claude Code's configuration file only when it changed) or the record names another plugin version than its
            own code's (an update the session has loaded), releasing its lock under the state lock so a
@@ -124,6 +132,21 @@ The contract: skills/setup/references/session-presence.md.
            prompt, interrupt applied and activity, while the session left no background work running
            and no turn failed, the interrupt is applied the same way at that time. A missing,
            unreadable or foreign file, or any other status, changes nothing.
+           It also asks DevStride whether a person stopped the session: the built-in reporter's
+           `stop-sync` (hooks/presence-report.py), every 15 seconds while the state is "starting"
+           or "working" and every 60 while it is "waiting" (every 15 in any of the three while this
+           machine keeps a stop, so its end is heard as fast), first at its first wake, in either
+           reporter mode, wherever the machine's DevStride connection carries a key or the machine
+           has a session reporter credential (with neither it is not run). The reporter keeps the answer on this machine
+           (skills/build-item/scripts/session_stop.py), where hooks/stop-gate.py refuses the
+           session's tool calls and prompts; an error or a timeout changes nothing, and its exit
+           code 3 quiets the check for 30 minutes. A session with a person at it is never
+           signalled: only the gate stops it, and a command it already started runs to its end.
+           For an `unattended` session, once the kept stop is acknowledged, the keeper ends the
+           session's process: only when its start time, known when recorded and read again now,
+           still matches (a process id that may have been reused is never signalled), with SIGTERM
+           (Claude Code ends its own commands and exits), on Windows with taskkill; it then sends
+           `end` (reason `stopped`) and exits.
   send <event> <state> <session> <record> <sequence> <at>  (detached) runs the reporter once,
            holding the session's send lock so reports run one at a time, and only for the record
            that queued it (a record recreated since is another) and when its sequence number is
@@ -176,6 +199,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 import claim_record  # noqa: E402  the one machine naming every claim uses
 import portable  # noqa: E402  the calls that differ on Windows
 import presence_settings  # noqa: E402  the one decision: off, the repository's command, or the built-in reporter
+import session_stop  # noqa: E402  the stop a person asked for, kept by the built-in reporter's stop check
 
 REPORTER = os.path.join(os.path.dirname(SCRIPT), "presence-report.py")
 QUIET_REFUSED = 1800     # seconds the built-in reporter stays quiet after a definite refusal
@@ -207,6 +231,11 @@ ITEM = re.compile(r"(?:^|[/_.-])(I[0-9]+)(?=$|[/_.-])")
 BEAT_AFTER = 60          # a prompt re-sends when the last send is this old
 CHANGE_AFTER = 30        # a state change within this of the last send waits for the next send
 COMMAND_TIMEOUT = 20
+KEEPER_TICK = 5          # seconds between a keeper's wakes; its own check runs every second one
+STOP_CHECK_TICKS = {"starting": 3, "working": 3, "waiting": 12}  # wakes between stop checks: 15 s, 60 s
+STOP_KEPT_TICKS = 3      # while this machine keeps a stop: 15 s whatever the state, so its end is heard as fast
+STOP_CHECK_TIMEOUT = 25  # a stop check is at most two calls of 10 seconds
+STOP_START_WAIT = 3      # the check a start makes for a stop kept while the session was ended: inside the hook's 5 s
 KEEP = 7 * 24 * 3600
 KEEPER_LOCK_TRIES = 20   # a new keeper tries its lock this many times, 0.1 s apart, before it leaves
 STARTED_SLACK = 5        # seconds a process's reported start time may drift before it is another process
@@ -351,8 +380,8 @@ _READINESS = []  # the last readiness word this process resolved, for the no-key
 
 def connection_ready(top, place):
     """Whether the machine's DevStride connection carries a key, for a session in this place. The
-    resolver is imported only here: a repository that names a command, or a switched-off one,
-    never loads it."""
+    resolver is imported only here: a hook in a repository that names a command, or a switched-off
+    one, never loads it (a keeper does, for its stop check)."""
     try:
         import devstride_connection  # the one place the machine's DevStride key is found
         word = devstride_connection.readiness(os.environ, devstride_connection.config_file(os.environ),
@@ -477,6 +506,22 @@ def started(pid):
     """A process's start time in epoch seconds, so a reused process id is told apart; 0 unknown.
     Printed in UTC, so a long-lived keeper and a fresh hook read it alike whatever the zone."""
     return portable.started(pid)
+
+
+def unattended(owner):
+    """Whether the session runs with no person at it, read at its start: DEVSTRIDE_UNATTENDED=1, an
+    SDK entry point (CLAUDE_CODE_ENTRYPOINT starts with `sdk`), or `-p` / `--print` among the
+    session process's own arguments (each argument whole, so a prompt that mentions -p is not
+    one). Only such a session's process is ever ended by a stop; any doubt reads as a person
+    being there."""
+    if os.environ.get("DEVSTRIDE_UNATTENDED") == "1" or (os.environ.get("CLAUDE_CODE_ENTRYPOINT") or "").startswith("sdk"):
+        return True
+    for argument in portable.arguments(owner)[1:]:
+        if argument == "--":
+            break  # what follows is the prompt
+        if argument in ("-p", "--print"):
+            return True
+    return False
 
 
 def lock(sid, kind, block_until_free, touch=True):
@@ -915,6 +960,7 @@ def hook():
     # every `ps` runs here, before the state lock is taken
     owner = owner_pid() if event in FIRST or opens else 0
     owner_started = started(owner) if owner else 0
+    alone = event == "SessionStart" and bool(owner) and unattended(owner)
     with state_lock(sid):
         now = time.time()
         record = load(sid)
@@ -952,6 +998,8 @@ def hook():
             record["activeAt"] = int(now * 1000)  # the session's last sign of life: start, prompt, tool call, stop
         if owner and (event == "SessionStart" or owner_started or owner != record.get("owner")):
             # re-read on every start and prompt; a start whose look-up failed keeps no old start time
+            if event == "SessionStart" or owner != record.get("owner"):
+                record["unattended"] = alone  # read at a start, for the process that started
             record.update({"owner": owner, "ownerStarted": owner_started})
         if event == "SessionEnd":
             record["reason"] = str(payload.get("reason") or "")
@@ -979,6 +1027,11 @@ def hook():
             spawn("keeper", sid)
     if fresh and event == "SessionStart":
         prune(sid, now)
+    if event == "SessionStart" and session_stop.read(sid) is not None:
+        # started again with a stop still kept: no keeper ran while the session was ended to hear a
+        # person let it continue, so ask now, before its first prompt reaches the stop gate; a slower
+        # answer is left to land, so the next start meets it
+        stop_check(sid, record, STOP_START_WAIT, let_finish=True)
 
 
 def replaced(record):
@@ -990,6 +1043,62 @@ def replaced(record):
         return False
     now = started(record.get("owner"))
     return bool(now and abs(now - was) > STARTED_SLACK)
+
+
+def confirmed(record):
+    """Whether the session's process is still the one the record names: its start time, known when
+    recorded and read again now, within a few seconds. The strict twin of replaced(): a look-up
+    that fails confirms nothing, so a process id that may have been reused is never signalled."""
+    was, owner = record.get("ownerStarted"), record.get("owner")
+    if (isinstance(was, bool) or not isinstance(was, int) or was <= 0
+            or isinstance(owner, bool) or not isinstance(owner, int) or owner <= 1):
+        return False
+    now = started(owner)
+    return bool(now) and abs(now - was) <= STARTED_SLACK
+
+
+def stop_check(sid, record, wait=STOP_CHECK_TIMEOUT, let_finish=False):
+    """Ask DevStride once whether a person stopped this session: the built-in reporter's stop-sync,
+    which keeps the answer on this machine. It runs in either reporter mode, wherever the machine's
+    DevStride connection carries a key or the machine has a session reporter credential. Returns the
+    reporter's exit code; None when it did not run (neither), could not be started or did not finish within `wait` seconds. A reporter still running
+    then is ended, which changes nothing, unless `let_finish` leaves it to keep its answer when it
+    comes (it runs in a group of its own, its output discarded)."""
+    top = record.get("top") if isinstance(record.get("top"), str) and record.get("top") else None
+    place = record.get("dir") if isinstance(record.get("dir"), str) and record.get("dir") else top
+    if not connection_ready(top, place):
+        return None
+    env = dict(os.environ)
+    env.update({"PRESENCE_SESSION_ID": sid, "PRESENCE_CHECKOUT": top or "", "CLAUDE_CODE_SESSION_ID": sid})
+    cwd = next((d for d in (place, top) if d and os.path.isdir(d)), None)  # where the key was looked for
+    try:
+        child = subprocess.Popen([sys.executable, REPORTER, "stop-sync"], cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **portable.group())
+        try:
+            return child.wait(timeout=wait)
+        except subprocess.TimeoutExpired:
+            if not let_finish:
+                portable.kill_tree(child)
+                child.wait()
+            return None
+    except Exception:
+        return None
+
+
+def end_stopped(sid, peek):
+    """End an unattended session a person stopped (the state lock is held): its process is asked
+    to end, and the record reads ended, reason `stopped`. Only for the process `peek` named, whose
+    start time the caller has just confirmed, and never for a session with a person at it. Returns
+    the queued `end` (the record's id, its sequence number and time), or None when nothing was done."""
+    record = load(sid)
+    if (not record or record.get("state") == "ended" or record.get("unattended") is not True
+            or record.get("owner") != peek.get("owner") or record.get("ownerStarted") != peek.get("ownerStarted")
+            or not portable.terminate(record.get("owner"))):
+        return None
+    record.update({"state": "ended", "reason": "stopped"})
+    job = (record["id"],) + queue(record, time.time())
+    save(sid, record)
+    return job
 
 
 def interrupt(record, peek, mark, idle=False):
@@ -1025,12 +1134,35 @@ def keeper(sid):
             time.sleep(0.1)
     if fd is None:
         return  # another keeper runs for this session
-    poll = 10 * MINUTE / 60
+    tick = KEEPER_TICK * MINUTE / 60
     version = own_version()
     path = os.path.join(records_path(), "%s.keeper.lock" % sid)
+    ticks, unchecked, quiet = 0, max(STOP_CHECK_TICKS.values()), 0  # the first stop check is due at the first wake
     try:
         while fd is not None:
-            time.sleep(poll)
+            time.sleep(tick)
+            ticks, unchecked, quiet = ticks + 1, unchecked + 1, max(0, quiet - 1)
+            peek = load(sid) or {}
+            every = STOP_CHECK_TICKS.get(peek.get("state"))
+            if every and session_stop.read(sid) is not None:
+                every = STOP_KEPT_TICKS  # a stopped session mostly waits: "allow to continue" is heard within 15 s
+            if every and unchecked >= every and not quiet:
+                unchecked = 0
+                if stop_check(sid, peek) == 3:
+                    quiet = QUIET_REFUSED // KEEPER_TICK  # the server has no such tool, or refused the key
+                kept = session_stop.read(sid)
+                # a stop the server knows this machine heard, for a session with no person at it
+                if kept and kept.get("acknowledged") is True and peek.get("unattended") is True and confirmed(peek):
+                    with state_lock(sid):
+                        job = end_stopped(sid, peek)
+                        if job:
+                            os.close(fd)  # released under the state lock, as every exit is
+                            fd = None
+                    if job:
+                        send("end", "ended", sid, job[0], job[1], job[2])
+                        continue
+            if ticks % 2:
+                continue  # the check below runs every second wake
             portable.touch(fd, path)
             peek = load(sid) or {}
             conf = settings(peek.get("top"), peek.get("dir"))

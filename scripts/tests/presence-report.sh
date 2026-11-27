@@ -566,6 +566,120 @@ then ok "(11g) a folder another user owns (even one that cannot be traversed) or
 else bad "(11g) a foreign or linked folder"; fi
 rm -rf "$CONF"
 
+# (12) stop-sync: a stop a person asked for is kept on this machine, acknowledged, put back when the
+#      record is removed by hand, and removed once the server says it is over
+SS="$(server stop)"; SURL="http://127.0.0.1:$(cat "$SS/port")"; key
+STOPS="$XDG_CACHE_HOME/devstride-plugin/stop"
+sync() { # sync SESSION — one stop check for SESSION against the stop server; OUT what it printed, RC its exit code
+  OUT="$(DEVSTRIDE_PLUGIN_TEST_URL="${SYNC_URL:-$SURL}" PRESENCE_SESSION_ID="$1" python3 "$RP" stop-sync 2>&1)"; RC=$?; printf '%s\n' "$OUT" >> "$ALL"
+}
+asked() { # asked — what each stop check the server got carried as `acknowledged` ("-" for none), in order
+  python3 -c 'import json,os,sys
+p = os.path.join(sys.argv[1], "stop-sync.jsonl")
+print(" ".join(json.loads(l).get("acknowledged", "-") for l in open(p)) if os.path.exists(p) else "")' "$SS"
+}
+kept() { # kept SESSION — the kept stop as "<id>/<by>/<reason>/<scope>/<acknowledged>", or "none", or "unreadable"
+  python3 - "$ROOT" "$1" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "skills/build-item/scripts"))
+import session_stop
+stop = session_stop.read(sys.argv[2])
+print("none" if stop is None else "unreadable" if stop.get("unreadable")
+      else "/".join(str(stop[k]) for k in ("id", "by", "reason", "scope", "acknowledged")))
+PY
+}
+short() { kept "$1" | cut -d/ -f1,5; }   # short SESSION — "<id>/<acknowledged>"
+keep() { # keep SESSION ID — a kept stop the server has not been told about yet
+  python3 - "$ROOT" "$1" "$2" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "skills/build-item/scripts"))
+import session_stop
+session_stop.write(sys.argv[2], session_stop.stop_of({"id": sys.argv[3], "by": {"name": "Jane Doe"}}), False)
+PY
+}
+stop_is() { # stop_is ID [REASON-JSON] [SCOPE] — the stop the server holds open
+  printf '{"id":"%s","by":{"userId":"u-1","name":"Jane Doe"},"at":"2026-11-25T20:14:00.000Z","reason":%s,"scope":"%s"}' "$1" "${2:-null}" "${3:-session}" > "$SS/stop"
+}
+sync st1; A="$RC:$OUT:$(kept st1):$(asked)"; [ -e "$STOPS" ] && A="$A:folder"
+stop_is stop-1 '"Wrong branch"'; sync st1; B="$RC:$OUT:$(kept st1):$(asked)"
+MODES="$(python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777), oct(os.stat(os.path.dirname(sys.argv[1])).st_mode & 0o777))' "$STOPS/st1.json")"
+sync st1; C="$RC:$(short st1):$(asked)"
+rm -f "$STOPS/st1.json"; sync st1; D="$RC:$(short st1):$(asked)"
+: > "$SS/stop-sync.jsonl"; keep st1 stop-1; E0="$(short st1)"; sync st1; E="$RC:$(short st1):$(asked)"
+: > "$SS/stop-sync.jsonl"; stop_is stop-2 null organization; sync st1; F="$RC:$OUT:$(kept st1):$(asked)"
+rm -f "$SS/stop"; sync st1; G="$RC:$OUT:$(kept st1)"
+N0="$(asked | wc -w | tr -d ' ')"; sync 'a:b'; sync ''; H="$RC:$OUT:$(asked | wc -w | tr -d ' ')"
+if [ "$A" = "0::none:-" ] && [ "$B" = "0::stop-1/Jane Doe/Wrong branch/session/True:- - stop-1" ] && [ "$MODES" = "0o600 0o700" ] \
+   && [ "$C" = "0:stop-1/True:- - stop-1 -" ] && [ "$D" = "0:stop-1/True:- - stop-1 - - stop-1" ] \
+   && [ "$E0" = "stop-1/False" ] && [ "$E" = "0:stop-1/True:stop-1" ] \
+   && [ "$F" = "0::stop-2/Jane Doe/None/organization/True:- stop-2" ] && [ "$G" = "0::none" ] && [ "$H" = "0::$N0" ]; then
+  ok "(12) stop-sync: no stop → nothing kept; a new stop → kept owner-only, then acknowledged at once; an acknowledged one → one plain call; a record removed by hand comes back; an unacknowledged one is acknowledged by the next call; a newer stop replaces it; no stop → removed; a session id no record could be kept for → no call; never any output"
+else bad "(12) a=$A b=$B modes=$MODES c=$C d=$D e=$E0|$E f=$F g=$G h=$H (was $N0)"; fi
+
+# (13) only a definite answer changes the record: an error, a refusal, a timeout, an unreachable server,
+#      an answer that names no usable stop and a machine with no key leave it as it is, kept or absent
+stop_is stop-2; sync st1; sync st2; BASE="$(short st1) $(short st2)"; rm -f "$STOPS/st2.json"
+A=""; for m in http500 http429 bad-json unknown-tool http401 http403; do
+  printf '%s' "$m" > "$SS/mode"; sync st1; A="$A$m=$RC:$OUT:$(short st1) "; sync st2; A="$A$RC:$(kept st2) "
+done; rm -f "$SS/mode"
+B=""; for t in '{"by":{"name":"x"}}' '"yes"' '{"id":""}'; do printf '%s' "$t" > "$SS/stop"; sync st1; B="$B$RC:$(short st1) "; sync st2; B="$B$RC:$(kept st2) "; done
+SYNC_URL="$DEADURL"; sync st1; C="$RC:$OUT:$(short st1)"; sync st2; C="$C $RC:$(kept st2)"
+SYNC_URL="http://127.0.0.1:$(cat "$SLOW/port")"; export DEVSTRIDE_PRESENCE_TIMEOUT=0.5; sync st1; D="$RC:$OUT:$(short st1)"; sync st2; D="$D $RC:$(kept st2)"
+unset SYNC_URL DEVSTRIDE_PRESENCE_TIMEOUT
+stop_is stop-2; nokey; sync st1; E="$RC:$OUT:$(short st1)"; sync st2; E="$E $RC:$(kept st2)"; key
+printf 'not json' > "$STOPS/st1.json"; U0="$(kept st1)"; printf http500 > "$SS/mode"; sync st1; U1="$RC:$(kept st1)"; rm -f "$SS/mode"
+sync st1; U2="$RC:$(short st1)"
+printf 'not json' > "$STOPS/st1.json"; rm -f "$SS/stop"; sync st1; U3="$RC:$(kept st1)"
+WANT=""; for m in http500=4 http429=4 bad-json=4 unknown-tool=3 http401=3 http403=3; do WANT="$WANT$m::stop-2/True ${m#*=}:none "; done
+if [ "$BASE" = "stop-2/True stop-2/True" ] && [ "$A" = "$WANT" ] && [ "$B" = "4:stop-2/True 4:none 4:stop-2/True 4:none 4:stop-2/True 4:none " ] \
+   && [ "$C" = "4::stop-2/True 4:none" ] && [ "$D" = "4::stop-2/True 4:none" ] && [ "$E" = "4::stop-2/True 4:none" ] \
+   && [ "$U0" = unreadable ] && [ "$U1" = "4:unreadable" ] && [ "$U2" = "0:stop-2/True" ] && [ "$U3" = "0:none" ]; then
+  ok "(13) stop-sync keeps the record as it is, kept or absent, on HTTP 500 and 429, a bad answer, a stop with no usable id, an unreachable server, a timeout and a machine with no key (exit 4) and on no such tool, 401 and 403 (exit 3); a record that cannot be read is replaced by an open stop and removed when there is none"
+else bad "(13) base=$BASE a=$A (want $WANT) b=$B c=$C d=$D e=$E u=$U0|$U1|$U2|$U3"; fi
+
+# (13b) a machine whose only credential is the session reporter's checks for a stop with it (a server
+#       that takes only that credential's key, secret and organization answers), and no refusal sets
+#       it aside: the tool's 401 error and the gateway's bare refusal exit 4 (asked again at the next
+#       check), an HTTP 401 or 403 exits 3, nothing is printed, and the credential stays each time; a
+#       full key wins over it (the stop server, which takes only the full key, answers it)
+nokey; mkdir -p "$CONF"; chmod 700 "$CONF"; cp -p "$SAVED" "$REPORTER_FILE"; rm -f "$REPORTER_FILE.refused"
+RSS="$WORK/ds-reporter-stop"; mkdir -p "$RSS"
+python3 - "$SAVED" "$FX/fake-devstride.py" "$RSS" >/dev/null 2>&1 <<'PY' &
+import json, os, sys
+stored = json.load(open(sys.argv[1]))  # the drill's own throwaway credential; nothing is printed
+env = dict(os.environ, FAKE_DS_KEY=stored["apiKey"], FAKE_DS_SECRET=stored["secret"], FAKE_DS_ORG=stored["organizationId"])
+os.execve(sys.executable, [sys.executable, sys.argv[2], sys.argv[3]], env)
+PY
+echo "$!" >> "$WORK/pids"; n=0; until [ -s "$RSS/port" ] || [ $n -gt 100 ]; do sleep 0.05; n=$((n + 1)); done
+SYNC_URL="http://127.0.0.1:$(cat "$RSS/port")"
+calls() { [ -f "$RSS/stop-sync.jsonl" ] && wc -l < "$RSS/stop-sync.jsonl" | tr -d ' ' || echo 0; }
+sync st7; A="$RC:$OUT:$(kept st7):$(calls)"
+B=""; for m in tool401 toolgateway http401 http403; do
+  printf '%s' "$m" > "$RSS/mode"; sync st7
+  B="$B$m=$RC:$OUT:$([ -f "$REPORTER_FILE" ] && echo kept)$([ -e "$REPORTER_FILE.refused" ] && echo :aside) "
+done; rm -f "$RSS/mode"
+key; unset SYNC_URL; N0="$(wc -l < "$SS/stop-sync.jsonl")"; sync st7
+C="$RC:$OUT:$(( $(wc -l < "$SS/stop-sync.jsonl") - N0 )):$(calls)"
+rm -rf "$CONF"
+if [ "$A" = "0::none:1" ] && [ "$B" = "tool401=4::kept toolgateway=4::kept http401=3::kept http403=3::kept " ] && [ "$C" = "0::1:1" ]; then
+  ok "(13b) a machine whose only credential is the session reporter's checks for a stop with it; a refusal never sets it aside: the tool's 401 error and the gateway's bare refusal exit 4 (asked again at the next check), an HTTP 401 or 403 exits 3, nothing is printed, and the credential stays each time; a full key wins over it (the server that takes only the full key answers, the reporter's server is not asked)"
+else bad "(13b) a=$A b=$B c=$C"; fi
+
+# (14) a recorded report's answer may carry the stop too: it is kept, never acknowledged or removed by a report
+beat() { # beat SESSION — one working beat for SESSION against the stop server
+  OUT="$(DEVSTRIDE_PLUGIN_TEST_URL="$SURL" PRESENCE_EVENT=beat PRESENCE_SESSION_ID="$1" PRESENCE_STATE=working PRESENCE_MACHINE=m9 python3 "$RP" 2>&1)"; RC=$?; printf '%s\n' "$OUT" >> "$ALL"
+}
+: > "$SS/stop-sync.jsonl"; stop_is stop-4 '"Hold on"'
+beat st5; A="$RC:$OUT:$(kept st5)"
+sync st5; B="$RC:$(short st5):$(asked)"
+beat st5; C="$RC:$(short st5)"
+printf stale > "$SS/presence-outcome"; beat st6; D="$RC:$(kept st6)"; rm -f "$SS/presence-outcome"
+rm -f "$SS/stop"; beat st5; E="$RC:$(short st5)"
+if [ "$A" = "0::stop-4/Jane Doe/Hold on/session/False" ] && [ "$B" = "0:stop-4/True:stop-4" ] && [ "$C" = "0:stop-4/True" ] \
+   && [ "$D" = "0:none" ] && [ "$E" = "0:stop-4/True" ]; then
+  ok "(14) a recorded report whose answer carries a stop keeps it, unacknowledged, and the next stop check acknowledges it in one call; a later report keeps the acknowledgement; an answer that is not a renewal keeps nothing; a report with no stop on its answer never removes one"
+else bad "(14) a=$A b=$B c=$C d=$D e=$E"; fi
+
 # (9) across every captured output, and everything the reporter left on disk: no key, secret or organization id
 if ! grep -rqF -e "$KEY" -e "$SECRET" -e "$ORG" "$ALL" "$XDG_CACHE_HOME" 2>/dev/null \
    && ! grep -qF -e "$SECRET" -e "$ORG" "$DS/presence.jsonl" && ! grep -qF "$KEY" "$DS/presence.jsonl"; then

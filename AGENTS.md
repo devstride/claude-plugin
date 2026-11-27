@@ -104,8 +104,10 @@ paths individually) rather than trusting a single root-level run.
   a repo-level directory.
 - `hooks/` holds `hooks.json` and the hook scripts it registers: `version-check.sh`
   (SessionStart), `session-gate.sh` (UserPromptSubmit), `session-runtime.py` (SessionStart and
-  UserPromptSubmit) and `presence.py` (the session's live status, on ten events; it runs the
-  consuming repository's presence command, else `presence-report.py`, the built-in reporter). All fail open and never block a
+  UserPromptSubmit), `presence.py` (the session's live status, on ten events; it runs the
+  consuming repository's presence command, else `presence-report.py`, the built-in reporter) and
+  `stop-gate.py` (PreToolUse and UserPromptSubmit: a session a person stopped on the Agent Fleet
+  runs no tool and takes no prompt). All fail open and never block a
   session by accident. Skill-owned helpers live under `skills/<name>/scripts/` and are run by
   the skill's text, never read as context.
 - `schemas/` holds `seam-registry.json`, the one list of every config key and hook (hand-edited),

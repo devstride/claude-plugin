@@ -248,15 +248,23 @@ the session runs a DevStride skill.
 - **Who sees it.** Any member's sessions are reported; the Fleet is readable by the people your
   organization lets read it (its Owner and Admins by default), so a member's sessions are visible
   to their administrators.
+- **A person can stop a session.** On the Fleet, the session's own person (if they can see the
+  Fleet) or anyone your organization lets stop agents can press Stop on its row. Its machine hears
+  it within about 15 seconds while the session works (a minute while it waits on its person); the
+  session then refuses every further tool call and prompt and says who stopped it, when and why,
+  and a session with nobody at it (`claude -p`, the SDK) is ended. **Allow to continue** lets it
+  go on.
 - **Turning it off.** `"presence": null` in a repository's `.claude/ds-config.json` switches that
-  repository off; `DEVSTRIDE_PRESENCE=0` in the environment switches a whole machine off.
+  repository off; `DEVSTRIDE_PRESENCE=0` in the environment switches a whole machine off. Either
+  switches the stop check off with it.
 - **It never gets in the way.** With an older DevStride or no network it stays silent and never
   slows a turn. A repository that names its own `presence.command` keeps using that instead.
 - **Signed in through the browser?** Such a connection carries no key, so each session start says
   the session is not on the Fleet yet. The first time you run a DevStride skill, the plugin sets up
-  a narrow reporting key for the machine by itself (it can only report your own sessions) and says
-  so in one line; revoke it any time under **Profile Settings → API Keys**, which also shows when it
-  last reported. A full key, connected as above, always takes its place.
+  a narrow reporting key for the machine by itself (it can only report your own sessions and hear
+  whether a person stopped them) and says so in one line; revoke it any time under
+  **Profile Settings → API Keys**, which also shows when it last reported. A full key, connected as
+  above, always takes its place.
 
 The contract is `skills/setup/references/session-presence.md`.
 
@@ -716,7 +724,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **4.14.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **4.15.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 The public repository, `devstride/claude-plugin`, is a published copy written only by the release

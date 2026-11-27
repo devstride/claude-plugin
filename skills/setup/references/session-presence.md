@@ -67,8 +67,8 @@ source, after every full key. When DevStride no longer knows it (revoked under P
 another registration of the same machine name), the first report DevStride refuses for that reason
 moves it aside to `session-reporter.json.refused`: the machine reads as keyless again, the
 session-start line returns and the next DevStride skill registers a new one. DevStride refuses it on
-every route but the session presence report, so the release clearance provider never reads it and
-the skills keep using the signed-in connection.
+every route but the session presence report and the stop check, so the release clearance provider
+never reads it and the skills keep using the signed-in connection.
 
 ## What the built-in reporter sends
 
@@ -162,16 +162,61 @@ entry, and writes no file of its own.**
 | The keeper, when the last report is `intervalMinutes` old, or a held change is 30 seconds old | `beat` | the latest |
 | Session end (`PRESENCE_END_REASON`: `clear`, `logout`, …) | `end` | `ended` |
 | The keeper finds the session's process gone (killed, crashed) | `end` (reason `gone`) | `ended` |
+| The keeper ends an unattended session a person stopped on the Fleet (below) | `end` (reason `stopped`) | `ended` |
 
 A state change within 30 seconds of the last report is held and carried by the next report.
 Reports for one session run one at a time; each is numbered when queued, and one overtaken by a
 newer report is dropped, so a late `end` never follows a resumed session's `start`. The keeper,
-one detached process per session, checks every 10 seconds, keeps a long turn visible and exits
+one detached process per session, wakes every 5 seconds and checks every 10, keeps a long turn visible and exits
 once the session ends, its record goes, reporting is switched off, the connection loses its key or
 the session loads another plugin version, whose next hook event starts its own. A session that
 moves to a place where reporting is off keeps reporting under the one it came from, and so does a
 session its repository's command reports when it moves to a place that names no command (the
 built-in reporter never takes it over); one outside a repository that walks into one beats from it.
+
+## A stop asked for on the Agent Fleet
+
+A person can stop one session, or every session of the organization, on Agents → Fleet. The
+keeper asks DevStride whether its session was stopped (the tool `sync_session_stop`, through
+`hooks/presence-report.py stop-sync`: 10 seconds at most a call) at its first wake, then every 15
+seconds while the session starts or works and every 60 while it waits (every 15 while a stop is
+kept). It asks with
+either reporter, wherever the machine's DevStride connection carries a key or the machine has a
+session reporter credential (a browser sign-in); with neither, or with presence switched off (no
+keeper runs), a stop cannot reach the session. A server with no such
+tool, or an HTTP 401 or 403 from the address, is left alone for 30 minutes; a refusal that comes
+back as the tool's own error is asked again at the next check. No refusal of a stop check sets the
+session reporter credential aside: the presence report decides that.
+
+- **What is kept.** A stop the server names is kept in
+  `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/stop/<session>.json` (owner-only: the stop's id,
+  who asked, when, why and its scope), and the server is told at once that this machine heard it
+  (`acknowledged`). A report's `recorded` answer may carry the stop as well. **Only a definite
+  answer changes the record:** `stop: null` removes it; an error, a timeout or an unreachable
+  server changes nothing, so nothing is ever blocked by a stop this machine has not heard.
+- **What it stops.** While the record is there, `hooks/stop-gate.py` (first on every tool call and
+  every prompt; it reads that one file and uses no network) refuses every tool call, a helper
+  agent's included, and ends the turn, and refuses every prompt, each with the one line
+  `skills/build-item/scripts/session_stop.py` writes: "Stopped from DevStride by <name> at <this
+  machine's time>: <the reason, or no reason given>. This session runs no more tools or workflow
+  steps until a person allows it to continue on Agents → Fleet." The step runner refuses `start`,
+  `next`, `done`, `wait` and `resume` for the session with the same line (`stopped-by-director`,
+  exit 2, the run left as it was); `status` still answers. A command the session had already
+  started runs to its end. A record that is there but cannot be read counts as a stop; any other
+  failure in the gate lets the session through.
+- **A session with no person at it is ended.** A session is unattended when it was started with
+  `-p` or `--print`, by an SDK (`CLAUDE_CODE_ENTRYPOINT` starts with `sdk`) or with
+  `DEVSTRIDE_UNATTENDED=1`: nobody would read a refusal there. Once the server knows the stop was
+  heard, the keeper asks that session's process to end (SIGTERM; on Windows `taskkill /T /F`),
+  only while the process still has the start time recorded for it, so a reused process id is never
+  signalled, and reports `end` with the reason `stopped`. A session with a person at it is never
+  signalled.
+- **Going on.** A person allows the session to continue on Agents → Fleet: the keeper's next check
+  removes the record, and `resume` carries a workflow run on where it stopped. Removing the file by
+  hand does not let it go on: while the stop is open, the next check puts it back. A session the
+  stop ended has no keeper to hear the person, so when it is started again its start runs the
+  check at once, waiting at most 3 seconds, before its first prompt reaches the gate; a slower
+  answer still lands, for the start after.
 
 ## What a repository's command receives
 
@@ -215,6 +260,8 @@ name. Its exit code is kept in the session's local record; nothing reads it as a
 - `skills/setup/references/config-defaults.md` — the Session presence section.
 - `schemas/seam-registry.json` — `presence.command`'s contract.
 - `hooks/presence.py` and `hooks/presence-report.py` — their docstrings.
+- `hooks/stop-gate.py` and `skills/build-item/scripts/session_stop.py` — their docstrings (a stop
+  asked for on the Agent Fleet).
 - `skills/setup/SKILL.md` — the `connect` mode; `skills/doctor/SKILL.md` §3 and
   `skills/doctor/references/claims-checks.md` — "Ready for agents".
 - `README.md` — "Connect to DevStride" and "Live status on the Fleet".

@@ -16,8 +16,8 @@ carries, else (for the session reporter only) its session reporter credential. T
      from that one entry, never mixed with another source.
   4. only for a caller that asks (`reporter=True`: the session reporter and its readiness check),
      the machine's session reporter credential (reporter_credential.py): a narrow key DevStride
-     refuses on every route but the session presence report. A full key always wins over it, and
-     the release clearance provider never asks for it.
+     refuses on every route but the session presence report and the stop check. A full key always
+     wins over it, and the release clearance provider never asks for it.
 
 The first step that yields a key, a secret and an organization id wins. Rules for every source: the
 key goes only to an https://api(-<stage>).devstride.(com|dev) host, redirects are refused, every

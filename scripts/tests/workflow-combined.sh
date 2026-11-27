@@ -54,7 +54,8 @@ def plugin(name, change=None):
     for folder in (".claude-plugin", "schemas", "skills/run-workflow/scripts", "skills/build-item/scripts"):
         os.makedirs(os.path.join(root, folder))
     for path in (".claude-plugin/plugin.json", RUNNER, "skills/build-item/scripts/workflow_report.py",
-                 "skills/build-item/scripts/claim_record.py", "skills/build-item/scripts/routing.py"):
+                 "skills/build-item/scripts/claim_record.py", "skills/build-item/scripts/session_stop.py",
+                 "skills/build-item/scripts/portable.py", "skills/build-item/scripts/routing.py"):
         shutil.copy(os.path.join(ROOT, path), os.path.join(root, path))
     catalog = copy.deepcopy(CATALOG)
     if change:

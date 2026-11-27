@@ -38,6 +38,12 @@ Every answer carries `reports`: ready argument objects for the tracker's step-re
 Exit 0 with an answer; 2 with exactly one `workflow: <code>: <message>` line on stderr and nothing
 on stdout for a refusal; 1 (also one `workflow:` line) for anything else. Never a traceback.
 
+A session a person stopped from DevStride gets no step: while this machine keeps a stop for the
+session the request names, or for the calling agent's own (skills/build-item/scripts/session_stop.py),
+`start`, `next`, `done`, `wait` and `resume` are refused with `stopped-by-director` and the line that
+says who stopped it, when and why, and nothing changes; `status`, `reported`, `unsent`, `judge` and
+`repository` still answer. Once a person allows the session to continue, `resume` carries the run on.
+
 State: one file per session and item (a run with no item: per session and run id, and a session
 holds one open such run of a workflow unless a start says `beside`) under
 ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/workflows, owner-only, written atomically, pruned
@@ -61,6 +67,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 CATALOG_PATH = os.path.join(PLUGIN_ROOT, "schemas", "step-contracts.json")
 COMMANDS = ("start", "next", "done", "wait", "status", "resume", "reported", "unsent", "judge", "repository")
+MOVING = ("start", "next", "done", "wait", "resume")  # the commands that move a run on: a stopped session gets none
 
 KEEP_SECONDS = 7 * 24 * 3600
 STATE_MAX_BYTES = 1048576
@@ -240,6 +247,7 @@ CONFIG_MAX_BYTES = 1 << 20
 DECIDED_NOTE = "Decided from the repository's config, with no model turn: "
 REPORT = None   # skills/build-item/scripts/workflow_report.py: hashing, normalizing, capping, report shape
 CLAIMS = None   # skills/build-item/scripts/claim_record.py: the session id and the plugin version
+STOPS = None    # skills/build-item/scripts/session_stop.py: the stop a person asked for, kept on this machine
 
 
 class Refuse(Exception):
@@ -255,20 +263,24 @@ class GitFailed(Exception):
 
 
 def load_helpers():
-    """Load the two shared helpers by file path; the runner keeps no second copy of their rules."""
-    global REPORT, CLAIMS
+    """Load the three shared helpers by file path; the runner keeps no second copy of their rules."""
+    global REPORT, CLAIMS, STOPS
     if REPORT is None:
         folder = os.path.join(os.path.dirname(os.path.dirname(HERE)), "build-item/scripts")  # the skill beside this one
         loaded = []
-        for name in ("workflow_report", "claim_record"):
-            spec = importlib.util.spec_from_file_location(name, os.path.join(folder, name + ".py"))
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            loaded.append(module)
-        REPORT, CLAIMS = loaded
+        sys.path.insert(0, folder)  # only while they load: session_stop.py imports its neighbour portable.py by name
+        try:
+            for name in ("workflow_report", "claim_record", "session_stop"):
+                spec = importlib.util.spec_from_file_location(name, os.path.join(folder, name + ".py"))
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                loaded.append(module)
+        finally:
+            sys.path.remove(folder)
+        REPORT, CLAIMS, STOPS = loaded
 
 
-# The few calls that differ on Windows, kept here: the runner loads no module but its two helpers and
+# The few calls that differ on Windows, kept here: the runner's own code calls no module but its helpers and
 # the library skill cache (the build-item skill's portable.py holds the same rules for every other script).
 
 def os_flags(*names):
@@ -3411,6 +3423,16 @@ HANDLERS = {"repository": command_repository, "start": command_start, "next": co
             "unsent": command_unsent, "judge": command_judge}
 
 
+def refuse_stopped(request, world):
+    """A session a person stopped from DevStride gets no step until a person allows it to continue.
+    The session the request names and the calling agent's own are both looked up: naming another
+    session never gets a stopped one a step. A stop record that cannot be read counts as a stop."""
+    for session in dict.fromkeys((session_of(request, world), CLAIMS.session_id(world.env))):
+        stop = STOPS.read(session, world.env)
+        if stop is not None:
+            raise Refuse("stopped-by-director", STOPS.line(stop))
+
+
 def run_command(command, request, world=None):
     """One command, in process: what the command line does after it has read stdin."""
     load_helpers()
@@ -3419,6 +3441,8 @@ def run_command(command, request, world=None):
     if not isinstance(request, dict):
         raise Refuse("bad-request", "the request on stdin must be one JSON object")
     world = world or World()
+    if command in MOVING:
+        refuse_stopped(request, world)
     if "now" in request:
         if not isinstance(request["now"], str) or not REPORT.ISO.match(request["now"]):
             raise Refuse("bad-request", "now must be an ISO time")

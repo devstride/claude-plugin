@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A fake DevStride MCP server for scripts/tests/clearance-devstride.sh, presence.sh and
-presence-report.sh: the six claim tools and `report_session_presence` over HTTP on 127.0.0.1, with
-the claims kept in <state dir>/claims.json. Usage: fake-devstride.py <state dir>; it writes its
+presence-report.sh: the six claim tools, `report_session_presence` and `sync_session_stop` over HTTP
+on 127.0.0.1, with the claims kept in <state dir>/claims.json. Usage: fake-devstride.py <state dir>; it writes its
 port to <state dir>/port once it listens and serves until killed.
 
 `report_session_presence` refuses what the real operation refuses (an unknown key, a bad event,
@@ -12,6 +12,12 @@ with `_keyDigest`, the digest of the API key header it arrived with (never the k
 recorded answer also carries `rename`, the JSON object in the control file `presence-rename`, as
 the real server does, until a report sends that object's `at` back as `renameApplied`.
 
+`sync_session_stop` takes {sessionId, acknowledged?} and nothing else, and answers {stop: null}, or
+{stop: <the JSON object in the control file `stop`>} while that file is there (a stop a person asked
+for, open for every session that asks); a recorded presence answer carries the same `stop`. Each
+call's arguments go to <state dir>/stop-sync.jsonl with `_at` (when it arrived, epoch seconds) and
+`_open` (the open stop's id, or null).
+
 Control files in the state dir (any may be absent):
   now        an ISO instant used as the server's clock (default: the real one)
   mode       unknown-tool | tool401 | toolgateway | http403 | http401 | http500 | http429 | bad-json | forbidden |
@@ -19,6 +25,8 @@ Control files in the state dir (any may be absent):
              echo-key (a tool error whose text repeats the key and secret that arrived) — every call
              answers that way (consumed by nothing)
   delay      seconds every call waits before it is answered
+  stop-delay seconds a `sync_session_stop` call waits before it is answered (its arrival is
+             written down at once)
   any-key    its presence accepts any API key (the digest in presence.jsonl says which one arrived)
   fail-once  the file's presence makes the next call answer HTTP 500, then removes it
   sse        its presence answers as text/event-stream instead of JSON
@@ -133,6 +141,23 @@ def presence_problem(a):
     for name in PRESENCE_STAMPS:
         if name in a and (not whole(a[name]) or not 0 < a[name] < 10 ** 16):
             return name
+    return None
+
+
+def open_stop():
+    """The stop a person asked for (the control file `stop`), or None."""
+    text = control("stop")
+    return json.loads(text) if text else None
+
+
+def stop_problem(a):
+    """Why the real operation would refuse this stop check, or None."""
+    if set(a) - {"sessionId", "acknowledged"}:
+        return "unknown keys: %s" % ", ".join(sorted(set(a) - {"sessionId", "acknowledged"}))
+    if not isinstance(a.get("sessionId"), str) or not re.match(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$", a["sessionId"]):
+        return "sessionId"
+    if "acknowledged" in a and (not isinstance(a["acknowledged"], str) or not a["acknowledged"]):
+        return "acknowledged"
     return None
 
 
@@ -285,7 +310,19 @@ class Handler(BaseHTTPRequestHandler):
                     os.unlink(os.path.join(STATE, "presence-rename"))  # taken: the server stops asking
                 else:
                     answer["rename"] = asked
+            if outcome == "recorded" and open_stop():
+                answer["stop"] = open_stop()
             return self.text(json.dumps({"data": answer}))
+        if tool == "sync_session_stop":
+            problem = stop_problem(args)
+            if problem:
+                return self.text("Invalid arguments: %s" % problem, is_error=True)
+            stop = open_stop()
+            with open(os.path.join(STATE, "stop-sync.jsonl"), "a") as handle:
+                handle.write(json.dumps(dict(args, _at=time.time(), _open=stop.get("id") if isinstance(stop, dict) else None)) + "\n")
+            if control("stop-delay"):
+                time.sleep(float(control("stop-delay")))
+            return self.text(json.dumps({"data": {"stop": stop}}))
         if tool == "whoami":  # the one identity a key's own call answers with
             return self.text(json.dumps({"data": {"identity": {"username": control("username") or "keyholder"}}}))
         try:

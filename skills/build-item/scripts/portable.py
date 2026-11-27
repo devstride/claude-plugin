@@ -248,6 +248,57 @@ def kill_tree(process):
         pass
 
 
+def terminate(pid):
+    """Ask one process, by its id, to end: SIGTERM on macOS and Linux, which a program may handle
+    (Claude Code ends its own commands and exits); on Windows, which has no such signal, taskkill
+    ends it and everything it started. True when the request was made. The caller has already
+    proved the id still belongs to the process it means (`started`)."""
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1:
+        return False
+    try:
+        if IS_WINDOWS:
+            done = subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.DEVNULL, timeout=5, creationflags=_NO_WINDOW)
+            return done.returncode == 0
+        import signal
+        os.kill(pid, signal.SIGTERM)
+        return True
+    except Exception:
+        return False
+
+
+def arguments(pid):
+    """A process's own argument list, each argument whole (never a command line split on spaces,
+    where an argument holding a space reads as several); [] when it cannot be read, and always on
+    Windows. Linux keeps it in /proc; macOS answers through the system library."""
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1:
+        return []
+    try:
+        if sys.platform.startswith("linux"):
+            with open("/proc/%d/cmdline" % pid, "rb") as handle:
+                parts = handle.read(1048576).split(b"\0")
+            return [part.decode("utf-8", "replace") for part in (parts[:-1] if parts and not parts[-1] else parts)]
+        if sys.platform == "darwin":
+            import ctypes
+            libc = ctypes.CDLL(None, use_errno=True)
+            libc.sysctl.argtypes = (ctypes.POINTER(ctypes.c_int), ctypes.c_uint, ctypes.c_void_p,
+                                    ctypes.POINTER(ctypes.c_size_t), ctypes.c_void_p, ctypes.c_size_t)
+            size = ctypes.c_size_t(max(4096, os.sysconf("SC_ARG_MAX")))
+            data = ctypes.create_string_buffer(size.value)
+            name = (ctypes.c_int * 3)(1, 49, pid)  # CTL_KERN, KERN_PROCARGS2
+            if libc.sysctl(name, 3, data, ctypes.byref(size), None, 0) != 0 or size.value < 4:
+                return []
+            # the argument count, the program's path and its padding, then each argument ended by a zero byte
+            count, rest = int.from_bytes(data.raw[:4], sys.byteorder), data.raw[4:size.value]
+            parts = rest[rest.index(b"\0"):].lstrip(b"\0").split(b"\0")
+            if count <= 0 or len(parts) < count:
+                return []
+            return [part.decode("utf-8", "replace") for part in parts[:count]]
+    except Exception:
+        pass
+    return []
+
+
 def which(name, skip=None):
     """The full path of a program on the search path, or None. On Windows the current directory is
     never searched: Python's own lookup tries it first there, so a program of that name inside the

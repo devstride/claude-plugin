@@ -59,7 +59,8 @@ def plugin_copy(name, catalog=None):
     for folder in (".claude-plugin", "schemas", "skills/run-workflow/scripts", "skills/build-item/scripts"):
         os.makedirs(os.path.join(root, folder))
     shutil.copy(os.path.join(ROOT, ".claude-plugin/plugin.json"), os.path.join(root, ".claude-plugin/plugin.json"))
-    for path in (RUNNER, "skills/build-item/scripts/workflow_report.py", "skills/build-item/scripts/claim_record.py"):
+    for path in (RUNNER, "skills/build-item/scripts/workflow_report.py", "skills/build-item/scripts/claim_record.py",
+                 "skills/build-item/scripts/session_stop.py", "skills/build-item/scripts/portable.py"):
         shutil.copy(os.path.join(ROOT, path), os.path.join(root, path))
     with open(os.path.join(root, "schemas/step-contracts.json"), "w", encoding="utf-8") as out:
         json.dump(catalog or REAL_CATALOG, out)
@@ -1536,8 +1537,8 @@ def section_static():
     check("the runner imports no network module", not set(imported) & {"socket", "http", "urllib", "ssl", "ftplib", "smtplib", "xmlrpc", "asyncio", "requests"}
           and not re.search(r"\b(socket|urllib|http\.client|ssl|requests)\b", source))
     helpers = re.findall(r'for name in \(([^)]*)\):\n\s+spec = importlib\.util\.spec_from_file_location', source)
-    check("the two helpers, the library skill cache and the branch matcher are loaded by file path, and nothing else is",
-          helpers == ['"workflow_report", "claim_record"'] and source.count("spec_from_file_location") == 3
+    check("the three helpers, the library skill cache and the branch matcher are loaded by file path, and nothing else is",
+          helpers == ['"workflow_report", "claim_record", "session_stop"'] and source.count("spec_from_file_location") == 3
           and 'spec_from_file_location("library_skill", LIBRARY_PATH)' in source
           and 'spec_from_file_location("routing", path)' in source and "__import__" not in source, helpers)
     started = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name) and n.func.value.id == "subprocess"]
@@ -1974,11 +1975,92 @@ def section_outcomes():
     check("the latest recording step's outcome wins", rc == 0 and answer["recordedOutcome"] == "handed-up" and closes(answer, "handed-up"), (rc, err, answer))
 
 
+def section_stopped():
+    """A session a person stopped from DevStride gets no step; its run is as it was once it may go on."""
+    module = load()
+    stops = module.STOPS
+    check("the helpers' folder is on the module search path only while they load (the stop record's helper imports its neighbour by name)",
+          stops is not None and not [entry for entry in sys.path if entry.replace(os.sep, "/").endswith("build-item/scripts")], sys.path)
+    run = Driver()
+    run.until("build")
+    issued = run.answer["step"]
+    kept = {"XDG_CACHE_HOME": run.cache}
+    asked = {"id": "stop-1", "by": {"userId": "u-1", "name": "Jane Doe"}, "at": "2026-11-25T20:14:00.000Z",
+             "reason": "Wrong branch", "scope": "session"}
+    folder = os.path.dirname(run.state_path())
+    before, files = open(run.state_path(), "rb").read(), sorted(os.listdir(folder))
+    moving = {
+        "start": {"definition": FIX["definitions"]["claim-only"], "context": dict(FIX["context"], cwd=run.cwd, item="I124")},
+        "next": {"item": "I123"},
+        "done": {"item": "I123", "stepId": issued["id"], "attempt": issued["attempt"], "output": canned(issued["contract"], run.repo)},
+        "wait": {"item": "I123", "stepId": issued["id"], "attempt": issued["attempt"], "reason": "the queue"},
+        "resume": {"item": "I123"},
+    }
+    check("the commands that move a run on are exactly the five", module.MOVING == tuple(moving), module.MOVING)
+    stops.write("s1", stops.stop_of(asked), False, kept)
+    line = stops.line(stops.read("s1", kept))
+    check("the line names who stopped the session, when and why, and how it may go on",
+          re.match(r"^Stopped from DevStride by Jane Doe at \d{1,2}:\d\d [AP]M \S.*: Wrong branch\. This session runs no more tools "
+                   r"or workflow steps until a person allows it to continue on Agents → Fleet\.$", line) is not None, line)
+    for command, request in moving.items():
+        result = run.call(command, request)
+        check("%s is refused for a stopped session, with the line" % command,
+              refused(result, "stopped-by-director") and result[3] == "workflow: stopped-by-director: %s\n" % line, result)
+    stops.write("s1", stops.stop_of(asked), True, kept)
+    check("... and as much once the server knows this machine heard the stop", refused(run.call("next", {"item": "I123"}), "stopped-by-director"))
+    check("nothing changed: the run's state is what it was, and no file appeared beside it",
+          open(run.state_path(), "rb").read() == before and sorted(os.listdir(folder)) == files, sorted(os.listdir(folder)))
+    rc, status, _, err = run.call("status", {"item": "I123"})
+    check("status still answers, and shows the step the run waits at", rc == 0 and status is not None
+          and [row["stepId"] for row in status["rows"] if row["status"] == "issued"] == [issued["id"]], err)
+    check("status of every run, unsent, reported and judge still answer",
+          run.call("status", {"all": True})[0] == 0 and run.call("unsent", {"cwd": run.cwd})[0] == 0
+          and run.call("reported", {"item": "I123", "ok": True})[0] == 0
+          and run.call("judge", {"item": "I123", "answer": {"runs": []}})[1]["verdict"] == "not-reported")
+    check("repository still answers", cli(run.root, "repository", {}, run.cache, cwd=run.cwd)[0] == 0)
+
+    def ask(command, request, own):
+        """One command whose calling agent's own session is `own`."""
+        env = dict((k, v) for k, v in os.environ.items() if k not in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID"))
+        env.update({"XDG_CACHE_HOME": run.cache, "CLAUDE_CODE_SESSION_ID": own})
+        done = subprocess.run([sys.executable, "-B", os.path.join(run.root, RUNNER), command], input=json.dumps(request),
+                              capture_output=True, text=True, env=env, cwd=run.cwd)
+        return done.returncode, None, done.stdout, done.stderr
+
+    check("a stopped session that names another session is still refused",
+          refused(ask("next", {"item": "I123", "session": "s2"}, "s1"), "stopped-by-director"))
+    check("another session that names the stopped one is refused too",
+          refused(ask("next", {"item": "I123", "session": "s1"}, "s2"), "stopped-by-director"))
+    check("a session with no stop is not: it is told it has no run", refused(ask("next", {"item": "I123"}, "s2"), "no-run"))
+    with open(stops.path("s1", kept), "w") as out:
+        out.write("{not json")
+    result = run.call("next", {"item": "I123"})
+    check("a stop record that cannot be read counts as a stop",
+          refused(result, "stopped-by-director") and "cannot be read, which counts as a stop" in result[3], result)
+    os.unlink(stops.path("s1", kept))
+    os.symlink(run.state_path(), stops.path("s1", kept))
+    check("... and so does a link in its place", refused(run.call("resume", {"item": "I123"}), "stopped-by-director"))
+    check("still nothing changed", open(run.state_path(), "rb").read() == before)
+    stops.remove("s1", kept)
+    rc, answer, _, err = run.call("resume", {"item": "I123"})
+    check("once a person allows the session to continue, resume hands out the step the run stopped at",
+          rc == 0 and is_run(answer, issued["id"], issued["attempt"]) and answer["runId"] == run.answer["runId"], err)
+    run.answer = answer
+    answer = run.done()
+    check("... and the run goes on from there", answer is not None and answer["action"] == "run" and answer["recorded"]["stepId"] == issued["id"]
+          and answer["recorded"]["status"] == "done", answer)
+    reason = dict(asked, reason="token = abcdefgh1234")
+    stops.write("s1", stops.stop_of(reason), True, kept)
+    result = run.call("next", {"item": "I123"})
+    check("a reason that looks like a credential is never echoed, and the session is refused all the same",
+          refused(result, "stopped-by-director") and "abcdefgh1234" not in result[3], result)
+
+
 SECTIONS = {"catalog": section_catalog, "validation": section_validation, "verdicts": section_verdicts,
             "proof-fixtures": section_proof_fixtures, "lifecycle": section_lifecycle, "proofs": section_proofs,
             "stand-in": section_stand_in, "evidence": section_evidence, "state": section_state,
             "reporting": section_reporting, "records": section_records, "repository": section_repository, "static": section_static,
-            "additions": section_additions, "outcomes": section_outcomes}
+            "additions": section_additions, "outcomes": section_outcomes, "stopped": section_stopped}
 SECTIONS[SECTION]()
 print("ran %d" % counter[0])
 PY
@@ -2008,4 +2090,5 @@ section repository 7
 section static 18
 section additions 85
 section outcomes 24
+section stopped 22
 exit $FAIL

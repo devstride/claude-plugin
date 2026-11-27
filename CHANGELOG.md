@@ -8,6 +8,93 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.15.0] — 2026-11-26
+
+### Added
+
+- **A session stopped on the Agent Fleet stops on its machine.** When a person stops one session,
+  or every session of the organization, on Agents → Fleet, the session hears of it within 15
+  seconds while it works (60 while it waits on its person) and from then on runs no tool, a helper
+  agent's included, takes no prompt and is handed no workflow step. Each refusal says who stopped
+  it, when on that machine's clock and why: "Stopped from DevStride by <name> at <time>: <the
+  reason, or no reason given>. This session runs no more tools or workflow steps until a person
+  allows it to continue on Agents → Fleet." A command the session had already started runs to its
+  end. Once a person allows it to continue there, the session works again within 15 seconds
+  (a stopped session is asked about every 15 seconds, waiting or not), and a workflow run carries
+  on from the step it stopped at (`resume`).
+- **A stopped session with nobody at it is ended.** A session started with `-p` or `--print`, by
+  an SDK, or with `DEVSTRIDE_UNATTENDED=1` has no person to read a refusal, so once DevStride
+  knows the machine heard the stop, the session's process is asked to end (SIGTERM; on Windows
+  `taskkill /T /F`) and its row ends with the reason `stopped`. The request only ever goes to the
+  process the session started as (a process id since reused is never signalled), and a session
+  with a person at it is never ended this way. Started again once a person allows it to continue,
+  it asks DevStride as it starts, waiting up to 3 seconds, so its first prompt goes through; a
+  slower answer still arrives in time for the next start.
+- **How it works, and what it does not do.** The session's keeper now wakes every 5 seconds (its
+  own check still runs every 10) and asks DevStride for a stop through the built-in reporter's
+  new `stop-sync` mode (the tool `sync_session_stop`, 10 seconds at most a call), with either
+  reporter, on any machine whose DevStride connection carries a key, and on a machine signed in
+  through the browser, with its session reporter credential. What it hears is kept in an
+  owner-only file, `${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/stop/<session>.json`, which the
+  new `hooks/stop-gate.py` (first on every tool call and every prompt; no network) and the step
+  runner (`stopped-by-director`, exit 2, the run left as it was; `status` still answers) read.
+  Only a definite answer changes that file: while DevStride cannot be reached, nothing is stopped
+  and nothing that was stopped is let go. A file that is there but cannot be read counts as a
+  stop, and one removed by hand comes back at the next check while the stop is open. A machine
+  with neither a key on its DevStride connection nor a session reporter credential, or with
+  presence switched off, cannot hear a stop.
+  The contract is in `skills/setup/references/session-presence.md`.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since 2f8a749b33 @ 941f1eb09b, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@2f8a749b33 | tokens@2f8a749b33 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/review/SKILL.md | 23,994 | 7,998 | 23,994 | 7,998 | +0 | 7,999 |
+| skills/build-item/SKILL.md | 23,972 | 7,991 | 23,972 | 7,991 | +0 | 8,000 |
+| skills/doctor/SKILL.md | 23,958 | 7,986 | 23,958 | 7,986 | +0 | 8,000 |
+| skills/rationalize-gantt/SKILL.md | 12,332 | 4,111 | 12,332 | 4,111 | +0 | 4,200 |
+| skills/release/SKILL.md | 11,950 | 3,984 | 11,950 | 3,984 | +0 | 4,000 |
+| skills/pr/SKILL.md | 11,538 | 3,846 | 11,538 | 3,846 | +0 | 3,846 |
+| skills/ultracode-build/SKILL.md | 10,327 | 3,443 | 10,327 | 3,443 | +0 | 3,443 |
+| skills/rebalance/SKILL.md | 8,482 | 2,828 | 8,482 | 2,828 | +0 | 2,828 |
+| skills/plan/SKILL.md | 8,329 | 2,777 | 8,329 | 2,777 | +0 | 2,795 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,730 | 2,244 | 6,730 | 2,244 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 6,073 | 2,025 | 6,073 | 2,025 | +0 | 2,100 |
+| skills/insert-defect/SKILL.md | 5,605 | 1,869 | 5,605 | 1,869 | +0 | 1,869 |
+| skills/insert-story/SKILL.md | 4,928 | 1,643 | 4,928 | 1,643 | +0 | 1,643 |
+| skills/branch-hotfix/SKILL.md | 4,906 | 1,636 | 4,906 | 1,636 | +0 | 1,636 |
+| skills/branch-feature/SKILL.md | 4,413 | 1,471 | 4,413 | 1,471 | +0 | 1,471 |
+| skills/pre-ship/SKILL.md | 3,599 | 1,200 | 3,599 | 1,200 | +0 | 1,200 |
+| skills/risk-check/SKILL.md | 3,598 | 1,200 | 3,598 | 1,200 | +0 | 1,200 |
+| skills/hotfix-steps/SKILL.md | 3,596 | 1,199 | 3,596 | 1,199 | +0 | 1,200 |
+| skills/plan-steps/SKILL.md | 3,578 | 1,193 | 3,578 | 1,193 | +0 | 1,200 |
+| skills/local-checks/SKILL.md | 3,523 | 1,175 | 3,523 | 1,175 | +0 | 1,200 |
+| skills/run-workflow/SKILL.md | 3,354 | 1,118 | 3,354 | 1,118 | +0 | 1,200 |
+| skills/release-steps/SKILL.md | 3,288 | 1,096 | 3,288 | 1,096 | +0 | 1,200 |
+| skills/merge-story/SKILL.md | 3,266 | 1,089 | 3,266 | 1,089 | +0 | 1,090 |
+| skills/review-story/SKILL.md | 3,020 | 1,007 | 3,020 | 1,007 | +0 | 1,007 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/claim-story/SKILL.md | 2,875 | 959 | 2,875 | 959 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/story-lifecycle/SKILL.md | 2,700 | 900 | 2,700 | 900 | +0 | 900 |
+| skills/capture-findings/SKILL.md | 2,696 | 899 | 2,696 | 899 | +0 | 900 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/post-deploy/SKILL.md | 2,095 | 699 | 2,095 | 699 | +0 | 700 |
+| skills/local-environment/SKILL.md | 2,083 | 695 | 2,083 | 695 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/sync-base/SKILL.md | 1,652 | 551 | 1,652 | 551 | +0 | 551 |
+| skills/pre-merge-check/SKILL.md | 1,589 | 530 | 1,589 | 530 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,423 | 475 | 1,423 | 475 | +0 | 500 |
+| alwaysOn.context (skill listing) | 6,573 | 2,191 | 6,573 | 2,191 | +0 | 2,200 |
+| **total (bodies)** | 277,474 | 92,507 | 277,474 | 92,507 | +0 | |
+
 ## [4.14.0] — 2026-11-26
 
 ### Added
@@ -7513,7 +7600,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.14.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.15.0...HEAD
+[4.15.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.14.0...devstride--v4.15.0
 [4.14.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.13.0...devstride--v4.14.0
 [4.13.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.12.0...devstride--v4.13.0
 [4.12.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.11.0...devstride--v4.12.0

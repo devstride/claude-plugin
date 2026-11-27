@@ -22,7 +22,7 @@ when the connection is not ready).
 - **`AGENT CONNECTION: NOT READY (no API key: …)`** → WARN: "this machine's DevStride connection
   is a browser sign-in with no key, so its sessions are not on the Fleet yet". The next DevStride
   skill run sets up a session reporter by itself (a narrow key that can only report this member's
-  sessions). For a full key instead: `/devstride:setup connect`.
+  sessions and hear their stops). For a full key instead: `/devstride:setup connect`.
 - **`AGENT CONNECTION: NOT READY (the session reporter credential cannot be read safely: …)`** →
   FAIL. Fix: the `Fix:` line `check` printed under it, relayed word for word (it suits the reason).
 - **`AGENT CONNECTION: NOT READY (Claude Code's configuration file cannot be read safely: …)`** →

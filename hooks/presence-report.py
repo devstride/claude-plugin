@@ -2,7 +2,8 @@
 """hooks/presence-report.py — the built-in session reporter: one report to DevStride, with the API
 key the machine's DevStride connection already carries, else with the machine's session reporter
 credential (skills/build-item/scripts/reporter_credential.py). hooks/presence.py runs it for every session
-whose repository names no presence command of its own (skills/setup/references/session-presence.md).
+whose repository names no presence command of its own, and its `stop-sync` for every session,
+whichever reporter it has (skills/setup/references/session-presence.md).
 
   (no argument)  send the report the PRESENCE_* variables describe: one call of the tool
                  `report_session_presence`, one attempt, 15 seconds at most. Prints nothing.
@@ -21,6 +22,16 @@ whose repository names no presence command of its own (skills/setup/references/s
                  then `INTERVAL: <n> minute(s)` (`INTERVAL: none` when off). Always exit 0.
   prove          sends a start then an end for a throwaway session and prints one `PROOF: …` line.
                  Run only after the person's typed yes. Exit 0 only for `PROOF: ok`.
+  stop-sync      ask once whether a person stopped the session PRESENCE_SESSION_ID names: one call
+                 of the tool `sync_session_stop`, one attempt, 10 seconds at most. Prints nothing.
+                 The answer is kept on this machine (skills/build-item/scripts/session_stop.py),
+                 where hooks/stop-gate.py and the step runner read it: no stop removes the record;
+                 a stop this machine does not hold is kept, and one more call at once tells the
+                 server this machine heard it (`acknowledged`, the stop's id); a kept stop not yet
+                 acknowledged is acknowledged by this call. Only a definite answer changes the
+                 record: an error, a timeout or an answer this plugin does not know keeps it as it
+                 is, so an unreachable server never stops a session and never lets one go on.
+                 Exit codes as for a report: 0, 3 refused for now, 4 a failure that may pass.
   identity       prints `KEY USER: <username>`, the DevStride member the reporting key belongs to: for
                  the session reporter credential, the name stored with it (no network); for any
                  other key, the username one `whoami` call made with that key answers. `KEY USER:
@@ -37,7 +48,9 @@ and when it was asked for). The reporter keeps it on this machine
 own title at the next prompt; once the session's name is the one asked for, or the title hook has
 set it, every report carries the request's time as `renameApplied`, so the server stops asking. A recorded answer with no request
 removes the kept one, and so does an end; any other answer keeps it. Keeping it never changes the
-exit code. The key is found by skills/build-item/scripts/devstride_connection.py and
+exit code. A recorded answer may also carry `stop`, a stop a person asked for on the Agent Fleet:
+it is kept as the stop check keeps one, and only the stop check acknowledges or removes it.
+The key is found by skills/build-item/scripts/devstride_connection.py and
 goes only to a DevStride API host; a secret is never printed, logged, or taken from or put on a
 command line (a key's public id alone opens nothing). python3 and the standard library only.
 """
@@ -56,16 +69,19 @@ try:
     import presence  # noqa: E402  hooks/presence.py: the owner-checking reader and the checkout's root
     import presence_settings  # noqa: E402
     import session_rename  # noqa: E402  the rename asked for on the Agent Fleet, kept for the title hook
+    import session_stop  # noqa: E402  the stop asked for on the Agent Fleet, kept for the gate and the step runner
     UNLOADED = None
 except Exception as error:  # a helper this system cannot run: main() says so in its own words
     UNLOADED = type(error).__name__
 
 TOOL = "report_session_presence"
+STOP_TOOL = "sync_session_stop"
 # Seconds one call may take. Tests shorten it; nothing else sets DEVSTRIDE_PRESENCE_TIMEOUT.
 try:
     TIMEOUT = min(15.0, max(0.1, float(os.environ.get("DEVSTRIDE_PRESENCE_TIMEOUT") or 15)))
 except ValueError:
     TIMEOUT = 15.0
+STOP_TIMEOUT = min(10.0, TIMEOUT)  # seconds one stop check's call may take
 EVENTS = ("start", "beat", "end")
 STATES = ("starting", "working", "waiting")
 OUTCOMES = ("recorded", "ended", "stale", "not-owner")
@@ -148,8 +164,8 @@ def reporter_user(environ):
 # (packages/mcp/src/describe-error.ts, registry.ts), not as an HTTP 401. The API's authorizer refuses a
 # key it does not know with the gateway's bare body, "Unauthorized" or "Forbidden", which the tool error
 # opens with, followed by the organization line; an API refusal of a known key names its reason instead.
-# A session reporter key asks for only the one route its policy allows, so for it a bare gateway refusal
-# means DevStride no longer accepts the key.
+# A session reporter key asks only for what its policy allows (presence reports and stop checks), so for
+# it a bare gateway refusal means DevStride no longer accepts the key.
 TOOL_UNAUTHORIZED = re.compile(r"^(DevStride 401\b|(Unauthorized|Forbidden) \u2014 this session sends every request to\b)")
 
 
@@ -220,6 +236,23 @@ def keep_rename(body, answer):
         pass  # a convenience for the session's name; the report stands without it
 
 
+def keep_stop(body, answer):
+    """Keep a stop a recorded answer carries, for the gate and the step runner; never raises. The
+    stop check acknowledges it, and only the stop check removes one."""
+    try:
+        if not isinstance(answer, dict) or answer.get("outcome") != "recorded":
+            return
+        sid, stop = body["sessionId"], session_stop.stop_of(answer.get("stop"))
+        if not stop:
+            return
+        kept = session_stop.read(sid)
+        heard = bool(kept) and kept.get("id") == stop["id"] and kept.get("acknowledged") is True
+        if kept != dict(stop, acknowledged=heard):
+            session_stop.write(sid, stop, heard)
+    except Exception:
+        pass  # the stop check hears of it within seconds
+
+
 def report(environ):
     body = body_from(environ)
     if body is None:
@@ -234,7 +267,61 @@ def report(environ):
     code, answer = deliver(body, creds, environ)
     if code == 0 or body["event"] == "end":  # an ended session waits on no rename, whatever the answer
         keep_rename(body, answer)
+    if code == 0:
+        keep_stop(body, answer)
     return code
+
+
+def ask_stop(session, creds, acknowledged):
+    """One `sync_session_stop` call. (0, the open stop or None) for a definite answer; otherwise
+    (the exit code, None), and nothing may change."""
+    body = {"sessionId": session}
+    if acknowledged:
+        body["acknowledged"] = acknowledged
+    try:
+        answer = connection.call_tool(STOP_TOOL, body, creds, timeout=STOP_TIMEOUT, attempts=1)
+    except (connection.Absent, connection.Refused):
+        return EXIT_REFUSED, None
+    except connection.Problem:
+        return EXIT_TRANSIENT, None
+    if not isinstance(answer, dict) or "stop" not in answer:
+        return EXIT_TRANSIENT, None
+    if answer["stop"] is None:
+        return 0, None
+    stop = session_stop.stop_of(answer["stop"])
+    return (0, stop) if stop else (EXIT_TRANSIENT, None)
+
+
+def stop_sync(environ):
+    """Ask whether a person stopped this session and keep the answer on this machine."""
+    session = (environ.get("PRESENCE_SESSION_ID") or "").strip()
+    if not session_stop.SESSION_ID.match(session):
+        return 0  # no session a stop could be kept for
+    try:
+        creds = credentials(environ)
+    except connection.BadAddress:
+        return EXIT_REFUSED
+    except connection.Problem:
+        return EXIT_TRANSIENT
+    kept = session_stop.read(session)
+    known = kept.get("id") if kept else None  # an unreadable record names no stop
+    heard = bool(known) and kept.get("acknowledged") is True
+    for _ in range(2):  # a stop first heard of is kept, then acknowledged at once
+        owed = known if known and not heard else None
+        code, stop = ask_stop(session, creds, owed)
+        if code:
+            return code  # only a definite answer changes the record
+        if stop is None:
+            session_stop.remove(session)  # no stop, or a person allowed the session to continue
+            return 0
+        # the server took the acknowledgement only for the stop it still holds
+        heard = stop["id"] == known and (heard or owed is not None)
+        if kept != dict(stop, acknowledged=heard):
+            session_stop.write(session, stop, heard)  # also puts back a record removed by hand
+        if heard:
+            return 0
+        kept, known = dict(stop, acknowledged=False), stop["id"]
+    return 0
 
 
 def reporter_fix(unsafe):
@@ -357,7 +444,7 @@ def unloaded(argv):
     if argv == ["identity"]:
         print("KEY USER: unknown (the plugin's helpers could not load on this system: %s)" % UNLOADED)
         return 0
-    return EXIT_TRANSIENT if not argv else 2
+    return EXIT_TRANSIENT if argv in ([], ["stop-sync"]) else 2
 
 
 def main(argv):
@@ -370,12 +457,15 @@ def main(argv):
             return check(os.environ)
         if argv == ["prove"]:
             return prove(os.environ)
+        if argv == ["stop-sync"]:
+            return stop_sync(os.environ)
         if argv == ["identity"]:
             return identity(os.environ)
-        print("usage: presence-report.py [check|prove|identity]", file=sys.stderr)
+        print("usage: presence-report.py [check|prove|stop-sync|identity]", file=sys.stderr)
         return 2
     except Exception:
-        return EXIT_TRANSIENT if not argv else 1  # nothing was sent: never recorded as a report that went
+        # nothing was sent: never recorded as a report that went, or as a stop check that answered
+        return EXIT_TRANSIENT if argv in ([], ["stop-sync"]) else 1
 
 
 if __name__ == "__main__":

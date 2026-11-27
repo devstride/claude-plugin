@@ -18,6 +18,7 @@ export XDG_CONFIG_HOME="$WORK/config"   # where a session reporter credential wo
 export APPDATA="$XDG_CONFIG_HOME"   # and where it lives on native Windows, which prefers %APPDATA%
 export CLAUDE_CONFIG_DIR="$WORK/claude"   # Claude Code's own session status files (case 38b) live here
 unset CLAUDE_PID CLAUDE_CODE_SESSION_ID   # the cases name their own stand-in process
+unset CLAUDE_CODE_ENTRYPOINT DEVSTRIDE_UNATTENDED   # and say themselves when no person is at a session
 # A maintainer's real configuration file and real key are never read: a throwaway HOME, a scratch
 # CLAUDE_CONFIG_DIR (above) whose .claude.json only a case writes, and none of the key variables.
 export HOME="$WORK/home"; mkdir -p "$HOME" "$CLAUDE_CONFIG_DIR"
@@ -1116,12 +1117,13 @@ calls() { [ -f "$QS/calls.log" ] && wc -l < "$QS/calls.log" | tr -d ' ' || echo 
 lasted() { local i=0; while [ "$(rec "$1" 'r.get("last",{}).get("exit")' 2>/dev/null)" = None ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done; }
 quiet_case() { # quiet_case SESSION MODE — a start against the server in MODE; prints "<exit> <seconds of quiet, rounded to the minute>"
   printf '%s' "$2" > "$QS/mode"
-  DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire SessionStart "$1" "$BP" >> "$WORK/qout" 2>&1 || echo "hook exit for $1" >> "$WORK/qout"; lasted "$1"; stop_keeper "$1"; edit "$1" 'r["owner"] = 0'
+  # the keeper is stopped at once: its stop check would be one more call at the server
+  DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire SessionStart "$1" "$BP" >> "$WORK/qout" 2>&1 || echo "hook exit for $1" >> "$WORK/qout"; stop_keeper "$1"; lasted "$1"; edit "$1" 'r["owner"] = 0'
   rec "$1" 'str(r["last"]["exit"]) + " " + str(round((r.get("quiet", 0) - r["last"]["at"]) / 60))'
 }
 : > "$WORK/qout"; A="$(quiet_case b6u unknown-tool)"; C0="$(calls)"
-age b6u 61; DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire UserPromptSubmit b6u "$BP" >> "$WORK/qout" 2>&1 || echo "hook exit" >> "$WORK/qout"; sleep 0.7; C1="$(calls)"; D1="$(rec b6u 'r["done"]')"
-edit b6u 'r["quiet"] = 1'; age b6u 61; DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire UserPromptSubmit b6u "$BP" >> "$WORK/qout" 2>&1 || echo "hook exit" >> "$WORK/qout"
+age b6u 61; DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire UserPromptSubmit b6u "$BP" >> "$WORK/qout" 2>&1 || echo "hook exit" >> "$WORK/qout"; stop_keeper b6u; sleep 0.7; C1="$(calls)"; D1="$(rec b6u 'r["done"]')"
+edit b6u 'r["quiet"] = 1'; age b6u 61; DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire UserPromptSubmit b6u "$BP" >> "$WORK/qout" 2>&1 || echo "hook exit" >> "$WORK/qout"; stop_keeper b6u
 i=0; while [ "$(calls)" -lt 2 ] && [ $i -lt 50 ]; do sleep 0.1; i=$((i + 1)); done; C2="$(calls)"
 B="$(quiet_case b6a http401) $(quiet_case b6b http403)"; C="$(quiet_case b6c http500) $(quiet_case b6d http429) $(quiet_case b6e bad-json)"
 CE0="$(calls)"; DEVSTRIDE_PLUGIN_TEST_URL="$QURL" fire SessionEnd b6a "$BP" logout >> "$WORK/qout" 2>&1; sleep 0.7; CE1="$(calls)"   # an end inside the quiet time
@@ -1214,13 +1216,308 @@ if [ "$Q1" = 1 ] && [ "$Q2" = 2 ] && [ "$(got b826 2 event)" = beat ]; then ok "
 else bad "(B8d) q1=$Q1 q2=$Q2 n=$(got b826 0)"; fi
 stop_keeper b826; nokey
 
+# (S1)-(S6) a stop a person asked for on the Agent Fleet: the keeper asks the server for it and keeps
+#      what it hears for the stop gate; only a session with no person at it has its process ended.
+#      These sessions end with a SessionEnd, and their stand-in processes by their own process ids.
+STOPS="$XDG_CACHE_HOME/devstride-plugin/stop"
+STOP_ASKED='{"id":"stop-9","by":{"userId":"u-1","name":"Jane Doe"},"at":"2026-11-25T20:14:00.000Z","reason":"Wrong branch","scope":"session"}'
+asked() { # asked SESSION STATE-DIR [WHAT] — the stop checks that server got for the session: how many; `gaps:<epoch>` the
+  #         seconds between those that came after that time; `heard` how many came after the one that acknowledged a stop (-1: none did)
+  python3 -c 'import json,os,sys
+p=os.path.join(sys.argv[2],"stop-sync.jsonl"); what=sys.argv[3]
+rows=[json.loads(l) for l in open(p) if l.strip()] if os.path.exists(p) else []
+rows=[r for r in rows if r.get("sessionId")==sys.argv[1]]
+if what=="": print(len(rows))
+elif what=="heard":
+    at=next((i for i,r in enumerate(rows) if r.get("acknowledged")),None); print(-1 if at is None else len(rows)-at-1)
+else:
+    times=[r["_at"] for r in rows if r["_at"]>=float(what.partition(":")[2])]
+    print(" ".join("%.2f"%(b-a) for a,b in zip(times,times[1:])))' "$1" "$2" "${3:-}"
+}
+atleast() { # atleast N COMMAND… — until the command prints at least N, at most 20 s
+  local want="$1" i=0; shift; while [ "$("$@")" -lt "$want" ] && [ $i -lt 200 ]; do sleep 0.1; i=$((i + 1)); done; [ "$("$@")" -ge "$want" ]
+}
+left() { local i=0; while keeper_alive "$1" && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done; ! keeper_alive "$1"; }   # left SESSION — its keeper has gone
+during() { # during SESSION DIR OWNER MINUTE URL EVENT [REASON] [VAR=VALUE…] — one hook event of a session that process runs
+  local sid="$1" dir="$2" pid="$3" minute="$4" url="$5" event="$6" why="${7:-}"; shift 6; [ $# -gt 0 ] && shift
+  ( export DEVSTRIDE_PRESENCE_MINUTE="$minute" DEVSTRIDE_PLUGIN_TEST_URL="$url" CLAUDE_PID="$pid" "$@"; fire "$event" "$sid" "$dir" "$why" >/dev/null 2>&1 )
+}
+kept_stop() { # kept_stop SESSION — the stop kept for it: "<id> <acknowledged>", `none`, or `unreadable`
+  python3 -B -c 'import os,sys
+sys.path.insert(0, os.path.join(sys.argv[1], "skills/build-item/scripts"))
+import session_stop
+stop = session_stop.read(sys.argv[2])
+print("none" if stop is None else "unreadable" if stop.get("unreadable") else "%s %s" % (stop["id"], stop["acknowledged"]))' "$ROOT" "$1"
+}
+pyowner() { python3 -c 'import time; time.sleep(300)' "$@" >/dev/null 2>&1 & echo "$!" >> "$WORK/owners"; echo "$!"; }   # a stand-in with arguments
+
+# (S1) whether a person is at the session is read when it starts, from what started it
+nokey
+person() { # person SESSION OWNER [VAR=VALUE…] — a session that process starts with those variables set; prints the record's `unattended`
+  local sid="$1" pid="$2"; shift 2
+  during "$sid" "$K60" "$pid" 0.4 "$DEVSTRIDE_PLUGIN_TEST_URL" SessionStart "" "$@"; rec "$sid" 'r.get("unattended")'
+  during "$sid" "$K60" "$pid" 0.4 "$DEVSTRIDE_PLUGIN_TEST_URL" SessionEnd logout; left "$sid"
+}
+OP1="$(owner)"; OP2="$(pyowner -p 'do the thing')"; OP3="$(pyowner --print 'do the thing')"; OP4="$(pyowner 'explain the -p flag, and --print')"
+OP5="$(pyowner -- -p)"; OP6="$(owner)"; sleep 0.5   # each stand-in has become its own program before its arguments are read
+P1="$(person sp1 "$OP1" DEVSTRIDE_UNATTENDED=1) $(person sp2 "$OP1" CLAUDE_CODE_ENTRYPOINT=sdk-py) $(person sp3 "$OP2") $(person sp4 "$OP3")"
+P2="$(person sp5 "$OP1") $(person sp6 "$OP1" CLAUDE_CODE_ENTRYPOINT=cli DEVSTRIDE_UNATTENDED=yes) $(person sp7 "$OP4") $(person sp8 "$OP5")"
+during sp9 "$K60" "$OP1" 0.4 "$DEVSTRIDE_PLUGIN_TEST_URL" SessionStart "" DEVSTRIDE_UNATTENDED=1
+during sp9 "$K60" "$OP1" 0.4 "$DEVSTRIDE_PLUGIN_TEST_URL" UserPromptSubmit; P3="$(rec sp9 'r.get("unattended")')"          # the same process, later
+during sp9 "$K60" "$OP6" 0.4 "$DEVSTRIDE_PLUGIN_TEST_URL" UserPromptSubmit; P3="$P3 $(rec sp9 'r.get("unattended")')"     # another process took it over
+during sp9 "$K60" "$OP6" 0.4 "$DEVSTRIDE_PLUGIN_TEST_URL" SessionStart resume DEVSTRIDE_UNATTENDED=1; P3="$P3 $(rec sp9 'r.get("unattended")')"
+during sp9 "$K60" "$OP6" 0.4 "$DEVSTRIDE_PLUGIN_TEST_URL" SessionStart compact; P3="$P3 $(rec sp9 'r.get("unattended")')"  # a compaction is not a start
+during sp9 "$K60" "$OP6" 0.4 "$DEVSTRIDE_PLUGIN_TEST_URL" SessionStart resume; P3="$P3 $(rec sp9 'r.get("unattended")')"
+during sp9 "$K60" "$OP6" 0.4 "$DEVSTRIDE_PLUGIN_TEST_URL" SessionEnd logout; left sp9
+if [ "$P1" = "True True True True" ] && [ "$P2" = "False False False False" ] && [ "$P3" = "True False True True False" ]; then
+  ok "(S1) a session is recorded as unattended at its start when DEVSTRIDE_UNATTENDED=1, the entry point is an SDK's, or its process was given -p or --print; a prompt that mentions -p, one after --, another entry point and a plain start are a person's; the next start reads it again, and another process taking the session over clears it"
+else bad "(S1) unattended=$P1 attended=$P2 later=$P3"; fi
+
+# (S2) the keeper asks the server every 15 s while the session starts or works and every 60 s while it
+#      waits on its person (a keeper minute is 2 s here: 0.5 s and 2 s), and keeps nothing while no stop is open
+key; SK="$(server stops)"; SKURL="http://127.0.0.1:$(cat "$SK/port")"; OS2="$(owner)"; T0="$(python3 -c 'import time; print(time.time())')"
+during st2 "$BP" "$OS2" 2 "$SKURL" SessionStart; atleast 3 asked st2 "$SK"; UP2A=$?
+during st2 "$BP" "$OS2" 2 "$SKURL" UserPromptSubmit; atleast 6 asked st2 "$SK"; UP2B=$?
+during st2 "$BP" "$OS2" 2 "$SKURL" Stop; sleep 0.7; T1="$(python3 -c 'import time; print(time.time())')"; N2="$(asked st2 "$SK")"
+atleast $((N2 + 3)) asked st2 "$SK"; UP2C=$?
+BUSY2="$(asked st2 "$SK" "gaps:$T0" | cut -d' ' -f1-5)"; IDLE2="$(asked st2 "$SK" "gaps:$T1" | cut -d' ' -f1-2)"; KEPT2="$(kept_stop st2)"
+BODY2="$(python3 -c 'import json,sys; print(sorted(set(tuple(sorted(json.loads(l))) for l in open(sys.argv[1]))))' "$SK/stop-sync.jsonl")"
+during st2 "$BP" "$OS2" 2 "$SKURL" SessionEnd logout; left st2; GONE2=$?; N2E="$(asked st2 "$SK")"; sleep 1.2
+if [ "$UP2A$UP2B$UP2C" = 000 ] && [ "$KEPT2" = none ] && [ "$BODY2" = "[('_at', '_open', 'sessionId')]" ] && [ "$GONE2" = 0 ] && [ "$(asked st2 "$SK")" = "$N2E" ] \
+   && python3 -c 'import sys
+busy, idle = [float(g) for g in sys.argv[1].split()], [float(g) for g in sys.argv[2].split()]
+assert len(busy) == 5 and len(idle) == 2, (busy, idle)
+assert all(g >= 0.4 for g in busy) and sorted(busy)[2] < 1.5, busy   # three wakes apart: 0.5 s and the time a check takes
+assert all(1.8 <= g < 6 for g in idle), idle                         # twelve wakes apart: 2 s' "$BUSY2" "$IDLE2"; then
+  ok "(S2) the keeper asks for a stop every 15 s while the session starts or works and every 60 s while it waits, sending the session's id and nothing else; with no stop open nothing is kept, and an ended session is asked about no more"
+else bad "(S2) up=$UP2A$UP2B$UP2C busy=$BUSY2 idle=$IDLE2 kept=$KEPT2 body=$BODY2 gone=$GONE2 after-end=$N2E/$(asked st2 "$SK")"; fi
+
+# (S3) a machine whose connection carries no key asks nothing; a session its repository's own command
+#      reports is asked about all the same
+nokey; OS3="$(owner)"
+during st3n "$K60" "$OS3" 1 "$SKURL" SessionStart; wait_keeper st3n; UP3N=$?; sleep 1.5; N3N="$(asked st3n "$SK")"
+during st3n "$K60" "$OS3" 1 "$SKURL" SessionEnd logout; left st3n
+key
+during st3c "$K60" "$OS3" 1 "$SKURL" SessionStart; atleast 2 asked st3c "$SK"; UP3C=$?; M3C="$(rec st3c 'r["mode"]')"
+during st3c "$K60" "$OS3" 1 "$SKURL" SessionEnd logout; left st3c
+if [ "$UP3N" = 0 ] && [ "$N3N" = 0 ] && [ "$UP3C" = 0 ] && [ "$M3C" = command ]; then
+  ok "(S3) with no key on the machine's DevStride connection the keeper asks for no stop; with one it asks for a session its repository's own command reports too"
+else bad "(S3) no-key: keeper=$UP3N asked=$N3N; command: asked=$UP3C mode=$M3C"; fi
+
+# (S4) a server with no such tool, or one that refuses the key, is asked once, then left alone
+SQ="$(server stopq)"; SQURL="http://127.0.0.1:$(cat "$SQ/port")"; printf 'unknown-tool' > "$SQ/mode"
+stop_calls() { local n; n="$(grep -c '"tool": "sync_session_stop"' "$1/calls.log" 2>/dev/null)"; echo "${n:-0}"; }   # stop_calls STATE-DIR
+during st4 "$BP" "$OS3" 1 "$SQURL" SessionStart; atleast 1 stop_calls "$SQ"; UP4=$?; sleep 1.5; N4="$(stop_calls "$SQ")"; KEPT4="$(kept_stop st4)"
+during st4 "$BP" "$OS3" 1 "$SQURL" SessionEnd logout; left st4
+if [ "$UP4" = 0 ] && [ "$N4" = 1 ] && [ "$KEPT4" = none ]; then
+  ok "(S4) a server that has no stop check is asked once and then left alone (six checks' time passed without another); nothing is kept"
+else bad "(S4) asked=$UP4 calls=$N4 kept=$KEPT4"; fi
+
+# (S5) a stop is open: an unattended session's process is ended (SIGTERM) and the session ends with the
+#      reason `stopped`; a session with a person at it, and one whose process id now belongs to another
+#      process, are never signalled: the stop gate refuses their tools, and a record removed by hand comes back
+SX="$(server stopx)"; SXURL="http://127.0.0.1:$(cat "$SX/port")"
+last() { got "$1" "$(got "$1" 0 "" "$SX")" "$2" "$SX"; }   # last SESSION FIELD — of its newest report at that server
+OX2="$(owner)"; OX3="$(owner)"
+during su2 "$K60" "$OX2" 1 "$SXURL" SessionStart "" DEVSTRIDE_UNATTENDED=1; atleast 1 asked su2 "$SX"
+edit su2 'r["ownerStarted"] -= 1000'                                    # the process id was since reused: another start time
+during su3 "$BP" "$OX3" 1 "$SXURL" SessionStart; atleast 1 asked su3 "$SX"; during su3 "$BP" "$OX3" 1 "$SXURL" UserPromptSubmit
+printf '%s' "$STOP_ASKED" > "$SX/stop"
+python3 -c 'import signal, sys, time   # the unattended session: a stand-in that writes down the signal that ends it
+def heard(*_):
+    open(sys.argv[1], "w").write("SIGTERM"); sys.exit(0)
+signal.signal(signal.SIGTERM, heard); open(sys.argv[1] + ".ready", "w").close(); time.sleep(300)' "$WORK/ox1" >/dev/null 2>&1 &
+OX1=$!; i=0; while [ ! -e "$WORK/ox1.ready" ] && [ $i -lt 100 ]; do sleep 0.05; i=$((i + 1)); done
+during su1 "$BP" "$OX1" 1 "$SXURL" SessionStart "" DEVSTRIDE_UNATTENDED=1
+i=0; while kill -0 "$OX1" 2>/dev/null && [ $i -lt 150 ]; do sleep 0.1; i=$((i + 1)); done
+if kill -0 "$OX1" 2>/dev/null; then kill -9 "$OX1"; HOW1=alive; else HOW1="$(cat "$WORK/ox1" 2>/dev/null)"; fi; wait "$OX1" 2>/dev/null
+i=0; while [ "$(last su1 event)" != end ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done; left su1; GONE1=$?
+END1="$(last su1 event):$(last su1 endReason):$(rec su1 'r["state"]'):$(rec su1 'r["reason"]')"; KEPT1="$(kept_stop su1 | cut -d' ' -f1)"
+atleast 2 asked su2 "$SX" heard; UP2=$?; atleast 2 asked su3 "$SX" heard; UP3=$?
+kill -0 "$OX2" 2>/dev/null; LIVE2=$?; kill -0 "$OX3" 2>/dev/null; LIVE3=$?
+STATE23="$(rec su2 'r["state"]'):$(rec su2 'r.get("reason")'):$(kept_stop su2) $(rec su3 'r["state"]'):$(rec su3 'r.get("reason")'):$(kept_stop su3)"
+GATE3="$(printf '{"hook_event_name":"PreToolUse","session_id":"su3","tool_name":"Bash"}' | python3 "$ROOT/hooks/stop-gate.py" PreToolUse 2>&1)"
+PROMPT3="$(printf '{"hook_event_name":"UserPromptSubmit","session_id":"su3","prompt":"go on"}' | python3 "$ROOT/hooks/stop-gate.py" UserPromptSubmit 2>&1)"; RC3=$?
+rm -f "$STOPS/su3.json"; i=0; while [ "$(kept_stop su3)" != "stop-9 True" ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done; BACK3="$(kept_stop su3)"
+rm -f "$SX/stop"; i=0; while [ "$(kept_stop su3)" != none ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i + 1)); done; OVER3="$(kept_stop su3)"
+FREE3="$(printf '{"hook_event_name":"PreToolUse","session_id":"su3","tool_name":"Bash"}' | python3 "$ROOT/hooks/stop-gate.py" PreToolUse 2>&1)$?"
+kill -0 "$OX3" 2>/dev/null; LIVE3B=$?
+during su2 "$K60" "$OX2" 1 "$SXURL" SessionEnd logout; left su2; during su3 "$BP" "$OX3" 1 "$SXURL" SessionEnd logout; left su3
+if [ "$HOW1" = SIGTERM ] && [ "$GONE1" = 0 ] && [ "$END1" = "end:stopped:ended:stopped" ] && [ "$KEPT1" = stop-9 ] \
+   && [ "$UP2$UP3" = 00 ] && [ "$LIVE2$LIVE3$LIVE3B" = 000 ] && [ "$STATE23" = "starting:None:stop-9 True working:None:stop-9 True" ] \
+   && printf '%s' "$GATE3" | grep -q '"permissionDecision": "deny"' && printf '%s' "$GATE3" | grep -q 'Stopped from DevStride by Jane Doe at ' \
+   && [ "$RC3" = 2 ] && printf '%s' "$PROMPT3" | grep -q 'Wrong branch\. This session runs no more tools .* Your prompt was not sent\.$' \
+   && [ "$BACK3" = "stop-9 True" ] && [ "$OVER3" = none ] && [ "$FREE3" = 0 ]; then
+  ok "(S5) a stop: an unattended session's process is ended with SIGTERM and the session ends with the reason stopped, its keeper gone; a session with a person at it and one whose process id was reused are never signalled, however often the keeper asks; the gate refuses the stopped session's tool and prompt, a record removed by hand comes back, and once the person lets it continue the record goes and the gate passes"
+else bad "(S5) unattended: owner=$HOW1 keeper-gone=$GONE1 end=$END1 kept=$KEPT1; others: asked=$UP2$UP3 alive=$LIVE2$LIVE3$LIVE3B state=$STATE23 gate=$GATE3 prompt=$RC3:$PROMPT3 back=$BACK3 over=$OVER3 free=$FREE3"; fi
+
+# (S5b) the unattended session (S5) ended, started again once the person let it continue (the server
+#       holds no stop now): no keeper ran while it was ended, so its stop is still kept, and its start
+#       asks at once. A keeper minute of 36 s puts the keeper's own first check 3 seconds away, so only
+#       the start's check can let the first prompt through, and the server's count is read first
+cp "$STOPS/su1.json" "$WORK/su1.stop"   # the kept stop, again for (S5c)
+KEPT5B="$(kept_stop su1)"; OX5B="$(owner)"; N5B="$(asked su1 "$SX")"
+during su1 "$BP" "$OX5B" 36 "$SXURL" SessionStart resume DEVSTRIDE_UNATTENDED=1; ASKED5B=$(( $(asked su1 "$SX") - N5B ))
+PROMPT5B="$(printf '{"hook_event_name":"UserPromptSubmit","session_id":"su1","prompt":"go on"}' | python3 "$ROOT/hooks/stop-gate.py" UserPromptSubmit 2>&1)"; RC5B=$?
+AFTER5B="$(kept_stop su1):$(rec su1 'r["state"]'):$(rec su1 'r.get("unattended")'):$ASKED5B"
+sleep 3.5; kill -0 "$OX5B" 2>/dev/null; LIVE5B=$?   # past the keeper's first check: never signalled
+during su1 "$BP" "$OX5B" 36 "$SXURL" SessionEnd logout; stop_keeper su1; kill "$OX5B" 2>/dev/null
+if [ "$KEPT5B" = "stop-9 True" ] && [ "$RC5B" = 0 ] && [ -z "$PROMPT5B" ] && [ "$AFTER5B" = "none:starting:True:1" ] && [ "$LIVE5B" = 0 ]; then
+  ok "(S5b) a session a stop ended, started again once the person let it continue: its start asks the server at once, so its first prompt goes through, the kept stop is gone and the new process is never signalled"
+else bad "(S5b) kept-before=$KEPT5B prompt=$RC5B:$PROMPT5B after=$AFTER5B alive=$LIVE5B"; fi
+
+# (S5c) the same start while the server takes 5 seconds to answer the stop check: the start goes on after
+#       its 3 seconds with the stop still kept, so that run's first prompt is refused and the run ends,
+#       and the check it left running still lands, so the next start's first prompt goes through. A
+#       keeper minute of 120 s keeps the keeper's own first check 10 seconds away, and the keeper of an
+#       ended session never asks, so only the start's check can remove the stop
+cp "$WORK/su1.stop" "$STOPS/su1.json"; printf 5 > "$SX/stop-delay"; OX5C="$(owner)"
+during su1 "$BP" "$OX5C" 120 "$SXURL" SessionStart resume DEVSTRIDE_UNATTENDED=1; EARLY5C="$(kept_stop su1)"
+printf '{"hook_event_name":"UserPromptSubmit","session_id":"su1","prompt":"go on"}' | python3 "$ROOT/hooks/stop-gate.py" UserPromptSubmit >/dev/null 2>&1; RC5C=$?
+during su1 "$BP" "$OX5C" 120 "$SXURL" SessionEnd other   # the refused run ends
+i=0; while [ "$(kept_stop su1)" != none ] && [ $i -lt 120 ]; do sleep 0.1; i=$((i + 1)); done; LATE5C="$(kept_stop su1)"
+rm -f "$SX/stop-delay"; stop_keeper su1; kill "$OX5C" 2>/dev/null
+NEXT5C="$(printf '{"hook_event_name":"UserPromptSubmit","session_id":"su1","prompt":"go on"}' | python3 "$ROOT/hooks/stop-gate.py" UserPromptSubmit 2>&1)$?"
+if [ "$EARLY5C" = "stop-9 True" ] && [ "$RC5C" = 2 ] && [ "$LATE5C" = none ] && [ "$NEXT5C" = 0 ]; then
+  ok "(S5c) the same start while the server answers slowly: the start goes on after 3 seconds with the stop still kept, so that run's first prompt is refused, and the check it left running lands, so the next start's first prompt goes through"
+else bad "(S5c) early=$EARLY5C prompt=$RC5C late=$LATE5C next=$NEXT5C"; fi
+
+# (S6) the keeper's own clock, wake by wake, with nothing real asked or signalled: when it asks, how long it
+#      stays quiet after a refusal, and exactly which session it ends
+nokey; OS6="$(owner)"
+during st6 "$K60" "$OS6" 0.4 "$DEVSTRIDE_PLUGIN_TEST_URL" SessionStart; wait_keeper st6
+during st6 "$K60" "$OS6" 0.4 "$DEVSTRIDE_PLUGIN_TEST_URL" SessionEnd logout; left st6
+if python3 - "$HOOK" st6 "$ROOT" <<'PY'
+import importlib.util, os, sys, time as real_time
+hook, sid, root = sys.argv[1:4]
+sys.dont_write_bytecode = True
+spec = importlib.util.spec_from_file_location("presence_under_test", hook)
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+import session_stop  # on the path once the hook has loaded
+base = m.load(sid)
+base.pop("reason", None)
+stop = session_stop.stop_of({"id": "stop-6", "by": {"name": "Jane Doe"}, "at": "2026-11-25T20:14:00Z", "reason": "r", "scope": "organization"})
+
+
+class Clock:
+    """The keeper's time module: every sleep is one wake, and nothing really waits."""
+
+    def __init__(self, plan):
+        self.wake, self.plan = 0, plan
+
+    def sleep(self, seconds):
+        if seconds != m.KEEPER_TICK * m.MINUTE / 60:
+            return real_time.sleep(seconds)  # a lock retry, not a wake
+        self.wake += 1
+        change = self.plan.get(self.wake)
+        if change:
+            # under the state lock, as every writer of the record: a report this session's own hooks
+            # queued may still be writing the record back, and an unlocked change would be lost to it
+            with m.state_lock(sid):
+                m.save(sid, dict(m.load(sid), **change))
+        if self.wake > 2000:
+            raise SystemExit("the keeper never left")
+
+    def __getattr__(self, name):
+        return getattr(real_time, name)
+
+
+def run(record, plan, answers=None, kept=None, signal=True):
+    """One keeper over `record`: `plan` changes the record before a wake, `answers` are the stop
+    checks' exit codes by wake, `kept` the stop record a check leaves. Returns the wakes at which
+    it asked, the processes it signalled, the ends it sent and the record it left. `kept` is (the
+    wake a check first leaves the stop at, whether it is acknowledged[, the wake a check removes it at])."""
+    with m.state_lock(sid):  # as the clock's changes are
+        m.save(sid, record)
+    session_stop.remove(sid)
+    clock, asked, signalled, sent = Clock(plan), [], [], []
+
+    def stop_check(session, peek):
+        asked.append(clock.wake)
+        if kept and len(kept) > 2 and clock.wake >= kept[2]:
+            session_stop.remove(sid)  # a person allowed the session to continue
+        elif kept and clock.wake >= kept[0]:
+            session_stop.write(sid, stop, kept[1])
+        return (answers or {}).get(clock.wake, 0)
+
+    def terminate(pid):
+        signalled.append(pid)
+        return signal
+
+    m.time, m.stop_check, m.portable.terminate = clock, stop_check, terminate
+    m.send = lambda *job: sent.append(job)
+    m.keeper(sid)
+    return asked, signalled, sent, m.load(sid)
+
+
+# when it asks: the first wake, then every third while the session starts or works, every twelfth
+# while it waits; a refusal (exit 3) quiets it for 360 wakes, half an hour; any other failure is
+# asked again at the next turn; an ended session is asked about no more
+plan = {11: {"state": "waiting"}, 35: {"state": "starting"}, 404: {"state": "ended"}}
+asked, signalled, sent, left = run(dict(base, state="working", unattended=True), plan, answers={37: 3, 397: 4, 400: None})
+assert asked == [1, 4, 7, 10, 22, 34, 37, 397, 400, 403], asked
+assert signalled == [] and left["state"] == "ended" and session_stop.read(sid) is None, (signalled, left)
+assert m.QUIET_REFUSED // m.KEEPER_TICK == 360 and m.STOP_CHECK_TICKS == {"starting": 3, "working": 3, "waiting": 12}
+
+# while this machine keeps a stop, a waiting session is asked about every third wake too, so the
+# person's "allow to continue" is heard within 15 seconds; once the record goes, every twelfth again
+asked, signalled, sent, left = run(dict(base, state="waiting", unattended=False), {40: {"state": "ended"}}, kept=(1, True, 13))
+assert asked == [1, 4, 7, 10, 13, 25, 37] and m.STOP_KEPT_TICKS == 3, asked
+assert signalled == [] and session_stop.read(sid) is None, (signalled, left)
+
+# which session it ends: one with no person at it, whose stop the server knows this machine heard,
+# and whose process still has the start time the record names
+mine = dict(base, state="working", unattended=True)
+owner, begun = mine["owner"], mine["ownerStarted"]
+assert owner > 1 and begun > 0 and m.confirmed(mine), mine
+for unknown in ({"owner": 0}, {"owner": 1}, {"owner": True}, {"owner": None}, {"ownerStarted": None}, {"ownerStarted": True},
+                {"ownerStarted": begun + m.STARTED_SLACK + 1}, {"ownerStarted": begun - m.STARTED_SLACK - 1}):
+    assert not m.confirmed(dict(mine, **unknown)), unknown
+end = {8: {"state": "ended"}}
+for label, record, kept in (
+        ("a stop not yet acknowledged", mine, (1, False)),
+        ("a person at the session", dict(mine, unattended=False), (1, True)),
+        ("nothing recorded about a person", {k: v for k, v in mine.items() if k != "unattended"}, (1, True)),
+        ("another start time", dict(mine, ownerStarted=begun - 1000), (1, True)),
+        ("no start time known", dict(mine, ownerStarted=0), (1, True)),
+        ("no stop at all", mine, None)):
+    asked, signalled, sent, left = run(record, end, kept=kept)
+    assert signalled == [] and [job for job in sent if job[0] == "end"] == [] and left.get("reason") != "stopped", (label, signalled, sent, left)
+    assert asked == [1, 4, 7], (label, asked)
+asked, signalled, sent, left = run(mine, end, kept=(4, True))
+assert asked == [1, 4] and signalled == [owner], (asked, signalled)
+assert left["state"] == "ended" and left["reason"] == "stopped" and left["owner"] == owner, left
+assert len(sent) == 1 and sent[0][:4] == ("end", "ended", sid, left["id"]) and sent[0][4] == left["queued"], (sent, left)
+assert not m.keeper_running(sid), "the keeper left its lock"
+asked, signalled, sent, left = run(mine, end, kept=(1, True), signal=False)   # the request to end could not be made
+assert signalled == [owner, owner, owner] and left.get("reason") != "stopped" and [job for job in sent if job[0] == "end"] == [], (signalled, left, sent)
+# a process whose start time cannot be read just now confirms nothing
+real_started, m.started = m.started, lambda pid: 0
+assert not m.confirmed(mine)
+asked, signalled, sent, left = run(mine, end, kept=(1, True))
+assert signalled == [] and left.get("reason") != "stopped", (signalled, left)
+m.started = real_started
+# the process changed between the keeper's look and its taking the session's lock
+m.save(sid, dict(mine, owner=owner + 1))
+with m.state_lock(sid):
+    assert m.end_stopped(sid, mine) is None
+m.save(sid, dict(mine, state="ended", reason="logout"))
+with m.state_lock(sid):
+    assert m.end_stopped(sid, mine) is None and m.load(sid)["reason"] == "logout"
+session_stop.remove(sid)
+PY
+then ok "(S6) wake by wake: the keeper asks at its first wake, every third wake while the session starts or works and every twelfth while it waits (every third while a stop is kept); a refusal quiets it for half an hour, another failure is asked again; it ends only an unattended session whose stop was acknowledged and whose process has the recorded start time, sends its end once, and leaves"
+else bad "(S6) the keeper's stop checks, wake by wake"; fi
+kill "$OX2" "$OX3" "$OS2" "$OS3" "$OS6" "$OP1" "$OP2" "$OP3" "$OP4" "$OP5" "$OP6" 2>/dev/null
+nokey
+
 # (B10) nothing the hook wrote (a session's record, a lock, the no-key marker) holds a key or a secret
 if [ -n "$(ls "$RECORDS")" ] && ! grep -rqF -e test-key -e test-secret -e k-env -e k-user -e k-proj -e k-main -e k-dir -e k-lower -e k-keep "$WORK/cache" "$WORK/cache-line" 2>/dev/null; then
   ok "(B10) no record, lock or marker the hook wrote holds a key or a secret, wherever the key came from"
 else bad "(B10) a key or secret in: $(grep -rlF -e test-key -e test-secret -e k-env -e k-user -e k-proj -e k-main -e k-dir -e k-lower -e k-keep "$WORK/cache" "$WORK/cache-line" 2>/dev/null | head -3)"; fi
 
 # (12) hooks.json registers the hook on all ten events, bounded and failing open; Notification only for
-#      the six prompt types the hook reads, and PreToolUse after the model recorder
+#      the six prompt types the hook reads, and PreToolUse after the stop gate and the model recorder
 if python3 - "$ROOT/hooks/hooks.json" <<'PY'
 import json, sys
 h = json.load(open(sys.argv[1]))["hooks"]
@@ -1233,7 +1530,7 @@ for event in ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "
     elif event != "SessionStart":
         assert "matcher" not in found[0][0], event
 pre = [c["command"] for g in h["PreToolUse"] for c in g["hooks"]]
-assert "session-runtime.py\" seen" in pre[0] and "presence.py\" hook" in pre[1], pre
+assert "stop-gate.py\" PreToolUse" in pre[0] and "session-runtime.py\" seen" in pre[1] and "presence.py\" hook" in pre[2], pre
 PY
 then ok "(12) hooks.json → presence hook on ten events (timeout 5, exit 0); Notification for the six prompt types only"
 else bad "(12) hooks.json registration"; fi

@@ -26,7 +26,8 @@ owns or one with group or other permission bits is refused; on macOS and Linux s
 folder that is a link, that another user owns or that others may write to, and a folder that is a link
 or another user's is named even when no file can be seen in it (prepare closes a folder of the user's
 own to 0700 whenever group or other users have any access to it). A full API key always wins over it, and the release clearance provider never reads it: the key
-it holds is refused on every route but the session presence report. Exit 0 on success, 2 for a refusal (one line on stderr, never a value).
+it holds is refused on every route but the session presence report and the stop check. Exit 0 on success, 2 for a refusal
+(one line on stderr, never a value).
 """
 import hashlib
 import json
