@@ -218,6 +218,13 @@ check("(11b) another item, and another session, get another", len({run_id("I301"
 closing = run("payload", {"config": {}, "item": "I303", "now": "2026-01-02T05:00:00.000Z", "reports": [{"step": "sync", "status": "done", "verdict": "Synced"}], "run": {"outcome": "completed"}}, ENV)[1]["call"]["arguments"]
 check("(11c) closing a run sends its outcome and end", closing["run"], {"outcome": "completed", "endedAt": "2026-01-02T05:00:00.000Z"})
 check("(11d) the same item picked up again later is a new run", run_id("I303") != closing["runId"], True)
+early = run("payload", {"config": {}, "item": "I304", "now": "2026-01-02T05:00:00.000Z", "reports": [{"step": "propose", "status": "done", "verdict": "Dry run"}], "run": {"outcome": "ended-early"}}, ENV)[1]["call"]["arguments"]
+check("(11e) a run that ends early by design closes as ended-early", early["run"]["outcome"], "ended-early")
+asked = w.build_report_arguments("r", "s", [{"step": "build", "status": "waiting", "verdict": "which format?", "waitingOn": "person"},
+                                             {"step": "deploy", "status": "waiting", "verdict": "Waiting for the dev deploy"},
+                                             {"step": "land", "status": "done", "verdict": "Landed", "waitingOn": "person"},
+                                             {"step": "queue", "status": "waiting", "verdict": "queued", "waitingOn": "machine"}])["reports"]
+check("(11f) only a waiting step asked of a person carries waitingOn", [r.get("waitingOn") for r in asked], ["person", None, None, None])
 
 # (12) usage and bad input: exit 2, one line, no traceback
 for label, command, body, args in (("invalid JSON on stdin", "payload", "{not json", ()), ("an unknown command", "explode", None, ()),

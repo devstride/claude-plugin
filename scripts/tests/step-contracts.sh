@@ -566,16 +566,16 @@ for name, entry in contracts.items():
     said = (entry["builtinSkill"], "%s: %s" % (entry["verdict"]["label"], " | ".join("%s=%s" % (v["value"], v["class"]) for v in entry["verdict"]["values"])),
             entry["proof"]["binding"], entry["requires"], entry["claimPhase"], entry["shipIntentStage"])
     check("%s is as published: skill, verdicts and classes, binding, requirements, phase, stage" % name, said == PUBLISHED.get(name), said)
-# A verdict value that records the run's outcome: the tracker's literal list (the three a run ends
+# A verdict value that records the run's outcome: the tracker's literal list (the four a run ends
 # with today plus landed, handed-up and shipped), and only the marks published so far.
-TRACKER_OUTCOMES = ["completed", "failed", "interrupted", "landed", "handed-up", "shipped"]
+TRACKER_OUTCOMES = ["completed", "failed", "interrupted", "ended-early", "landed", "handed-up", "shipped"]
 RECORDED = dict(("%s %s" % (name, v["value"]), v["recordsOutcome"]) for name, entry in all_contracts.items()
                 for v in entry["verdict"]["values"] if "recordsOutcome" in v)
 check("every recorded outcome is in the tracker's literal list", all(o in TRACKER_OUTCOMES for o in RECORDED.values()), RECORDED)
 check("the published recording marks: COMPLETE DONE records shipped, LANDED records landed",
       RECORDED == {"complete@1 DONE": "shipped", "complete@1 LANDED": "landed"}, RECORDED)
 check("the runner's list of recordable outcomes is the literal list's last three",
-      list(runner.RECORDED_OUTCOMES) == TRACKER_OUTCOMES[3:] and list(runner.TRACKER_OUTCOMES) == TRACKER_OUTCOMES)
+      list(runner.RECORDED_OUTCOMES) == TRACKER_OUTCOMES[4:] and list(runner.TRACKER_OUTCOMES) == TRACKER_OUTCOMES)
 for bad in ("merged", "completed", "Landed"):
     edited = copy.deepcopy(catalog)
     edited["contracts"]["complete@1"]["verdict"]["values"][1]["recordsOutcome"] = bad

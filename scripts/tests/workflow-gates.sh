@@ -290,6 +290,7 @@ check("APPROVAL: REQUESTED parks the run: wait, naming the gate and the one read
 check("the step is recorded and reported waiting, with its verdict",
       answer["recorded"]["status"] == "parked" and [(r["status"], r["verdict"]) for r in gate_reports(answer)] == [("waiting", "APPROVAL: REQUESTED")],
       (answer.get("recorded"), gate_reports(answer)))
+check("a parked gate's report says a person is asked", [r.get("waitingOn") for r in gate_reports(answer)] == ["person"], gate_reports(answer))
 check("the gate's id is kept in the run's state file", run.state()["steps"]["approve"]["gate"] == {"id": "gate-1", "since": SINCE})
 first, second = run.call("next", {"item": "I123"})[1], run.call("next", {"item": "I123"})[1]
 check("next while parked is wait, the same both times, and reports nothing new",
@@ -520,6 +521,7 @@ answer = cp.done(asked("cp-1"))
 check("CHECKPOINT: REQUESTED parks the run at a blocking checkpoint, reported waiting",
       answer["action"] == "parked" and answer["gate"]["id"] == "cp-1"
       and [(r["status"], r["verdict"]) for r in checkpoint_reports(answer)] == [("waiting", "CHECKPOINT: REQUESTED")], answer)
+check("a parked checkpoint's report says a person is asked", [r.get("waitingOn") for r in checkpoint_reports(answer)] == ["person"], checkpoint_reports(answer))
 status = cp.call("status", {"item": "I123"})[1]
 check("status names the checkpoint the run waits at", status["parkedAt"] == {"id": "cp-1", "since": SINCE, "stepId": "by-hand"}, status)
 answer = cp.next(gateAnswer=marked(cp, "cp-1", "approve"))

@@ -334,6 +334,34 @@ ADDED = {"recordedOutcome": (None, "landed", "shipped"), "continuedPastFailures"
 # The refusals whose code changed, by walk: the release step skill was missing, and is now not
 # switched on; a gate or a checkpoint was a step 4.8.1 had no contract for, and is now not switched on.
 RENAMED_REFUSALS = {"a gate and a checkpoint handed to start": {"unknown-contract": "skill-dormant"}}
+# A stop that asks a person no longer ends the run: 4.8.1 told the tracker it ended `interrupted`,
+# and the run now stays open so the answer carries it on. Only that ending is set aside, and only on
+# such a stop; the answer must then carry no ending at all.
+def opened_stop(old, new):
+    answer = old.get("answer")
+    if not (isinstance(answer, dict) and answer.get("action") == "stopped" and answer.get("kind") == "needs-person"):
+        return old
+    for batch in (new.get("answer") or {}).get("reports") or []:
+        if "run" in batch:
+            return old
+    old = copy.deepcopy(old)
+    for batch in old["answer"].get("reports") or []:
+        if batch.get("run", {}).get("outcome") == "interrupted":
+            batch.pop("run")
+    return old
+
+
+# A waiting step that asked a person now says so (`waitingOn: "person"`), a key 4.8.1 never sent.
+# It is set aside only on a waiting report; anywhere else it stays and the comparison fails.
+def asked_person(new):
+    new = copy.deepcopy(new)
+    for batch in (new.get("answer") or {}).get("reports") or [] if isinstance(new.get("answer"), dict) else []:
+        for report in batch.get("reports") or []:
+            if report.get("status") == "waiting" and report.get("waitingOn") == "person":
+                report.pop("waitingOn")
+    return new
+
+
 # The recorded walks no longer replayed, each with why: the fixture is never edited.
 RETIRED = {"the release definitions": "the Release workflow is switched on: workflow-release.sh case (140) starts each definition"}
 OLD_ACTIONS = ("run", "stopped", "finished")
@@ -359,6 +387,8 @@ for name in sorted(before):
                     value = new["answer"].pop(key)
                     if value not in allowed:
                         extra.append("%s call %d: %s is %r" % (name, at + 1, key, value))
+        new = asked_person(new)
+        old = opened_stop(old, new)
         if old.get("refused") in RENAMED_REFUSALS.get(name, {}):
             old = dict(old, refused=RENAMED_REFUSALS[name][old["refused"]])
         if old != new:

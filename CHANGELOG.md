@@ -8,6 +8,71 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.13.0] — 2026-11-25
+
+### Changed
+
+- **A run that stops to ask a person something stays open.** When a step asks a question or waits
+  for a yes or no, the run reports its waiting step and is no longer reported as ended, so it stays
+  on the tracker's list of running work, reading as waiting for that person, and carries on as the
+  same run once the answer is given. A run held, replaced or declined still ends as interrupted.
+- **A rebalance dry run ends as "ended early".** A run that stops before its last step by design
+  (a dry-run verdict) is reported with the new outcome `ended-early`, so the tracker shows it as
+  ended by design rather than as an interrupted run with steps never reported.
+- **The tracker names a person only when the run asked one.** A waiting step that asked a question,
+  a confirmation or an approval is reported as waiting for a person; a step waiting on something
+  else, such as a queue or a deploy, is reported with what it waits for instead.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since b63b125f54 @ 4ddffc1f73, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@b63b125f54 | tokens@b63b125f54 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/build-item/SKILL.md | 23,992 | 7,998 | 23,992 | 7,998 | +0 | 8,000 |
+| skills/review/SKILL.md | 23,994 | 7,998 | 23,994 | 7,998 | +0 | 7,999 |
+| skills/doctor/SKILL.md | 23,847 | 7,949 | 23,847 | 7,949 | +0 | 8,000 |
+| skills/rationalize-gantt/SKILL.md | 12,332 | 4,111 | 12,332 | 4,111 | +0 | 4,200 |
+| skills/release/SKILL.md | 11,950 | 3,984 | 11,950 | 3,984 | +0 | 4,000 |
+| skills/pr/SKILL.md | 11,538 | 3,846 | 11,538 | 3,846 | +0 | 3,846 |
+| skills/ultracode-build/SKILL.md | 10,327 | 3,443 | 10,327 | 3,443 | +0 | 3,443 |
+| skills/rebalance/SKILL.md | 8,482 | 2,828 | 8,482 | 2,828 | +0 | 2,828 |
+| skills/plan/SKILL.md | 8,329 | 2,777 | 8,329 | 2,777 | +0 | 2,795 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,730 | 2,244 | 6,730 | 2,244 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 6,073 | 2,025 | 6,073 | 2,025 | +0 | 2,100 |
+| skills/insert-defect/SKILL.md | 5,605 | 1,869 | 5,605 | 1,869 | +0 | 1,869 |
+| skills/insert-story/SKILL.md | 4,928 | 1,643 | 4,928 | 1,643 | +0 | 1,643 |
+| skills/branch-hotfix/SKILL.md | 4,906 | 1,636 | 4,906 | 1,636 | +0 | 1,636 |
+| skills/branch-feature/SKILL.md | 3,707 | 1,236 | 3,707 | 1,236 | +0 | 1,236 |
+| skills/pre-ship/SKILL.md | 3,599 | 1,200 | 3,599 | 1,200 | +0 | 1,200 |
+| skills/risk-check/SKILL.md | 3,598 | 1,200 | 3,598 | 1,200 | +0 | 1,200 |
+| skills/hotfix-steps/SKILL.md | 3,596 | 1,199 | 3,596 | 1,199 | +0 | 1,200 |
+| skills/plan-steps/SKILL.md | 3,578 | 1,193 | 3,578 | 1,193 | +0 | 1,200 |
+| skills/local-checks/SKILL.md | 3,523 | 1,175 | 3,523 | 1,175 | +0 | 1,200 |
+| skills/run-workflow/SKILL.md | 3,354 | 1,118 | 3,354 | 1,118 | +0 | 1,200 |
+| skills/release-steps/SKILL.md | 3,288 | 1,096 | 3,288 | 1,096 | +0 | 1,200 |
+| skills/merge-story/SKILL.md | 3,240 | 1,080 | 3,240 | 1,080 | +0 | 1,081 |
+| skills/review-story/SKILL.md | 3,020 | 1,007 | 3,020 | 1,007 | +0 | 1,007 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/claim-story/SKILL.md | 2,875 | 959 | 2,875 | 959 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/story-lifecycle/SKILL.md | 2,700 | 900 | 2,700 | 900 | +0 | 900 |
+| skills/capture-findings/SKILL.md | 2,696 | 899 | 2,696 | 899 | +0 | 900 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/post-deploy/SKILL.md | 2,095 | 699 | 2,095 | 699 | +0 | 700 |
+| skills/local-environment/SKILL.md | 2,083 | 695 | 2,083 | 695 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/pre-merge-check/SKILL.md | 1,589 | 530 | 1,589 | 530 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/sync-base/SKILL.md | 1,471 | 491 | 1,471 | 491 | +0 | 500 |
+| skills/classify-release/SKILL.md | 1,423 | 475 | 1,423 | 475 | +0 | 500 |
+| alwaysOn.context (skill listing) | 6,573 | 2,191 | 6,573 | 2,191 | +0 | 2,200 |
+| **total (bodies)** | 276,470 | 92,173 | 276,470 | 92,173 | +0 | |
+
 ## [4.12.0] — 2026-11-24
 
 ### Changed
@@ -7316,7 +7381,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.12.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.13.0...HEAD
+[4.13.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.12.0...devstride--v4.13.0
 [4.12.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.11.0...devstride--v4.12.0
 [4.11.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.10.0...devstride--v4.11.0
 [4.10.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.9.0...devstride--v4.10.0

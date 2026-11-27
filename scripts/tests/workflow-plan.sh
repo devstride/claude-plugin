@@ -354,11 +354,14 @@ run = Run(reb)
 end = walk(run)
 check("a clean rebalance issues the thirteen steps in the pinned order and finishes",
       (run.issued, end.get("outcome")) == ([s for _, ids in REBALANCE_PHASES for s in ids], "completed"), (run.issued, end))
-for step_id, verdict, outcome in (("propose", "REBALANCE PROPOSAL: DRY RUN", "dry-run"), ("propose", "REBALANCE PROPOSAL: DECLINED", "declined")):
+for step_id, verdict, outcome, told in (("propose", "REBALANCE PROPOSAL: DRY RUN", "dry-run", "ended-early"),
+                                       ("propose", "REBALANCE PROPOSAL: DECLINED", "declined", "interrupted")):
     run = Run(reb)
     end = walk(run, {step_id: [verdict]})
     check("%s ends %s and no write step is issued" % (verdict, outcome), end.get("outcome") == outcome
           and not set(run.issued) & set(order), (end, run.issued))
+    ends = [call["run"]["outcome"] for call in end.get("reports", []) if "run" in call]
+    check("%s is reported to the tracker as %s" % (verdict, told), ends == [told], end.get("reports"))
 for step_id, verdict in (("gates", "REBALANCE GATES: BUILD LOOP ACTIVE I105"), ("scheduler-probe", "SCHEDULER PROBE: OVERWRITTEN")):
     run = Run(reb)
     end = walk(run, {step_id: [verdict]})

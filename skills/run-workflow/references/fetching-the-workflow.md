@@ -34,8 +34,8 @@ steps 1 to 4 and start with the built-in definition alone.
    never for "no workflow" and never for an unavailable server, which stay silent.
 
 The runner checks what came back and decides; the entry skill never judges the answer itself.
-An answer's `runOutcomes`, where the tracker sends one, lists the run endings it accepts; only those
-are ever reported (`workflow-runner.md`, Reporting).
+An answer's `runOutcomes`, where the tracker sends one, lists the run endings it accepts; a recorded
+ending is reported only when listed (`workflow-runner.md`, Reporting).
 It pins the definition it chose for the whole run: `next`, `done`, `status` and `resume` read only
 that copy, and a second `start` for a run under way keeps it, so a workflow published or archived
 meanwhile changes only the next run. `status` names the workflow (`workflow`) and where it came

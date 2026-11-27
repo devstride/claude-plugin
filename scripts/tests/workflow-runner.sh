@@ -326,6 +326,11 @@ def closes(answer, outcome):
     return bool(calls) and calls[-1].get("run", {}).get("outcome") == outcome
 
 
+def ends_run(answer):
+    """Whether any report in the answer ends the run."""
+    return any("run" in call for call in answer.get("reports", []))
+
+
 # --- sections ---------------------------------------------------------------------------------
 
 def section_catalog():
@@ -694,16 +699,35 @@ def section_lifecycle():
     run.until("build")
     answer = run.done("BUILD: NEEDS DECISION keep the old export format?\nthe spec does not say\n")
     report = run.step_reports([answer])[-1]
-    check("NEEDS DECISION stops the run for a person, with a waiting report",
+    check("NEEDS DECISION stops the run for a person, with a waiting report, and leaves the run open",
           is_stopped(answer, "needs-person", "build") and answer["reason"] == "keep the old export format?" and report["status"] == "waiting"
-          and closes(answer, "interrupted") and answer["recorded"]["status"] == "waiting", answer)
+          and not ends_run(answer) and answer["recorded"]["status"] == "waiting", answer)
+    check("a question's waiting report says a person is asked", report.get("waitingOn") == "person", report)
     check("a stopped run stays stopped until it is resumed", is_stopped(run.next(), "needs-person") and run.answer["reports"] == [])
     rc, answer, _, _ = run.call("resume", {"item": "I123", "answer": "yes, keep it"})
-    check("resume with an answer re-issues the step with the answer in its payload", is_run(answer, "build", 2) and answer["payload"]["answer"] == "yes, keep it", answer)
+    check("resume with an answer re-issues the step with the answer in its payload, and ends nothing",
+          is_run(answer, "build", 2) and answer["payload"]["answer"] == "yes, keep it" and not ends_run(answer), answer)
     check("the answer is still there when the step is asked for again", run.next()["payload"]["answer"] == "yes, keep it" and is_run(run.answer, "build", 2))
     answer = run.done()
     check("the answer is handed out for that attempt only", is_run(answer, "risk-check", 1) and run.state()["steps"]["build"]["answer"] is None, answer)
     check("an answer that is not text is refused", refused(run.call("resume", {"item": "I123", "answer": 7}), "bad-request"))
+
+    # A run waiting for a person whose reports did not arrive is replayed open, never ended.
+    run = Driver()
+    run.until("build")
+    run.done("BUILD: NEEDS DECISION keep the old export format?\n")
+    run.call("reported", {"item": "I123", "ok": False})
+    unsent = run.call("unsent", {"cwd": run.cwd}, session="another-session")[1]
+    replayed = [call for listed in unsent["runs"] for call in listed["reports"]]
+    # Resuming from another folder of the same checkout finds the run: its own session by the
+    # session, another session by the run's recorded repository, never by the current folder.
+    deeper = os.path.join(run.cwd, "docs", "inner")
+    os.makedirs(deeper)
+    rc, mine, _, err = cli(run.root, "resume", {"item": "I123", "workflow": "build", "answer": "yes", "cwd": deeper}, run.cache, cwd=deeper)
+    check("resume from a folder deeper in the same checkout finds this session's run", rc == 0 and is_run(mine, "build", 2), (rc, err))
+    check("a replayed run waiting for a person says its waiting step and does not end the run",
+          len(unsent["runs"]) == 1 and replayed and not any("run" in call for call in replayed)
+          and [r["status"] for call in replayed for r in call["reports"] if r["stepId"] == "build"][-1] == "waiting", unsent)
 
     # FAIL and BLOCKED stop
     run = Driver()
@@ -1463,6 +1487,11 @@ def section_records():
     check("a run whose definition the tracker does not hold cannot be judged",
           judge({"runs": [{"state": "ended", "workflow": {"hash": "x"}, "reports": []}], "definitions": {}})["verdict"] == "unknown")
     check("a run still going with every step done is complete", judge(tracked(done, "open"))["verdict"] == "complete")
+    early = lambda statuses: dict(tracked(statuses), runs=[dict(tracked(statuses)["runs"][0], outcome="ended-early")])
+    check("a run that ended early by design (a dry run) is complete without its later steps, as the tracker says",
+          judge(early(done[:4]))["verdict"] == "complete")
+    check("a run that ended early still names a step that failed or never finished",
+          judge(early(done[:3] + [("risk-check", 1, "running")]))["gaps"] == [{"stepId": "risk-check", "reason": "unfinished"}])
     odd = run.call("judge", {"item": "I123", "answer": {"runs": [{"workflow": {"hash": ["x"]}, "reports": 3}], "definitions": {}}})
     worse = run.call("judge", {"item": "I123", "answer": {"runs": [{"workflow": {"hash": "h"}, "reports": [7]}], "definitions": {"h": {"phases": [{"name": "p", "steps": [3]}]}}}})
     check("an answer that is not the tracker's never crashes the runner",
@@ -1614,7 +1643,7 @@ def section_additions():
     check("a confirm verdict stops the run waiting for the person, and says the stop is a confirmation",
           is_stopped(answer, "needs-person", "check") and answer.get("confirm") is True and answer["reason"] == "CHECK: NOT RUN"
           and answer["recorded"] == {"stepId": "check", "attempt": 1, "verdict": "CHECK: NOT RUN", "class": "confirm", "status": "waiting"}
-          and reports_of(answer)[-1]["status"] == "waiting" and closes(answer, "interrupted"), answer)
+          and reports_of(answer)[-1]["status"] == "waiting" and not ends_run(answer), answer)
     before = open(os.path.join(cache, "devstride-plugin", "workflows", "s1.I123.json")).read()
     for words in ("maybe later", "yesterday it ran", "", "nothing to add"):
         check("an answer of %r is neither yes nor no: refused, nothing changed" % words,
@@ -1700,7 +1729,8 @@ def section_additions():
     rc, answer, _, _ = cli(root, "done", {"runId": a, "stepId": "check", "attempt": 1, "output": "CHECK: CLEAR\n"}, cache)
     check("the first run is driven by its run id", is_run(answer, "after", 1) and answer["runId"] == a, answer)
     rc, answer, _, _ = cli(root, "done", {"runId": b, "stepId": "check", "attempt": 1, "output": "CHECK: NOT RUN\n"}, cache)
-    check("... then the second, which stops for its person", is_stopped(answer, "needs-person", "check") and answer["runId"] == b, answer)
+    check("... then the second, which stops for its person and stays open", is_stopped(answer, "needs-person", "check") and answer["runId"] == b
+          and not ends_run(answer), answer)
     rc, status, _, _ = cli(root, "status", {"runId": a}, cache)
     check("status takes a run id", rc == 0 and status["runId"] == a and status["position"]["stepId"] == "after", status)
     rc, listed, _, _ = cli(root, "status", {"all": True}, cache)
@@ -1826,6 +1856,8 @@ def section_additions():
           and [(r["stepId"], r["attempt"], r["status"], r["verdict"]) for r in run.step_reports([answer])] == [("claim", 1, "waiting", reason)]
           and "endedAt" not in run.step_reports([answer])[0] and "run" not in answer["reports"][-1], answer)
     status = run.call("status", {"item": "I123"})[1]
+    check("a step waiting inside itself never says a person is asked: its verdict names what it waits for",
+          all("waitingOn" not in r for r in run.step_reports([answer])), answer)
     check("status shows the step waiting while the run is still running",
           status["state"] == "running" and status["rows"][0]["status"] == "waiting" and run.state()["current"] == {"stepId": "claim", "attempt": 1}, status)
     check("the list of runs carries what it waits for", run.call("status", {"all": True})[1]["runs"][0]["waiting"] == reason)
@@ -1899,7 +1931,7 @@ def section_outcomes():
         else:
             check("rollup start: %s -> %s" % (case["name"], case["expect"]), refused(run.result, case["expect"])
                   and case.get("message", "") in run.result[3] and not os.listdir(run.cache), run.result[3])
-    wanted = sorted(["completed", "failed", "interrupted", "landed", "handed-up", "shipped"])
+    wanted = sorted(["completed", "failed", "interrupted", "landed", "handed-up", "shipped", "ended-early"])
     check("the runner's tracker outcomes are the literal list", sorted(module.TRACKER_OUTCOMES) == wanted
           and sorted(module.REPORT.RUN_OUTCOMES) == wanted and module.RECORDED_OUTCOMES == ("landed", "handed-up", "shipped"))
     for case in FIX["outcomes"]["ends"]:

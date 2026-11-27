@@ -133,8 +133,8 @@ Two different things, with two names; neither is a stop.
 | Where it is | `position` is the issued step; `status` with `all` gives the reason as `waiting` | `position` is the gate; `parkedAt` names it (`stepId`, `id`, `since`), in `status` and in `status` with `all` |
 | How it ends | The step's `done` | `next` with the `gateAnswer` (`gates.md`) |
 
-The tracker has one word for both, so each is reported to it as `waiting`. A step that asked a
-question (`ask`, `confirm`) is a stop, not either of these: its row says `waiting` and the run's
+Both reach the tracker as `waiting`, a parked one with `waitingOn: person`. A step that asked a
+question (`ask`, `confirm`) is a stop, not either of these: its row says `waiting` (that mark too) and the run's
 `state` is `stopped`. `wait` on a gate or a checkpoint is refused (`wait-not-a-step`), and a `next`
 with a `gateAnswer` for a run that is not parked is refused (`not-parked`).
 
@@ -203,10 +203,11 @@ a running report when a step is issued, a finished one when it ends, at most fou
 definition in a run's first object (and again after an adoption), the run's end in its last. A run
 that finishes is reported `completed`, or as the `recordsOutcome` (`landed`, `handed-up` or
 `shipped`) of its latest finished step whose verdict carries one (`COMPLETE: LANDED` → `landed`,
-`DONE` → `shipped`), when the workflow answer's `runOutcomes` lists it; one held, replaced,
-declined (a no at a `confirm` stop) or waiting for a person `interrupted`, never `landed` or
-`shipped` whatever a step recorded; any other stop `failed`. A tracker that lists no `runOutcomes`
-is only ever told `completed`, `failed` or `interrupted`. A step repaired by hand (`done` on the step a run stopped on) is reported
+`DONE` → `shipped`), when the workflow answer's `runOutcomes` lists it; a dry run (`end:dry-run`)
+`ended-early`; one held, replaced or declined (a no at a `confirm` stop) `interrupted`, never
+`landed` or `shipped`; any other stop `failed`. A `needs-person` stop ends nothing: the run stays
+open and `resume` carries it on. A tracker listing no `runOutcomes` is never told `landed`,
+`handed-up` or `shipped`. A step repaired by hand (`done` on the step a run stopped on) is reported
 as a later attempt, because the tracker never changes an attempt it holds as finished. **The runner
 never sends them.**
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` is the authority for

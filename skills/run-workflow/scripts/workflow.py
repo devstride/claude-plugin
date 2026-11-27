@@ -178,21 +178,24 @@ RUN_OUTCOME = {
     "completed": "completed",
     "held": "interrupted",
     "interrupted": "interrupted",
-    "needs-person": "interrupted",
+    "dry-run": "ended-early",  # the end:dry-run verdict: a run that stops before its last step by design
     "failed": "failed",
     "no-verdict": "failed",
     "proof": "failed",
     "attempts-exhausted": "failed",
     CONFIRM_DECLINED: "interrupted",  # a person said no at a confirm verdict; never completed, landed or shipped
 }
-# What the tracker accepts as a run's end: the three above, and the three a step may record
+# What the tracker accepts as a run's end: the four above, and the three a step may record
 # (`recordsOutcome` on a verdict value of the catalog). A run that finishes normally is reported as
 # the outcome its latest recording step named, and only to a tracker whose workflow answer lists
 # that outcome (`runOutcomes`); to any other it is reported `completed`, as before.
+# A run stopped to ask a person something (`needs-person`) is not ended: it is told its waiting step
+# and stays open, so it goes on as the same run once the person answers.
+OPEN_STOPS = ("needs-person",)
 # A step asked of a person in the tracker and not answered yet: parked (the run waits for it) or
 # open (a checkpoint the run went on without). The tracker is told `waiting` for both.
 PARKED_STATUSES = ("parked", "open")
-TRACKER_OUTCOMES = ("completed", "failed", "interrupted", "landed", "handed-up", "shipped")
+TRACKER_OUTCOMES = ("completed", "failed", "interrupted", "ended-early", "landed", "handed-up", "shipped")
 RECORDED_OUTCOMES = ("landed", "handed-up", "shipped")
 
 # What looks like a credential: shapes, not words. An evidence line that matches is dropped whole,
@@ -2239,17 +2242,21 @@ class Run:
         status = "waiting" if waiting else "running" if record["status"] == "issued" else record["status"]
         if status in PARKED_STATUSES:
             status = "waiting"  # the tracker's one word for a step that waits, whatever it waits for
+        # Asked of a person (a question, a confirmation, a gate or checkpoint), unless the step waits
+        # inside itself (`wait`), which names what it waits for in its verdict.
+        on_person = status == "waiting" and not waiting
         # A step repaired by hand is reported as a later attempt: the tracker never changes an
         # attempt it holds as finished, so the repair would otherwise stay recorded as the failure.
         attempt = min(max(record["attempt"], 1) + record.get("repairs", 0), REPORT.MAX_ATTEMPT)
         self.events.append({"step": step["id"], "attempt": attempt, "status": status,
                             "verdict": waiting or record["verdict"], "evidence": record["evidence"], "links": record["links"],
-                            "startedAt": record["startedAt"], "endedAt": record["endedAt"], "ran": record["ran"]})
+                            "startedAt": record["startedAt"], "endedAt": record["endedAt"], "ran": record["ran"],
+                            **({"waitingOn": "person"} if on_person else {})})
 
     def stop(self, kind, reason, index):
         self.state["current"] = None
         self.state["stopped"] = {"kind": kind, "reason": REPORT.clean_verdict(reason) or kind, "stepId": self.steps[index]["id"]}
-        self.closing = {"outcome": RUN_OUTCOME[kind], "endedAt": self.world.now()}
+        self.closing = None if kind in OPEN_STOPS else {"outcome": RUN_OUTCOME[kind], "endedAt": self.world.now()}
         return self.stopped_answer()
 
     def stopped_answer(self):
@@ -3093,7 +3100,7 @@ def replay_reports(state, contracts, world):
             run.report(index)
     run.resend_definition = True
     ended = state["outcome"] or (state["stopped"] or {}).get("kind")
-    if ended:
+    if ended and not (not state["outcome"] and ended in OPEN_STOPS):
         run.closing = {"outcome": tracker_outcome(state, ended), "endedAt": state.get("endedAt") or world.now()}
     return run.reports()
 
@@ -3172,9 +3179,12 @@ def command_unsent(world, request, contracts):
 
 def judge_run(run, definition):
     """Whether a recorded run did every step its workflow requires: (verdict, gaps). A step is
-    required when it always runs and is not switched off; done or skipped satisfies it."""
+    required when it always runs and is not switched off; done or skipped satisfies it. A run that
+    ended early by design (a dry run) never reached its later steps on purpose: a step it never
+    reported is no gap there, while a failed or unfinished one still is."""
     if not isinstance(definition, dict):
         return "unknown", []
+    ended_early = run.get("outcome") == "ended-early"
     newest = {}
     listed = run.get("reports") or run.get("steps") or []
     for report in listed if isinstance(listed, list) else []:
@@ -3194,7 +3204,7 @@ def judge_run(run, definition):
             continue
         status = newest.get(step["id"], (0, None))[1]
         if status is None:
-            if dig(step, ["when", "mode"]) == "always":
+            if dig(step, ["when", "mode"]) == "always" and not ended_early:
                 gaps.append({"stepId": step["id"], "reason": "missing"})
         elif status == "failed":
             if step.get("onFail") == "stop":
